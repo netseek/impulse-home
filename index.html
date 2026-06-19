@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0b1016">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 112">
+    <rect width="160" height="112" fill="#0b1016"/>
+    <ellipse cx="80" cy="72" rx="54" ry="8" fill="#1a2030" opacity="0.7"/>
+    <path d="M32 68 Q36 56 52 52 Q62 46 80 44 Q98 46 108 52 Q124 56 128 68 Z" fill="#2a3a50"/>
+    <path d="M44 68 Q50 58 62 54 Q72 50 80 50 Q88 50 98 54 Q110 58 116 68 Z" fill="#4fd6e8" opacity="0.7"/>
+    <rect x="40" y="66" width="80" height="10" rx="2" fill="#1e3a5a"/>
+    <circle cx="54" cy="72" r="8" fill="#111" stroke="#4fd6e8" stroke-width="1.5"/>
+    <circle cx="106" cy="72" r="8" fill="#111" stroke="#4fd6e8" stroke-width="1.5"/>
+    <circle cx="54" cy="72" r="3" fill="#4fd6e8"/>
+    <circle cx="106" cy="72" r="3" fill="#4fd6e8"/>
+    <text x="80" y="28" text-anchor="middle" font-family="monospace" font-size="9" fill="#4fd6e8" opacity="0.8">HAVAL H6</text>
+    <text x="80" y="40" text-anchor="middle" font-family="monospace" font-size="7" fill="#ffffff" opacity="0.4">3D VIEWER</text>
+  </svg>
+</template>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
+  <meta name="ext-resource-dependency" content="uploads/haval-h6-v3.glb" data-resource-id="glbModel">
+  <meta name="ext-resource-dependency" content="uploads/st_peters_square_night_2k.hdr" data-resource-id="stPetersHdr">
+  <script src="https://unpkg.com/three@0.137.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/DRACOLoader.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/objects/Sky.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/RGBELoader.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/environments/RoomEnvironment.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/shaders/HorizontalBlurShader.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/shaders/VerticalBlurShader.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0b1016; overflow: hidden; }
+    * { box-sizing: border-box; }
+    @keyframes vp-spin { to { transform: rotate(360deg); } }
+    @keyframes vp-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  </style>
+</helmet>
+<div style="position: fixed; inset: 0; background: radial-gradient(130% 120% at 50% 38%, #efefef 0%, #dcdee0 78%, #cfd1d4 100%); font-family: 'Space Grotesk', system-ui, sans-serif;">
+
+  <div ref="{{ containerRef }}" style="position: absolute; inset: 0;"></div>
+
+  <!-- top-left model label -->
+  <div style="position: absolute; top: 26px; left: 30px; color: #2b3037; pointer-events: none; user-select: none;">
+    <div style="font-size: 11px; letter-spacing: .42em; font-weight: 600; opacity: .55;">HAVAL</div>
+    <div style="font-size: 30px; font-weight: 600; letter-spacing: .04em; line-height: 1.05; margin-top: 2px;">H6</div>
+    <div style="font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .18em; opacity: .45; margin-top: 6px;">REV 1.10 · GLB</div>
+  </div>
+
+  <!-- bottom hint -->
+  <div style="position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #6a7077; pointer-events: none; user-select: none; transition: opacity .6s ease; opacity: {{ hintOpacity }};">
+    DRAG TO ORBIT &nbsp;·&nbsp; SCROLL TO ZOOM &nbsp;·&nbsp; RIGHT-DRAG TO PAN
+  </div>
+
+  <!-- cyan accent corner ticks -->
+  <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
+
+  <!-- configure panel -->
+  <div style="position: absolute; top: 22px; right: 26px; width: 214px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 16px 16px 18px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelDisplay }};">
+    <div style="font-size: 10px; letter-spacing: .3em; opacity: .55; font-weight: 600; margin-bottom: 16px;">CONFIGURE</div>
+
+    <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 10px;">PAINT</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 20px;">
+      <sc-for list="{{ swatches }}" as="sw" hint-placeholder-count="7">
+        <button onClick="{{ sw.onClick }}" title="{{ sw.title }}" style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; background: {{ sw.hex }}; border: 2px solid {{ sw.ring }}; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: border-color .15s ease, transform .15s ease;"></button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
+      <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">LIGHT</span>
+      <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ lightLabel }}</span>
+    </div>
+    <input type="range" min="0" max="6" step="0.1" value="{{ lightIntensity }}" onChange="{{ onLight }}" onInput="{{ onLight }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 20px;" />
+
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
+      <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">EXPOSURE</span>
+      <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ exposureLabel }}</span>
+    </div>
+    <input type="range" min="0.3" max="1.8" step="0.02" value="{{ exposure }}" onChange="{{ onExposure }}" onInput="{{ onExposure }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 20px;" />
+
+    <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">ENVIRONMENT</div>
+    <select value="{{ hdriKey }}" onChange="{{ onHdri }}" style="width: 100%; background: rgba(255,255,255,.06); color: #eaf2f8; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; padding: 7px 9px; font-family: 'Space Grotesk', sans-serif; font-size: 12px; outline: none; cursor: pointer;">
+      <option value="st_peters" style="color:#111;">St. Peter's Square Night</option>
+      <option value="studio" style="color:#111;">Studio (neutral)</option>
+      <option value="venice" style="color:#111;">Venice Sunset</option>
+      <option value="quarry" style="color:#111;">Quarry</option>
+      <option value="overpass" style="color:#111;">Pedestrian Overpass</option>
+      <option value="studio_small" style="color:#111;">Studio Small</option>
+      <option value="studio_loft" style="color:#111;">Studio Loft</option>
+      <option value="custom" style="color:#111;" disabled="{{ customDisabled }}">{{ customLabel }}</option>
+    </select>
+    <label style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 9px; padding: 7px 9px; border: 1px dashed rgba(79,214,232,.4); border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .12em; color: #9fe6f0; cursor: pointer;">
+      UPLOAD .HDR
+      <input type="file" accept=".hdr,image/vnd.radiance" onChange="{{ onUploadHdri }}" style="display: none;" />
+    </label>
+  </div>
+
+  <!-- loader -->
+  <div style="position: absolute; inset: 0; display: {{ loaderDisplay }}; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(120% 120% at 50% 40%, rgba(11,16,22,.35), rgba(11,16,22,.78)); backdrop-filter: blur(2px); gap: 18px;">
+    <div style="width: 34px; height: 34px; border: 2.5px solid rgba(255,255,255,.18); border-top-color: #4fd6e8; border-radius: 50%; animation: vp-spin .9s linear infinite;"></div>
+    <div style="text-align: center; color: #eaf2f8;">
+      <div style="font-size: 13px; letter-spacing: .26em; font-weight: 500; animation: vp-pulse 1.6s ease-in-out infinite;">LOADING MODEL</div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .12em; opacity: .65; margin-top: 8px;">{{ progressText }}</div>
+    </div>
+    <div style="width: 190px; height: 2px; background: rgba(255,255,255,.14); border-radius: 2px; overflow: hidden;">
+      <div style="height: 100%; width: {{ progressWidth }}; background: linear-gradient(90deg, #4fd6e8, #7ce8f5); border-radius: 2px; transition: width .25s ease;"></div>
+    </div>
+  </div>
+
+  <!-- error -->
+  <div style="position: absolute; inset: 0; display: {{ errorDisplay }}; flex-direction: column; align-items: center; justify-content: center; background: rgba(11,16,22,.85); gap: 10px; padding: 32px; text-align: center;">
+    <div style="font-size: 13px; letter-spacing: .22em; color: #4fd6e8; font-weight: 600;">COULD NOT LOAD MODEL</div>
+    <div style="font-family: 'Space Mono', monospace; font-size: 12px; color: #b7c3cd; max-width: 460px; line-height: 1.6;">{{ errorMsg }}</div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 0.66, hdriKey: 'st_peters', origHex: null, customHdriName: null };
+
+  constructor(props) {
+    super(props);
+    this.containerRef = React.createRef();
+  }
+
+  renderVals() {
+    const s = this.state;
+    const palette = [
+      { key: '#F4F5F7', hex: '#F4F5F7', title: 'Branco Ágata' },
+      { key: '#121214', hex: '#121214', title: 'Preto Hematita' },
+      { key: '#757B85', hex: '#757B85', title: 'Cinza Diamante' },
+      { key: '#8A9BB8', hex: '#8A9BB8', title: 'Cinza Amazonita' },
+      { key: '#1B365D', hex: '#1B365D', title: 'Azul Topázio' },
+      { key: '#4A3C31', hex: '#4A3C31', title: 'Marrom Citrino' },
+      { key: '#8B0000', hex: '#8B0000', title: 'Vermelho Granada' },
+    ];
+    const activeKey = s.carColor === null ? '#F4F5F7' : s.carColor;
+    const swatches = palette.map((p) => ({
+      hex: p.hex,
+      title: p.title,
+      ring: p.key === activeKey ? '#4fd6e8' : 'rgba(255,255,255,.22)',
+      onClick: () => this.setColor(p.key),
+    }));
+    return {
+      containerRef: this.containerRef,
+      loaderDisplay: s.loading && !s.error ? 'flex' : 'none',
+      errorDisplay: s.error ? 'flex' : 'none',
+      errorMsg: s.error || '',
+      progressText: Math.round(s.progress) + '%',
+      progressWidth: s.progress + '%',
+      hintOpacity: s.loading ? '0' : '0.85',
+      panelDisplay: s.loading || s.error ? 'none' : 'block',
+      swatches,
+      lightIntensity: s.lightIntensity,
+      lightLabel: s.lightIntensity.toFixed(1),
+      exposure: s.exposure,
+      exposureLabel: s.exposure.toFixed(2),
+      hdriKey: s.hdriKey,
+      customDisabled: s.customHdriName ? undefined : true,
+      customLabel: s.customHdriName || 'Custom…',
+      onLight: (e) => this.onLight(e),
+      onExposure: (e) => this.onExposure(e),
+      onHdri: (e) => this.onHdri(e),
+      onUploadHdri: (e) => this.onUploadHdri(e),
+    };
+  }
+
+  setColor(key) {
+    if (key === 'stock') { this.setState({ carColor: null }); this.applyCarColor(null); }
+    else { this.setState({ carColor: key }); this.applyCarColor(key); }
+  }
+
+  // Darken a hex colour by factor (0.5 = 50% darker), except white which is kept.
+  darkenHex(hex, factor) {
+    if (!hex || hex.toUpperCase() === '#F4F5F7') return hex;
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    const f = 1 - factor;
+    return '#' + [r,g,b].map(v=>Math.round(v*f).toString(16).padStart(2,'0')).join('');
+  }
+
+  // Darken a hex colour by factor (0–1), except white #F4F5F7 which is kept.
+  // Low-saturation colors (grays) get gentler darkening so they stay as mid-tones.
+  darkenHex(hex, factor) {
+    if (!hex || hex.toUpperCase() === '#F4F5F7') return hex;
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    const sat = max > 0 ? (max - min) / max : 0;
+    // Grays and blue-grays (saturation < 0.30) get max 15% darkening to preserve mid-tone character
+    const f = 1 - (sat < 0.30 ? Math.min(factor, 0.15) : Math.min(factor, 0.35));
+    return '#' + [r,g,b].map(v => Math.round(v*f).toString(16).padStart(2,'0')).join('');
+  }
+
+  applyCarColor(hex) {
+    if (!this.bodyMats) return;
+    // Apply a 50%-darkened version of the swatch color to the car body so the
+    // palette swatches show true catalog colors while the car reads richly deep.
+    const applied = hex ? this.darkenHex(hex, 0.72) : null;
+    this.bodyMats.forEach((m) => {
+      if (applied) m.color.set(applied);
+      else if (this._paintOrig && this._paintOrig.has(m)) m.color.copy(this._paintOrig.get(m));
+      m.needsUpdate = true;
+    });
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+  }
+
+  // High-contrast studio: dark surround + bright HDR softbox panels. PMREM turns
+  // this into an environment map that reflects as crisp bright streaks on paint
+  // and glass, while the dark areas keep colors rich.
+  makeStudioEnv() {
+    const THREE = this.THREE;
+    const env = new THREE.Scene();
+    env.background = new THREE.Color(0x16171b);
+    const panel = (value, w, h, pos, look) => {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      mat.color.setScalar(value);   // values > 1 => HDR softbox
+      mat.toneMapped = false;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+      m.position.set(pos[0], pos[1], pos[2]);
+      m.lookAt(look[0], look[1], look[2]);
+      env.add(m);
+    };
+    // Large overhead strip (key) reflects as a long bright streak + side fills
+    panel(5.0, 5, 15, [0, 11, 0], [0, 0, 0]);
+    panel(3.2, 3.5, 11, [-9, 6, 7], [0, 2, 0]);
+    panel(2.6, 3, 12, [10, 5, -3], [0, 2, 0]);
+    panel(2.0, 4, 9, [5, 5, -11], [0, 2, 0]);
+    panel(0.5, 26, 26, [0, -7, 0], [0, 0, 0]);
+    return env;
+  }
+
+  // Soft elliptical contact shadow rendered as a textured plane under the car.
+  _ellipse(ctx, x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); }
+
+  // Procedural metallic-flake normal map. Tiny random sub-pixel normals that,
+  // tiled densely under the clearcoat, read as fine metallic sparkle.
+  makeFlakeNormal() {
+    const THREE = this.THREE;
+    if (this._flakeTex) return this._flakeTex;
+    const S = 256;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d');
+    const img = ctx.createImageData(S, S);
+    for (let i = 0; i < S * S; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.pow(Math.random(), 1.5) * 0.85;  // mostly flat, occasional steep flake
+      img.data[i * 4]     = 128 + Math.cos(a) * r * 127;
+      img.data[i * 4 + 1] = 128 + Math.sin(a) * r * 127;
+      img.data[i * 4 + 2] = 255;
+      img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(48, 48);
+    this._flakeTex = t;
+    return t;
+  }
+
+  // Realistic baked contact shadow: a soft underbody pool PLUS four tighter,
+  // darker wheel contacts (a single blurry ellipse reads as fake & "missing"
+  // under the wheels — real car shadows are darkest right at the tyre contact).
+  // ShadowMaterial-based shadow catcher: a thin plane at car base that is
+  // invisible except where the directional light's shadow falls — no depth-pass
+  // artifacts from glass or complex underbody geometry.
+  addShadowCatcher(center, size, baseY) {
+    const THREE = this.THREE;
+    const w = size.x * 1.6, h = size.z * 2.2;
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.ShadowMaterial({ opacity: 0.82, depthWrite: false })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(center.x, baseY + 0.008, center.z);
+    plane.receiveShadow = true;
+    plane.renderOrder = 2;
+    this.scene.add(plane);
+    this.shadowCatcher = plane;
+  }
+  // car from directly below with a depth material into a render target, blur it
+  // horizontally + vertically, and show it on a ground plane. The result follows
+  // the actual car silhouette with a soft penumbra — like the reference render.
+  setupContactShadow(center, size, baseY) {
+    const THREE = this.THREE;
+    const renderer = this.renderer;
+    const W = size.x * 1.35, H = size.z * 1.5;   // plane footprint
+    const CAM_H = size.y * 0.42;                  // only lower body → light contact shadow
+    const RES = 1024;
+    const darkness = 1.15;
+    const blurAmount = 2.6;
+
+    const group = new THREE.Group();
+    group.position.set(center.x, baseY + 0.004, center.z);
+    this.scene.add(group);
+
+    const rt = new THREE.WebGLRenderTarget(RES, RES);
+    rt.texture.generateMipmaps = false;
+    const rtBlur = new THREE.WebGLRenderTarget(RES, RES);
+    rtBlur.texture.generateMipmaps = false;
+
+    const planeGeo = new THREE.PlaneGeometry(W, H).rotateX(Math.PI / 2);
+    const plane = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({
+      map: rt.texture, transparent: true, opacity: 1, depthWrite: false, toneMapped: false,
+    }));
+    plane.renderOrder = 2;
+    plane.scale.y = -1;   // texture Y is flipped
+    group.add(plane);
+
+    const blurPlane = new THREE.Mesh(planeGeo);
+    blurPlane.visible = false;
+    group.add(blurPlane);
+
+    const shadowCam = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 0, CAM_H);
+    shadowCam.rotation.x = Math.PI / 2;   // look straight up from the ground
+    group.add(shadowCam);
+
+    // MeshDepthMaterial tweaked to go black→transparent with distance from ground
+    const depthMat = new THREE.MeshDepthMaterial();
+    depthMat.userData.darkness = { value: darkness };
+    depthMat.onBeforeCompile = (shader) => {
+      shader.uniforms.darkness = depthMat.userData.darkness;
+      shader.fragmentShader = 'uniform float darkness;\n' + shader.fragmentShader.replace(
+        'gl_FragColor = vec4( vec3( 1.0 - fragCoordZ ), opacity );',
+        'gl_FragColor = vec4( vec3( 0.0 ), ( 1.0 - fragCoordZ ) * darkness );'
+      );
+    };
+    depthMat.depthTest = false;
+    depthMat.depthWrite = false;
+    // Double-sided so the shadow camera (looking up from below) still captures
+    // underbody panels whose normals face away from it — otherwise backface
+    // culling leaves a "light through the middle" gap in the shadow.
+    depthMat.side = THREE.DoubleSide;
+
+    const hBlur = new THREE.ShaderMaterial(THREE.HorizontalBlurShader);
+    hBlur.depthTest = false;
+    const vBlur = new THREE.ShaderMaterial(THREE.VerticalBlurShader);
+    vBlur.depthTest = false;
+
+    const blur = (amount) => {
+      blurPlane.visible = true;
+      blurPlane.material = hBlur;
+      hBlur.uniforms.tDiffuse.value = rt.texture;
+      hBlur.uniforms.h.value = (amount * 1) / RES;
+      renderer.setRenderTarget(rtBlur);
+      renderer.render(blurPlane, shadowCam);
+      blurPlane.material = vBlur;
+      vBlur.uniforms.tDiffuse.value = rtBlur.texture;
+      vBlur.uniforms.v.value = (amount * 1) / RES;
+      renderer.setRenderTarget(rt);
+      renderer.render(blurPlane, shadowCam);
+      blurPlane.visible = false;
+    };
+
+    // Render the shadow once (car + shadow are static)
+    this.renderContactShadow = () => {
+      const scene = this.scene;
+      const prevBg = scene.background;
+      const prevClear = renderer.getClearAlpha();
+      // Exclude the ground floor and the shadow plane itself from the depth pass —
+      // otherwise the big floor fills the frame as a solid black rectangle.
+      const floorWasVisible = this.floorMesh ? this.floorMesh.visible : null;
+      if (this.floorMesh) this.floorMesh.visible = false;
+      plane.visible = false;
+      scene.background = null;
+      scene.overrideMaterial = depthMat;
+      renderer.setClearAlpha(0);
+      renderer.setRenderTarget(rt);
+      renderer.clear();
+      renderer.render(scene, shadowCam);
+      scene.overrideMaterial = null;
+      blur(blurAmount);
+      blur(blurAmount * 0.4);
+      renderer.setRenderTarget(null);
+      renderer.setClearAlpha(prevClear);
+      scene.background = prevBg;
+      plane.visible = true;
+      if (this.floorMesh) this.floorMesh.visible = floorWasVisible;
+    };
+    this.renderContactShadow();
+    this.contactShadow = plane;
+  }
+
+  _unusedBakedShadow(center, size, baseY) {
+    const THREE = this.THREE;
+    const S = 1024;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, S, S);
+    const cx = S / 2, cy = S / 2;
+    const lenK = 1.4, widK = 1.5;
+    const halfL = (1 / lenK) / 2 * S;
+    const halfW = (1 / widK) / 2 * S;
+    ctx.filter = 'blur(16px)';
+    ctx.fillStyle = 'rgba(0,0,0,0.34)';
+    this._ellipse(ctx, cx, cy, halfL * 0.9, halfW * 0.72);
+    ctx.filter = 'none';
+    const tex = new THREE.CanvasTexture(cv);
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(size.x * lenK, size.z * widK),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 1, toneMapped: false })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(center.x, baseY + 0.008, center.z);
+    this.scene.add(plane);
+  }
+
+  onLight(e) {
+    const v = parseFloat(e.target.value);
+    this.setState({ lightIntensity: v });
+    if (this.dirLight) { this.dirLight.intensity = v; }
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+  }
+
+  onExposure(e) {
+    const v = parseFloat(e.target.value);
+    this.setState({ exposure: v });
+    if (this.renderer) this.renderer.toneMappingExposure = v;
+  }
+
+  onUploadHdri(e) {
+    const THREE = this.THREE;
+    const file = e.target.files && e.target.files[0];
+    if (!file || !this.rgbe || !this.pmrem || !THREE) return;
+    const url = URL.createObjectURL(file);
+    this.rgbe.load(
+      url,
+      (hdr) => {
+        hdr.mapping = THREE.EquirectangularReflectionMapping;
+        const env = this.pmrem.fromEquirectangular(hdr).texture;
+        if (this.scene) this.scene.environment = env;
+        hdr.dispose();
+        URL.revokeObjectURL(url);
+        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+      },
+      undefined,
+      (err) => { URL.revokeObjectURL(url); console.warn('[Haval H6] custom HDRI failed', err); }
+    );
+    this.setState({ hdriKey: 'custom', customHdriName: file.name.replace(/\.[^.]+$/, '').slice(0, 16) });
+  }
+
+  onHdri(e) {
+    const key = e.target.value;
+    this.setState({ hdriKey: key });
+    this.loadHDRI(key);
+  }
+
+  loadHDRI(key) {
+    const THREE = this.THREE;
+    if (key === 'studio') {
+      if (this.roomEnv && this.scene) {
+        this.scene.environment = this.roomEnv;
+        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+      }
+      return;
+    }
+    const map = {
+      st_peters: (window.__resources && window.__resources.stPetersHdr) || 'uploads/st_peters_square_night_2k.hdr',
+      venice: 'venice_sunset_1k.hdr',
+      quarry: 'quarry_01_1k.hdr',
+      overpass: 'pedestrian_overpass_1k.hdr',
+      studio_small: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr',
+      studio_loft: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/photo_studio_loft_hall_1k.hdr',
+    };
+    const entry = map[key];
+    const file = entry && entry.startsWith('http') ? entry : entry ? 'https://threejs.org/examples/textures/equirectangular/' + entry : null;
+    if (!file || !this.rgbe || !this.pmrem || !THREE) return;
+    this.rgbe.load(
+      file,
+      (hdr) => {
+        hdr.mapping = THREE.EquirectangularReflectionMapping;
+        const env = this.pmrem.fromEquirectangular(hdr).texture;
+        if (this.scene) this.scene.environment = env;
+        hdr.dispose();
+        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+      },
+      undefined,
+      (err) => console.warn('[Haval H6] HDRI failed to load: ' + key, err)
+    );
+  }
+
+  loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = false;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async componentDidMount() {
+    try {
+      // Three.js scripts are pre-loaded via <script src> in helmet — skip dynamic loading
+      // if already available (standalone bundled mode), otherwise load them.
+      if (!window.THREE) {
+        const B = 'https://unpkg.com/three@0.137.0/';
+        await this.loadScript(B + 'build/three.min.js');
+        await this.loadScript(B + 'examples/js/loaders/GLTFLoader.js');
+        await this.loadScript(B + 'examples/js/loaders/DRACOLoader.js');
+        await this.loadScript(B + 'examples/js/controls/OrbitControls.js');
+        await this.loadScript(B + 'examples/js/objects/Sky.js');
+        await this.loadScript(B + 'examples/js/loaders/RGBELoader.js');
+        await this.loadScript(B + 'examples/js/environments/RoomEnvironment.js');
+        await this.loadScript(B + 'examples/js/shaders/HorizontalBlurShader.js');
+        await this.loadScript(B + 'examples/js/shaders/VerticalBlurShader.js');
+      }
+
+      const THREE = window.THREE;
+      const OrbitControls = THREE.OrbitControls;
+      const Sky = THREE.Sky;
+      this.THREE = THREE;
+
+      const container = this.containerRef.current;
+      if (!container) return;
+      const w = container.clientWidth, h = container.clientHeight;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      renderer.setSize(w, h);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = this.state.exposure;
+      if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+      this.renderer = renderer;
+
+      const scene = new THREE.Scene();
+      this.scene = scene;
+
+      const camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 2000000);
+      camera.position.set(7, 3.2, 9);
+      this.camera = camera;
+
+      // --- Sun direction (drives the single soft shadow under the car) ---
+      const sun = new THREE.Vector3();
+      {
+        const elevation = 86, azimuth = 135;
+        const phi = THREE.MathUtils.degToRad(90 - elevation);
+        const theta = THREE.MathUtils.degToRad(azimuth);
+        sun.setFromSphericalCoords(1, phi, theta);
+      }
+
+      // --- Studio background: flat light gray, like the reference turntable ---
+      scene.background = new THREE.Color(0xe7e7e7);
+
+      // Neutral sky-derived environment for reflections until the HDRI loads.
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      this.pmrem = pmrem;
+
+      // Reliable high-contrast studio environment (network-independent), used as
+      // the default. Dark surround with bright HDR softboxes => the clearcoat and
+      // glass show crisp bright reflection streaks (like the reference render)
+      // without washing the paint color the way a uniformly-bright env does.
+      const studioEnv = pmrem.fromScene(this.makeStudioEnv(), 0.015).texture;
+      this.roomEnv = studioEnv;
+      scene.environment = studioEnv;
+
+      // --- Configurable HDRI: drives reflections (background stays flat gray) ---
+      const rgbe = new THREE.RGBELoader();
+      if (rgbe.setDataType) rgbe.setDataType(THREE.HalfFloatType);
+      this.rgbe = rgbe;
+      if (this.state.hdriKey && this.state.hdriKey !== 'studio') this.loadHDRI(this.state.hdriKey);
+      if (this.dirLight) this.dirLight.intensity = this.state.lightIntensity;
+
+      // --- Sun light (single soft shadow under the car + self-shadows) + fill ---
+      const dir = new THREE.DirectionalLight(0xffffff, this.state.lightIntensity);
+      dir.position.copy(sun).multiplyScalar(26);
+      dir.castShadow = true;
+      dir.shadow.mapSize.set(2048, 2048);
+      dir.shadow.bias = -0.0003;
+      dir.shadow.radius = 15;
+      scene.add(dir);
+      this.dirLight = dir;
+      scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b4bc, 0.28));
+
+      // --- Controls ---
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.maxPolarAngle = Math.PI / 2 - 0.035;
+      controls.minDistance = 2;
+      controls.maxDistance = 120;
+      this.controls = controls;
+
+      // --- Load GLB (Draco-compressed glTF with PBR materials) ---
+      const draco = new THREE.DRACOLoader();
+      draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+      const loader = new THREE.GLTFLoader();
+      loader.setDRACOLoader(draco);
+      const url = (window.__resources && window.__resources.glbModel) || 'uploads/haval-h6-v3.glb';
+      loader.load(
+        url,
+        (gltf) => this.onModelLoaded(gltf.scene),
+        (e) => {
+          let p;
+          if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
+          else p = Math.min(99, (e.loaded / 20787604) * 100);
+          this.setState({ progress: p });
+        },
+        (err) => {
+          console.error('GLB load error', err);
+          this.setState({ error: 'The model failed to load. Check the file path and that the Draco decoder is reachable.' });
+        }
+      );
+
+      // --- Resize ---
+      this._onResize = () => {
+        const W = container.clientWidth, H = container.clientHeight;
+        camera.aspect = W / H;
+        camera.updateProjectionMatrix();
+        renderer.setSize(W, H);
+      };
+      window.addEventListener('resize', this._onResize);
+
+      // --- Render loop ---
+      const loop = () => {
+        this._raf = requestAnimationFrame(loop);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      loop();
+    } catch (err) {
+      console.error(err);
+      this.setState({ error: String(err && err.message ? err.message : err) });
+    }
+  }
+
+  onModelLoaded(obj) {
+    const THREE = this.THREE;
+
+    // Keep the model's own (Blender) floor, but flag it so it doesn't dominate
+    // the bounding box used to scale and frame the car.
+    const isFloor = (c) => {
+      const mat = Array.isArray(c.material) ? c.material[0] : c.material;
+      return /floor|ground|backdrop/i.test(c.name || '') || /floor|ground/i.test((mat && mat.name) || '');
+    };
+    const carBounds = () => {
+      const b = new THREE.Box3();
+      obj.traverse((c) => {
+        if (c.isMesh && !isFloor(c)) {
+          const cb = new THREE.Box3().setFromObject(c);
+          if (!cb.isEmpty()) b.union(cb);
+        }
+      });
+      return b;
+    };
+
+    // Normalize scale to the CAR (not the floor)
+    obj.updateMatrixWorld(true);
+    let box = carBounds();
+    const maxDim = Math.max(...box.getSize(new THREE.Vector3()).toArray()) || 1;
+    obj.scale.setScalar(5 / maxDim);
+    obj.updateMatrixWorld(true);
+
+    // Sit the car on the ground and centre it on XZ (floor moves with it)
+    box = carBounds();
+    const c2 = box.getCenter(new THREE.Vector3());
+    obj.position.x -= c2.x;
+    obj.position.z -= c2.z;
+    obj.position.y -= box.min.y;
+    this.scene.add(obj);
+    obj.updateMatrixWorld(true);
+
+    // Materials: HDRI reflections, shadows, dark glass, shadow-catcher floor
+    const meshNames = [];
+    const bodyMats = [];
+    obj.traverse((c) => {
+      if (!c.isMesh) return;
+
+      // The Blender floor: a flat matte gray. It does NOT receive the directional
+      // shadow — the contact-shadow pass renders the real soft silhouette shadow
+      // onto a plane just above it, which reads far more realistically.
+      if (isFloor(c)) {
+        c.castShadow = false;
+        c.receiveShadow = false;
+        const fm = new THREE.MeshStandardMaterial({ color: 0xdedfe1, roughness: 0.96, metalness: 0 });
+        fm.envMapIntensity = 0.25;
+        c.material = fm;
+        this.floorMesh = c;
+        return;
+      }
+
+      c.castShadow = true;
+      c.receiveShadow = true;
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      // Headlight glass by mesh name + material-name detection
+      const isHeadlight = c.name === 'BuildingMesh-00106';
+      let isGlass = isHeadlight;
+      mats.forEach((m) => {
+        if (!m) return;
+        const nm = (m.name || '').toLowerCase();
+        if (/glass|window|windshield|windscreen/.test(nm)) isGlass = true;
+      });
+      if (isGlass) { c.castShadow = false; }
+      mats.forEach((m) => {
+        if (!m) return;
+        m.envMapIntensity = 1.3;   // let the HDRI reflections read on paint/chrome
+        const nm = (m.name || '').toLowerCase();
+
+        // Body paint — capture the painted panels so the swatches can recolor them
+        // (Body + Panel + Roof are the visible painted shell; exclude glass/chrome/
+        // lights/tires/trim).
+        if (/^body$|^panel|^roof$|hood|bonnet|fender|quarter|^door|bumper/i.test(m.name || '')) {
+          if (!this._paintOrig) this._paintOrig = new Map();
+          if (!this._paintOrig.has(m) && m.color) this._paintOrig.set(m, m.color.clone());
+          // Metallic-flake car paint: a metallic base for the flake sheen, a
+          // glossy clearcoat on top, and a dense flake normal map on the coat for
+          // fine sparkle. The dark studio env keeps the colour rich.
+          // MeshPhysicalMaterial car paint: high metalness base for candy/flake
+          // sparkle, glossy clearcoat on top, dense flake normal on the coat.
+          m.metalness = 0.9;
+          m.roughness = 0.5;
+          m.envMapIntensity = 0.5;
+          if (m.map) m.map = null;   // drop baked tint so chosen colour reads true
+          if ('clearcoat' in m) {
+            m.clearcoat = 1.0;
+            m.clearcoatRoughness = 0.08;
+            m.clearcoatNormalMap = this.makeFlakeNormal();
+            if (m.clearcoatNormalScale) m.clearcoatNormalScale.set(0.22, 0.22);
+          }
+          bodyMats.push(m);
+          if (this.bodyOrigHex == null && m.color) this.bodyOrigHex = '#' + m.color.getHexString();
+        }
+
+        // Headlight glass (BuildingMesh-00106): clear, light, highly reflective
+        if (isHeadlight) {
+          m.transparent = true;
+          m.opacity = 0.18;
+          m.depthWrite = false;
+          m.metalness = 0;
+          m.roughness = 0.0;
+          m.envMapIntensity = 3.5;
+          if (m.color) m.color.setRGB(0.92, 0.94, 0.98);  // near-clear with cool tint
+          if ('clearcoat' in m) { m.clearcoat = 1; m.clearcoatRoughness = 0.0; }
+          if ('ior' in m) m.ior = 1.5;
+          m.needsUpdate = true;
+        }
+
+        // Window / windscreen glass: dark smoked tint
+        if (!isHeadlight && /glass|window|windshield|windscreen/.test(nm)) {
+          m.transparent = true;
+          m.opacity = 0.62;
+          m.depthWrite = false;
+          m.metalness = 0;
+          m.roughness = 0.04;
+          m.envMapIntensity = 2.4;
+          if (m.color) m.color.setRGB(0.015, 0.017, 0.02);  // smoked / dark tint
+          if ('clearcoat' in m) { m.clearcoat = 1; m.clearcoatRoughness = 0.04; }
+          if ('specularIntensity' in m) m.specularIntensity = 1;
+          if ('ior' in m) m.ior = 1.5;
+        }
+        m.needsUpdate = true;
+      });
+      if (c.name) meshNames.push(c.name);
+    });
+    this.bodyMats = bodyMats;
+    if (this.bodyOrigHex) this.setState({ origHex: this.bodyOrigHex });
+    // Surface part names so doors/roof/windows can be targeted later
+    console.log('[Haval H6] mesh parts (' + meshNames.length + '):', meshNames);
+    this.modelParts = meshNames;
+    this.model = obj;
+
+    // Fit camera to the CAR only
+    const box3 = carBounds();
+    const size3 = box3.getSize(new THREE.Vector3());
+    const center3 = box3.getCenter(new THREE.Vector3());
+
+    // Real contact shadow: a ShadowMaterial plane catches the directional light's
+    // shadow map. No depth-pass artifacts from glass — glass is excluded from
+    // castShadow so it doesn't punch a fake opaque hole in the shadow.
+    this.addShadowCatcher(center3, size3, box3.min.y);
+    const radius = Math.max(size3.x, size3.y, size3.z) * 0.6;
+    const fov = this.camera.fov * Math.PI / 180;
+    const dist = (radius / Math.sin(fov / 2)) * 1.02;
+    this.controls.target.copy(center3);
+    this.camera.position.set(center3.x - dist * 0.66, center3.y + dist * 0.30, center3.z + dist * 0.70);
+    this.camera.near = dist / 120;
+    this.camera.far = dist * 120;
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+    this.renderOnce = () => this.renderer.render(this.scene, this.camera);
+    window.__renderOnce = this.renderOnce;
+    window.__scene = this.scene;
+
+    // Shadow camera bounds around the car
+    const d = this.dirLight;
+    const sp = Math.max(size3.x, size3.z) * 1.4;
+    d.shadow.camera.left = -sp; d.shadow.camera.right = sp;
+    d.shadow.camera.top = sp; d.shadow.camera.bottom = -sp;
+    d.shadow.camera.near = 0.5; d.shadow.camera.far = dist * 6;
+    d.target.position.copy(center3);
+    this.scene.add(d.target);
+    d.shadow.camera.updateProjectionMatrix();
+
+    this.setState({ loading: false, progress: 100 });
+  }
+
+  componentWillUnmount() {
+    if (this._raf) cancelAnimationFrame(this._raf);
+    if (this._onResize) window.removeEventListener('resize', this._onResize);
+    if (this.renderer) {
+      this.renderer.dispose();
+      const el = this.renderer.domElement;
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    }
+  }
+}
+</script>
+</body>
+</html>
