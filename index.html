@@ -6,37 +6,15 @@
 <script src="./support.js"></script>
 </head>
 <body>
-<template id="__bundler_thumbnail" data-bg-color="#0b1016">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 112">
-    <rect width="160" height="112" fill="#0b1016"/>
-    <ellipse cx="80" cy="72" rx="54" ry="8" fill="#1a2030" opacity="0.7"/>
-    <path d="M32 68 Q36 56 52 52 Q62 46 80 44 Q98 46 108 52 Q124 56 128 68 Z" fill="#2a3a50"/>
-    <path d="M44 68 Q50 58 62 54 Q72 50 80 50 Q88 50 98 54 Q110 58 116 68 Z" fill="#4fd6e8" opacity="0.7"/>
-    <rect x="40" y="66" width="80" height="10" rx="2" fill="#1e3a5a"/>
-    <circle cx="54" cy="72" r="8" fill="#111" stroke="#4fd6e8" stroke-width="1.5"/>
-    <circle cx="106" cy="72" r="8" fill="#111" stroke="#4fd6e8" stroke-width="1.5"/>
-    <circle cx="54" cy="72" r="3" fill="#4fd6e8"/>
-    <circle cx="106" cy="72" r="3" fill="#4fd6e8"/>
-    <text x="80" y="28" text-anchor="middle" font-family="monospace" font-size="9" fill="#4fd6e8" opacity="0.8">HAVAL H6</text>
-    <text x="80" y="40" text-anchor="middle" font-family="monospace" font-size="7" fill="#ffffff" opacity="0.4">3D VIEWER</text>
-  </svg>
-</template>
 <x-dc>
 <helmet>
+<style>
+@keyframes grain { 0%,100%{transform:translate(0,0)} 10%{transform:translate(-2%,-3%)} 20%{transform:translate(3%,2%)} 30%{transform:translate(-1%,4%)} 40%{transform:translate(4%,-1%)} 50%{transform:translate(-3%,3%)} 60%{transform:translate(2%,-4%)} 70%{transform:translate(-4%,1%)} 80%{transform:translate(1%,3%)} 90%{transform:translate(3%,-2%)} }
+.bg-grain::after { content:''; position:fixed; inset:-50%; width:200%; height:200%; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"); opacity:0.028; animation:grain 0.5s steps(1) infinite; pointer-events:none; z-index:1; }
+</style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
-  <meta name="ext-resource-dependency" content="uploads/haval-h6-v3.glb" data-resource-id="glbModel">
-  <meta name="ext-resource-dependency" content="uploads/st_peters_square_night_2k.hdr" data-resource-id="stPetersHdr">
-  <script src="https://unpkg.com/three@0.137.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/DRACOLoader.js"></script>
-  <script src="https://unpkg.com/three@0.137.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://unpkg.com/three@0.137.0/examples/js/objects/Sky.js"></script>
-  <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/RGBELoader.js"></script>
-  <script src="https://unpkg.com/three@0.137.0/examples/js/environments/RoomEnvironment.js"></script>
-  <script src="https://unpkg.com/three@0.137.0/examples/js/shaders/HorizontalBlurShader.js"></script>
-  <script src="https://unpkg.com/three@0.137.0/examples/js/shaders/VerticalBlurShader.js"></script>
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #0b1016; overflow: hidden; }
     * { box-sizing: border-box; }
@@ -44,63 +22,158 @@
     @keyframes vp-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
   </style>
 </helmet>
-<div style="position: fixed; inset: 0; background: radial-gradient(130% 120% at 50% 38%, #efefef 0%, #dcdee0 78%, #cfd1d4 100%); font-family: 'Space Grotesk', system-ui, sans-serif;">
+<div ref="{{ outerRef }}" style="position: fixed; inset: 0; background: radial-gradient(130% 120% at 50% 38%, #efefef 0%, #dcdee0 78%, #cfd1d4 100%); font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease;">
 
   <div ref="{{ containerRef }}" style="position: absolute; inset: 0;"></div>
 
   <!-- top-left model label -->
-  <div style="position: absolute; top: 26px; left: 30px; color: #2b3037; pointer-events: none; user-select: none;">
+  <div style="position: absolute; top: 26px; left: 30px; color: {{ labelColor }}; pointer-events: none; user-select: none; transition: color 0.6s ease;">
     <div style="font-size: 11px; letter-spacing: .42em; font-weight: 600; opacity: .55;">HAVAL</div>
     <div style="font-size: 30px; font-weight: 600; letter-spacing: .04em; line-height: 1.05; margin-top: 2px;">H6</div>
     <div style="font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .18em; opacity: .45; margin-top: 6px;">REV 1.10 · GLB</div>
   </div>
 
   <!-- bottom hint -->
-  <div style="position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #6a7077; pointer-events: none; user-select: none; transition: opacity .6s ease; opacity: {{ hintOpacity }};">
+  <div style="position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .14em; color: {{ hintColor }}; pointer-events: none; user-select: none; transition: opacity .6s ease, color 0.6s ease; opacity: {{ hintOpacity }};">
     DRAG TO ORBIT &nbsp;·&nbsp; SCROLL TO ZOOM &nbsp;·&nbsp; RIGHT-DRAG TO PAN
   </div>
 
   <!-- cyan accent corner ticks -->
   <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
 
+  <!-- floating buttons (shown when panel is collapsed) -->
+  <div style="position: absolute; top: 22px; right: 26px; display: {{ panelIconDisplay }}; gap: 8px; align-items: center;">
+    <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+      <sc-if value="{{ nightMode }}" hint-placeholder-val="{{ false }}">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </sc-if>
+      <sc-if value="{{ isDayMode }}" hint-placeholder-val="{{ true }}">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </sc-if>
+    </button>
+    <button onClick="{{ togglePanel }}" title="Open config" style="width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    </button>
+  </div>
+
   <!-- configure panel -->
-  <div style="position: absolute; top: 22px; right: 26px; width: 214px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 16px 16px 18px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelDisplay }};">
-    <div style="font-size: 10px; letter-spacing: .3em; opacity: .55; font-weight: 600; margin-bottom: 16px;">CONFIGURE</div>
+  <div style="position: absolute; top: 22px; right: 26px; width: 220px; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }};">
 
-    <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 10px;">PAINT</div>
-    <div style="display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 20px;">
-      <sc-for list="{{ swatches }}" as="sw" hint-placeholder-count="7">
-        <button onClick="{{ sw.onClick }}" title="{{ sw.title }}" style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; background: {{ sw.hex }}; border: 2px solid {{ sw.ring }}; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: border-color .15s ease, transform .15s ease;"></button>
-      </sc-for>
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <div style="font-size: 10px; letter-spacing: .3em; opacity: .55; font-weight: 600;">CONFIGURE</div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="background: none; border: none; color: rgba(79,214,232,.7); cursor: pointer; padding: 4px 5px; line-height: 1; border-radius: 4px; display: flex; align-items: center;">
+          <sc-if value="{{ nightMode }}" hint-placeholder-val="{{ false }}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </sc-if>
+          <sc-if value="{{ isDayMode }}" hint-placeholder-val="{{ true }}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </sc-if>
+        </button>
+        <button onClick="{{ togglePanel }}" title="Collapse" style="background: none; border: none; color: rgba(79,214,232,.7); cursor: pointer; padding: 2px 4px; font-size: 16px; line-height: 1; border-radius: 4px;">×</button>
+      </div>
     </div>
 
-    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
-      <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">LIGHT</span>
-      <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ lightLabel }}</span>
+    <!-- Tab bar -->
+    <div style="display: flex; gap: 3px; background: rgba(0,0,0,.30); border-radius: 7px; padding: 3px; margin-bottom: 14px;">
+      <button onClick="{{ setTabColor }}"  style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgColor }};  color: {{ tabColColor }};  transition: all .15s;">COLOR</button>
+      <button onClick="{{ setTabEnv }}"    style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgEnv }};    color: {{ tabColEnv }};    transition: all .15s;">ENV</button>
+      <button onClick="{{ setTabLights }}" style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgLights }}; color: {{ tabColLights }}; transition: all .15s;">LIGHTS</button>
     </div>
-    <input type="range" min="0" max="6" step="0.1" value="{{ lightIntensity }}" onChange="{{ onLight }}" onInput="{{ onLight }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 20px;" />
 
-    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
-      <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">EXPOSURE</span>
-      <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ exposureLabel }}</span>
-    </div>
-    <input type="range" min="0.3" max="1.8" step="0.02" value="{{ exposure }}" onChange="{{ onExposure }}" onInput="{{ onExposure }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 20px;" />
+    <!-- ── COLOR TAB ── -->
+    <sc-if value="{{ tabIsColor }}" hint-placeholder-val="{{ true }}">
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">PAINT</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 18px;">
+        <sc-for list="{{ swatches }}" as="sw" hint-placeholder-count="7">
+          <button onClick="{{ sw.onClick }}" title="{{ sw.title }}" style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; background: {{ sw.hex }}; border: 2px solid {{ sw.ring }}; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: border-color .15s ease;"></button>
+        </sc-for>
+      </div>
 
-    <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">ENVIRONMENT</div>
-    <select value="{{ hdriKey }}" onChange="{{ onHdri }}" style="width: 100%; background: rgba(255,255,255,.06); color: #eaf2f8; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; padding: 7px 9px; font-family: 'Space Grotesk', sans-serif; font-size: 12px; outline: none; cursor: pointer;">
-      <option value="st_peters" style="color:#111;">St. Peter's Square Night</option>
-      <option value="studio" style="color:#111;">Studio (neutral)</option>
-      <option value="venice" style="color:#111;">Venice Sunset</option>
-      <option value="quarry" style="color:#111;">Quarry</option>
-      <option value="overpass" style="color:#111;">Pedestrian Overpass</option>
-      <option value="studio_small" style="color:#111;">Studio Small</option>
-      <option value="studio_loft" style="color:#111;">Studio Loft</option>
-      <option value="custom" style="color:#111;" disabled="{{ customDisabled }}">{{ customLabel }}</option>
-    </select>
-    <label style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 9px; padding: 7px 9px; border: 1px dashed rgba(79,214,232,.4); border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .12em; color: #9fe6f0; cursor: pointer;">
-      UPLOAD .HDR
-      <input type="file" accept=".hdr,image/vnd.radiance" onChange="{{ onUploadHdri }}" style="display: none;" />
-    </label>
+      <!-- BG colors row -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+        <label style="display: flex; flex-direction: column; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; opacity: .6; cursor: pointer;">
+          DAY BG
+          <input type="color" value="{{ dayBg }}" onChange="{{ onDayBg }}" onInput="{{ onDayBgInput }}" style="width: 100%; height: 26px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer; background: none; padding: 2px;" />
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; opacity: .6; cursor: pointer;">
+          NIGHT BG
+          <input type="color" value="{{ nightBg }}" onChange="{{ onNightBg }}" onInput="{{ onNightBgInput }}" style="width: 100%; height: 26px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer; background: none; padding: 2px;" />
+        </label>
+      </div>
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">VIGNETTE</div>
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+        <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
+          COLOR
+          <input type="color" value="{{ vignetteColor }}" onChange="{{ onVignetteColor }}" onInput="{{ onVignetteColorInput }}" style="width: 40px; height: 22px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; background: none; padding: 1px;" />
+        </label>
+        <div style="flex: 1;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
+            <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">INTENSITY</span>
+            <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ vignetteIntensity }}%</span>
+          </div>
+          <input type="range" min="0" max="95" step="1" value="{{ vignetteIntensity }}" onChange="{{ onVignetteIntensity }}" onInput="{{ onVignetteIntensity }}" style="width: 100%; accent-color: #4fd6e8;" />
+        </div>
+      </div>
+
+      <!-- Grain toggle -->
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .7;">
+        <input type="checkbox" checked="{{ grainEnabled }}" onChange="{{ onGrain }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
+        GRAIN EFFECT
+      </label>
+    </sc-if>
+
+    <!-- ── ENV TAB ── -->
+    <sc-if value="{{ tabIsEnv }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">LIGHT</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ lightLabel }}</span>
+      </div>
+      <input type="range" min="0" max="6" step="0.1" value="{{ lightIntensity }}" onChange="{{ onLight }}" onInput="{{ onLight }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
+
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">EXPOSURE</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ exposureLabel }}</span>
+      </div>
+      <input type="range" min="0.3" max="1.8" step="0.02" value="{{ exposure }}" onChange="{{ onExposure }}" onInput="{{ onExposure }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">ENVIRONMENT</div>
+      <select value="{{ hdriKey }}" onChange="{{ onHdri }}" style="width: 100%; background: rgba(255,255,255,.06); color: #eaf2f8; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; padding: 7px 9px; font-family: 'Space Grotesk', sans-serif; font-size: 12px; outline: none; cursor: pointer; margin-bottom: 8px;">
+        <option value="st_peters" style="color:#111;">St. Peter's Square Night</option>
+        <option value="studio" style="color:#111;">Studio (neutral)</option>
+        <option value="venice" style="color:#111;">Venice Sunset</option>
+        <option value="quarry" style="color:#111;">Quarry</option>
+        <option value="overpass" style="color:#111;">Pedestrian Overpass</option>
+        <option value="studio_small" style="color:#111;">Studio Small</option>
+        <option value="studio_loft" style="color:#111;">Studio Loft</option>
+        <option value="custom" style="color:#111;" disabled="{{ customDisabled }}">{{ customLabel }}</option>
+      </select>
+      <label style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 9px; border: 1px dashed rgba(79,214,232,.4); border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .12em; color: #9fe6f0; cursor: pointer;">
+        UPLOAD .HDR
+        <input type="file" accept=".hdr,image/vnd.radiance" onChange="{{ onUploadHdri }}" style="display: none;" />
+      </label>
+    </sc-if>
+
+    <!-- ── LIGHTS TAB ── -->
+    <sc-if value="{{ tabIsLights }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 7px;">
+        <sc-for list="{{ lightBtns }}" as="lb" hint-placeholder-count="8">
+          <button onClick="{{ lb.onClick }}" onContextMenu="{{ lb.onContextMenu }}" title="{{ lb.label }}"
+            style="padding: 7px 4px; border-radius: 7px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .10em; font-weight: 600; transition: all .15s ease; background: {{ lb.bg }}; border: 1px solid {{ lb.border }}; color: {{ lb.textColor }}; box-shadow: {{ lb.boxShadow }};">
+            {{ lb.label }}
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <!-- assign mode banner -->
+  <div style="position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%); display: {{ assignBannerVis }}; align-items: center; gap: 14px; background: rgba(16,21,28,.88); backdrop-filter: blur(10px); border: 1px solid rgba(79,214,232,.35); border-radius: 9px; padding: 10px 18px; font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #4fd6e8; box-shadow: 0 6px 24px rgba(0,0,0,.4);">
+    {{ assignBanner }}
+    <button onClick="{{ onExitAssign }}" style="background: rgba(79,214,232,.15); border: 1px solid rgba(79,214,232,.4); color: #4fd6e8; border-radius: 5px; padding: 3px 10px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .1em; white-space: nowrap;">DONE</button>
   </div>
 
   <!-- loader -->
@@ -125,11 +198,26 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 0.66, hdriKey: 'st_peters', origHex: null, customHdriName: null };
+  state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 0.66, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: true, nightMode: false,
+    lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
+    configTab: 'color',
+    dayBg: '#efefef',
+    nightBg: '#131415',
+    vignette: { color: '#000000', intensity: 0 },
+    grainEnabled: false,
+    showGlassTweaks: false,
+    glassTweaks: { opacity: 0.1, iridescence: 0, iridIOR: 1.8, thickMin: 100, thickMax: 400, clearcoat: 1.0, envMap: 1.0, color: '#ffffff', fresnel: 0 },
+    showRearGlassTweaks: false,
+    rearGlassTweaks: { opacity: 0.6, roughness: 0.15, transmission: 0.6, envMap: 0.5, clearcoat: 1.0, color: '#5c0808' }
+  };
 
   constructor(props) {
     super(props);
     this.containerRef = React.createRef();
+    this.outerRef = React.createRef();
+    // Restore saved glass tweaks (if user hit Save previously)
+    try { const sg = localStorage.getItem('h6_glassTweaks'); if (sg) this.state.glassTweaks = { ...this.state.glassTweaks, ...JSON.parse(sg) }; } catch(e) {}
+    try { const sr = localStorage.getItem('h6_rearGlassTweaks'); if (sr) this.state.rearGlassTweaks = { ...this.state.rearGlassTweaks, ...JSON.parse(sr) }; } catch(e) {}
   }
 
   renderVals() {
@@ -152,6 +240,13 @@ class Component extends DCLogic {
     }));
     return {
       containerRef: this.containerRef,
+      outerRef: this.outerRef,
+      nightMode: s.nightMode,
+      isDayMode: !s.nightMode,
+      toggleNightMode: () => this.toggleNightMode(),
+      nightTooltip: s.nightMode ? 'Switch to day' : 'Switch to night',
+      labelColor: s.nightMode ? '#c8daea' : '#2b3037',
+      hintColor: s.nightMode ? 'rgba(180,210,235,0.55)' : '#6a7077',
       loaderDisplay: s.loading && !s.error ? 'flex' : 'none',
       errorDisplay: s.error ? 'flex' : 'none',
       errorMsg: s.error || '',
@@ -159,6 +254,10 @@ class Component extends DCLogic {
       progressWidth: s.progress + '%',
       hintOpacity: s.loading ? '0' : '0.85',
       panelDisplay: s.loading || s.error ? 'none' : 'block',
+      panelOpen: s.panelOpen,
+      panelBodyDisplay: (!s.loading && !s.error && s.panelOpen) ? 'block' : 'none',
+      panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
+      togglePanel: () => this.setState(st => ({ panelOpen: !st.panelOpen })),
       swatches,
       lightIntensity: s.lightIntensity,
       lightLabel: s.lightIntensity.toFixed(1),
@@ -171,7 +270,454 @@ class Component extends DCLogic {
       onExposure: (e) => this.onExposure(e),
       onHdri: (e) => this.onHdri(e),
       onUploadHdri: (e) => this.onUploadHdri(e),
+      showRearGlassTweaks: s.showRearGlassTweaks,
+      rearGlassTweaks: s.rearGlassTweaks,
+      configTab: s.configTab,
+      tabIsColor:  s.configTab === 'color',
+      tabIsEnv:    s.configTab === 'env',
+      tabIsLights: s.configTab === 'lights',
+      setTabColor:  () => this.setState({ configTab: 'color'  }),
+      setTabEnv:    () => this.setState({ configTab: 'env'    }),
+      setTabLights: () => this.setState({ configTab: 'lights' }),
+      tabBgColor:  s.configTab === 'color'  ? 'rgba(79,214,232,.18)' : 'transparent',
+      tabBgEnv:    s.configTab === 'env'    ? 'rgba(79,214,232,.18)' : 'transparent',
+      tabBgLights: s.configTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
+      tabColColor:  s.configTab === 'color'  ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      tabColEnv:    s.configTab === 'env'    ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      tabColLights: s.configTab === 'lights' ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      dayBg: s.dayBg,
+      nightBg: s.nightBg,
+      vignetteColor:    s.vignette.color,
+      vignetteIntensity: s.vignette.intensity,
+      grainEnabled: s.grainEnabled,
+      onDayBg:            (e) => this._setBg('day',   e.target.value),
+      onNightBg:          (e) => this._setBg('night', e.target.value),
+      onVignetteColor:    (e) => this._setVignette('color',     e.target.value),
+      onVignetteIntensity:(e) => this._setVignette('intensity', e.target.value),
+      onGrain:            (e) => this._setGrain(e.target.checked),
+      // onInput aliases so color pickers update live in all browsers
+      onDayBgInput:         (e) => this._setBg('day',   e.target.value),
+      onNightBgInput:       (e) => this._setBg('night', e.target.value),
+      onVignetteColorInput: (e) => this._setVignette('color', e.target.value),
+      onToggleRearGlassTweaks: () => this.setState({ showRearGlassTweaks: !this.state.showRearGlassTweaks }),
+      onRearGlassOpacity:     (e) => this._setRearGlassTweak('opacity',      e.target.value),
+      onRearGlassRoughness:   (e) => this._setRearGlassTweak('roughness',    e.target.value),
+      onRearGlassTransmission:(e) => this._setRearGlassTweak('transmission', e.target.value),
+      onRearGlassEnvMap:      (e) => this._setRearGlassTweak('envMap',       e.target.value),
+      onRearGlassClearcoat:   (e) => this._setRearGlassTweak('clearcoat',    e.target.value),
+      onRearGlassColor:       (e) => this._setRearGlassTweak('color',        e.target.value),
+      onSaveRearGlass: () => {
+        const t = this.state.rearGlassTweaks;
+        localStorage.setItem('h6_rearGlassTweaks', JSON.stringify(t));
+        console.log('[RearGlass] Saved:', JSON.stringify(t));
+        alert('Saved: ' + JSON.stringify(t, null, 2));
+      },
+      showGlassTweaks: s.showGlassTweaks,
+      glassTweaks: s.glassTweaks,
+      onToggleGlassTweaks: () => this.setState({ showGlassTweaks: !this.state.showGlassTweaks }),
+      onGlassOpacity:     (e) => this._setGlassTweak('opacity',     e.target.value),
+      onGlassIridescence: (e) => this._setGlassTweak('iridescence', e.target.value),
+      onGlassIridIOR:     (e) => this._setGlassTweak('iridIOR',     e.target.value),
+      onGlassThickMin:    (e) => this._setGlassTweak('thickMin',    e.target.value),
+      onGlassThickMax:    (e) => this._setGlassTweak('thickMax',    e.target.value),
+      onGlassClearcoat:   (e) => this._setGlassTweak('clearcoat',   e.target.value),
+      onGlassEnvMap:      (e) => this._setGlassTweak('envMap',      e.target.value),
+      onGlassFresnel:      (e) => this._setGlassTweak('fresnel',     e.target.value),
+      onGlassColor:       (e) => this._setGlassTweak('color',       e.target.value),
+      onHardcodeGlass: () => {
+        const t = this.state.glassTweaks;
+        localStorage.setItem('h6_glassTweaks', JSON.stringify(t));
+        console.log('[Glass] Saved:', JSON.stringify(t));
+        alert('Saved! Values: ' + JSON.stringify(t, null, 2));
+      },
+      lights: s.lights,
+      assignMode: s.assignMode,
+      assignBanner: s.assignMode === 'fogFront' ? 'ASSIGN FOG FRONT · click each fog lens · Esc to finish'
+                  : s.assignMode === 'fogRear'  ? 'ASSIGN REAR FOG · click the rear fog light · Esc to finish' : '',
+      assignBannerVis: s.assignMode ? 'flex' : 'none',
+      onExitAssign: () => this.exitAssignMode(),
+      lightBtns: [
+        { key: 'position', label: 'POS',     color: '#ffe8c0', glow: 'rgba(255,232,192,.55)' },
+        { key: 'headlight',label: 'HEAD',    color: '#ddeeff', glow: 'rgba(180,220,255,.55)' },
+        { key: 'highbeam', label: 'HIGH',    color: '#ffffff', glow: 'rgba(255,255,255,.50)' },
+        { key: 'brake',    label: 'BRK',     color: '#ff2200', glow: 'rgba(255,34,0,.55)'    },
+        { key: 'fogFront', label: 'FOG F',   color: '#ffe066', glow: 'rgba(255,224,102,.55)' },
+        { key: 'fogRear',  label: 'FOG R',   color: '#ff4400', glow: 'rgba(255,68,0,.55)'    },
+        { key: 'turnL',    label: '\u2190 L', color: '#ff8800', glow: 'rgba(255,136,0,.55)'  },
+        { key: 'turnR',    label: 'R \u2192', color: '#ff8800', glow: 'rgba(255,136,0,.55)'  },
+        { key: 'hazard',   label: '\u26a0 HAZ',color:'#ff8800',glow: 'rgba(255,136,0,.55)'  },
+        { key: 'reverse',  label: 'REV',     color: '#ffffff', glow: 'rgba(255,255,255,.45)' },
+      ].map(b => {
+        const isFog = b.key === 'fogFront' || b.key === 'fogRear';
+        const assigned = isFog && this.lightGroups ? (this.lightGroups[b.key] || []) : null;
+        const picking  = s.assignMode === b.key;
+        const label = isFog
+          ? (picking ? '\u25c6 PICKING' : b.label)
+          : b.label;
+        const active = picking || s.lights[b.key];
+        return {
+          ...b, label,
+          onClick: () => {
+            if (isFog) {
+              if (s.assignMode === b.key) { this.exitAssignMode(); return; }
+              if (!assigned || !assigned.length) { this.enterAssignMode(b.key); return; }
+            }
+            this.toggleLight(b.key);
+          },
+          onContextMenu: isFog ? (e) => { e.preventDefault(); this.enterAssignMode(b.key); } : undefined,
+          bg:        active ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.04)',
+          border:    active ? b.color               : 'rgba(255,255,255,.16)',
+          textColor: active ? b.color               : 'rgba(255,255,255,.50)',
+          boxShadow: active ? ('0 0 10px '+b.glow)  : 'none',
+        };
+      }),
     };
+  }
+
+  _applyBackground(night, dayBg, nightBg, vig, grain) {
+    const bg = night ? nightBg : dayBg;
+    const vc = vig.color || '#000000';
+    const vi = vig.intensity ?? 0;
+    // Flat scene background — vignette handled by the WebGL shader overlay
+    if (this.scene && this.THREE) {
+      this.scene.background = this._makeBgTex(bg, vc, 0, grain);
+    }
+    // Update vignette shader uniforms (float precision, no banding)
+    if (this.vignetteMat) {
+      const h = vc.replace('#','');
+      this.vignetteMat.uniforms.vignetteColor.value.setRGB(
+        parseInt(h.slice(0,2),16)/255,
+        parseInt(h.slice(2,4),16)/255,
+        parseInt(h.slice(4,6),16)/255
+      );
+      this.vignetteMat.uniforms.vignetteIntensity.value = vi / 100;
+    }
+    // CSS background — loading state + behind the panel
+    if (this.outerRef && this.outerRef.current) {
+      this.outerRef.current.style.background = bg;
+      this.outerRef.current.classList.toggle('bg-grain', !!grain);
+    }
+  }
+
+  _setBg(mode, val) {
+    const s = this.state;
+    const update = mode === 'day' ? { dayBg: val } : { nightBg: val };
+    this.setState(update);
+    const nb = mode === 'night' ? val : s.nightBg;
+    const db = mode === 'day'   ? val : s.dayBg;
+    this._applyBackground(s.nightMode, db, nb, s.vignette, s.grainEnabled);
+  }
+
+  _setVignette(key, val) {
+    const s = this.state;
+    const v = { ...s.vignette, [key]: key === 'intensity' ? parseFloat(val) : val };
+    this.setState({ vignette: v });
+    this._applyBackground(s.nightMode, s.dayBg, s.nightBg, v, s.grainEnabled);
+  }
+
+  _setGrain(enabled) {
+    this.setState({ grainEnabled: enabled });
+    this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, enabled);
+  }
+
+  toggleNightMode() {
+    const next = !this.state.nightMode;
+    this.setState({ nightMode: next });
+    // Scene background is handled by _applyBackground below
+    // Hemisphere light
+    if (this.hemiLight) {
+      // Zero out ambient at night — white additive floor must be pure black in unlit areas
+      this.hemiLight.intensity = next ? 0.0 : 0.28;
+      this.hemiLight.color.set(next ? 0x1a2a40 : 0xffffff);
+      this.hemiLight.groundColor.set(next ? 0x050810 : 0xb0b4bc);
+    }
+    // Directional (sun) light: kill it at night
+    if (this.dirLight) {
+      if (next) { this._dayLightIntensity = this.dirLight.intensity; this.dirLight.intensity = 0.001; }
+      else { this.dirLight.intensity = this._dayLightIntensity !== undefined ? this._dayLightIntensity : this.state.lightIntensity; }
+    }
+    // Floor: near-black asphalt at night so point-light pools pop
+    if (this.floorMesh) {
+      const fm = this.floorMesh.material;
+      fm.color.set(next ? 0x0c0c0d : 0xdedfe1);
+      fm.roughness = next ? 0.74 : 0.96;
+      fm.envMapIntensity = next ? 0 : 0.25;
+      fm.needsUpdate = true;
+    }
+    // Wheel/brake interiors: cut envMapIntensity at night so they don't read as
+    // sun-lit. IBL is the only remaining light source after hemi+dir are zeroed,
+    // so we must reduce it per-material for the wheel cavity meshes.
+    if (this.scene) {
+      const WHEEL_RE = /^(Wheel|Break|Tire Top|Tire Side)$/;
+      this.scene.traverse(c => {
+        if (!c.isMesh) return;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach(m => {
+          if (!m || !WHEEL_RE.test(m.name || '')) return;
+          if (next) {
+            if (m._dayEnvMap === undefined) m._dayEnvMap = m.envMapIntensity;
+            m.envMapIntensity = 0.30;
+          } else {
+            if (m._dayEnvMap !== undefined) m.envMapIntensity = m._dayEnvMap;
+          }
+          m.needsUpdate = true;
+        });
+      });
+    }
+    // Night floor (MeshStandardMaterial — reacts to SpotLights, shown only at night)
+    if (this.nightFloor) this.nightFloor.visible = next;
+    // Sync active car lights → their ground spot lights
+    const ls = this.state.lights || {};
+    if (next) {
+      const lo = ls.headlight ? 0.7 : 0;
+      if (this.nlLowBeamL) this.nlLowBeamL.intensity = lo;
+      if (this.nlLowBeamR) this.nlLowBeamR.intensity = lo;
+      const hi = ls.highbeam ? 1.2 : 0;
+      if (this.nlHeadL) this.nlHeadL.intensity = hi;
+      if (this.nlHeadR) this.nlHeadR.intensity = hi;
+      if (this.nlFogF)   this.nlFogF.intensity   = ls.fogFront  ? 0.10 : 0;
+      if (this.nlFogR)   this.nlFogR.intensity   = ls.fogRear   ? 0.12 : 0;
+      if (this.nlBrake)  this.nlBrake.intensity  = ls.brake     ? 0.10 : (ls.headlight ? 0.08 : 0);
+      if (this.nlRev)    this.nlRev.intensity    = ls.reverse   ? 0.07 : 0;
+      if (this.nlPos)    this.nlPos.intensity    = ls.position  ? 0.08 : 0;
+      const ta = (ls.turnL || ls.hazard) ? 0.04 : 0;
+      const tb = (ls.turnR || ls.hazard) ? 0.04 : 0;
+      if (this.nlTurnL)  this.nlTurnL.intensity  = ta;
+      if (this.nlTurnLB) this.nlTurnLB.intensity = ta;
+      if (this.nlTurnR)  this.nlTurnR.intensity  = tb;
+      if (this.nlTurnRB) this.nlTurnRB.intensity = tb;
+    } else {
+      // Kill all ground lights when returning to day
+      [this.nlHeadL, this.nlHeadR, this.nlLowBeamL, this.nlLowBeamR,
+       this.nlFogF, this.nlFogR, this.nlBrake, this.nlRev, this.nlPos,
+       this.nlTurnL, this.nlTurnR, this.nlTurnLB, this.nlTurnRB]
+        .forEach(sl => { if (sl) sl.intensity = 0; });
+    }
+    // UI background
+    this._applyBackground(next, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
+  }
+
+  // Shared background texture generator — used for BOTH day and night modes.
+  // Drives scene.background so the vignette actually shows in the 3D canvas.
+  _makeBgTex(bgColor, vigColor, vigIntensity, dither) {
+    if (!this.THREE) return null;
+    const S = 1024;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d');
+    // Fill base color first, then overlay a radial vignette whose edge alpha
+    // is driven by intensity (0 = invisible, 100 = fully opaque vignette color).
+    // This avoids the "disk" artifact of the stop-position approach.
+    const alpha = (vigIntensity ?? 0) / 100;
+    const vc    = vigColor || '#000000';
+    const hex   = vc.replace('#','');
+    const r     = parseInt(hex.slice(0,2),16);
+    const g     = parseInt(hex.slice(2,4),16);
+    const b2    = parseInt(hex.slice(4,6),16);
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, S, S);
+    const grad  = ctx.createRadialGradient(S * 0.5, S * 0.46, 0, S * 0.5, S * 0.5, S * 0.74);
+    grad.addColorStop(0, `rgba(${r},${g},${b2},0)`);
+    grad.addColorStop(1, `rgba(${r},${g},${b2},${alpha.toFixed(3)})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, S, S);
+    // Film-grain dithering — only when grain effect is enabled
+    if (dither) {
+      const imgData = ctx.getImageData(0, 0, S, S);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * 10;
+        d[i]   = Math.max(0, Math.min(255, d[i]   + n));
+        d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
+        d[i+2] = Math.max(0, Math.min(255, d[i+2] + n));
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+    const tex = new this.THREE.CanvasTexture(cv);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  _setupNightSceneLights(center, size, baseY) {
+    if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
+
+    // ── Detect car orientation from actual light mesh positions ────────────
+    const grpCenter = (key) => {
+      const meshes = this.lightGroups && this.lightGroups[key];
+      if (!meshes || !meshes.length) return null;
+      const b = new THREE.Box3();
+      meshes.forEach(m => b.expandByObject(m));
+      return b.getCenter(new THREE.Vector3());
+    };
+    const hC = grpCenter('headlight');
+
+    // forwardDir: from car centre toward headlights (horizontal only)
+    let forwardDir;
+    if (hC) {
+      forwardDir = new THREE.Vector3().subVectors(hC, center).setY(0).normalize();
+    } else {
+      forwardDir = new THREE.Vector3(-1, 0, 0); // fallback
+    }
+    // leftDir: driver's left (90° CCW from forward in horizontal plane)
+    const leftDir = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forwardDir).normalize();
+
+    // Car width / length along the detected axes
+    const carW = size.x * Math.abs(leftDir.x)    + size.z * Math.abs(leftDir.z);
+    const carL = size.x * Math.abs(forwardDir.x) + size.z * Math.abs(forwardDir.z);
+
+    const frontPos = new THREE.Vector3().copy(center).addScaledVector(forwardDir,  carL * 0.46).setY(baseY);
+    const rearPos  = new THREE.Vector3().copy(center).addScaledVector(forwardDir, -carL * 0.46).setY(baseY);
+    const beamGnd  = new THREE.Vector3().copy(frontPos).addScaledVector(forwardDir, carL * 0.65).setY(baseY - 0.3);
+
+    // poolH above car height so the car body can cast shadow on the floor
+    const poolH = baseY + 2.4;
+    const hlH   = baseY + size.y * 0.30;
+    const pd    = Math.max(carW, carL) * 1.6;
+    const pa    = Math.PI / 1.4;   // wider cone since lights are higher up
+
+    const makePool = (hex, dist, angle) => {
+      const sl = new THREE.SpotLight(hex, 0, dist, angle, 0.60, 2);
+      sl.target = new THREE.Object3D();
+      this.scene.add(sl.target);
+      this.scene.add(sl);
+      return sl;
+    };
+    const aimDown = (sl, pos) => {
+      sl.position.set(pos.x, poolH, pos.z);
+      sl.target.position.set(pos.x, baseY - 3, pos.z);
+    };
+    const makeBeam = (hex, dist) => {
+      const sl = new THREE.SpotLight(hex, 0, dist, Math.PI / 7, 0.40, 2);
+      sl.target = new THREE.Object3D();
+      this.scene.add(sl.target);
+      this.scene.add(sl);
+      return sl;
+    };
+
+    // Headlight beams (L + R)
+    const hPosL = new THREE.Vector3().copy(frontPos).addScaledVector(leftDir,  carW * 0.28).setY(hlH);
+    const hPosR = new THREE.Vector3().copy(frontPos).addScaledVector(leftDir, -carW * 0.28).setY(hlH);
+    const btL   = new THREE.Vector3().copy(beamGnd).addScaledVector(leftDir,  carW * 0.10);
+    const btR   = new THREE.Vector3().copy(beamGnd).addScaledVector(leftDir, -carW * 0.10);
+
+    this.nlHeadL = makeBeam(0xd0e8ff, pd * 1.8);
+    this.nlHeadL.position.copy(hPosL);
+    this.nlHeadL.target.position.copy(btL);
+
+    this.nlHeadR = makeBeam(0xd0e8ff, pd * 1.8);
+    this.nlHeadR.position.copy(hPosR);
+    this.nlHeadR.target.position.copy(btR);
+
+    // Low-beam SpotLights (HEAD) — wider angle, shorter reach than high beams
+    const btLowL = new THREE.Vector3().copy(frontPos).addScaledVector(forwardDir, carL * 0.28).setY(baseY - 0.3).addScaledVector(leftDir,  carW * 0.08);
+    const btLowR = new THREE.Vector3().copy(frontPos).addScaledVector(forwardDir, carL * 0.28).setY(baseY - 0.3).addScaledVector(leftDir, -carW * 0.08);
+
+    this.nlLowBeamL = new THREE.SpotLight(0xd8edff, 0, pd * 1.4, Math.PI / 4.2, 0.52, 2);
+    this.nlLowBeamL.target = new THREE.Object3D();
+    this.scene.add(this.nlLowBeamL.target);
+    this.nlLowBeamL.position.copy(hPosL);
+    this.nlLowBeamL.target.position.copy(btLowL);
+    this.scene.add(this.nlLowBeamL);
+
+    this.nlLowBeamR = new THREE.SpotLight(0xd8edff, 0, pd * 1.4, Math.PI / 4.2, 0.52, 2);
+    this.nlLowBeamR.target = new THREE.Object3D();
+    this.scene.add(this.nlLowBeamR.target);
+    this.nlLowBeamR.position.copy(hPosR);
+    this.nlLowBeamR.target.position.copy(btLowR);
+    this.scene.add(this.nlLowBeamR);
+
+    // Pool lights — all aimed straight down from above car height
+    this.nlFogF  = makePool(0xe4eeff, pd * 1.0, pa);  aimDown(this.nlFogF,  frontPos);
+    this.nlBrake = makePool(0xff1800, pd * 1.1, pa);  aimDown(this.nlBrake, rearPos);
+    this.nlFogR  = makePool(0xff0000, pd * 0.8, pa);  aimDown(this.nlFogR,  rearPos);
+    this.nlRev   = makePool(0xffffff, pd * 0.85, pa); aimDown(this.nlRev,   rearPos);
+    // Position lights are at the front, not the centre
+    this.nlPos   = makePool(0xffe8c0, pd * 1.3, pa);  aimDown(this.nlPos,   frontPos);
+
+    // Turn signals: front + rear corners (3 per side = 6 total on the car)
+    const cornerAngle = Math.PI / 2.0;
+    const tFrontL = new THREE.Vector3().copy(frontPos).addScaledVector(leftDir,  carW * 0.46).setY(poolH * 0.65);
+    const tFrontR = new THREE.Vector3().copy(frontPos).addScaledVector(leftDir, -carW * 0.46).setY(poolH * 0.65);
+    const tRearL  = new THREE.Vector3().copy(rearPos).addScaledVector(leftDir,   carW * 0.46).setY(poolH * 0.65);
+    const tRearR  = new THREE.Vector3().copy(rearPos).addScaledVector(leftDir,  -carW * 0.46).setY(poolH * 0.65);
+
+    this.nlTurnL = makePool(0xff8800, pd * 0.7, cornerAngle);
+    this.nlTurnL.position.copy(tFrontL);
+    this.nlTurnL.target.position.set(tFrontL.x, baseY - 3, tFrontL.z);
+
+    this.nlTurnR = makePool(0xff8800, pd * 0.7, cornerAngle);
+    this.nlTurnR.position.copy(tFrontR);
+    this.nlTurnR.target.position.set(tFrontR.x, baseY - 3, tFrontR.z);
+
+    this.nlTurnLB = makePool(0xff8800, pd * 0.7, cornerAngle);
+    this.nlTurnLB.position.copy(tRearL);
+    this.nlTurnLB.target.position.set(tRearL.x, baseY - 3, tRearL.z);
+
+    this.nlTurnRB = makePool(0xff8800, pd * 0.7, cornerAngle);
+    this.nlTurnRB.position.copy(tRearR);
+    this.nlTurnRB.target.position.set(tRearR.x, baseY - 3, tRearR.z);
+
+    // Night floor — large enough to never clip beams or pools.
+    // white + AdditiveBlending = invisible where dark, shows pool colour where lit.
+    // receiveShadow = true so dirLight shadow catcher (car silhouette) composites on top.
+    const nfMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 1.0, metalness: 0, envMapIntensity: 0,
+    });
+    nfMat.blending = THREE.AdditiveBlending;
+    nfMat.transparent = true;
+    nfMat.depthWrite = false;
+    const dim = Math.max(carW, carL) * 12;   // large enough for full beam reach
+    const nightFloor = new THREE.Mesh(new THREE.PlaneGeometry(dim, dim), nfMat);
+    nightFloor.rotation.x = -Math.PI / 2;
+    nightFloor.position.set(center.x, baseY + 0.004, center.z);
+    nightFloor.renderOrder = 1;
+    nightFloor.receiveShadow = true;
+    nightFloor.visible = false;
+    this.scene.add(nightFloor);
+    this.nightFloor = nightFloor;
+  }
+
+  _updateNightLight(key, on) {
+    if (!this.state.nightMode) return;
+    if (key === 'headlight') {
+      const i = on ? 0.7 : 0;
+      if (this.nlLowBeamL) this.nlLowBeamL.intensity = i;
+      if (this.nlLowBeamR) this.nlLowBeamR.intensity = i;
+      if (this.nlBrake) {
+        const ls = this.state.lights || {};
+        if (!ls.brake) this.nlBrake.intensity = on ? 0.08 : 0;
+      }
+      return;
+    }
+    if (key === 'highbeam') {
+      const i = on ? 1.2 : 0;
+      if (this.nlHeadL) this.nlHeadL.intensity = i;
+      if (this.nlHeadR) this.nlHeadR.intensity = i;
+      return;
+    }
+    // Turn signals: front + rear corners both blink together
+    if (key === 'turnL') {
+      const i = on ? 0.04 : 0;
+      if (this.nlTurnL)  this.nlTurnL.intensity  = i;
+      if (this.nlTurnLB) this.nlTurnLB.intensity = i;
+      return;
+    }
+    if (key === 'turnR') {
+      const i = on ? 0.04 : 0;
+      if (this.nlTurnR)  this.nlTurnR.intensity  = i;
+      if (this.nlTurnRB) this.nlTurnRB.intensity = i;
+      return;
+    }
+    const map = {
+      fogFront:      { pl: this.nlFogF,  i: 0.10 },
+      fogRear:       { pl: this.nlFogR,  i: 0.12 },
+      brake:         { pl: this.nlBrake, i: 0.10 },
+      reverse:       { pl: this.nlRev,   i: 0.07 },
+      positionFront: { pl: this.nlPos,   i: 0.08 },
+    };
+    const e = map[key];
+    if (e && e.pl) e.pl.intensity = on ? e.i : 0;
   }
 
   setColor(key) {
@@ -252,9 +798,9 @@ class Component extends DCLogic {
     const img = ctx.createImageData(S, S);
     for (let i = 0; i < S * S; i++) {
       const a = Math.random() * Math.PI * 2;
-      const r = Math.pow(Math.random(), 1.5) * 0.85;  // mostly flat, occasional steep flake
-      img.data[i * 4]     = 128 + Math.cos(a) * r * 127;
-      img.data[i * 4 + 1] = 128 + Math.sin(a) * r * 127;
+      const r = Math.pow(Math.random(), 1.5) * 0.85; // mostly flat, occasional steep
+      img.data[i * 4]     = 128 + Math.round(Math.cos(a) * r * 127);
+      img.data[i * 4 + 1] = 128 + Math.round(Math.sin(a) * r * 127);
       img.data[i * 4 + 2] = 255;
       img.data[i * 4 + 3] = 255;
     }
@@ -427,6 +973,1064 @@ class Component extends DCLogic {
     if (this.renderer) this.renderer.toneMappingExposure = v;
   }
 
+  // ── Lights ──────────────────────────────────────────────────────────────
+  // Called from onModelLoaded to collect light meshes by material name
+  collectLightMeshes(obj) {
+    // Store MESH references (not material refs) so _setGroupEmissive always
+    // operates on the live mesh.material and never holds stale pointers.
+    const groups = {
+      positionFront: [], positionRear: [], headlight: [], fogFront: [], fogRear: [], turnL: [],
+      turnR: [], brake: [], reverse: [],
+    };
+    obj.traverse((c) => {
+      if (!c.isMesh) return;
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      mats.forEach((m) => {
+        if (!m) return;
+        const n = m.name || '';
+        if (/PositionLight_Front/i.test(n)) groups.positionFront.push(c);
+        if (/PositionLight_Rear/i.test(n))  groups.positionRear.push(c);
+        if (/HeadlightMain/i.test(n))  groups.headlight.push(c);
+        if (/FogLight[^_]|Fog_Light_Front|FogLamp|FogFront|Fog_Front|HeadlightFog|Fog[_\s]?F[^a-z]/i.test(n)) groups.fogFront.push(c);
+        if (/FogLight_Rear|Fog_Rear|FogRear|RearFog|Fog[_\s]?R[^a-z]|CenterFog|FogCenter|FogBack/i.test(n)) groups.fogRear.push(c);
+        if (/Light.Turn.L/i.test(n))   groups.turnL.push(c);
+        if (/Light.Turn.R/i.test(n))   groups.turnR.push(c);
+        if (/BrakeLight/i.test(n))     groups.brake.push(c);
+        if (/ReverseLight/i.test(n))   groups.reverse.push(c);
+      });
+    });
+    this.lightGroups = groups;
+    // Put all light meshes on layer 1 so the dedicated bloom camera sees only them
+    // Split positionFront into L/R by world-space Z centre (Z>0 = left, Z<0 = right)
+    const box3 = new THREE.Box3();
+    const getZ = m => { box3.setFromObject(m); return box3.getCenter(new THREE.Vector3()).z; };
+    // NOTE: This model has FULLY SEPARATED rear-cluster meshes — Brake,
+    // PositionLight_Rear, ReverseLight and Light Turn L/R each own dedicated
+    // geometry. The old combined-geometry workarounds (trimming the position bar
+    // away from brake "teeth", and dropping a wide brake strip that doubled as
+    // reverse) are NOT needed here and would damage the real meshes, so they are
+    // intentionally omitted. Each material group lights its own meshes cleanly.
+    groups.positionFrontL = groups.positionFront.filter(m => getZ(m) > 0.1);
+    groups.positionFrontR = groups.positionFront.filter(m => getZ(m) < -0.1);
+    // If no side meshes exist (single centred strip), split the geometry by Z.
+    if (!groups.positionFrontL.length && !groups.positionFrontR.length && groups.positionFront.length) {
+      const split = this._splitMeshesByZ(groups.positionFront);
+      if (split.L.length || split.R.length) {
+        groups.positionFrontL = split.L;
+        groups.positionFrontR = split.R;
+        groups.positionFront = [...split.L, ...split.R];
+      }
+    }
+    // ── Resolve rear-cluster z-fighting ───────────────────────────────────
+    // The rear emitter shells (Brake / PositionLight_Rear / ReverseLight) are
+    // modelled as INTERPENETRATING thin shells at nearly the same depth (e.g.
+    // center brake Y 1.135–1.206 vs reverse Y 1.188–1.211, both full-width and
+    // overlapping in X). With equal depth the GPU picks a winner per-pixel, so a
+    // lit brake bleeds its red over the (unlit) reverse strip and vice-versa.
+    // We DON'T touch the model — instead give each material a distinct
+    // polygonOffset so they render at separated depths and never z-fight.
+    // Priority (closest→farthest from the rear camera): reverse > brake > position.
+    const setPO = (re, factor, units) => {
+      obj.traverse(c => {
+        if (!c.isMesh) return;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach(m => {
+          if (!m || !re.test(m.name || '')) return;
+          m.polygonOffset = true;
+          m.polygonOffsetFactor = factor;
+          m.polygonOffsetUnits = units;
+          m.needsUpdate = true;
+        });
+      });
+    };
+    setPO(/ReverseLight/i,      -2, -4);  // pull toward camera → wins over brake
+    setPO(/BrakeLight/i,         0,  0);  // neutral
+    setPO(/PositionLight_Rear/i, 2,  4);  // push back → behind brake/reverse
+    // Merge front+rear for the toggle key
+    groups.position = [...groups.positionFront, ...groups.positionRear];
+    const BL = this.BLOOM_LAYER || 1;
+    // Start with ALL light meshes OFF layer 1 — they join only when turned on
+    Object.values(groups).forEach(arr => arr.forEach(mesh => mesh.layers.disable(BL)));
+    // Fog assignments are set by the user via pick mode (click on model).
+    // Load any previously saved assignments from localStorage.
+    this._loadFogAssignments(obj, groups);
+    // The headlight is a single full-width mesh containing all 4 lamps (inner
+    // projectors + outer DRLs). Split its geometry by |Z|: inner (small |Z|,
+    // closer to centre) = high beam, outer (large |Z|) = head/low beam.
+    if (groups.headlight.length === 1) {
+      const split = this._splitMeshByAbsZ(groups.headlight[0], 0.72);
+      if (split) {
+        groups.highbeam  = [split.inner];
+        groups.headlight = [split.outer];
+        split.inner.layers.disable(BL);
+        split.outer.layers.disable(BL);
+        // Darken both emitter sub-meshes immediately (lights start off at load)
+        // Glass-like: dark tinted + very low roughness so HDRI reflects in it
+        [split.inner, split.outer].forEach(mesh => {
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          mats.forEach(m => {
+            if (!m) return;
+            m._hlOrigColor     = m.color.clone();
+            m._hlOrigRoughness = m.roughness !== undefined ? m.roughness : 0.5;
+            m._hlOrigMetalness = m.metalness !== undefined ? m.metalness : 0;
+            m.color.setRGB(0.06, 0.06, 0.07);  // dark but not black
+            m.roughness = 0.12;                  // very smooth → reflective
+            m.metalness = 0.35;                  // picks up env map
+            m.needsUpdate = true;
+          });
+        });
+        console.log('[Lights] headlight geometry split ✓ — inner→high, outer→head');
+      } else {
+        console.warn('[Lights] headlight geometry split failed');
+      }
+    }
+    const summary = {};
+    Object.keys(groups).forEach(k => { summary[k] = groups[k].length; });
+    window.__lightGroups = summary;
+    console.log('[Lights]', summary);
+  }
+
+  // Selective-bloom helpers: black out every mesh that ISN'T an active light so
+  // the bloom pass renders only emissive lights, while solid geometry still
+  // writes depth (and black colour) — occluding lights hidden behind the body.
+  _darkenNonStreak(scene) {
+    if (!this._blackMat) this._blackMat = new this.THREE.MeshBasicMaterial({ color: 0x000000 });
+    if (!this._matStore) this._matStore = new Map();
+    if (!this._hiddenForBloom) this._hiddenForBloom = [];
+    const set = this._streakMeshSet || new Set();
+    scene.traverse((o) => {
+      if (!o.isMesh || !o.visible || set.has(o)) return;
+      const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+      if (mat && mat.transparent) {
+        o.visible = false;
+        this._hiddenForBloom.push(o);
+      } else {
+        this._matStore.set(o, o.material);
+        o.material = this._blackMat;
+      }
+    });
+  }
+
+  _darkenNonBloom(scene) {
+    if (!this._blackMat) this._blackMat = new this.THREE.MeshBasicMaterial({ color: 0x000000 });
+    if (!this._matStore) this._matStore = new Map();
+    if (!this._hiddenForBloom) this._hiddenForBloom = [];
+    const set = this._bloomMeshSet || new Set();
+    scene.traverse((o) => {
+      if (!o.isMesh || !o.visible || set.has(o)) return;
+      const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+      if (mat && mat.transparent) {
+        // Hide transparent glass so lens covers don't occlude bloom from lights behind them
+        o.visible = false;
+        this._hiddenForBloom.push(o);
+      } else {
+        this._matStore.set(o, o.material);
+        o.material = this._blackMat;
+      }
+    });
+  }
+  _restoreMaterials() {
+    if (this._matStore) {
+      this._matStore.forEach((mat, o) => { o.material = mat; });
+      this._matStore.clear();
+    }
+    if (this._hiddenForBloom) {
+      this._hiddenForBloom.forEach((o) => { o.visible = true; });
+      this._hiddenForBloom.length = 0;
+    }
+  }
+
+  // Trim a mesh in place to keep only triangles whose world-Y centroid is at or
+  // above minWorldY (used to drop the cluster faces below the rear signature bar).
+  _trimMeshAboveY(mesh, minWorldY) {
+    const THREE = this.THREE;
+    const geo = mesh.geometry;
+    const pos = geo.attributes.position;
+    if (!pos) return;
+    const index = geo.index;
+    const triCount = index ? index.count / 3 : pos.count / 3;
+    const keep = [];
+    const v = new THREE.Vector3();
+    mesh.updateMatrixWorld(true);
+    for (let t = 0; t < triCount; t++) {
+      const a = index ? index.getX(t*3)   : t*3;
+      const b = index ? index.getX(t*3+1) : t*3+1;
+      const c = index ? index.getX(t*3+2) : t*3+2;
+      let yc = 0;
+      [a, b, c].forEach(i => { v.fromBufferAttribute(pos, i); mesh.localToWorld(v); yc += v.y; });
+      yc /= 3;
+      if (yc >= minWorldY) keep.push(a, b, c);
+    }
+    if (keep.length) geo.setIndex(keep);
+  }
+
+  // Split each mesh into left (worldZ>0) and right (worldZ<0) halves by triangle
+  // centroid. Each half gets its own cloned material so they emit independently.
+  // Split a single mesh into inner (|worldZ| < threshold) and outer (|worldZ| >= threshold)
+  // sub-meshes by triangle centroid. Used to separate inner high-beam projectors from the
+  // outer DRL/head beam when they share one geometry. Returns { inner, outer } meshes.
+  _splitMeshByAbsZ(mesh, threshold) {
+    const THREE = this.THREE;
+    const geo = mesh.geometry;
+    const pos = geo.attributes.position;
+    if (!pos) return null;
+    const index = geo.index;
+    const triCount = index ? index.count / 3 : pos.count / 3;
+    const innerIdx = [], outerIdx = [];
+    const v = new THREE.Vector3();
+    mesh.updateMatrixWorld(true);
+    for (let t = 0; t < triCount; t++) {
+      const a = index ? index.getX(t*3)   : t*3;
+      const b = index ? index.getX(t*3+1) : t*3+1;
+      const c = index ? index.getX(t*3+2) : t*3+2;
+      let zc = 0;
+      [a, b, c].forEach(i => { v.fromBufferAttribute(pos, i); mesh.localToWorld(v); zc += Math.abs(v.z); });
+      zc /= 3;
+      if (zc < threshold) innerIdx.push(a, b, c); else outerIdx.push(a, b, c);
+    }
+    if (!innerIdx.length || !outerIdx.length) return null;
+    const baseMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    const makeSub = (idxArr) => {
+      const g = geo.clone();
+      g.setIndex(idxArr);
+      const mat = baseMat.clone();
+      if (mat.emissive) mat.emissive.setRGB(0, 0, 0);
+      mat.emissiveIntensity = 0;
+      const m = new THREE.Mesh(g, mat);
+      m.position.copy(mesh.position);
+      m.quaternion.copy(mesh.quaternion);
+      m.scale.copy(mesh.scale);
+      m.castShadow = mesh.castShadow;
+      m.receiveShadow = mesh.receiveShadow;
+      m.layers.disable(this.BLOOM_LAYER || 1);
+      (mesh.parent || this.scene).add(m);
+      return m;
+    };
+    const inner = makeSub(innerIdx);
+    const outer = makeSub(outerIdx);
+    mesh.visible = false; // hide original undivided mesh
+    return { inner, outer };
+  }
+
+  _splitMeshesByZ(meshes) {
+    const THREE = this.THREE;
+    const L = [], R = [];
+    meshes.forEach((mesh) => {
+      const geo = mesh.geometry;
+      const pos = geo.attributes.position;
+      if (!pos) return;
+      const index = geo.index;
+      const triCount = index ? index.count / 3 : pos.count / 3;
+      const leftIdx = [], rightIdx = [];
+      const v = new THREE.Vector3();
+      mesh.updateMatrixWorld(true);
+      for (let t = 0; t < triCount; t++) {
+        const a = index ? index.getX(t*3)   : t*3;
+        const b = index ? index.getX(t*3+1) : t*3+1;
+        const c = index ? index.getX(t*3+2) : t*3+2;
+        let zc = 0;
+        [a, b, c].forEach(i => { v.fromBufferAttribute(pos, i); mesh.localToWorld(v); zc += v.z; });
+        zc /= 3;
+        if (zc > 0) leftIdx.push(a, b, c); else rightIdx.push(a, b, c);
+      }
+      const baseMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+      const makeHalf = (idxArr, arr) => {
+        if (!idxArr.length) return;
+        const g = geo.clone();
+        g.setIndex(idxArr);
+        const mat = baseMat.clone();
+        if (mat.emissive) mat.emissive.setRGB(0, 0, 0);
+        mat.emissiveIntensity = 0;
+        const m = new THREE.Mesh(g, mat);
+        m.position.copy(mesh.position);
+        m.quaternion.copy(mesh.quaternion);
+        m.scale.copy(mesh.scale);
+        m.castShadow = mesh.castShadow;
+        m.receiveShadow = mesh.receiveShadow;
+        m.layers.disable(this.BLOOM_LAYER || 1);
+        (mesh.parent || this.scene).add(m);
+        arr.push(m);
+      };
+      makeHalf(leftIdx, L);
+      makeHalf(rightIdx, R);
+      mesh.visible = false; // hide the original undivided strip
+    });
+    return { L, R };
+  }
+
+  // Extract a connected face component from a mesh starting at faceIndex.
+  // Returns a new Mesh with just those faces, or null if extraction fails.
+  _extractConnectedComponent(mesh, faceIndex) {
+    const geo = mesh.geometry;
+    if (!geo || !geo.index) return null;
+    const idx = geo.index.array;
+    const pos = geo.attributes.position;
+    if (!pos) return null;
+    const triCount = idx.length / 3;
+
+    // Build vertex → triangle adjacency (which tris share each vertex)
+    const vertToTris = new Map();
+    for (let t = 0; t < triCount; t++) {
+      for (let v = 0; v < 3; v++) {
+        const vi = idx[t * 3 + v];
+        if (!vertToTris.has(vi)) vertToTris.set(vi, []);
+        vertToTris.get(vi).push(t);
+      }
+    }
+
+    // Flood-fill from faceIndex through shared vertices
+    const visited = new Uint8Array(triCount);
+    const queue = [faceIndex];
+    visited[faceIndex] = 1;
+    const component = [faceIndex];
+    while (queue.length) {
+      const t = queue.shift();
+      for (let v = 0; v < 3; v++) {
+        const vi = idx[t * 3 + v];
+        (vertToTris.get(vi) || []).forEach(nt => {
+          if (!visited[nt]) { visited[nt] = 1; queue.push(nt); component.push(nt); }
+        });
+      }
+    }
+
+    // If all faces are connected (single component) just clone the mesh
+    if (component.length === triCount) {
+      const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material).clone();
+      const m = new this.THREE.Mesh(geo, mat);
+      m.position.copy(mesh.position); m.quaternion.copy(mesh.quaternion); m.scale.copy(mesh.scale);
+      m._fogMatCloned = true; m._extractedFog = true;
+      mesh.parent && mesh.parent.add(m);
+      return m;
+    }
+
+    // Build new index array for this component only
+    const newIdx = [];
+    component.forEach(t => { newIdx.push(idx[t*3], idx[t*3+1], idx[t*3+2]); });
+
+    const newGeo = geo.clone();
+    newGeo.setIndex(newIdx);
+    // Trim to only referenced vertices via computeVertexNormals + compactly
+    newGeo.computeBoundingBox();
+
+    const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material).clone();
+    const subMesh = new this.THREE.Mesh(newGeo, mat);
+    subMesh.position.copy(mesh.position);
+    subMesh.quaternion.copy(mesh.quaternion);
+    subMesh.scale.copy(mesh.scale);
+    subMesh.matrixAutoUpdate = true;
+    subMesh._fogMatCloned = true;
+    subMesh._extractedFog = true;
+
+    // Hide the source mesh, add sub-mesh in its place
+    mesh.visible = false;
+    mesh.parent && mesh.parent.add(subMesh);
+
+    // Save stable ID: sourceId|f{faceIndex} — triangle index is stable for same GLB
+    subMesh._fogStableId = this._meshStableId(mesh) + '|f' + faceIndex;
+    console.log('[FogRear] Extracted component:', component.length, '/', triCount, 'tris, id:', subMesh._fogStableId);
+    return subMesh;
+  }
+
+  _setRearGlassTweak(key, val) {
+    const parsed = key === 'color' ? val : parseFloat(val);
+    const gt = { ...this.state.rearGlassTweaks, [key]: parsed };
+    this.setState({ rearGlassTweaks: gt });
+    this._applyRearGlassTweaks(gt);
+  }
+
+  _applyRearGlassTweaks(tweaks) {
+    if (!this.scene) return;
+    this.scene.traverse(c => {
+      if (!c.isMesh) return;
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      mats.forEach(m => {
+        if (!m || !/rear.lights|glass.*rear/i.test(m.name || '')) return;
+        m.opacity        = tweaks.opacity;
+        m.roughness      = tweaks.roughness;
+        m.transmission   = tweaks.transmission;
+        m.envMapIntensity = tweaks.envMap;
+        m.clearcoat      = tweaks.clearcoat;
+        if (tweaks.color && m.color) {
+          const hex = tweaks.color.replace('#','');
+          m.color.setRGB(parseInt(hex.slice(0,2),16)/255, parseInt(hex.slice(2,4),16)/255, parseInt(hex.slice(4,6),16)/255);
+        }
+        m.needsUpdate = true;
+        if (this.renderer) this.renderer.properties.remove(m);
+      });
+    });
+  }
+
+  _setGlassTweak(key, val) {
+    const parsed = key === 'color' ? val : parseFloat(val);
+    const gt = { ...this.state.glassTweaks, [key]: parsed };
+    this.setState({ glassTweaks: gt });
+    this._applyGlassTweaks(gt);
+  }
+
+  _applyGlassTweaks(tweaks) {
+    if (!this.scene) return;
+    this.scene.traverse(c => {
+      if (!c.isMesh) return;
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      mats.forEach(m => {
+        if (!m || !m.isMeshPhysicalMaterial || !m._isHeadlightGlass) return;
+        m.opacity           = tweaks.opacity;
+        m.iridescence       = tweaks.iridescence;
+        m.iridescenceIOR    = tweaks.iridIOR;
+        m.iridescenceThicknessRange = [tweaks.thickMin, tweaks.thickMax];
+        m.reflectivity = tweaks.fresnel !== undefined ? tweaks.fresnel : 1.0;
+        m.specularIntensity = tweaks.fresnel !== undefined ? tweaks.fresnel : 1.0;
+        m.clearcoat         = tweaks.clearcoat;
+        m.envMapIntensity   = tweaks.envMap;
+        if (tweaks.color && m.color) {
+          const hex = tweaks.color.replace('#','');
+          const r = parseInt(hex.slice(0,2),16)/255;
+          const g = parseInt(hex.slice(2,4),16)/255;
+          const b = parseInt(hex.slice(4,6),16)/255;
+          m.color.setRGB(r, g, b);
+        }
+        m.needsUpdate = true;
+        // Force shader recompile so clearcoat/iridescence feature flags take effect
+        if (this.renderer) this.renderer.properties.remove(m);
+      });
+    });
+  }
+
+  // ── Fog assignment persistence ──────────────────────────────────────────
+  _fogStorageKey() { return 'h6_fog_v2'; } // v2 uses stable mesh+mat names
+
+  _meshStableId(mesh) {
+    if (mesh._fogStableId) return mesh._fogStableId;
+    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    return (mesh.name || '') + '|' + ((mat && mat.name) || '');
+  }
+
+  _loadFogAssignments(obj, groups) {
+    // Hardcoded defaults — baked from user assignment session.
+    // localStorage overrides these if the user re-assigns.
+    const DEFAULTS = {
+      fogFront: ['BuildingMesh-00026|HeadlightMain'],
+      fogRear:  ['BuildingMesh-00027|Glass (Rear Lights)|f179'],
+    };
+    try {
+      const stored = JSON.parse(localStorage.getItem(this._fogStorageKey()) || '{}');
+      // Merge: use stored value if present, else fall back to default
+      const saved = {
+        fogFront: (stored.fogFront && stored.fogFront.length) ? stored.fogFront : DEFAULTS.fogFront,
+        fogRear:  (stored.fogRear  && stored.fogRear.length)  ? stored.fogRear  : DEFAULTS.fogRear,
+      };
+      const byId = {};
+      obj.traverse(c => { if (c.isMesh) byId[this._meshStableId(c)] = c; });
+      ['fogFront','fogRear'].forEach(key => {
+        if (saved[key] && saved[key].length) {
+          // Handle centroid-based IDs for extracted rear fog components: sourceId|cx,cy,cz
+          const meshes = saved[key]
+            .map(id => {
+              if (!id.includes('|f') && !id.includes('|cx')) return byId[id]; // normal mesh
+              // Re-extract from source mesh by face index (|f) or legacy centroid (|cx)
+              if (id.includes('|f')) {
+                const parts = id.split('|f');
+                const srcId = parts[0];
+                const faceIdx = parseInt(parts[1]);
+                const src = byId[srcId];
+                if (!src || !src.geometry || !src.geometry.index) { console.warn('[FogLoad] src not found for', srcId); return null; }
+                console.log('[FogLoad] Re-extracting by face index', faceIdx, 'from', srcId);
+                return this._extractConnectedComponent(src, faceIdx);
+              }
+              // Legacy |cx centroid path — just pick face 0 as seed (will re-save as |f on next pick)
+              const srcId2 = id.split('|cx')[0];
+              const src2 = byId[srcId2];
+              if (!src2 || !src2.geometry || !src2.geometry.index) return null;
+              console.log('[FogLoad] Legacy cx id, re-extracting from face 0:', srcId2);
+              return this._extractConnectedComponent(src2, 0);
+            }).filter(Boolean);
+          if (meshes.length) {
+            meshes.forEach(mesh => {
+              if (mesh._fogMatCloned) return;
+              const isArr = Array.isArray(mesh.material);
+              const mats = isArr ? mesh.material : [mesh.material];
+              mesh.material = isArr ? mats.map(m => m ? m.clone() : m) : mats[0].clone();
+              mesh._fogMatCloned = true;
+            });
+            groups[key] = meshes;
+            console.log('[Lights] Loaded', key, meshes.length, 'meshes:', saved[key]);
+          }
+        }
+      });
+      ['fogFront','fogRear'].forEach(key => {
+        if (saved[key] && saved[key].length) {
+          const meshes = saved[key].map(id => byId[id]).filter(Boolean);
+          if (meshes.length) {
+            meshes.forEach(mesh => {
+              if (mesh._fogMatCloned) return;
+              const isArr = Array.isArray(mesh.material);
+              const mats = isArr ? mesh.material : [mesh.material];
+              const cloned = mats.map(m => m ? m.clone() : m);
+              mesh.material = isArr ? cloned : cloned[0];
+              mesh._fogMatCloned = true;
+            });
+            groups[key] = meshes;
+            console.log('[Lights] Loaded', key, meshes.length, 'meshes:', saved[key]);
+          }
+        }
+      });
+      // Remove fogFront meshes from headlight so HEAD doesn't control them
+      if (groups.fogFront.length) {
+        const fogSet = new Set(groups.fogFront);
+        groups.headlight = groups.headlight.filter(m => !fogSet.has(m));
+      }
+    } catch(e) { console.warn('[Lights] load fog assignments failed:', e); }
+  }
+
+  // Called after model + fog assignments are ready; zeroes out fog emissives
+  // so the car starts in a fully-off state regardless of previous material state.
+  _applyInitialFogStates() {
+    if (!this.lightGroups) return;
+    // fogFront off: darken the lens and zero emissive
+    (this.lightGroups.fogFront || []).forEach(mesh => {
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach(m => {
+        if (!m) return;
+        if (!m._fogOrigColor) m._fogOrigColor = m.color ? m.color.clone() : null;
+        if (m._fogOrigRoughness === undefined) m._fogOrigRoughness = m.roughness !== undefined ? m.roughness : 0.5;
+        if (m._fogOrigMetalness === undefined) m._fogOrigMetalness = m.metalness !== undefined ? m.metalness : 0;
+        if (m.color) m.color.setRGB(0.02, 0.02, 0.02);
+        m.roughness = 0.95; m.metalness = 0.0;
+        if (m.emissive) m.emissive.setRGB(0, 0, 0);
+        m.emissiveIntensity = 0;
+        m.needsUpdate = true;
+      });
+      mesh.layers.disable(this.BLOOM_LAYER || 1);
+      mesh.layers.disable(this.STREAK_LAYER || 2);
+    });
+    // fogRear off: zero emissive
+    (this.lightGroups.fogRear || []).forEach(mesh => {
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach(m => {
+        if (!m) return;
+        if (m.emissive) m.emissive.setRGB(0, 0, 0);
+        m.emissiveIntensity = 0;
+        m.needsUpdate = true;
+      });
+      mesh.layers.disable(this.BLOOM_LAYER || 1);
+    });
+    // turnL/turnR off: zero baked emissive (#ff4403 from GLTF), darken base color
+    ['turnL', 'turnR'].forEach(key => {
+      (this.lightGroups[key] || []).forEach(mesh => {
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach(m => {
+          if (!m) return;
+          if (!m._turnOrigColor) m._turnOrigColor = m.color.clone(); // save #555555
+          m.color.setRGB(0.04, 0.02, 0.00); // dark amber-tinted → bloom captures clean orange
+          if (m.emissive) m.emissive.setRGB(0, 0, 0);
+          m.emissiveIntensity = 0;
+          m.toneMapped = true;
+          m.needsUpdate = true;
+        });
+        mesh.layers.disable(this.BLOOM_LAYER || 1);
+        mesh.layers.disable(this.STREAK_LAYER || 2);
+      });
+    });
+    // brake/reverse off: darken base color so the red/white plastic reads dimly
+    // through the rear glass cover when the light is not active.
+    // Original color saved as _rearOrigColor; restored when light fires.
+    ['brake', 'reverse'].forEach(key => {
+      (this.lightGroups[key] || []).forEach(mesh => {
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach(m => {
+          if (!m) return;
+          if (!m._rearOrigColor) m._rearOrigColor = m.color.clone();
+          m.color.setRGB(
+            m._rearOrigColor.r * 0.18,
+            m._rearOrigColor.g * 0.18,
+            m._rearOrigColor.b * 0.18
+          );
+          if (m.emissive) m.emissive.setRGB(0, 0, 0);
+          m.emissiveIntensity = 0;
+          m.needsUpdate = true;
+        });
+        mesh.layers.disable(this.BLOOM_LAYER || 1);
+      });
+    });
+  }
+
+  _saveFogAssignments() {
+    if (!this.lightGroups) return;
+    const data = {};
+    ['fogFront','fogRear'].forEach(key => {
+      data[key] = (this.lightGroups[key] || []).map(m => this._meshStableId(m));
+    });
+    localStorage.setItem(this._fogStorageKey(), JSON.stringify(data));
+    console.log('[Lights] Saved fog assignments:', data);
+  }
+
+  // Highlight a mesh temporarily (cyan tint) to show it's selected/hovered
+  _flashMesh(mesh, on) {
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    mats.forEach(m => {
+      if (!m) return;
+      if (on) {
+        if (!m._preAssignEmissive) m._preAssignEmissive = m.emissive ? m.emissive.clone() : new this.THREE.Color(0,0,0);
+        if (!m._preAssignIntensity) m._preAssignIntensity = m.emissiveIntensity || 0;
+        if (m.emissive) m.emissive.setRGB(0.1, 0.85, 1.0);
+        m.emissiveIntensity = 3.0;
+      } else {
+        if (m._preAssignEmissive && m.emissive) m.emissive.copy(m._preAssignEmissive);
+        if (m._preAssignIntensity !== undefined) m.emissiveIntensity = m._preAssignIntensity;
+        m._preAssignEmissive = null;
+        m._preAssignIntensity = undefined;
+      }
+      m.needsUpdate = true;
+    });
+  }
+
+  enterAssignMode(groupKey) {
+    this.exitAssignMode();
+    this.setState({ assignMode: groupKey });
+    const canvas = this.renderer && this.renderer.domElement;
+    if (!canvas) return;
+    canvas.style.cursor = 'crosshair';
+    this._assignHovered = null;
+
+    this._hiddenGlassMeshes = []; // no longer hiding glass — we now pick it directly
+
+    this._onAssignMove = (e) => {
+      // For fogRear, only highlight glass/transparent meshes
+      const pool = groupKey === 'fogRear' ? this._getGlassMeshes() : null;
+      const hit = this._raycastMesh(e, pool);
+      if (hit !== this._assignHovered) {
+        if (this._assignHovered) this._flashMesh(this._assignHovered, false);
+        this._assignHovered = hit;
+        if (hit) this._flashMesh(hit, true);
+      }
+    };
+    this._onAssignClick = (e) => {
+      if (e.button !== 0) return;
+      const pool = groupKey === 'fogRear' ? this._getGlassMeshes() : null;
+      const hit = this._raycastMesh(e, pool);
+      if (!hit) return;
+      if (groupKey === 'fogRear') {
+        // Flood-fill from the clicked triangle on any glass mesh to extract just this lens component.
+        const allTargets = [];
+        this.scene.traverse(c => { if (c.isMesh && c.visible) allTargets.push(c); });
+        const rect3 = this.renderer.domElement.getBoundingClientRect();
+        const mouse3 = new this.THREE.Vector2(
+          ((e.clientX - rect3.left) / rect3.width)  * 2 - 1,
+          -((e.clientY - rect3.top)  / rect3.height) * 2 + 1
+        );
+        const rc3 = new this.THREE.Raycaster();
+        rc3.setFromCamera(mouse3, this.camera);
+        const hits3 = rc3.intersectObjects(allTargets, false);
+        if (!hits3.length) return;
+        const { object: srcMesh, faceIndex } = hits3[0];
+        const subMesh = this._extractConnectedComponent(srcMesh, faceIndex);
+        const target = subMesh || srcMesh;
+        // Save original opacity for restore when light is off
+        const tmat = Array.isArray(target.material) ? target.material[0] : target.material;
+        if (tmat && tmat._origOpacity === undefined) tmat._origOpacity = tmat.opacity || 1.0;
+        this.lightGroups[groupKey] = [target];
+        this._flashMesh(target, false);
+        this._assignHovered = null;
+        this._saveFogAssignments();
+        this.forceUpdate();
+        this.exitAssignMode();
+        return;
+      }
+      if (groupKey === 'fogFront') {
+        // Clone material so emissive doesn't bleed to other meshes sharing it
+        const cloneMat = (mesh) => {
+          if (mesh._fogMatCloned) return;
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          const cloned = mats.map(m => m ? m.clone() : m);
+          mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
+          mesh._fogMatCloned = true;
+        };
+        const idx = grp.indexOf(hit);
+        const mirrorOf = (mesh) => {
+          if (!this.lightGroups) return null;
+          const b = new this.THREE.Box3().setFromObject(mesh);
+          const hitZ = b.getCenter(new this.THREE.Vector3()).z;
+          // Find the mesh in the same material group with the closest opposite Z
+          const pool = [...(this.lightGroups.headlight || []), ...(this.lightGroups.fogFront || []), mesh];
+          let best = null, bestDiff = Infinity;
+          pool.forEach(m => {
+            if (m === mesh) return;
+            const mb = new this.THREE.Box3().setFromObject(m);
+            const mz = mb.getCenter(new this.THREE.Vector3()).z;
+            const diff = Math.abs(mz + hitZ); // mirror: mz ≈ -hitZ
+            if (diff < bestDiff) { bestDiff = diff; best = m; }
+          });
+          return (bestDiff < 0.5 && best) ? best : null;
+        };
+        const mirror = mirrorOf(hit);
+        if (idx >= 0) {
+          grp.splice(idx, 1);
+          if (mirror) { const mi = grp.indexOf(mirror); if (mi >= 0) grp.splice(mi, 1); }
+          // restore to headlight
+          if (this.lightGroups.headlight) {
+            [hit, mirror].filter(Boolean).forEach(m => { if (!this.lightGroups.headlight.includes(m)) this.lightGroups.headlight.push(m); });
+          }
+        } else {
+          cloneMat(hit);
+          grp.push(hit);
+          if (mirror) { cloneMat(mirror); if (!grp.includes(mirror)) grp.push(mirror); }
+          // remove from headlight
+          if (this.lightGroups.headlight) {
+            this.lightGroups.headlight = this.lightGroups.headlight.filter(m => m !== hit && m !== mirror);
+          }
+        }
+        this.lightGroups[groupKey] = grp;
+        this._saveFogAssignments();
+        this._flashMesh(hit, false);
+        this._assignHovered = null;
+        this.forceUpdate();
+        return;
+      }
+    };
+    this._onAssignKey = (e) => { if (e.key === 'Escape') this.exitAssignMode(); };
+    canvas.addEventListener('mousemove', this._onAssignMove);
+    canvas.addEventListener('click', this._onAssignClick);
+    window.addEventListener('keydown', this._onAssignKey);
+  }
+
+  exitAssignMode() {
+    const canvas = this.renderer && this.renderer.domElement;
+    if (canvas) {
+      canvas.style.cursor = '';
+      if (this._onAssignMove) canvas.removeEventListener('mousemove', this._onAssignMove);
+      if (this._onAssignClick) canvas.removeEventListener('click', this._onAssignClick);
+    }
+    if (this._onAssignKey) window.removeEventListener('keydown', this._onAssignKey);
+    if (this._assignHovered) { this._flashMesh(this._assignHovered, false); this._assignHovered = null; }
+    // Restore any glass meshes hidden during fogRear pick mode
+    if (this._hiddenGlassMeshes && this._hiddenGlassMeshes.length) {
+      this._hiddenGlassMeshes.forEach(c => { c.visible = true; });
+      this._hiddenGlassMeshes = [];
+    }
+    this._onAssignMove = null;
+    this._onAssignClick = null;
+    this._onAssignKey = null;
+    this.setState({ assignMode: null });
+  }
+
+  _getGlassMeshes() {
+    const meshes = [];
+    this.scene && this.scene.traverse(c => {
+      if (!c.isMesh || !c.visible) return;
+      const mat = Array.isArray(c.material) ? c.material[0] : c.material;
+      if (mat && mat.transparent) meshes.push(c);
+    });
+    return meshes;
+  }
+
+  // Raycast against a specific pool of meshes (or all visible if pool is null)
+  _raycastMesh(e, pool) {
+    if (!this.renderer || !this.camera || !this.scene) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const mouse = new this.THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width)  * 2 - 1,
+      -((e.clientY - rect.top)  / rect.height) * 2 + 1
+    );
+    const rc = new this.THREE.Raycaster();
+    rc.setFromCamera(mouse, this.camera);
+    const targets = pool ? pool.filter(c => c.visible) : [];
+    if (!pool) this.scene.traverse(c => { if (c.isMesh && c.visible) targets.push(c); });
+    const hits = rc.intersectObjects(targets, false);
+    return hits.length ? hits[0].object : null;
+  }
+
+  // Emissive config per group
+  _lightCfg() {
+    return {
+      fogFront:             { color: [0.95, 0.96, 1.00], intensity: 22.0, toneMapped: false }, // white beam, matches headlight
+      fogRear:              { color: [1.00, 0.00, 0.00], intensity: 28.0, toneMapped: false }, // pure red rear fog
+      positionFront:       { color: [1.00, 0.91, 0.75], intensity: 0.8  }, // warm white, dim
+      positionFrontAmber:  { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
+      positionFrontLAmber: { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
+      positionFrontRAmber: { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
+      positionRear:        { color: [0.85, 0.04, 0.00], intensity: 0.5  }, // red, dim + less spread
+      position:            { color: [1.00, 0.91, 0.75], intensity: 0.8  }, // fallback
+      headlight:           { color: [0.87, 0.93, 1.00], intensity: 28.0, toneMapped: false }, // strong beam
+      highbeam:            { color: [0.90, 0.95, 1.00], intensity: 32.0, toneMapped: false }, // inner projector, brighter
+      turnL:               { color: [1.00, 0.52, 0.00], intensity: 0.38, toneMapped: false },
+      turnR:               { color: [1.00, 0.52, 0.00], intensity: 0.38, toneMapped: false },
+      hazard:              { color: [1.00, 0.52, 0.00], intensity: 0.38, toneMapped: false },
+      brake:               { color: [1.00, 0.00, 0.00], intensity: 4.0, toneMapped: false }, // pure red, less spread
+      reverse:             { color: [1.00, 1.00, 1.00], intensity: 3.5  },
+    };
+  }
+
+  _setGroupEmissive(key, on) {
+    // Amber aliases reuse their respective mesh groups
+    const meshKey = key === 'positionFrontAmber'  ? 'positionFront'  :
+                    key === 'positionFrontLAmber' ? 'positionFrontL' :
+                    key === 'positionFrontRAmber' ? 'positionFrontR' : key;
+    const meshes = this.lightGroups && this.lightGroups[meshKey];
+    if (!meshes || !meshes.length) { console.warn('[Lights] no meshes for', key); return; }
+    const cfg = this._lightCfg()[key];
+    const BL = this.BLOOM_LAYER || 1;
+    const SL = this.STREAK_LAYER || 2;
+    const isStreakGroup = /^(headlight|highbeam|reverse|fogFront)$/.test(key);
+    meshes.forEach((mesh) => {
+      if (!this._bloomMeshSet) this._bloomMeshSet = new Set();
+      if (on) { mesh.layers.enable(BL); this._bloomMeshSet.add(mesh); }
+      else    { mesh.layers.disable(BL); this._bloomMeshSet.delete(mesh); }
+      if (isStreakGroup) {
+        if (!this._streakMeshSet) this._streakMeshSet = new Set();
+        if (on) { mesh.layers.enable(SL); this._streakMeshSet.add(mesh); }
+        else    { mesh.layers.disable(SL); this._streakMeshSet.delete(mesh); }
+      }
+      // headlight/highbeam: the emitter sub-meshes have color:#cccccc which
+      // makes them look lit even at zero emissive. Darken color when off.
+      if (key === 'headlight' || key === 'highbeam') {
+        const hmats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        hmats.forEach(m => {
+          if (!m) return;
+          if (on) {
+            if (m._hlOrigColor     !== undefined) m.color.copy(m._hlOrigColor);
+            if (m._hlOrigRoughness !== undefined) m.roughness = m._hlOrigRoughness;
+            if (m._hlOrigMetalness !== undefined) m.metalness = m._hlOrigMetalness;
+          } else {
+            if (m._hlOrigColor === undefined)     m._hlOrigColor = m.color.clone();
+            if (m._hlOrigRoughness === undefined) m._hlOrigRoughness = m.roughness !== undefined ? m.roughness : 0.5;
+            if (m._hlOrigMetalness === undefined) m._hlOrigMetalness = m.metalness !== undefined ? m.metalness : 0;
+            m.color.setRGB(0.06, 0.06, 0.07);
+            m.roughness = 0.12;
+            m.metalness = 0.35;
+          }
+          m.needsUpdate = true;
+        });
+      }
+      // turn / amber states: darken base color so bloom captures clean orange, not white
+      const isAmberKey = /^(turnL|turnR|hazard|positionFrontAmber|positionFrontLAmber|positionFrontRAmber)$/.test(key);
+      if (isAmberKey) {
+        const tmats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        tmats.forEach(m => {
+          if (!m) return;
+          // Always keep base dark in amber path (both on and off flashes)
+          if (!m._turnOrigColor) m._turnOrigColor = m.color.clone();
+          m.color.setRGB(0.03, 0.015, 0.00);
+          m.needsUpdate = true;
+        });
+      }
+      // positionFront white: restore original base color
+      if (key === 'positionFront' || key === 'positionFrontL' || key === 'positionFrontR') {
+        const pmats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        pmats.forEach(m => {
+          if (!m) return;
+          if (m._turnOrigColor) { m.color.copy(m._turnOrigColor); m.needsUpdate = true; }
+        });
+      }
+      // brake/reverse: restore original base color when ON, darken when OFF
+      if (key === 'brake' || key === 'reverse') {
+        const rmats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        rmats.forEach(m => {
+          if (!m || !m._rearOrigColor) return;
+          if (on) {
+            m.color.copy(m._rearOrigColor);
+          } else {
+            m.color.setRGB(m._rearOrigColor.r * 0.18, m._rearOrigColor.g * 0.18, m._rearOrigColor.b * 0.18);
+          }
+          m.needsUpdate = true;
+        });
+      }
+      // fogFront: darken the cloned lens material when off so it reads as unlit
+      if (key === 'fogFront') {
+        const fmats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        fmats.forEach(m => {
+          if (!m) return;
+          if (on) {
+            if (m._fogOrigColor) m.color.copy(m._fogOrigColor);
+            if (m._fogOrigRoughness !== undefined) m.roughness = m._fogOrigRoughness;
+            if (m._fogOrigMetalness !== undefined) m.metalness = m._fogOrigMetalness;
+          } else {
+            if (!m._fogOrigColor) m._fogOrigColor = m.color.clone();
+            if (m._fogOrigRoughness === undefined) m._fogOrigRoughness = m.roughness !== undefined ? m.roughness : 0.5;
+            if (m._fogOrigMetalness === undefined) m._fogOrigMetalness = m.metalness !== undefined ? m.metalness : 0;
+            m.color.setRGB(0.02, 0.02, 0.02);
+            m.roughness = 0.95;
+            m.metalness = 0.0;
+          }
+          m.needsUpdate = true;
+        });
+      }
+
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m) => {
+        if (!m) return;
+        if (on) {
+          if (!m.emissive) m.emissive = new this.THREE.Color();
+          m.emissive.setRGB(...cfg.color);
+          m.emissiveIntensity = cfg.intensity;
+          if (cfg.toneMapped === false) m.toneMapped = false;
+          // MeshPhysicalMaterial: ensure emissive isn't blocked by low opacity
+          if (m.isMeshPhysicalMaterial) {
+            m.opacity = Math.max(m.opacity, 0.55);
+          }
+        } else {
+          if (m.emissive) m.emissive.setRGB(0, 0, 0);
+          m.emissiveIntensity = 0;
+          m.toneMapped = true;
+          if (m.isMeshPhysicalMaterial) {
+            // Restore original opacity if saved
+            if (m._origOpacity !== undefined) m.opacity = m._origOpacity;
+          }
+        }
+        m.needsUpdate = true;
+      });
+    });
+    this._updateNightLight(key, on);
+  }
+
+  toggleLight(key) {
+    const lights = { ...this.state.lights };
+    if (key === 'hazard') {
+      // Hazard toggles both turns together
+      const next = !lights.hazard;
+      lights.hazard = next;
+      lights.turnL = false;
+      lights.turnR = false;
+      this.setState({ lights });
+      this._stopBlink('turnL');
+      this._stopBlink('turnR');
+      this._stopBlink('hazard');
+      if (next) {
+        // Blink both indicators + both front position sides (or whole strip fallback)
+        const hasSides = this.lightGroups && this.lightGroups.positionFrontL && this.lightGroups.positionFrontL.length;
+        const posKeys = hasSides ? ['positionFrontLAmber', 'positionFrontRAmber'] : ['positionFrontAmber'];
+        this._startBlink(['turnL', 'turnR', ...posKeys], 'hazard');
+      } else {
+        this._setGroupEmissive('turnL', false);
+        this._setGroupEmissive('turnR', false);
+        const hasSides = this.lightGroups && this.lightGroups.positionFrontL && this.lightGroups.positionFrontL.length;
+        if (hasSides) {
+          this._setGroupEmissive('positionFrontL', lights.position);
+          this._setGroupEmissive('positionFrontR', lights.position);
+        } else {
+          this._setGroupEmissive('positionFront', lights.position);
+        }
+      }
+      return;
+    }
+    if (key === 'turnL' || key === 'turnR') {
+      const next = !lights[key];
+      lights[key] = next;
+      lights.hazard = false;
+      this.setState({ lights });
+      this._stopBlink('hazard');
+      this._stopBlink(key);
+      if (next) {
+        // Same-side position blinks amber if the model has separate L/R meshes;
+        // otherwise fall back to the whole front position strip (single mesh).
+        const sideKey = key === 'turnL' ? 'positionFrontL' : 'positionFrontR';
+        const hasSide = this.lightGroups && this.lightGroups[sideKey] && this.lightGroups[sideKey].length;
+        const posKey = hasSide
+          ? (key === 'turnL' ? 'positionFrontLAmber' : 'positionFrontRAmber')
+          : 'positionFrontAmber';
+        this._startBlink([key, posKey], key);
+      } else {
+        this._setGroupEmissive(key, false);
+        const sideKey = key === 'turnL' ? 'positionFrontL' : 'positionFrontR';
+        const hasSide = this.lightGroups && this.lightGroups[sideKey] && this.lightGroups[sideKey].length;
+        this._setGroupEmissive(hasSide ? sideKey : 'positionFront', lights.position);
+      }
+      return;
+    }
+    lights[key] = !lights[key];
+    this.setState({ lights });
+    const rearOn = lights.headlight || lights.brake;
+    if (key === 'position') {
+      this._setGroupEmissive('positionFront', lights.position);
+    } else if (key === 'headlight') {
+      this._setGroupEmissive('headlight',    lights.headlight);
+      this._setGroupEmissive('positionRear', rearOn);
+      // HEAD off → also kill high beam
+      if (!lights.headlight && lights.highbeam) {
+        lights.highbeam = false;
+        this.setState({ lights });
+        this._setGroupEmissive('highbeam', false);
+        this._updateNightLight('highbeam', false);
+      }
+    } else if (key === 'brake') {
+      this._setGroupEmissive('brake',        lights.brake);
+      this._setGroupEmissive('positionRear', rearOn); // rear pos on with brake too
+    } else if (key === 'fogFront') {
+      this._setGroupEmissive('fogFront', lights.fogFront);
+    } else if (key === 'fogRear') {
+      this._setGroupEmissive('fogRear', lights.fogRear);
+    } else if (key === 'highbeam') {
+      // High beam requires HEAD; cannot turn on without it
+      if (lights.highbeam && !lights.headlight) {
+        lights.highbeam = false;
+        this.setState({ lights });
+        return;
+      }
+      this._setGroupEmissive('highbeam', lights.highbeam);
+      this._updateNightLight('highbeam', lights.highbeam);
+    } else {
+      this._setGroupEmissive(key, lights[key]);
+    }
+  }
+
+  _startBlink(keys, timerKey) {
+    let on = true;
+    const tick = () => {
+      keys.forEach(k => this._setGroupEmissive(k, on));
+      on = !on;
+    };
+    tick();
+    this['_blink_' + timerKey] = setInterval(tick, 420); // ~71 flashes/min
+  }
+
+  _stopBlink(timerKey) {
+    clearInterval(this['_blink_' + timerKey]);
+    this['_blink_' + timerKey] = null;
+  }
+
+  componentWillUnmount() {
+    ['turnL', 'turnR', 'hazard'].forEach(k => this._stopBlink(k));
+    if (this.renderer) { this.renderer.dispose(); this.animFrameId && cancelAnimationFrame(this.animFrameId); }
+  }
+
+  // Bake an equirectangular HDR through a ground-mask shader: pixels below the
+  // horizon (equirect v < 0.5) are replaced with black. This stops chrome/paint
+  // on the car from picking up sky reflections from below the floor plane.
+  // Returns a WebGLRenderTarget whose .texture is ready for PMREMGenerator.
+  _maskHDRBelowHorizon(hdrTex) {
+    const THREE = this.THREE, renderer = this.renderer;
+    const W = hdrTex.image.width, H = hdrTex.image.height;
+    const rt = new THREE.WebGLRenderTarget(W, H, {
+      type: THREE.HalfFloatType, format: THREE.RGBAFormat,
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+    });
+    const orthoScene = new THREE.Scene();
+    const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { tHDR: { value: hdrTex } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position,1.0); }`,
+      fragmentShader: `
+        uniform sampler2D tHDR;
+        varying vec2 vUv;
+        void main(){
+          // equirect: horizon at v=0.5. RGBELoader sets flipY=true so in shader
+          // space y=0 = bottom-of-image = nadir; y=1 = top = zenith.
+          // Below-horizon → vUv.y < 0.5. Soft blend around horizon line.
+          float above = smoothstep(0.44, 0.52, vUv.y);
+          vec4 sky = texture2D(tHDR, vUv);
+          gl_FragColor = mix(vec4(0.0, 0.0, 0.0, 1.0), sky, above);
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    orthoScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(rt);
+    renderer.render(orthoScene, orthoCamera);
+    renderer.setRenderTarget(prev);
+    mat.dispose();
+    rt.texture.mapping = THREE.EquirectangularReflectionMapping;
+    return rt;
+  }
+
   onUploadHdri(e) {
     const THREE = this.THREE;
     const file = e.target.files && e.target.files[0];
@@ -436,9 +2040,10 @@ class Component extends DCLogic {
       url,
       (hdr) => {
         hdr.mapping = THREE.EquirectangularReflectionMapping;
-        const env = this.pmrem.fromEquirectangular(hdr).texture;
+        const rt = this._maskHDRBelowHorizon(hdr);
+        const env = this.pmrem.fromEquirectangular(rt.texture).texture;
         if (this.scene) this.scene.environment = env;
-        hdr.dispose();
+        hdr.dispose(); rt.dispose();
         URL.revokeObjectURL(url);
         if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
       },
@@ -464,7 +2069,7 @@ class Component extends DCLogic {
       return;
     }
     const map = {
-      st_peters: (window.__resources && window.__resources.stPetersHdr) || 'uploads/st_peters_square_night_2k.hdr',
+      st_peters: 'uploads/st_peters_v2.hdr',
       venice: 'venice_sunset_1k.hdr',
       quarry: 'quarry_01_1k.hdr',
       overpass: 'pedestrian_overpass_1k.hdr',
@@ -472,15 +2077,19 @@ class Component extends DCLogic {
       studio_loft: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/photo_studio_loft_hall_1k.hdr',
     };
     const entry = map[key];
-    const file = entry && entry.startsWith('http') ? entry : entry ? 'https://threejs.org/examples/textures/equirectangular/' + entry : null;
+    const file = entry
+      ? (entry.startsWith('http') || entry.startsWith('uploads/') ? entry
+        : 'https://threejs.org/examples/textures/equirectangular/' + entry)
+      : null;
     if (!file || !this.rgbe || !this.pmrem || !THREE) return;
     this.rgbe.load(
       file,
       (hdr) => {
         hdr.mapping = THREE.EquirectangularReflectionMapping;
-        const env = this.pmrem.fromEquirectangular(hdr).texture;
+        const rt = this._maskHDRBelowHorizon(hdr);
+        const env = this.pmrem.fromEquirectangular(rt.texture).texture;
         if (this.scene) this.scene.environment = env;
-        hdr.dispose();
+        hdr.dispose(); rt.dispose();
         if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
       },
       undefined,
@@ -500,21 +2109,29 @@ class Component extends DCLogic {
   }
 
   async componentDidMount() {
+    // Ensure grain class is correctly off before model loads
+    if (this.outerRef && this.outerRef.current) {
+      this.outerRef.current.classList.remove('bg-grain');
+    }
     try {
-      // Three.js scripts are pre-loaded via <script src> in helmet — skip dynamic loading
-      // if already available (standalone bundled mode), otherwise load them.
-      if (!window.THREE) {
-        const B = 'https://unpkg.com/three@0.137.0/';
-        await this.loadScript(B + 'build/three.min.js');
-        await this.loadScript(B + 'examples/js/loaders/GLTFLoader.js');
-        await this.loadScript(B + 'examples/js/loaders/DRACOLoader.js');
-        await this.loadScript(B + 'examples/js/controls/OrbitControls.js');
-        await this.loadScript(B + 'examples/js/objects/Sky.js');
-        await this.loadScript(B + 'examples/js/loaders/RGBELoader.js');
-        await this.loadScript(B + 'examples/js/environments/RoomEnvironment.js');
-        await this.loadScript(B + 'examples/js/shaders/HorizontalBlurShader.js');
-        await this.loadScript(B + 'examples/js/shaders/VerticalBlurShader.js');
-      }
+      const B = 'https://unpkg.com/three@0.137.0/';
+      // Classic global builds, loaded strictly in dependency order.
+      await this.loadScript(B + 'build/three.min.js');
+      await this.loadScript(B + 'examples/js/loaders/GLTFLoader.js');
+      await this.loadScript(B + 'examples/js/loaders/DRACOLoader.js');
+      await this.loadScript(B + 'examples/js/controls/OrbitControls.js');
+      await this.loadScript(B + 'examples/js/objects/Sky.js');
+      await this.loadScript(B + 'examples/js/loaders/RGBELoader.js');
+      await this.loadScript(B + 'examples/js/environments/RoomEnvironment.js');
+      await this.loadScript(B + 'examples/js/shaders/HorizontalBlurShader.js');
+      await this.loadScript(B + 'examples/js/shaders/VerticalBlurShader.js');
+      await this.loadScript(B + 'examples/js/shaders/CopyShader.js');
+      await this.loadScript(B + 'examples/js/shaders/LuminosityHighPassShader.js');
+      await this.loadScript(B + 'examples/js/postprocessing/EffectComposer.js');
+      await this.loadScript(B + 'examples/js/postprocessing/RenderPass.js');
+      await this.loadScript(B + 'examples/js/postprocessing/ShaderPass.js');
+      await this.loadScript(B + 'examples/js/postprocessing/UnrealBloomPass.js');
+      await this.loadScript(B + 'examples/js/shaders/GammaCorrectionShader.js');
 
       const THREE = window.THREE;
       const OrbitControls = THREE.OrbitControls;
@@ -552,7 +2169,8 @@ class Component extends DCLogic {
         sun.setFromSphericalCoords(1, phi, theta);
       }
 
-      // --- Studio background: flat light gray, like the reference turntable ---
+      // Background is driven by _applyBackground after model loads;
+      // set a flat fallback during loading so the canvas isn't black.
       scene.background = new THREE.Color(0xe7e7e7);
 
       // Neutral sky-derived environment for reflections until the HDRI loads.
@@ -583,7 +2201,11 @@ class Component extends DCLogic {
       dir.shadow.radius = 15;
       scene.add(dir);
       this.dirLight = dir;
-      scene.add(new THREE.HemisphereLight(0xffffff, 0xb0b4bc, 0.28));
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0b4bc, 0.28);
+      this.hemiLight = hemiLight;
+      scene.add(hemiLight);
+
+
 
       // --- Controls ---
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -599,8 +2221,11 @@ class Component extends DCLogic {
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
       const loader = new THREE.GLTFLoader();
       loader.setDRACOLoader(draco);
-      const url = (window.__resources && window.__resources.glbModel) || 'uploads/haval-h6-v3.glb';
-      loader.load(
+      const url = 'uploads/haval-h6-v5.glb';
+      // Load the rear-light fix source FIRST (it has the corrected face→material
+      // split with a dedicated Chrome group), stash its 3 rear clusters, then load
+      // the main car and splice the corrected rear clusters in during onModelLoaded.
+      const loadMain = () => loader.load(
         url,
         (gltf) => this.onModelLoaded(gltf.scene),
         (e) => {
@@ -614,6 +2239,12 @@ class Component extends DCLogic {
           this.setState({ error: 'The model failed to load. Check the file path and that the Draco decoder is reachable.' });
         }
       );
+      loader.load(
+        'uploads/haval-h6-rear-fix.glb',
+        (gltf) => { this._rearFixScene = gltf.scene; loadMain(); },
+        undefined,
+        (err) => { console.warn('rear-fix source failed to load; using base rear lights', err); loadMain(); }
+      );
 
       // --- Resize ---
       this._onResize = () => {
@@ -621,14 +2252,204 @@ class Component extends DCLogic {
         camera.aspect = W / H;
         camera.updateProjectionMatrix();
         renderer.setSize(W, H);
+        if (this.occluderCam) { this.occluderCam.aspect = W/H; this.occluderCam.updateProjectionMatrix(); }
+        if (this.bloomComposer) this.bloomComposer.setSize(W, H);
+        if (this.bloomRT) this.bloomRT.setSize(W, H);
+        if (this.bAnaPass) this.bAnaPass.uniforms.resolution.value.set(W, H);
       };
       window.addEventListener('resize', this._onResize);
+
+      // --- Post-processing: Bloom + Anamorphic flare ---
+      const AnamorphicShader = {
+        uniforms: {
+          tDiffuse:   { value: null },
+          resolution: { value: new THREE.Vector2(w, h) },
+          threshold:  { value: 0.96 },   // only the ultra-bright headlights streak
+          intensity:  { value: 0.55 },   // strong anamorphic on headlights
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+        `,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform vec2 resolution;
+          uniform float threshold;
+          uniform float intensity;
+          varying vec2 vUv;
+          void main() {
+            vec4 base = texture2D(tDiffuse, vUv);
+            vec3 streak = vec3(0.0);
+            for (int i = 1; i <= 56; i++) {
+              float fi = float(i);
+              float weight = exp(-fi * 0.065);
+              vec2 oL = vec2(-fi * 4.0 / resolution.x, 0.0);
+              vec2 oR = vec2( fi * 4.0 / resolution.x, 0.0);
+              vec3 sL = texture2D(tDiffuse, vUv + oL).rgb;
+              vec3 sR = texture2D(tDiffuse, vUv + oR).rgb;
+              float lL = dot(sL, vec3(0.2126,0.7152,0.0722));
+              float lR = dot(sR, vec3(0.2126,0.7152,0.0722));
+              streak += sL * max(0.0, lL - threshold) * weight;
+              streak += sR * max(0.0, lR - threshold) * weight;
+            }
+            streak = streak * intensity * vec3(0.22, 0.52, 1.0);
+            gl_FragColor = vec4(base.rgb + streak, base.a);
+          }
+        `,
+      };
+
+      // --- Selective bloom via layers ---
+      // Layer 1 = ALL light meshes (bloom only — no streak).
+      // Layer 2 = STREAK lights only (headlight + reverse → anamorphic).
+      const BLOOM_LAYER = 1;
+      const STREAK_LAYER = 2;
+      this.BLOOM_LAYER = BLOOM_LAYER;
+      this.STREAK_LAYER = STREAK_LAYER;
+
+      const makeRT = () => new THREE.WebGLRenderTarget(w, h, {
+        minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat,
+      });
+
+      // --- Bloom composer: full scene (non-light meshes blacked out) → UnrealBloom ---
+      // bloomCam sees ALL layers so the solid car body (rendered black during the
+      // bloom pass) writes real depth and naturally occludes lights behind it.
+      const bloomRT = makeRT();
+      const bloomCam = camera.clone();
+      bloomCam.layers.enableAll();
+      this.bloomCam = bloomCam;
+      const bloomComposer = new THREE.EffectComposer(renderer, bloomRT);
+      bloomComposer.renderToScreen = false;
+      const bRP = new THREE.RenderPass(scene, bloomCam);
+      bRP.clearColor = new THREE.Color(0, 0, 0); bRP.clearAlpha = 1;
+      bloomComposer.addPass(bRP);
+      // Tight rim glow: half-res bloom (less spread), minimum radius, very low
+      // strength so the halo stays within ~3px of the light surface.
+      const bBloom = new THREE.UnrealBloomPass(new THREE.Vector2(w * 0.5, h * 0.5), 0.2, 0.0, 0.0);
+      bloomComposer.addPass(bBloom);
+      this.bloomComposer = bloomComposer;
+
+      // --- Streak composer: layer 2 → AnamorphicShader only ---
+      const streakRT = makeRT();
+      const streakCam = camera.clone();
+      streakCam.layers.enableAll(); // sees all meshes for depth occlusion
+      this.streakCam = streakCam;
+      const streakComposer = new THREE.EffectComposer(renderer, streakRT);
+      streakComposer.renderToScreen = false;
+      const sRP = new THREE.RenderPass(scene, streakCam);
+      sRP.clearColor = new THREE.Color(0, 0, 0); sRP.clearAlpha = 1;
+      streakComposer.addPass(sRP);
+      const sAna = new THREE.ShaderPass(AnamorphicShader);
+      streakComposer.addPass(sAna);
+      this.streakComposer = streakComposer;
+      this.sAnaPass = sAna;
+
+      // Additive overlay material — reused for both bloom and streak
+      const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      const bloomMat = new THREE.MeshBasicMaterial({
+        map: null, transparent: true, blending: THREE.AdditiveBlending,
+        depthTest: false, depthWrite: false, toneMapped: false,
+      });
+      const streakMat = new THREE.MeshBasicMaterial({
+        map: null, transparent: true, blending: THREE.AdditiveBlending,
+        depthTest: false, depthWrite: false, toneMapped: false,
+      });
+      const quad = new THREE.PlaneGeometry(2, 2);
+      const overlayScene = new THREE.Scene();
+      const bloomQuad = new THREE.Mesh(quad, bloomMat);
+      const streakQuad = new THREE.Mesh(quad, streakMat);
+      overlayScene.add(bloomQuad);
+      overlayScene.add(streakQuad);
+      this.orthoCamera = orthoCamera;
+      this.bloomMat = bloomMat;
+      this.streakMat = streakMat;
+      this.overlayScene = overlayScene;
+
+      // Vignette overlay — full-screen quad, transparent radial blend.
+      // Rendered LAST so it composites over the full scene in float space,
+      // avoiding the 8-bit banding of canvas-texture gradients.
+      const vignetteMat = new THREE.ShaderMaterial({
+        uniforms: {
+          vignetteColor:     { value: new THREE.Color(0, 0, 0) },
+          vignetteIntensity: { value: 0.0 },
+        },
+        vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position,1.0); }`,
+        fragmentShader: `
+          uniform vec3 vignetteColor;
+          uniform float vignetteIntensity;
+          varying vec2 vUv;
+          void main(){
+            vec2 uv = vUv - 0.5;
+            float dist = length(uv) * 2.0; // 0 at centre, 1.41 at corner
+            float alpha = clamp(dist, 0.0, 1.0) * vignetteIntensity;
+            gl_FragColor = vec4(vignetteColor, alpha);
+          }`,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+      });
+      const vignetteScene = new THREE.Scene();
+      vignetteScene.add(new THREE.Mesh(quad, vignetteMat));
+      this.vignetteMat   = vignetteMat;
+      this.vignetteScene = vignetteScene;
 
       // --- Render loop ---
       const loop = () => {
         this._raf = requestAnimationFrame(loop);
         controls.update();
+        const syncCam = (dst) => {
+          dst.position.copy(camera.position);
+          dst.quaternion.copy(camera.quaternion);
+          dst.fov = camera.fov; dst.aspect = camera.aspect;
+          dst.near = camera.near; dst.far = camera.far;
+          dst.updateProjectionMatrix();
+        };
+
+        const anyLight = this.state.lights && Object.values(this.state.lights).some(Boolean);
+        const anyStreak = this.state.lights && (this.state.lights.headlight || this.state.lights.reverse || this.state.lights.fogFront);
+
+        // 1) Main scene
+        renderer.autoClear = true;
         renderer.render(scene, camera);
+
+        if (anyLight && this.bloomComposer) {
+          syncCam(this.bloomCam);
+          const savedBg = scene.background;
+          scene.background = null;
+
+          // 2) Bloom pass (all lights). Black out non-light meshes so solid body
+          //    occludes hidden lights via real depth; emissive lights stay bright.
+          this._darkenNonBloom(scene);
+          this.bloomComposer.render();
+          this._restoreMaterials();
+
+          // 3) Streak pass (layer 2 — headlight + reverse only)
+          if (anyStreak && this.streakComposer) {
+            syncCam(this.streakCam);
+            this._darkenNonStreak(scene);
+            this.streakComposer.render();
+            this._restoreMaterials();
+          }
+
+          scene.background = savedBg;
+
+          // 4) Additive overlay: bloom + streak quads
+          this.bloomMat.map = this.bloomComposer.readBuffer.texture;
+          this.bloomMat.visible = true;
+          this.bloomMat.needsUpdate = true;
+          this.streakMat.map = anyStreak && this.streakComposer ? this.streakComposer.readBuffer.texture : null;
+          this.streakMat.visible = !!(anyStreak && this.streakComposer);
+          this.streakMat.needsUpdate = true;
+          renderer.autoClear = false;
+          renderer.render(this.overlayScene, this.orthoCamera);
+          renderer.autoClear = true;
+        }
+
+        // Vignette overlay — always rendered last (even without lights)
+        if (this.vignetteScene && this.vignetteMat && this.vignetteMat.uniforms.vignetteIntensity.value > 0) {
+          renderer.autoClear = false;
+          renderer.render(this.vignetteScene, this.orthoCamera);
+          renderer.autoClear = true;
+        }
       };
       loop();
     } catch (err) {
@@ -637,8 +2458,68 @@ class Component extends DCLogic {
     }
   }
 
+  // Splice the corrected rear-light clusters from the rear-fix source into the
+  // main car. The fix source has the proper face→material split (notably a
+  // dedicated Chrome group for the non-emitting faces that v5 wrongly baked into
+  // BrakeLight/PositionLight). We keep the main car's MATERIAL instances (all our
+  // runtime tuning lives on them) and only adopt the new file's GEOMETRY +
+  // face→material assignment, rebinding each primitive to our material by name.
+  _swapRearLights(obj) {
+    const src = this._rearFixScene;
+    if (!src) return;
+    // Map existing scene materials by name so new primitives reuse OUR instances.
+    const matByName = new Map();
+    obj.traverse((c) => {
+      if (!c.isMesh) return;
+      (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => {
+        if (m && m.name && !matByName.has(m.name)) matByName.set(m.name, m);
+      });
+    });
+    const rebind = (m) => (m && m.name && matByName.has(m.name)) ? matByName.get(m.name) : m;
+    // GLTFLoader sanitizes node names (spaces→underscores, etc). Match by a
+    // normalized key so "Rear Headlight Left (Internals #1)" finds
+    // "Rear_Headlight_Left_(Internals_#1)".
+    const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const findNode = (root, name) => {
+      const key = norm(name);
+      let hit = null;
+      root.traverse((c) => { if (!hit && norm(c.name) === key) hit = c; });
+      return hit;
+    };
+    const clusters = [
+      'Rear Headlight Left (Internals #1)',
+      'Rear Headlight Right (Internals #1)',
+      'Rear Headlight Center (Internals #1)',
+    ];
+    let swapped = 0;
+    clusters.forEach((name) => {
+      const oldNode = findNode(obj, name);
+      const newNode = findNode(src, name);
+      if (!oldNode || !newNode) { console.warn('rear-swap: node missing', name, 'old=', !!oldNode, 'new=', !!newNode); return; }
+      // Remove old per-primitive meshes.
+      const oldMeshes = [];
+      oldNode.traverse((c) => { if (c.isMesh) oldMeshes.push(c); });
+      oldMeshes.forEach((m) => { if (m.parent) m.parent.remove(m); if (m.geometry && m.geometry.dispose) m.geometry.dispose(); });
+      // Clone the new per-primitive meshes, rebind materials by name, attach.
+      newNode.traverse((c) => {
+        if (!c.isMesh) return;
+        const mesh = c.clone();
+        mesh.geometry = c.geometry.clone();
+        mesh.material = Array.isArray(c.material) ? c.material.map(rebind) : rebind(c.material);
+        oldNode.add(mesh);
+        swapped++;
+      });
+    });
+    this._rearFixScene = null; // release the source scene
+    console.log('rear-swap: spliced', swapped, 'corrected rear-light meshes');
+  }
+
   onModelLoaded(obj) {
     const THREE = this.THREE;
+
+    // Splice the corrected rear-light clusters in BEFORE scale/centre so they get
+    // the same treatment as the rest of the car.
+    this._swapRearLights(obj);
 
     // Keep the model's own (Blender) floor, but flag it so it doesn't dominate
     // the bounding box used to scale and frame the car.
@@ -696,7 +2577,7 @@ class Component extends DCLogic {
       c.receiveShadow = true;
       const mats = Array.isArray(c.material) ? c.material : [c.material];
       // Headlight glass by mesh name + material-name detection
-      const isHeadlight = c.name === 'BuildingMesh-00106';
+      const isHeadlight = c.name === 'BuildingMesh-00106' || c.name === 'BuildingMesh-00107';
       let isGlass = isHeadlight;
       mats.forEach((m) => {
         if (!m) return;
@@ -712,51 +2593,114 @@ class Component extends DCLogic {
         // Body paint — capture the painted panels so the swatches can recolor them
         // (Body + Panel + Roof are the visible painted shell; exclude glass/chrome/
         // lights/tires/trim).
-        if (/^body$|^panel|^roof$|hood|bonnet|fender|quarter|^door|bumper/i.test(m.name || '')) {
+        // Match the known painted-shell material names.
+        const isBodyMesh = /^(body|roof|panel 2)$/i.test(m.name || '');
+        if (isBodyMesh) {
           if (!this._paintOrig) this._paintOrig = new Map();
           if (!this._paintOrig.has(m) && m.color) this._paintOrig.set(m, m.color.clone());
-          // Metallic-flake car paint: a metallic base for the flake sheen, a
-          // glossy clearcoat on top, and a dense flake normal map on the coat for
-          // fine sparkle. The dark studio env keeps the colour rich.
-          // MeshPhysicalMaterial car paint: high metalness base for candy/flake
-          // sparkle, glossy clearcoat on top, dense flake normal on the coat.
+          // Modify in-place — preserves original texture maps, UVs and normals
           m.metalness = 0.9;
           m.roughness = 0.5;
           m.envMapIntensity = 0.5;
-          if (m.map) m.map = null;   // drop baked tint so chosen colour reads true
+          if (m.map) m.map = null; // drop baked tint so swatch colour reads true
           if ('clearcoat' in m) {
             m.clearcoat = 1.0;
             m.clearcoatRoughness = 0.08;
             m.clearcoatNormalMap = this.makeFlakeNormal();
             if (m.clearcoatNormalScale) m.clearcoatNormalScale.set(0.22, 0.22);
           }
+          m.needsUpdate = true;
           bodyMats.push(m);
           if (this.bodyOrigHex == null && m.color) this.bodyOrigHex = '#' + m.color.getHexString();
         }
 
-        // Headlight glass (BuildingMesh-00106): clear, light, highly reflective
-        if (isHeadlight) {
-          m.transparent = true;
-          m.opacity = 0.18;
-          m.depthWrite = false;
-          m.metalness = 0;
-          m.roughness = 0.0;
-          m.envMapIntensity = 3.5;
-          if (m.color) m.color.setRGB(0.92, 0.94, 0.98);  // near-clear with cool tint
-          if ('clearcoat' in m) { m.clearcoat = 1; m.clearcoatRoughness = 0.0; }
-          if ('ior' in m) m.ior = 1.5;
+        // Rear light glass: matte, transmission-based, less reflective
+        if (/rear.lights|glass.*rear/i.test(m.name || '')) {
+          m.roughness = 0.15;
+          m.transmission = 0.6;
+          m.envMapIntensity = 0.5;
           m.needsUpdate = true;
         }
 
+        // Rear position light: make matte (remove mirror-like metalness + reflections)
+        if (/PositionLight_Rear/i.test(m.name || '')) {
+          m.metalness = 0;
+          m.roughness = 1.0;
+          m.envMapIntensity = 0;
+          m.needsUpdate = true;
+        }
+
+        // Headlight glass (BuildingMesh-00106): clear, iridescent, highly reflective
+        if (isHeadlight) {
+          // Soap-bubble glass: near-invisible but with iridescent thin-film reflection
+          const pm2 = new THREE.MeshPhysicalMaterial();
+          pm2.transparent = true;
+          pm2.opacity = 0.1;
+          pm2.depthWrite = false;
+          pm2.roughness = 0.0;
+          pm2.metalness = 0.0;
+          pm2.envMapIntensity = 1.0;
+          pm2.color.setRGB(1.0, 1.0, 1.0);
+          pm2.clearcoat = 1.0;
+          pm2.clearcoatRoughness = 0.0;
+          pm2.ior = 1.5;
+          pm2.iridescence = 0;
+          pm2.iridescenceIOR = 1.8;
+          pm2.iridescenceThicknessRange = [100, 400];
+          pm2.reflectivity = 0;
+          pm2.specularIntensity = 0;
+          pm2.side = THREE.DoubleSide;
+          pm2.name = m.name; pm2.map = m.map; pm2.envMap = m.envMap; pm2.side = m.side;
+          pm2._isHeadlightGlass = true;
+          if (Array.isArray(c.material)) { const i2 = c.material.indexOf(m); if (i2 >= 0) c.material[i2] = pm2; }
+          else c.material = pm2;
+          pm2.needsUpdate = true;
+          return; // skip generic needsUpdate below
+        }
+
         // Window / windscreen glass: dark smoked tint
+        // Rear light covers (Glass (Rear Lights)) get a lighter tint so the
+        // red emissive behind them reads correctly.
+        // Only match materials that are explicitly named as glass/lens covers
+        const isRearLightGlass = /glass.*(rear|light)|light.*glass|(rear.lights)/i.test(m.name || '');
         if (!isHeadlight && /glass|window|windshield|windscreen/.test(nm)) {
+          if (isRearLightGlass) {
+            // Upgrade rear light glass to MeshPhysicalMaterial for iridescence
+            const rpm = new THREE.MeshPhysicalMaterial();
+            rpm.transparent = true;
+            rpm.opacity = 0.60;
+            rpm.depthWrite = false;
+            rpm.metalness = 0;
+            rpm.roughness = 0.0;
+            rpm.envMapIntensity = 3.0;
+            rpm.color.setRGB(0.015, 0.002, 0.002); // near-black red
+            rpm.clearcoat = 1; rpm.clearcoatRoughness = 0.02;
+            rpm.ior = 1.3;
+            rpm.iridescence = 0;
+            rpm.iridescenceIOR = 1.65;
+            rpm.iridescenceThicknessRange = [180, 580];
+            rpm.name = m.name;
+            rpm.map = m.map;
+            rpm.envMap = m.envMap;
+            rpm.side = m.side;
+            rpm._origOpacity = 0.15;
+            if (Array.isArray(c.material)) {
+              const idx3 = c.material.indexOf(m);
+              if (idx3 >= 0) c.material[idx3] = rpm;
+            } else {
+              c.material = rpm;
+            }
+            rpm.needsUpdate = true;
+            return;
+          }
+          // Regular window / windscreen glass
           m.transparent = true;
           m.opacity = 0.62;
           m.depthWrite = false;
           m.metalness = 0;
           m.roughness = 0.04;
           m.envMapIntensity = 2.4;
-          if (m.color) m.color.setRGB(0.015, 0.017, 0.02);  // smoked / dark tint
+          if (m.color) m.color.setRGB(0.015, 0.017, 0.02);
           if ('clearcoat' in m) { m.clearcoat = 1; m.clearcoatRoughness = 0.04; }
           if ('specularIntensity' in m) m.specularIntensity = 1;
           if ('ior' in m) m.ior = 1.5;
@@ -771,6 +2715,12 @@ class Component extends DCLogic {
     console.log('[Haval H6] mesh parts (' + meshNames.length + '):', meshNames);
     this.modelParts = meshNames;
     this.model = obj;
+    this.collectLightMeshes(obj);
+    this._applyInitialFogStates();
+    // Apply saved (or default) rear glass tint now that materials are in scene
+    this._applyRearGlassTweaks(this.state.rearGlassTweaks);
+    // Apply background gradient + vignette now that scene exists
+    this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
 
     // Fit camera to the CAR only
     const box3 = carBounds();
@@ -781,6 +2731,7 @@ class Component extends DCLogic {
     // shadow map. No depth-pass artifacts from glass — glass is excluded from
     // castShadow so it doesn't punch a fake opaque hole in the shadow.
     this.addShadowCatcher(center3, size3, box3.min.y);
+    this._setupNightSceneLights(center3, size3, box3.min.y);
     const radius = Math.max(size3.x, size3.y, size3.z) * 0.6;
     const fov = this.camera.fov * Math.PI / 180;
     const dist = (radius / Math.sin(fov / 2)) * 1.02;
@@ -793,6 +2744,8 @@ class Component extends DCLogic {
     this.renderOnce = () => this.renderer.render(this.scene, this.camera);
     window.__renderOnce = this.renderOnce;
     window.__scene = this.scene;
+    window.__camera = this.camera;
+    window.__controls = this.controls;
 
     // Shadow camera bounds around the car
     const d = this.dirLight;
