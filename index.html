@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
-<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80"><rect width="120" height="80" fill="#131415"/><ellipse cx="60" cy="44" rx="38" ry="20" fill="none" stroke="#4fd6e8" stroke-width="1.5" opacity=".6"/><rect x="36" y="36" width="48" height="16" rx="4" fill="#1e2224"/><circle cx="46" cy="56" r="7" fill="#222426" stroke="#4fd6e8" stroke-width="1"/><circle cx="74" cy="56" r="7" fill="#222426" stroke="#4fd6e8" stroke-width="1"/><rect x="42" y="26" width="36" height="10" rx="3" fill="#2a2e32"/></svg></template>
 </head>
 <body>
 <x-dc>
 <helmet>
+<style>
+@keyframes grain { 0%,100%{transform:translate(0,0)} 10%{transform:translate(-2%,-3%)} 20%{transform:translate(3%,2%)} 30%{transform:translate(-1%,4%)} 40%{transform:translate(4%,-1%)} 50%{transform:translate(-3%,3%)} 60%{transform:translate(2%,-4%)} 70%{transform:translate(-4%,1%)} 80%{transform:translate(1%,3%)} 90%{transform:translate(3%,-2%)} }
+.bg-grain::after { content:''; position:fixed; inset:-50%; width:200%; height:200%; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"); opacity:0.028; animation:grain 0.5s steps(1) infinite; pointer-events:none; z-index:1; }
+</style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
@@ -77,6 +80,7 @@
       <button onClick="{{ setTabColor }}"  style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgColor }};  color: {{ tabColColor }};  transition: all .15s;">COLOR</button>
       <button onClick="{{ setTabEnv }}"    style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgEnv }};    color: {{ tabColEnv }};    transition: all .15s;">ENV</button>
       <button onClick="{{ setTabLights }}" style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgLights }}; color: {{ tabColLights }}; transition: all .15s;">LIGHTS</button>
+      <button onClick="{{ setTabMotion }}" style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgMotion }}; color: {{ tabColMotion }}; transition: all .15s;">MOTION</button>
     </div>
 
     <!-- ── COLOR TAB ── -->
@@ -165,6 +169,24 @@
       </div>
     </sc-if>
 
+    <!-- ── MOTION TAB ── -->
+    <sc-if value="{{ tabIsMotion }}" hint-placeholder-val="{{ false }}">
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL ANGLE</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">LEFT ←  → RIGHT</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelAngleLabel }}</span>
+      </div>
+      <input type="range" min="-35" max="35" step="1" value="{{ wheelAngle }}" onChange="{{ onWheelAngle }}" onInput="{{ onWheelAngle }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">SPEED</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">REV ←  → FWD</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ motionSpeedLabel }}</span>
+      </div>
+      <input type="range" min="-5" max="5" step="0.05" value="{{ motionSpeed }}" onChange="{{ onMotionSpeed }}" onInput="{{ onMotionSpeed }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 14px;" />
+      <button onClick="{{ onMotionStop }}" style="width: 100%; padding: 7px; border-radius: 7px; border: 1px solid rgba(79,214,232,.3); background: rgba(79,214,232,.08); color: #4fd6e8; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em;">STOP</button>
+    </sc-if>
+
   </div>
 
   <!-- assign mode banner -->
@@ -198,6 +220,9 @@ class Component extends DCLogic {
   state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 0.66, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: true, nightMode: false,
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configTab: 'color',
+    motionSpeed: 0,
+    wheelAngle: 0,
+    motionActive: false,
     dayBg: '#efefef',
     nightBg: '#131415',
     vignette: { color: '#000000', intensity: 0 },
@@ -273,15 +298,26 @@ class Component extends DCLogic {
       tabIsColor:  s.configTab === 'color',
       tabIsEnv:    s.configTab === 'env',
       tabIsLights: s.configTab === 'lights',
+      tabIsMotion: s.configTab === 'motion',
       setTabColor:  () => this.setState({ configTab: 'color'  }),
       setTabEnv:    () => this.setState({ configTab: 'env'    }),
       setTabLights: () => this.setState({ configTab: 'lights' }),
+      setTabMotion: () => this.setState({ configTab: 'motion' }),
+      wheelAngle:      s.wheelAngle,
+      wheelAngleLabel: s.wheelAngle + '°',
+      motionSpeed:      s.motionSpeed,
+      motionSpeedLabel: Math.round(Math.abs(s.motionSpeed) * 40) + ' km/h' + (s.motionSpeed < 0 ? ' ↩' : ''),
+      onWheelAngle:  (e) => this._setWheelAngle(parseFloat(e.target.value)),
+      onMotionSpeed: (e) => this._setMotionSpeed(parseFloat(e.target.value)),
+      onMotionStop:  () => this._setMotionSpeed(0),
       tabBgColor:  s.configTab === 'color'  ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgEnv:    s.configTab === 'env'    ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgLights: s.configTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
+      tabBgMotion: s.configTab === 'motion' ? 'rgba(79,214,232,.18)' : 'transparent',
       tabColColor:  s.configTab === 'color'  ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       tabColEnv:    s.configTab === 'env'    ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       tabColLights: s.configTab === 'lights' ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      tabColMotion: s.configTab === 'motion' ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       dayBg: s.dayBg,
       nightBg: s.nightBg,
       vignetteColor:    s.vignette.color,
@@ -415,6 +451,291 @@ class Component extends DCLogic {
   _setGrain(enabled) {
     this.setState({ grainEnabled: enabled });
     this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, enabled);
+  }
+
+  // ── Motion controls ─────────────────────────────────────────────────────
+  _setWheelAngle(deg) {
+    this.setState({ wheelAngle: deg });
+    this._applyWheelTransforms();
+  }
+
+  // Apply steer + roll in WORLD space about each wheel's shared axle centre.
+  //   newWorld = T(P) × R_steer × R_roll × T(-P) × _initWorld
+  // P = wheel-cluster centre (so all 7 sub-meshes pivot on the same axle — no
+  // wobble). Working in world space means both sides spin the same physical
+  // direction regardless of mirrored geometry. Converting to parent-local and
+  // applying the FULL decompose (pos+quat+scale) preserves negative-scale
+  // (mirror-modifier) wheels — dropping scale was what flipped them before.
+  _applyWheelTransforms() {
+    if (!this.THREE || !this._allWheels) return;
+    const THREE    = this.THREE;
+    const steerRad = (this.state.wheelAngle || 0) * Math.PI / 180;
+    const lateral  = this._carLateralDir || new THREE.Vector3(0,0,1);
+    const worldUp  = new THREE.Vector3(0,1,0);
+    const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
+
+    const applyRot = (m, rollAngle, doSteer) => {
+      if (!m._initWorld || !m._pivot) return;
+      const P = m._pivot;
+      // Extra world rotation about P: roll (spin) first, then steer (turn).
+      // Negative roll about the axle ⇒ contact patch moves backward = forward drive.
+      // Spin about the wheel's REAL axle (PCA) — using the car lateral instead
+      // makes the disc tumble (wobble) because the model's wheels are tilted.
+      const rollAxis = m._rollAxis || lateral;
+      const R = new THREE.Matrix4().makeRotationAxis(rollAxis, -rollAngle);
+      if (doSteer) R.premultiply(new THREE.Matrix4().makeRotationAxis(worldUp, -steerRad));
+      const newWorld = new THREE.Matrix4()
+        .makeTranslation(P.x, P.y, P.z)
+        .multiply(R)
+        .multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z))
+        .multiply(m._initWorld);
+      // World → parent-local using the cached init parent-inverse, then apply all.
+      (m._initParentInv || new THREE.Matrix4()).clone().multiply(newWorld)
+        .decompose(_p, _q, _s);
+      m.position.copy(_p);
+      m.quaternion.copy(_q);
+      m.scale.copy(_s);
+    };
+
+    this._allWheels.forEach(m => {
+      const isFront = (this._frontLeftWheels||[]).includes(m) ||
+                      (this._frontRightWheels||[]).includes(m);
+      applyRot(m, m._rollAngle || 0, isFront);
+    });
+
+    // Brake discs: steer only, no roll
+    if (this._steerOnlyMeshes) {
+      [...(this._steerOnlyMeshes.fl||[]), ...(this._steerOnlyMeshes.fr||[])].forEach(m => {
+        applyRot(m, 0, true);
+      });
+    }
+  }
+
+  _setMotionSpeed(speed) {
+    this.setState({ motionSpeed: speed });
+  }
+
+  _collectWheelMeshes(obj) {
+    if (!obj || !this.THREE) return;
+    const THREE = this.THREE;
+
+    // ── Spatial reference ──────────────────────────────────────────────────
+    const box     = new THREE.Box3().setFromObject(obj);
+    const center  = box.getCenter(new THREE.Vector3());
+    const carFwd  = (this._carForwardDir || new THREE.Vector3(-1,0,0)).clone().normalize();
+    const worldUp = new THREE.Vector3(0,1,0);
+    // Car's right side = cross(fwd, up); lateral = axle direction
+    const rightDir   = new THREE.Vector3().crossVectors(carFwd, worldUp).normalize();
+    const lateralDir = rightDir.clone(); // wheels roll around this world axis
+
+    // ── Helper: snap vector to nearest local cardinal axis ─────────────────
+    const snapCardinal = (v) => {
+      const ax=Math.abs(v.x), ay=Math.abs(v.y), az=Math.abs(v.z);
+      if (ax>=ay && ax>=az) return new THREE.Vector3(v.x>0?1:-1,0,0);
+      if (ay>=ax && ay>=az) return new THREE.Vector3(0,v.y>0?1:-1,0);
+      return new THREE.Vector3(0,0,v.z>0?1:-1);
+    };
+
+    // ── Step 1: collect ALL wheel meshes + project onto car axes ──────────
+    const primaryRx = /tire|tyre|wheel|hub/i;
+    const items = [];
+    obj.traverse(c => {
+      if (!c.isMesh) return;
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      if (!mats.some(m => m && primaryRx.test(m.name || ''))) return;
+      c.updateWorldMatrix(true, false);
+      const wc    = new THREE.Box3().setFromObject(c).getCenter(new THREE.Vector3());
+      const delta = wc.clone().sub(center);
+      items.push({ c, wc, fwdProj: delta.dot(carFwd), rightProj: delta.dot(rightDir) });
+    });
+
+    // ── Step 2: median-split → guaranteed equal FL/FR/RL/RR counts ────────
+    const fwdSorted   = items.map(i=>i.fwdProj).slice().sort((a,b)=>a-b);
+    const rightSorted = items.map(i=>i.rightProj).slice().sort((a,b)=>a-b);
+    const fwdMed   = fwdSorted[Math.floor(fwdSorted.length/2)];
+    const rightMed = rightSorted[Math.floor(rightSorted.length/2)];
+
+    const fl=[], fr=[], rl=[], rr=[];
+    items.forEach(({ c, fwdProj, rightProj }) => {
+      const isFront = fwdProj >= fwdMed;
+      const isRight = rightProj >= rightMed;
+      if      ( isFront && !isRight) fl.push(c);
+      else if ( isFront &&  isRight) fr.push(c);
+      else if (!isFront && !isRight) rl.push(c);
+      else                           rr.push(c);
+    });
+
+    // ── Step 3: cache full init world matrix + init parent-inverse per mesh ─
+    // Runtime rotates each mesh about its wheel-cluster centre (pivot P) in
+    // world space: newWorld = T(P) × R × T(-P) × _initWorld, then converts to
+    // parent-local and applies the FULL decompose (pos+quat+scale). Caching the
+    // init parent-inverse decouples from any live parent motion, and applying
+    // scale (not just quaternion) keeps mirrored/negative-scale wheels intact.
+    const cacheInit = (c) => {
+      c.updateWorldMatrix(true, false);
+      c._rollAngle = 0;
+      c._initWorld = c.matrixWorld.clone();
+      if (c.parent) { c.parent.updateWorldMatrix(true, false); }
+      c._initParentInv = c.parent ? c.parent.matrixWorld.clone().invert()
+                                  : new THREE.Matrix4();
+    };
+    [...fl,...fr,...rl,...rr].forEach(c => { cacheInit(c); console.log('[WheelInit]', c.name||'?'); });
+
+    // ── Shared pivot per wheel cluster (axle centre) ───────────────────────
+    // Pivoting every sub-mesh around the COMMON wheel centre (not its own
+    // origin) is what stops the wobble/orbit. Use the combined bbox centre.
+    const clusterCenter = (arr) => {
+      const b = new THREE.Box3();
+      arr.forEach(c => b.expandByObject(c));
+      return arr.length ? b.getCenter(new THREE.Vector3()) : new THREE.Vector3();
+    };
+    const flCenter = clusterCenter(fl), frCenter = clusterCenter(fr);
+    const rlCenter = clusterCenter(rl), rrCenter = clusterCenter(rr);
+    fl.forEach(c => c._pivot = flCenter); fr.forEach(c => c._pivot = frCenter);
+    rl.forEach(c => c._pivot = rlCenter); rr.forEach(c => c._pivot = rrCenter);
+
+    // ── Per-cluster roll axis (the REAL axle) via PCA ──────────────────────
+    // The wheel disc's symmetry axis is NOT the car's lateral direction — the
+    // model's wheels sit ~30° off it. Spinning about the car lateral therefore
+    // makes the disc TUMBLE (the "angled spin axis" wobble). Derive each
+    // cluster's true axle as the smallest-variance principal axis of its
+    // vertices: a disc has two large + one small eigenvalue; small = axle.
+    const eigenSym3 = (m) => { // m = [xx,xy,xz,yy,yz,zz]
+      const A = [[m[0],m[1],m[2]],[m[1],m[3],m[4]],[m[2],m[4],m[5]]];
+      const V = [[1,0,0],[0,1,0],[0,0,1]];
+      for (let it=0; it<60; it++) {
+        let p=0,q=1,mx=Math.abs(A[0][1]);
+        if (Math.abs(A[0][2])>mx){mx=Math.abs(A[0][2]);p=0;q=2;}
+        if (Math.abs(A[1][2])>mx){mx=Math.abs(A[1][2]);p=1;q=2;}
+        if (mx<1e-9) break;
+        const phi=0.5*Math.atan2(2*A[p][q],A[q][q]-A[p][p]);
+        const cs=Math.cos(phi), sn=Math.sin(phi);
+        for(let k=0;k<3;k++){const a=A[k][p],b=A[k][q];A[k][p]=cs*a-sn*b;A[k][q]=sn*a+cs*b;}
+        for(let k=0;k<3;k++){const a=A[p][k],b=A[q][k];A[p][k]=cs*a-sn*b;A[q][k]=sn*a+cs*b;}
+        for(let k=0;k<3;k++){const a=V[k][p],b=V[k][q];V[k][p]=cs*a-sn*b;V[k][q]=sn*a+cs*b;}
+      }
+      const ev=[A[0][0],A[1][1],A[2][2]];
+      let mi=0; if(ev[1]<ev[mi])mi=1; if(ev[2]<ev[mi])mi=2;
+      return new THREE.Vector3(V[0][mi],V[1][mi],V[2][mi]).normalize();
+    };
+    const clusterAxle = (arr) => {
+      const v=new THREE.Vector3(), mean=new THREE.Vector3(); let n=0;
+      const each = (cb) => arr.forEach(c => {
+        const pos=c.geometry && c.geometry.attributes && c.geometry.attributes.position;
+        if(!pos) return;
+        c.updateWorldMatrix(true,false);
+        const stride=Math.max(1,Math.floor(pos.count/2000));
+        for(let i=0;i<pos.count;i+=stride){ v.fromBufferAttribute(pos,i).applyMatrix4(c.matrixWorld); cb(v); }
+      });
+      each(p => { mean.add(p); n++; });
+      if(!n) return rightDir.clone();
+      mean.divideScalar(n);
+      let xx=0,yy=0,zz=0,xy=0,xz=0,yz=0;
+      each(p => { const d=p.clone().sub(mean);
+        xx+=d.x*d.x; yy+=d.y*d.y; zz+=d.z*d.z; xy+=d.x*d.y; xz+=d.x*d.z; yz+=d.y*d.z; });
+      const axle = eigenSym3([xx,xy,xz,yy,yz,zz]);
+      if (axle.dot(rightDir) < 0) axle.negate(); // orient toward car's right (consistent spin)
+      return axle;
+    };
+    const flAxle=clusterAxle(fl), frAxle=clusterAxle(fr), rlAxle=clusterAxle(rl), rrAxle=clusterAxle(rr);
+    fl.forEach(c=>c._rollAxis=flAxle); fr.forEach(c=>c._rollAxis=frAxle);
+    rl.forEach(c=>c._rollAxis=rlAxle); rr.forEach(c=>c._rollAxis=rrAxle);
+    const fx=v=>v.toArray().map(x=>+x.toFixed(3));
+    console.log('[WheelAxle] FL',fx(flAxle),'FR',fx(frAxle),'RL',fx(rlAxle),'RR',fx(rrAxle));
+
+    // Store lateral direction (fallback) for use in _applyWheelTransforms
+    this._carLateralDir = rightDir.clone();
+
+    // ── Step 4: brake disks — front only, steer only ──────────────────────
+    this._steerOnlyMeshes = { fl: [], fr: [] };
+    const breakDiskRx = /break.*disk|breakdisk/i;
+    obj.traverse(c => {
+      if (!c.isMesh) return;
+      const nm = (c.name || '').trim();
+      if (!breakDiskRx.test(nm)) return;
+      c.updateWorldMatrix(true, false);
+      const wc      = new THREE.Box3().setFromObject(c).getCenter(new THREE.Vector3());
+      const delta   = wc.clone().sub(center);
+      const fwdProj = delta.dot(carFwd);
+      if (fwdProj < fwdMed) { console.log('[BreakDisk skip rear]', nm); return; }
+      cacheInit(c);
+      const isRight = delta.dot(rightDir) >= rightMed;
+      // Steer the front disc around the SAME pivot as its wheel cluster.
+      c._pivot = isRight ? frCenter : flCenter;
+      if (isRight) this._steerOnlyMeshes.fr.push(c);
+      else         this._steerOnlyMeshes.fl.push(c);
+      console.log('[BreakDisk front]', nm, '→', isRight ? 'fr' : 'fl');
+    });
+
+    this._frontLeftWheels  = fl;
+    this._frontRightWheels = fr;
+    this._rearLeftWheels   = rl;
+    this._rearRightWheels  = rr;
+    this._allWheels = [...fl,...fr,...rl,...rr];
+    console.log('[Wheels] FL:', fl.length, 'FR:', fr.length, 'RL:', rl.length, 'RR:', rr.length);
+  }
+
+  // Injects "Hemisphere Teleportation Flow" directly into the PMREM reflectVec of
+  // each car-body material. Single-pass, preserves PMREM roughness/clearcoat
+  // quality and brightness — no CubeCamera, no encoding issues. The shared
+  // uEnvOffset uniform is advanced in the render loop to animate reflections.
+  _setupReflectionFlow() {
+    if (!this.THREE || !this.scene) return;
+    if (!this._reflectionFlowUniforms) {
+      this._reflectionFlowUniforms = { uEnvOffset: { value: 0.0 } };
+    }
+    const uniforms = this._reflectionFlowUniforms;
+    // Collect PBR body materials
+    this._animEnvMaterials = [];
+    this.scene.traverse(c => {
+      if (!c.isMesh) return;
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      mats.forEach(m => {
+        if (m && (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) &&
+            !this._animEnvMaterials.includes(m)) {
+          this._animEnvMaterials.push(m);
+        }
+      });
+    });
+    // Inject flow into each material's reflection vector
+    this._animEnvMaterials.forEach(m => {
+      if (m._flowInjected) return;
+      const prev = m.onBeforeCompile ? m.onBeforeCompile.bind(m) : null;
+      m.onBeforeCompile = (shader) => {
+        if (prev) prev(shader);
+        shader.uniforms.uEnvOffset = uniforms.uEnvOffset;
+        shader.fragmentShader = 'uniform float uEnvOffset;\n' + shader.fragmentShader;
+        // onBeforeCompile sees #include directives UNRESOLVED, so replace the
+        // include with a modified copy of the chunk that warps reflectVec.
+        const THREE = this.THREE;
+        const incName = 'envmap_physical_pars_fragment';
+        const chunk = THREE.ShaderChunk[incName];
+        const warp = `
+            {
+              vec3 rr = reflectVec;
+              // Flow along Z (front-to-rear for -X-facing car viewed sideways)
+              float lim = max(sqrt(1.0 - rr.x * rr.x), 0.001);
+              float zN = rr.z / lim;
+              float wr = mod(zN - uEnvOffset + 1.0, 2.0) - 1.0;
+              float nZ = wr * lim;
+              float nY = sign(rr.y) * sqrt(max(1.0 - rr.x * rr.x - nZ * nZ, 0.0));
+              reflectVec = vec3(rr.x, nY, nZ);
+            }`;
+        const tgt = 'reflectVec = reflect( - viewDir, normal );';
+        if (chunk && chunk.includes(tgt)) {
+          const modified = chunk.split(tgt).join(tgt + warp);
+          shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <' + incName + '>', modified
+          );
+        }
+      };
+      // Force three.js to build a NEW program (not reuse the cached one that
+      // compiled before onBeforeCompile was assigned).
+      m.customProgramCacheKey = () => 'reflflow_v1';
+      m._flowInjected = true;
+      m.needsUpdate = true;
+    });
+    console.log('[ReflectionFlow] injected into', this._animEnvMaterials.length, 'materials');
   }
 
   toggleNightMode() {
@@ -2085,8 +2406,13 @@ class Component extends DCLogic {
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         const rt = this._maskHDRBelowHorizon(hdr);
         const env = this.pmrem.fromEquirectangular(rt.texture).texture;
+        this._staticPMREM = env;
         if (this.scene) this.scene.environment = env;
+        // Inject hemisphere flow into car materials (animated reflections)
+        this._setupReflectionFlow();
         hdr.dispose(); rt.dispose();
+        // Restore canvas vignette background
+        this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
         if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
       },
       undefined,
@@ -2390,8 +2716,27 @@ class Component extends DCLogic {
       this.vignetteScene = vignetteScene;
 
       // --- Render loop ---
+      let _lastT = performance.now();
       const loop = () => {
         this._raf = requestAnimationFrame(loop);
+        const now = performance.now();
+        const delta = Math.min((now - _lastT) / 1000, 0.1); // seconds, capped
+        _lastT = now;
+
+        // Motion: advance reflection flow offset + roll wheels
+        const speed = this.state.motionSpeed || 0;
+        if (speed !== 0) {
+          if (this._reflectionFlowUniforms) {
+            this._reflectionFlowUniforms.uEnvOffset.value += delta * speed * 0.3;
+          }
+          // Roll all wheels on Z axis (axle), steer front wheels on Y
+          const rollDelta = delta * speed * 6;
+          if (this._allWheels) {
+            this._allWheels.forEach(m => { m._rollAngle = (m._rollAngle || 0) + rollDelta; });
+            this._applyWheelTransforms();
+          }
+        }
+
         controls.update();
         const syncCam = (dst) => {
           dst.position.copy(camera.position);
@@ -2714,6 +3059,26 @@ class Component extends DCLogic {
     this.model = obj;
     this.collectLightMeshes(obj);
     this._applyInitialFogStates();
+    // Compute true forward direction from headlight positions so wheel
+    // FL/FR/RL/RR classification is correct regardless of model orientation.
+    const _fwdBox = new THREE.Box3().setFromObject(obj);
+    const _fwdCenter = _fwdBox.getCenter(new THREE.Vector3());
+    const _hlMeshes = this.lightGroups && this.lightGroups['headlight'];
+    if (_hlMeshes && _hlMeshes.length) {
+      const _hlBox = new THREE.Box3();
+      _hlMeshes.forEach(m => _hlBox.expandByObject(m));
+      const _hlCenter = _hlBox.getCenter(new THREE.Vector3());
+      this._carForwardDir = new THREE.Vector3().subVectors(_hlCenter, _fwdCenter).setY(0).normalize();
+    } else {
+      this._carForwardDir = new THREE.Vector3(-1, 0, 0);
+    }
+    console.log('[Car] forwardDir:', JSON.stringify(this._carForwardDir));
+    this._collectWheelMeshes(obj);
+    // Save car centre
+    const cBox = new THREE.Box3().setFromObject(obj);
+    this._carCenter = cBox.getCenter(new THREE.Vector3());
+    // (Re-)inject reflection flow now the model is in scene (HDR may load first)
+    this._setupReflectionFlow();
     // Apply saved (or default) rear glass tint now that materials are in scene
     this._applyRearGlassTweaks(this.state.rearGlassTweaks);
     // Apply background gradient + vignette now that scene exists
