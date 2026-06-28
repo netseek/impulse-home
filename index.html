@@ -692,7 +692,7 @@ class Component extends DCLogic {
     renderer.clear();
     renderer.render(this._blurScene, this._blurCamera);
 
-    // Diagnostics check: Read all pixels to see if the texture has any contents
+    // Diagnostics check: Read pixels to see if the texture has any contents
     const size = 256;
     const testPixels = new Uint8Array(size * size * 4);
     renderer.readRenderTargetPixels(this._rtBlurred, 0, 0, size, size, testPixels);
@@ -700,7 +700,11 @@ class Component extends DCLogic {
     for (let i = 0; i < testPixels.length; i++) {
       if (testPixels[i] > maxVal) maxVal = testPixels[i];
     }
-    console.log('[WheelBlur Diagnostics] Max pixel value:', maxVal);
+    const pixelCorner = new Uint8Array(4);
+    renderer.readRenderTargetPixels(this._rtBlurred, 10, 10, 1, 1, pixelCorner);
+    const pixelCenter = new Uint8Array(4);
+    renderer.readRenderTargetPixels(this._rtBlurred, 128, 128, 1, 1, pixelCenter);
+    console.log('[WheelBlur Diagnostics] MaxVal:', maxVal, 'Corner:', Array.from(pixelCorner), 'Center:', Array.from(pixelCenter));
 
     renderer.setRenderTarget(oldRenderTarget);
     renderer.setClearColor(oldClearColor, oldClearAlpha);
