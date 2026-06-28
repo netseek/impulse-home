@@ -474,6 +474,20 @@ class Component extends DCLogic {
     const worldUp  = new THREE.Vector3(0,1,0);
     const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
 
+    const speed = this.state.motionSpeed || 0;
+    const isFast = Math.abs(speed) * 40 >= 60;
+
+    // Toggle visibility of rims vs blurred discs
+    if (this._rimWheels) {
+      this._rimWheels.forEach(m => { m.visible = !isFast; });
+    }
+    if (this._blurredDiscs) {
+      this._blurredDiscs.forEach(m => { m.visible = isFast; });
+    }
+    if (this._tireWheels) {
+      this._tireWheels.forEach(m => { m.visible = true; });
+    }
+
     const applyRot = (m, rollAngle, doSteer) => {
       if (!m._initWorld || !m._pivot) return;
       const P = m._pivot;
@@ -509,10 +523,162 @@ class Component extends DCLogic {
         applyRot(m, 0, true);
       });
     }
+
+    // Blurred discs: steer and roll
+    if (this._blurredDiscs) {
+      this._blurredDiscs.forEach(m => {
+        const isFront = m._side === 'fl' || m._side === 'fr';
+        applyRot(m, m._rollAngle || 0, isFront);
+      });
+    }
   }
 
   _setMotionSpeed(speed) {
     this.setState({ motionSpeed: speed });
+  }
+
+  _initWheelBlur() {
+    if (this._wheelBlurInitialized) return;
+    const THREE = this.THREE;
+    const size = 256;
+
+    this._rtSource = new THREE.WebGLRenderTarget(size, size, {
+      minFilter: THREE.LinearMipmapLinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      generateMipmaps: true
+    });
+    this._rtBlurred = new THREE.WebGLRenderTarget(size, size, {
+      minFilter: THREE.LinearMipmapLinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      generateMipmaps: true
+    });
+
+    this._blurShaderMat = new THREE.ShaderMaterial({
+      uniforms: {
+        tSource: { value: null }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tSource;
+        varying vec2 vUv;
+        void main() {
+          vec2 center = vec2(0.5, 0.5);
+          vec2 uv = vUv - center;
+          vec4 color = vec4(0.0);
+          const int SAMPLES = 32;
+          for (int i = 0; i < SAMPLES; i++) {
+            float angle = float(i) * 6.2831853 / float(SAMPLES);
+            float cosA = cos(angle);
+            float sinA = sin(angle);
+            vec2 rotatedUv = vec2(
+              uv.x * cosA - uv.y * sinA,
+              uv.x * sinA + uv.y * cosA
+            ) + center;
+            color += texture2D(tSource, rotatedUv);
+          }
+          gl_FragColor = color / float(SAMPLES);
+        }
+      `
+    });
+
+    this._blurScene = new THREE.Scene();
+    this._blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const quad = new THREE.PlaneGeometry(2, 2);
+    const quadMesh = new THREE.Mesh(quad, this._blurShaderMat);
+    this._blurScene.add(quadMesh);
+
+    this._wheelBlurInitialized = true;
+  }
+
+  _generateBlurredWheelTexture() {
+    if (!this.THREE || !this.renderer || !this._frontLeftWheels || !this._rimWheels) return;
+    if (!this._wheelBlurInitialized) this._initWheelBlur();
+
+    const THREE = this.THREE;
+    const renderer = this.renderer;
+    const scene = this.scene;
+
+    const flBox = new THREE.Box3();
+    let hasRim = false;
+    this._frontLeftWheels.forEach(m => {
+      if (this._rimWheels.includes(m)) {
+        flBox.expandByObject(m);
+        hasRim = true;
+      }
+    });
+    if (!hasRim) return;
+
+    const sizeVec = new THREE.Vector3();
+    flBox.getSize(sizeVec);
+    const r = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
+
+    const flFirst = this._frontLeftWheels[0];
+    const pivot = flFirst._pivot;
+    const axle = flFirst._rollAxis;
+    if (!pivot || !axle) return;
+
+    const tempCam = new THREE.OrthographicCamera(-r, r, r, -r, 0.01, 10);
+    tempCam.position.copy(pivot).addScaledVector(axle, -2.0);
+    tempCam.lookAt(pivot);
+    tempCam.up.set(0, 1, 0);
+    tempCam.updateProjectionMatrix();
+
+    const savedVisibilities = new Map();
+    scene.traverse(c => {
+      if (c.isMesh) {
+        savedVisibilities.set(c, c.visible);
+        const isFlRim = this._frontLeftWheels.includes(c) && this._rimWheels.includes(c);
+        c.visible = isFlRim;
+      }
+    });
+
+    if (this.shadowCatcher) {
+      savedVisibilities.set(this.shadowCatcher, this.shadowCatcher.visible);
+      this.shadowCatcher.visible = false;
+    }
+    if (this.nightFloor) {
+      savedVisibilities.set(this.nightFloor, this.nightFloor.visible);
+      this.nightFloor.visible = false;
+    }
+
+    const oldRenderTarget = renderer.getRenderTarget();
+    const oldClearColor = new THREE.Color();
+    renderer.getClearColor(oldClearColor);
+    const oldClearAlpha = renderer.getClearAlpha();
+
+    renderer.setRenderTarget(this._rtSource);
+    renderer.setClearColor(0x000000, 0.0);
+    renderer.clear();
+    renderer.render(scene, tempCam);
+
+    scene.traverse(c => {
+      if (c.isMesh && savedVisibilities.has(c)) {
+        c.visible = savedVisibilities.get(c);
+      }
+    });
+    if (this.shadowCatcher && savedVisibilities.has(this.shadowCatcher)) {
+      this.shadowCatcher.visible = savedVisibilities.get(this.shadowCatcher);
+    }
+    if (this.nightFloor && savedVisibilities.has(this.nightFloor)) {
+      this.nightFloor.visible = savedVisibilities.get(this.nightFloor);
+    }
+
+    this._blurShaderMat.uniforms.tSource.value = this._rtSource.texture;
+    renderer.setRenderTarget(this._rtBlurred);
+    renderer.setClearColor(0x000000, 0.0);
+    renderer.clear();
+    renderer.render(this._blurScene, this._blurCamera);
+
+    renderer.setRenderTarget(oldRenderTarget);
+    renderer.setClearColor(oldClearColor, oldClearAlpha);
   }
 
   _collectWheelMeshes(obj) {
@@ -681,6 +847,84 @@ class Component extends DCLogic {
     this._rearRightWheels  = rr;
     this._allWheels = [...fl,...fr,...rl,...rr];
     console.log('[Wheels] FL:', fl.length, 'FR:', fr.length, 'RL:', rl.length, 'RR:', rr.length);
+
+    // Split rims vs tires
+    const isTire = (mesh) => {
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      return mats.some(m => m && /tire|tyre/i.test(m.name || ''));
+    };
+    this._tireWheels = this._allWheels.filter(isTire);
+    this._rimWheels = this._allWheels.filter(m => !isTire(m));
+
+    // Generate blurred wheel texture dynamically
+    this._generateBlurredWheelTexture();
+
+    // Create blurred discs
+    this._blurredDiscs = [];
+    if (this._rtBlurred) {
+      const blurredMaterial = new THREE.MeshBasicMaterial({
+        map: this._rtBlurred.texture,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+
+      // Find the FL wheel radius from the bounding box of FL rim meshes
+      const flBox = new THREE.Box3();
+      fl.forEach(m => {
+        if (this._rimWheels.includes(m)) flBox.expandByObject(m);
+      });
+      const sizeVec = new THREE.Vector3();
+      flBox.getSize(sizeVec);
+      const radius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
+
+      const clusters = [
+        { arr: fl, center: flCenter, axle: flP.axle, side: 'fl' },
+        { arr: fr, center: frCenter, axle: frP.axle, side: 'fr' },
+        { arr: rl, center: rlCenter, axle: rlP.axle, side: 'rl' },
+        { arr: rr, center: rrCenter, axle: rrP.axle, side: 'rr' }
+      ];
+
+      clusters.forEach(item => {
+        const discGeo = new THREE.CircleGeometry(radius, 32);
+        const disc = new THREE.Mesh(discGeo, blurredMaterial);
+        
+        // Position at wheel center
+        disc.position.copy(item.center);
+        
+        // Align to look along axle
+        disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), item.axle);
+        
+        // Offset slightly outward to avoid Z-fighting
+        const isRight = item.side.endsWith('r');
+        const outwardDir = item.axle.clone().multiplyScalar(isRight ? 1 : -1);
+        disc.position.addScaledVector(outwardDir, 0.015);
+        
+        // Add to scene first, then attach to model parent so it inherits scaling/translation
+        if (this.scene) {
+          this.scene.add(disc);
+          disc.updateMatrixWorld(true);
+          const firstMesh = item.arr[0];
+          if (firstMesh && firstMesh.parent) {
+            firstMesh.parent.attach(disc);
+          }
+        }
+        
+        disc.visible = false;
+        
+        // Set pivot, roll axle, and side for steering/rolling in applyRot
+        disc._pivot = item.center.clone();
+        disc._rollAxis = item.axle.clone();
+        disc._side = item.side;
+        disc._rollAngle = 0;
+        
+        disc.updateWorldMatrix(true, false);
+        disc._initWorld = disc.matrixWorld.clone();
+        disc._initParentInv = disc.parent ? disc.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
+        
+        this._blurredDiscs.push(disc);
+      });
+    }
   }
 
   // Injects "Hemisphere Teleportation Flow" directly into the PMREM reflectVec of
@@ -854,6 +1098,7 @@ class Component extends DCLogic {
     }
     // UI background
     this._applyBackground(next, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
+    this._generateBlurredWheelTexture();
   }
 
   // Shared background texture generator — used for BOTH day and night modes.
@@ -2427,6 +2672,7 @@ class Component extends DCLogic {
       if (this.roomEnv && this.scene) {
         this.scene.environment = this.roomEnv;
         if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        this._generateBlurredWheelTexture();
       }
       return;
     }
@@ -2458,6 +2704,7 @@ class Component extends DCLogic {
         // Restore canvas vignette background
         this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
         if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        this._generateBlurredWheelTexture();
         // This callback doesn't setState, so request a redraw explicitly.
         if (this.requestRender) this.requestRender(4);
       },
@@ -2857,10 +3104,15 @@ class Component extends DCLogic {
           const rollDelta = delta * speed * 6;
           if (this._allWheels) {
             this._allWheels.forEach(m => { m._rollAngle = (m._rollAngle || 0) + rollDelta; });
-            this._applyWheelTransforms();
+          }
+          if (this._blurredDiscs) {
+            this._blurredDiscs.forEach(m => { m._rollAngle = (m._rollAngle || 0) + rollDelta; });
           }
           needRender = true;
         }
+
+        // Always apply wheel transforms to keep steer + roll + visibility (rim vs disc) in sync
+        this._applyWheelTransforms();
 
         // controls.update() must run every frame for damping; true = camera moved
         if (controls.update()) needRender = true;
