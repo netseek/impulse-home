@@ -689,6 +689,11 @@ class Component extends DCLogic {
     renderer.clear();
     renderer.render(this._blurScene, this._blurCamera);
 
+    // Diagnostics check: Read pixels to see if the render target is empty
+    const pixels = new Uint8Array(4);
+    renderer.readRenderTargetPixels(this._rtBlurred, 128, 128, 1, 1, pixels);
+    console.log('[WheelBlur Diagnostics] Center pixel:', Array.from(pixels));
+
     renderer.setRenderTarget(oldRenderTarget);
     renderer.setClearColor(oldClearColor, oldClearAlpha);
   }
