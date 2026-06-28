@@ -587,13 +587,17 @@ class Component extends DCLogic {
             ) + center;
             color += texture2D(tSource, rotatedUv);
           }
-          gl_FragColor = color / float(SAMPLES);
+          vec4 avgColor = color / float(SAMPLES);
+          // Boost alpha non-linearly to make the spinning rim feel solid and metallic
+          avgColor.a = min(1.0, pow(avgColor.a, 0.6) * 1.5);
+          gl_FragColor = avgColor;
         }
       `
     });
 
     this._blurScene = new THREE.Scene();
-    this._blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    // Setting near/far to -1 and 1 prevents the quad at Z=0 from being clipped by the camera near plane
+    this._blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
     const quad = new THREE.PlaneGeometry(2, 2);
     const quadMesh = new THREE.Mesh(quad, this._blurShaderMat);
     this._blurScene.add(quadMesh);
