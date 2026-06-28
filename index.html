@@ -581,26 +581,14 @@ class Component extends DCLogic {
     };
     [...fl,...fr,...rl,...rr].forEach(c => { cacheInit(c); console.log('[WheelInit]', c.name||'?'); });
 
-    // ── Shared pivot per wheel cluster (axle centre) ───────────────────────
-    // Pivoting every sub-mesh around the COMMON wheel centre (not its own
-    // origin) is what stops the wobble/orbit. Use the combined bbox centre.
-    const clusterCenter = (arr) => {
-      const b = new THREE.Box3();
-      arr.forEach(c => b.expandByObject(c));
-      return arr.length ? b.getCenter(new THREE.Vector3()) : new THREE.Vector3();
-    };
-    const flCenter = clusterCenter(fl), frCenter = clusterCenter(fr);
-    const rlCenter = clusterCenter(rl), rrCenter = clusterCenter(rr);
-    fl.forEach(c => c._pivot = flCenter); fr.forEach(c => c._pivot = frCenter);
-    rl.forEach(c => c._pivot = rlCenter); rr.forEach(c => c._pivot = rrCenter);
-
-    // ── Per-cluster roll axis (the REAL axle) via PCA ──────────────────────
-    // The wheel disc's symmetry axis is NOT the car's lateral direction — the
-    // model's wheels sit ~30° off it. Spinning about the car lateral therefore
-    // makes the disc TUMBLE (the "angled spin axis" wobble). Derive each
-    // cluster's true axle as the smallest-variance principal axis of its
-    // vertices: a disc has two large + one small eigenvalue; small = axle.
-    const eigenSym3 = (m) => { // m = [xx,xy,xz,yy,yz,zz]
+    // ── Per-cluster spin axis + centre (the REAL axle) via PCA ─────────────
+    // For a wobble-free spin the rotation axis must be the wheel's symmetry
+    // axis AND pass through its true centre. Both come from PCA of the densest
+    // sub-mesh (the tire/rim — a clean concentric disc): the centroid is the
+    // wheel centre, and the smallest-variance eigenvector is the axle. Using
+    // the combined-cluster bbox centre/axle instead let the off-centre brake
+    // caliper bias both, which is what left the residual wobble.
+    const eigenSym3 = (m) => { // m=[xx,xy,xz,yy,yz,zz] → eigen-pairs sorted ASC by value
       const A = [[m[0],m[1],m[2]],[m[1],m[3],m[4]],[m[2],m[4],m[5]]];
       const V = [[1,0,0],[0,1,0],[0,0,1]];
       for (let it=0; it<60; it++) {
@@ -615,33 +603,53 @@ class Component extends DCLogic {
         for(let k=0;k<3;k++){const a=V[k][p],b=V[k][q];V[k][p]=cs*a-sn*b;V[k][q]=sn*a+cs*b;}
       }
       const ev=[A[0][0],A[1][1],A[2][2]];
-      let mi=0; if(ev[1]<ev[mi])mi=1; if(ev[2]<ev[mi])mi=2;
-      return new THREE.Vector3(V[0][mi],V[1][mi],V[2][mi]).normalize();
+      const idx=[0,1,2].sort((a,b)=>ev[a]-ev[b]);
+      return { ev: idx.map(i=>ev[i]),
+               vec: idx.map(i=>new THREE.Vector3(V[0][i],V[1][i],V[2][i]).normalize()) };
     };
-    const clusterAxle = (arr) => {
+    // PCA of one mesh's world-space verts → axle (smallest axis) + centre + a
+    // "disc quality" score (high when two eigenvalues are large & near-equal and
+    // the third is clearly smaller → a flat ring). Partial arcs (Tire Side) and
+    // chunky/curve meshes score low, so they can't hijack the axle.
+    const meshPCA = (c) => {
+      const pos=c.geometry&&c.geometry.attributes&&c.geometry.attributes.position;
+      if(!pos || !pos.count) return null;
+      c.updateWorldMatrix(true,false);
+      const st=Math.max(1,Math.floor(pos.count/3000));
       const v=new THREE.Vector3(), mean=new THREE.Vector3(); let n=0;
-      const each = (cb) => arr.forEach(c => {
-        const pos=c.geometry && c.geometry.attributes && c.geometry.attributes.position;
-        if(!pos) return;
-        c.updateWorldMatrix(true,false);
-        const stride=Math.max(1,Math.floor(pos.count/2000));
-        for(let i=0;i<pos.count;i+=stride){ v.fromBufferAttribute(pos,i).applyMatrix4(c.matrixWorld); cb(v); }
-      });
-      each(p => { mean.add(p); n++; });
-      if(!n) return rightDir.clone();
-      mean.divideScalar(n);
+      for(let i=0;i<pos.count;i+=st){ v.fromBufferAttribute(pos,i).applyMatrix4(c.matrixWorld); mean.add(v); n++; }
+      if(!n) return null; mean.divideScalar(n);
       let xx=0,yy=0,zz=0,xy=0,xz=0,yz=0;
-      each(p => { const d=p.clone().sub(mean);
-        xx+=d.x*d.x; yy+=d.y*d.y; zz+=d.z*d.z; xy+=d.x*d.y; xz+=d.x*d.z; yz+=d.y*d.z; });
-      const axle = eigenSym3([xx,xy,xz,yy,yz,zz]);
-      if (axle.dot(rightDir) < 0) axle.negate(); // orient toward car's right (consistent spin)
-      return axle;
+      for(let i=0;i<pos.count;i+=st){ v.fromBufferAttribute(pos,i).applyMatrix4(c.matrixWorld).sub(mean);
+        xx+=v.x*v.x; yy+=v.y*v.y; zz+=v.z*v.z; xy+=v.x*v.y; xz+=v.x*v.z; yz+=v.y*v.z; }
+      const e=eigenSym3([xx,xy,xz,yy,yz,zz]); // ascending: [small, mid, big]
+      const [s,mid,big]=e.ev;
+      const isDisc = (big < 1.6*mid) && (mid > 3*Math.max(s,1e-6));
+      const quality = isDisc ? mid : 0; // bigger clean disc = more trustworthy
+      return { axle: e.vec[0].clone(), center: mean, quality, verts: n };
     };
-    const flAxle=clusterAxle(fl), frAxle=clusterAxle(fr), rlAxle=clusterAxle(rl), rrAxle=clusterAxle(rr);
-    fl.forEach(c=>c._rollAxis=flAxle); fr.forEach(c=>c._rollAxis=frAxle);
-    rl.forEach(c=>c._rollAxis=rlAxle); rr.forEach(c=>c._rollAxis=rrAxle);
+    const clusterPCA = (arr) => {
+      // Axle from the highest-quality disc (weighted by size); the wheel's true
+      // symmetry axis. Centre from that same disc (lies on the axle).
+      let best=null;
+      arr.forEach(c => { const p=meshPCA(c); if(!p) return;
+        const score = p.quality * Math.sqrt(p.verts);
+        if(p.quality>0 && (!best || score>best.score)) best={...p, score}; });
+      if(!best) { // fallback: densest mesh, even if not a clean disc
+        arr.forEach(c => { const p=meshPCA(c); if(p && (!best || p.verts>best.verts)) best={...p, score:0}; });
+      }
+      if(!best) return { axle: rightDir.clone(), center: new THREE.Vector3() };
+      if(best.axle.dot(rightDir) < 0) best.axle.negate(); // consistent spin sign
+      return { axle: best.axle, center: best.center };
+    };
+    const flP=clusterPCA(fl), frP=clusterPCA(fr), rlP=clusterPCA(rl), rrP=clusterPCA(rr);
+    const flCenter=flP.center, frCenter=frP.center, rlCenter=rlP.center, rrCenter=rrP.center;
+    fl.forEach(c=>{ c._pivot=flCenter; c._rollAxis=flP.axle; });
+    fr.forEach(c=>{ c._pivot=frCenter; c._rollAxis=frP.axle; });
+    rl.forEach(c=>{ c._pivot=rlCenter; c._rollAxis=rlP.axle; });
+    rr.forEach(c=>{ c._pivot=rrCenter; c._rollAxis=rrP.axle; });
     const fx=v=>v.toArray().map(x=>+x.toFixed(3));
-    console.log('[WheelAxle] FL',fx(flAxle),'FR',fx(frAxle),'RL',fx(rlAxle),'RR',fx(rrAxle));
+    console.log('[WheelAxle] FL',fx(flP.axle),'FR',fx(frP.axle),'RL',fx(rlP.axle),'RR',fx(rrP.axle));
 
     // Store lateral direction (fallback) for use in _applyWheelTransforms
     this._carLateralDir = rightDir.clone();
@@ -681,18 +689,32 @@ class Component extends DCLogic {
   // uEnvOffset uniform is advanced in the render loop to animate reflections.
   _setupReflectionFlow() {
     if (!this.THREE || !this.scene) return;
+    const THREE = this.THREE;
     if (!this._reflectionFlowUniforms) {
-      this._reflectionFlowUniforms = { uEnvOffset: { value: 0.0 } };
+      this._reflectionFlowUniforms = {
+        uEnvOffset: { value: 0.0 },
+        uFlowLong:  { value: new THREE.Vector3(1, 0, 0) },
+      };
     }
     const uniforms = this._reflectionFlowUniforms;
-    // Collect PBR body materials
+    // Longitudinal (front<->rear) world axis the reflection streams along, so
+    // the speed sensation reads identically from ANY camera angle.
+    uniforms.uFlowLong.value
+      .copy(this._carForwardDir || new THREE.Vector3(-1, 0, 0))
+      .setY(0).normalize();
+    // Collect PBR BODY materials only. The flow must NOT touch wheels/tires/
+    // brakes: on a smooth tire there are no surface features, so the only
+    // visible motion is the reflection — streaming it rearward makes the tire
+    // look like it's spinning BACKWARD, plus the hemisphere warp adds a faint
+    // up-down shimmer. The spinning geometry already conveys wheel motion.
+    const SKIP_FLOW = /wheel|tire|tyre|brake|break|hub|rim|disc|disk|caliper/i;
     this._animEnvMaterials = [];
     this.scene.traverse(c => {
       if (!c.isMesh) return;
       const mats = Array.isArray(c.material) ? c.material : [c.material];
       mats.forEach(m => {
         if (m && (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) &&
-            !this._animEnvMaterials.includes(m)) {
+            !SKIP_FLOW.test(m.name || '') && !this._animEnvMaterials.includes(m)) {
           this._animEnvMaterials.push(m);
         }
       });
@@ -704,34 +726,53 @@ class Component extends DCLogic {
       m.onBeforeCompile = (shader) => {
         if (prev) prev(shader);
         shader.uniforms.uEnvOffset = uniforms.uEnvOffset;
-        shader.fragmentShader = 'uniform float uEnvOffset;\n' + shader.fragmentShader;
+        shader.uniforms.uFlowLong  = uniforms.uFlowLong;
+        shader.fragmentShader =
+          'uniform float uEnvOffset;\nuniform vec3 uFlowLong;\n' + shader.fragmentShader;
         // onBeforeCompile sees #include directives UNRESOLVED, so replace the
         // include with a modified copy of the chunk that warps reflectVec.
-        const THREE = this.THREE;
+        // IMPORTANT: warp AFTER reflectVec is taken to WORLD space (the
+        // inverseTransformDirection line). The previous version warped the
+        // VIEW-space reflectVec, so the flow followed the camera — the
+        // reflection appeared to move toward the front / sides / both depending
+        // on the viewing angle. In world space the streak direction is fixed.
         const incName = 'envmap_physical_pars_fragment';
-        const chunk = THREE.ShaderChunk[incName];
+        const chunk = this.THREE.ShaderChunk[incName];
         const warp = `
             {
-              vec3 rr = reflectVec;
-              // Flow along Z (front-to-rear for -X-facing car viewed sideways)
-              float lim = max(sqrt(1.0 - rr.x * rr.x), 0.001);
-              float zN = rr.z / lim;
-              float wr = mod(zN - uEnvOffset + 1.0, 2.0) - 1.0;
-              float nZ = wr * lim;
-              float nY = sign(rr.y) * sqrt(max(1.0 - rr.x * rr.x - nZ * nZ, 0.0));
-              reflectVec = vec3(rr.x, nY, nZ);
+              vec3 r = normalize(reflectVec);          // world-space reflection
+              vec3 U = vec3(0.0, 1.0, 0.0);
+              vec3 L = normalize(uFlowLong);           // car front<->rear (horizontal)
+              vec3 S = normalize(cross(U, L));         // lateral band (held fixed)
+              float a = dot(r, S);
+              float b = dot(r, U);
+              float c = dot(r, L);
+              // Teleportation flow: slide the longitudinal component, wrapping
+              // up over the top, with the lateral band 'a' held constant.
+              float lim = max(sqrt(max(1.0 - a * a, 0.0)), 0.001);
+              float cN  = c / lim;
+              float wr  = mod(cN + uEnvOffset + 1.0, 2.0) - 1.0;
+              float nC  = wr * lim;
+              float nB  = sign(b) * sqrt(max(1.0 - a * a - nC * nC, 0.0));
+              vec3 warped = normalize(a * S + nB * U + nC * L);
+              // Animate the TOP hemisphere only; keep the ground reflection
+              // static (blend across the horizon to avoid a hard seam).
+              float topBlend = smoothstep(0.0, 0.15, b);
+              reflectVec = normalize(mix(r, warped, topBlend));
             }`;
-        const tgt = 'reflectVec = reflect( - viewDir, normal );';
+        const tgt = 'reflectVec = inverseTransformDirection( reflectVec, viewMatrix );';
         if (chunk && chunk.includes(tgt)) {
           const modified = chunk.split(tgt).join(tgt + warp);
           shader.fragmentShader = shader.fragmentShader.replace(
             '#include <' + incName + '>', modified
           );
+        } else {
+          console.warn('[ReflectionFlow] world-space target not found; flow not injected');
         }
       };
       // Force three.js to build a NEW program (not reuse the cached one that
       // compiled before onBeforeCompile was assigned).
-      m.customProgramCacheKey = () => 'reflflow_v1';
+      m.customProgramCacheKey = () => 'reflflow_v3';
       m._flowInjected = true;
       m.needsUpdate = true;
     });
