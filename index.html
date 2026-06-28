@@ -475,14 +475,30 @@ class Component extends DCLogic {
     const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
 
     const speed = this.state.motionSpeed || 0;
-    const isFast = Math.abs(speed) * 40 >= 60;
+    const speedKmh = Math.abs(speed) * 40;
+    const isFast = speedKmh >= 65;
+    const isBlending = speedKmh >= 45;
 
-    // Toggle visibility of spokes vs blurred discs
+    // Calculate blend opacity for blurred discs (linear fade from 45 to 65 km/h)
+    let blend = 0;
+    if (speedKmh >= 45) {
+      blend = Math.min(1.0, (speedKmh - 45) / 20);
+    }
+
+    if (this._blurredDiscs && this._blurredDiscs[0]) {
+      const mat = this._blurredDiscs[0].material;
+      if (mat) mat.opacity = blend;
+    }
+
+    // Toggle visibility of spokes vs blurred discs & backing discs
     if (this._spokesWheels) {
       this._spokesWheels.forEach(m => { m.visible = !isFast; });
     }
     if (this._blurredDiscs) {
-      this._blurredDiscs.forEach(m => { m.visible = isFast; });
+      this._blurredDiscs.forEach(m => { m.visible = isBlending; });
+    }
+    if (this._backingDiscs) {
+      this._backingDiscs.forEach(m => { m.visible = isBlending; });
     }
     if (this._otherRimWheels) {
       this._otherRimWheels.forEach(m => { m.visible = true; });
@@ -509,6 +525,7 @@ class Component extends DCLogic {
       // World → parent-local using the cached init parent-inverse, then apply all.
       (m._initParentInv || new THREE.Matrix4()).clone().multiply(newWorld)
         .decompose(_p, _q, _s);
+
       m.position.copy(_p);
       m.quaternion.copy(_q);
       m.scale.copy(_s);
@@ -534,6 +551,15 @@ class Component extends DCLogic {
         applyRot(m, m._rollAngle || 0, isFront);
       });
     }
+
+    // Backing discs: steer only, no roll
+    if (this._backingDiscs) {
+      this._backingDiscs.forEach(m => {
+        const isFront = m._side === 'fl' || m._side === 'fr';
+        applyRot(m, 0, isFront);
+      });
+    }
+
   }
 
   _setMotionSpeed(speed) {
@@ -696,15 +722,17 @@ class Component extends DCLogic {
     const size = 256;
     const testPixels = new Uint8Array(size * size * 4);
     renderer.readRenderTargetPixels(this._rtBlurred, 0, 0, size, size, testPixels);
-    let maxVal = 0;
-    for (let i = 0; i < testPixels.length; i++) {
-      if (testPixels[i] > maxVal) maxVal = testPixels[i];
+    let maxVal = 0, opaqueCount = 0;
+    for (let i = 0; i < testPixels.length; i += 4) {
+      const a = testPixels[i+3];
+      if (a > 10) opaqueCount++;
+      for (let j = 0; j < 4; j++) {
+        if (testPixels[i+j] > maxVal) maxVal = testPixels[i+j];
+      }
     }
-    const pixelCorner = new Uint8Array(4);
-    renderer.readRenderTargetPixels(this._rtBlurred, 10, 10, 1, 1, pixelCorner);
-    const pixelCenter = new Uint8Array(4);
-    renderer.readRenderTargetPixels(this._rtBlurred, 128, 128, 1, 1, pixelCenter);
-    console.log('[WheelBlur Diagnostics] MaxVal:', maxVal, 'Corner:', Array.from(pixelCorner), 'Center:', Array.from(pixelCenter));
+    const pixelCorner = Array.from(testPixels.slice(10 * size * 4 + 10 * 4, 10 * size * 4 + 10 * 4 + 4));
+    const pixelCenter = Array.from(testPixels.slice(128 * size * 4 + 128 * 4, 128 * size * 4 + 128 * 4 + 4));
+    console.log('[WheelBlur Diagnostics] MaxVal:', maxVal, 'OpaqueCount:', opaqueCount, 'Corner:', pixelCorner, 'Center:', pixelCenter);
 
     renderer.setRenderTarget(oldRenderTarget);
     renderer.setClearColor(oldClearColor, oldClearAlpha);
@@ -924,24 +952,40 @@ class Component extends DCLogic {
     // Generate blurred wheel texture dynamically
     this._generateBlurredWheelTexture();
 
-    // Create blurred discs
+    // Create blurred discs and backing discs
     this._blurredDiscs = [];
+    this._backingDiscs = [];
     if (this._rtBlurred) {
       const blurredMaterial = new THREE.MeshBasicMaterial({
         map: this._rtBlurred.texture,
         transparent: true,
         depthWrite: false,
+        side: THREE.DoubleSide,
+        color: 0x2e2e32 // Dark metallic tint for black spinning wheels
+      });
+
+      const backingMaterial = new THREE.MeshBasicMaterial({
+        color: 0x0a0a0b, // flat dark shadow to block the white interior
         side: THREE.DoubleSide
       });
 
-      // Find the FL wheel radius from the bounding box of FL spokes
+      // Find the parent's world scale factor to convert radius to local units
+      const parentScale = new THREE.Vector3();
+      const firstMesh = fl[0];
+      if (firstMesh && firstMesh.parent) {
+        firstMesh.parent.getWorldScale(parentScale);
+      }
+      const scaleFactor = parentScale.x || 1.0;
+
+      // Find the FL wheel radius from the bounding box of FL spokes in world coordinates
       const flBox = new THREE.Box3();
       fl.forEach(m => {
         if (this._spokesWheels.includes(m)) flBox.expandByObject(m);
       });
       const sizeVec = new THREE.Vector3();
       flBox.getSize(sizeVec);
-      const radius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
+      const worldRadius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
+      const localRadius = worldRadius / scaleFactor;
 
       const clusters = [
         { arr: fl, center: flCenter, axle: flP.axle, side: 'fl' },
@@ -951,21 +995,18 @@ class Component extends DCLogic {
       ];
 
       clusters.forEach(item => {
-        const discGeo = new THREE.CircleGeometry(radius, 32);
+        const discGeo = new THREE.CircleGeometry(localRadius, 32);
+        
+        // 1. Blurred spokes overlay disc
         const disc = new THREE.Mesh(discGeo, blurredMaterial);
-        
-        // Position at wheel center
         disc.position.copy(item.center);
-        
-        // Align to look along axle
         disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), item.axle);
         
         // Offset slightly outward to avoid Z-fighting
         const isRight = item.side.endsWith('r');
         const outwardDir = item.axle.clone().multiplyScalar(isRight ? 1 : -1);
-        disc.position.addScaledVector(outwardDir, 0.015);
+        disc.position.addScaledVector(outwardDir, 0.115);
         
-        // Add to scene first, then attach to model parent so it inherits scaling/translation
         if (this.scene) {
           this.scene.add(disc);
           disc.updateMatrixWorld(true);
@@ -974,20 +1015,44 @@ class Component extends DCLogic {
             firstMesh.parent.attach(disc);
           }
         }
-        
         disc.visible = false;
-        
-        // Set pivot, roll axle, and side for steering/rolling in applyRot
+        disc.renderOrder = 10;
         disc._pivot = item.center.clone();
         disc._rollAxis = item.axle.clone();
         disc._side = item.side;
         disc._rollAngle = 0;
-        
         disc.updateWorldMatrix(true, false);
         disc._initWorld = disc.matrixWorld.clone();
         disc._initParentInv = disc.parent ? disc.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
         
         this._blurredDiscs.push(disc);
+
+        // 2. Dark backing disc (placed behind brakes/suspension)
+        const backingDisc = new THREE.Mesh(discGeo, backingMaterial);
+        backingDisc.position.copy(item.center);
+        backingDisc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), item.axle);
+        
+        // Offset inward to sit behind the brakes
+        const inwardDir = item.axle.clone().multiplyScalar(isRight ? -1 : 1);
+        backingDisc.position.addScaledVector(inwardDir, 0.04); // 4 cm inward
+        
+        if (this.scene) {
+          this.scene.add(backingDisc);
+          backingDisc.updateMatrixWorld(true);
+          const firstMesh = item.arr[0];
+          if (firstMesh && firstMesh.parent) {
+            firstMesh.parent.attach(backingDisc);
+          }
+        }
+        backingDisc.visible = false;
+        backingDisc._pivot = item.center.clone();
+        backingDisc._rollAxis = item.axle.clone();
+        backingDisc._side = item.side;
+        backingDisc.updateWorldMatrix(true, false);
+        backingDisc._initWorld = backingDisc.matrixWorld.clone();
+        backingDisc._initParentInv = backingDisc.parent ? backingDisc.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
+        
+        this._backingDiscs.push(backingDisc);
       });
     }
   }
@@ -3245,7 +3310,9 @@ class Component extends DCLogic {
             this._reflectionFlowUniforms.uEnvOffset.value += delta * speed * 0.3;
           }
           // Roll all wheels on Z axis (axle), steer front wheels on Y
-          const rollDelta = delta * speed * 6;
+          // Faked spin speed (half of real speed to look aesthetically pleasing and break wagon-wheel locking):
+          // Real speed w ~ speed * 30.4 rad/s. Half speed ~ speed * 15.2 rad/s.
+          const rollDelta = delta * speed * 15.2;
           if (this._allWheels) {
             this._allWheels.forEach(m => { m._rollAngle = (m._rollAngle || 0) + rollDelta; });
           }
