@@ -184,8 +184,16 @@
         <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ motionSpeedLabel }}</span>
       </div>
       <input type="range" min="-5" max="5" step="0.05" value="{{ motionSpeed }}" onChange="{{ onMotionSpeed }}" onInput="{{ onMotionSpeed }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 14px;" />
-      <button onClick="{{ onMotionStop }}" style="width: 100%; padding: 7px; border-radius: 7px; border: 1px solid rgba(79,214,232,.3); background: rgba(79,214,232,.08); color: #4fd6e8; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em;">STOP</button>
+      <button onClick="{{ onMotionStop }}" style="width: 100%; padding: 7px; border-radius: 7px; border: 1px solid rgba(79,214,232,.3); background: rgba(79,214,232,.08); color: #4fd6e8; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; margin-bottom: 18px;">STOP</button>
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">SUNROOF</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">CLOSED ←  → OPEN</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ sunroofLabel }}</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ sunroofOpen }}" onChange="{{ onSunroofOpen }}" onInput="{{ onSunroofOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
     </sc-if>
+
 
   </div>
 
@@ -222,6 +230,7 @@ class Component extends DCLogic {
     configTab: 'color',
     motionSpeed: 0,
     wheelAngle: 0,
+    sunroofOpen: 0,
     motionActive: false,
     dayBg: '#efefef',
     nightBg: '#131415',
@@ -310,6 +319,9 @@ class Component extends DCLogic {
       onWheelAngle:  (e) => this._setWheelAngle(parseFloat(e.target.value)),
       onMotionSpeed: (e) => this._setMotionSpeed(parseFloat(e.target.value)),
       onMotionStop:  () => this._setMotionSpeed(0),
+      sunroofOpen:      s.sunroofOpen,
+      sunroofLabel:     s.sunroofOpen + '%',
+      onSunroofOpen:    (e) => this._setSunroofOpen(parseFloat(e.target.value)),
       tabBgColor:  s.configTab === 'color'  ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgEnv:    s.configTab === 'env'    ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgLights: s.configTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
@@ -2993,7 +3005,14 @@ class Component extends DCLogic {
       if (!container) return;
       const w = container.clientWidth, h = container.clientHeight;
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      // No preserveDrawingBuffer: on many mobile GPUs it silently DISABLES
+      // MSAA (the two are mutually exclusive there). Without MSAA the thin rear
+      // LED strip's sub-pixel triangles produce no fragments and it "crops" at
+      // distance — the root cause of the rear position light vanishing on phones
+      // while desktop (MSAA intact) never reproduced it. Nothing here needs the
+      // preserved buffer (no canvas readback/export; on-demand rendering keeps
+      // the last frame on its own).
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.setSize(w, h);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
