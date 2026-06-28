@@ -477,12 +477,15 @@ class Component extends DCLogic {
     const speed = this.state.motionSpeed || 0;
     const isFast = Math.abs(speed) * 40 >= 60;
 
-    // Toggle visibility of rims vs blurred discs
-    if (this._rimWheels) {
-      this._rimWheels.forEach(m => { m.visible = !isFast; });
+    // Toggle visibility of spokes vs blurred discs
+    if (this._spokesWheels) {
+      this._spokesWheels.forEach(m => { m.visible = !isFast; });
     }
     if (this._blurredDiscs) {
       this._blurredDiscs.forEach(m => { m.visible = isFast; });
+    }
+    if (this._otherRimWheels) {
+      this._otherRimWheels.forEach(m => { m.visible = true; });
     }
     if (this._tireWheels) {
       this._tireWheels.forEach(m => { m.visible = true; });
@@ -599,7 +602,7 @@ class Component extends DCLogic {
   }
 
   _generateBlurredWheelTexture() {
-    if (!this.THREE || !this.renderer || !this._frontLeftWheels || !this._rimWheels) return;
+    if (!this.THREE || !this.renderer || !this._frontLeftWheels || !this._spokesWheels) return;
     if (!this._wheelBlurInitialized) this._initWheelBlur();
 
     const THREE = this.THREE;
@@ -609,7 +612,7 @@ class Component extends DCLogic {
     const flBox = new THREE.Box3();
     let hasRim = false;
     this._frontLeftWheels.forEach(m => {
-      if (this._rimWheels.includes(m)) {
+      if (this._spokesWheels.includes(m)) {
         flBox.expandByObject(m);
         hasRim = true;
       }
@@ -635,8 +638,8 @@ class Component extends DCLogic {
     scene.traverse(c => {
       if (c.isMesh) {
         savedVisibilities.set(c, c.visible);
-        const isFlRim = this._frontLeftWheels.includes(c) && this._rimWheels.includes(c);
-        c.visible = isFlRim;
+        const isFlSpokes = this._frontLeftWheels.includes(c) && this._spokesWheels.includes(c);
+        c.visible = isFlSpokes;
       }
     });
 
@@ -653,11 +656,16 @@ class Component extends DCLogic {
     const oldClearColor = new THREE.Color();
     renderer.getClearColor(oldClearColor);
     const oldClearAlpha = renderer.getClearAlpha();
+    const oldBg = scene.background;
+
+    scene.background = null; // Prevent scene background from filling the target with solid color
 
     renderer.setRenderTarget(this._rtSource);
     renderer.setClearColor(0x000000, 0.0);
     renderer.clear();
     renderer.render(scene, tempCam);
+
+    scene.background = oldBg;
 
     scene.traverse(c => {
       if (c.isMesh && savedVisibilities.has(c)) {
@@ -856,6 +864,42 @@ class Component extends DCLogic {
     this._tireWheels = this._allWheels.filter(isTire);
     this._rimWheels = this._allWheels.filter(m => !isTire(m));
 
+    // Get vertex count helper
+    const getVertexCount = (mesh) => {
+      const pos = mesh.geometry && mesh.geometry.attributes && mesh.geometry.attributes.position;
+      return pos ? pos.count : 0;
+    };
+
+    // Among the wheel meshes (non-tires), identify the spokes mesh (the one with the largest vertex count in each cluster)
+    this._spokesWheels = [];
+    this._otherRimWheels = [];
+
+    const identifySpokes = (clusterMeshes) => {
+      const rimMeshes = clusterMeshes.filter(m => !isTire(m));
+      if (rimMeshes.length === 0) return;
+      let maxCount = -1;
+      let spokesMesh = null;
+      rimMeshes.forEach(m => {
+        const count = getVertexCount(m);
+        if (count > maxCount) {
+          maxCount = count;
+          spokesMesh = m;
+        }
+      });
+      rimMeshes.forEach(m => {
+        if (m === spokesMesh) {
+          this._spokesWheels.push(m);
+        } else {
+          this._otherRimWheels.push(m);
+        }
+      });
+    };
+
+    identifySpokes(fl);
+    identifySpokes(fr);
+    identifySpokes(rl);
+    identifySpokes(rr);
+
     // Generate blurred wheel texture dynamically
     this._generateBlurredWheelTexture();
 
@@ -869,10 +913,10 @@ class Component extends DCLogic {
         side: THREE.DoubleSide
       });
 
-      // Find the FL wheel radius from the bounding box of FL rim meshes
+      // Find the FL wheel radius from the bounding box of FL spokes
       const flBox = new THREE.Box3();
       fl.forEach(m => {
-        if (this._rimWheels.includes(m)) flBox.expandByObject(m);
+        if (this._spokesWheels.includes(m)) flBox.expandByObject(m);
       });
       const sizeVec = new THREE.Vector3();
       flBox.getSize(sizeVec);
@@ -2594,6 +2638,85 @@ class Component extends DCLogic {
     this['_blink_' + timerKey] = null;
   }
 
+  _warmupLights() {
+    if (!this.lightGroups || !this.renderer || !this.scene || !this.camera) return;
+    console.log('[Lights Warmup] Starting shader compilation pre-warm...');
+
+    const warmupKeys = [
+      'headlight', 'highbeam', 'fogFront', 'fogRear', 'brake', 'reverse',
+      'turnL', 'turnR', 'positionFront', 'positionFrontL', 'positionFrontR',
+      'positionFrontAmber', 'positionFrontLAmber', 'positionFrontRAmber',
+      'positionRear', 'position'
+    ];
+
+    // 1. Temporarily turn ALL lights ON (both standard and aliases)
+    warmupKeys.forEach(k => {
+      try { this._setGroupEmissive(k, true); } catch (e) {}
+    });
+
+    // 2. Perform a complete compile/render cycle with all lights active
+    try {
+      // Main scene compile
+      this.renderer.compile(this.scene, this.camera);
+
+      // Warm up Bloom Composer
+      if (this.bloomComposer && this.bloomCam) {
+        this.bloomCam.position.copy(this.camera.position);
+        this.bloomCam.quaternion.copy(this.camera.quaternion);
+        this.bloomCam.updateProjectionMatrix();
+
+        const savedBg = this.scene.background;
+        this.scene.background = null;
+        this._darkenNonBloom(this.scene);
+        this.bloomComposer.render();
+        this._restoreMaterials();
+        this.scene.background = savedBg;
+      }
+
+      // Warm up Streak Composer
+      if (this.streakComposer && this.streakCam) {
+        this.streakCam.position.copy(this.camera.position);
+        this.streakCam.quaternion.copy(this.camera.quaternion);
+        this.streakCam.updateProjectionMatrix();
+
+        const savedBg = this.scene.background;
+        this.scene.background = null;
+        this._darkenNonStreak(this.scene);
+        this.streakComposer.render();
+        this._restoreMaterials();
+        this.scene.background = savedBg;
+      }
+      
+      // Warm up Additive Overlay
+      if (this.bloomMat && this.streakMat && this.bloomComposer && this.streakComposer) {
+        this.bloomMat.map = this.bloomComposer.readBuffer.texture;
+        this.bloomMat.visible = true;
+        this.bloomMat.needsUpdate = true;
+        this.streakMat.map = this.streakComposer.readBuffer.texture;
+        this.streakMat.visible = true;
+        this.streakMat.needsUpdate = true;
+        this.renderer.render(this.overlayScene, this.orthoCamera);
+      }
+    } catch (err) {
+      console.warn('[Lights Warmup] Error during warmup render:', err);
+    }
+
+    // 3. Turn ALL lights back OFF
+    warmupKeys.forEach(k => {
+      try { this._setGroupEmissive(k, false); } catch (e) {}
+    });
+    
+    // Clear overlay quad states
+    if (this.bloomMat && this.streakMat) {
+      this.bloomMat.visible = false;
+      this.streakMat.visible = false;
+      this.bloomMat.needsUpdate = true;
+      this.streakMat.needsUpdate = true;
+    }
+
+    console.log('[Lights Warmup] Compilation pre-warm completed.');
+  }
+
   componentWillUnmount() {
     ['turnL', 'turnR', 'hazard'].forEach(k => this._stopBlink(k));
     if (this.renderer) { this.renderer.dispose(); this.animFrameId && cancelAnimationFrame(this.animFrameId); }
@@ -3522,6 +3645,8 @@ class Component extends DCLogic {
     // camera bounds are finalised, then draw.
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(4);
+
+    this._warmupLights();
 
     this.setState({ loading: false, progress: 100 });
   }
