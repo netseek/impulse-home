@@ -2455,6 +2455,8 @@ class Component extends DCLogic {
         // Restore canvas vignette background
         this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
         if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        // This callback doesn't setState, so request a redraw explicitly.
+        if (this.requestRender) this.requestRender(4);
       },
       undefined,
       (err) => console.warn('[Haval H6] HDRI failed to load: ' + key, err)
@@ -2470,6 +2472,32 @@ class Component extends DCLogic {
       s.onerror = () => reject(new Error('Failed to load ' + src));
       document.head.appendChild(s);
     });
+  }
+
+  // Any React state/prop change (paint, env, lights, vignette, night, steer …)
+  // means the scene may look different — request a redraw under on-demand mode.
+  componentDidUpdate() {
+    if (this.requestRender) this.requestRender(3);
+  }
+
+  // Step the device pixel ratio toward smoothness/crispness based on sustained
+  // render cost. Hysteresis + a cooldown prevent resolution flapping.
+  _maybeAdaptDPR() {
+    if (!this.renderer || !this._dprSteps) return;
+    const t = performance.now();
+    if (t - (this._lastDprChange || 0) < 1200) return;
+    let idx = this._dprIdx;
+    if (this._frameMsAvg > 26 && idx > 0) idx--;                       // <~38fps → coarser
+    else if (this._frameMsAvg < 10 && idx < this._dprSteps.length - 1) idx++; // big headroom → crisper
+    if (idx === this._dprIdx) return;
+    this._dprIdx = idx;
+    const dpr = this._dprSteps[idx];
+    this.renderer.setPixelRatio(dpr);
+    if (this._onResize) this._onResize(); // re-apply renderer + composer sizes
+    this._perf.dpr = dpr;
+    this._frameMsAvg = 16;        // reset measurement after a change
+    this._lastDprChange = t;
+    this.requestRender(3);
   }
 
   async componentDidMount() {
@@ -2514,6 +2542,13 @@ class Component extends DCLogic {
       if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      // The car and sun are static, so the soft shadow never changes frame to
+      // frame — re-rendering a 2048² PCF-soft map every frame is pure waste.
+      // Update it only on demand; the shadowMap.needsUpdate=true calls already
+      // placed at model load, HDR load and night-mode toggle cover every moment
+      // the shadow actually changes.
+      renderer.shadowMap.autoUpdate = false;
+      renderer.shadowMap.needsUpdate = true;
       container.appendChild(renderer.domElement);
       this.renderer = renderer;
 
@@ -2580,6 +2615,27 @@ class Component extends DCLogic {
       controls.maxDistance = 120;
       this.controls = controls;
 
+      // ── On-demand rendering ────────────────────────────────────────────────
+      // Only draw when something changes. _renderFrames>0 forces N frames so
+      // damping/async work settles. requestRender() is the single entry point;
+      // componentDidUpdate (any setState), resize, and async loads all call it.
+      this._renderFrames = 6;
+      this.requestRender = (n = 3) => { this._renderFrames = Math.max(this._renderFrames || 0, n); };
+      controls.addEventListener('change', () => this.requestRender(2));
+      // ── Adaptive pixel ratio ───────────────────────────────────────────────
+      // Step DPR within [1.0 .. cap] from sustained render cost (rendered frames
+      // only), so weak GPUs stay smooth and strong ones stay crisp.
+      this._dprCap   = Math.min(window.devicePixelRatio || 1, 1.5);
+      // Steps never exceed the device cap (rendering above 1× the display is
+      // pure waste). Floor at 1.0 to avoid a blurry under-sampled image.
+      this._dprSteps = [...new Set([1.0, 1.25, 1.5].filter(v => v <= this._dprCap).concat(this._dprCap))]
+        .sort((a, b) => a - b);
+      this._dprIdx   = this._dprSteps.length - 1; // start crisp
+      this._frameMsAvg = 16;
+      this._perf = { fps: 0, lastMs: 0, renderedFrames: 0, dpr: this._dprSteps[this._dprIdx] };
+      window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
+        drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
+
       // --- Load GLB (Draco-compressed glTF with PBR materials) ---
       const draco = new THREE.DRACOLoader();
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
@@ -2620,6 +2676,7 @@ class Component extends DCLogic {
         if (this.bloomComposer) this.bloomComposer.setSize(W, H);
         if (this.bloomRT) this.bloomRT.setSize(W, H);
         if (this.bAnaPass) this.bAnaPass.uniforms.resolution.value.set(W, H);
+        if (this.requestRender) this.requestRender(2);
       };
       window.addEventListener('resize', this._onResize);
 
@@ -2756,8 +2813,9 @@ class Component extends DCLogic {
       this.vignetteMat   = vignetteMat;
       this.vignetteScene = vignetteScene;
 
-      // --- Render loop ---
+      // --- Render loop (on-demand: only draws when something actually changes) ---
       let _lastT = performance.now();
+      let _fpsT = _lastT, _fpsCount = 0;
       const loop = () => {
         this._raf = requestAnimationFrame(loop);
         const now = performance.now();
@@ -2765,6 +2823,7 @@ class Component extends DCLogic {
         _lastT = now;
 
         // Motion: advance reflection flow offset + roll wheels
+        let needRender = false;
         const speed = this.state.motionSpeed || 0;
         if (speed !== 0) {
           if (this._reflectionFlowUniforms) {
@@ -2776,9 +2835,17 @@ class Component extends DCLogic {
             this._allWheels.forEach(m => { m._rollAngle = (m._rollAngle || 0) + rollDelta; });
             this._applyWheelTransforms();
           }
+          needRender = true;
         }
 
-        controls.update();
+        // controls.update() must run every frame for damping; true = camera moved
+        if (controls.update()) needRender = true;
+        // Forced frames after UI changes / async loads (componentDidUpdate, etc.)
+        if (this._renderFrames > 0) { this._renderFrames--; needRender = true; }
+        // Idle — nothing changed: skip ALL GPU work this frame
+        if (!needRender) return;
+        const _t0 = performance.now();
+
         const syncCam = (dst) => {
           dst.position.copy(camera.position);
           dst.quaternion.copy(camera.quaternion);
@@ -2793,6 +2860,9 @@ class Component extends DCLogic {
         // 1) Main scene
         renderer.autoClear = true;
         renderer.render(scene, camera);
+        // Capture main-scene cost before the overlay passes overwrite info.render
+        this._perf.mainCalls = renderer.info.render.calls;
+        this._perf.mainTris  = renderer.info.render.triangles;
 
         if (anyLight && this.bloomComposer) {
           syncCam(this.bloomCam);
@@ -2833,6 +2903,18 @@ class Component extends DCLogic {
           renderer.render(this.vignetteScene, this.orthoCamera);
           renderer.autoClear = true;
         }
+
+        // Profiler + adaptive pixel ratio (measured on rendered frames only)
+        const _ms = performance.now() - _t0;
+        this._frameMsAvg = this._frameMsAvg * 0.9 + _ms * 0.1;
+        this._perf.lastMs = +_ms.toFixed(2);
+        this._perf.renderedFrames++;
+        _fpsCount++;
+        if (now - _fpsT >= 500) {
+          this._perf.fps = Math.round(_fpsCount * 1000 / (now - _fpsT));
+          _fpsCount = 0; _fpsT = now;
+        }
+        this._maybeAdaptDPR();
       };
       loop();
     } catch (err) {
@@ -3159,6 +3241,10 @@ class Component extends DCLogic {
     d.target.position.copy(center3);
     this.scene.add(d.target);
     d.shadow.camera.updateProjectionMatrix();
+    // Shadow map updates on demand now (autoUpdate off) — refresh it once the
+    // camera bounds are finalised, then draw.
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(4);
 
     this.setState({ loading: false, progress: 100 });
   }
