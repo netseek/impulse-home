@@ -191,7 +191,14 @@
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">CLOSED ←  → OPEN</span>
         <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ sunroofLabel }}</span>
       </div>
-      <input type="range" min="0" max="100" step="1" value="{{ sunroofOpen }}" onChange="{{ onSunroofOpen }}" onInput="{{ onSunroofOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
+      <input type="range" min="0" max="100" step="1" value="{{ sunroofOpen }}" onChange="{{ onSunroofOpen }}" onInput="{{ onSunroofOpen }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 18px;" />
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CURTAIN</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">CLOSED ←  → OPEN</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ curtainLabel }}</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ curtainOpen }}" onChange="{{ onCurtainOpen }}" onInput="{{ onCurtainOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
     </sc-if>
 
 
@@ -231,6 +238,7 @@ class Component extends DCLogic {
     motionSpeed: 0,
     wheelAngle: 0,
     sunroofOpen: 0,
+    curtainOpen: 0,
     motionActive: false,
     dayBg: '#efefef',
     nightBg: '#131415',
@@ -322,6 +330,9 @@ class Component extends DCLogic {
       sunroofOpen:      s.sunroofOpen,
       sunroofLabel:     s.sunroofOpen + '%',
       onSunroofOpen:    (e) => this._setSunroofOpen(parseFloat(e.target.value)),
+      curtainOpen:      s.curtainOpen,
+      curtainLabel:     s.curtainOpen + '%',
+      onCurtainOpen:    (e) => this._setCurtainOpen(parseFloat(e.target.value)),
       tabBgColor:  s.configTab === 'color'  ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgEnv:    s.configTab === 'env'    ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgLights: s.configTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
@@ -463,6 +474,56 @@ class Component extends DCLogic {
   _setGrain(enabled) {
     this.setState({ grainEnabled: enabled });
     this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, enabled);
+  }
+
+  _setSunroofOpen(pct) {
+    this.setState({ sunroofOpen: pct });
+    this._applySunroofTransform(pct);
+  }
+
+  _applySunroofTransform(pct) {
+    if (!this.THREE || !this.sunroofFront || !this._sunroofFrontOrigPos) return;
+    const value = pct !== undefined ? pct : (this.state.sunroofOpen ?? 0);
+    const ratio = value / 100;
+
+    const transitionThreshold = 0.25;
+    let upOffset = 0;
+    let backOffset = 0;
+
+    const maxUp = 0.045; // meters
+    const maxBack = 0.496; // meters (80% of original 0.62)
+
+    if (ratio < transitionThreshold) {
+      upOffset = (ratio / transitionThreshold) * maxUp;
+      backOffset = 0;
+    } else {
+      upOffset = maxUp;
+      backOffset = ((ratio - transitionThreshold) / (1 - transitionThreshold)) * maxBack;
+    }
+
+    this.sunroofFront.position.y = this._sunroofFrontOrigPos.y + upOffset;
+    this.sunroofFront.position.x = this._sunroofFrontOrigPos.x + backOffset;
+
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(3);
+  }
+
+  _setCurtainOpen(pct) {
+    this.setState({ curtainOpen: pct });
+    this._applyCurtainTransform(pct);
+  }
+
+  _applyCurtainTransform(pct) {
+    if (!this.THREE || !this.sunroofCurtain) return;
+    const value = pct !== undefined ? pct : (this.state.curtainOpen ?? 0);
+    const ratio = value / 100;
+
+    const scaleX = 1 - ratio;
+    this.sunroofCurtain.scale.x = scaleX;
+    this.sunroofCurtain.position.x = 1.94 - (1.35 * scaleX) / 2;
+
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(3);
   }
 
   // ── Motion controls ─────────────────────────────────────────────────────
@@ -3691,6 +3752,41 @@ class Component extends DCLogic {
     console.log('[Haval H6] mesh parts (' + meshNames.length + '):', meshNames);
     this.modelParts = meshNames;
     this.model = obj;
+
+    const findMesh = (name) => {
+      const normKey = name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      let hit = null;
+      obj.traverse((c) => {
+        if (!hit && c.name && c.name.toLowerCase().replace(/[^a-z0-9]+/g, '') === normKey) {
+          hit = c;
+        }
+      });
+      return hit;
+    };
+
+    this.sunroofFront = findMesh('Sunroof Front');
+    if (this.sunroofFront) {
+      this._sunroofFrontOrigPos = this.sunroofFront.position.clone();
+      this._applySunroofTransform();
+    }
+
+    // Create and add the sunroof curtain (roller blind) mesh
+    if (THREE) {
+      const curtainGeom = new THREE.PlaneGeometry(1.35, 0.82);
+      curtainGeom.rotateX(-Math.PI / 2);
+      const curtainMat = new THREE.MeshStandardMaterial({
+        color: 0x706456, // Dark warm taupe/beige
+        roughness: 0.9,
+        metalness: 0.05,
+        side: THREE.DoubleSide
+      });
+      const curtainMesh = new THREE.Mesh(curtainGeom, curtainMat);
+      curtainMesh.name = "Sunroof_Curtain";
+      curtainMesh.position.set(1.265, 1.62, -0.366);
+      obj.add(curtainMesh);
+      this.sunroofCurtain = curtainMesh;
+      this._applyCurtainTransform(this.state.curtainOpen);
+    }
     this.collectLightMeshes(obj);
     this._applyInitialFogStates();
     // Compute true forward direction from headlight positions so wheel
