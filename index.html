@@ -637,6 +637,9 @@ class Component extends DCLogic {
     tempCam.lookAt(pivot);
     tempCam.up.set(0, 1, 0);
     tempCam.updateProjectionMatrix();
+    tempCam.updateMatrixWorld(true);
+
+    console.log('[WheelBlur Camera] Pivot:', pivot.toArray(), 'Axle:', axle.toArray(), 'Radius:', r, 'CamPos:', tempCam.position.toArray());
 
     const savedVisibilities = new Map();
     scene.traverse(c => {
@@ -689,10 +692,15 @@ class Component extends DCLogic {
     renderer.clear();
     renderer.render(this._blurScene, this._blurCamera);
 
-    // Diagnostics check: Read pixels to see if the render target is empty
-    const pixels = new Uint8Array(4);
-    renderer.readRenderTargetPixels(this._rtBlurred, 128, 128, 1, 1, pixels);
-    console.log('[WheelBlur Diagnostics] Center pixel:', Array.from(pixels));
+    // Diagnostics check: Read all pixels to see if the texture has any contents
+    const size = 256;
+    const testPixels = new Uint8Array(size * size * 4);
+    renderer.readRenderTargetPixels(this._rtBlurred, 0, 0, size, size, testPixels);
+    let maxVal = 0;
+    for (let i = 0; i < testPixels.length; i++) {
+      if (testPixels[i] > maxVal) maxVal = testPixels[i];
+    }
+    console.log('[WheelBlur Diagnostics] Max pixel value:', maxVal);
 
     renderer.setRenderTarget(oldRenderTarget);
     renderer.setClearColor(oldClearColor, oldClearAlpha);
