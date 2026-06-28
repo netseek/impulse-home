@@ -2107,7 +2107,7 @@ class Component extends DCLogic {
       positionFrontAmber:  { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
       positionFrontLAmber: { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
       positionFrontRAmber: { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
-      positionRear:        { color: [0.85, 0.04, 0.00], intensity: 0.5  }, // red, dim + less spread
+      positionRear:        { color: [0.85, 0.04, 0.00], intensity: 2.0, toneMapped: false }, // red running light. toneMapped:false + higher intensity so the thin LED strip stays visibly lit at distance — at 0.5/toneMapped the sub-pixel-averaged strip washed out as the camera pulled back. Still well below brake (4.0).
       position:            { color: [1.00, 0.91, 0.75], intensity: 0.8  }, // fallback
       headlight:           { color: [0.87, 0.93, 1.00], intensity: 28.0, toneMapped: false }, // strong beam
       highbeam:            { color: [0.90, 0.95, 1.00], intensity: 32.0, toneMapped: false }, // inner projector, brighter
@@ -2552,6 +2552,19 @@ class Component extends DCLogic {
       container.appendChild(renderer.domElement);
       this.renderer = renderer;
 
+      // FPS HUD (bottom-left). Shows rendered frames/sec; "idle" under
+      // on-demand rendering when nothing is being drawn.
+      const fpsEl = document.createElement('div');
+      fpsEl.style.cssText = 'position:absolute;left:14px;bottom:14px;z-index:30;' +
+        'font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;' +
+        'color:#4fd6e8;background:rgba(10,14,18,.55);backdrop-filter:blur(6px);' +
+        '-webkit-backdrop-filter:blur(6px);padding:4px 9px;border-radius:6px;' +
+        'border:1px solid rgba(79,214,232,.18);pointer-events:none;user-select:none;';
+      fpsEl.textContent = '— FPS';
+      container.appendChild(fpsEl);
+      this._fpsEl = fpsEl;
+      this._renderTimes = [];
+
       const scene = new THREE.Scene();
       this.scene = scene;
 
@@ -2822,6 +2835,14 @@ class Component extends DCLogic {
         const delta = Math.min((now - _lastT) / 1000, 0.1); // seconds, capped
         _lastT = now;
 
+        // FPS HUD — rendered frames in the last second ("idle" when on-demand
+        // rendering is skipping frames because nothing changed).
+        if (this._fpsEl) {
+          const rt = this._renderTimes;
+          while (rt.length && now - rt[0] > 1000) rt.shift();
+          this._fpsEl.textContent = rt.length ? rt.length + ' FPS' : 'idle';
+        }
+
         // Motion: advance reflection flow offset + roll wheels
         let needRender = false;
         const speed = this.state.motionSpeed || 0;
@@ -2905,6 +2926,7 @@ class Component extends DCLogic {
         }
 
         // Profiler + adaptive pixel ratio (measured on rendered frames only)
+        this._renderTimes.push(now);
         const _ms = performance.now() - _t0;
         this._frameMsAvg = this._frameMsAvg * 0.9 + _ms * 0.1;
         this._perf.lastMs = +_ms.toFixed(2);
