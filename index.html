@@ -3758,6 +3758,38 @@ class Component extends DCLogic {
       this._applySunroofTransform();
     }
 
+    // Add structural frame around each glass panel using SunRoof Structure material
+    if (THREE) {
+      const structMesh = findMesh('SunRoof Structure');
+      const addGlassFrame = (glassMesh) => {
+        if (!glassMesh || !glassMesh.geometry) return;
+        glassMesh.geometry.computeBoundingBox();
+        const lb = glassMesh.geometry.boundingBox;
+        if (!lb) return;
+        const lc = lb.getCenter(new THREE.Vector3());
+        const ls = lb.getSize(new THREE.Vector3());
+        const fMat = structMesh
+          ? structMesh.material.clone()
+          : new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3, metalness: 0.8 });
+        const b = 0.04;
+        const oW = ls.x / 2 + b, oD = ls.z / 2 + b;
+        const iW = ls.x / 2,     iD = ls.z / 2;
+        const sh = new THREE.Shape();
+        sh.moveTo(-oW, -oD); sh.lineTo(oW, -oD); sh.lineTo(oW, oD); sh.lineTo(-oW, oD); sh.closePath();
+        const hole = new THREE.Path();
+        hole.moveTo(-iW, -iD); hole.lineTo(iW, -iD); hole.lineTo(iW, iD); hole.lineTo(-iW, iD); hole.closePath();
+        sh.holes.push(hole);
+        const fg = new THREE.ShapeGeometry(sh);
+        fg.rotateX(-Math.PI / 2);
+        const fm = new THREE.Mesh(fg, fMat);
+        fm.name = glassMesh.name + '_Frame';
+        fm.position.set(lc.x, lc.y + ls.y / 2 + 0.001, lc.z);
+        glassMesh.add(fm);
+      };
+      addGlassFrame(this.sunroofFront);
+      addGlassFrame(findMesh('Sunroof Rear'));
+    }
+
     // Create and add the sunroof curtain (roller blind) mesh
     if (THREE) {
       const curtainGeom = new THREE.PlaneGeometry(1.35, 0.82);
