@@ -3764,6 +3764,12 @@ class Component extends DCLogic {
       this._sunroofFrontOrigPos = this.sunroofFront.position.clone();
       this._sunroofFrontOrigRot = this.sunroofFront.rotation.clone();
       this._applySunroofTransform();
+
+      // Match rear glass material to front so both panels look identical
+      const sunroofRearMesh = findMesh('Sunroof Rear') || findMesh('Sunroof Back');
+      if (sunroofRearMesh && this.sunroofFront.material) {
+        sunroofRearMesh.material = this.sunroofFront.material.clone();
+      }
     }
 
     // Add structural frame around each glass panel using SunRoof Structure material
