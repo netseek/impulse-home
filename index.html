@@ -3287,13 +3287,9 @@ class Component extends DCLogic {
       const bRP = new THREE.RenderPass(scene, bloomCam);
       bRP.clearColor = new THREE.Color(0, 0, 0); bRP.clearAlpha = 1;
       bloomComposer.addPass(bRP);
-      // Full-res bloom with a modest spread. Half-res dropped THIN sources
-      // (the rear position LED strip) at distance — they fell below the
-      // downsampled buffer's resolution and "cropped" out, while the larger
-      // brake cluster survived much farther. Full res captures the thin strip,
-      // and a small radius spreads its glow so it stays visible as the camera
-      // pulls back (critical on mobile, where the main render has no MSAA).
-      const bBloom = new THREE.UnrealBloomPass(new THREE.Vector2(w, h), 0.28, 0.45, 0.0);
+      // Tight rim glow: half-res bloom (less spread), minimum radius, very low
+      // strength so the halo stays within ~3px of the light surface.
+      const bBloom = new THREE.UnrealBloomPass(new THREE.Vector2(w * 0.5, h * 0.5), 0.2, 0.0, 0.0);
       bloomComposer.addPass(bBloom);
       this.bloomComposer = bloomComposer;
 
