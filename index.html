@@ -3771,7 +3771,8 @@ class Component extends DCLogic {
         const fMat = structMesh
           ? structMesh.material.clone()
           : new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3, metalness: 0.8 });
-        const b = 0.04;
+        const b = 0.05;     // border overhang on each side
+        const edgeH = 0.025; // 2.5 cm lip wrapping down around the glass edge
         const oW = ls.x / 2 + b, oD = ls.z / 2 + b;
         const iW = ls.x / 2,     iD = ls.z / 2;
         const sh = new THREE.Shape();
@@ -3779,8 +3780,10 @@ class Component extends DCLogic {
         const hole = new THREE.Path();
         hole.moveTo(-iW, -iD); hole.lineTo(iW, -iD); hole.lineTo(iW, iD); hole.lineTo(-iW, iD); hole.closePath();
         sh.holes.push(hole);
-        const fg = new THREE.ShapeGeometry(sh);
-        fg.rotateX(-Math.PI / 2);
+        // ExtrudeGeometry gives the frame a visible edge from the side.
+        // rotateX(+PI/2) maps extrude +Z → world -Y so the lip hangs downward.
+        const fg = new THREE.ExtrudeGeometry(sh, { depth: edgeH, bevelEnabled: false });
+        fg.rotateX(Math.PI / 2);
         const fm = new THREE.Mesh(fg, fMat);
         fm.name = glassMesh.name + '_Frame';
         fm.position.set(lc.x, lc.y + ls.y / 2 + 0.001, lc.z);
