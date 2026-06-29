@@ -63,16 +63,22 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div style="font-size: 10px; letter-spacing: .3em; opacity: .55; font-weight: 600;">CONFIGURE</div>
       <div style="display: flex; align-items: center; gap: 4px;">
-        <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="background: none; border: none; color: rgba(79,214,232,.7); cursor: pointer; padding: 4px 5px; line-height: 1; border-radius: 4px; display: flex; align-items: center;">
-          <sc-if value="{{ nightMode }}" hint-placeholder-val="{{ false }}">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-          </sc-if>
-          <sc-if value="{{ isDayMode }}" hint-placeholder-val="{{ true }}">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-          </sc-if>
-        </button>
         <button onClick="{{ togglePanel }}" title="Collapse" style="background: none; border: none; color: rgba(79,214,232,.7); cursor: pointer; padding: 2px 4px; font-size: 16px; line-height: 1; border-radius: 4px;">×</button>
       </div>
+    </div>
+
+    <!-- Model variant toggle -->
+    <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .18em; opacity: .5; margin-bottom: 6px;">MODEL</div>
+    <div style="display: flex; gap: 3px; background: rgba(0,0,0,.30); border-radius: 7px; padding: 3px; margin-bottom: 8px;">
+      <button onClick="{{ setModelHev }}" title="Haval H6 HEV / PHEV" style="flex: 1; padding: 6px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .10em; font-weight: 600; background: {{ modelHevBg }}; color: {{ modelHevCol }}; transition: all .15s;">HEV / PHEV</button>
+      <button onClick="{{ setModelGt }}" title="Haval H6 GT" style="flex: 1; padding: 6px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .10em; font-weight: 600; background: {{ modelGtBg }}; color: {{ modelGtCol }}; transition: all .15s;">GT</button>
+    </div>
+
+    <!-- Day / Night toggle -->
+    <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .18em; opacity: .5; margin-bottom: 6px;">MODE</div>
+    <div style="display: flex; gap: 3px; background: rgba(0,0,0,.30); border-radius: 7px; padding: 3px; margin-bottom: 12px;">
+      <button onClick="{{ setDayMode }}"   style="flex: 1; padding: 6px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .10em; font-weight: 600; background: {{ modeDayBg }}; color: {{ modeDayCol }}; transition: all .15s;">DAY</button>
+      <button onClick="{{ setNightMode }}" style="flex: 1; padding: 6px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .10em; font-weight: 600; background: {{ modeNightBg }}; color: {{ modeNightCol }}; transition: all .15s;">NIGHT</button>
     </div>
 
     <!-- Tab bar -->
@@ -234,6 +240,7 @@ class Component extends DCLogic {
   state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 0.66, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: true, nightMode: false,
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configTab: 'color',
+    modelVariant: 'hev',
     motionSpeed: 0,
     wheelAngle: 0,
     sunroofOpen: 0,
@@ -283,6 +290,12 @@ class Component extends DCLogic {
       isDayMode: !s.nightMode,
       toggleNightMode: () => this.toggleNightMode(),
       nightTooltip: s.nightMode ? 'Switch to day' : 'Switch to night',
+      setDayMode:   () => { if (s.nightMode)  this.toggleNightMode(); },
+      setNightMode: () => { if (!s.nightMode) this.toggleNightMode(); },
+      modeDayBg:    !s.nightMode ? 'rgba(79,214,232,.18)' : 'transparent',
+      modeNightBg:   s.nightMode ? 'rgba(79,214,232,.18)' : 'transparent',
+      modeDayCol:   !s.nightMode ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      modeNightCol:  s.nightMode ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       labelColor: s.nightMode ? '#c8daea' : '#2b3037',
       hintColor: s.nightMode ? 'rgba(180,210,235,0.55)' : '#6a7077',
       loaderDisplay: s.loading && !s.error ? 'flex' : 'none',
@@ -319,6 +332,16 @@ class Component extends DCLogic {
       setTabEnv:    () => this.setState({ configTab: 'env'    }),
       setTabLights: () => this.setState({ configTab: 'lights' }),
       setTabMotion: () => this.setState({ configTab: 'motion' }),
+      // Model variant toggle (HEV/PHEV ↔ GT)
+      modelVariant: s.modelVariant,
+      isHev: s.modelVariant === 'hev',
+      isGt:  s.modelVariant === 'gt',
+      setModelHev: () => this._setModelVariant('hev'),
+      setModelGt:  () => this._setModelVariant('gt'),
+      modelHevBg:  s.modelVariant === 'hev' ? 'rgba(79,214,232,.18)' : 'transparent',
+      modelGtBg:   s.modelVariant === 'gt'  ? 'rgba(79,214,232,.18)' : 'transparent',
+      modelHevCol: s.modelVariant === 'hev' ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      modelGtCol:  s.modelVariant === 'gt'  ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       wheelAngle:      s.wheelAngle,
       wheelAngleLabel: s.wheelAngle + '°',
       motionSpeed:      s.motionSpeed,
@@ -489,8 +512,9 @@ class Component extends DCLogic {
     let upOffset = 0;
     let backOffset = 0;
 
-    const maxUp = 0.015; // 1.5cm lift — close to body but clears the opening edge
-    const maxBack = 0.60; // +20% more slide
+    const range = this._sunroofRange || { up: 0.015, back: 0.60 };
+    const maxUp = range.up;   // lift — close to body but clears the opening edge
+    const maxBack = range.back; // rearward slide
 
     if (ratio < transitionThreshold) {
       upOffset = (ratio / transitionThreshold) * maxUp;
@@ -524,9 +548,10 @@ class Component extends DCLogic {
     const value = pct !== undefined ? pct : (this.state.curtainOpen ?? 0);
     const ratio = value / 100;
 
+    const p = this._curtainParams || { width: 1.35, baseX: 1.94 };
     const scaleX = 1 - ratio;
     this.sunroofCurtain.scale.x = scaleX;
-    this.sunroofCurtain.position.x = 1.94 - (1.35 * scaleX) / 2;
+    this.sunroofCurtain.position.x = p.baseX - (p.width * scaleX) / 2;
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(3);
@@ -746,6 +771,11 @@ class Component extends DCLogic {
 
     console.log('[WheelBlur Camera] Pivot:', pivot.toArray(), 'Axle:', axle.toArray(), 'Radius:', r, 'CamPos:', tempCam.position.toArray());
 
+    // Save shadowCatcher/nightFloor BEFORE the traverse so the restore gets the
+    // original value — the traverse would overwrite the map entry with 'false'.
+    const scOrigVisible = this.shadowCatcher ? this.shadowCatcher.visible : undefined;
+    const nfOrigVisible = this.nightFloor    ? this.nightFloor.visible    : undefined;
+
     const savedVisibilities = new Map();
     scene.traverse(c => {
       if (c.isMesh) {
@@ -755,14 +785,8 @@ class Component extends DCLogic {
       }
     });
 
-    if (this.shadowCatcher) {
-      savedVisibilities.set(this.shadowCatcher, this.shadowCatcher.visible);
-      this.shadowCatcher.visible = false;
-    }
-    if (this.nightFloor) {
-      savedVisibilities.set(this.nightFloor, this.nightFloor.visible);
-      this.nightFloor.visible = false;
-    }
+    if (this.shadowCatcher) this.shadowCatcher.visible = false;
+    if (this.nightFloor)    this.nightFloor.visible    = false;
 
     const oldRenderTarget = renderer.getRenderTarget();
     const oldClearColor = new THREE.Color();
@@ -784,12 +808,8 @@ class Component extends DCLogic {
         c.visible = savedVisibilities.get(c);
       }
     });
-    if (this.shadowCatcher && savedVisibilities.has(this.shadowCatcher)) {
-      this.shadowCatcher.visible = savedVisibilities.get(this.shadowCatcher);
-    }
-    if (this.nightFloor && savedVisibilities.has(this.nightFloor)) {
-      this.nightFloor.visible = savedVisibilities.get(this.nightFloor);
-    }
+    if (this.shadowCatcher && scOrigVisible !== undefined) this.shadowCatcher.visible = scOrigVisible;
+    if (this.nightFloor    && nfOrigVisible !== undefined) this.nightFloor.visible    = nfOrigVisible;
 
     this._blurShaderMat.uniforms.tSource.value = this._rtSource.texture;
     renderer.setRenderTarget(this._rtBlurred);
@@ -1792,7 +1812,7 @@ class Component extends DCLogic {
     // Store MESH references (not material refs) so _setGroupEmissive always
     // operates on the live mesh.material and never holds stale pointers.
     const groups = {
-      positionFront: [], positionRear: [], headlight: [], fogFront: [], fogRear: [], turnL: [],
+      positionFront: [], positionRear: [], headlight: [], highbeam: [], fogFront: [], fogRear: [], turnL: [],
       turnR: [], brake: [], reverse: [],
     };
     obj.traverse((c) => {
@@ -1804,7 +1824,8 @@ class Component extends DCLogic {
         if (/PositionLight_Front/i.test(n)) groups.positionFront.push(c);
         if (/PositionLight_Rear/i.test(n))  groups.positionRear.push(c);
         if (/HeadlightMain/i.test(n))  groups.headlight.push(c);
-        if (/FogLight[^_]|Fog_Light_Front|FogLamp|FogFront|Fog_Front|HeadlightFog|Fog[_\s]?F[^a-z]/i.test(n)) groups.fogFront.push(c);
+        if (/Headlight High Beam|HighBeam|High_Beam/i.test(n)) groups.highbeam.push(c);
+        if (/FogLight[^_]|Fog_Light_Front|FogLamp|FogFront|Fog_Front|Fog Front|HeadlightFog|Fog[_\s]?F[^a-z]/i.test(n)) groups.fogFront.push(c);
         if (/FogLight_Rear|Fog_Rear|FogRear|RearFog|Fog[_\s]?R[^a-z]|CenterFog|FogCenter|FogBack/i.test(n)) groups.fogRear.push(c);
         if (/Light.Turn.L/i.test(n))   groups.turnL.push(c);
         if (/Light.Turn.R/i.test(n))   groups.turnR.push(c);
@@ -1870,7 +1891,8 @@ class Component extends DCLogic {
     // The headlight is a single full-width mesh containing all 4 lamps (inner
     // projectors + outer DRLs). Split its geometry by |Z|: inner (small |Z|,
     // closer to centre) = high beam, outer (large |Z|) = head/low beam.
-    if (groups.headlight.length === 1) {
+    // (Skipped when the model has a dedicated high-beam material, e.g. GT.)
+    if (!groups.highbeam.length && groups.headlight.length === 1) {
       const split = this._splitMeshByAbsZ(groups.headlight[0], 0.72);
       if (split) {
         groups.highbeam  = [split.inner];
@@ -3187,18 +3209,30 @@ class Component extends DCLogic {
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
 
-      // --- Load GLB (Draco-compressed glTF with PBR materials) ---
+      // --- Load GLBs (Draco-compressed glTF with PBR materials) ---
       const draco = new THREE.DRACOLoader();
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
       const loader = new THREE.GLTFLoader();
       loader.setDRACOLoader(draco);
-      const url = 'assets/haval-h6.glb';
+      const HEV_URL = 'assets/haval-h6.glb';
+      const GT_URL  = 'assets/haval-h6-gt.glb';
+      const profiles = this._modelProfiles();
+      // Eager-load BOTH variants. The HEV/PHEV car is PRIMARY: it is visible at
+      // start and drives the camera framing, contact shadow and night-light rig.
+      // The GT loads in parallel, is processed through the same pipeline with the
+      // GT profile, and starts hidden — the MODEL toggle swaps which is visible.
+      const loadGT = () => loader.load(
+        GT_URL,
+        (gltf) => { try { this.onModelLoaded(gltf.scene, profiles.gt, { primary: false }); } catch (e) { console.error('GT process error', e); } },
+        undefined,
+        (err) => console.warn('GT model failed to load', err)
+      );
       // Load the rear-light fix source FIRST (it has the corrected face→material
       // split with a dedicated Chrome group), stash its 3 rear clusters, then load
       // the main car and splice the corrected rear clusters in during onModelLoaded.
       const loadMain = () => loader.load(
-        url,
-        (gltf) => this.onModelLoaded(gltf.scene),
+        HEV_URL,
+        (gltf) => { this.onModelLoaded(gltf.scene, profiles.hev, { primary: true }); loadGT(); },
         (e) => {
           let p;
           if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
@@ -3546,12 +3580,113 @@ class Component extends DCLogic {
     console.log('rear-swap: spliced', swapped, 'corrected rear-light meshes');
   }
 
-  onModelLoaded(obj) {
+  // ── Model variants ───────────────────────────────────────────────────────
+  // Per-model name conventions so ONE processing pipeline handles both the
+  // HEV/PHEV car and the GT. The GT model uses a completely different mesh/
+  // material naming scheme, so its model-specific bits live here as data.
+  _modelProfiles() {
+    return {
+      hev: {
+        key: 'hev',
+        applyRearFix: true,
+        // Legacy: HEV headlight glass is identified by mesh name.
+        isHeadlightGlassMesh: (c) => c.name === 'BuildingMesh-00106' || c.name === 'BuildingMesh-00107',
+        isHeadlightGlassMat: () => false,
+        bodyPaintRe: /^(body|roof|panel 2)$/i,
+        splitMultiMatLamps: false,
+        hasExplicitHighbeam: false,
+        sunroof: { front: 'Sunroof Front', rear: 'Sunroof Rear', struct: 'SunRoof Structure' },
+        // HEV curtain: hard-measured placement under the sunroof opening.
+        curtain: { mode: 'fixed', width: 1.35, depth: 0.82, x: 1.265, y: 1.62, z: -0.366, baseX: 1.94, frameBorder: 0.05 },
+      },
+      gt: {
+        key: 'gt',
+        applyRearFix: false,
+        // GT headlight glass is identified by material name (Glass (Headlight)).
+        isHeadlightGlassMesh: () => false,
+        isHeadlightGlassMat: (m) => /^Glass \(Headlight\)/i.test((m && m.name) || ''),
+        bodyPaintRe: /^body$/i,
+        splitMultiMatLamps: true,
+        hasExplicitHighbeam: true,
+        // Soft-touch interior + trim plastics → matte black (no reflection).
+        flatBlack: ['Plastic Black Soft'],
+        // Rubber-type materials (door seals, plastic cladding, seat structure) →
+        // dark gray with high roughness so they read as rubber/soft-plastic.
+        flatRubber: ['car_black_b.002', 'car_black_b.003', 'car_black_plastic.001',
+          'car_black_plastic_01.002', 'car_black_plastic_01.003', 'car_inner.003',
+          'car_inner_door.001', 'car_chair.001'],
+        // GT-only materials that should adopt the shared HEV material of the given name
+        // (avoids duplicating texture work; body-discoloration maps read as sparkles).
+        sharedAliases: { 'car_body_metal_discoloration.001': 'Body' },
+        sunroof: { front: '15_car_top_glass', rear: '15_car_top_glass_2', struct: null },
+        // GT curtain: derive placement from the sunroof glass bounds at runtime.
+        curtain: { mode: 'auto' },
+      },
+    };
+  }
+
+  // Materials reused across variants (same instance shared with the HEV scene so
+  // paint, light toggles, chrome, etc. stay in sync and aren't duplicated on the
+  // GPU). Glass materials are intentionally excluded — each model processes its
+  // own glass (HEV swaps per-mesh physical-glass instances anyway).
+  _sharedMatNames() {
+    return new Set([
+      'Break', 'Tire Top', 'Tire Side', 'Wheel', 'Chrome', 'BrakeLight',
+      'PositionLight_Rear', 'Light Turn L', 'Light Turn R', 'ReverseLight',
+      'Body', 'Plastic Black', 'Plastic Black Glossy', 'HeadlightMain',
+      'PositionLight_Front', 'Bottom Black', 'Leather', 'Mirror',
+    ]);
+  }
+
+  // Split every multi-material mesh that carries a light-emitter material into one
+  // single-material child mesh per geometry group. The light system sets emissive
+  // on ALL of a mesh's materials, so combined lamp clusters (GT's rear/front
+  // lights bake Chrome + Brake + Position + Turn onto one mesh) must be separated
+  // or toggling one lamp lights the whole cluster. Mirrors the effect the HEV
+  // rear-fix GLB provides via dedicated single-material meshes.
+  _splitMultiMaterialLamps(obj) {
     const THREE = this.THREE;
+    const emitterRe = /BrakeLight|ReverseLight|PositionLight|Light Turn|HeadlightMain|Headlight High Beam|Fog Front|Reflecting Red/i;
+    const toSplit = [];
+    obj.traverse((c) => {
+      if (!c.isMesh || !Array.isArray(c.material) || c.material.length < 2) return;
+      const groups = c.geometry && c.geometry.groups;
+      if (!groups || groups.length < 2) return;
+      if (!c.material.some((m) => m && emitterRe.test(m.name || ''))) return;
+      toSplit.push(c);
+    });
+    toSplit.forEach((mesh) => {
+      const geo = mesh.geometry;
+      geo.groups.forEach((g, gi) => {
+        const sub = geo.clone();
+        sub.clearGroups();
+        sub.addGroup(g.start, g.count, 0);
+        const child = new THREE.Mesh(sub, mesh.material[g.materialIndex]);
+        child.name = mesh.name + '__g' + gi;
+        child.castShadow = mesh.castShadow;
+        child.receiveShadow = mesh.receiveShadow;
+        child.position.copy(mesh.position);
+        child.quaternion.copy(mesh.quaternion);
+        child.scale.copy(mesh.scale);
+        mesh.parent.add(child);
+      });
+      if (mesh.parent) mesh.parent.remove(mesh);
+    });
+    if (toSplit.length) console.log('[Lamps] split', toSplit.length, 'multi-material lamp meshes');
+  }
+
+  onModelLoaded(obj, profile, opts) {
+    const THREE = this.THREE;
+    profile = profile || this._modelProfiles().hev;
+    const primary = !opts || opts.primary !== false;
 
     // Splice the corrected rear-light clusters in BEFORE scale/centre so they get
-    // the same treatment as the rest of the car.
-    this._swapRearLights(obj);
+    // the same treatment as the rest of the car. (HEV only.)
+    if (profile.applyRearFix) this._swapRearLights(obj);
+
+    // GT: separate combined lamp clusters into single-material meshes so each
+    // light toggles independently (see _splitMultiMaterialLamps).
+    if (profile.splitMultiMatLamps) this._splitMultiMaterialLamps(obj);
 
     // Keep the model's own (Blender) floor, but flag it so it doesn't dominate
     // the bounding box used to scale and frame the car.
@@ -3586,6 +3721,25 @@ class Component extends DCLogic {
     this.scene.add(obj);
     obj.updateMatrixWorld(true);
 
+    // Material reuse: the SECONDARY model adopts the primary scene's shared
+    // material instances (paint, chrome, lights, leather, …) by name, so the two
+    // cars stay in sync and we don't duplicate materials on the GPU. Glass is
+    // excluded — each model keeps its own and is processed independently below.
+    if (!primary && this._sharedMats) {
+      const shareSet = this._sharedMatNames();
+      const aliases = profile.sharedAliases || {};
+      const swap = (m) => {
+        if (!m) return m;
+        if (shareSet.has(m.name) && this._sharedMats.has(m.name)) return this._sharedMats.get(m.name);
+        if (aliases[m.name] && this._sharedMats.has(aliases[m.name])) return this._sharedMats.get(aliases[m.name]);
+        return m;
+      };
+      obj.traverse((c) => {
+        if (!c.isMesh) return;
+        c.material = Array.isArray(c.material) ? c.material.map(swap) : swap(c.material);
+      });
+    }
+
     // Materials: HDRI reflections, shadows, dark glass, shadow-catcher floor
     const meshNames = [];
     const bodyMats = [];
@@ -3598,6 +3752,9 @@ class Component extends DCLogic {
       if (isFloor(c)) {
         c.castShadow = false;
         c.receiveShadow = false;
+        // Only the primary model owns the shared floor; the secondary's floor is
+        // hidden so we don't stack two ground planes.
+        if (!primary) { c.visible = false; return; }
         const fm = new THREE.MeshStandardMaterial({ color: 0xdedfe1, roughness: 0.96, metalness: 0 });
         fm.envMapIntensity = 0.25;
         c.material = fm;
@@ -3608,8 +3765,8 @@ class Component extends DCLogic {
       c.castShadow = true;
       c.receiveShadow = true;
       const mats = Array.isArray(c.material) ? c.material : [c.material];
-      // Headlight glass by mesh name + material-name detection
-      const isHeadlight = c.name === 'BuildingMesh-00106' || c.name === 'BuildingMesh-00107';
+      // Headlight glass: HEV detects by mesh name, GT by material name (profile).
+      const isHeadlight = profile.isHeadlightGlassMesh(c) || mats.some((m) => m && profile.isHeadlightGlassMat(m));
       let isGlass = isHeadlight;
       mats.forEach((m) => {
         if (!m) return;
@@ -3626,7 +3783,7 @@ class Component extends DCLogic {
         // (Body + Panel + Roof are the visible painted shell; exclude glass/chrome/
         // lights/tires/trim).
         // Match the known painted-shell material names.
-        const isBodyMesh = /^(body|roof|panel 2)$/i.test(m.name || '');
+        const isBodyMesh = profile.bodyPaintRe.test(m.name || '');
         if (isBodyMesh) {
           if (!this._paintOrig) this._paintOrig = new Map();
           if (!this._paintOrig.has(m) && m.color) this._paintOrig.set(m, m.color.clone());
@@ -3638,11 +3795,10 @@ class Component extends DCLogic {
           if ('clearcoat' in m) {
             m.clearcoat = 1.0;
             m.clearcoatRoughness = 0.08;
-            m.clearcoatNormalMap = this.makeFlakeNormal();
-            if (m.clearcoatNormalScale) m.clearcoatNormalScale.set(0.22, 0.22);
+            m.clearcoatNormalMap = null;
           }
           m.needsUpdate = true;
-          bodyMats.push(m);
+          if (!bodyMats.includes(m)) bodyMats.push(m); // dedupe: shared Body instance
           if (this.bodyOrigHex == null && m.color) this.bodyOrigHex = '#' + m.color.getHexString();
         }
 
@@ -3741,8 +3897,54 @@ class Component extends DCLogic {
       });
       if (c.name) meshNames.push(c.name);
     });
+
+    // Collapse assorted GT black trim/interior/plastic materials into ONE matte
+    // black: no environment reflection (envMapIntensity 0) and low roughness.
+    // Done AFTER the material pass so the generic envMapIntensity=1.3 doesn't
+    // override it. Uses a single shared instance so it's not duplicated.
+    if (profile.flatBlack && profile.flatBlack.length) {
+      if (!this._flatBlackMat) {
+        this._flatBlackMat = new THREE.MeshStandardMaterial({ color: 0x050505, metalness: 0, roughness: 0.25 });
+        this._flatBlackMat.envMapIntensity = 0;
+        this._flatBlackMat.name = 'GT Black Matte';
+      }
+      const blackSet = new Set(profile.flatBlack);
+      const swapB = (m) => (m && blackSet.has(m.name)) ? this._flatBlackMat : m;
+      obj.traverse((c) => {
+        if (!c.isMesh) return;
+        c.material = Array.isArray(c.material) ? c.material.map(swapB) : swapB(c.material);
+      });
+    }
+
+    // Rubber/soft-plastic GT trim: dark gray, matte, no reflection.
+    if (profile.flatRubber && profile.flatRubber.length) {
+      if (!this._flatRubberMat) {
+        this._flatRubberMat = new THREE.MeshStandardMaterial({ color: 0x585858, metalness: 0, roughness: 0.88 });
+        this._flatRubberMat.envMapIntensity = 0;
+        this._flatRubberMat.name = 'GT Rubber Gray';
+      }
+      const rubberSet = new Set(profile.flatRubber);
+      const swapR = (m) => (m && rubberSet.has(m.name)) ? this._flatRubberMat : m;
+      obj.traverse((c) => {
+        if (!c.isMesh) return;
+        c.material = Array.isArray(c.material) ? c.material.map(swapR) : swapR(c.material);
+      });
+    }
+
     this.bodyMats = bodyMats;
     if (this.bodyOrigHex) this.setState({ origHex: this.bodyOrigHex });
+    // After the PRIMARY model is processed, record its shared material instances
+    // by name so the secondary model can reuse them (see reuse pre-pass above).
+    if (primary) {
+      this._sharedMats = new Map();
+      const shareSet = this._sharedMatNames();
+      obj.traverse((c) => {
+        if (!c.isMesh) return;
+        (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => {
+          if (m && m.name && shareSet.has(m.name) && !this._sharedMats.has(m.name)) this._sharedMats.set(m.name, m);
+        });
+      });
+    }
     // Surface part names so doors/roof/windows can be targeted later
     console.log('[Haval H6] mesh parts (' + meshNames.length + '):', meshNames);
     this.modelParts = meshNames;
@@ -3759,22 +3961,33 @@ class Component extends DCLogic {
       return hit;
     };
 
-    this.sunroofFront = findMesh('Sunroof Front');
+    this.sunroofFront = findMesh(profile.sunroof.front);
     if (this.sunroofFront) {
       this._sunroofFrontOrigPos = this.sunroofFront.position.clone();
       this._sunroofFrontOrigRot = this.sunroofFront.rotation.clone();
+      // Slide range: HEV uses its hand-tuned values; GT derives them from the
+      // panel's own local length so the slide reads correctly at its scale.
+      if (profile.key === 'hev') {
+        this._sunroofRange = { up: 0.015, back: 0.60 };
+      } else {
+        this.sunroofFront.geometry.computeBoundingBox();
+        const ps = this.sunroofFront.geometry.boundingBox.getSize(new THREE.Vector3());
+        const panelLen = Math.max(ps.x, ps.z);
+        this._sunroofRange = { up: panelLen * 0.04, back: panelLen * 0.75 };
+      }
       this._applySunroofTransform();
 
       // Match rear glass material to front so both panels look identical
-      const sunroofRearMesh = findMesh('Sunroof Rear') || findMesh('Sunroof Back');
+      const sunroofRearMesh = findMesh(profile.sunroof.rear) || findMesh('Sunroof Back');
       if (sunroofRearMesh && this.sunroofFront.material) {
         sunroofRearMesh.material = this.sunroofFront.material.clone();
       }
     }
 
-    // Add structural frame around each glass panel using SunRoof Structure material
-    if (THREE) {
-      const structMesh = findMesh('SunRoof Structure');
+    // Add structural frame around each glass panel (HEV only — uses the model's
+    // SunRoof Structure material; GT's sunroof is frameless glass).
+    if (THREE && profile.sunroof.struct) {
+      const structMesh = findMesh(profile.sunroof.struct);
       const addGlassFrame = (glassMesh) => {
         if (!glassMesh || !glassMesh.geometry) return;
         glassMesh.geometry.computeBoundingBox();
@@ -3804,12 +4017,29 @@ class Component extends DCLogic {
         glassMesh.add(fm);
       };
       addGlassFrame(this.sunroofFront);
-      addGlassFrame(findMesh('Sunroof Rear'));
+      addGlassFrame(findMesh(profile.sunroof.rear));
     }
 
-    // Create and add the sunroof curtain (roller blind) mesh
-    if (THREE) {
-      const curtainGeom = new THREE.PlaneGeometry(1.35, 0.82);
+    // Create and add the sunroof curtain (roller blind) mesh + opening frame.
+    // HEV uses hand-measured local placement; GT derives placement from the
+    // sunroof glass panels' bounds (converted into the model's local space).
+    if (THREE && this.sunroofFront) {
+      let cw, cd, cx, cy, cz, baseX, hasFrame;
+      if (profile.curtain.mode === 'fixed') {
+        const p = profile.curtain;
+        cw = p.width; cd = p.depth; cx = p.x; cy = p.y; cz = p.z; baseX = p.baseX; hasFrame = true;
+      } else {
+        const sb = new THREE.Box3();
+        [this.sunroofFront, findMesh(profile.sunroof.rear)].forEach((m) => { if (m) sb.expandByObject(m); });
+        const wc = sb.getCenter(new THREE.Vector3());
+        const ws = sb.getSize(new THREE.Vector3());
+        const localC = obj.worldToLocal(wc.clone());
+        const inv = 1 / (obj.scale.x || 1);
+        cw = ws.x * inv * 0.92; cd = ws.z * inv * 0.92;
+        cx = localC.x; cz = localC.z; cy = localC.y - ws.y * inv * 0.5;
+        baseX = cx + cw / 2; hasFrame = false;
+      }
+      const curtainGeom = new THREE.PlaneGeometry(cw, cd);
       curtainGeom.rotateX(-Math.PI / 2);
       const curtainMat = new THREE.MeshStandardMaterial({
         color: 0x706456, // Dark warm taupe/beige
@@ -3819,41 +4049,44 @@ class Component extends DCLogic {
       });
       const curtainMesh = new THREE.Mesh(curtainGeom, curtainMat);
       curtainMesh.name = "Sunroof_Curtain";
-      curtainMesh.position.set(1.265, 1.62, -0.366);
+      curtainMesh.position.set(cx, cy, cz);
       obj.add(curtainMesh);
       this.sunroofCurtain = curtainMesh;
+      this._curtainParams = { width: cw, baseX };
       this._applyCurtainTransform(this.state.curtainOpen);
 
-      // Frame around the curtain opening — borrows material from SunRoof Structure
-      const structMesh = findMesh('SunRoof Structure');
-      const frameMat = structMesh
-        ? structMesh.material.clone()
-        : new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.35, metalness: 0.5 });
+      // Frame around the curtain opening — HEV only (borrows SunRoof Structure mat)
+      if (hasFrame && profile.sunroof.struct) {
+        const structMesh = findMesh(profile.sunroof.struct);
+        const frameMat = structMesh
+          ? structMesh.material.clone()
+          : new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.35, metalness: 0.5 });
 
-      const border = 0.05;
-      const oW = (1.35 + border * 2) / 2, oD = (0.82 + border * 2) / 2;
-      const iW = 1.35 / 2, iD = 0.82 / 2;
+        const border = 0.05;
+        const oW = (cw + border * 2) / 2, oD = (cd + border * 2) / 2;
+        const iW = cw / 2, iD = cd / 2;
 
-      const frameShape = new THREE.Shape();
-      frameShape.moveTo(-oW, -oD);
-      frameShape.lineTo( oW, -oD);
-      frameShape.lineTo( oW,  oD);
-      frameShape.lineTo(-oW,  oD);
-      frameShape.closePath();
-      const hole = new THREE.Path();
-      hole.moveTo(-iW, -iD);
-      hole.lineTo( iW, -iD);
-      hole.lineTo( iW,  iD);
-      hole.lineTo(-iW,  iD);
-      hole.closePath();
-      frameShape.holes.push(hole);
+        const frameShape = new THREE.Shape();
+        frameShape.moveTo(-oW, -oD);
+        frameShape.lineTo( oW, -oD);
+        frameShape.lineTo( oW,  oD);
+        frameShape.lineTo(-oW,  oD);
+        frameShape.closePath();
+        const hole = new THREE.Path();
+        hole.moveTo(-iW, -iD);
+        hole.lineTo( iW, -iD);
+        hole.lineTo( iW,  iD);
+        hole.lineTo(-iW,  iD);
+        hole.closePath();
+        frameShape.holes.push(hole);
 
-      const frameGeom = new THREE.ShapeGeometry(frameShape);
-      frameGeom.rotateX(-Math.PI / 2);
-      const frameMesh = new THREE.Mesh(frameGeom, frameMat);
-      frameMesh.name = "Sunroof_Curtain_Frame";
-      frameMesh.position.set(1.265, 1.621, -0.366);
-      obj.add(frameMesh);
+        const frameGeom = new THREE.ShapeGeometry(frameShape);
+        frameGeom.rotateX(-Math.PI / 2);
+        const frameMesh = new THREE.Mesh(frameGeom, frameMat);
+        frameMesh.name = "Sunroof_Curtain_Frame";
+        frameMesh.position.set(cx, cy + 0.001, cz);
+        obj.add(frameMesh);
+      }
     }
     this.collectLightMeshes(obj);
     this._applyInitialFogStates();
@@ -3875,10 +4108,28 @@ class Component extends DCLogic {
     // Save car centre
     const cBox = new THREE.Box3().setFromObject(obj);
     this._carCenter = cBox.getCenter(new THREE.Vector3());
-    // (Re-)inject reflection flow now the model is in scene (HDR may load first)
-    this._setupReflectionFlow();
     // Apply saved (or default) rear glass tint now that materials are in scene
     this._applyRearGlassTweaks(this.state.rearGlassTweaks);
+
+    // Capture this variant's per-model feature references (lights, wheels, paint,
+    // sunroof, curtain, …) so the MODEL toggle can swap variants without re-running
+    // the heavy collection passes.
+    this._captureVariant(profile.key, obj);
+
+    // The SECONDARY model starts hidden — it shares the primary's camera framing,
+    // contact shadow and night-light rig (both cars normalize to the same size and
+    // ground), so we skip all the scene-level setup below for it.
+    if (!primary) {
+      obj.visible = false;
+      // Processing the secondary left the live this.* refs pointing at it; restore
+      // whichever variant is currently selected (default: the primary, 'hev').
+      this._activateVariant(this.state.modelVariant);
+      if (this.requestRender) this.requestRender(2);
+      return;
+    }
+
+    // (Re-)inject reflection flow now the model is in scene (HDR may load first)
+    this._setupReflectionFlow();
     // Apply background gradient + vignette now that scene exists
     this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
 
@@ -3924,6 +4175,94 @@ class Component extends DCLogic {
     this._warmupLights();
 
     this.setState({ loading: false, progress: 100 });
+    // If the user switched to the secondary model before it finished loading,
+    // honor that pending choice once it's ready (handled on the secondary path).
+  }
+
+  // ── Variant snapshot / activation ────────────────────────────────────────
+  // Per-model instance fields that the feature methods read. Per-MESH caches
+  // (pivots, init matrices, blur discs) live on the meshes themselves and travel
+  // with each model root, so only these top-level references need swapping.
+  _variantFields() {
+    return ['model', 'modelParts', 'bodyMats', 'sunroofFront', '_sunroofFrontOrigPos',
+      '_sunroofFrontOrigRot', '_sunroofRange', 'sunroofCurtain', '_curtainParams', 'lightGroups',
+      '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels', '_allWheels',
+      '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels', '_steerOnlyMeshes',
+      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter'];
+  }
+
+  _captureVariant(key, root) {
+    if (!this._variants) this._variants = {};
+    const b = { root };
+    this._variantFields().forEach((f) => { b[f] = this[f]; });
+    this._variants[key] = b;
+  }
+
+  _activateVariant(key) {
+    if (!this._variants || !this._variants[key]) return;
+    const b = this._variants[key];
+    // Show the chosen model, hide the others.
+    Object.keys(this._variants).forEach((k) => {
+      const r = this._variants[k] && this._variants[k].root;
+      if (r) r.visible = (k === key);
+    });
+    // Swap the active per-model references.
+    this._variantFields().forEach((f) => { this[f] = b[f]; });
+    this.model = b.root;
+    // Re-apply the current UI state to the now-active model.
+    this._setupReflectionFlow();
+    this.applyCarColor(this.state.carColor);
+    this._applyWheelTransforms();
+    this._applySunroofTransform();
+    this._applyCurtainTransform();
+    // Reset emitters to a clean off baseline FIRST (this zeroes brake/reverse/
+    // turn/fog), then re-light whatever the saved light state says is on.
+    this._applyInitialFogStates();
+    this._reapplyLights();
+    this._applyRearGlassTweaks(this.state.rearGlassTweaks);
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(5);
+  }
+
+  // Re-drive the light emitters for the active model from the saved on/off state
+  // (mirrors toggleLight's composite rules: rear position follows head/brake,
+  // high-beam requires head, turn/hazard blink).
+  _reapplyLights() {
+    if (!this.lightGroups) return;
+    const ls = this.state.lights || {};
+    ['turnL', 'turnR', 'hazard'].forEach((t) => this._stopBlink(t));
+    const set = (k, on) => { if (this.lightGroups[k]) this._setGroupEmissive(k, !!on); };
+    const blinkActive = ls.turnL || ls.turnR || ls.hazard;
+    const rearOn = ls.headlight || ls.brake;
+    const hasSides = this.lightGroups.positionFrontL && this.lightGroups.positionFrontL.length;
+    if (hasSides) {
+      set('positionFrontL', ls.position && !blinkActive);
+      set('positionFrontR', ls.position && !blinkActive);
+    } else {
+      set('positionFront', ls.position && !blinkActive);
+    }
+    set('positionRear', rearOn);
+    set('headlight', ls.headlight);
+    set('highbeam', ls.highbeam && ls.headlight);
+    set('fogFront', ls.fogFront);
+    set('fogRear', ls.fogRear);
+    set('brake', ls.brake);
+    set('reverse', ls.reverse);
+    if (ls.hazard) {
+      const posKeys = hasSides ? ['positionFrontLAmber', 'positionFrontRAmber'] : ['positionFrontAmber'];
+      this._startBlink(['turnL', 'turnR', ...posKeys], 'hazard');
+    } else {
+      if (ls.turnL) this._startBlink(['turnL', hasSides ? 'positionFrontLAmber' : 'positionFrontAmber'], 'turnL');
+      if (ls.turnR) this._startBlink(['turnR', hasSides ? 'positionFrontRAmber' : 'positionFrontAmber'], 'turnR');
+    }
+  }
+
+  _setModelVariant(v) {
+    if (v === this.state.modelVariant) return;
+    this.setState({ modelVariant: v });
+    // If the target model is loaded, swap now; otherwise the pending choice is
+    // honored by _captureVariant once it finishes loading.
+    if (this._variants && this._variants[v]) this._activateVariant(v);
   }
 
   componentWillUnmount() {
