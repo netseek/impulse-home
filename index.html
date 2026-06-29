@@ -1808,7 +1808,7 @@ class Component extends DCLogic {
 
   // ── Lights ──────────────────────────────────────────────────────────────
   // Called from onModelLoaded to collect light meshes by material name
-  collectLightMeshes(obj) {
+  collectLightMeshes(obj, profile) {
     // Store MESH references (not material refs) so _setGroupEmissive always
     // operates on the live mesh.material and never holds stale pointers.
     const groups = {
@@ -1887,7 +1887,7 @@ class Component extends DCLogic {
     Object.values(groups).forEach(arr => arr.forEach(mesh => mesh.layers.disable(BL)));
     // Fog assignments are set by the user via pick mode (click on model).
     // Load any previously saved assignments from localStorage.
-    this._loadFogAssignments(obj, groups);
+    this._loadFogAssignments(obj, groups, profile);
     // The headlight is a single full-width mesh containing all 4 lamps (inner
     // projectors + outer DRLs). Split its geometry by |Z|: inner (small |Z|,
     // closer to centre) = high beam, outer (large |Z|) = head/low beam.
@@ -2240,74 +2240,50 @@ class Component extends DCLogic {
     return (mesh.name || '') + '|' + ((mat && mat.name) || '');
   }
 
-  _loadFogAssignments(obj, groups) {
-    // Hardcoded defaults — baked from user assignment session.
-    // localStorage overrides these if the user re-assigns.
-    const DEFAULTS = {
+  _loadFogAssignments(obj, groups, profile) {
+    // Per-model defaults; HEV assignments are hardcoded, GT (and others) supply
+    // fogDefaults in their profile. localStorage user overrides take priority but
+    // only if they resolve to actual meshes in the current model — if not, we fall
+    // back to the model's own defaults (prevents HEV assignments bleeding into GT).
+    const DEFAULTS = (profile && profile.fogDefaults) || {
       fogFront: ['BuildingMesh-00026|HeadlightMain'],
       fogRear:  ['BuildingMesh-00027|Glass (Rear Lights)|f179'],
     };
     try {
       const stored = JSON.parse(localStorage.getItem(this._fogStorageKey()) || '{}');
-      // Merge: use stored value if present, else fall back to default
-      const saved = {
-        fogFront: (stored.fogFront && stored.fogFront.length) ? stored.fogFront : DEFAULTS.fogFront,
-        fogRear:  (stored.fogRear  && stored.fogRear.length)  ? stored.fogRear  : DEFAULTS.fogRear,
-      };
       const byId = {};
       obj.traverse(c => { if (c.isMesh) byId[this._meshStableId(c)] = c; });
-      ['fogFront','fogRear'].forEach(key => {
-        if (saved[key] && saved[key].length) {
-          // Handle centroid-based IDs for extracted rear fog components: sourceId|cx,cy,cz
-          const meshes = saved[key]
-            .map(id => {
-              if (!id.includes('|f') && !id.includes('|cx')) return byId[id]; // normal mesh
-              // Re-extract from source mesh by face index (|f) or legacy centroid (|cx)
-              if (id.includes('|f')) {
-                const parts = id.split('|f');
-                const srcId = parts[0];
-                const faceIdx = parseInt(parts[1]);
-                const src = byId[srcId];
-                if (!src || !src.geometry || !src.geometry.index) { console.warn('[FogLoad] src not found for', srcId); return null; }
-                console.log('[FogLoad] Re-extracting by face index', faceIdx, 'from', srcId);
-                return this._extractConnectedComponent(src, faceIdx);
-              }
-              // Legacy |cx centroid path — just pick face 0 as seed (will re-save as |f on next pick)
-              const srcId2 = id.split('|cx')[0];
-              const src2 = byId[srcId2];
-              if (!src2 || !src2.geometry || !src2.geometry.index) return null;
-              console.log('[FogLoad] Legacy cx id, re-extracting from face 0:', srcId2);
-              return this._extractConnectedComponent(src2, 0);
-            }).filter(Boolean);
-          if (meshes.length) {
-            meshes.forEach(mesh => {
-              if (mesh._fogMatCloned) return;
-              const isArr = Array.isArray(mesh.material);
-              const mats = isArr ? mesh.material : [mesh.material];
-              mesh.material = isArr ? mats.map(m => m ? m.clone() : m) : mats[0].clone();
-              mesh._fogMatCloned = true;
-            });
-            groups[key] = meshes;
-            console.log('[Lights] Loaded', key, meshes.length, 'meshes:', saved[key]);
-          }
+
+      // Resolve fog assignment IDs → meshes. Handles |f face-extract, |cx legacy, and direct lookups.
+      const resolve = (ids) => (ids || []).map(id => {
+        if (!id.includes('|f') && !id.includes('|cx')) return byId[id];
+        if (id.includes('|f')) {
+          const parts = id.split('|f');
+          const src = byId[parts[0]];
+          if (!src || !src.geometry || !src.geometry.index) { console.warn('[FogLoad] src not found for', parts[0]); return null; }
+          return this._extractConnectedComponent(src, parseInt(parts[1]));
         }
-      });
-      ['fogFront','fogRear'].forEach(key => {
-        if (saved[key] && saved[key].length) {
-          const meshes = saved[key].map(id => byId[id]).filter(Boolean);
-          if (meshes.length) {
-            meshes.forEach(mesh => {
-              if (mesh._fogMatCloned) return;
-              const isArr = Array.isArray(mesh.material);
-              const mats = isArr ? mesh.material : [mesh.material];
-              const cloned = mats.map(m => m ? m.clone() : m);
-              mesh.material = isArr ? cloned : cloned[0];
-              mesh._fogMatCloned = true;
-            });
-            groups[key] = meshes;
-            console.log('[Lights] Loaded', key, meshes.length, 'meshes:', saved[key]);
-          }
-        }
+        // Legacy |cx centroid path — pick face 0 as seed
+        const src2 = byId[id.split('|cx')[0]];
+        if (!src2 || !src2.geometry || !src2.geometry.index) return null;
+        return this._extractConnectedComponent(src2, 0);
+      }).filter(Boolean);
+
+      ['fogFront', 'fogRear'].forEach(key => {
+        // Prefer stored assignment if it resolves for this model, else use model defaults.
+        const storedIds = stored[key];
+        const storedMeshes = (storedIds && storedIds.length) ? resolve(storedIds) : [];
+        const meshes = storedMeshes.length ? storedMeshes : resolve(DEFAULTS[key]);
+        if (!meshes.length) return;
+        meshes.forEach(mesh => {
+          if (mesh._fogMatCloned) return;
+          const isArr = Array.isArray(mesh.material);
+          const mats = isArr ? mesh.material : [mesh.material];
+          mesh.material = isArr ? mats.map(m => m ? m.clone() : m) : mats[0].clone();
+          mesh._fogMatCloned = true;
+        });
+        groups[key] = meshes;
+        console.log('[Lights] Loaded', key, meshes.length, 'meshes');
       });
       // Remove fogFront meshes from headlight so HEAD doesn't control them
       if (groups.fogFront.length) {
@@ -3622,6 +3598,22 @@ class Component extends DCLogic {
           'Body.001': 'Body',  // 01_car_body uses Blender-suffixed duplicate
           'Body.002': 'Body',  // 06_car_trunk uses Blender-suffixed duplicate
         },
+        // Per-mesh material overrides keyed by mesh name → shared material name.
+        // Used for meshes whose Blender material name doesn't map cleanly to an alias.
+        meshMaterialOverrides: {
+          '06_car_trunk_mirror': 'Plastic Black',  // HAVAL trunk text — gloss → flat matte black
+        },
+        // Extra meshes to add to light groups by name (material name won't match).
+        lightMeshOverrides: {
+          brake: ['51_trunk_map_c_b'],  // interior 3rd brake-light strip (car_hendlight mat)
+        },
+        // Per-model fog defaults used when localStorage has no valid assignment for this model.
+        fogDefaults: {
+          fogRear: [
+            '13_Headlight_Map_c_b|Reflecting Red|f0',  // center-strip left component
+            '13_Headlight_Map_c_b|Reflecting Red|f3',  // center-strip right component
+          ],
+        },
         sunroof: { front: '15_car_top_glass', rear: '15_car_top_glass_2', struct: null },
         // GT curtain: derive placement from the sunroof glass bounds at runtime.
         curtain: { mode: 'auto' },
@@ -3742,6 +3734,15 @@ class Component extends DCLogic {
         if (!c.isMesh) return;
         c.material = Array.isArray(c.material) ? c.material.map(swap) : swap(c.material);
       });
+      // Per-mesh overrides: set a specific shared material on named meshes.
+      const meshOverrides = profile.meshMaterialOverrides || {};
+      if (Object.keys(meshOverrides).length) {
+        obj.traverse((c) => {
+          if (!c.isMesh || !meshOverrides[c.name]) return;
+          const mat = this._sharedMats.get(meshOverrides[c.name]);
+          if (mat) c.material = Array.isArray(c.material) ? c.material.map(() => mat) : mat;
+        });
+      }
     }
 
     // Materials: HDRI reflections, shadows, dark glass, shadow-catcher floor
@@ -4092,7 +4093,19 @@ class Component extends DCLogic {
         obj.add(frameMesh);
       }
     }
-    this.collectLightMeshes(obj);
+    this.collectLightMeshes(obj, profile);
+    // Add named meshes to light groups that couldn't be matched by material name.
+    if (profile.lightMeshOverrides) {
+      Object.entries(profile.lightMeshOverrides).forEach(([group, names]) => {
+        const nameSet = new Set(names);
+        obj.traverse((c) => {
+          if (!c.isMesh || !nameSet.has(c.name)) return;
+          if (this.lightGroups[group] && !this.lightGroups[group].includes(c)) {
+            this.lightGroups[group].push(c);
+          }
+        });
+      });
+    }
     this._applyInitialFogStates();
     // Compute true forward direction from headlight positions so wheel
     // FL/FR/RL/RR classification is correct regardless of model orientation.
