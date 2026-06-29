@@ -503,6 +503,12 @@ class Component extends DCLogic {
     this.sunroofFront.position.y = this._sunroofFrontOrigPos.y + upOffset;
     this.sunroofFront.position.x = this._sunroofFrontOrigPos.x + backOffset;
 
+    // Tilt proportional to slide: front rises, rear drops to follow roofline curvature
+    const slideRatio = ratio > transitionThreshold
+      ? (ratio - transitionThreshold) / (1 - transitionThreshold)
+      : 0;
+    const origRz = this._sunroofFrontOrigRot ? this._sunroofFrontOrigRot.z : 0;
+    this.sunroofFront.rotation.z = origRz - 0.08 * slideRatio;
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(3);
