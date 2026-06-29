@@ -978,7 +978,7 @@ class Component extends DCLogic {
 
     // ── Step 4: brake disks — front only, steer only ──────────────────────
     this._steerOnlyMeshes = { fl: [], fr: [] };
-    const breakDiskRx = /break.*disk|breakdisk/i;
+    const breakDiskRx = /(?:break|brake).*dis[ck]/i;
     obj.traverse(c => {
       if (!c.isMesh) return;
       const nm = (c.name || '').trim();
@@ -1048,13 +1048,13 @@ class Component extends DCLogic {
     identifySpokes(rl);
     identifySpokes(rr);
 
-    // Generate blurred wheel texture dynamically
-    this._generateBlurredWheelTexture();
-
-    // Create blurred discs and backing discs
+    // Generate blurred wheel texture dynamically.
+    // Skip for models that inherit wheels from another variant — their own wheel
+    // classification may be wrong and would overwrite the source's clean texture.
     this._blurredDiscs = [];
     this._backingDiscs = [];
-    if (this._rtBlurred) {
+    if (!this._skipWheelBlur) this._generateBlurredWheelTexture();
+    if (this._rtBlurred && !this._skipWheelBlur) {
       const blurredMaterial = new THREE.MeshBasicMaterial({
         map: this._rtBlurred.texture,
         transparent: true,
@@ -4126,7 +4126,9 @@ class Component extends DCLogic {
       this._carForwardDir = new THREE.Vector3(-1, 0, 0);
     }
     console.log('[Car] forwardDir:', JSON.stringify(this._carForwardDir));
+    this._skipWheelBlur = !!profile.inheritWheelsFrom;
     this._collectWheelMeshes(obj);
+    this._skipWheelBlur = false;
     // Save car centre
     const cBox = new THREE.Box3().setFromObject(obj);
     this._carCenter = cBox.getCenter(new THREE.Vector3());
