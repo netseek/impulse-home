@@ -201,7 +201,6 @@
       <input type="range" min="0" max="100" step="1" value="{{ curtainOpen }}" onChange="{{ onCurtainOpen }}" onInput="{{ onCurtainOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
     </sc-if>
 
-
   </div>
 
   <!-- assign mode banner -->
@@ -3066,14 +3065,7 @@ class Component extends DCLogic {
       if (!container) return;
       const w = container.clientWidth, h = container.clientHeight;
 
-      // No preserveDrawingBuffer: on many mobile GPUs it silently DISABLES
-      // MSAA (the two are mutually exclusive there). Without MSAA the thin rear
-      // LED strip's sub-pixel triangles produce no fragments and it "crops" at
-      // distance — the root cause of the rear position light vanishing on phones
-      // while desktop (MSAA intact) never reproduced it. Nothing here needs the
-      // preserved buffer (no canvas readback/export; on-demand rendering keeps
-      // the last frame on its own).
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       renderer.setSize(w, h);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
