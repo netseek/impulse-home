@@ -489,8 +489,8 @@ class Component extends DCLogic {
     let upOffset = 0;
     let backOffset = 0;
 
-    const maxUp = 0.045; // meters
-    const maxBack = 0.496; // meters (80% of original 0.62)
+    const maxUp = 0.008; // minimal lift — glass stays close to body
+    const maxBack = 0.496;
 
     if (ratio < transitionThreshold) {
       upOffset = (ratio / transitionThreshold) * maxUp;
@@ -502,6 +502,7 @@ class Component extends DCLogic {
 
     this.sunroofFront.position.y = this._sunroofFrontOrigPos.y + upOffset;
     this.sunroofFront.position.x = this._sunroofFrontOrigPos.x + backOffset;
+
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(3);
@@ -3755,6 +3756,7 @@ class Component extends DCLogic {
     this.sunroofFront = findMesh('Sunroof Front');
     if (this.sunroofFront) {
       this._sunroofFrontOrigPos = this.sunroofFront.position.clone();
+      this._sunroofFrontOrigRot = this.sunroofFront.rotation.clone();
       this._applySunroofTransform();
     }
 
