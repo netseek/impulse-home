@@ -3774,6 +3774,37 @@ class Component extends DCLogic {
       obj.add(curtainMesh);
       this.sunroofCurtain = curtainMesh;
       this._applyCurtainTransform(this.state.curtainOpen);
+
+      // Frame around the curtain opening — borrows material from SunRoof Structure
+      const structMesh = findMesh('SunRoof Structure');
+      const frameMat = structMesh
+        ? structMesh.material.clone()
+        : new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.35, metalness: 0.5 });
+
+      const border = 0.05;
+      const oW = (1.35 + border * 2) / 2, oD = (0.82 + border * 2) / 2;
+      const iW = 1.35 / 2, iD = 0.82 / 2;
+
+      const frameShape = new THREE.Shape();
+      frameShape.moveTo(-oW, -oD);
+      frameShape.lineTo( oW, -oD);
+      frameShape.lineTo( oW,  oD);
+      frameShape.lineTo(-oW,  oD);
+      frameShape.closePath();
+      const hole = new THREE.Path();
+      hole.moveTo(-iW, -iD);
+      hole.lineTo( iW, -iD);
+      hole.lineTo( iW,  iD);
+      hole.lineTo(-iW,  iD);
+      hole.closePath();
+      frameShape.holes.push(hole);
+
+      const frameGeom = new THREE.ShapeGeometry(frameShape);
+      frameGeom.rotateX(-Math.PI / 2);
+      const frameMesh = new THREE.Mesh(frameGeom, frameMat);
+      frameMesh.name = "Sunroof_Curtain_Frame";
+      frameMesh.position.set(1.265, 1.621, -0.366);
+      obj.add(frameMesh);
     }
     this.collectLightMeshes(obj);
     this._applyInitialFogStates();
