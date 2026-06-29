@@ -3615,6 +3615,10 @@ class Component extends DCLogic {
             '13_Headlight_Map_c_b|Reflecting Red|f3',  // center-strip right component
           ],
         },
+        // Reuse HEV's validated wheel meshes — GT's own wheel classification
+        // has pivot/axis issues and tire-side detachment. Both models share the
+        // same wheel geometry so this is a safe substitution.
+        inheritWheelsFrom: 'hev',
         sunroof: { front: '15_car_top_glass', rear: '15_car_top_glass_2', struct: null },
         // GT curtain: derive placement from the sunroof glass bounds at runtime.
         curtain: { mode: 'auto' },
@@ -4134,6 +4138,28 @@ class Component extends DCLogic {
     // the heavy collection passes.
     this._captureVariant(profile.key, obj);
 
+    // If a secondary model delegates wheel rendering to a source variant, hide its
+    // own (buggy) wheel meshes and redirect all wheel arrays to the validated source.
+    if (!primary && profile.inheritWheelsFrom && this._variants[profile.inheritWheelsFrom]) {
+      const srcV = this._variants[profile.inheritWheelsFrom];
+      const dstV = this._variants[profile.key];
+      // Permanently hide the secondary's own wheel/brake-disc meshes.
+      [...(dstV._allWheels || []),
+       ...Object.values(dstV._steerOnlyMeshes || {}).flat()
+      ].forEach(m => { m.visible = false; });
+      // Remove the secondary's scene-level blur/backing discs — we'll use the source's.
+      [...(dstV._blurredDiscs || []), ...(dstV._backingDiscs || [])].forEach(d => {
+        if (this.scene) this.scene.remove(d);
+      });
+      // Point all wheel arrays at the source variant's (already correct) data.
+      ['_frontLeftWheels','_frontRightWheels','_rearLeftWheels','_rearRightWheels',
+       '_allWheels','_tireWheels','_rimWheels','_spokesWheels','_otherRimWheels',
+       '_steerOnlyMeshes','_blurredDiscs','_backingDiscs','_carLateralDir',
+      ].forEach(f => { dstV[f] = srcV[f]; });
+      dstV._inheritedWheelsFrom = profile.inheritWheelsFrom;
+      console.log('[Wheels] GT inheriting wheels from', profile.inheritWheelsFrom);
+    }
+
     // The SECONDARY model starts hidden — it shares the primary's camera framing,
     // contact shadow and night-light rig (both cars normalize to the same size and
     // ground), so we skip all the scene-level setup below for it.
@@ -4219,11 +4245,40 @@ class Component extends DCLogic {
   _activateVariant(key) {
     if (!this._variants || !this._variants[key]) return;
     const b = this._variants[key];
+
+    // Restore per-mesh visibility changes made for a previous inherited-wheels variant.
+    if (this._variantHiddenMeshes) {
+      this._variantHiddenMeshes.forEach(({ mesh, wasVisible }) => { mesh.visible = wasVisible; });
+      this._variantHiddenMeshes = null;
+    }
+
     // Show the chosen model, hide the others.
     Object.keys(this._variants).forEach((k) => {
       const r = this._variants[k] && this._variants[k].root;
       if (r) r.visible = (k === key);
     });
+
+    // If this variant uses another model's wheels, keep that model's root visible
+    // but hide every mesh in it that isn't a wheel or brake disc.
+    if (b._inheritedWheelsFrom) {
+      const srcV = this._variants[b._inheritedWheelsFrom];
+      if (srcV && srcV.root) {
+        srcV.root.visible = true;
+        const keepSet = new Set([
+          ...(b._allWheels || []),
+          ...Object.values(b._steerOnlyMeshes || {}).flat(),
+        ]);
+        const hidden = [];
+        srcV.root.traverse(c => {
+          if (c.isMesh && !keepSet.has(c)) {
+            hidden.push({ mesh: c, wasVisible: c.visible });
+            c.visible = false;
+          }
+        });
+        this._variantHiddenMeshes = hidden;
+      }
+    }
+
     // Swap the active per-model references.
     this._variantFields().forEach((f) => { this[f] = b[f]; });
     this.model = b.root;
