@@ -966,10 +966,74 @@ class Component extends DCLogic {
     };
     const flP=clusterPCA(fl), frP=clusterPCA(fr), rlP=clusterPCA(rl), rrP=clusterPCA(rr);
     const flCenter=flP.center, frCenter=frP.center, rlCenter=rlP.center, rrCenter=rrP.center;
-    fl.forEach(c=>{ c._pivot=flCenter; c._rollAxis=flP.axle; });
-    fr.forEach(c=>{ c._pivot=frCenter; c._rollAxis=frP.axle; });
-    rl.forEach(c=>{ c._pivot=rlCenter; c._rollAxis=rlP.axle; });
-    rr.forEach(c=>{ c._pivot=rrCenter; c._rollAxis=rrP.axle; });
+    // Per-mesh pivot: each clean-disc mesh (rim ring/face, tyre) must spin about
+    // ITS OWN centre so it stays concentric with itself. Using ONE shared cluster
+    // centre for everything made the rim — whose own centre sits ~4 mm off the
+    // tyre's — orbit the tyre centre as it spun: a visible in-tyre wobble. The axle
+    // DIRECTION stays shared (robust, identical for all parts); only the centre the
+    // axis passes through is per-mesh. The centre comes from a least-squares CIRCLE
+    // FIT in the plane ⊥ to the axle — centroid is unreliable here (vertex-density
+    // bias skews flat rim faces; sidewall bands sit off their geometric centre).
+    // Returns the fitted world centre, or null for non-concentric meshes (a small
+    // rim logo/valve whose short arc fits an unstable phantom circle far away).
+    const meshSpinCenter = (c, axis, clusterCenter) => {
+      const pos = c.geometry && c.geometry.attributes && c.geometry.attributes.position;
+      if (!pos || pos.count < 30) return null;
+      let u = new THREE.Vector3(1,0,0); if (Math.abs(u.dot(axis))>0.9) u.set(0,1,0);
+      u.sub(axis.clone().multiplyScalar(u.dot(axis))).normalize();
+      const w = new THREE.Vector3().crossVectors(axis,u).normalize();
+      c.updateWorldMatrix(true,false);
+      const step = Math.max(1, Math.floor(pos.count/3000));
+      const v = new THREE.Vector3();
+      let Sx=0,Sy=0,Sxx=0,Syy=0,Sxy=0,Sxz=0,Syz=0,Sz=0,n=0;
+      for (let i=0;i<pos.count;i+=step){
+        v.fromBufferAttribute(pos,i).applyMatrix4(c.matrixWorld).sub(clusterCenter);
+        const x=v.dot(u), y=v.dot(w), z=x*x+y*y;
+        Sx+=x;Sy+=y;Sxx+=x*x;Syy+=y*y;Sxy+=x*y;Sxz+=x*z;Syz+=y*z;Sz+=z;n++;
+      }
+      // Solve 3×3 for x²+y² = a·x + b·y + cc → centre (a/2, b/2), radius from cc.
+      const M=[[Sxx,Sxy,Sx,Sxz],[Sxy,Syy,Sy,Syz],[Sx,Sy,n,Sz]];
+      for(let i=0;i<3;i++){
+        let p=i; for(let k=i+1;k<3;k++) if(Math.abs(M[k][i])>Math.abs(M[p][i])) p=k;
+        if(Math.abs(M[p][i])<1e-12) return null; [M[i],M[p]]=[M[p],M[i]];
+        for(let k=0;k<3;k++) if(k!==i){const f=M[k][i]/M[i][i]; for(let j=i;j<4;j++) M[k][j]-=f*M[i][j];}
+      }
+      const cx=(M[0][3]/M[0][0])/2, cy=(M[1][3]/M[1][1])/2, cc=M[2][3]/M[2][2];
+      const R=Math.sqrt(Math.max(0, cc + cx*cx + cy*cy));
+      if(!isFinite(R) || R<1e-4) return null;
+      // For any rotationally-symmetric part (thin ring, thick rim face, sidewall
+      // band) the least-squares centre is the true spin centre regardless of radial
+      // thickness — so no residual gate (a wide rim face legitimately spans many
+      // radii). Reject only by distance: a centre far from the cluster centre means
+      // a non-concentric part (the lug/valve sliver fits a circle ~250 mm out).
+      if(Math.hypot(cx,cy) > 0.06) return null;
+      return clusterCenter.clone().addScaledVector(u, cx).addScaledVector(w, cy);
+    };
+    const isTireMat = (c) => (Array.isArray(c.material)?c.material:[c.material])
+      .some(m => m && /tire|tyre/i.test(m.name||''));
+    const vertCount = (c) => (c.geometry&&c.geometry.attributes&&c.geometry.attributes.position
+      &&c.geometry.attributes.position.count)||0;
+    const assignPivots = (arr, clusterCenter, clusterAxle) => {
+      // Pass 1: fit each mesh's own spin centre.
+      const info = arr.map(c => ({ c, fit: meshSpinCenter(c, clusterAxle, clusterCenter),
+        tire: isTireMat(c), verts: vertCount(c) }));
+      // Consensus rim centre = vert-weighted mean of the rim (non-tyre) fits. Used as
+      // the fallback for small rim features (logo/valve) whose own fit is unstable, so
+      // they track the rim — NOT the tyre centre, which sits ~4 mm off and would make
+      // them wobble in exactly the rim-edge zone the eye checks.
+      const acc=new THREE.Vector3(); let wsum=0;
+      info.forEach(o=>{ if(o.fit && !o.tire){ acc.addScaledVector(o.fit, o.verts); wsum+=o.verts; } });
+      const rimCenter = wsum>0 ? acc.multiplyScalar(1/wsum) : clusterCenter;
+      // Pass 2: own fit if found, else rim centre (wheel parts) / cluster centre (tyre).
+      info.forEach(o => {
+        o.c._pivot = o.fit || (o.tire ? clusterCenter : rimCenter);
+        o.c._rollAxis = clusterAxle;
+      });
+    };
+    assignPivots(fl, flCenter, flP.axle);
+    assignPivots(fr, frCenter, frP.axle);
+    assignPivots(rl, rlCenter, rlP.axle);
+    assignPivots(rr, rrCenter, rrP.axle);
     const fx=v=>v.toArray().map(x=>+x.toFixed(3));
     console.log('[WheelAxle] FL',fx(flP.axle),'FR',fx(frP.axle),'RL',fx(rlP.axle),'RR',fx(rrP.axle));
 
