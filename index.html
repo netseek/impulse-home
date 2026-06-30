@@ -527,14 +527,18 @@ class Component extends DCLogic {
   _applySunroofTransform(pct) {
     if (!this.THREE || !this.sunroofFront || !this._sunroofFrontOrigPos) return;
     const value = pct !== undefined ? pct : (this.state.sunroofOpen ?? 0);
-    const ratio = value / 100;
+    const isGt = this.state.modelVariant === 'gt';
+    let ratio = value / 100;
+    if (isGt) {
+      ratio = Math.min(ratio, 0.9);
+    }
 
     const transitionThreshold = 0.25;
     let upOffset = 0;
     let backOffset = 0;
 
     const range = this._sunroofRange || { up: 0.015, back: 0.60 };
-    const maxUp = range.up;   // lift — close to body but clears the opening edge
+    const maxUp = isGt ? 0.0018 : range.up;   // lift — close to body but clears the opening edge
     const maxBack = range.back; // rearward slide
 
     if (ratio < transitionThreshold) {
@@ -549,19 +553,18 @@ class Component extends DCLogic {
       ? (ratio - transitionThreshold) / (1 - transitionThreshold)
       : 0;
 
-    const isGt = this.state.modelVariant === 'gt';
-
     if (isGt) {
       // GT model sunroof glass local orientation:
       // Local X is parent X (backward). Increase position.x to slide back.
-      // Local Z is -parent Y (upward). Decrease position.z to lift.
+      // Local Y is parent Y (upward). Increase position.y to lift.
       // Local Y is parent Z (lateral). Rotate around local Y to pitch.
-      const extraLift = 0.018 * slideRatio;
+      const extraLift = 0.024 * slideRatio;
       this.sunroofFront.position.x = this._sunroofFrontOrigPos.x + backOffset;
-      this.sunroofFront.position.z = this._sunroofFrontOrigPos.z - (upOffset + extraLift);
+      this.sunroofFront.position.y = this._sunroofFrontOrigPos.y + (upOffset + extraLift);
+      this.sunroofFront.position.z = this._sunroofFrontOrigPos.z;
 
       const origRy = this._sunroofFrontOrigRot ? this._sunroofFrontOrigRot.y : 0;
-      this.sunroofFront.rotation.y = origRy - 0.035 * slideRatio;
+      this.sunroofFront.rotation.y = origRy;
     } else {
       // HEV/PHEV model sunroof glass local orientation:
       // Local X is parent X (backward). Increase position.x to slide back.
@@ -2995,85 +2998,6 @@ class Component extends DCLogic {
     this['_blink_' + timerKey] = null;
   }
 
-  _warmupLights() {
-    if (!this.lightGroups || !this.renderer || !this.scene || !this.camera) return;
-    console.log('[Lights Warmup] Starting shader compilation pre-warm...');
-
-    const warmupKeys = [
-      'headlight', 'highbeam', 'fogFront', 'fogRear', 'brake', 'reverse',
-      'turnL', 'turnR', 'positionFront', 'positionFrontL', 'positionFrontR',
-      'positionFrontAmber', 'positionFrontLAmber', 'positionFrontRAmber',
-      'positionRear', 'position'
-    ];
-
-    // 1. Temporarily turn ALL lights ON (both standard and aliases)
-    warmupKeys.forEach(k => {
-      try { this._setGroupEmissive(k, true); } catch (e) {}
-    });
-
-    // 2. Perform a complete compile/render cycle with all lights active
-    try {
-      // Main scene compile
-      this.renderer.compile(this.scene, this.camera);
-
-      // Warm up Bloom Composer
-      if (this.bloomComposer && this.bloomCam) {
-        this.bloomCam.position.copy(this.camera.position);
-        this.bloomCam.quaternion.copy(this.camera.quaternion);
-        this.bloomCam.updateProjectionMatrix();
-
-        const savedBg = this.scene.background;
-        this.scene.background = null;
-        this._darkenNonBloom(this.scene);
-        this.bloomComposer.render();
-        this._restoreMaterials();
-        this.scene.background = savedBg;
-      }
-
-      // Warm up Streak Composer
-      if (this.streakComposer && this.streakCam) {
-        this.streakCam.position.copy(this.camera.position);
-        this.streakCam.quaternion.copy(this.camera.quaternion);
-        this.streakCam.updateProjectionMatrix();
-
-        const savedBg = this.scene.background;
-        this.scene.background = null;
-        this._darkenNonStreak(this.scene);
-        this.streakComposer.render();
-        this._restoreMaterials();
-        this.scene.background = savedBg;
-      }
-      
-      // Warm up Additive Overlay
-      if (this.bloomMat && this.streakMat && this.bloomComposer && this.streakComposer) {
-        this.bloomMat.map = this.bloomComposer.readBuffer.texture;
-        this.bloomMat.visible = true;
-        this.bloomMat.needsUpdate = true;
-        this.streakMat.map = this.streakComposer.readBuffer.texture;
-        this.streakMat.visible = true;
-        this.streakMat.needsUpdate = true;
-        this.renderer.render(this.overlayScene, this.orthoCamera);
-      }
-    } catch (err) {
-      console.warn('[Lights Warmup] Error during warmup render:', err);
-    }
-
-    // 3. Turn ALL lights back OFF
-    warmupKeys.forEach(k => {
-      try { this._setGroupEmissive(k, false); } catch (e) {}
-    });
-    
-    // Clear overlay quad states
-    if (this.bloomMat && this.streakMat) {
-      this.bloomMat.visible = false;
-      this.streakMat.visible = false;
-      this.bloomMat.needsUpdate = true;
-      this.streakMat.needsUpdate = true;
-    }
-
-    console.log('[Lights Warmup] Compilation pre-warm completed.');
-  }
-
   componentWillUnmount() {
     ['turnL', 'turnR', 'hazard'].forEach(k => this._stopBlink(k));
     if (this.renderer) { this.renderer.dispose(); this.animFrameId && cancelAnimationFrame(this.animFrameId); }
@@ -3780,7 +3704,11 @@ class Component extends DCLogic {
         // Legacy: HEV headlight glass is identified by mesh name.
         isHeadlightGlassMesh: (c) => c.name === 'BuildingMesh-00106' || c.name === 'BuildingMesh-00107',
         isHeadlightGlassMat: () => false,
-        bodyPaintRe: /^(body|roof|panel 2)$/i,
+        // "panel 2" was historically a body-colour-matched interior trim accent,
+        // hence its old inclusion here — it's now a dedicated emissive dashboard
+        // screen (see the Panel-material treatment below) and must NOT be tinted
+        // with the car's paint colour or have its colour reset by applyCarColor().
+        bodyPaintRe: /^(body|roof)$/i,
         splitMultiMatLamps: false,
         hasExplicitHighbeam: false,
         sunroof: { front: 'Sunroof Front', rear: 'Sunroof Rear', struct: 'SunRoof Structure' },
@@ -4048,6 +3976,25 @@ class Component extends DCLogic {
 
         // Rear position light: make matte (remove mirror-like metalness + reflections)
         if (/PositionLight_Rear/i.test(m.name || '')) {
+          m.metalness = 0;
+          m.roughness = 1.0;
+          m.envMapIntensity = 0;
+          m.needsUpdate = true;
+        }
+
+        // Dashboard display panels (emissive screen quads): authored with a
+        // white base colour and the SAME texture as both the base-colour map
+        // AND the emissive map, plus KHR_materials_emissive_strength (10x) —
+        // an extension this old three.js build (r137) doesn't read, so it's
+        // silently ignored and emissiveIntensity stays at 1. With color=white,
+        // the texture is then lit normally (diffuseColor = color * map) AND
+        // added again as emissive, double-exposing it — bright/white areas of
+        // the dashboard image (e.g. instrument cluster gauge faces) blow out
+        // to flat white. Black base colour kills the diffuse term entirely
+        // (color * map = 0 regardless of map) so only the emissive term shows,
+        // giving a clean self-lit screen look.
+        if (/^Panel\s*\d/i.test(m.name || '')) {
+          m.color.setRGB(0, 0, 0);
           m.metalness = 0;
           m.roughness = 1.0;
           m.envMapIntensity = 0;
@@ -4463,8 +4410,6 @@ class Component extends DCLogic {
     // camera bounds are finalised, then draw.
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(4);
-
-    this._warmupLights();
 
     this.setState({ loading: false, progress: 100 });
     // If the user switched to the secondary model before it finished loading,
