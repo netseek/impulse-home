@@ -41,52 +41,48 @@
   <!-- cyan accent corner ticks -->
   <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
 
-  <!-- floating buttons (shown when panel is collapsed) -->
-  <div style="position: absolute; top: 22px; right: 26px; display: {{ panelIconDisplay }}; gap: 8px; align-items: center;">
-    <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-      <sc-if value="{{ nightMode }}" hint-placeholder-val="{{ false }}">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-      </sc-if>
-      <sc-if value="{{ isDayMode }}" hint-placeholder-val="{{ true }}">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-      </sc-if>
-    </button>
-    <button onClick="{{ togglePanel }}" title="Open config" style="width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-    </button>
-  </div>
+  <!-- day-night switch button -->
+  <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="position: absolute; top: 22px; right: {{ dayNightRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease; z-index: 10;">
+    <sc-if value="{{ nightMode }}" hint-placeholder-val="{{ false }}">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    </sc-if>
+    <sc-if value="{{ isDayMode }}" hint-placeholder-val="{{ true }}">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </sc-if>
+  </button>
+
+  <!-- model toggle button -->
+  <button onClick="{{ toggleModel }}" title="Switch model variant" style="position: absolute; top: 22px; right: {{ modelBtnRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease; font-family: 'Space Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: 0.05em; z-index: 10;">
+    {{ modelLabel }}
+  </button>
+
+  <!-- motion tab button -->
+  <button onClick="{{ clickTabMotion }}" title="Motion and sunroof settings" style="position: absolute; top: 22px; right: {{ tabMotionRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabMotionBorder }}; color: {{ tabMotionCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L12 12"></path><circle cx="12" cy="12" r="1"></circle><path d="M12 3v2"></path><path d="M12 19v2"></path><path d="M3 12h2"></path><path d="M19 12h2"></path></svg>
+  </button>
+
+  <!-- lights tab button -->
+  <button onClick="{{ clickTabLights }}" title="Lights settings" style="position: absolute; top: 22px; right: {{ tabLightsRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabLightsBorder }}; color: {{ tabLightsCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A5 5 0 0 0 8 8c0 1 .3 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><line x1="9" y1="18" x2="15" y2="18"></line><line x1="10" y1="22" x2="14" y2="22"></line></svg>
+  </button>
+
+  <!-- env tab button -->
+  <button onClick="{{ clickTabEnv }}" title="Environment settings" style="position: absolute; top: 22px; right: {{ tabEnvRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabEnvBorder }}; color: {{ tabEnvCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+  </button>
+
+  <!-- color tab button -->
+  <button onClick="{{ clickTabColor }}" title="Car paint color" style="position: absolute; top: 22px; right: {{ tabColorRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabColorBorder }}; color: {{ tabColorCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+    <div style="width: 18px; height: 18px; border-radius: 50%; background: {{ currentCarPaintHex }}; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
+  </button>
 
   <!-- configure panel -->
-  <div style="position: absolute; top: 22px; right: 26px; width: 220px; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }};">
-
-    <!-- Header -->
+  <div style="position: absolute; top: 22px; right: 26px; width: 220px; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }};">    <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div style="font-size: 10px; letter-spacing: .3em; opacity: .55; font-weight: 600;">CONFIGURE</div>
       <div style="display: flex; align-items: center; gap: 4px;">
         <button onClick="{{ togglePanel }}" title="Collapse" style="background: none; border: none; color: rgba(79,214,232,.7); cursor: pointer; padding: 2px 4px; font-size: 16px; line-height: 1; border-radius: 4px;">×</button>
       </div>
-    </div>
-
-    <!-- Model variant toggle -->
-    <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .18em; opacity: .5; margin-bottom: 6px;">MODEL</div>
-    <div style="display: flex; gap: 3px; background: rgba(0,0,0,.30); border-radius: 7px; padding: 3px; margin-bottom: 8px;">
-      <button onClick="{{ setModelHev }}" title="Haval H6 HEV / PHEV" style="flex: 1; padding: 6px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .10em; font-weight: 600; background: {{ modelHevBg }}; color: {{ modelHevCol }}; transition: all .15s;">HEV / PHEV</button>
-      <button onClick="{{ setModelGt }}" title="Haval H6 GT" style="flex: 1; padding: 6px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .10em; font-weight: 600; background: {{ modelGtBg }}; color: {{ modelGtCol }}; transition: all .15s;">GT</button>
-    </div>
-
-    <!-- Day / Night toggle -->
-    <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .18em; opacity: .5; margin-bottom: 6px;">MODE</div>
-    <div style="display: flex; gap: 3px; background: rgba(0,0,0,.30); border-radius: 7px; padding: 3px; margin-bottom: 12px;">
-      <button onClick="{{ setDayMode }}"   style="flex: 1; padding: 6px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .10em; font-weight: 600; background: {{ modeDayBg }}; color: {{ modeDayCol }}; transition: all .15s;">DAY</button>
-      <button onClick="{{ setNightMode }}" style="flex: 1; padding: 6px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .10em; font-weight: 600; background: {{ modeNightBg }}; color: {{ modeNightCol }}; transition: all .15s;">NIGHT</button>
-    </div>
-
-    <!-- Tab bar -->
-    <div style="display: flex; gap: 3px; background: rgba(0,0,0,.30); border-radius: 7px; padding: 3px; margin-bottom: 14px;">
-      <button onClick="{{ setTabColor }}"  style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgColor }};  color: {{ tabColColor }};  transition: all .15s;">COLOR</button>
-      <button onClick="{{ setTabEnv }}"    style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgEnv }};    color: {{ tabColEnv }};    transition: all .15s;">ENV</button>
-      <button onClick="{{ setTabLights }}" style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgLights }}; color: {{ tabColLights }}; transition: all .15s;">LIGHTS</button>
-      <button onClick="{{ setTabMotion }}" style="flex: 1; padding: 5px 2px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; font-weight: 600; background: {{ tabBgMotion }}; color: {{ tabColMotion }}; transition: all .15s;">MOTION</button>
     </div>
 
     <!-- ── COLOR TAB ── -->
@@ -97,39 +93,6 @@
           <button onClick="{{ sw.onClick }}" title="{{ sw.title }}" style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; background: {{ sw.hex }}; border: 2px solid {{ sw.ring }}; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: border-color .15s ease;"></button>
         </sc-for>
       </div>
-
-      <!-- BG colors row -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
-        <label style="display: flex; flex-direction: column; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; opacity: .6; cursor: pointer;">
-          DAY BG
-          <input type="color" value="{{ dayBg }}" onChange="{{ onDayBg }}" onInput="{{ onDayBgInput }}" style="width: 100%; height: 26px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer; background: none; padding: 2px;" />
-        </label>
-        <label style="display: flex; flex-direction: column; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; opacity: .6; cursor: pointer;">
-          NIGHT BG
-          <input type="color" value="{{ nightBg }}" onChange="{{ onNightBg }}" onInput="{{ onNightBgInput }}" style="width: 100%; height: 26px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer; background: none; padding: 2px;" />
-        </label>
-      </div>
-
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">VIGNETTE</div>
-      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-        <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
-          COLOR
-          <input type="color" value="{{ vignetteColor }}" onChange="{{ onVignetteColor }}" onInput="{{ onVignetteColorInput }}" style="width: 40px; height: 22px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; background: none; padding: 1px;" />
-        </label>
-        <div style="flex: 1;">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
-            <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">INTENSITY</span>
-            <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ vignetteIntensity }}%</span>
-          </div>
-          <input type="range" min="0" max="95" step="1" value="{{ vignetteIntensity }}" onChange="{{ onVignetteIntensity }}" onInput="{{ onVignetteIntensity }}" style="width: 100%; accent-color: #4fd6e8;" />
-        </div>
-      </div>
-
-      <!-- Grain toggle -->
-      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .7;">
-        <input type="checkbox" checked="{{ grainEnabled }}" onChange="{{ onGrain }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
-        GRAIN EFFECT
-      </label>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -157,9 +120,42 @@
         <option value="studio_loft" style="color:#111;">Studio Loft</option>
         <option value="custom" style="color:#111;" disabled="{{ customDisabled }}">{{ customLabel }}</option>
       </select>
-      <label style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 9px; border: 1px dashed rgba(79,214,232,.4); border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .12em; color: #9fe6f0; cursor: pointer;">
+      <label style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 9px; border: 1px dashed rgba(79,214,232,.4); border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .12em; color: #9fe6f0; cursor: pointer; margin-bottom: 18px;">
         UPLOAD .HDR
         <input type="file" accept=".hdr,image/vnd.radiance" onChange="{{ onUploadHdri }}" style="display: none;" />
+      </label>
+
+      <!-- BG colors row -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
+        <label style="display: flex; flex-direction: column; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; opacity: .6; cursor: pointer;">
+          DAY BG
+          <input type="color" value="{{ dayBg }}" onChange="{{ onDayBg }}" onInput="{{ onDayBgInput }}" style="width: 100%; height: 26px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer; background: none; padding: 2px;" />
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; opacity: .6; cursor: pointer;">
+          NIGHT BG
+          <input type="color" value="{{ nightBg }}" onChange="{{ onNightBg }}" onInput="{{ onNightBgInput }}" style="width: 100%; height: 26px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer; background: none; padding: 2px;" />
+        </label>
+      </div>
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">VIGNETTE</div>
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+        <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
+          COLOR
+          <input type="color" value="{{ vignetteColor }}" onChange="{{ onVignetteColor }}" onInput="{{ onVignetteColorInput }}" style="width: 40px; height: 22px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; background: none; padding: 1px;" />
+        </label>
+        <div style="flex: 1;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
+            <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">INTENSITY</span>
+            <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ vignetteIntensity }}%</span>
+          </div>
+          <input type="range" min="0" max="95" step="1" value="{{ vignetteIntensity }}" onChange="{{ onVignetteIntensity }}" onInput="{{ onVignetteIntensity }}" style="width: 100%; accent-color: #4fd6e8;" />
+        </div>
+      </div>
+
+      <!-- Grain toggle -->
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .7;">
+        <input type="checkbox" checked="{{ grainEnabled }}" onChange="{{ onGrain }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
+        GRAIN EFFECT
       </label>
     </sc-if>
 
@@ -308,6 +304,31 @@ class Component extends DCLogic {
       panelOpen: s.panelOpen,
       panelBodyDisplay: (!s.loading && !s.error && s.panelOpen) ? 'block' : 'none',
       panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
+      dayNightDisplay: (!s.loading && !s.error) ? 'flex' : 'none',
+      tabColorRight:  s.panelOpen ? '254px' : '26px',
+      tabEnvRight:    s.panelOpen ? '302px' : '74px',
+      tabLightsRight: s.panelOpen ? '350px' : '122px',
+      tabMotionRight: s.panelOpen ? '398px' : '170px',
+      modelBtnRight:  s.panelOpen ? '446px' : '218px',
+      dayNightRight:  s.panelOpen ? '494px' : '266px',
+      tabColorBorder: (s.panelOpen && s.configTab === 'color') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabColorCol:    (s.panelOpen && s.configTab === 'color') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tabEnvBorder:   (s.panelOpen && s.configTab === 'env')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabEnvCol:      (s.panelOpen && s.configTab === 'env')   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tabLightsBorder:(s.panelOpen && s.configTab === 'lights')? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabLightsCol:   (s.panelOpen && s.configTab === 'lights')? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tabMotionBorder:(s.panelOpen && s.configTab === 'motion')? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabMotionCol:   (s.panelOpen && s.configTab === 'motion')? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      clickTabColor:  () => this.selectTab('color'),
+      clickTabEnv:    () => this.selectTab('env'),
+      clickTabLights: () => this.selectTab('lights'),
+      clickTabMotion: () => this.selectTab('motion'),
+      toggleModel:    () => {
+        const next = s.modelVariant === 'hev' ? 'gt' : 'hev';
+        this._setModelVariant(next);
+      },
+      modelLabel: s.modelVariant === 'gt' ? 'GT' : 'HEV',
+      currentCarPaintHex: activeKey,
       togglePanel: () => this.setState(st => ({ panelOpen: !st.panelOpen })),
       swatches,
       lightIntensity: s.lightIntensity,
@@ -1062,8 +1083,13 @@ class Component extends DCLogic {
     // Store lateral direction (fallback) for use in _applyWheelTransforms
     this._carLateralDir = rightDir.clone();
 
-    // ── Step 4: brake disks — front only, steer only ──────────────────────
-    this._steerOnlyMeshes = { fl: [], fr: [] };
+    // ── Step 4: brake disks — steer only (front) or fully static (rear) ────
+    // Rear keys (rl/rr) exist so GT can inherit HEV's correctly-positioned
+    // rear discs wholesale (same mechanism as the wheels themselves) instead
+    // of trying to reposition GT's own discarded-geometry calipers onto the
+    // inherited wheel — _applyWheelTransforms only ever rotates .fl/.fr, so
+    // rear discs just stay at their authored (already correct) position.
+    this._steerOnlyMeshes = { fl: [], fr: [], rl: [], rr: [] };
     const breakDiskRx = /break.*disk|breakdisk/i;
     obj.traverse(c => {
       if (!c.isMesh) return;
@@ -1073,14 +1099,15 @@ class Component extends DCLogic {
       const wc      = new THREE.Box3().setFromObject(c).getCenter(new THREE.Vector3());
       const delta   = wc.clone().sub(center);
       const fwdProj = delta.dot(carFwd);
-      if (fwdProj < fwdMed) { console.log('[BreakDisk skip rear]', nm); return; }
+      const isFront = fwdProj >= fwdMed;
       cacheInit(c);
       const isRight = delta.dot(rightDir) >= rightMed;
-      // Steer the front disc around the SAME pivot as its wheel cluster.
-      c._pivot = isRight ? frCenter : flCenter;
-      if (isRight) this._steerOnlyMeshes.fr.push(c);
-      else         this._steerOnlyMeshes.fl.push(c);
-      console.log('[BreakDisk front]', nm, '→', isRight ? 'fr' : 'fl');
+      // Pivot uses the SAME centre as its wheel cluster (front discs steer
+      // around it; rear discs never move but get one for consistency).
+      c._pivot = isFront ? (isRight ? frCenter : flCenter) : (isRight ? rrCenter : rlCenter);
+      const key = (isFront ? 'f' : 'r') + (isRight ? 'r' : 'l');
+      this._steerOnlyMeshes[key].push(c);
+      console.log('[BreakDisk]', nm, '→', key);
     });
 
     this._frontLeftWheels  = fl;
@@ -1336,6 +1363,14 @@ class Component extends DCLogic {
       m.needsUpdate = true;
     });
     console.log('[ReflectionFlow] injected into', this._animEnvMaterials.length, 'materials');
+  }
+
+  selectTab(tab) {
+    if (this.state.panelOpen && this.state.configTab === tab) {
+      this.setState({ panelOpen: false });
+    } else {
+      this.setState({ panelOpen: true, configTab: tab });
+    }
   }
 
   toggleNightMode() {
@@ -3779,22 +3814,19 @@ class Component extends DCLogic {
         // has pivot/axis issues and tire-side detachment. Both models share the
         // same wheel geometry so this is a safe substitution.
         inheritWheelsFrom: 'hev',
-        // GT's own front brake calipers, hidden explicitly by name (NOT by the
-        // front/rear spatial median-split — that classifier is unreliable on GT,
-        // the same bug that misclassified RR as a steering wheel). Verified by
-        // world position: BrakeDisks002 (x≈-1.59, front right) and BrakeDisks001
-        // (x≈-1.59, front left) are front; BrakeDisks002_1/_2 (x≈1.53) are rear
-        // and must stay visible.
-        // BrakeDisks002/BrakeDisks001: GT's own front calipers (use HEV's instead).
+        // GT's own brake calipers (front AND rear) are hidden explicitly by
+        // name — NOT by the front/rear spatial median-split, which is
+        // unreliable on GT (the same bug that misclassified RR as a steering
+        // wheel). Verified by world position: BrakeDisks002/BrakeDisks001
+        // (x≈-1.59) are front; BrakeDisks002_1/_2 (x≈1.53) are rear.
+        // All four are replaced by HEV's calipers via inheritWheelsFrom
+        // below (_steerOnlyMeshes now carries fl/fr/rl/rr) — GT's own rear
+        // ones were authored against its own discarded wheel geometry and
+        // sat visibly off-centre inside the inherited HEV wheel; repositioning
+        // them was tried and was still off, so just reuse HEV's directly,
+        // same as the wheels themselves.
         // 21_car_hub_metal_mirror_1: HAVAL wheel-hub logo medallion — removed per request.
-        hiddenMeshes: ['BrakeDisks002', 'BrakeDisks001', '21_car_hub_metal_mirror_1'],
-        // GT's own rear calipers (BrakeDisks002_1/_2, kept visible — see above)
-        // were authored against GT's own (now-discarded) wheel geometry, not
-        // HEV's. A small but consistent registration offset between the two
-        // models (measured: ~1.2cm on the car's X axis, identical both sides)
-        // left them off-centre from the inherited HEV wheel they now sit in.
-        // Translated to match the nearest wheel's true pivot at runtime.
-        recenterToWheel: ['BrakeDisks002_1', 'BrakeDisks002_2'],
+        hiddenMeshes: ['BrakeDisks002', 'BrakeDisks001', 'BrakeDisks002_1', 'BrakeDisks002_2', '21_car_hub_metal_mirror_1'],
         sunroof: { front: '15_car_top_glass', rear: '15_car_top_glass_2', struct: null },
         // GT curtain: derive placement from the sunroof glass bounds at runtime.
         curtain: { mode: 'auto' },
@@ -4354,35 +4386,6 @@ class Component extends DCLogic {
       ].forEach(f => { dstV[f] = srcV[f]; });
       dstV._inheritedWheelsFrom = profile.inheritWheelsFrom;
       console.log('[Wheels] GT inheriting wheels from', profile.inheritWheelsFrom);
-
-      // Recentre the secondary's own meshes (e.g. GT's rear calipers, kept
-      // visible above) onto the inherited wheel's true pivot. They were
-      // authored against the secondary's own discarded wheel geometry, so a
-      // small registration offset between the two models leaves them
-      // off-centre from the wheel they now sit in.
-      if (profile.recenterToWheel && profile.recenterToWheel.length) {
-        const wheelMeshes = (dstV._allWheels || []).filter(m => m._pivot);
-        if (wheelMeshes.length) {
-          profile.recenterToWheel.forEach(name => {
-            let target;
-            obj.traverse(c => { if (c.name === name) target = c; });
-            if (!target) return;
-            target.updateWorldMatrix(true, false);
-            const center = new THREE.Box3().setFromObject(target).getCenter(new THREE.Vector3());
-            let best = wheelMeshes[0], bestDist = center.distanceTo(wheelMeshes[0]._pivot);
-            wheelMeshes.forEach(m => {
-              const d = center.distanceTo(m._pivot);
-              if (d < bestDist) { bestDist = d; best = m; }
-            });
-            const delta = best._pivot.clone().sub(center);
-            const newWorldPos = new THREE.Vector3();
-            target.getWorldPosition(newWorldPos).add(delta);
-            if (target.parent) target.parent.worldToLocal(newWorldPos);
-            target.position.copy(newWorldPos);
-            target.updateMatrixWorld(true);
-          });
-        }
-      }
     }
 
     // The SECONDARY model starts hidden — it shares the primary's camera framing,
