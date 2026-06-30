@@ -2196,7 +2196,16 @@ class Component extends DCLogic {
   // Extract a connected face component from a mesh starting at faceIndex.
   // Returns a new Mesh with just those faces, or null if extraction fails.
   _extractConnectedComponent(mesh, faceIndex) {
-    const geo = mesh.geometry;
+    // Always flood-fill against the mesh's ORIGINAL (pre-extraction) geometry.
+    // This can be called more than once for the same source mesh (e.g. GT's
+    // rear fog strip is two separate face-index seeds, f0 and f3) — an earlier
+    // call shrinks mesh.geometry's index to exclude its own component, which
+    // shifts every triangle index after that point. A later call's faceIndex
+    // then resolves to the WRONG component entirely against the shrunk array
+    // (this caused GT's fog light to extract a corner reflector wedge instead
+    // of the strip's second half). Cache the original once and always use it.
+    if (!mesh._origGeoForExtraction) mesh._origGeoForExtraction = mesh.geometry;
+    const geo = mesh._origGeoForExtraction;
     if (!geo || !geo.index) return null;
     const idx = geo.index.array;
     const pos = geo.attributes.position;
@@ -2260,10 +2269,14 @@ class Component extends DCLogic {
     // outright. The source can contain other disconnected islands sharing the
     // same material (e.g. a side reflector wedge next to the fog-light strip);
     // hiding the whole mesh blanked those out too, showing as holes in the body.
-    const inComponent = new Set(component);
+    // Accumulate across calls (mesh._extractedTriSet) and always rebuild from
+    // the cached ORIGINAL index, so a second extraction on the same source
+    // mesh correctly excludes BOTH components, not just its own.
+    if (!mesh._extractedTriSet) mesh._extractedTriSet = new Set();
+    component.forEach(t => mesh._extractedTriSet.add(t));
     const remainingIdx = [];
     for (let t = 0; t < triCount; t++) {
-      if (!inComponent.has(t)) remainingIdx.push(idx[t*3], idx[t*3+1], idx[t*3+2]);
+      if (!mesh._extractedTriSet.has(t)) remainingIdx.push(idx[t*3], idx[t*3+1], idx[t*3+2]);
     }
     if (remainingIdx.length) {
       const remGeo = geo.clone();
