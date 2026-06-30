@@ -3132,7 +3132,14 @@ class Component extends DCLogic {
         if (this.scene) this.scene.environment = env;
         hdr.dispose(); rt.dispose();
         URL.revokeObjectURL(url);
+        // _generateBlurredWheelTexture hides every mesh except one wheel rim
+        // for its capture pass — it must run BEFORE the needsUpdate flag is
+        // set, or that internal render consumes the flag against a scene
+        // where the body (and its shadow) is invisible, baking in an empty
+        // shadow map that then sticks (shadowMap.autoUpdate is off).
+        this._generateBlurredWheelTexture();
         if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        if (this.requestRender) this.requestRender(4);
       },
       undefined,
       (err) => { URL.revokeObjectURL(url); console.warn('[Haval H6] custom HDRI failed', err); }
@@ -3151,8 +3158,14 @@ class Component extends DCLogic {
     if (key === 'studio') {
       if (this.roomEnv && this.scene) {
         this.scene.environment = this.roomEnv;
-        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        // _generateBlurredWheelTexture hides every mesh except one wheel rim
+        // for its capture pass — must run BEFORE the needsUpdate flag is set,
+        // or that internal render consumes the flag against a scene where the
+        // body (and its shadow) is invisible, baking in an empty shadow map
+        // that then sticks (shadowMap.autoUpdate is off).
         this._generateBlurredWheelTexture();
+        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        if (this.requestRender) this.requestRender(4);
       }
       return;
     }
@@ -3183,8 +3196,13 @@ class Component extends DCLogic {
         hdr.dispose(); rt.dispose();
         // Restore canvas vignette background
         this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
-        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        // _generateBlurredWheelTexture hides every mesh except one wheel rim
+        // for its capture pass — must run BEFORE the needsUpdate flag is set,
+        // or that internal render consumes the flag against a scene where the
+        // body (and its shadow) is invisible, baking in an empty shadow map
+        // that then sticks (shadowMap.autoUpdate is off).
         this._generateBlurredWheelTexture();
+        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
         // This callback doesn't setState, so request a redraw explicitly.
         if (this.requestRender) this.requestRender(4);
       },
@@ -4429,6 +4447,8 @@ class Component extends DCLogic {
     window.__scene = this.scene;
     window.__camera = this.camera;
     window.__controls = this.controls;
+    window.__renderer = this.renderer;
+    window.__app = this;
 
     // Shadow camera bounds around the car
     const d = this.dirLight;
