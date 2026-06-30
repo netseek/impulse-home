@@ -1363,7 +1363,15 @@ class Component extends DCLogic {
     }
     // Wheel/brake interiors: cut envMapIntensity at night so they don't read as
     // sun-lit. IBL is the only remaining light source after hemi+dir are zeroed,
-    // so we must reduce it per-material for the wheel cavity meshes.
+    // so we must reduce it per-material for the wheel cavity meshes — but not
+    // so far that they go to a flat black void. "Wheel"/"Break" are metalness:1
+    // with a near-black base colour, so by PBR definition they have NO diffuse
+    // term — every bit of visibility they have comes from this one dial. 0.30
+    // was too aggressive (especially combined with roughness 0's razor-thin
+    // mirror highlight) and needed extra point lights to compensate, which cast
+    // unwanted light pools on the ground. Dropped that approach entirely:
+    // 0.65 alone, plus widening the reflection into a visible sheen via
+    // roughness, keeps the wheels visible without adding any new light source.
     if (this.scene) {
       // \.\d+ matches Blender-suffixed duplicates (e.g. GT's own "Break.001" rear
       // caliper material, distinct from HEV's shared "Break" used on the front).
@@ -1376,12 +1384,7 @@ class Component extends DCLogic {
           if (next) {
             if (m._dayEnvMap === undefined) m._dayEnvMap = m.envMapIntensity;
             if (m._dayRoughness === undefined) m._dayRoughness = m.roughness;
-            m.envMapIntensity = 0.30;
-            // "Wheel" is metalness:1 with near-black colour — by PBR definition
-            // a metal has NO diffuse term, so with roughness 0 it can ONLY show
-            // via a razor-thin mirror reflection. Widen that into a visible
-            // sheen (Math.max so already-rough materials like Tire Top/Side
-            // aren't smoothed out).
+            m.envMapIntensity = 0.65;
             m.roughness = Math.max(m.roughness, 0.45);
           } else {
             if (m._dayEnvMap !== undefined) m.envMapIntensity = m._dayEnvMap;
@@ -1390,29 +1393,6 @@ class Component extends DCLogic {
           m.needsUpdate = true;
         });
       });
-    }
-    // Wheel fill lights: even with the widened sheen above, a metal with no
-    // diffuse term still needs SOMETHING nearby to reflect — the night HDRI is
-    // mostly dark in most view directions, so without a guaranteed light the
-    // wheels render as flat black voids regardless of roughness. One small
-    // point light per wheel pivot (shared world position — valid for both HEV
-    // and GT since GT inherits HEV's wheel meshes) guarantees a visible sheen.
-    if (this.scene && this._frontLeftWheels && this._frontLeftWheels.length) {
-      if (!this._wheelFillLights) {
-        const mk = (arr) => {
-          const p = arr && arr[0] && arr[0]._pivot;
-          if (!p) return null;
-          const pl = new this.THREE.PointLight(0xcfd8e6, 0, 1.2);
-          pl.position.copy(p);
-          this.scene.add(pl);
-          return pl;
-        };
-        this._wheelFillLights = [
-          mk(this._frontLeftWheels), mk(this._frontRightWheels),
-          mk(this._rearLeftWheels),  mk(this._rearRightWheels),
-        ].filter(Boolean);
-      }
-      this._wheelFillLights.forEach(pl => { pl.intensity = next ? 0.4 : 0; });
     }
     // Night floor (MeshStandardMaterial — reacts to SpotLights, shown only at night)
     if (this.nightFloor) this.nightFloor.visible = next;
