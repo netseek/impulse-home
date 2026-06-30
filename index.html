@@ -978,7 +978,7 @@ class Component extends DCLogic {
 
     // ── Step 4: brake disks — front only, steer only ──────────────────────
     this._steerOnlyMeshes = { fl: [], fr: [] };
-    const breakDiskRx = /(?:break|brake).*dis[ck]/i;
+    const breakDiskRx = /break.*disk|breakdisk/i;
     obj.traverse(c => {
       if (!c.isMesh) return;
       const nm = (c.name || '').trim();
@@ -3619,6 +3619,13 @@ class Component extends DCLogic {
         // has pivot/axis issues and tire-side detachment. Both models share the
         // same wheel geometry so this is a safe substitution.
         inheritWheelsFrom: 'hev',
+        // GT's own front brake calipers, hidden explicitly by name (NOT by the
+        // front/rear spatial median-split — that classifier is unreliable on GT,
+        // the same bug that misclassified RR as a steering wheel). Verified by
+        // world position: BrakeDisks002 (x≈-1.59, front right) and BrakeDisks001
+        // (x≈-1.59, front left) are front; BrakeDisks002_1/_2 (x≈1.53) are rear
+        // and must stay visible.
+        hiddenMeshes: ['BrakeDisks002', 'BrakeDisks001'],
         sunroof: { front: '15_car_top_glass', rear: '15_car_top_glass_2', struct: null },
         // GT curtain: derive placement from the sunroof glass bounds at runtime.
         curtain: { mode: 'auto' },
@@ -4145,10 +4152,14 @@ class Component extends DCLogic {
     if (!primary && profile.inheritWheelsFrom && this._variants[profile.inheritWheelsFrom]) {
       const srcV = this._variants[profile.inheritWheelsFrom];
       const dstV = this._variants[profile.key];
-      // Permanently hide the secondary's own wheel/brake-disc meshes.
-      [...(dstV._allWheels || []),
-       ...Object.values(dstV._steerOnlyMeshes || {}).flat()
-      ].forEach(m => { m.visible = false; });
+      // Permanently hide the secondary's own wheel meshes.
+      (dstV._allWheels || []).forEach(m => { m.visible = false; });
+      // Hide its own front brake calipers by explicit name (profile.hiddenMeshes) —
+      // NOT via _steerOnlyMeshes, whose front/rear spatial split is unreliable on GT.
+      if (profile.hiddenMeshes && profile.hiddenMeshes.length) {
+        const hideSet = new Set(profile.hiddenMeshes);
+        obj.traverse(c => { if (c.isMesh && hideSet.has(c.name)) c.visible = false; });
+      }
       // Remove the secondary's scene-level blur/backing discs — we'll use the source's.
       [...(dstV._blurredDiscs || []), ...(dstV._backingDiscs || [])].forEach(d => {
         if (this.scene) this.scene.remove(d);
