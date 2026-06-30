@@ -271,41 +271,50 @@
         <input type="file" accept=".glb,.gltf" onChange="{{ onUploadWheel }}" style="display: none;" />
       </label>
 
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">DEPTH OFFSET</div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CALIPER DEPTH</div>
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">INWARD ←  → OUTWARD</span>
         <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelDepthOffsetLabel }}</span>
       </div>
       <input type="range" min="-15" max="15" step="0.5" value="{{ wheelDepthOffsetVal }}" onChange="{{ onWheelDepthOffset }}" onInput="{{ onWheelDepthOffset }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 18px;" />
 
-      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 18px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .7;">
-        <input type="checkbox" checked="{{ wheelFlip }}" onChange="{{ onWheelFlip }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
-        FLIP WHEEL DIRECTION
-      </label>
-
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM FINISH</div>
-      
-      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
-        <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
-          COLOR
-          <input type="color" value="{{ wheelColor }}" onChange="{{ onWheelColor }}" onInput="{{ onWheelColor }}" style="width: 40px; height: 22px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; background: none; padding: 1px;" />
-        </label>
-        
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">ROUGHNESS</span>
-            <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelRoughnessLabel }}</span>
-          </div>
-          <input type="range" min="0" max="1" step="0.02" value="{{ wheelRoughness }}" onChange="{{ onWheelRoughness }}" onInput="{{ onWheelRoughness }}" style="width: 100%; accent-color: #4fd6e8;" />
-        </div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL SIZE</div>
+      <div style="display: flex; gap: 4px; margin-bottom: 18px;">
+        <button onClick="{{ setSize20 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size20Bg }}; color: {{ size20Col }}; font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">20"</button>
+        <button onClick="{{ setSize21 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size21Bg }}; color: {{ size21Col }}; font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">21"</button>
+        <button onClick="{{ setSize22 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size22Bg }}; color: {{ size22Col }}; font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">22"</button>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-          <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">METALNESS / GLOSS</span>
-          <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelMetalnessLabel }}</span>
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM FINISH</div>
+
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .8;">
+        <input type="checkbox" checked="{{ wheelTintOverride }}" onChange="{{ onWheelTintOverride }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
+        TINT OVERRIDE
+      </label>
+
+      <div style="opacity: {{ wheelTintOverride ? '1.0' : '0.3' }}; pointer-events: {{ wheelTintOverride ? 'auto' : 'none' }}; transition: opacity 0.2s ease;">
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+          <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
+            COLOR
+            <input type="color" value="{{ wheelColor }}" onChange="{{ onWheelColor }}" onInput="{{ onWheelColor }}" style="width: 40px; height: 22px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; background: none; padding: 1px;" />
+          </label>
+          
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">ROUGHNESS</span>
+              <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelRoughnessLabel }}</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.02" value="{{ wheelRoughness }}" onChange="{{ onWheelRoughness }}" onInput="{{ onWheelRoughness }}" style="width: 100%; accent-color: #4fd6e8;" />
+          </div>
         </div>
-        <input type="range" min="0" max="1" step="0.02" value="{{ wheelMetalness }}" onChange="{{ onWheelMetalness }}" onInput="{{ onWheelMetalness }}" style="width: 100%; accent-color: #4fd6e8;" />
+
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">METALNESS / GLOSS</span>
+            <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelMetalnessLabel }}</span>
+          </div>
+          <input type="range" min="0" max="1" step="0.02" value="{{ wheelMetalness }}" onChange="{{ onWheelMetalness }}" onInput="{{ onWheelMetalness }}" style="width: 100%; accent-color: #4fd6e8;" />
+        </div>
       </div>
     </sc-if>
 
@@ -361,7 +370,8 @@ class Component extends DCLogic {
     wheelRoughness: 0.15,
     wheelMetalness: 0.95,
     wheelDepthOffset: 0.0,
-    wheelFlip: false,
+    wheelSizeInch: 20,
+    wheelTintOverride: false,
     uploadedWheelName: null,
     doorsOpen: false,
     doorFLOpen: 0,
@@ -501,8 +511,17 @@ class Component extends DCLogic {
       wheelDepthOffsetVal: s.wheelDepthOffset * 100,
       wheelDepthOffsetLabel: (s.wheelDepthOffset * 100 > 0 ? '+' : '') + (s.wheelDepthOffset * 100).toFixed(1) + ' cm',
       onWheelDepthOffset: (e) => this.onWheelDepthOffset(e),
-      wheelFlip: s.wheelFlip,
-      onWheelFlip: (e) => this.onWheelFlip(e),
+      setSize20: () => this.onWheelSizeInch(20),
+      setSize21: () => this.onWheelSizeInch(21),
+      setSize22: () => this.onWheelSizeInch(22),
+      size20Bg: s.wheelSizeInch === 20 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size21Bg: s.wheelSizeInch === 21 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size22Bg: s.wheelSizeInch === 22 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size20Col: s.wheelSizeInch === 20 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size21Col: s.wheelSizeInch === 21 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size22Col: s.wheelSizeInch === 22 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      wheelTintOverride: s.wheelTintOverride,
+      onWheelTintOverride: (e) => this.onWheelTintOverride(e),
       // Model variant toggle (HEV/PHEV ↔ GT)
       modelVariant: s.modelVariant,
       isHev: s.modelVariant === 'hev',
@@ -855,10 +874,13 @@ class Component extends DCLogic {
       applyRot(m, m._rollAngle || 0, isFront);
     });
 
-    // Brake discs: steer only, no roll
+    // Brake discs: steer only (front), no steer (rear), no roll
     if (this._steerOnlyMeshes) {
       [...(this._steerOnlyMeshes.fl||[]), ...(this._steerOnlyMeshes.fr||[])].forEach(m => {
         applyRot(m, 0, true);
+      });
+      [...(this._steerOnlyMeshes.rl||[]), ...(this._steerOnlyMeshes.rr||[])].forEach(m => {
+        applyRot(m, 0, false);
       });
     }
 
@@ -3449,8 +3471,11 @@ class Component extends DCLogic {
     console.log(`[UploadWheel] Programmatically identified axle axis: ${detectedAxle.toUpperCase()}`);
 
     // 5. Traverse all meshes and their vertices to find the maximum radial distance
-    // from the detected axle axis. This represents the outer radius of the wheel rim.
+    // from the detected axle axis, and calculate the average coordinate along the axle
+    // to identify the side containing the wheel face (spokes have higher vertex density).
     let maxRadius = 0;
+    let sumAxleVal = 0;
+    let totalVerts = 0;
     scene.traverse(c => {
       if (c.isMesh) {
         const geom = c.geometry;
@@ -3464,16 +3489,22 @@ class Component extends DCLogic {
               tempV.applyMatrix4(c.matrixWorld);
               
               let radialDist = 0;
+              let axleCoordinate = 0;
               if (detectedAxle === 'x') {
                 radialDist = Math.sqrt(tempV.y * tempV.y + tempV.z * tempV.z);
+                axleCoordinate = tempV.x;
               } else if (detectedAxle === 'y') {
                 radialDist = Math.sqrt(tempV.x * tempV.x + tempV.z * tempV.z);
+                axleCoordinate = tempV.y;
               } else {
                 radialDist = Math.sqrt(tempV.x * tempV.x + tempV.y * tempV.y);
+                axleCoordinate = tempV.z;
               }
               if (radialDist > maxRadius) {
                 maxRadius = radialDist;
               }
+              sumAxleVal += axleCoordinate;
+              totalVerts++;
             }
           }
         }
@@ -3485,6 +3516,16 @@ class Component extends DCLogic {
       throw new Error('Invalid geometry: measured wheel radius is near zero.');
     }
 
+    const avgAxleVal = totalVerts > 0 ? (sumAxleVal / totalVerts) : 0;
+    console.log(`[UploadWheel] Average axle coordinate: ${avgAxleVal.toFixed(5)}`);
+
+    // If the average coordinate is negative, the spokes/face are situated on the negative side of the axle.
+    // We will flip the orientation so the face points towards positive Z.
+    const shouldFlipFace = avgAxleVal < 0;
+    if (shouldFlipFace) {
+      console.log('[UploadWheel] Face detected on negative axle side. Will auto-flip 180 degrees.');
+    }
+
     // 6. Scale the model so its maximum radius from the axle is exactly 1.0 (normalization)
     const scaleFactor = 1.0 / maxRadius;
     scene.scale.setScalar(scaleFactor);
@@ -3492,17 +3533,27 @@ class Component extends DCLogic {
     scene.updateMatrixWorld(true);
 
     // 7. Rotate the model so that the detected axle is aligned with the Z-axis (0, 0, 1)
+    // and ensure the wheel face (spokes) points outwards (towards positive Z).
     const qRotate = new THREE.Quaternion();
+    const targetZ = shouldFlipFace ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 0, 1);
+
     if (detectedAxle === 'x') {
-      // Rotate X axis to Z axis (90 degrees around Y axis)
-      qRotate.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1));
+      // Rotate X axis to targetZ
+      qRotate.setFromUnitVectors(new THREE.Vector3(1, 0, 0), targetZ);
       scene.quaternion.copy(qRotate);
       scene.position.applyQuaternion(qRotate);
     } else if (detectedAxle === 'y') {
-      // Rotate Y axis to Z axis (90 degrees around X axis)
-      qRotate.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
+      // Rotate Y axis to targetZ
+      qRotate.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetZ);
       scene.quaternion.copy(qRotate);
       scene.position.applyQuaternion(qRotate);
+    } else {
+      // Z-facing wheel. If spokes are on the negative side, flip it around Y (180 degrees)
+      if (shouldFlipFace) {
+        qRotate.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+        scene.quaternion.copy(qRotate);
+        scene.position.applyQuaternion(qRotate);
+      }
     }
     scene.updateMatrixWorld(true);
 
@@ -3533,6 +3584,24 @@ class Component extends DCLogic {
         wrapper.add(c);
       }
     });
+
+    // Compute the maximum Z coordinate of the normalized meshes (outer face extent)
+    let maxZ = -Infinity;
+    wrapper.traverse(c => {
+      if (c.isMesh && c.geometry && c.geometry.attributes.position) {
+        const pos = c.geometry.attributes.position;
+        const tempV = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          tempV.fromBufferAttribute(pos, i);
+          // since local transforms are identity, vertex positions are already in wrapper's space
+          if (tempV.z > maxZ) {
+            maxZ = tempV.z;
+          }
+        }
+      }
+    });
+    console.log(`[UploadWheel] Programmatically computed normalized localOuterZ (max Z): ${maxZ}`);
+    this._customRimLocalOuterZ = isFinite(maxZ) ? maxZ : 0.15;
 
     this._customRimSource = wrapper;
     this._customRimNativeRadius = 1.0; // The radius is now normalized to exactly 1.0!
@@ -3574,6 +3643,7 @@ class Component extends DCLogic {
     }
 
     const orig = this._originalWheelsState;
+    const firstMesh = orig._frontLeftWheels[0];
 
     if (style === 'default') {
       orig._allWheels.forEach(m => {
@@ -3603,7 +3673,6 @@ class Component extends DCLogic {
       });
 
       const parentScale = new THREE.Vector3();
-      const firstMesh = orig._frontLeftWheels[0];
       if (firstMesh && firstMesh.parent) {
         firstMesh.parent.getWorldScale(parentScale);
       }
@@ -3616,7 +3685,32 @@ class Component extends DCLogic {
       const sizeVec = new THREE.Vector3();
       flBox.getSize(sizeVec);
       const worldRadius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
-      const localRadius = worldRadius / scaleFactor;
+
+      // Measure the maximum outward extent of the original spokes relative to the wheel center (firstMesh._pivot)
+      let origOutwardExtent = 0.08; // default fallback (8 cm)
+      if (firstMesh) {
+        const axle = firstMesh._rollAxis;
+        const outwardDir = axle.clone().multiplyScalar(-1); // left side outward is -axle
+        let maxProj = -Infinity;
+        orig._spokesWheels.forEach(m => {
+          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
+            const pos = m.geometry.attributes.position;
+            const tempV = new THREE.Vector3();
+            m.updateWorldMatrix(true, false);
+            for (let i = 0; i < pos.count; i++) {
+              tempV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+              const proj = tempV.clone().sub(firstMesh._pivot).dot(outwardDir);
+              if (proj > maxProj) {
+                maxProj = proj;
+              }
+            }
+          }
+        });
+        if (isFinite(maxProj) && maxProj > 0.01) {
+          origOutwardExtent = maxProj;
+        }
+      }
+      console.log(`[onWheelStyle] Measured original spokes outward extent: ${origOutwardExtent.toFixed(5)} meters`);
 
       const flClones = [], frClones = [], rlClones = [], rrClones = [];
 
@@ -3627,9 +3721,6 @@ class Component extends DCLogic {
         { center: orig._rearRightWheels[0]._pivot, axle: orig._rearRightWheels[0]._rollAxis, side: 'rr', arr: rrClones, parentMesh: orig._rearRightWheels[0] }
       ];
 
-      const nativeRadius = this._customRimNativeRadius;
-      const targetLocalScale = localRadius / nativeRadius;
-      const localAxle = this._customRimLocalAxle || new THREE.Vector3(0, 0, 1);
       const depthOffsetMeters = this.state.wheelDepthOffset || 0.0;
 
       clusters.forEach(item => {
@@ -3637,15 +3728,19 @@ class Component extends DCLogic {
 
         const isRight = item.side.endsWith('r');
         const outwardDir = item.axle.clone().multiplyScalar(isRight ? 1 : -1);
-        const finalPos = item.center.clone().addScaledVector(outwardDir, depthOffsetMeters);
+
+        // Align custom wheel's outer face with original spokes' outer face
+        const localOuterZ = this._customRimLocalOuterZ !== undefined ? this._customRimLocalOuterZ : 0.15;
+        const customOutwardExtent = localOuterZ * (worldRadius * 0.80);
+        const shiftAmount = customOutwardExtent - origOutwardExtent;
+
+        // Base aligned position (flushed with the tire)
+        const finalPos = item.center.clone().addScaledVector(outwardDir, -shiftAmount);
 
         const targetOutwardAxle = isRight ? item.axle : item.axle.clone().negate();
-        if (this.state.wheelFlip) {
-          targetOutwardAxle.negate();
-        }
-
-        // Force update the parent's world matrix relative to all its parents before attach
-        item.parentMesh.parent.updateWorldMatrix(true, false);
+        const parent = item.parentMesh.parent;
+        // Update parent's world matrix so parent.matrixWorld is accurate
+        parent.updateMatrixWorld(true);
 
         // We traverse the normalized source group and clone each mesh, placing them directly under the parent suspension node
         this._customRimSource.children.forEach(c => {
@@ -3653,14 +3748,31 @@ class Component extends DCLogic {
             const cloneMesh = c.clone();
             cloneMesh.name = "Custom_Wheel_Mesh_" + item.side + "_" + c.name;
             
-            cloneMesh.position.copy(finalPos);
-            cloneMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetOutwardAxle);
-            cloneMesh.scale.setScalar(targetLocalScale);
+            // Construct the desired world transform matrix W
+            // Since the geometry's radius is normalized to 1.0, we scale X & Y by targetWorldRadius.
+            // 20" is our baseline (sizeScale = 0.80). Larger diameters scale linearly (sizeScale = (inch / 20) * 0.80).
+            // To maintain depth alignment, the Z-axis (axle depth) is kept constant at the 20" baseline radius.
+            const inchSize = this.state.wheelSizeInch || 20;
+            const sizeScale = (inchSize / 20) * 0.80;
+            const targetWorldRadius = worldRadius * sizeScale;
+            const baselineWorldRadius = worldRadius * 0.80;
 
-            // Add directly to suspension parent (makes it a direct sibling of the original tire meshes)
-            item.parentMesh.parent.add(cloneMesh);
+            const W = new THREE.Matrix4().compose(
+              finalPos,
+              new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetOutwardAxle),
+              new THREE.Vector3(targetWorldRadius, targetWorldRadius, baselineWorldRadius)
+            );
+
+            // Compute local matrix: parent.matrixWorld.invert() * W
+            const localMatrix = parent.matrixWorld.clone().invert().multiply(W);
             
-            // Force update the cloneMesh's world matrix relative to the newly added parent
+            // Decompose local matrix to set position, quaternion, and scale of cloneMesh relative to the parent
+            localMatrix.decompose(cloneMesh.position, cloneMesh.quaternion, cloneMesh.scale);
+
+            // Add directly to suspension parent
+            parent.add(cloneMesh);
+            
+            // Force update world matrix of cloneMesh after attachment
             cloneMesh.updateWorldMatrix(true, false);
 
             cloneMesh._rollAngle = 0;
@@ -3685,6 +3797,37 @@ class Component extends DCLogic {
       this._otherRimWheels   = [];
 
       this._customWheelsInstalled = true;
+    }
+
+    // Shift brake discs (calipers / discs) to match the wheel depth offset
+    if (this._steerOnlyMeshes && orig) {
+      const depthOffsetMeters = (style === 'custom') ? (this.state.wheelDepthOffset || 0.0) : 0.0;
+
+      const brakeClusters = [
+        { side: 'fl', axle: firstMesh ? firstMesh._rollAxis : new THREE.Vector3(0,0,1) },
+        { side: 'fr', axle: orig._frontRightWheels[0] ? orig._frontRightWheels[0]._rollAxis : new THREE.Vector3(0,0,1) },
+        { side: 'rl', axle: orig._rearLeftWheels[0] ? orig._rearLeftWheels[0]._rollAxis : new THREE.Vector3(0,0,1) },
+        { side: 'rr', axle: orig._rearRightWheels[0] ? orig._rearRightWheels[0]._rollAxis : new THREE.Vector3(0,0,1) }
+      ];
+
+      brakeClusters.forEach(item => {
+        const arr = this._steerOnlyMeshes[item.side] || [];
+        const isRight = item.side.endsWith('r');
+        const outwardDir = item.axle.clone().multiplyScalar(isRight ? 1 : -1);
+        const offsetVec = outwardDir.clone().multiplyScalar(depthOffsetMeters);
+
+        arr.forEach(m => {
+          if (!m._originalInitWorld) {
+            m._originalInitWorld = m._initWorld.clone();
+            m._originalPivot = m._pivot.clone();
+          }
+          // Reset to original and shift by offsetVec
+          m._pivot.copy(m._originalPivot).add(offsetVec);
+          
+          const shiftMat = new THREE.Matrix4().makeTranslation(offsetVec.x, offsetVec.y, offsetVec.z);
+          m._initWorld.copy(m._originalInitWorld).premultiply(shiftMat);
+        });
+      });
     }
 
     this._updateVariantWheelRefs();
@@ -3716,6 +3859,7 @@ class Component extends DCLogic {
     const THREE = this.THREE;
     if (!THREE) return;
 
+    const useOverride = this.state.wheelTintOverride !== undefined ? this.state.wheelTintOverride : false;
     const color = new THREE.Color(this.state.wheelColor);
     const roughness = this.state.wheelRoughness;
     const metalness = this.state.wheelMetalness;
@@ -3730,6 +3874,12 @@ class Component extends DCLogic {
           const clone = mat.clone();
           clone._customized = true;
           clone.name = oldName;
+          
+          // Cache original properties to support restoring them
+          clone._originalColor = mat.color ? mat.color.clone() : new THREE.Color('#ffffff');
+          clone._originalRoughness = mat.roughness !== undefined ? mat.roughness : 0.5;
+          clone._originalMetalness = mat.metalness !== undefined ? mat.metalness : 0.5;
+          
           return clone;
         }
         return mat;
@@ -3744,9 +3894,16 @@ class Component extends DCLogic {
       const activeMats = Array.isArray(m.material) ? m.material : [m.material];
       activeMats.forEach(mat => {
         if (mat) {
-          mat.color.copy(color);
-          mat.roughness = roughness;
-          mat.metalness = metalness;
+          if (useOverride) {
+            mat.color.copy(color);
+            mat.roughness = roughness;
+            mat.metalness = metalness;
+          } else {
+            // Restore original properties if cached
+            if (mat._originalColor) mat.color.copy(mat._originalColor);
+            if (mat._originalRoughness !== undefined) mat.roughness = mat._originalRoughness;
+            if (mat._originalMetalness !== undefined) mat.metalness = mat._originalMetalness;
+          }
           mat.needsUpdate = true;
         }
       });
@@ -3761,9 +3918,15 @@ class Component extends DCLogic {
     this.onWheelStyle(this.state.wheelStyle);
   }
 
-  onWheelFlip(e) {
-    this.setState({ wheelFlip: e.target.checked });
+  onWheelSizeInch(inch) {
+    this.setState({ wheelSizeInch: inch });
     this.onWheelStyle(this.state.wheelStyle);
+  }
+
+  onWheelTintOverride(e) {
+    this.setState({ wheelTintOverride: e.target.checked });
+    this.applyWheelMaterialProperties();
+    this._generateBlurredWheelTexture();
   }
 
   onWheelColor(e) {
