@@ -41,6 +41,17 @@
   <!-- cyan accent corner ticks -->
   <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
 
+  <!-- doors control button -->
+  <button onClick="{{ toggleDoors }}" title="Toggle all doors" style="position: absolute; top: 22px; right: {{ doorsBtnRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ doorsBtnBorder }}; color: {{ doorsBtnCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease; z-index: 10;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="6" y="2" width="12" height="20" rx="3" />
+      <line x1="6" y1="8" x2="2" y2="6" />
+      <line x1="18" y1="8" x2="22" y2="6" />
+      <line x1="6" y1="16" x2="2" y2="14" />
+      <line x1="18" y1="16" x2="22" y2="14" />
+    </svg>
+  </button>
+
   <!-- day-night switch button -->
   <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="position: absolute; top: 22px; right: {{ dayNightRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease; z-index: 10;">
     <sc-if value="{{ nightMode }}" hint-placeholder-val="{{ false }}">
@@ -54,6 +65,22 @@
   <!-- model toggle button -->
   <button onClick="{{ toggleModel }}" title="Switch model variant" style="position: absolute; top: 22px; right: {{ modelBtnRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease; font-family: 'Space Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: 0.05em; z-index: 10;">
     {{ modelLabel }}
+  </button>
+
+  <!-- wheels tab button -->
+  <button onClick="{{ clickTabWheels }}" title="Wheels customization" style="position: absolute; top: 22px; right: {{ tabWheelsRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabWheelsBorder }}; color: {{ tabWheelsCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <circle cx="12" cy="12" r="3"></circle>
+      <line x1="12" y1="2" x2="12" y2="9"></line>
+      <line x1="12" y1="15" x2="12" y2="22"></line>
+      <line x1="2" y1="12" x2="9" y2="12"></line>
+      <line x1="15" y1="12" x2="22" y2="12"></line>
+      <line x1="4.93" y1="4.93" x2="9.88" y2="9.88"></line>
+      <line x1="14.12" y1="14.12" x2="19.07" y2="19.07"></line>
+      <line x1="4.93" y1="19.07" x2="9.88" y2="14.12"></line>
+      <line x1="14.12" y1="9.88" x2="19.07" y2="4.93"></line>
+    </svg>
   </button>
 
   <!-- motion tab button -->
@@ -200,7 +227,86 @@
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">CLOSED ←  → OPEN</span>
         <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ curtainLabel }}</span>
       </div>
-      <input type="range" min="0" max="100" step="1" value="{{ curtainOpen }}" onChange="{{ onCurtainOpen }}" onInput="{{ onCurtainOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
+      <input type="range" min="0" max="100" step="1" value="{{ curtainOpen }}" onChange="{{ onCurtainOpen }}" onInput="{{ onCurtainOpen }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 18px;" />
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">DOORS</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">FRONT LEFT</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ doorFLLabel }}</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ doorFLOpen }}" onChange="{{ onDoorFLOpen }}" onInput="{{ onDoorFLOpen }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 12px;" />
+
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">FRONT RIGHT</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ doorFRLabel }}</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ doorFROpen }}" onChange="{{ onDoorFROpen }}" onInput="{{ onDoorFROpen }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 12px;" />
+
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">REAR LEFT</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ doorRLLabel }}</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ doorRLOpen }}" onChange="{{ onDoorRLOpen }}" onInput="{{ onDoorRLOpen }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 12px;" />
+
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">REAR RIGHT</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ doorRRLabel }}</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ doorRROpen }}" onChange="{{ onDoorRROpen }}" onInput="{{ onDoorRROpen }}" style="width: 100%; accent-color: #4fd6e8;" />
+    </sc-if>
+
+    <!-- ── WHEELS TAB ── -->
+    <sc-if value="{{ tabIsWheels }}" hint-placeholder-val="{{ false }}">
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL MODEL</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+        <button onClick="{{ setWheelDefault }}" style="padding: 6px; border-radius: 6px; border: 1px solid {{ isDefaultWheel ? '#4fd6e8' : 'rgba(255,255,255,.12)' }}; background: {{ isDefaultWheel ? 'rgba(79,214,232,.18)' : 'transparent' }}; color: {{ isDefaultWheel ? '#4fd6e8' : 'rgba(255,255,255,.6)' }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .1em; transition: all 0.15s ease;">DEFAULT</button>
+        <button onClick="{{ setWheelCustom }}" style="padding: 6px; border-radius: 6px; border: 1px solid {{ isCustomWheel ? '#4fd6e8' : 'rgba(255,255,255,.12)' }}; background: {{ isCustomWheel ? 'rgba(79,214,232,.18)' : 'transparent' }}; color: {{ isCustomWheel ? '#4fd6e8' : 'rgba(255,255,255,.6)' }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .1em; transition: all 0.15s ease;" disabled="{{ uploadedWheelName ? undefined : true }}">CUSTOM</button>
+      </div>
+
+      <label style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px 9px; border: 1px dashed rgba(79,214,232,.35); border-radius: 8px; background: rgba(79,214,232,.02); color: #9fe6f0; cursor: pointer; margin-bottom: 18px; text-align: center; transition: all 0.15s ease;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; line-height: 1.3; word-break: break-all;">
+          {{ uploadedWheelName ? uploadedWheelName : 'UPLOAD GLB / GLTF' }}
+        </span>
+        <input type="file" accept=".glb,.gltf" onChange="{{ onUploadWheel }}" style="display: none;" />
+      </label>
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">DEPTH OFFSET</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">INWARD ←  → OUTWARD</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelDepthOffsetLabel }}</span>
+      </div>
+      <input type="range" min="-15" max="15" step="0.5" value="{{ wheelDepthOffsetVal }}" onChange="{{ onWheelDepthOffset }}" onInput="{{ onWheelDepthOffset }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 18px;" />
+
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 18px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .7;">
+        <input type="checkbox" checked="{{ wheelFlip }}" onChange="{{ onWheelFlip }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
+        FLIP WHEEL DIRECTION
+      </label>
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM FINISH</div>
+      
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+        <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
+          COLOR
+          <input type="color" value="{{ wheelColor }}" onChange="{{ onWheelColor }}" onInput="{{ onWheelColor }}" style="width: 40px; height: 22px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; background: none; padding: 1px;" />
+        </label>
+        
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">ROUGHNESS</span>
+            <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelRoughnessLabel }}</span>
+          </div>
+          <input type="range" min="0" max="1" step="0.02" value="{{ wheelRoughness }}" onChange="{{ onWheelRoughness }}" onInput="{{ onWheelRoughness }}" style="width: 100%; accent-color: #4fd6e8;" />
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">METALNESS / GLOSS</span>
+          <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelMetalnessLabel }}</span>
+        </div>
+        <input type="range" min="0" max="1" step="0.02" value="{{ wheelMetalness }}" onChange="{{ onWheelMetalness }}" onInput="{{ onWheelMetalness }}" style="width: 100%; accent-color: #4fd6e8;" />
+      </div>
     </sc-if>
 
   </div>
@@ -249,13 +355,27 @@ class Component extends DCLogic {
     showGlassTweaks: false,
     glassTweaks: { opacity: 0.1, iridescence: 0, iridIOR: 1.8, thickMin: 100, thickMax: 400, clearcoat: 1.0, envMap: 1.0, color: '#ffffff', fresnel: 0 },
     showRearGlassTweaks: false,
-    rearGlassTweaks: { opacity: 0.6, roughness: 0.15, transmission: 0.6, envMap: 0.5, clearcoat: 1.0, color: '#5c0808' }
+    rearGlassTweaks: { opacity: 0.6, roughness: 0.15, transmission: 0.6, envMap: 0.5, clearcoat: 1.0, color: '#5c0808' },
+    wheelStyle: 'default', // 'default' | 'custom'
+    wheelColor: '#3a3a3d',
+    wheelRoughness: 0.15,
+    wheelMetalness: 0.95,
+    wheelDepthOffset: 0.0,
+    wheelFlip: false,
+    uploadedWheelName: null,
+    doorsOpen: false,
+    doorFLOpen: 0,
+    doorFROpen: 0,
+    doorRLOpen: 0,
+    doorRROpen: 0
   };
 
   constructor(props) {
     super(props);
     this.containerRef = React.createRef();
     this.outerRef = React.createRef();
+    this._doorProgress = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    this._doorTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
     // Restore saved glass tweaks (if user hit Save previously)
     try { const sg = localStorage.getItem('h6_glassTweaks'); if (sg) this.state.glassTweaks = { ...this.state.glassTweaks, ...JSON.parse(sg) }; } catch(e) {}
     try { const sr = localStorage.getItem('h6_rearGlassTweaks'); if (sr) this.state.rearGlassTweaks = { ...this.state.rearGlassTweaks, ...JSON.parse(sr) }; } catch(e) {}
@@ -309,8 +429,13 @@ class Component extends DCLogic {
       tabEnvRight:    s.panelOpen ? '302px' : '74px',
       tabLightsRight: s.panelOpen ? '350px' : '122px',
       tabMotionRight: s.panelOpen ? '398px' : '170px',
-      modelBtnRight:  s.panelOpen ? '446px' : '218px',
-      dayNightRight:  s.panelOpen ? '494px' : '266px',
+      tabWheelsRight: s.panelOpen ? '446px' : '218px',
+      modelBtnRight:  s.panelOpen ? '494px' : '266px',
+      dayNightRight:  s.panelOpen ? '542px' : '314px',
+      doorsBtnRight:  s.panelOpen ? '590px' : '362px',
+      doorsBtnBorder: s.doorsOpen ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      doorsBtnCol:    s.doorsOpen ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      toggleDoors:    () => this.toggleDoors(),
       tabColorBorder: (s.panelOpen && s.configTab === 'color') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       tabColorCol:    (s.panelOpen && s.configTab === 'color') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       tabEnvBorder:   (s.panelOpen && s.configTab === 'env')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
@@ -319,10 +444,13 @@ class Component extends DCLogic {
       tabLightsCol:   (s.panelOpen && s.configTab === 'lights')? '#4fd6e8' : 'rgba(255,255,255,.70)',
       tabMotionBorder:(s.panelOpen && s.configTab === 'motion')? '#4fd6e8' : 'rgba(79,214,232,.20)',
       tabMotionCol:   (s.panelOpen && s.configTab === 'motion')? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tabWheelsBorder:(s.panelOpen && s.configTab === 'wheels')? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabWheelsCol:   (s.panelOpen && s.configTab === 'wheels')? '#4fd6e8' : 'rgba(255,255,255,.70)',
       clickTabColor:  () => this.selectTab('color'),
       clickTabEnv:    () => this.selectTab('env'),
       clickTabLights: () => this.selectTab('lights'),
       clickTabMotion: () => this.selectTab('motion'),
+      clickTabWheels: () => this.selectTab('wheels'),
       toggleModel:    () => {
         const next = s.modelVariant === 'hev' ? 'gt' : 'hev';
         this._setModelVariant(next);
@@ -349,10 +477,32 @@ class Component extends DCLogic {
       tabIsEnv:    s.configTab === 'env',
       tabIsLights: s.configTab === 'lights',
       tabIsMotion: s.configTab === 'motion',
+      tabIsWheels: s.configTab === 'wheels',
       setTabColor:  () => this.setState({ configTab: 'color'  }),
       setTabEnv:    () => this.setState({ configTab: 'env'    }),
       setTabLights: () => this.setState({ configTab: 'lights' }),
       setTabMotion: () => this.setState({ configTab: 'motion' }),
+      setTabWheels: () => this.setState({ configTab: 'wheels' }),
+      wheelColor: s.wheelColor,
+      wheelRoughness: s.wheelRoughness,
+      wheelRoughnessLabel: Math.round(s.wheelRoughness * 100) + '%',
+      wheelMetalness: s.wheelMetalness,
+      wheelMetalnessLabel: Math.round(s.wheelMetalness * 100) + '%',
+      wheelStyle: s.wheelStyle,
+      isDefaultWheel: s.wheelStyle === 'default',
+      isCustomWheel: s.wheelStyle === 'custom',
+      uploadedWheelName: s.uploadedWheelName,
+      onUploadWheel: (e) => this.onUploadWheel(e),
+      onWheelColor: (e) => this.onWheelColor(e),
+      onWheelRoughness: (e) => this.onWheelRoughness(e),
+      onWheelMetalness: (e) => this.onWheelMetalness(e),
+      setWheelDefault: () => this.onWheelStyle('default'),
+      setWheelCustom: () => this.onWheelStyle('custom'),
+      wheelDepthOffsetVal: s.wheelDepthOffset * 100,
+      wheelDepthOffsetLabel: (s.wheelDepthOffset * 100 > 0 ? '+' : '') + (s.wheelDepthOffset * 100).toFixed(1) + ' cm',
+      onWheelDepthOffset: (e) => this.onWheelDepthOffset(e),
+      wheelFlip: s.wheelFlip,
+      onWheelFlip: (e) => this.onWheelFlip(e),
       // Model variant toggle (HEV/PHEV ↔ GT)
       modelVariant: s.modelVariant,
       isHev: s.modelVariant === 'hev',
@@ -376,6 +526,18 @@ class Component extends DCLogic {
       curtainOpen:      s.curtainOpen,
       curtainLabel:     s.curtainOpen + '%',
       onCurtainOpen:    (e) => this._setCurtainOpen(parseFloat(e.target.value)),
+      doorFLOpen:       s.doorFLOpen,
+      doorFLLabel:      s.doorFLOpen + '%',
+      onDoorFLOpen:     (e) => this._setDoorOpen('fl', parseFloat(e.target.value)),
+      doorFROpen:       s.doorFROpen,
+      doorFRLabel:      s.doorFROpen + '%',
+      onDoorFROpen:     (e) => this._setDoorOpen('fr', parseFloat(e.target.value)),
+      doorRLOpen:       s.doorRLOpen,
+      doorRLLabel:      s.doorRLOpen + '%',
+      onDoorRLOpen:     (e) => this._setDoorOpen('rl', parseFloat(e.target.value)),
+      doorRROpen:       s.doorRROpen,
+      doorRRLabel:      s.doorRROpen + '%',
+      onDoorRROpen:     (e) => this._setDoorOpen('rr', parseFloat(e.target.value)),
       tabBgColor:  s.configTab === 'color'  ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgEnv:    s.configTab === 'env'    ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgLights: s.configTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
@@ -530,7 +692,7 @@ class Component extends DCLogic {
     const isGt = this.state.modelVariant === 'gt';
     let ratio = value / 100;
     if (isGt) {
-      ratio = Math.min(ratio, 0.9);
+      ratio = Math.min(ratio, 0.75);
     }
 
     const transitionThreshold = 0.25;
@@ -538,7 +700,7 @@ class Component extends DCLogic {
     let backOffset = 0;
 
     const range = this._sunroofRange || { up: 0.015, back: 0.60 };
-    const maxUp = isGt ? 0.0018 : range.up;   // lift — close to body but clears the opening edge
+    const maxUp = isGt ? 0.01 : range.up;   // lift — close to body but clears the opening edge
     const maxBack = range.back; // rearward slide
 
     if (ratio < transitionThreshold) {
@@ -564,7 +726,7 @@ class Component extends DCLogic {
       this.sunroofFront.position.z = this._sunroofFrontOrigPos.z;
 
       const origRy = this._sunroofFrontOrigRot ? this._sunroofFrontOrigRot.y : 0;
-      this.sunroofFront.rotation.y = origRy;
+      this.sunroofFront.rotation.y = origRy - 0.08 * slideRatio;
     } else {
       // HEV/PHEV model sunroof glass local orientation:
       // Local X is parent X (backward). Increase position.x to slide back.
@@ -598,6 +760,12 @@ class Component extends DCLogic {
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(3);
+  }
+
+  _setDoorOpen(doorKey, pct) {
+    this.setState({ [`door${doorKey.toUpperCase()}Open`]: pct });
+    if (!this._doorTargets) this._doorTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    this._doorTargets[doorKey] = pct / 100;
   }
 
   // ── Motion controls ─────────────────────────────────────────────────────
@@ -881,6 +1049,117 @@ class Component extends DCLogic {
 
     renderer.setRenderTarget(oldRenderTarget);
     renderer.setClearColor(oldClearColor, oldClearAlpha);
+  }
+
+  _initDoors(obj, profile) {
+    if (!obj || !this.THREE) return;
+    const THREE = this.THREE;
+
+    const hasWord = (name, word) => {
+      const re = new RegExp(`(^|[^a-zA-Z0-9])${word}([^a-zA-Z0-9]|$)`, 'i');
+      return re.test(name);
+    };
+
+    const getDoorKey = (name) => {
+      if (!name) return null;
+      const n = name.toLowerCase();
+      
+      // Skip trunk/tailgate/backdoor unless it is a side door window
+      if (n.includes('back') || n.includes('rear detail') || n.includes('rear plastic')) {
+        if (!n.includes('bl') && !n.includes('br') && !n.includes('lb') && !n.includes('rb')) {
+          return null;
+        }
+      }
+
+      const isDoorPart = /door|window|glass|mirror|plastic|metallic|internals|turn/i.test(name);
+      if (!isDoorPart) return null;
+
+      if (hasWord(name, 'fl') || hasWord(name, 'lf')) return 'fl';
+      if (hasWord(name, 'fr') || hasWord(name, 'rf')) return 'fr';
+      if (hasWord(name, 'bl') || hasWord(name, 'lb') || hasWord(name, 'rl')) return 'rl';
+      if (hasWord(name, 'br') || hasWord(name, 'rb') || hasWord(name, 'rr')) return 'rr';
+
+      return null;
+    };
+
+    // Classify all meshes in the loaded scene (Flat collection first, no hierarchy mods during traverse!)
+    const doorGroups = { fl: [], fr: [], rl: [], rr: [] };
+    obj.traverse((c) => {
+      if (!c.isMesh) return;
+      const key = getDoorKey(c.name);
+      if (key) {
+        doorGroups[key].push(c);
+      }
+    });
+
+    const anchorNames = {
+      fl: ['door fl', '02_car_lf_door'],
+      fr: ['door fr', '04_car_rf_door'],
+      rl: ['door bl', '03_car_lb_door'],
+      rr: ['door br', '05_car_rb_door']
+    };
+
+    this._hinges = {};
+
+    Object.keys(doorGroups).forEach((k) => {
+      const meshes = doorGroups[k];
+      if (!meshes.length) return;
+
+      // Find anchor mesh
+      const possibleAnchors = anchorNames[k];
+      let anchor = meshes.find(m => m.name && possibleAnchors.some(pa => m.name.toLowerCase().replace(/[^a-z0-9]+/g, '') === pa.replace(/[^a-z0-9]+/g, '')));
+      if (!anchor) {
+        anchor = meshes[0]; // fallback
+      }
+
+      // Compute anchor's world bounding box to find the exact hinge line coordinates
+      anchor.updateWorldMatrix(true, false);
+      const anchorBox = new THREE.Box3().setFromObject(anchor);
+      
+      const pivotPos = new THREE.Vector3();
+      // X-hinge coordinate: front edge of the door panel (facing negative X)
+      pivotPos.x = anchorBox.min.x;
+      // Y-hinge coordinate: middle of the door panel vertical height
+      pivotPos.y = (anchorBox.min.y + anchorBox.max.y) * 0.5;
+      // Z-hinge coordinate: outer skin edge
+      if (k === 'fl' || k === 'rl') {
+        pivotPos.z = anchorBox.max.z - 0.01; // left side outer skin
+      } else {
+        pivotPos.z = anchorBox.min.z + 0.01; // right side outer skin
+      }
+
+      // Create hinge group
+      const hinge = new THREE.Group();
+      hinge.name = 'Hinge_' + k.toUpperCase();
+      obj.add(hinge);
+      hinge.position.copy(obj.worldToLocal(pivotPos.clone()));
+      hinge.updateMatrixWorld(true);
+
+      // Attach all meshes to hinge AFTER traverse is fully complete
+      meshes.forEach((mesh) => {
+        hinge.attach(mesh);
+      });
+
+      this._hinges[k] = hinge;
+    });
+
+    console.log('[Haval H6] Created door hinges:', Object.keys(this._hinges));
+  }
+
+  _applyDoorsTransform(progress) {
+    if (!this._hinges) return;
+    const maxAngle = 0.7; // ~40 degrees
+    
+    const getAngle = (k) => {
+      if (progress !== undefined) return progress * maxAngle;
+      if (this._doorProgress && this._doorProgress[k] !== undefined) return this._doorProgress[k] * maxAngle;
+      return (this.state.doorsOpen ? 1 : 0) * maxAngle;
+    };
+
+    if (this._hinges.fl) this._hinges.fl.rotation.y = -getAngle('fl');
+    if (this._hinges.rl) this._hinges.rl.rotation.y = -getAngle('rl');
+    if (this._hinges.fr) this._hinges.fr.rotation.y = getAngle('fr');
+    if (this._hinges.rr) this._hinges.rr.rotation.y = getAngle('rr');
   }
 
   _collectWheelMeshes(obj) {
@@ -1693,6 +1972,23 @@ class Component extends DCLogic {
   setColor(key) {
     if (key === 'stock') { this.setState({ carColor: null }); this.applyCarColor(null); }
     else { this.setState({ carColor: key }); this.applyCarColor(key); }
+  }
+
+  toggleDoors() {
+    const s = this.state;
+    const anyOpen = s.doorFLOpen > 0 || s.doorFROpen > 0 || s.doorRLOpen > 0 || s.doorRROpen > 0;
+    const targetVal = anyOpen ? 0 : 100;
+    const targetProgress = anyOpen ? 0 : 1;
+
+    this.setState({
+      doorFLOpen: targetVal,
+      doorFROpen: targetVal,
+      doorRLOpen: targetVal,
+      doorRROpen: targetVal,
+      doorsOpen: !anyOpen
+    });
+
+    this._doorTargets = { fl: targetProgress, fr: targetProgress, rl: targetProgress, rr: targetProgress };
   }
 
   // Darken a hex colour by factor (0.5 = 50% darker), except white which is kept.
@@ -2874,7 +3170,12 @@ class Component extends DCLogic {
           if (m._fogRearOrigMetalness === undefined) m._fogRearOrigMetalness = m.metalness !== undefined ? m.metalness : 0;
           if (on) {
             m.color.copy(m._fogRearOrigColor);
-            m.opacity = m._fogRearOrigOpacity;
+            // Don't blindly restore _fogRearOrigOpacity here — the generic
+            // block above already set Math.max(m.opacity, 0.55) for
+            // MeshPhysicalMaterial. Restoring a low original opacity
+            // (e.g. 0.15 for HEV's glass) would override that and leave
+            // the lit glass essentially invisible.
+            if (m.transparent) m.opacity = Math.max(m._fogRearOrigOpacity, 0.55);
             m.roughness = m._fogRearOrigRoughness;
             m.metalness = m._fogRearOrigMetalness;
           } else {
@@ -3075,6 +3376,412 @@ class Component extends DCLogic {
     const key = e.target.value;
     this.setState({ hdriKey: key });
     this.loadHDRI(key);
+  }
+
+  onUploadWheel(e) {
+    const THREE = this.THREE;
+    const file = e.target.files && e.target.files[0];
+    if (!file || !THREE) return;
+
+    this.setState({ progress: 20, progressText: 'LOADING UPLOADED WHEEL...', loading: true });
+    const url = URL.createObjectURL(file);
+    const loader = new THREE.GLTFLoader();
+    const draco = new THREE.DRACOLoader();
+    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    loader.setDRACOLoader(draco);
+
+    loader.load(
+      url,
+      (gltf) => {
+        URL.revokeObjectURL(url);
+        try {
+          this._handleUploadedWheelModel(gltf.scene, file.name);
+          this.setState({ loading: false });
+        } catch (err) {
+          console.error(err);
+          this.setState({ error: 'Failed to process wheel model: ' + err.message, loading: false });
+        }
+      },
+      (xhr) => {
+        if (xhr.lengthComputable) {
+          this.setState({ progress: (xhr.loaded / xhr.total) * 100 });
+        }
+      },
+      (err) => {
+        URL.revokeObjectURL(url);
+        console.error(err);
+        this.setState({ error: 'Failed to load glTF/GLB file.', loading: false });
+      }
+    );
+  }
+
+  _handleUploadedWheelModel(scene, name) {
+    const THREE = this.THREE;
+    if (!THREE || !scene) return;
+
+    // 1. Force update the world matrix of the loaded scene so child transforms are fully resolved
+    scene.updateMatrixWorld(true);
+
+    // 2. Compute the bounding box of the entire model to find its geometric center
+    const box = new THREE.Box3().setFromObject(scene);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    console.log(`[UploadWheel] Loaded custom wheel "${name}". Raw center:`, center.toArray(), 'Size:', size.toArray());
+
+    // 3. Center the scene geometry around (0, 0, 0)
+    scene.position.sub(center);
+    scene.updateMatrixWorld(true);
+
+    // 4. Determine the axle axis by analyzing the dimensions of the bounding box.
+    // Since the wheel is a cylinder, the dimensions perpendicular to the axle (diameter)
+    // will be approximately equal. The dimension along the axle (width) will differ.
+    const diffX = Math.abs(size.y - size.z);
+    const diffY = Math.abs(size.x - size.z);
+    const diffZ = Math.abs(size.x - size.y);
+
+    let detectedAxle = 'z';
+    if (diffX < diffY && diffX < diffZ) {
+      detectedAxle = 'x';
+    } else if (diffY < diffX && diffY < diffZ) {
+      detectedAxle = 'y';
+    }
+    console.log(`[UploadWheel] Programmatically identified axle axis: ${detectedAxle.toUpperCase()}`);
+
+    // 5. Traverse all meshes and their vertices to find the maximum radial distance
+    // from the detected axle axis. This represents the outer radius of the wheel rim.
+    let maxRadius = 0;
+    scene.traverse(c => {
+      if (c.isMesh) {
+        const geom = c.geometry;
+        if (geom) {
+          const positionAttr = geom.attributes.position;
+          if (positionAttr) {
+            const tempV = new THREE.Vector3();
+            for (let i = 0; i < positionAttr.count; i++) {
+              tempV.fromBufferAttribute(positionAttr, i);
+              // Transform vertex position into the scene's local coordinate system (which is now centered)
+              tempV.applyMatrix4(c.matrixWorld);
+              
+              let radialDist = 0;
+              if (detectedAxle === 'x') {
+                radialDist = Math.sqrt(tempV.y * tempV.y + tempV.z * tempV.z);
+              } else if (detectedAxle === 'y') {
+                radialDist = Math.sqrt(tempV.x * tempV.x + tempV.z * tempV.z);
+              } else {
+                radialDist = Math.sqrt(tempV.x * tempV.x + tempV.y * tempV.y);
+              }
+              if (radialDist > maxRadius) {
+                maxRadius = radialDist;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    console.log(`[UploadWheel] Measured native radius (distance to furthest vertex): ${maxRadius.toFixed(5)}`);
+    if (maxRadius < 1e-4) {
+      throw new Error('Invalid geometry: measured wheel radius is near zero.');
+    }
+
+    // 6. Scale the model so its maximum radius from the axle is exactly 1.0 (normalization)
+    const scaleFactor = 1.0 / maxRadius;
+    scene.scale.setScalar(scaleFactor);
+    scene.position.multiplyScalar(scaleFactor); // adjust center offset translation to match new scale
+    scene.updateMatrixWorld(true);
+
+    // 7. Rotate the model so that the detected axle is aligned with the Z-axis (0, 0, 1)
+    const qRotate = new THREE.Quaternion();
+    if (detectedAxle === 'x') {
+      // Rotate X axis to Z axis (90 degrees around Y axis)
+      qRotate.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1));
+      scene.quaternion.copy(qRotate);
+      scene.position.applyQuaternion(qRotate);
+    } else if (detectedAxle === 'y') {
+      // Rotate Y axis to Z axis (90 degrees around X axis)
+      qRotate.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
+      scene.quaternion.copy(qRotate);
+      scene.position.applyQuaternion(qRotate);
+    }
+    scene.updateMatrixWorld(true);
+
+    // 8. Flatten the hierarchy and bake c.matrixWorld directly into c.geometry
+    const wrapper = new THREE.Group();
+    wrapper.name = "Custom_Wheel_Wrapper_" + name;
+
+    const meshesToProcess = [];
+    scene.traverse(c => {
+      if (c.isMesh) meshesToProcess.push(c);
+    });
+
+    meshesToProcess.forEach(c => {
+      if (c.geometry) {
+        c.geometry = c.geometry.clone();
+        
+        // Bake the combined normalized transform (which is now fully represented by c.matrixWorld)
+        c.geometry.applyMatrix4(c.matrixWorld);
+        
+        // Reset the local transform of the mesh
+        c.position.set(0, 0, 0);
+        c.quaternion.set(0, 0, 0, 1);
+        c.scale.set(1, 1, 1);
+        c.matrix.identity();
+        c.matrixWorld.identity();
+
+        // Add directly to wrapper (flat collection of normalized meshes!)
+        wrapper.add(c);
+      }
+    });
+
+    this._customRimSource = wrapper;
+    this._customRimNativeRadius = 1.0; // The radius is now normalized to exactly 1.0!
+    this._customRimLocalAxle = new THREE.Vector3(0, 0, 1); // Always Z-facing!
+
+    this.setState({ uploadedWheelName: name.replace(/\.[^.]+$/, '').slice(0, 16) });
+    this.onWheelStyle('custom');
+  }
+
+  onWheelStyle(style) {
+    if (style === this.state.wheelStyle && style === 'default' && !this._customWheelsInstalled) return;
+
+    const THREE = this.THREE;
+    if (!THREE) return;
+
+    if (style === 'custom' && !this._customRimSource) return;
+
+    this.setState({ wheelStyle: style });
+
+    if (this._customClonedWheels) {
+      this._customClonedWheels.forEach(c => {
+        if (c.parent) c.parent.remove(c);
+      });
+      this._customClonedWheels = null;
+    }
+
+    if (!this._originalWheelsState) {
+      this._originalWheelsState = {
+        _frontLeftWheels:  [...(this._frontLeftWheels || [])],
+        _frontRightWheels: [...(this._frontRightWheels || [])],
+        _rearLeftWheels:   [...(this._rearLeftWheels || [])],
+        _rearRightWheels:  [...(this._rearRightWheels || [])],
+        _allWheels:        [...(this._allWheels || [])],
+        _tireWheels:       [...(this._tireWheels || [])],
+        _rimWheels:        [...(this._rimWheels || [])],
+        _spokesWheels:     [...(this._spokesWheels || [])],
+        _otherRimWheels:   [...(this._otherRimWheels || [])]
+      };
+    }
+
+    const orig = this._originalWheelsState;
+
+    if (style === 'default') {
+      orig._allWheels.forEach(m => {
+        m.visible = true;
+      });
+
+      this._frontLeftWheels  = orig._frontLeftWheels;
+      this._frontRightWheels = orig._frontRightWheels;
+      this._rearLeftWheels   = orig._rearLeftWheels;
+      this._rearRightWheels  = orig._rearRightWheels;
+      this._allWheels        = orig._allWheels;
+      this._tireWheels       = orig._tireWheels;
+      this._rimWheels        = orig._rimWheels;
+      this._spokesWheels     = orig._spokesWheels;
+      this._otherRimWheels   = orig._otherRimWheels;
+
+      this._customWheelsInstalled = false;
+    } else {
+      this._customClonedWheels = [];
+
+      orig._rimWheels.forEach(m => {
+        m.visible = false;
+      });
+
+      orig._tireWheels.forEach(m => {
+        m.visible = true;
+      });
+
+      const parentScale = new THREE.Vector3();
+      const firstMesh = orig._frontLeftWheels[0];
+      if (firstMesh && firstMesh.parent) {
+        firstMesh.parent.getWorldScale(parentScale);
+      }
+      const scaleFactor = parentScale.x || 1.0;
+
+      const flBox = new THREE.Box3();
+      orig._frontLeftWheels.forEach(m => {
+        if (orig._spokesWheels.includes(m)) flBox.expandByObject(m);
+      });
+      const sizeVec = new THREE.Vector3();
+      flBox.getSize(sizeVec);
+      const worldRadius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
+      const localRadius = worldRadius / scaleFactor;
+
+      const flClones = [], frClones = [], rlClones = [], rrClones = [];
+
+      const clusters = [
+        { center: firstMesh._pivot, axle: firstMesh._rollAxis, side: 'fl', arr: flClones, parentMesh: orig._frontLeftWheels[0] },
+        { center: orig._frontRightWheels[0]._pivot, axle: orig._frontRightWheels[0]._rollAxis, side: 'fr', arr: frClones, parentMesh: orig._frontRightWheels[0] },
+        { center: orig._rearLeftWheels[0]._pivot, axle: orig._rearLeftWheels[0]._rollAxis, side: 'rl', arr: rlClones, parentMesh: orig._rearLeftWheels[0] },
+        { center: orig._rearRightWheels[0]._pivot, axle: orig._rearRightWheels[0]._rollAxis, side: 'rr', arr: rrClones, parentMesh: orig._rearRightWheels[0] }
+      ];
+
+      const nativeRadius = this._customRimNativeRadius;
+      const targetLocalScale = localRadius / nativeRadius;
+      const localAxle = this._customRimLocalAxle || new THREE.Vector3(0, 0, 1);
+      const depthOffsetMeters = this.state.wheelDepthOffset || 0.0;
+
+      clusters.forEach(item => {
+        if (!item.parentMesh || !item.parentMesh.parent) return;
+
+        const isRight = item.side.endsWith('r');
+        const outwardDir = item.axle.clone().multiplyScalar(isRight ? 1 : -1);
+        const finalPos = item.center.clone().addScaledVector(outwardDir, depthOffsetMeters);
+
+        const targetOutwardAxle = isRight ? item.axle : item.axle.clone().negate();
+        if (this.state.wheelFlip) {
+          targetOutwardAxle.negate();
+        }
+
+        // Force update the parent's world matrix relative to all its parents before attach
+        item.parentMesh.parent.updateWorldMatrix(true, false);
+
+        // We traverse the normalized source group and clone each mesh, placing them directly under the parent suspension node
+        this._customRimSource.children.forEach(c => {
+          if (c.isMesh) {
+            const cloneMesh = c.clone();
+            cloneMesh.name = "Custom_Wheel_Mesh_" + item.side + "_" + c.name;
+            
+            cloneMesh.position.copy(finalPos);
+            cloneMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), targetOutwardAxle);
+            cloneMesh.scale.setScalar(targetLocalScale);
+
+            // Add directly to suspension parent (makes it a direct sibling of the original tire meshes)
+            item.parentMesh.parent.add(cloneMesh);
+            
+            // Force update the cloneMesh's world matrix relative to the newly added parent
+            cloneMesh.updateWorldMatrix(true, false);
+
+            cloneMesh._rollAngle = 0;
+            cloneMesh._pivot = finalPos;
+            cloneMesh._rollAxis = item.axle;
+            cloneMesh._initWorld = cloneMesh.matrixWorld.clone();
+            cloneMesh._initParentInv = cloneMesh.parent ? cloneMesh.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
+
+            item.arr.push(cloneMesh);
+            this._customClonedWheels.push(cloneMesh);
+          }
+        });
+      });
+
+      this._frontLeftWheels  = flClones;
+      this._frontRightWheels = frClones;
+      this._rearLeftWheels   = rlClones;
+      this._rearRightWheels  = rrClones;
+      this._allWheels        = [...flClones, ...frClones, ...rlClones, ...rrClones];
+      this._rimWheels        = [...this._allWheels];
+      this._spokesWheels     = [...this._allWheels];
+      this._otherRimWheels   = [];
+
+      this._customWheelsInstalled = true;
+    }
+
+    this._updateVariantWheelRefs();
+    this.applyWheelMaterialProperties();
+    this._applyWheelTransforms();
+    this._generateBlurredWheelTexture();
+
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(6);
+  }
+
+  _updateVariantWheelRefs() {
+    if (!this._variants) return;
+    const fields = [
+      '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels',
+      '_allWheels', '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels'
+    ];
+    Object.keys(this._variants).forEach(k => {
+      const v = this._variants[k];
+      if (k === 'hev') {
+        fields.forEach(f => { v[f] = this[f]; });
+      } else if (k === 'gt' && v._inheritedWheelsFrom === 'hev') {
+        fields.forEach(f => { v[f] = this[f]; });
+      }
+    });
+  }
+
+  applyWheelMaterialProperties() {
+    const THREE = this.THREE;
+    if (!THREE) return;
+
+    const color = new THREE.Color(this.state.wheelColor);
+    const roughness = this.state.wheelRoughness;
+    const metalness = this.state.wheelMetalness;
+
+    const meshes = [...(this._spokesWheels || []), ...(this._otherRimWheels || [])];
+    meshes.forEach(m => {
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      const newMats = mats.map(mat => {
+        if (!mat) return mat;
+        if (!mat._customized) {
+          const oldName = mat.name;
+          const clone = mat.clone();
+          clone._customized = true;
+          clone.name = oldName;
+          return clone;
+        }
+        return mat;
+      });
+
+      if (Array.isArray(m.material)) {
+        m.material = newMats;
+      } else {
+        m.material = newMats[0];
+      }
+
+      const activeMats = Array.isArray(m.material) ? m.material : [m.material];
+      activeMats.forEach(mat => {
+        if (mat) {
+          mat.color.copy(color);
+          mat.roughness = roughness;
+          mat.metalness = metalness;
+          mat.needsUpdate = true;
+        }
+      });
+    });
+
+    if (this.requestRender) this.requestRender(4);
+  }
+
+  onWheelDepthOffset(e) {
+    const val = parseFloat(e.target.value) / 100; // convert cm to meters
+    this.setState({ wheelDepthOffset: val });
+    this.onWheelStyle(this.state.wheelStyle);
+  }
+
+  onWheelFlip(e) {
+    this.setState({ wheelFlip: e.target.checked });
+    this.onWheelStyle(this.state.wheelStyle);
+  }
+
+  onWheelColor(e) {
+    this.setState({ wheelColor: e.target.value });
+    this.applyWheelMaterialProperties();
+    this._generateBlurredWheelTexture();
+  }
+
+  onWheelRoughness(e) {
+    this.setState({ wheelRoughness: parseFloat(e.target.value) });
+    this.applyWheelMaterialProperties();
+    this._generateBlurredWheelTexture();
+  }
+
+  onWheelMetalness(e) {
+    this.setState({ wheelMetalness: parseFloat(e.target.value) });
+    this.applyWheelMaterialProperties();
+    this._generateBlurredWheelTexture();
   }
 
   loadHDRI(key) {
@@ -3545,6 +4252,26 @@ class Component extends DCLogic {
             this._blurredDiscs.forEach(m => { m._rollAngle = (m._rollAngle || 0) + rollDelta; });
           }
           needRender = true;
+        }
+
+        // Smooth doors animation
+        let doorsNeedRender = false;
+        if (this._doorProgress && this._doorTargets) {
+          const step = 0.04;
+          ['fl', 'fr', 'rl', 'rr'].forEach((k) => {
+            if (this._doorProgress[k] !== this._doorTargets[k]) {
+              if (this._doorProgress[k] < this._doorTargets[k]) {
+                this._doorProgress[k] = Math.min(this._doorTargets[k], this._doorProgress[k] + step);
+              } else {
+                this._doorProgress[k] = Math.max(this._doorTargets[k], this._doorProgress[k] - step);
+              }
+              doorsNeedRender = true;
+            }
+          });
+          if (doorsNeedRender) {
+            this._applyDoorsTransform();
+            needRender = true;
+          }
         }
 
         // Always apply wheel transforms to keep steer + roll + visibility (rim vs disc) in sync
@@ -4325,6 +5052,7 @@ class Component extends DCLogic {
     // Capture this variant's per-model feature references (lights, wheels, paint,
     // sunroof, curtain, …) so the MODEL toggle can swap variants without re-running
     // the heavy collection passes.
+    this._initDoors(obj, profile);
     this._captureVariant(profile.key, obj);
 
     // If a secondary model delegates wheel rendering to a source variant, hide its
@@ -4425,7 +5153,7 @@ class Component extends DCLogic {
       '_sunroofFrontOrigRot', '_sunroofRange', 'sunroofCurtain', '_curtainParams', 'lightGroups',
       '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels', '_allWheels',
       '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels', '_steerOnlyMeshes',
-      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter'];
+      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges'];
   }
 
   _captureVariant(key, root) {
@@ -4479,8 +5207,18 @@ class Component extends DCLogic {
     this._setupReflectionFlow();
     this.applyCarColor(this.state.carColor);
     this._applyWheelTransforms();
+    this.applyWheelMaterialProperties();
     this._applySunroofTransform();
     this._applyCurtainTransform();
+    // Sync door targets and progress from React state to match active model
+    this._doorTargets = {
+      fl: (this.state.doorFLOpen ?? 0) / 100,
+      fr: (this.state.doorFROpen ?? 0) / 100,
+      rl: (this.state.doorRLOpen ?? 0) / 100,
+      rr: (this.state.doorRROpen ?? 0) / 100
+    };
+    this._doorProgress = { ...this._doorTargets };
+    this._applyDoorsTransform();
     // Reset emitters to a clean off baseline FIRST (this zeroes brake/reverse/
     // turn/fog), then re-light whatever the saved light state says is on.
     this._applyInitialFogStates();
