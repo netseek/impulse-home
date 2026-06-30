@@ -524,15 +524,33 @@ class Component extends DCLogic {
       backOffset = ((ratio - transitionThreshold) / (1 - transitionThreshold)) * maxBack;
     }
 
-    this.sunroofFront.position.y = this._sunroofFrontOrigPos.y + upOffset;
-    this.sunroofFront.position.x = this._sunroofFrontOrigPos.x + backOffset;
-
-    // Tilt proportional to slide: front rises, rear drops to follow roofline curvature
     const slideRatio = ratio > transitionThreshold
       ? (ratio - transitionThreshold) / (1 - transitionThreshold)
       : 0;
-    const origRz = this._sunroofFrontOrigRot ? this._sunroofFrontOrigRot.z : 0;
-    this.sunroofFront.rotation.z = origRz + 0.08 * slideRatio;
+
+    const isGt = this.state.modelVariant === 'gt';
+
+    if (isGt) {
+      // GT model sunroof glass local orientation:
+      // Local X is parent X (backward). Increase position.x to slide back.
+      // Local Z is -parent Y (upward). Decrease position.z to lift.
+      // Local Y is parent Z (lateral). Rotate around local Y to pitch.
+      this.sunroofFront.position.x = this._sunroofFrontOrigPos.x + backOffset;
+      this.sunroofFront.position.z = this._sunroofFrontOrigPos.z - upOffset;
+
+      const origRy = this._sunroofFrontOrigRot ? this._sunroofFrontOrigRot.y : 0;
+      this.sunroofFront.rotation.y = origRy - 0.08 * slideRatio;
+    } else {
+      // HEV/PHEV model sunroof glass local orientation:
+      // Local X is parent X (backward). Increase position.x to slide back.
+      // Local Y is parent Y (upward). Increase position.y to lift.
+      // Local Z is -parent Z (lateral). Rotate around local Z to pitch.
+      this.sunroofFront.position.y = this._sunroofFrontOrigPos.y + upOffset;
+      this.sunroofFront.position.x = this._sunroofFrontOrigPos.x + backOffset;
+
+      const origRz = this._sunroofFrontOrigRot ? this._sunroofFrontOrigRot.z : 0;
+      this.sunroofFront.rotation.z = origRz + 0.08 * slideRatio;
+    }
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(3);
@@ -4230,7 +4248,7 @@ class Component extends DCLogic {
         const localC = obj.worldToLocal(wc.clone());
         const inv = 1 / (obj.scale.x || 1);
         cw = ws.x * inv * 0.92; cd = ws.z * inv * 0.92;
-        cx = localC.x; cz = localC.z; cy = localC.y - ws.y * inv * 0.5;
+        cx = localC.x; cz = localC.z; cy = localC.y - ws.y * inv * 0.5 - 0.025;
         baseX = cx + cw / 2; hasFrame = false;
       }
       const curtainGeom = new THREE.PlaneGeometry(cw, cd);
