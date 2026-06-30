@@ -583,10 +583,13 @@ class Component extends DCLogic {
     const isFast = speedKmh >= 65;
     const isBlending = speedKmh >= 45;
 
-    // Calculate blend opacity for blurred discs (linear fade from 45 to 65 km/h)
+    // Calculate blend opacity for blurred discs (linear fade from 45 to 65 km/h).
+    // Capped below 1 so the spinning-blur sprite always reads as translucent
+    // rather than a flat opaque disc, even at full speed.
+    const MAX_BLUR_OPACITY = 0.6;
     let blend = 0;
     if (speedKmh >= 45) {
-      blend = Math.min(1.0, (speedKmh - 45) / 20);
+      blend = Math.min(1.0, (speedKmh - 45) / 20) * MAX_BLUR_OPACITY;
     }
 
     if (this._blurredDiscs && this._blurredDiscs[0]) {
@@ -1344,7 +1347,9 @@ class Component extends DCLogic {
     // sun-lit. IBL is the only remaining light source after hemi+dir are zeroed,
     // so we must reduce it per-material for the wheel cavity meshes.
     if (this.scene) {
-      const WHEEL_RE = /^(Wheel|Break|Tire Top|Tire Side)$/;
+      // \.\d+ matches Blender-suffixed duplicates (e.g. GT's own "Break.001" rear
+      // caliper material, distinct from HEV's shared "Break" used on the front).
+      const WHEEL_RE = /^(Wheel|Break|Tire Top|Tire Side)(\.\d+)?$/;
       this.scene.traverse(c => {
         if (!c.isMesh) return;
         const mats = Array.isArray(c.material) ? c.material : [c.material];
