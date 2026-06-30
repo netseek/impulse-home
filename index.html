@@ -4354,6 +4354,35 @@ class Component extends DCLogic {
       ].forEach(f => { dstV[f] = srcV[f]; });
       dstV._inheritedWheelsFrom = profile.inheritWheelsFrom;
       console.log('[Wheels] GT inheriting wheels from', profile.inheritWheelsFrom);
+
+      // Recentre the secondary's own meshes (e.g. GT's rear calipers, kept
+      // visible above) onto the inherited wheel's true pivot. They were
+      // authored against the secondary's own discarded wheel geometry, so a
+      // small registration offset between the two models leaves them
+      // off-centre from the wheel they now sit in.
+      if (profile.recenterToWheel && profile.recenterToWheel.length) {
+        const wheelMeshes = (dstV._allWheels || []).filter(m => m._pivot);
+        if (wheelMeshes.length) {
+          profile.recenterToWheel.forEach(name => {
+            let target;
+            obj.traverse(c => { if (c.name === name) target = c; });
+            if (!target) return;
+            target.updateWorldMatrix(true, false);
+            const center = new THREE.Box3().setFromObject(target).getCenter(new THREE.Vector3());
+            let best = wheelMeshes[0], bestDist = center.distanceTo(wheelMeshes[0]._pivot);
+            wheelMeshes.forEach(m => {
+              const d = center.distanceTo(m._pivot);
+              if (d < bestDist) { bestDist = d; best = m; }
+            });
+            const delta = best._pivot.clone().sub(center);
+            const newWorldPos = new THREE.Vector3();
+            target.getWorldPosition(newWorldPos).add(delta);
+            if (target.parent) target.parent.worldToLocal(newWorldPos);
+            target.position.copy(newWorldPos);
+            target.updateMatrixWorld(true);
+          });
+        }
+      }
     }
 
     // The SECONDARY model starts hidden — it shares the primary's camera framing,
