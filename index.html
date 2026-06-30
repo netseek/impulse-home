@@ -2758,6 +2758,38 @@ class Component extends DCLogic {
         }
         m.needsUpdate = true;
       });
+      // fogRear: standard dim red-glass tint when off. Some assigned meshes use
+      // a near-mirror material (metalness 1 / roughness 0, e.g. GT's "Reflecting
+      // Red") whose visible colour comes almost entirely from environment
+      // reflection — a diffuse colour change alone is invisible in a shadowed
+      // recess with nothing bright to reflect. Others use the "Glass (Rear)"
+      // family physical material — near-black colour, low opacity
+      // (_origOpacity ~0.15). Both read as fully invisible with the light off.
+      // Force matte (like fogFront) so the dim red colour actually renders via
+      // diffuse light instead of depending on a reflection. On, restore the
+      // true baked appearance so the emissive overlay above reads correctly.
+      if (key === 'fogRear') {
+        const frmats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        frmats.forEach(m => {
+          if (!m) return;
+          if (!m._fogRearOrigColor) m._fogRearOrigColor = m.color.clone();
+          if (m._fogRearOrigOpacity === undefined) m._fogRearOrigOpacity = (m.opacity !== undefined ? m.opacity : 1);
+          if (m._fogRearOrigRoughness === undefined) m._fogRearOrigRoughness = m.roughness !== undefined ? m.roughness : 0.5;
+          if (m._fogRearOrigMetalness === undefined) m._fogRearOrigMetalness = m.metalness !== undefined ? m.metalness : 0;
+          if (on) {
+            m.color.copy(m._fogRearOrigColor);
+            m.opacity = m._fogRearOrigOpacity;
+            m.roughness = m._fogRearOrigRoughness;
+            m.metalness = m._fogRearOrigMetalness;
+          } else {
+            m.color.setRGB(0.25, 0.02, 0.02);
+            m.roughness = 0.5;
+            m.metalness = 0.0;
+            if (m.transparent) m.opacity = Math.max(m._fogRearOrigOpacity, 0.5);
+          }
+          m.needsUpdate = true;
+        });
+      }
     });
     this._updateNightLight(key, on);
     if (this.requestRender) {
