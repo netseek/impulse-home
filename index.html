@@ -586,7 +586,7 @@ class Component extends DCLogic {
     // Calculate blend opacity for blurred discs (linear fade from 45 to 65 km/h).
     // Capped below 1 so the spinning-blur sprite always reads as translucent
     // rather than a flat opaque disc, even at full speed.
-    const MAX_BLUR_OPACITY = 0.6;
+    const MAX_BLUR_OPACITY = 0.85;
     let blend = 0;
     if (speedKmh >= 45) {
       blend = Math.min(1.0, (speedKmh - 45) / 20) * MAX_BLUR_OPACITY;
@@ -2225,8 +2225,23 @@ class Component extends DCLogic {
     subMesh._fogMatCloned = true;
     subMesh._extractedFog = true;
 
-    // Hide the source mesh, add sub-mesh in its place
-    mesh.visible = false;
+    // Remove just the extracted triangles from the source mesh — NOT hide it
+    // outright. The source can contain other disconnected islands sharing the
+    // same material (e.g. a side reflector wedge next to the fog-light strip);
+    // hiding the whole mesh blanked those out too, showing as holes in the body.
+    const inComponent = new Set(component);
+    const remainingIdx = [];
+    for (let t = 0; t < triCount; t++) {
+      if (!inComponent.has(t)) remainingIdx.push(idx[t*3], idx[t*3+1], idx[t*3+2]);
+    }
+    if (remainingIdx.length) {
+      const remGeo = geo.clone();
+      remGeo.setIndex(remainingIdx);
+      remGeo.computeBoundingBox();
+      mesh.geometry = remGeo;
+    } else {
+      mesh.visible = false; // nothing left — the whole mesh was this one component
+    }
     mesh.parent && mesh.parent.add(subMesh);
 
     // Save stable ID: sourceId|f{faceIndex} — triangle index is stable for same GLB
@@ -2782,7 +2797,7 @@ class Component extends DCLogic {
             m.roughness = m._fogRearOrigRoughness;
             m.metalness = m._fogRearOrigMetalness;
           } else {
-            m.color.setRGB(0.25, 0.02, 0.02);
+            m.color.setRGB(0.07, 0.005, 0.005);
             m.roughness = 0.5;
             m.metalness = 0.0;
             if (m.transparent) m.opacity = Math.max(m._fogRearOrigOpacity, 0.5);
@@ -3936,6 +3951,20 @@ class Component extends DCLogic {
           m.metalness = 0;
           m.roughness = 1.0;
           m.envMapIntensity = 0;
+          m.needsUpdate = true;
+        }
+
+        // GT's "Reflecting Red" covers both the rear fog-light strip AND the
+        // corner reflector wedge next to it (same mesh/material). Raw values
+        // were metalness 1 / roughness 0 — a near-perfect mirror whose visible
+        // colour comes almost entirely from environment reflection, reading as
+        // a black hole in a shadowed recess with nothing bright to reflect.
+        // Lower metalness so the red base colour reads via diffuse light,
+        // keeping some gloss for an actual reflector look.
+        if (/^Reflecting Red$/i.test(m.name || '')) {
+          m.metalness = 0.3;
+          m.roughness = 0.25;
+          m.envMapIntensity = 0.8;
           m.needsUpdate = true;
         }
 
