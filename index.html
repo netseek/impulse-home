@@ -535,11 +535,12 @@ class Component extends DCLogic {
       // Local X is parent X (backward). Increase position.x to slide back.
       // Local Z is -parent Y (upward). Decrease position.z to lift.
       // Local Y is parent Z (lateral). Rotate around local Y to pitch.
+      const extraLift = 0.018 * slideRatio;
       this.sunroofFront.position.x = this._sunroofFrontOrigPos.x + backOffset;
-      this.sunroofFront.position.z = this._sunroofFrontOrigPos.z - upOffset;
+      this.sunroofFront.position.z = this._sunroofFrontOrigPos.z - (upOffset + extraLift);
 
       const origRy = this._sunroofFrontOrigRot ? this._sunroofFrontOrigRot.y : 0;
-      this.sunroofFront.rotation.y = origRy - 0.08 * slideRatio;
+      this.sunroofFront.rotation.y = origRy - 0.035 * slideRatio;
     } else {
       // HEV/PHEV model sunroof glass local orientation:
       // Local X is parent X (backward). Increase position.x to slide back.
@@ -3787,6 +3788,13 @@ class Component extends DCLogic {
         // BrakeDisks002/BrakeDisks001: GT's own front calipers (use HEV's instead).
         // 21_car_hub_metal_mirror_1: HAVAL wheel-hub logo medallion — removed per request.
         hiddenMeshes: ['BrakeDisks002', 'BrakeDisks001', '21_car_hub_metal_mirror_1'],
+        // GT's own rear calipers (BrakeDisks002_1/_2, kept visible — see above)
+        // were authored against GT's own (now-discarded) wheel geometry, not
+        // HEV's. A small but consistent registration offset between the two
+        // models (measured: ~1.2cm on the car's X axis, identical both sides)
+        // left them off-centre from the inherited HEV wheel they now sit in.
+        // Translated to match the nearest wheel's true pivot at runtime.
+        recenterToWheel: ['BrakeDisks002_1', 'BrakeDisks002_2'],
         sunroof: { front: '15_car_top_glass', rear: '15_car_top_glass_2', struct: null },
         // GT curtain: derive placement from the sunroof glass bounds at runtime.
         curtain: { mode: 'auto' },
@@ -4165,7 +4173,7 @@ class Component extends DCLogic {
         this.sunroofFront.geometry.computeBoundingBox();
         const ps = this.sunroofFront.geometry.boundingBox.getSize(new THREE.Vector3());
         const panelLen = Math.max(ps.x, ps.z);
-        this._sunroofRange = { up: panelLen * 0.04, back: panelLen * 0.75 };
+        this._sunroofRange = { up: panelLen * 0.04, back: panelLen * 0.45 };
       }
       this._applySunroofTransform();
 
