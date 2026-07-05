@@ -384,8 +384,10 @@
 
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL SIZE</div>
         <div style="display: flex; gap: 4px; margin-bottom: 6px;">
-          <button onClick="{{ setSize21 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size21Bg }}; color: {{ size21Col }}; font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">21"</button>
-          <button onClick="{{ setSize22 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size22Bg }}; color: {{ size22Col }}; font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">22"</button>
+          <button onClick="{{ setSize19 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size19Bg }}; color: {{ size19Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">19"</button>
+          <button onClick="{{ setSize20 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size20Bg }}; color: {{ size20Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">20"</button>
+          <button onClick="{{ setSize21 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size21Bg }}; color: {{ size21Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">21"</button>
+          <button onClick="{{ setSize22 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size22Bg }}; color: {{ size22Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">22"</button>
         </div>
         <div style="font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; opacity: .4; line-height: 1.4;">Depth &amp; size also apply to wheels picked from the catalog.</div>
       </sc-if>
@@ -680,12 +682,20 @@ class Component extends DCLogic {
       wheelDepthOffsetVal: s.wheelDepthOffset * 100,
       wheelDepthOffsetLabel: (s.wheelDepthOffset * 100 > 0 ? '+' : '') + (s.wheelDepthOffset * 100).toFixed(1) + ' cm',
       onWheelDepthOffset: (e) => this.onWheelDepthOffset(e),
-      // Button labels read "21"/"22" but keep driving the original 20"/21"
-      // geometry scale — only the displayed text changed, per user request.
+      // Button labels read one inch higher than the internal scale value they
+      // drive (19"→18, 20"→19, 21"→20, 22"→21) — only the displayed text
+      // shifted, per earlier user request; the geometry scale stayed anchored
+      // to the original values.
+      setSize19: () => this.onWheelSizeInch(18),
+      setSize20: () => this.onWheelSizeInch(19),
       setSize21: () => this.onWheelSizeInch(20),
       setSize22: () => this.onWheelSizeInch(21),
+      size19Bg: s.wheelSizeInch === 18 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size20Bg: s.wheelSizeInch === 19 ? 'rgba(79,214,232,.18)' : 'transparent',
       size21Bg: s.wheelSizeInch === 20 ? 'rgba(79,214,232,.18)' : 'transparent',
       size22Bg: s.wheelSizeInch === 21 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size19Col: s.wheelSizeInch === 18 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size20Col: s.wheelSizeInch === 19 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       size21Col: s.wheelSizeInch === 20 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       size22Col: s.wheelSizeInch === 21 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       wheelTintOverride: s.wheelTintOverride,
@@ -1337,16 +1347,38 @@ class Component extends DCLogic {
     // containment (>90% of the mesh's own volume falls inside a single door's
     // footprint). Hardcoded per-asset since the names carry no semantic info.
     const extraDoorMeshNames = {
-      fl: ['BuildingMesh-00032_2', 'BuildingMesh-00049', 'BuildingMesh-00066', 'BuildingMesh-00032001_1', 'BuildingMesh-00032001_2', 'BuildingMesh-00071'],
-      fr: ['BuildingMesh-00057', 'BuildingMesh-00069', 'BuildingMesh-00040001', 'BuildingMesh-00073'],
-      rl: ['BuildingMesh-00051', 'BuildingMesh-00068', 'BuildingMesh-00072'],
-      rr: ['BuildingMesh-00056', 'BuildingMesh-00070', 'BuildingMesh-00074'],
+      // Includes larger outer black-trim/cladding and inner-panel pieces
+      // (00032_1/00033/00119 on the left, mirrored on the right) that are
+      // 85%+ contained in their own door's footprint — genuine door parts,
+      // not shared body panels, despite their larger size.
+      // Side mirror (housing shell, black mounting base, and glass) — low
+      // bounding-box containment since a mirror protrudes past the door's
+      // own outline, but position confirms it belongs to this door/side.
+      fl: ['BuildingMesh-00032_2', 'BuildingMesh-00049', 'BuildingMesh-00066', 'BuildingMesh-00032001_1', 'BuildingMesh-00032001_2', 'BuildingMesh-00071', 'BuildingMesh-00032_1', 'BuildingMesh-00033', 'BuildingMesh-00119', 'BuildingMesh-00045', 'BuildingMesh-00075', 'BuildingMesh-00094'],
+      fr: ['BuildingMesh-00057', 'BuildingMesh-00069', 'BuildingMesh-00040001', 'BuildingMesh-00073', 'BuildingMesh-00040', 'BuildingMesh-00039', 'BuildingMesh-00122', 'BuildingMesh-00031', 'BuildingMesh-00076', 'BuildingMesh-00095'],
+      rl: ['BuildingMesh-00051', 'BuildingMesh-00068', 'BuildingMesh-00072', 'BuildingMesh-00037', 'BuildingMesh-00038', 'BuildingMesh-00121_1', 'BuildingMesh-00121_2'],
+      rr: ['BuildingMesh-00056', 'BuildingMesh-00070', 'BuildingMesh-00074', 'BuildingMesh-00044', 'BuildingMesh-00043', 'BuildingMesh-00014_1', 'BuildingMesh-00014_2'],
     };
     Object.keys(extraDoorMeshNames).forEach((k) => {
       extraDoorMeshNames[k].forEach((name) => {
         const m = obj.getObjectByName(name);
         if (m && m.isMesh && !doorGroups[k].includes(m)) doorGroups[k].push(m);
       });
+    });
+
+    // Exporter bug: the rear door-card ("Internals") meshes have their L/R
+    // swapped — "Door_BL_(Internals)" actually sits geometrically on the
+    // right side and vice versa. Move each to the group matching where it
+    // actually is, not what its name claims, so it opens with the right door.
+    [
+      { name: 'Door_BL_(Internals)', from: 'rl', to: 'rr' },
+      { name: 'Door_BR_(Internals)', from: 'rr', to: 'rl' },
+    ].forEach(({ name, from, to }) => {
+      const m = obj.getObjectByName(name);
+      if (!m) return;
+      const idx = doorGroups[from].indexOf(m);
+      if (idx >= 0) doorGroups[from].splice(idx, 1);
+      if (!doorGroups[to].includes(m)) doorGroups[to].push(m);
     });
 
     const anchorNames = {
@@ -4048,8 +4080,10 @@ class Component extends DCLogic {
       }
     });
 
-    // Compute the maximum Z coordinate of the normalized meshes (outer face extent)
-    let maxZ = -Infinity;
+    // Compute the min/max Z coordinate of the normalized meshes (outer face
+    // extent + overall axial span) — the span's midpoint is the rim's own
+    // "center of depth", used to auto-fit it inside the tire's bore.
+    let minZ = Infinity, maxZ = -Infinity;
     wrapper.traverse(c => {
       if (c.isMesh && c.geometry && c.geometry.attributes.position) {
         const pos = c.geometry.attributes.position;
@@ -4057,18 +4091,23 @@ class Component extends DCLogic {
         for (let i = 0; i < pos.count; i++) {
           tempV.fromBufferAttribute(pos, i);
           // since local transforms are identity, vertex positions are already in wrapper's space
-          if (tempV.z > maxZ) {
-            maxZ = tempV.z;
-          }
+          if (tempV.z > maxZ) maxZ = tempV.z;
+          if (tempV.z < minZ) minZ = tempV.z;
         }
       }
     });
     console.log(`[UploadWheel] Programmatically computed normalized localOuterZ (max Z): ${maxZ}`);
     this._customRimLocalOuterZ = isFinite(maxZ) ? maxZ : 0.15;
+    this._customRimLocalCenterZ = (isFinite(minZ) && isFinite(maxZ)) ? (minZ + maxZ) / 2 : this._customRimLocalOuterZ * 0.5;
 
     this._customRimSource = wrapper;
     this._customRimNativeRadius = 1.0; // The radius is now normalized to exactly 1.0!
     this._customRimLocalAxle = new THREE.Vector3(0, 0, 1); // Always Z-facing!
+
+    // A newly selected wheel gets one automatic caliper-depth fit; onWheelStyle
+    // consumes this flag once and clears it so later manual slider drags
+    // (which also re-run onWheelStyle) don't get overwritten.
+    this._pendingAutoDepthFit = true;
 
     this.setState({ uploadedWheelName: name.replace(/\.[^.]+$/, '').slice(0, 16) });
     this.onWheelStyle('custom');
@@ -4227,13 +4266,17 @@ class Component extends DCLogic {
       flBox.getSize(sizeVec);
       const worldRadius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
 
-      // Measure the maximum outward extent of the original spokes relative to the wheel center (firstMesh._pivot)
-      let origOutwardExtent = 0.08; // default fallback (8 cm)
+      // Measure the ORIGINAL TIRE's own axial span relative to the wheel
+      // centre (firstMesh._pivot) and take its midpoint. Fitting the custom
+      // rim's own depth-centre to this (instead of matching the stock rim's
+      // face) grounds the fit in the tire's actual bore rather than in
+      // whatever depth the stock rim happened to sit at.
+      let tireAxialCenter = 0.0;
       if (firstMesh) {
         const axle = firstMesh._rollAxis;
         const outwardDir = axle.clone().multiplyScalar(-1); // left side outward is -axle
-        let maxProj = -Infinity;
-        orig._spokesWheels.forEach(m => {
+        let minProj = Infinity, maxProj = -Infinity;
+        orig._tireWheels.forEach(m => {
           if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
             const pos = m.geometry.attributes.position;
             const tempV = new THREE.Vector3();
@@ -4241,17 +4284,16 @@ class Component extends DCLogic {
             for (let i = 0; i < pos.count; i++) {
               tempV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
               const proj = tempV.clone().sub(firstMesh._pivot).dot(outwardDir);
-              if (proj > maxProj) {
-                maxProj = proj;
-              }
+              if (proj < minProj) minProj = proj;
+              if (proj > maxProj) maxProj = proj;
             }
           }
         });
-        if (isFinite(maxProj) && maxProj > 0.01) {
-          origOutwardExtent = maxProj;
+        if (isFinite(minProj) && isFinite(maxProj)) {
+          tireAxialCenter = (minProj + maxProj) / 2;
         }
       }
-      console.log(`[onWheelStyle] Measured original spokes outward extent: ${origOutwardExtent.toFixed(5)} meters`);
+      console.log(`[onWheelStyle] Measured tire axial centre (bore midpoint): ${tireAxialCenter.toFixed(5)} meters`);
 
       const flClones = [], frClones = [], rlClones = [], rrClones = [];
 
@@ -4262,7 +4304,12 @@ class Component extends DCLogic {
         { center: orig._rearRightWheels[0]._pivot, axle: orig._rearRightWheels[0]._rollAxis, side: 'rr', arr: rrClones, parentMesh: orig._rearRightWheels[0] }
       ];
 
-      const depthOffsetMeters = this.state.wheelDepthOffset || 0.0;
+      // The FL cluster's shiftAmount (how far the rim's native centre had to
+      // move to land on the tire's axial centre) doubles as the automatic
+      // caliper-depth default — computed once per newly-selected wheel via
+      // _pendingAutoDepthFit, then left alone so manual slider drags (which
+      // also re-run this function) aren't clobbered.
+      let flShiftAmount = 0;
 
       clusters.forEach(item => {
         if (!item.parentMesh || !item.parentMesh.parent) return;
@@ -4270,12 +4317,13 @@ class Component extends DCLogic {
         const isRight = item.side.endsWith('r');
         const outwardDir = item.axle.clone().multiplyScalar(isRight ? 1 : -1);
 
-        // Align custom wheel's outer face with original spokes' outer face
-        const localOuterZ = this._customRimLocalOuterZ !== undefined ? this._customRimLocalOuterZ : 0.15;
-        const customOutwardExtent = localOuterZ * (worldRadius * 0.80);
-        const shiftAmount = customOutwardExtent - origOutwardExtent;
+        // Align the custom rim's own depth-centre with the tire's axial centre.
+        const localCenterZ = this._customRimLocalCenterZ !== undefined ? this._customRimLocalCenterZ : (this._customRimLocalOuterZ || 0.15) * 0.5;
+        const customCenterExtent = localCenterZ * (worldRadius * 0.80);
+        const shiftAmount = customCenterExtent - tireAxialCenter;
+        if (item.side === 'fl') flShiftAmount = shiftAmount;
 
-        // Base aligned position (flushed with the tire)
+        // Base aligned position (centred inside the tire's bore)
         const finalPos = item.center.clone().addScaledVector(outwardDir, -shiftAmount);
 
         const targetOutwardAxle = isRight ? item.axle : item.axle.clone().negate();
@@ -4339,6 +4387,18 @@ class Component extends DCLogic {
       this._otherRimWheels   = [];
 
       this._customWheelsInstalled = true;
+
+      // One-shot auto-fit: now that the rim has been centred on the tire's
+      // bore, derive the caliper depth default from how far it had to move
+      // (flShiftAmount) rather than leaving calipers at their stock depth.
+      // Sign is flipped vs. the rim shift because "outward" is positive for
+      // the caliper offset but the rim shift above is applied as -shiftAmount.
+      if (this._pendingAutoDepthFit) {
+        this._pendingAutoDepthFit = false;
+        const autoDepthOffsetMeters = -flShiftAmount;
+        console.log(`[onWheelStyle] Auto-fit caliper depth: ${(autoDepthOffsetMeters * 100).toFixed(2)} cm`);
+        this.setState({ wheelDepthOffset: autoDepthOffsetMeters });
+      }
     }
 
     // Shift brake discs (calipers / discs) to match the wheel depth offset
