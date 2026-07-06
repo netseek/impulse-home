@@ -287,6 +287,14 @@
           <input type="range" min="0" max="100" step="1" value="{{ curtainOpen }}" onChange="{{ onCurtainOpen }}" onInput="{{ onCurtainOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
         </div>
       </div>
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin: 16px 0 9px;">TRUNK</div>
+      <button onClick="{{ toggleTrunk }}" style="width: 100%; padding: 9px 4px; border-radius: 7px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; font-weight: 600; transition: all .15s ease; background: {{ trunkBtnBg }}; border: 1px solid {{ trunkBtnBorder }}; color: {{ trunkBtnCol }}; margin-bottom: 8px;">{{ trunkBtnLabel }}</button>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 7px; opacity: .5;">FINE TUNE</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ trunkLabel }}</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ trunkOpen }}" onChange="{{ onTrunkOpen }}" onInput="{{ onTrunkOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
     </sc-if>
 
     <!-- ── WHEELS TAB ── -->
@@ -458,7 +466,8 @@ class Component extends DCLogic {
     doorFLOpen: 0,
     doorFROpen: 0,
     doorRLOpen: 0,
-    doorRROpen: 0
+    doorRROpen: 0,
+    trunkOpen: 0
   };
 
   constructor(props) {
@@ -467,8 +476,11 @@ class Component extends DCLogic {
     this.outerRef = React.createRef();
     this._doorProgress = { fl: 0, fr: 0, rl: 0, rr: 0 };
     this._doorTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    this._trunkProgress = 0;
+    this._trunkTarget = 0;
     this._wheelsShareCarRoot = true;
     this._wheelCatalog = [
+      { key: 'tripo_wheel',        file: 'car_wheel_rim_with_brake_disc_and_caliper.glb', label: 'Tripo Rim' },
       { key: 'vossen_lc104t',      file: '3d_vossen_lc104t.glb',           label: 'Vossen LC104T' },
       { key: 'audi_rs5',           file: 'Audi-RS5.glb',                   label: 'Audi RS5' },
       { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT' },
@@ -738,6 +750,14 @@ class Component extends DCLogic {
       doorRROpen:       s.doorRROpen,
       doorRRLabel:      s.doorRROpen + '%',
       onDoorRROpen:     (e) => this._setDoorOpen('rr', parseFloat(e.target.value)),
+      trunkOpen:        s.trunkOpen,
+      trunkLabel:       s.trunkOpen + '%',
+      onTrunkOpen:      (e) => this._setTrunkOpen(parseFloat(e.target.value)),
+      toggleTrunk:      () => this._setTrunkOpen(s.trunkOpen > 0 ? 0 : 100),
+      trunkBtnLabel:    s.trunkOpen > 0 ? 'CLOSE TRUNK' : 'OPEN TRUNK',
+      trunkBtnBorder:   s.trunkOpen > 0 ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      trunkBtnBg:       s.trunkOpen > 0 ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
+      trunkBtnCol:      s.trunkOpen > 0 ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       tabBgColor:  s.configTab === 'color'  ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgEnv:    s.configTab === 'env'    ? 'rgba(79,214,232,.18)' : 'transparent',
       tabBgLights: s.configTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
@@ -966,6 +986,11 @@ class Component extends DCLogic {
     this.setState({ [`door${doorKey.toUpperCase()}Open`]: pct });
     if (!this._doorTargets) this._doorTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
     this._doorTargets[doorKey] = pct / 100;
+  }
+
+  _setTrunkOpen(pct) {
+    this.setState({ trunkOpen: pct });
+    this._trunkTarget = pct / 100;
   }
 
   // ── Motion controls ─────────────────────────────────────────────────────
@@ -1449,6 +1474,137 @@ class Component extends DCLogic {
     if (this._hinges.rl) this._hinges.rl.rotation.y = -getAngle('rl');
     if (this._hinges.fr) this._hinges.fr.rotation.y = getAngle('fr');
     if (this._hinges.rr) this._hinges.rr.rotation.y = getAngle('rr');
+  }
+
+  // Trunk/tailgate lid, its glass, badge, trim and inner liner — grouped under
+  // one hinge per model variant since the two GLBs use unrelated naming
+  // ("BuildingMesh-NNNNN" on HEV vs explicit "NN_trunk_*" names on GT).
+  _initTrunk(obj, profile) {
+    if (!obj || !this.THREE) return;
+    const THREE = this.THREE;
+    this._trunkCoverColor = '#181818';
+
+    const trunkMeshNamesByVariant = {
+      // 'BuildingMesh-00019' is the PHEV badge mounted on the tailgate itself
+      // (identified via click-inspection — was fixed to Scene, appeared to
+      // float in place while the lid swung away from it).
+      hev: ['BuildingMesh-00078_1', 'BuildingMesh-00078_2', 'BuildingMesh-00078_3',
+        'Window_Back', 'BuildingMesh-00025', 'BuildingMesh-00025001',
+        'BuildingMesh-00007', 'BuildingMesh-00020', 'BuildingMesh-00024', 'BuildingMesh-00024_1',
+        'BuildingMesh-00034', 'BuildingMesh-00046', 'BuildingMesh-00058', 'BuildingMesh-00084',
+        'BuildingMesh-00018_(Logo)', 'BuildingMesh-00018', 'Rear_Headlight_Center_(Internals_#2)',
+        'BuildingMesh-00023006', 'BuildingMesh-00023006_1', 'BuildingMesh-00023006_2', 'BuildingMesh-00023006_3',
+        'BuildingMesh-00019'],
+      // "68_Trunk_window_map_c" deliberately excluded: it's a fixed trim/seal
+      // piece around the trunk opening (body-mounted), not part of the moving
+      // lid — attaching it made it swing open with the tailgate instead of
+      // staying put to frame the opening (confirmed via click-inspection).
+      // The rear light cluster group, conversely, IS mounted on the tailgate
+      // and was missing — it stayed fixed and looked like it floated away
+      // from the lid as it opened. Same for the 3rd brake light strip and
+      // the gas-strut rod — found via a bounding-box scan for leftover
+      // unattached meshes still inside the trunk opening.
+      // "13_Headlight_Map_c" was also caught by that scan but turned out to
+      // be a fixed rear-cluster glass lens, not part of the lid — reverted
+      // per click-inspection (was incorrectly swinging open with the lid).
+      // "52_trunk_inner_map_c" (the GT cover-equivalent, previously treated
+      // as fixed trim like 68_Trunk_window_map_c) is actually the inner liner
+      // mounted to the lid itself — click-inspection confirmed it was the
+      // piece left floating in place while the lid moved away from it.
+      gt: ['06_car_trunk', '06_car_trunk_cfrp', '06_car_trunk_PHEV', '06_car_trunk_mirror',
+        '06_car_trunk_mirror_GT', '06_car_trunk_plastic', '11_trunk_licence_map_c',
+        '51_trunk_map_c', '54_trunk_glass', '57_trunk_plastic',
+        '62_trunk_line_plastic', 'Rear_Headlight_Center_(Internals_#1)001',
+        '51_trunk_map_c_b', '64_rod_plastic', '52_trunk_inner_map_c'],
+    };
+
+    const names = trunkMeshNamesByVariant[profile.key] || [];
+    // Accept both meshes and groups (e.g. the GT rear light cluster is a Group
+    // wrapping several sub-meshes) — attach() carries a group's children along.
+    const meshes = names.map((n) => obj.getObjectByName(n)).filter((m) => m && (m.isMesh || m.isGroup));
+    if (!meshes.length) { this._trunkHinge = null; return; }
+
+    // The HEV trunk cover/liner shares its "Plastic Black" material (roughness 0,
+    // mirror-smooth) with the door and headlight internals — fine on those small
+    // parts, but reads as an obvious glossy sheen on this large flat panel. Clone
+    // it just for this mesh so the shared material elsewhere is untouched.
+    if (profile.key === 'hev') {
+      // BuildingMesh-00007 (tailgate inner liner, moves with the lid) and
+      // BuildingMesh-00101 (fixed cargo-floor cover, identified via click-
+      // inspection — stays put, which is correct) both share the glossy
+      // "Plastic Black" material. Clone it per-mesh so neither the shared
+      // original (used by door/headlight internals) nor each other are affected.
+      // Color: started at pure black (too dark per feedback), moved to match
+      // GT's "GT Rubber Gray" #585858 (then too light per feedback) — settled
+      // on a dark gray between the two for both models.
+      ['BuildingMesh-00007', 'BuildingMesh-00101'].forEach((name) => {
+        const cover = obj.getObjectByName(name);
+        if (cover && cover.material) {
+          const matte = cover.material.clone();
+          matte.name = 'Trunk Cover Matte';
+          matte.roughness = 0.75;
+          matte.color.set(this._trunkCoverColor);
+          if ('envMapIntensity' in matte) matte.envMapIntensity = 0.2;
+          cover.material = matte;
+        }
+      });
+
+      // Trunk floor trim strips — share the glossy "Plastic Black Glossy"
+      // material with the front-door window trim, so clone per-mesh here too.
+      ['BuildingMesh-00034', 'BuildingMesh-00046'].forEach((name) => {
+        const strip = obj.getObjectByName(name);
+        if (strip && strip.material) {
+          const matte = strip.material.clone();
+          matte.name = 'Trunk Floor Matte';
+          matte.roughness = 0.8;
+          matte.metalness = 0;
+          if ('envMapIntensity' in matte) matte.envMapIntensity = 0.2;
+          strip.material = matte;
+        }
+      });
+    }
+
+    // GT's cover-equivalent trim ("52_trunk_inner_map_c", now attached to the
+    // lid — see note above) shares "GT Rubber Gray" with other cladding
+    // pieces elsewhere on the car, so clone it here too rather than
+    // darkening the shared material.
+    if (profile.key === 'gt') {
+      const cover = obj.getObjectByName('52_trunk_inner_map_c');
+      if (cover && cover.material) {
+        const matte = cover.material.clone();
+        matte.name = 'Trunk Cover Matte';
+        matte.color.set(this._trunkCoverColor);
+        cover.material = matte;
+      }
+    }
+
+    const box = new THREE.Box3();
+    meshes.forEach((m) => { m.updateWorldMatrix(true, false); box.expandByObject(m); });
+
+    // Pivot at the top-front edge of the lid (where it meets the roofline) so
+    // it swings up and back like a hatchback tailgate, rotating about the
+    // lateral (Z) axis rather than the vertical (Y) axis doors use.
+    const pivotPos = new THREE.Vector3(box.min.x, box.max.y, 0);
+
+    const hinge = new THREE.Group();
+    hinge.name = 'Hinge_TRUNK';
+    obj.add(hinge);
+    hinge.position.copy(obj.worldToLocal(pivotPos.clone()));
+    hinge.updateMatrixWorld(true);
+
+    meshes.forEach((mesh) => hinge.attach(mesh));
+    this._trunkHinge = hinge;
+
+    console.log('[Haval H6] Created trunk hinge with', meshes.length, 'meshes for', profile.key);
+  }
+
+  _applyTrunkTransform(progress) {
+    if (!this._trunkHinge) return;
+    const maxAngle = 1.05; // ~60 degrees
+    const p = progress !== undefined ? progress : (this._trunkProgress || 0);
+    // Positive: lid swings up and rearward (over the roofline), away from the
+    // cabin. The negative sign originally used swung it forward into the car.
+    this._trunkHinge.rotation.z = p * maxAngle;
   }
 
   _collectWheelMeshes(obj) {
@@ -3644,6 +3800,86 @@ class Component extends DCLogic {
     this['_blink_' + timerKey] = null;
   }
 
+  _warmupLights() {
+    if (!this.lightGroups || !this.renderer || !this.scene || !this.camera) return;
+    console.log('[Lights Warmup] Starting sequential shader pre-warm...');
+
+    const warmupKeys = [
+      'headlight', 'highbeam', 'fogFront', 'fogRear', 'brake', 'reverse',
+      'turnL', 'turnR', 'hazard',
+      'positionFront', 'positionFrontL', 'positionFrontR',
+      'positionFrontAmber', 'positionFrontLAmber', 'positionFrontRAmber',
+      'positionRear', 'position'
+    ];
+
+    warmupKeys.forEach(k => {
+      try {
+        // 1. Turn this specific group ON
+        this._setGroupEmissive(k, true);
+
+        // 2. Compile main scene with this light ON
+        this.renderer.compile(this.scene, this.camera);
+
+        // 3. Compile Bloom composer with this light ON
+        if (this.bloomComposer && this.bloomCam) {
+          this.bloomCam.position.copy(this.camera.position);
+          this.bloomCam.quaternion.copy(this.camera.quaternion);
+          this.bloomCam.updateProjectionMatrix();
+
+          const savedBg = this.scene.background;
+          this.scene.background = null;
+          this._darkenNonBloom(this.scene);
+          this.bloomComposer.render();
+          this._restoreMaterials();
+          this.scene.background = savedBg;
+        }
+
+        // 4. Compile Streak composer if this group is a streak group
+        const isStreakGroup = /^(headlight|highbeam|reverse|fogFront)$/.test(k);
+        if (isStreakGroup && this.streakComposer && this.streakCam) {
+          this.streakCam.position.copy(this.camera.position);
+          this.streakCam.quaternion.copy(this.camera.quaternion);
+          this.streakCam.updateProjectionMatrix();
+
+          const savedBg = this.scene.background;
+          this.scene.background = null;
+          this._darkenNonStreak(this.scene);
+          this.streakComposer.render();
+          this._restoreMaterials();
+          this.scene.background = savedBg;
+        }
+
+        // 5. Turn this specific group OFF
+        this._setGroupEmissive(k, false);
+
+      } catch (err) {
+        console.warn(`[Lights Warmup] Error warming up group ${k}:`, err);
+      }
+    });
+
+    // 6. Warm up Additive Overlay
+    try {
+      if (this.bloomMat && this.streakMat && this.bloomComposer && this.streakComposer) {
+        this.bloomMat.map = this.bloomComposer.readBuffer.texture;
+        this.bloomMat.visible = true;
+        this.bloomMat.needsUpdate = true;
+        this.streakMat.map = this.streakComposer.readBuffer.texture;
+        this.streakMat.visible = true;
+        this.streakMat.needsUpdate = true;
+        this.renderer.render(this.overlayScene, this.orthoCamera);
+
+        this.bloomMat.visible = false;
+        this.streakMat.visible = false;
+        this.bloomMat.needsUpdate = true;
+        this.streakMat.needsUpdate = true;
+      }
+    } catch (err) {
+      console.warn('[Lights Warmup] Error during overlay warmup:', err);
+    }
+
+    console.log('[Lights Warmup] Sequential pre-warm completed.');
+  }
+
   componentWillUnmount() {
     ['turnL', 'turnR', 'hazard'].forEach(k => this._stopBlink(k));
     if (this.renderer) { this.renderer.dispose(); this.animFrameId && cancelAnimationFrame(this.animFrameId); }
@@ -3734,6 +3970,9 @@ class Component extends DCLogic {
     const draco = new THREE.DRACOLoader();
     draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
     loader.setDRACOLoader(draco);
+    if (window.MeshoptDecoder) {
+      loader.setMeshoptDecoder(window.MeshoptDecoder);
+    }
 
     loader.load(
       url,
@@ -3779,6 +4018,9 @@ class Component extends DCLogic {
     const draco = new THREE.DRACOLoader();
     draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
     loader.setDRACOLoader(draco);
+    if (window.MeshoptDecoder) {
+      loader.setMeshoptDecoder(window.MeshoptDecoder);
+    }
 
     loader.load(
       'assets/wheels/' + item.file,
@@ -3852,6 +4094,9 @@ class Component extends DCLogic {
       const draco = new THREE.DRACOLoader();
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
       loader.setDRACOLoader(draco);
+      if (window.MeshoptDecoder) {
+        loader.setMeshoptDecoder(window.MeshoptDecoder);
+      }
       loader.load(
         'assets/wheels/' + item.file,
         (gltf) => {
@@ -3935,6 +4180,87 @@ class Component extends DCLogic {
   _handleUploadedWheelModel(scene, name) {
     const THREE = this.THREE;
     if (!THREE || !scene) return;
+
+    // Helper to strip brakes (disc & caliper) from the wheel model by connected components
+    function stripBrakes(mesh) {
+      const geometry = mesh.geometry;
+      const positionAttr = geometry.attributes.position;
+      const indexAttr = geometry.index;
+      if (!positionAttr || !indexAttr) return;
+
+      const indices = indexAttr.array;
+      const faceCount = indices.length / 3;
+      const vertexCount = positionAttr.count;
+
+      const vertexFaces = Array.from({ length: vertexCount }, () => []);
+      for (let i = 0; i < faceCount; i++) {
+        vertexFaces[indices[i * 3]].push(i);
+        vertexFaces[indices[i * 3 + 1]].push(i);
+        vertexFaces[indices[i * 3 + 2]].push(i);
+      }
+
+      const visitedFaces = new Uint8Array(faceCount);
+      const components = [];
+
+      for (let i = 0; i < faceCount; i++) {
+        if (visitedFaces[i]) continue;
+
+        const component = [];
+        const queue = [i];
+        visitedFaces[i] = 1;
+
+        let head = 0;
+        while (head < queue.length) {
+          const faceIdx = queue[head++];
+          component.push(faceIdx);
+
+          const v0 = indices[faceIdx * 3];
+          const v1 = indices[faceIdx * 3 + 1];
+          const v2 = indices[faceIdx * 3 + 2];
+
+          for (const v of [v0, v1, v2]) {
+            for (const neighborFace of vertexFaces[v]) {
+              if (!visitedFaces[neighborFace]) {
+                visitedFaces[neighborFace] = 1;
+                queue.push(neighborFace);
+              }
+            }
+          }
+        }
+        components.push(component);
+      }
+
+      components.sort((a, b) => b.length - a.length);
+      console.log(`[Component Split] Split mesh "${mesh.name}" into ${components.length} components.`);
+      components.forEach((c, idx) => console.log(`  Component {idx}: ${c.length} faces`));
+
+      if (components.length <= 1) return;
+
+      const rimFaces = components[0];
+      const newGeometry = new THREE.BufferGeometry();
+      const newIndices = new Uint32Array(rimFaces.length * 3);
+      for (let i = 0; i < rimFaces.length; i++) {
+        const faceIdx = rimFaces[i];
+        newIndices[i * 3] = indices[faceIdx * 3];
+        newIndices[i * 3 + 1] = indices[faceIdx * 3 + 1];
+        newIndices[i * 3 + 2] = indices[faceIdx * 3 + 2];
+      }
+
+      newGeometry.setAttribute('position', positionAttr);
+      if (geometry.attributes.normal) newGeometry.setAttribute('normal', geometry.attributes.normal);
+      if (geometry.attributes.uv) newGeometry.setAttribute('uv', geometry.attributes.uv);
+      newGeometry.setIndex(new THREE.BufferAttribute(newIndices, 1));
+
+      mesh.geometry = newGeometry;
+    }
+
+    if (name.toLowerCase().includes('tripo')) {
+      scene.traverse(c => {
+        if (c.isMesh) {
+          stripBrakes(c);
+        }
+      });
+    }
 
     // 1. Force update the world matrix of the loaded scene so child transforms are fully resolved
     scene.updateMatrixWorld(true);
@@ -4099,18 +4425,67 @@ class Component extends DCLogic {
     console.log(`[UploadWheel] Programmatically computed normalized localOuterZ (max Z): ${maxZ}`);
     this._customRimLocalOuterZ = isFinite(maxZ) ? maxZ : 0.15;
     this._customRimLocalCenterZ = (isFinite(minZ) && isFinite(maxZ)) ? (minZ + maxZ) / 2 : this._customRimLocalOuterZ * 0.5;
+    // Half of the rim's own native depth span (in the same normalized-by-radius
+    // units as OuterZ/CenterZ) — used later to clamp how deep the rim is
+    // allowed to scale so a naturally deep-dish design can't out-scale the
+    // tire's real bore and poke out past its sidewalls.
+    this._customRimLocalHalfSpan = (isFinite(minZ) && isFinite(maxZ)) ? (maxZ - minZ) / 2 : this._customRimLocalOuterZ * 0.5;
+
+    // Raycast straight down the rotation axis, through the exact centre
+    // (x=0, y=0), and take the FRONTMOST surface it hits. Unlike scanning
+    // every vertex near the centre (which can't tell "deep but covered" from
+    // "genuinely open" — a solid hub cap and an open spoke gap can have the
+    // same nearby min Z), a single ray naturally resolves occlusion: a solid
+    // cap gives a shallow hit close to outerZ, while a truly open design
+    // gives a hit near (or past) the rim's own depth centre. No hit at all
+    // (ray passes clean through) falls back to the deepest surface anywhere
+    // in the wheel as a conservative "fully open" estimate.
+    {
+      const centerMeshes = [];
+      wrapper.traverse(c => { if (c.isMesh) centerMeshes.push(c); });
+      const centerRay = new THREE.Raycaster();
+      centerRay.set(new THREE.Vector3(0, 0, 10), new THREE.Vector3(0, 0, -1));
+      const centerHits = centerRay.intersectObjects(centerMeshes, false);
+      this._customRimLocalCenterRayZ = centerHits.length ? centerHits[0].point.z : minZ;
+      console.log(`[UploadWheel] Centre-ray depth (occlusion-aware): ${this._customRimLocalCenterRayZ}`);
+    }
 
     this._customRimSource = wrapper;
     this._customRimNativeRadius = 1.0; // The radius is now normalized to exactly 1.0!
     this._customRimLocalAxle = new THREE.Vector3(0, 0, 1); // Always Z-facing!
 
-    // A newly selected wheel gets one automatic caliper-depth fit; onWheelStyle
-    // consumes this flag once and clears it so later manual slider drags
-    // (which also re-run onWheelStyle) don't get overwritten.
+    // A newly selected wheel gets one automatic caliper-depth fit (see
+    // onWheelStyle) based on the centre-ray depth above — consumed once and
+    // cleared so later manual slider drags (which also re-run onWheelStyle)
+    // aren't overwritten.
     this._pendingAutoDepthFit = true;
 
     this.setState({ uploadedWheelName: name.replace(/\.[^.]+$/, '').slice(0, 16) });
     this.onWheelStyle('custom');
+
+    // Auto-export the fixed GLB if it is a Tripo model
+    if (name.toLowerCase().includes('tripo')) {
+      console.log("[Export] Tripo model detected. Starting auto-export...");
+      if (THREE.GLTFExporter) {
+        const exporter = new THREE.GLTFExporter();
+        exporter.parse(wrapper, (glb) => {
+          const blob = new Blob([glb], { type: 'application/octet-stream' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'car_wheel_rim_with_brake_disc_and_caliper.glb';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          console.log("[Export] GLB download triggered.");
+        }, (err) => {
+          console.error("GLTF Export failed:", err);
+        }, { binary: true });
+      } else {
+        console.warn("GLTFExporter is not loaded yet.");
+      }
+    }
   }
 
   // Radially stretches (or restores) each tire's inner-bore vertices so a
@@ -4267,11 +4642,16 @@ class Component extends DCLogic {
       const worldRadius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
 
       // Measure the ORIGINAL TIRE's own axial span relative to the wheel
-      // centre (firstMesh._pivot) and take its midpoint. Fitting the custom
-      // rim's own depth-centre to this (instead of matching the stock rim's
-      // face) grounds the fit in the tire's actual bore rather than in
-      // whatever depth the stock rim happened to sit at.
+      // centre (firstMesh._pivot). Grounding the fit in the tire's real
+      // geometry (rather than the stock rim's face) is still the goal, but
+      // aligning to the tire's OUTER face — not its midpoint — is what
+      // actually matters: a wheel's face sits near the tire's front opening
+      // in reality. Centring broke down for unusually thin/flat rim models
+      // (e.g. a 6cm-deep disc) by burying the whole thing at the tire's
+      // depth midpoint, nowhere near the visible opening.
       let tireAxialCenter = 0.0;
+      let tireHalfSpan = 0.0;
+      let tireOuterFace = 0.0;
       if (firstMesh) {
         const axle = firstMesh._rollAxis;
         const outwardDir = axle.clone().multiplyScalar(-1); // left side outward is -axle
@@ -4291,9 +4671,19 @@ class Component extends DCLogic {
         });
         if (isFinite(minProj) && isFinite(maxProj)) {
           tireAxialCenter = (minProj + maxProj) / 2;
+          tireHalfSpan = (maxProj - minProj) / 2;
+          tireOuterFace = maxProj;
         }
       }
-      console.log(`[onWheelStyle] Measured tire axial centre (bore midpoint): ${tireAxialCenter.toFixed(5)} meters`);
+      console.log(`[onWheelStyle] Measured tire axial centre (bore midpoint): ${tireAxialCenter.toFixed(5)} meters, half-span: ${tireHalfSpan.toFixed(5)} meters, outer face: ${tireOuterFace.toFixed(5)} meters`);
+
+      // Clamp the rim's depth scale so a naturally deep-dish design can't
+      // out-scale the tire's real bore and poke out past its sidewalls —
+      // wheels that already fit (nativeRimHalfSpanWorld <= tireHalfSpan) are
+      // completely unaffected (depthFitScale stays 1).
+      const nativeRimHalfSpanWorld = (this._customRimLocalHalfSpan !== undefined ? this._customRimLocalHalfSpan : 0.15) * (worldRadius * 0.80);
+      const depthFitScale = (tireHalfSpan > 0 && nativeRimHalfSpanWorld > 0) ? Math.min(1, tireHalfSpan / nativeRimHalfSpanWorld) : 1;
+      console.log(`[onWheelStyle] Rim depth-fit scale: ${depthFitScale.toFixed(3)} (native half-span ${nativeRimHalfSpanWorld.toFixed(5)}m vs tire half-span ${tireHalfSpan.toFixed(5)}m)`);
 
       const flClones = [], frClones = [], rlClones = [], rrClones = [];
 
@@ -4304,11 +4694,8 @@ class Component extends DCLogic {
         { center: orig._rearRightWheels[0]._pivot, axle: orig._rearRightWheels[0]._rollAxis, side: 'rr', arr: rrClones, parentMesh: orig._rearRightWheels[0] }
       ];
 
-      // The FL cluster's shiftAmount (how far the rim's native centre had to
-      // move to land on the tire's axial centre) doubles as the automatic
-      // caliper-depth default — computed once per newly-selected wheel via
-      // _pendingAutoDepthFit, then left alone so manual slider drags (which
-      // also re-run this function) aren't clobbered.
+      // Captured from the FL cluster below — used after the loop for the
+      // one-shot centre-ray caliper auto-fit.
       let flShiftAmount = 0;
 
       clusters.forEach(item => {
@@ -4317,13 +4704,14 @@ class Component extends DCLogic {
         const isRight = item.side.endsWith('r');
         const outwardDir = item.axle.clone().multiplyScalar(isRight ? 1 : -1);
 
-        // Align the custom rim's own depth-centre with the tire's axial centre.
-        const localCenterZ = this._customRimLocalCenterZ !== undefined ? this._customRimLocalCenterZ : (this._customRimLocalOuterZ || 0.15) * 0.5;
-        const customCenterExtent = localCenterZ * (worldRadius * 0.80);
-        const shiftAmount = customCenterExtent - tireAxialCenter;
+        // Align the custom rim's own outer face with the tire's outer face —
+        // not its midpoint (see the tireOuterFace comment above for why).
+        const localOuterZAdj = this._customRimLocalOuterZ !== undefined ? this._customRimLocalOuterZ : 0.15;
+        const customOutwardExtent = localOuterZAdj * (worldRadius * 0.80) * depthFitScale;
+        const shiftAmount = customOutwardExtent - tireOuterFace;
         if (item.side === 'fl') flShiftAmount = shiftAmount;
 
-        // Base aligned position (centred inside the tire's bore)
+        // Base aligned position (face flush with the tire's outer edge)
         const finalPos = item.center.clone().addScaledVector(outwardDir, -shiftAmount);
 
         const targetOutwardAxle = isRight ? item.axle : item.axle.clone().negate();
@@ -4344,7 +4732,10 @@ class Component extends DCLogic {
             const inchSize = this.state.wheelSizeInch || 20;
             const sizeScale = (inchSize / 20) * 0.80;
             const targetWorldRadius = worldRadius * sizeScale;
-            const baselineWorldRadius = worldRadius * 0.80;
+            // depthFitScale (<=1) compresses an overly deep-dish rim so it
+            // never scales past the tire's real bore depth — see its
+            // computation above for why.
+            const baselineWorldRadius = worldRadius * 0.80 * depthFitScale;
 
             const W = new THREE.Matrix4().compose(
               finalPos,
@@ -4369,7 +4760,18 @@ class Component extends DCLogic {
             cloneMesh._pivot = finalPos;
             cloneMesh._rollAxis = item.axle;
             cloneMesh._initWorld = cloneMesh.matrixWorld.clone();
-            cloneMesh._initParentInv = cloneMesh.parent ? cloneMesh.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
+            // _applyWheelTransforms's heightShiftY compensation only cancels out
+            // correctly when _initWorld/_initParentInv were captured at
+            // carHeightOffset = 0 (see cacheInit, used for the stock wheels).
+            // If the car is currently lowered/raised while a custom rim is
+            // built, parent.matrixWorld already bakes in that live offset, so
+            // undo it here before inverting — otherwise the resized wheel ends
+            // up permanently shifted by whatever the ride height was at build
+            // time.
+            const liveOffsetY = (this._wheelsShareCarRoot !== false) ? (this.state.carHeightOffset || 0) : 0;
+            cloneMesh._initParentInv = cloneMesh.parent
+              ? cloneMesh.parent.matrixWorld.clone().invert().multiply(new THREE.Matrix4().makeTranslation(0, liveOffsetY, 0))
+              : new THREE.Matrix4();
 
             item.arr.push(cloneMesh);
             this._customClonedWheels.push(cloneMesh);
@@ -4388,16 +4790,46 @@ class Component extends DCLogic {
 
       this._customWheelsInstalled = true;
 
-      // One-shot auto-fit: now that the rim has been centred on the tire's
-      // bore, derive the caliper depth default from how far it had to move
-      // (flShiftAmount) rather than leaving calipers at their stock depth.
-      // Sign is flipped vs. the rim shift because "outward" is positive for
-      // the caliper offset but the rim shift above is applied as -shiftAmount.
+      // One-shot auto-fit for a newly-selected wheel: calipers/discs are
+      // fixed to the hub in reality and don't move with a wheel swap — but
+      // how much of the disc a given rim EXPOSES depends on whether its
+      // centre is actually covered. A blind "nearest vertex near the axis"
+      // scan can't tell a solid hub cap (covered, needs no correction) from
+      // a genuinely open design (needs the disc pulled back) — both can have
+      // deep vertices nearby, one just has material in FRONT of them. The
+      // centre-ray depth measured in _handleUploadedWheelModel resolves that
+      // by only keeping the frontmost hit, i.e. what's actually visible
+      // looking straight down the axle.
       if (this._pendingAutoDepthFit) {
         this._pendingAutoDepthFit = false;
-        const autoDepthOffsetMeters = -flShiftAmount;
-        console.log(`[onWheelStyle] Auto-fit caliper depth: ${(autoDepthOffsetMeters * 100).toFixed(2)} cm`);
-        this.setState({ wheelDepthOffset: autoDepthOffsetMeters });
+
+        const centerRayZ = this._customRimLocalCenterRayZ !== undefined ? this._customRimLocalCenterRayZ : this._customRimLocalCenterZ;
+        const hubDepthRelPivot = -flShiftAmount + (worldRadius * 0.80 * depthFitScale) * centerRayZ;
+
+        const flAxle = firstMesh._rollAxis;
+        const flOutwardDir = flAxle.clone().multiplyScalar(-1);
+        const flCalipers = (this._steerOnlyMeshes && this._steerOnlyMeshes.fl) || [];
+        const _v = new THREE.Vector3();
+        let stockCaliperOutwardExtent = -Infinity;
+        flCalipers.forEach(m => {
+          const worldMat = m._originalInitWorld || m._initWorld;
+          if (!worldMat || !m.geometry || !m.geometry.attributes.position) return;
+          const pos = m.geometry.attributes.position;
+          for (let i = 0; i < pos.count; i++) {
+            _v.fromBufferAttribute(pos, i).applyMatrix4(worldMat);
+            const proj = _v.clone().sub(firstMesh._pivot).dot(flOutwardDir);
+            if (proj > stockCaliperOutwardExtent) stockCaliperOutwardExtent = proj;
+          }
+        });
+
+        if (isFinite(stockCaliperOutwardExtent)) {
+          // Flat 3cm recess requested on top of the measured fit, applied
+          // uniformly to every wheel's auto-computed default.
+          const DEPTH_BIAS_METERS = -0.03;
+          const autoDepthOffsetMeters = hubDepthRelPivot - stockCaliperOutwardExtent + DEPTH_BIAS_METERS;
+          console.log(`[onWheelStyle] Centre-ray caliper auto-fit: centre-ray depth ${hubDepthRelPivot.toFixed(5)}m, stock caliper ${stockCaliperOutwardExtent.toFixed(5)}m, bias ${DEPTH_BIAS_METERS}m -> offset ${(autoDepthOffsetMeters * 100).toFixed(2)}cm`);
+          this.setState({ wheelDepthOffset: autoDepthOffsetMeters });
+        }
       }
     }
 
@@ -4655,6 +5087,8 @@ class Component extends DCLogic {
       await this.loadScript(B + 'build/three.min.js');
       await this.loadScript(B + 'examples/js/loaders/GLTFLoader.js');
       await this.loadScript(B + 'examples/js/loaders/DRACOLoader.js');
+      await this.loadScript(B + 'examples/js/libs/meshopt_decoder.js');
+      await this.loadScript(B + 'examples/js/exporters/GLTFExporter.js');
       await this.loadScript(B + 'examples/js/controls/OrbitControls.js');
       await this.loadScript(B + 'examples/js/objects/Sky.js');
       await this.loadScript(B + 'examples/js/loaders/RGBELoader.js');
@@ -4798,6 +5232,9 @@ class Component extends DCLogic {
       draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
       const loader = new THREE.GLTFLoader();
       loader.setDRACOLoader(draco);
+      if (window.MeshoptDecoder) {
+        loader.setMeshoptDecoder(window.MeshoptDecoder);
+      }
       const HEV_URL = 'assets/haval-h6.glb';
       const GT_URL  = 'assets/haval-h6-gt.glb';
       const profiles = this._modelProfiles();
@@ -5042,6 +5479,18 @@ class Component extends DCLogic {
             this._applyDoorsTransform();
             needRender = true;
           }
+        }
+
+        // Smooth trunk animation
+        if (this._trunkProgress !== this._trunkTarget) {
+          const step = 0.04;
+          if (this._trunkProgress < this._trunkTarget) {
+            this._trunkProgress = Math.min(this._trunkTarget, this._trunkProgress + step);
+          } else {
+            this._trunkProgress = Math.max(this._trunkTarget, this._trunkProgress - step);
+          }
+          this._applyTrunkTransform();
+          needRender = true;
         }
 
         // Always apply wheel transforms to keep steer + roll + visibility (rim vs disc) in sync
@@ -5841,6 +6290,7 @@ class Component extends DCLogic {
     // sunroof, curtain, …) so the MODEL toggle can swap variants without re-running
     // the heavy collection passes.
     this._initDoors(obj, profile);
+    this._initTrunk(obj, profile);
     this._captureVariant(profile.key, obj);
 
     // If a secondary model delegates wheel rendering to a source variant, hide its
@@ -5873,6 +6323,8 @@ class Component extends DCLogic {
     // contact shadow and night-light rig (both cars normalize to the same size and
     // ground), so we skip all the scene-level setup below for it.
     if (!primary) {
+      obj.visible = true;
+      this._warmupLights();
       obj.visible = false;
       // Processing the secondary left the live this.* refs pointing at it; restore
       // whichever variant is currently selected (default: the primary, 'hev').
@@ -5927,6 +6379,8 @@ class Component extends DCLogic {
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(4);
 
+    this._warmupLights();
+
     this.setState({ loading: false, progress: 100 });
     // If the user switched to the secondary model before it finished loading,
     // honor that pending choice once it's ready (handled on the secondary path).
@@ -5941,7 +6395,7 @@ class Component extends DCLogic {
       '_sunroofFrontOrigRot', '_sunroofRange', 'sunroofCurtain', '_curtainParams', 'lightGroups',
       '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels', '_allWheels',
       '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels', '_steerOnlyMeshes',
-      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges'];
+      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges', '_trunkHinge'];
   }
 
   _captureVariant(key, root) {
@@ -6009,6 +6463,10 @@ class Component extends DCLogic {
     };
     this._doorProgress = { ...this._doorTargets };
     this._applyDoorsTransform();
+    // Sync trunk target/progress from React state to match active model
+    this._trunkTarget = (this.state.trunkOpen ?? 0) / 100;
+    this._trunkProgress = this._trunkTarget;
+    this._applyTrunkTransform();
     // Reset emitters to a clean off baseline FIRST (this zeroes brake/reverse/
     // turn/fog), then re-light whatever the saved light state says is on.
     this._applyInitialFogStates();
