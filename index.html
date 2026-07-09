@@ -20,6 +20,13 @@
     * { box-sizing: border-box; }
     @keyframes vp-spin { to { transform: rotate(360deg); } }
     @keyframes vp-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+    .hv-toolbar { scrollbar-width: none; -ms-overflow-style: none; }
+    .hv-toolbar::-webkit-scrollbar { display: none; }
+    @media (max-width: 640px) {
+      .hv-toolbar { left: 14px !important; right: 14px !important; max-width: none !important; gap: 6px !important; }
+      .hv-toolbar > button { width: 36px !important; height: 36px !important; }
+      .hv-config-panel { top: 70px !important; right: 14px !important; max-height: calc(100vh - 84px); overflow-y: auto; }
+    }
   </style>
 </helmet>
 <div ref="{{ outerRef }}" style="position: fixed; inset: 0; background: radial-gradient(130% 120% at 50% 38%, #efefef 0%, #dcdee0 78%, #cfd1d4 100%); font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease;">
@@ -41,8 +48,13 @@
   <!-- cyan accent corner ticks -->
   <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
 
+  <!-- top icon toolbar: single flex row, `order` controls visual sequence so it
+       can scroll horizontally as one unit instead of each button carrying its
+       own hardcoded right-offset (which clipped off-screen on narrow viewports) -->
+  <div class="hv-toolbar" style="position: absolute; top: 22px; right: {{ toolbarRight }}; display: {{ dayNightDisplay }}; gap: 8px; max-width: calc(100vw - 40px); overflow-x: auto; -webkit-overflow-scrolling: touch; transition: right 0.3s ease; z-index: 10;">
+
   <!-- day-night switch button -->
-  <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="position: absolute; top: 22px; right: {{ dayNightRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease; z-index: 10;">
+  <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="order: 1; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;">
     <sc-if value="{{ nightMode }}" hint-placeholder-val="{{ false }}">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
     </sc-if>
@@ -52,12 +64,12 @@
   </button>
 
   <!-- model toggle button -->
-  <button onClick="{{ toggleModel }}" title="Switch model variant" style="position: absolute; top: 22px; right: {{ modelBtnRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease; font-family: 'Space Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: 0.05em; z-index: 10;">
+  <button onClick="{{ toggleModel }}" title="Switch model variant" style="order: 2; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; font-family: 'Space Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: 0.05em;">
     {{ modelLabel }}
   </button>
 
   <!-- wheels tab button -->
-  <button onClick="{{ clickTabWheels }}" title="Wheels customization" style="position: absolute; top: 22px; right: {{ tabWheelsRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabWheelsBorder }}; color: {{ tabWheelsCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+  <button onClick="{{ clickTabWheels }}" title="Wheels customization" style="order: 3; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabWheelsBorder }}; color: {{ tabWheelsCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10"></circle>
       <circle cx="12" cy="12" r="3"></circle>
@@ -73,7 +85,7 @@
   </button>
 
   <!-- lights tab button -->
-  <button onClick="{{ clickTabLights }}" title="Lights settings" style="position: absolute; top: 22px; right: {{ tabLightsRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabLightsBorder }}; color: {{ tabLightsCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+  <button onClick="{{ clickTabLights }}" title="Lights settings" style="order: 6; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabLightsBorder }}; color: {{ tabLightsCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="M2 8h6" />
       <path d="M2 12h7" />
@@ -84,7 +96,7 @@
   </button>
 
   <!-- doors control button -->
-  <button onClick="{{ clickTabDoors }}" title="Doors, sunroof &amp; curtain" style="position: absolute; top: 22px; right: {{ doorsBtnRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ doorsBtnBorder }}; color: {{ doorsBtnCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease; z-index: 10;">
+  <button onClick="{{ clickTabDoors }}" title="Doors, sunroof &amp; curtain" style="order: 5; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ doorsBtnBorder }}; color: {{ doorsBtnCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;">
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <rect x="6" y="2" width="12" height="20" rx="3" />
       <line x1="6" y1="8" x2="2" y2="6" />
@@ -95,7 +107,7 @@
   </button>
 
   <!-- motion tab button -->
-  <button onClick="{{ clickTabMotion }}" title="Motion and sunroof settings" style="position: absolute; top: 22px; right: {{ tabMotionRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabMotionBorder }}; color: {{ tabMotionCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+  <button onClick="{{ clickTabMotion }}" title="Motion and sunroof settings" style="order: 4; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabMotionBorder }}; color: {{ tabMotionCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <path d="m12 14 4-4" />
       <path d="M3.34 19a10 10 0 1 1 17.32 0" />
@@ -103,17 +115,18 @@
   </button>
 
   <!-- env tab button -->
-  <button onClick="{{ clickTabEnv }}" title="Environment settings" style="position: absolute; top: 22px; right: {{ tabEnvRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabEnvBorder }}; color: {{ tabEnvCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+  <button onClick="{{ clickTabEnv }}" title="Environment settings" style="order: 7; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabEnvBorder }}; color: {{ tabEnvCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
   </button>
 
   <!-- color tab button -->
-  <button onClick="{{ clickTabColor }}" title="Car paint color" style="position: absolute; top: 22px; right: {{ tabColorRight }}; display: {{ dayNightDisplay }}; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabColorBorder }}; color: {{ tabColorCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: right 0.3s ease, border-color 0.15s ease, background 0.15s ease; z-index: 10;">
+  <button onClick="{{ clickTabColor }}" title="Car paint color" style="order: 8; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabColorBorder }}; color: {{ tabColorCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
     <div style="width: 18px; height: 18px; border-radius: 50%; background: {{ currentCarPaintHex }}; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
   </button>
+  </div>
 
   <!-- configure panel -->
-  <div style="position: absolute; top: 22px; right: 26px; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; transition: width 0.2s ease;">
+  <div class="hv-config-panel" style="position: absolute; top: 22px; right: 26px; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; transition: width 0.2s ease;">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div style="font-size: 10px; letter-spacing: .3em; opacity: .55; font-weight: 600;">CONFIGURE</div>
@@ -228,19 +241,21 @@
 
     <!-- ── DOORS TAB ── -->
     <sc-if value="{{ tabIsDoors }}" hint-placeholder-val="{{ false }}">
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">DOORS</div>
-      <!-- 2x2 grid mirroring physical door layout: front row on top, rear row on bottom -->
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CONTROLS</div>
+      <!-- 2x2 grid mirroring physical door layout, then trunk + sunroof (drives sunroof & curtain together) -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
         <sc-for list="{{ doorBtns }}" as="db" hint-placeholder-count="4">
           <button onClick="{{ db.onClick }}" title="{{ db.title }}" style="padding: 9px 4px; border-radius: 7px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; font-weight: 600; transition: all .15s ease; background: {{ db.bg }}; border: 1px solid {{ db.border }}; color: {{ db.col }};">
             {{ db.label }}
           </button>
         </sc-for>
+        <button onClick="{{ toggleTrunk }}" style="padding: 9px 4px; border-radius: 7px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; font-weight: 600; transition: all .15s ease; background: {{ trunkBtnBg }}; border: 1px solid {{ trunkBtnBorder }}; color: {{ trunkBtnCol }};">{{ trunkBtnLabel }}</button>
+        <button onClick="{{ toggleSunroofCurtain }}" title="Toggle sunroof &amp; curtain" style="padding: 9px 4px; border-radius: 7px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; font-weight: 600; transition: all .15s ease; background: {{ sunroofBtnBg }}; border: 1px solid {{ sunroofBtnBorder }}; color: {{ sunroofBtnCol }};">{{ sunroofBtnLabel }}</button>
       </div>
-      <button onClick="{{ toggleDoors }}" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px dashed rgba(79,214,232,.35); background: transparent; color: rgba(159,230,240,.8); cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .1em; margin-bottom: 16px;">TOGGLE ALL</button>
+      <button onClick="{{ toggleDoors }}" title="Toggle all doors" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px dashed rgba(79,214,232,.35); background: transparent; color: rgba(159,230,240,.8); cursor: pointer; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .1em; margin-bottom: 16px;">TOGGLE ALL</button>
 
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">FINE TUNE</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-bottom: 16px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;">
         <div>
           <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
             <span style="font-family: 'Space Mono', monospace; font-size: 7px; opacity: .5;">FRONT L</span>
@@ -269,9 +284,13 @@
           </div>
           <input type="range" min="0" max="100" step="1" value="{{ doorRROpen }}" onChange="{{ onDoorRROpen }}" onInput="{{ onDoorRROpen }}" style="width: 100%; accent-color: #4fd6e8;" />
         </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;">
+        <div style="grid-column: 1 / -1;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+            <span style="font-family: 'Space Mono', monospace; font-size: 7px; opacity: .5;">TRUNK</span>
+            <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ trunkLabel }}</span>
+          </div>
+          <input type="range" min="0" max="100" step="1" value="{{ trunkOpen }}" onChange="{{ onTrunkOpen }}" onInput="{{ onTrunkOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
+        </div>
         <div>
           <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
             <span style="font-family: 'Space Mono', monospace; font-size: 7px; opacity: .5;">SUNROOF</span>
@@ -287,14 +306,6 @@
           <input type="range" min="0" max="100" step="1" value="{{ curtainOpen }}" onChange="{{ onCurtainOpen }}" onInput="{{ onCurtainOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
         </div>
       </div>
-
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin: 16px 0 9px;">TRUNK</div>
-      <button onClick="{{ toggleTrunk }}" style="width: 100%; padding: 9px 4px; border-radius: 7px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; font-weight: 600; transition: all .15s ease; background: {{ trunkBtnBg }}; border: 1px solid {{ trunkBtnBorder }}; color: {{ trunkBtnCol }}; margin-bottom: 8px;">{{ trunkBtnLabel }}</button>
-      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-        <span style="font-family: 'Space Mono', monospace; font-size: 7px; opacity: .5;">FINE TUNE</span>
-        <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ trunkLabel }}</span>
-      </div>
-      <input type="range" min="0" max="100" step="1" value="{{ trunkOpen }}" onChange="{{ onTrunkOpen }}" onInput="{{ onTrunkOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
     </sc-if>
 
     <!-- ── WHEELS TAB ── -->
@@ -478,6 +489,10 @@ class Component extends DCLogic {
     this._doorTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
     this._trunkProgress = 0;
     this._trunkTarget = 0;
+    this._sunroofProgress = 0;
+    this._sunroofTarget = 0;
+    this._curtainProgress = 0;
+    this._curtainTarget = 0;
     this._wheelsShareCarRoot = true;
     this._wheelCatalog = [
       { key: 'tripo_wheel',        file: 'car_wheel_rim_with_brake_disc_and_caliper.glb', label: 'Tripo Rim' },
@@ -558,14 +573,11 @@ class Component extends DCLogic {
       panelWidth: (s.configTab === 'wheels' && s.wheelSubTab === 'catalog') ? '300px' : '220px',
       panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
       dayNightDisplay: (!s.loading && !s.error) ? 'flex' : 'none',
-      tabColorRight:  s.panelOpen ? (254 + wideExtra) + 'px' : '26px',
-      tabEnvRight:    s.panelOpen ? (302 + wideExtra) + 'px' : '74px',
-      tabLightsRight: s.panelOpen ? (350 + wideExtra) + 'px' : '122px',
-      doorsBtnRight:  s.panelOpen ? (398 + wideExtra) + 'px' : '170px',
-      tabMotionRight: s.panelOpen ? (446 + wideExtra) + 'px' : '218px',
-      tabWheelsRight: s.panelOpen ? (494 + wideExtra) + 'px' : '266px',
-      modelBtnRight:  s.panelOpen ? (542 + wideExtra) + 'px' : '314px',
-      dayNightRight:  s.panelOpen ? (590 + wideExtra) + 'px' : '362px',
+      // All 8 icons now live in one flex row (order set per-button below), so a
+      // single container offset replaces what used to be 8 hand-computed
+      // per-button `right` values — it just needs to match the old rightmost
+      // (color-tab) offset since flexbox gap handles the rest.
+      toolbarRight: s.panelOpen ? (254 + wideExtra) + 'px' : '26px',
       doorsBtnBorder: (s.panelOpen && s.configTab === 'doors') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       doorsBtnCol:    (s.panelOpen && s.configTab === 'doors') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       toggleDoors:    () => this.toggleDoors(),
@@ -738,6 +750,11 @@ class Component extends DCLogic {
       curtainOpen:      s.curtainOpen,
       curtainLabel:     s.curtainOpen + '%',
       onCurtainOpen:    (e) => this._setCurtainOpen(parseFloat(e.target.value)),
+      toggleSunroofCurtain: () => this.toggleSunroofCurtain(),
+      sunroofBtnLabel:  (s.sunroofOpen > 0 || s.curtainOpen > 0) ? 'CLOSE SUNROOF' : 'OPEN SUNROOF',
+      sunroofBtnBorder: (s.sunroofOpen > 0 || s.curtainOpen > 0) ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      sunroofBtnBg:     (s.sunroofOpen > 0 || s.curtainOpen > 0) ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
+      sunroofBtnCol:    (s.sunroofOpen > 0 || s.curtainOpen > 0) ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       doorFLOpen:       s.doorFLOpen,
       doorFLLabel:      s.doorFLOpen + '%',
       onDoorFLOpen:     (e) => this._setDoorOpen('fl', parseFloat(e.target.value)),
@@ -903,7 +920,7 @@ class Component extends DCLogic {
 
   _setSunroofOpen(pct) {
     this.setState({ sunroofOpen: pct });
-    this._applySunroofTransform(pct);
+    this._sunroofTarget = pct / 100;
   }
 
   _applySunroofTransform(pct) {
@@ -965,7 +982,7 @@ class Component extends DCLogic {
 
   _setCurtainOpen(pct) {
     this.setState({ curtainOpen: pct });
-    this._applyCurtainTransform(pct);
+    this._curtainTarget = pct / 100;
   }
 
   _applyCurtainTransform(pct) {
@@ -1205,9 +1222,15 @@ class Component extends DCLogic {
             color += texture2D(tSource, rotatedUv);
           }
           vec4 avgColor = color / float(SAMPLES);
+          // avgColor.rgb is diluted by how much of the disc the spokes actually
+          // cover (transparent gaps contribute (0,0,0,0) to the sum), so a
+          // thin-spoked wheel comes out artificially dim regardless of its real
+          // material color. Un-premultiply by coverage (== avgColor.a here) to
+          // recover the true rim brightness/color before boosting alpha.
+          vec3 trueColor = avgColor.a > 0.001 ? avgColor.rgb / avgColor.a : avgColor.rgb;
           // Boost alpha non-linearly to make the spinning rim feel solid and metallic
-          avgColor.a = min(1.0, pow(avgColor.a, 0.6) * 1.5);
-          gl_FragColor = avgColor;
+          float boostedAlpha = min(1.0, pow(avgColor.a, 0.6) * 1.5);
+          gl_FragColor = vec4(trueColor, boostedAlpha);
         }
       `
     });
@@ -1562,6 +1585,20 @@ class Component extends DCLogic {
           strip.material = matte;
         }
       });
+
+      // Cargo-floor pan (BuildingMesh-00021_1, fixed to Scene — identified
+      // via click-inspection as the reflective floor). Its "Plastic Soft"
+      // material isn't shared with anything else, but clone anyway for
+      // consistency with the other trunk-material overrides here.
+      const floorPan = obj.getObjectByName('BuildingMesh-00021_1');
+      if (floorPan && floorPan.material) {
+        const matte = floorPan.material.clone();
+        matte.name = 'Trunk Floor Matte';
+        matte.roughness = 0.85;
+        matte.metalness = 0;
+        if ('envMapIntensity' in matte) matte.envMapIntensity = 0.2;
+        floorPan.material = matte;
+      }
     }
 
     // GT's cover-equivalent trim ("52_trunk_inner_map_c", now attached to the
@@ -1575,6 +1612,40 @@ class Component extends DCLogic {
         matte.name = 'Trunk Cover Matte';
         matte.color.set(this._trunkCoverColor);
         cover.material = matte;
+      }
+
+      // "11_trunk_licence_map_c" (license-plate surround on the lid) shares
+      // the glossy "Plastic Black" material with unrelated parts elsewhere —
+      // identified via click-inspection as reading too shiny next to the
+      // matte cover, so clone it to the same matte finish/color.
+      const plateSurround = obj.getObjectByName('11_trunk_licence_map_c');
+      if (plateSurround && plateSurround.material) {
+        const matte = plateSurround.material.clone();
+        matte.name = 'Trunk Cover Matte';
+        matte.roughness = 0.75;
+        matte.color.set(this._trunkCoverColor);
+        if ('envMapIntensity' in matte) matte.envMapIntensity = 0.2;
+        plateSurround.material = matte;
+      }
+
+      // NOTE: "06_car_trunk" (the lid mesh itself) was previously matted here
+      // under the belief it was interior plastic — corrected via click-
+      // inspection: it's the exterior painted panel (same "Body" material as
+      // the rest of the car, confirmed by it dominating a normal exterior
+      // rear view). Left as the shared paint material so it colors/finishes
+      // along with the rest of the body via applyCarColor.
+
+      // "68_Trunk_window_map_c" (trunk cover) shares "GT Rubber Gray" at its
+      // flat mid-gray swatch color, which reads as raw unpainted plastic —
+      // identified via click-inspection. Already fully matte (roughness
+      // 0.88, envMapIntensity 0), so the "plastic" look is the color;
+      // darken it to match the PHEV cover treatment.
+      const trunkCoverPanel = obj.getObjectByName('68_Trunk_window_map_c');
+      if (trunkCoverPanel && trunkCoverPanel.material) {
+        const matte = trunkCoverPanel.material.clone();
+        matte.name = 'Trunk Cover Matte';
+        matte.color.set(this._trunkCoverColor);
+        trunkCoverPanel.material = matte;
       }
     }
 
@@ -1605,6 +1676,26 @@ class Component extends DCLogic {
     // Positive: lid swings up and rearward (over the roofline), away from the
     // cabin. The negative sign originally used swung it forward into the car.
     this._trunkHinge.rotation.z = p * maxAngle;
+  }
+
+  // One-off cosmetic material overrides for GT interior parts that read as
+  // raw plastic — flagged via click-inspection, unrelated to trunk/door
+  // mechanics so kept separate from those init passes.
+  _initGtCosmeticFixes(obj, profile) {
+    if (!obj || profile.key !== 'gt') return;
+
+    // Seat base ("25_inner_chair_map_c_01") uses "GT Rubber Gray" at its flat
+    // mid-gray swatch color — already fully matte (roughness 0.88, no env
+    // reflection), so the "plastic" look is the color; darken to match the
+    // other cladding fixes rather than editing the shared material (used by
+    // 13 other cladding meshes across the car).
+    const seatBase = obj.getObjectByName('25_inner_chair_map_c_01');
+    if (seatBase && seatBase.material) {
+      const matte = seatBase.material.clone();
+      matte.name = 'Interior Trim Matte';
+      matte.color.set(this._trunkCoverColor);
+      seatBase.material = matte;
+    }
   }
 
   _collectWheelMeshes(obj) {
@@ -1908,7 +1999,7 @@ class Component extends DCLogic {
         transparent: true,
         depthWrite: false,
         side: THREE.DoubleSide,
-        color: 0x2e2e32 // Dark metallic tint for black spinning wheels
+        color: 0xffffff // No tint — the captured texture already carries the real rim's color/brightness
       });
 
       const backingMaterial = new THREE.MeshBasicMaterial({
@@ -2443,7 +2534,8 @@ class Component extends DCLogic {
 
   toggleDoors() {
     const s = this.state;
-    const anyOpen = s.doorFLOpen > 0 || s.doorFROpen > 0 || s.doorRLOpen > 0 || s.doorRROpen > 0;
+    const anyOpen = s.doorFLOpen > 0 || s.doorFROpen > 0 || s.doorRLOpen > 0 || s.doorRROpen > 0
+      || s.trunkOpen > 0 || s.sunroofOpen > 0 || s.curtainOpen > 0;
     const targetVal = anyOpen ? 0 : 100;
     const targetProgress = anyOpen ? 0 : 1;
 
@@ -2456,6 +2548,18 @@ class Component extends DCLogic {
     });
 
     this._doorTargets = { fl: targetProgress, fr: targetProgress, rl: targetProgress, rr: targetProgress };
+
+    this._setTrunkOpen(targetVal);
+    this._setSunroofOpen(targetVal);
+    this._setCurtainOpen(targetVal);
+  }
+
+  toggleSunroofCurtain() {
+    const s = this.state;
+    const anyOpen = s.sunroofOpen > 0 || s.curtainOpen > 0;
+    const targetVal = anyOpen ? 0 : 100;
+    this._setSunroofOpen(targetVal);
+    this._setCurtainOpen(targetVal);
   }
 
   // Darken a hex colour by factor (0.5 = 50% darker), except white which is kept.
@@ -3506,6 +3610,118 @@ class Component extends DCLogic {
     if (!pool) this.scene.traverse(c => { if (c.isMesh && c.visible) targets.push(c); });
     const hits = rc.intersectObjects(targets, false);
     return hits.length ? hits[0].object : null;
+  }
+
+  // Debug object/material picker — click any part of the car to log its mesh
+  // name, parent chain, and material properties (color/roughness/metalness/
+  // envMapIntensity) to the console and a small on-screen overlay. Off by
+  // default. Enable via ?debug=materials (or ?debug=1) in the URL, or from
+  // devtools with window.__pickerOn() — that also persists via localStorage
+  // so it stays on across reloads/sessions until window.__pickerOff().
+  _initMaterialPicker() {
+    const params = new URLSearchParams(location.search);
+    this._pickerEnabled = params.get('debug') === 'materials' || params.get('debug') === '1'
+      || localStorage.getItem('hv_debug_picker') === '1';
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;left:14px;top:14px;z-index:9999;max-width:440px;' +
+      'font-family:"Space Mono",monospace;font-size:11px;line-height:1.6;white-space:pre-wrap;' +
+      'color:#4fd6e8;background:rgba(10,14,18,.92);backdrop-filter:blur(6px);' +
+      '-webkit-backdrop-filter:blur(6px);padding:9px 11px;border-radius:7px;' +
+      'border:1px solid rgba(79,214,232,.3);pointer-events:none;display:none;';
+    document.body.appendChild(overlay);
+    this._pickerOverlay = overlay;
+
+    const canvas = this.renderer.domElement;
+    this._onPickerClick = (e) => {
+      if (!this._pickerEnabled) return;
+      const hit = this._raycastMesh(e, null);
+      if (!hit) return;
+      const mats = Array.isArray(hit.material) ? hit.material : [hit.material];
+      const chain = [];
+      let p = hit.parent;
+      for (let i = 0; i < 4 && p; i++) { chain.push(p.name || '(unnamed)'); p = p.parent; }
+      const info = mats.map((m, i) => {
+        if (!m) return `  [${i}] (none)`;
+        const c = m.color ? '#' + m.color.getHexString() : 'n/a';
+        return `  [${i}] "${m.name || '(unnamed)'}" color=${c} rough=${m.roughness} metal=${m.metalness} env=${m.envMapIntensity} opacity=${m.opacity}${m.transparent ? ' transparent' : ''}`;
+      }).join('\n');
+      const variant = this.state && this.state.modelVariant;
+      const text = `variant: ${variant}\nmesh: "${hit.name || '(unnamed)'}"\nparents: ${chain.join(' > ') || '(none)'}\nmaterials:\n${info}`;
+      console.log('[picker]', text, hit);
+      overlay.textContent = text;
+      overlay.style.display = 'block';
+      this._flashMesh(hit, true);
+      if (this._pickerFlashTimer) clearTimeout(this._pickerFlashTimer);
+      this._pickerFlashTimer = setTimeout(() => this._flashMesh(hit, false), 1200);
+    };
+    canvas.addEventListener('click', this._onPickerClick);
+
+    window.__pickerOn  = () => {
+      this._pickerEnabled = true;
+      localStorage.setItem('hv_debug_picker', '1');
+      console.log('[picker] enabled — click any part of the car (window.__pickerOff() to disable)');
+    };
+    window.__pickerOff = () => {
+      this._pickerEnabled = false;
+      localStorage.setItem('hv_debug_picker', '0');
+      overlay.style.display = 'none';
+      console.log('[picker] disabled');
+    };
+    if (this._pickerEnabled) console.log('[picker] enabled — click any part of the car (window.__pickerOff() to disable)');
+
+    // Test-only toggle: compare the wheel-arch trim ring's current glossy
+    // finish against a rough/matte alternative, across HEV/PHEV and GT at
+    // once. Identified via the picker above: HEV/PHEV uses raw "Plastic
+    // Black" (roughness 0, envMapIntensity 1.3 — mirror-like); GT already
+    // runs this part through its "GT Black Matte" collapse (roughness 0.25).
+    // Console-driven since this is for side-by-side comparison, not a
+    // shipped feature: window.__archCapRough(true) / (false).
+    window.__archCapRough = (rough = true) => this._setArchCapRough(rough);
+  }
+
+  _archCapMeshNames() {
+    return [
+      'BuildingMesh-00014_1', 'BuildingMesh-00014_2', 'BuildingMesh-00119',
+      'BuildingMesh-00121_1', 'BuildingMesh-00121_2', 'BuildingMesh-00122',
+      '30_LF_door_plastic', '43_RF_door_plastic', '37_LB_door_plastic', '50_RB_door_plastic',
+    ];
+  }
+
+  _setArchCapRough(rough) {
+    this._archCapMeshNames().forEach(n => {
+      const obj = this.scene && this.scene.getObjectByName(n);
+      if (!obj || !obj.material) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      const newMats = mats.map(m => {
+        if (!m) return m;
+        if (!m._archCapClone) {
+          const clone = m.clone();
+          clone.name = m.name;
+          clone._archCapOrig = { roughness: m.roughness, metalness: m.metalness, envMapIntensity: m.envMapIntensity };
+          clone._archCapClone = true;
+          return clone;
+        }
+        return m;
+      });
+      obj.material = Array.isArray(obj.material) ? newMats : newMats[0];
+      const activeMats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      activeMats.forEach(m => {
+        if (!m || !m._archCapOrig) return;
+        if (rough) {
+          m.roughness = 0.8;
+          m.metalness = 0;
+          if ('envMapIntensity' in m) m.envMapIntensity = 0.25;
+        } else {
+          m.roughness = m._archCapOrig.roughness;
+          m.metalness = m._archCapOrig.metalness;
+          if ('envMapIntensity' in m) m.envMapIntensity = m._archCapOrig.envMapIntensity;
+        }
+        m.needsUpdate = true;
+      });
+    });
+    console.log(`[archCapRough] ${rough ? 'rough/matte' : 'reflective (original)'} applied to wheel-arch trim`);
+    if (this.requestRender) this.requestRender(6);
   }
 
   // Emissive config per group
@@ -5205,6 +5421,7 @@ class Component extends DCLogic {
       controls.minDistance = 2;
       controls.maxDistance = 120;
       this.controls = controls;
+      this._initMaterialPicker();
 
       // ── On-demand rendering ────────────────────────────────────────────────
       // Only draw when something changes. _renderFrames>0 forces N frames so
@@ -5464,7 +5681,7 @@ class Component extends DCLogic {
         // Smooth doors animation
         let doorsNeedRender = false;
         if (this._doorProgress && this._doorTargets) {
-          const step = 0.04;
+          const step = 0.02;
           ['fl', 'fr', 'rl', 'rr'].forEach((k) => {
             if (this._doorProgress[k] !== this._doorTargets[k]) {
               if (this._doorProgress[k] < this._doorTargets[k]) {
@@ -5478,12 +5695,13 @@ class Component extends DCLogic {
           if (doorsNeedRender) {
             this._applyDoorsTransform();
             needRender = true;
+            if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
           }
         }
 
         // Smooth trunk animation
         if (this._trunkProgress !== this._trunkTarget) {
-          const step = 0.04;
+          const step = 0.02;
           if (this._trunkProgress < this._trunkTarget) {
             this._trunkProgress = Math.min(this._trunkTarget, this._trunkProgress + step);
           } else {
@@ -5491,6 +5709,33 @@ class Component extends DCLogic {
           }
           this._applyTrunkTransform();
           needRender = true;
+          if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        }
+
+        // Smooth sunroof animation
+        if (this._sunroofProgress !== this._sunroofTarget) {
+          const step = 0.02;
+          if (this._sunroofProgress < this._sunroofTarget) {
+            this._sunroofProgress = Math.min(this._sunroofTarget, this._sunroofProgress + step);
+          } else {
+            this._sunroofProgress = Math.max(this._sunroofTarget, this._sunroofProgress - step);
+          }
+          this._applySunroofTransform(this._sunroofProgress * 100);
+          needRender = true;
+          if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+        }
+
+        // Smooth curtain animation
+        if (this._curtainProgress !== this._curtainTarget) {
+          const step = 0.02;
+          if (this._curtainProgress < this._curtainTarget) {
+            this._curtainProgress = Math.min(this._curtainTarget, this._curtainProgress + step);
+          } else {
+            this._curtainProgress = Math.max(this._curtainTarget, this._curtainProgress - step);
+          }
+          this._applyCurtainTransform(this._curtainProgress * 100);
+          needRender = true;
+          if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
         }
 
         // Always apply wheel transforms to keep steer + roll + visibility (rim vs disc) in sync
@@ -6291,6 +6536,7 @@ class Component extends DCLogic {
     // the heavy collection passes.
     this._initDoors(obj, profile);
     this._initTrunk(obj, profile);
+    this._initGtCosmeticFixes(obj, profile);
     this._captureVariant(profile.key, obj);
 
     // If a secondary model delegates wheel rendering to a source variant, hide its
@@ -6454,6 +6700,11 @@ class Component extends DCLogic {
     this.applyWheelMaterialProperties();
     this._applySunroofTransform();
     this._applyCurtainTransform();
+    // Sync sunroof/curtain target/progress from React state to match active model
+    this._sunroofTarget = (this.state.sunroofOpen ?? 0) / 100;
+    this._sunroofProgress = this._sunroofTarget;
+    this._curtainTarget = (this.state.curtainOpen ?? 0) / 100;
+    this._curtainProgress = this._curtainTarget;
     // Sync door targets and progress from React state to match active model
     this._doorTargets = {
       fl: (this.state.doorFLOpen ?? 0) / 100,
