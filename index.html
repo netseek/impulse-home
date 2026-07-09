@@ -323,11 +323,11 @@
       <sc-if value="{{ subIsCatalog }}" hint-placeholder-val="{{ true }}">
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM CATALOG</div>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: calc(100vh - 210px); overflow-y: auto; margin-bottom: 6px; padding-right: 2px;">
-          <button onClick="{{ onSelectStockWheel }}" title="Stock wheel" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ stockRing }}; background: {{ stockBg }}; cursor: pointer; transition: all 0.15s ease;">
+          <button onClick="{{ onSelectStockWheel }}" title="Vossen HF5 Black (Stock)" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ stockRing }}; background: {{ stockBg }}; cursor: pointer; transition: all 0.15s ease;">
             <div style="width: 100%; aspect-ratio: 1; border-radius: 7px; background: rgba(255,255,255,.04); display: flex; align-items: center; justify-content: center;">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="{{ stockCol }}" stroke-width="1.6"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle></svg>
             </div>
-            <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .04em; color: {{ stockCol }};">STOCK</span>
+            <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .02em; color: {{ stockCol }}; text-align: center; line-height: 1.2; word-break: break-word;">VOSSEN HF5 BLACK</span>
           </button>
           <sc-for list="{{ catalogItems }}" as="cw" hint-placeholder-count="21">
             <button onClick="{{ cw.onClick }}" title="{{ cw.label }}" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ cw.ring }}; background: {{ cw.bg }}; cursor: pointer; transition: all 0.15s ease;">
@@ -461,16 +461,16 @@ class Component extends DCLogic {
     glassTweaks: { opacity: 0.1, iridescence: 0, iridIOR: 1.8, thickMin: 100, thickMax: 400, clearcoat: 1.0, envMap: 1.0, color: '#ffffff', fresnel: 0 },
     showRearGlassTweaks: false,
     rearGlassTweaks: { opacity: 0.6, roughness: 0.15, transmission: 0.6, envMap: 0.5, clearcoat: 1.0, color: '#5c0808' },
-    wheelStyle: 'default', // 'default' | 'custom'
+    wheelStyle: 'custom', // 'default' | 'custom'
     wheelSubTab: 'catalog', // 'catalog' | 'finish' | 'custom'
     wheelColor: '#3a3a3d',
     wheelRoughness: 0.15,
     wheelMetalness: 0.95,
     wheelDepthOffset: 0.0,
-    wheelSizeInch: 20,
+    wheelSizeInch: 18, // 19inch
     wheelTintOverride: false,
     uploadedWheelName: null,
-    selectedCatalogKey: null,
+    selectedCatalogKey: 'haval_phev',
     catalogThumbs: {},
     catalogLoadingKey: null,
     doorsOpen: false,
@@ -495,7 +495,7 @@ class Component extends DCLogic {
     this._curtainTarget = 0;
     this._wheelsShareCarRoot = true;
     this._wheelCatalog = [
-      { key: 'tripo_wheel',        file: 'car_wheel_rim_with_brake_disc_and_caliper.glb', label: 'Tripo Rim' },
+      { key: 'haval_phev',         file: 'HavalPHEV-wheel.glb',            label: 'Haval PHEV' },
       { key: 'vossen_lc104t',      file: '3d_vossen_lc104t.glb',           label: 'Vossen LC104T' },
       { key: 'audi_rs5',           file: 'Audi-RS5.glb',                   label: 'Audi RS5' },
       { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT' },
@@ -4225,9 +4225,17 @@ class Component extends DCLogic {
     this.setState({ selectedCatalogKey: null, uploadedWheelName: null });
   }
 
-  onSelectCatalogWheel(item) {
+  _loadCatalogWheelByKey(key, callback) {
+    const item = this._wheelCatalog.find(i => i.key === key);
+    if (!item) {
+      if (callback) callback();
+      return;
+    }
     const THREE = this.THREE;
-    if (!THREE || this.state.catalogLoadingKey) return;
+    if (!THREE) {
+      if (callback) callback();
+      return;
+    }
 
     this.setState({ progress: 20, progressText: 'LOADING ' + item.label.toUpperCase() + '...', loading: true, catalogLoadingKey: item.key });
     const loader = new THREE.GLTFLoader();
@@ -4244,9 +4252,11 @@ class Component extends DCLogic {
         try {
           this._handleUploadedWheelModel(gltf.scene, item.label);
           this.setState({ loading: false, catalogLoadingKey: null, selectedCatalogKey: item.key });
+          if (callback) callback();
         } catch (err) {
           console.error(err);
           this.setState({ error: 'Failed to process wheel model: ' + err.message, loading: false, catalogLoadingKey: null });
+          if (callback) callback();
         }
       },
       (xhr) => {
@@ -4257,8 +4267,14 @@ class Component extends DCLogic {
       (err) => {
         console.error(err);
         this.setState({ error: 'Failed to load "' + item.label + '".', loading: false, catalogLoadingKey: null });
+        if (callback) callback();
       }
     );
+  }
+
+  onSelectCatalogWheel(item) {
+    if (this.state.catalogLoadingKey) return;
+    this._loadCatalogWheelByKey(item.key);
   }
 
   // Renders a small offscreen preview of each catalog wheel and caches it as a
@@ -4841,7 +4857,7 @@ class Component extends DCLogic {
       // Stretch the tire's inner bore to meet the (possibly resized) rim,
       // keeping the outer tread radius fixed — same idea as a real lower-
       // profile tire on a bigger rim.
-      this._deformTireBore((this.state.wheelSizeInch || 20) / 20);
+      this._deformTireBore((this.state.wheelSizeInch || 18) / 18);
 
       const parentScale = new THREE.Vector3();
       if (firstMesh && firstMesh.parent) {
@@ -4945,8 +4961,8 @@ class Component extends DCLogic {
             // Since the geometry's radius is normalized to 1.0, we scale X & Y by targetWorldRadius.
             // 20" is our baseline (sizeScale = 0.80). Larger diameters scale linearly (sizeScale = (inch / 20) * 0.80).
             // To maintain depth alignment, the Z-axis (axle depth) is kept constant at the 20" baseline radius.
-            const inchSize = this.state.wheelSizeInch || 20;
-            const sizeScale = (inchSize / 20) * 0.80;
+            const inchSize = this.state.wheelSizeInch || 18;
+            const sizeScale = (inchSize / 18) * 0.80;
             const targetWorldRadius = worldRadius * sizeScale;
             // depthFitScale (<=1) compresses an overly deep-dish rim so it
             // never scales past the tire's real bore depth — see its
@@ -6627,9 +6643,13 @@ class Component extends DCLogic {
 
     this._warmupLights();
 
-    this.setState({ loading: false, progress: 100 });
-    // If the user switched to the secondary model before it finished loading,
-    // honor that pending choice once it's ready (handled on the secondary path).
+    if (primary && this.state.selectedCatalogKey) {
+      this._loadCatalogWheelByKey(this.state.selectedCatalogKey, () => {
+        this.setState({ loading: false, progress: 100 });
+      });
+    } else {
+      this.setState({ loading: false, progress: 100 });
+    }
   }
 
   // ── Variant snapshot / activation ────────────────────────────────────────
@@ -6762,10 +6782,24 @@ class Component extends DCLogic {
 
   _setModelVariant(v) {
     if (v === this.state.modelVariant) return;
-    this.setState({ modelVariant: v });
-    // If the target model is loaded, swap now; otherwise the pending choice is
-    // honored by _captureVariant once it finishes loading.
-    if (this._variants && this._variants[v]) this._activateVariant(v);
+
+    // Check if we should auto-swap the default wheel
+    const currentKey = this.state.selectedCatalogKey;
+    const isDefaultWheelType = (currentKey === 'haval_phev' || currentKey === 'haval_gt');
+
+    if (isDefaultWheelType) {
+      const targetWheelKey = (v === 'gt') ? 'haval_gt' : 'haval_phev';
+      this.setState({ modelVariant: v, wheelSizeInch: 18 }); // Set size to 19" (18 internal)
+
+      if (this._variants && this._variants[v]) {
+        this._activateVariant(v);
+      }
+
+      this._loadCatalogWheelByKey(targetWheelKey);
+    } else {
+      this.setState({ modelVariant: v });
+      if (this._variants && this._variants[v]) this._activateVariant(v);
+    }
   }
 
   componentWillUnmount() {
