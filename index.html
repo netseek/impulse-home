@@ -323,11 +323,11 @@
       <sc-if value="{{ subIsCatalog }}" hint-placeholder-val="{{ true }}">
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM CATALOG</div>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: calc(100vh - 210px); overflow-y: auto; margin-bottom: 6px; padding-right: 2px;">
-          <button onClick="{{ onSelectStockWheel }}" title="Vossen HF5 Black (Stock)" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ stockRing }}; background: {{ stockBg }}; cursor: pointer; transition: all 0.15s ease;">
+          <button onClick="{{ onSelectStockWheel }}" title="Stock" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ stockRing }}; background: {{ stockBg }}; cursor: pointer; transition: all 0.15s ease;">
             <div style="width: 100%; aspect-ratio: 1; border-radius: 7px; background: rgba(255,255,255,.04); display: flex; align-items: center; justify-content: center;">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="{{ stockCol }}" stroke-width="1.6"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle></svg>
             </div>
-            <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .02em; color: {{ stockCol }}; text-align: center; line-height: 1.2; word-break: break-word;">VOSSEN HF5 BLACK</span>
+            <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .02em; color: {{ stockCol }}; text-align: center; line-height: 1.2; word-break: break-word;">STOCK</span>
           </button>
           <sc-for list="{{ catalogItems }}" as="cw" hint-placeholder-count="21">
             <button onClick="{{ cw.onClick }}" title="{{ cw.label }}" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ cw.ring }}; background: {{ cw.bg }}; cursor: pointer; transition: all 0.15s ease;">
@@ -461,7 +461,7 @@ class Component extends DCLogic {
     glassTweaks: { opacity: 0.1, iridescence: 0, iridIOR: 1.8, thickMin: 100, thickMax: 400, clearcoat: 1.0, envMap: 1.0, color: '#ffffff', fresnel: 0 },
     showRearGlassTweaks: false,
     rearGlassTweaks: { opacity: 0.6, roughness: 0.15, transmission: 0.6, envMap: 0.5, clearcoat: 1.0, color: '#5c0808' },
-    wheelStyle: 'custom', // 'default' | 'custom'
+    wheelStyle: 'default', // 'default' | 'custom' — HEV/PHEV's own stock rim (baked into haval-h6v2.glb) is correct now, so start on STOCK
     wheelSubTab: 'catalog', // 'catalog' | 'finish' | 'custom'
     wheelColor: '#3a3a3d',
     wheelRoughness: 0.15,
@@ -470,7 +470,7 @@ class Component extends DCLogic {
     wheelSizeInch: 19, // 19inch — smallest of the four selectable sizes (19"-22")
     wheelTintOverride: false,
     uploadedWheelName: null,
-    selectedCatalogKey: 'haval_phev',
+    selectedCatalogKey: null,
     catalogThumbs: {},
     catalogLoadingKey: null,
     doorsOpen: false,
@@ -495,10 +495,14 @@ class Component extends DCLogic {
     this._curtainTarget = 0;
     this._wheelsShareCarRoot = true;
     this._wheelCatalog = [
-      { key: 'haval_phev',         file: 'HavalPHEV-wheel.glb',            label: 'Haval PHEV' },
+      // Haval PHEV is no longer a catalog entry — the real PHEV rim is now
+      // baked into haval-h6v2.glb and shown via the STOCK button instead.
+      // Haval GT stays as a catalog wheel (GT's own car GLB doesn't have its
+      // stock rim fixed yet) and leads the list so it's the first alternative
+      // right after STOCK.
+      { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT' },
       { key: 'vossen_lc104t',      file: '3d_vossen_lc104t.glb',           label: 'Vossen LC104T' },
       { key: 'audi_rs5',           file: 'Audi-RS5.glb',                   label: 'Audi RS5' },
-      { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT' },
       { key: 'bmw_19',             file: 'bmw_wheel_19inch_model_859.glb', label: 'BMW 19"' },
       { key: 'conceptl',           file: 'conceptl_rim.glb',               label: 'Concept L' },
       { key: 'forgiato_multato',   file: 'forgiato_multato.glb',           label: 'Forgiato Multato' },
@@ -5645,7 +5649,7 @@ class Component extends DCLogic {
       if (window.MeshoptDecoder) {
         loader.setMeshoptDecoder(window.MeshoptDecoder);
       }
-      const HEV_URL = 'assets/haval-h6.glb';
+      const HEV_URL = 'assets/haval-h6v2.glb'; // v2: bakes in the real PHEV stock rim + the rear-light fixes
       const GT_URL  = 'assets/haval-h6-gt.glb';
       const profiles = this._modelProfiles();
       // Eager-load BOTH variants. The HEV/PHEV car is PRIMARY: it is visible at
@@ -5667,7 +5671,7 @@ class Component extends DCLogic {
         (e) => {
           let p;
           if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
-          else p = Math.min(99, (e.loaded / 20787604) * 100);
+          else p = Math.min(99, (e.loaded / 23900216) * 100);
           this.setState({ progress: p });
         },
         (err) => {
@@ -6960,19 +6964,27 @@ class Component extends DCLogic {
   _setModelVariant(v) {
     if (v === this.state.modelVariant) return;
 
-    // Check if we should auto-swap the default wheel
+    // Auto-swap the default-looking wheel when switching variants. HEV/PHEV's
+    // own stock rim is correct now (baked into haval-h6v2.glb), so leaving it
+    // on STOCK is fine; GT's native stock rim isn't fixed yet, so it still
+    // borrows the "Haval GT" catalog wheel as a stand-in whenever the user
+    // hasn't already picked something else.
     const currentKey = this.state.selectedCatalogKey;
-    const isDefaultWheelType = (currentKey === 'haval_phev' || currentKey === 'haval_gt');
+    const onPlaceholderWheel = (this.state.wheelStyle === 'default' && !currentKey) || currentKey === 'haval_gt';
 
-    if (isDefaultWheelType) {
-      const targetWheelKey = (v === 'gt') ? 'haval_gt' : 'haval_phev';
-      this.setState({ modelVariant: v, wheelSizeInch: 19 }); // PHEV/GT default wheel is the smallest selectable size (19"), below the general 21" catalog default
+    if (onPlaceholderWheel) {
+      this.setState({ modelVariant: v, wheelSizeInch: 19 }); // catalog wheel default size is the smallest selectable (19"), below the general 21" catalog default
 
       if (this._variants && this._variants[v]) {
         this._activateVariant(v);
       }
 
-      this._loadCatalogWheelByKey(targetWheelKey);
+      if (v === 'gt') {
+        this._loadCatalogWheelByKey('haval_gt');
+      } else {
+        this.onWheelStyle('default');
+        this.setState({ selectedCatalogKey: null, uploadedWheelName: null });
+      }
     } else {
       this.setState({ modelVariant: v });
       if (this._variants && this._variants[v]) this._activateVariant(v);
