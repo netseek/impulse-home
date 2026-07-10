@@ -403,10 +403,10 @@
 
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL SIZE</div>
         <div style="display: flex; gap: 4px; margin-bottom: 6px;">
-          <button onClick="{{ setSize19 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size19Bg }}; color: {{ size19Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">20"</button>
-          <button onClick="{{ setSize20 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size20Bg }}; color: {{ size20Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">21"</button>
-          <button onClick="{{ setSize21 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size21Bg }}; color: {{ size21Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">22"</button>
-          <button onClick="{{ setSize22 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size22Bg }}; color: {{ size22Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">23"</button>
+          <button onClick="{{ setSize19 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size19Bg }}; color: {{ size19Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">19"</button>
+          <button onClick="{{ setSize20 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size20Bg }}; color: {{ size20Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">20"</button>
+          <button onClick="{{ setSize21 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size21Bg }}; color: {{ size21Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">21"</button>
+          <button onClick="{{ setSize22 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size22Bg }}; color: {{ size22Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">22"</button>
         </div>
         <div style="font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; opacity: .4; line-height: 1.4;">Depth &amp; size also apply to wheels picked from the catalog.</div>
       </sc-if>
@@ -467,7 +467,7 @@ class Component extends DCLogic {
     wheelRoughness: 0.15,
     wheelMetalness: 0.95,
     wheelDepthOffset: 0.0,
-    wheelSizeInch: 20, // 20inch — smallest of the four selectable sizes (20"-23")
+    wheelSizeInch: 19, // 19inch — smallest of the four selectable sizes (19"-22")
     wheelTintOverride: false,
     uploadedWheelName: null,
     selectedCatalogKey: 'haval_phev',
@@ -706,23 +706,21 @@ class Component extends DCLogic {
       wheelDepthOffsetVal: s.wheelDepthOffset * 100,
       wheelDepthOffsetLabel: (s.wheelDepthOffset * 100 > 0 ? '+' : '') + (s.wheelDepthOffset * 100).toFixed(1) + ' cm',
       onWheelDepthOffset: (e) => this.onWheelDepthOffset(e),
-      // Button labels/values are shifted up one inch from their prop names
-      // (setSize19 -> 20", ... setSize22 -> 23") — the whole 19"-22" range
-      // moved up a notch per user request, with a genuinely new top size
-      // (23") rather than just relabeling the old 22" value; see the
-      // sizeTable comment in onWheelStyle for how that's computed.
-      setSize19: () => this.onWheelSizeInch(20),
-      setSize20: () => this.onWheelSizeInch(21),
-      setSize21: () => this.onWheelSizeInch(22),
-      setSize22: () => this.onWheelSizeInch(23),
-      size19Bg: s.wheelSizeInch === 20 ? 'rgba(79,214,232,.18)' : 'transparent',
-      size20Bg: s.wheelSizeInch === 21 ? 'rgba(79,214,232,.18)' : 'transparent',
-      size21Bg: s.wheelSizeInch === 22 ? 'rgba(79,214,232,.18)' : 'transparent',
-      size22Bg: s.wheelSizeInch === 23 ? 'rgba(79,214,232,.18)' : 'transparent',
-      size19Col: s.wheelSizeInch === 20 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      size20Col: s.wheelSizeInch === 21 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      size21Col: s.wheelSizeInch === 22 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      size22Col: s.wheelSizeInch === 23 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      // Labels stay 19"-22" — only the geometry each one produces shifted
+      // up one proportional step (see the sizeTable comment in
+      // onWheelStyle for how that's computed).
+      setSize19: () => this.onWheelSizeInch(19),
+      setSize20: () => this.onWheelSizeInch(20),
+      setSize21: () => this.onWheelSizeInch(21),
+      setSize22: () => this.onWheelSizeInch(22),
+      size19Bg: s.wheelSizeInch === 19 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size20Bg: s.wheelSizeInch === 20 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size21Bg: s.wheelSizeInch === 21 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size22Bg: s.wheelSizeInch === 22 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size19Col: s.wheelSizeInch === 19 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size20Col: s.wheelSizeInch === 20 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size21Col: s.wheelSizeInch === 21 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size22Col: s.wheelSizeInch === 22 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       wheelTintOverride: s.wheelTintOverride,
       onWheelTintOverride: (e) => this.onWheelTintOverride(e),
       // Model variant toggle (HEV/PHEV ↔ GT)
@@ -5056,19 +5054,22 @@ class Component extends DCLogic {
       // still what the tire can actually achieve; everything else is a
       // pure linear interpolation between them so the steps stay even.
       //
-      // The UI's four buttons are labelled 20"/21"/22"/23" — shifted up one
-      // notch from the physics-space 19"-22" per user request — with a
-      // genuinely bigger new top size (23") rather than just relabelling
-      // the old 22" value. So label 20" reuses the old (verified-good) 19"
-      // radius, 21"/22" reuse the old 20"/21" interpolated radii, and 23"
-      // extends the same per-step delta one further past the old 22".
+      // Labels stay 19"/20"/21"/22", but per user request each one now
+      // produces the size one proportional step bigger than it used to:
+      // 19" shows the old 20" radius, 20" shows the old 21" radius, 21"
+      // shows the old 22" radius (T4), and 22" is a genuinely new, even
+      // bigger size extending the same per-step delta one further past
+      // T4 — rather than re-running the real-math+tire-clamp simulation
+      // directly at a bigger inch value, which would likely hit the same
+      // physical bore-stretch ceiling that motivated this interpolation
+      // in the first place and produce another barely-different top step.
       const T1 = clampedRimRadiusForInch(19);
       const T4 = clampedRimRadiusForInch(22);
       const step = (T4 - T1) / 3;
-      const sizeTable = { 20: T1, 21: T1 + step, 22: T1 + 2 * step, 23: T4 + step };
+      const sizeTable = { 19: T1 + step, 20: T1 + 2 * step, 21: T4, 22: T4 + step };
       let realRimRadiusM = sizeTable[inchSize];
       if (realRimRadiusM === undefined) {
-        realRimRadiusM = inchSize < 20 ? T1 : (inchSize > 23 ? T4 + step : T1 + step * (inchSize - 20));
+        realRimRadiusM = inchSize < 19 ? (T1 + step) : (inchSize > 22 ? T4 + step : T1 + step * (inchSize - 18));
       }
 
       // Final fit: shrink the tire's bore a hair SMALLER than the rim so
@@ -6965,7 +6966,7 @@ class Component extends DCLogic {
 
     if (isDefaultWheelType) {
       const targetWheelKey = (v === 'gt') ? 'haval_gt' : 'haval_phev';
-      this.setState({ modelVariant: v, wheelSizeInch: 20 }); // PHEV/GT default wheel is the smallest selectable size (20"), below the general 22" catalog default
+      this.setState({ modelVariant: v, wheelSizeInch: 19 }); // PHEV/GT default wheel is the smallest selectable size (19"), below the general 21" catalog default
 
       if (this._variants && this._variants[v]) {
         this._activateVariant(v);
