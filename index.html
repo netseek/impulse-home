@@ -1723,7 +1723,11 @@ class Component extends DCLogic {
     };
 
     // ── Step 1: collect ALL wheel meshes + project onto car axes ──────────
-    const primaryRx = /tire|tyre|wheel|hub/i;
+    // "tripo" matches the AI-generated rim baked into the PHEV stock model
+    // (material "tripo_material_...") — without it, that rim's material name
+    // doesn't match any of the other keywords and the whole mesh gets
+    // silently excluded from wheel-cluster detection.
+    const primaryRx = /tire|tyre|wheel|hub|tripo/i;
     const items = [];
     obj.traverse(c => {
       if (!c.isMesh) return;
@@ -2954,6 +2958,24 @@ class Component extends DCLogic {
         console.log('[Lights] headlight geometry split ✓ — inner→high, outer→head');
       } else {
         console.warn('[Lights] headlight geometry split failed');
+      }
+    } else if (!groups.highbeam.length && groups.headlight.length > 1) {
+      // Some re-exports (e.g. after a GLTFExporter round-trip) already split
+      // the headlight assembly into separate per-primitive nodes instead of
+      // one combined mesh — same inner/outer split as above, just pre-done
+      // by the exporter. Pick whichever mesh has the smallest |Z| extent
+      // (closest to the centreline) as high beam; the rest stay head/low beam.
+      const box3b = new THREE.Box3();
+      const withExtent = groups.headlight.map(m => {
+        box3b.setFromObject(m);
+        const extent = Math.max(Math.abs(box3b.min.z), Math.abs(box3b.max.z));
+        return { m, extent };
+      }).sort((a, b) => a.extent - b.extent);
+      const [inner, ...rest] = withExtent;
+      if (rest.length && inner.extent < rest[0].extent) {
+        groups.highbeam = [inner.m];
+        groups.headlight = rest.map(x => x.m);
+        console.log('[Lights] headlight already pre-split by exporter — inner→high, outer→head');
       }
     }
     const summary = {};
@@ -5649,7 +5671,7 @@ class Component extends DCLogic {
       if (window.MeshoptDecoder) {
         loader.setMeshoptDecoder(window.MeshoptDecoder);
       }
-      const HEV_URL = 'assets/haval-h6v2.glb'; // v2: bakes in the real PHEV stock rim + the rear-light fixes
+      const HEV_URL = 'assets/haval-h6-phev-baked.glb'; // real PHEV stock rim baked in via export from the known-good original — materials/lights untouched
       const GT_URL  = 'assets/haval-h6-gt.glb';
       const profiles = this._modelProfiles();
       // Eager-load BOTH variants. The HEV/PHEV car is PRIMARY: it is visible at
@@ -5671,7 +5693,7 @@ class Component extends DCLogic {
         (e) => {
           let p;
           if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
-          else p = Math.min(99, (e.loaded / 23900216) * 100);
+          else p = Math.min(99, (e.loaded / 24129420) * 100);
           this.setState({ progress: p });
         },
         (err) => {
