@@ -4861,13 +4861,26 @@ class Component extends DCLogic {
       }
       const scaleFactor = parentScale.x || 1.0;
 
-      const flBox = new THREE.Box3();
+      // Rotation-invariant radius: an axis-aligned bounding box on a
+      // non-circular (spoked) stock-wheel silhouette overestimates or
+      // underestimates by up to sqrt(2) depending on whatever roll angle the
+      // wheel happens to be at when a custom rim is applied (see the matching
+      // fix in _generateBlurredWheelTexture). Since worldRadius directly
+      // scales the custom rim's diameter (targetWorldRadius below) and its
+      // depth-fit math, an unlucky angle made custom wheels come out visibly
+      // undersized — a small rim sitting deep in an oversized tire bore.
+      const _stockRimVtx = new THREE.Vector3();
+      let worldRadius = 0;
       orig._frontLeftWheels.forEach(m => {
-        if (orig._spokesWheels.includes(m)) flBox.expandByObject(m);
+        if (!orig._spokesWheels.includes(m) || !m.geometry || !m.geometry.attributes.position) return;
+        m.updateWorldMatrix(true, false);
+        const posAttr = m.geometry.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+          _stockRimVtx.fromBufferAttribute(posAttr, i).applyMatrix4(m.matrixWorld);
+          const d = _stockRimVtx.distanceTo(firstMesh._pivot);
+          if (d > worldRadius) worldRadius = d;
+        }
       });
-      const sizeVec = new THREE.Vector3();
-      flBox.getSize(sizeVec);
-      const worldRadius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
 
       // Measure the ORIGINAL TIRE's own axial span relative to the wheel
       // centre (firstMesh._pivot). Grounding the fit in the tire's real
