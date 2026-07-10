@@ -4893,6 +4893,7 @@ class Component extends DCLogic {
       let tireAxialCenter = 0.0;
       let tireHalfSpan = 0.0;
       let tireOuterFace = 0.0;
+      let tireBoreRadius = 0.0;
       if (firstMesh) {
         const axle = firstMesh._rollAxis;
         const outwardDir = axle.clone().multiplyScalar(-1); // left side outward is -axle
@@ -4914,9 +4915,37 @@ class Component extends DCLogic {
           tireAxialCenter = (minProj + maxProj) / 2;
           tireHalfSpan = (maxProj - minProj) / 2;
           tireOuterFace = maxProj;
+
+          // Radial bore opening: the smallest radial distance (from the axle
+          // line, not just the pivot point) among tire vertices near the
+          // outer face — i.e. the true "hole" the rim shows through. Some
+          // custom rim models pack most of their outer barrel surface right
+          // up against their own normalized max radius (unlike thinner/
+          // spoke-tip-only designs), so a rim sized purely off the stock
+          // wheel's radius can end up wider than this opening and have its
+          // whole outer band hidden behind the tire's inner lip.
+          const faceBand = 0.02; // metres
+          let minRadiusNearFace = Infinity;
+          orig._tireWheels.forEach(m => {
+            if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
+              const pos = m.geometry.attributes.position;
+              const tempV = new THREE.Vector3();
+              m.updateWorldMatrix(true, false);
+              for (let i = 0; i < pos.count; i++) {
+                tempV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+                const rel = tempV.clone().sub(firstMesh._pivot);
+                const proj = rel.dot(outwardDir);
+                if (proj > maxProj - faceBand) {
+                  const radial = rel.addScaledVector(outwardDir, -proj).length();
+                  if (radial < minRadiusNearFace) minRadiusNearFace = radial;
+                }
+              }
+            }
+          });
+          if (isFinite(minRadiusNearFace)) tireBoreRadius = minRadiusNearFace;
         }
       }
-      console.log(`[onWheelStyle] Measured tire axial centre (bore midpoint): ${tireAxialCenter.toFixed(5)} meters, half-span: ${tireHalfSpan.toFixed(5)} meters, outer face: ${tireOuterFace.toFixed(5)} meters`);
+      console.log(`[onWheelStyle] Measured tire axial centre (bore midpoint): ${tireAxialCenter.toFixed(5)} meters, half-span: ${tireHalfSpan.toFixed(5)} meters, outer face: ${tireOuterFace.toFixed(5)} meters, bore radius: ${tireBoreRadius.toFixed(5)} meters`);
 
       // Clamp the rim's depth scale so a naturally deep-dish design can't
       // out-scale the tire's real bore and poke out past its sidewalls —
@@ -4972,7 +5001,15 @@ class Component extends DCLogic {
             // To maintain depth alignment, the Z-axis (axle depth) is kept constant at the 20" baseline radius.
             const inchSize = this.state.wheelSizeInch || 20;
             const sizeScale = (inchSize / 20) * 0.80;
-            const targetWorldRadius = worldRadius * sizeScale;
+            // Clamp so the rim's own farthest point (== targetWorldRadius,
+            // since every custom rim is normalized so its max vertex sits at
+            // local radius 1.0) never exceeds the tire's actual bore opening
+            // — otherwise its outer edge/barrel renders behind the tire's
+            // inner lip instead of inside it. A small inset keeps a
+            // consistent, natural-looking sliver of tire visible all around
+            // rather than a perfectly flush (and depth-fighting-prone) edge.
+            const boreRadiusCap = tireBoreRadius > 0 ? tireBoreRadius * 0.96 : Infinity;
+            const targetWorldRadius = Math.min(worldRadius * sizeScale, boreRadiusCap);
             // depthFitScale (<=1) compresses an overly deep-dish rim so it
             // never scales past the tire's real bore depth — see its
             // computation above for why.
