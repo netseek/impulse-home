@@ -467,7 +467,7 @@ class Component extends DCLogic {
     wheelRoughness: 0.15,
     wheelMetalness: 0.95,
     wheelDepthOffset: 0.0,
-    wheelSizeInch: 18, // 19inch
+    wheelSizeInch: 19, // 19inch
     wheelTintOverride: false,
     uploadedWheelName: null,
     selectedCatalogKey: 'haval_phev',
@@ -706,22 +706,18 @@ class Component extends DCLogic {
       wheelDepthOffsetVal: s.wheelDepthOffset * 100,
       wheelDepthOffsetLabel: (s.wheelDepthOffset * 100 > 0 ? '+' : '') + (s.wheelDepthOffset * 100).toFixed(1) + ' cm',
       onWheelDepthOffset: (e) => this.onWheelDepthOffset(e),
-      // Button labels read one inch higher than the internal scale value they
-      // drive (19"→18, 20"→19, 21"→20, 22"→21) — only the displayed text
-      // shifted, per earlier user request; the geometry scale stayed anchored
-      // to the original values.
-      setSize19: () => this.onWheelSizeInch(18),
-      setSize20: () => this.onWheelSizeInch(19),
-      setSize21: () => this.onWheelSizeInch(20),
-      setSize22: () => this.onWheelSizeInch(21),
-      size19Bg: s.wheelSizeInch === 18 ? 'rgba(79,214,232,.18)' : 'transparent',
-      size20Bg: s.wheelSizeInch === 19 ? 'rgba(79,214,232,.18)' : 'transparent',
-      size21Bg: s.wheelSizeInch === 20 ? 'rgba(79,214,232,.18)' : 'transparent',
-      size22Bg: s.wheelSizeInch === 21 ? 'rgba(79,214,232,.18)' : 'transparent',
-      size19Col: s.wheelSizeInch === 18 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      size20Col: s.wheelSizeInch === 19 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      size21Col: s.wheelSizeInch === 20 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      size22Col: s.wheelSizeInch === 21 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      setSize19: () => this.onWheelSizeInch(19),
+      setSize20: () => this.onWheelSizeInch(20),
+      setSize21: () => this.onWheelSizeInch(21),
+      setSize22: () => this.onWheelSizeInch(22),
+      size19Bg: s.wheelSizeInch === 19 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size20Bg: s.wheelSizeInch === 20 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size21Bg: s.wheelSizeInch === 21 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size22Bg: s.wheelSizeInch === 22 ? 'rgba(79,214,232,.18)' : 'transparent',
+      size19Col: s.wheelSizeInch === 19 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size20Col: s.wheelSizeInch === 20 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size21Col: s.wheelSizeInch === 21 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      size22Col: s.wheelSizeInch === 22 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       wheelTintOverride: s.wheelTintOverride,
       onWheelTintOverride: (e) => this.onWheelTintOverride(e),
       // Model variant toggle (HEV/PHEV ↔ GT)
@@ -4857,7 +4853,7 @@ class Component extends DCLogic {
       // Stretch the tire's inner bore to meet the (possibly resized) rim,
       // keeping the outer tread radius fixed — same idea as a real lower-
       // profile tire on a bigger rim.
-      this._deformTireBore((this.state.wheelSizeInch || 18) / 18);
+      this._deformTireBore((this.state.wheelSizeInch || 20) / 20);
 
       const parentScale = new THREE.Vector3();
       if (firstMesh && firstMesh.parent) {
@@ -4961,8 +4957,8 @@ class Component extends DCLogic {
             // Since the geometry's radius is normalized to 1.0, we scale X & Y by targetWorldRadius.
             // 20" is our baseline (sizeScale = 0.80). Larger diameters scale linearly (sizeScale = (inch / 20) * 0.80).
             // To maintain depth alignment, the Z-axis (axle depth) is kept constant at the 20" baseline radius.
-            const inchSize = this.state.wheelSizeInch || 18;
-            const sizeScale = (inchSize / 18) * 0.80;
+            const inchSize = this.state.wheelSizeInch || 20;
+            const sizeScale = (inchSize / 20) * 0.80;
             const targetWorldRadius = worldRadius * sizeScale;
             // depthFitScale (<=1) compresses an overly deep-dish rim so it
             // never scales past the tire's real bore depth — see its
@@ -6789,7 +6785,7 @@ class Component extends DCLogic {
 
     if (isDefaultWheelType) {
       const targetWheelKey = (v === 'gt') ? 'haval_gt' : 'haval_phev';
-      this.setState({ modelVariant: v, wheelSizeInch: 18 }); // Set size to 19" (18 internal)
+      this.setState({ modelVariant: v, wheelSizeInch: 19 }); // PHEV/GT default wheel is smaller (19") than the general 21" catalog default
 
       if (this._variants && this._variants[v]) {
         this._activateVariant(v);
