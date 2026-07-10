@@ -4636,8 +4636,23 @@ class Component extends DCLogic {
 
     // Compute the min/max Z coordinate of the normalized meshes (outer face
     // extent + overall axial span) — the span's midpoint is the rim's own
-    // "center of depth", used to auto-fit it inside the tire's bore.
-    let minZ = Infinity, maxZ = -Infinity;
+    // "center of depth", used to auto-fit it inside the tire's bore. maxZ is
+    // meant to represent the VISIBLE outer barrel/lip face, not whatever
+    // single vertex happens to stick out furthest — some models have a small
+    // isolated tab/bolt/valve-stem boss reaching further than the actual
+    // barrel surface, which anchors the flush-alignment to that outlier and
+    // leaves the real visible face measurably recessed behind the tire's
+    // opening instead of flush with it (confirmed on the Haval PHEV/GT
+    // models). A plain "vertices near the outer radius" filter isn't
+    // reliable either — it can mix genuine front-facing lip surface with
+    // back-side/internal geometry that happens to sit at a similar radius.
+    // So maxZ is found the same occlusion-aware way as the centre-ray depth
+    // below: cast rays straight down the axle at several angles around the
+    // outer barrel radius and take the median of the FRONTMOST hit at each,
+    // falling back to a simple percentile-of-nearby-vertices estimate for
+    // any angle that misses everything (e.g. an open spoke gap there).
+    let minZ = Infinity, meshMaxRadius = 0;
+    const _depthVerts = [];
     wrapper.traverse(c => {
       if (c.isMesh && c.geometry && c.geometry.attributes.position) {
         const pos = c.geometry.attributes.position;
@@ -4645,12 +4660,41 @@ class Component extends DCLogic {
         for (let i = 0; i < pos.count; i++) {
           tempV.fromBufferAttribute(pos, i);
           // since local transforms are identity, vertex positions are already in wrapper's space
-          if (tempV.z > maxZ) maxZ = tempV.z;
           if (tempV.z < minZ) minZ = tempV.z;
+          const radial = Math.sqrt(tempV.x * tempV.x + tempV.y * tempV.y);
+          if (radial > meshMaxRadius) meshMaxRadius = radial;
+          _depthVerts.push(tempV.z, radial);
         }
       }
     });
-    console.log(`[UploadWheel] Programmatically computed normalized localOuterZ (max Z): ${maxZ}`);
+    let maxZ = -Infinity;
+    {
+      const outerBandZs = [];
+      for (let i = 0; i < _depthVerts.length; i += 2) {
+        if (_depthVerts[i + 1] > meshMaxRadius * 0.85) outerBandZs.push(_depthVerts[i]);
+      }
+      outerBandZs.sort((a, b) => a - b);
+      const percentileFallback = outerBandZs.length ? outerBandZs[Math.floor(outerBandZs.length * 0.90)] : minZ;
+
+      const rayMeshes = [];
+      wrapper.traverse(c => { if (c.isMesh) rayMeshes.push(c); });
+      const outerRayRadius = meshMaxRadius * 0.92;
+      const rayCaster = new THREE.Raycaster();
+      const hitZs = [];
+      const RAYS = 24;
+      for (let i = 0; i < RAYS; i++) {
+        const angle = (i / RAYS) * Math.PI * 2;
+        rayCaster.set(
+          new THREE.Vector3(outerRayRadius * Math.cos(angle), outerRayRadius * Math.sin(angle), 10),
+          new THREE.Vector3(0, 0, -1)
+        );
+        const hits = rayCaster.intersectObjects(rayMeshes, false);
+        if (hits.length) hitZs.push(hits[0].point.z);
+      }
+      hitZs.sort((a, b) => a - b);
+      maxZ = hitZs.length >= RAYS * 0.5 ? hitZs[Math.floor(hitZs.length / 2)] : percentileFallback;
+    }
+    console.log(`[UploadWheel] Programmatically computed normalized localOuterZ (occlusion-aware outer-band median): ${maxZ}`);
     this._customRimLocalOuterZ = isFinite(maxZ) ? maxZ : 0.15;
     this._customRimLocalCenterZ = (isFinite(minZ) && isFinite(maxZ)) ? (minZ + maxZ) / 2 : this._customRimLocalOuterZ * 0.5;
     // Half of the rim's own native depth span (in the same normalized-by-radius
@@ -4866,22 +4910,59 @@ class Component extends DCLogic {
       const scaleFactor = parentScale.x || 1.0;
 
       // Real physical sizing, anchored to actual tire-spec math (e.g. a
-      // 235/55R19 tire: 19" rim diameter, 55%-of-235mm sidewall) instead of
-      // the stock wheel's own modeled radius — that radius isn't necessarily
-      // an accurate 19"/20"/... reference, so scaling off it (as the code
-      // used to) doesn't track real rim sizes and can't be fixed by tuning a
-      // multiplier. Rim radius follows the inch spec directly; the tire's
-      // OUTER tread radius stays fixed (matching the "plus sizing" idea
-      // already used for the bore stretch below) and its sidewall/bore
-      // simply absorbs the difference.
+      // 235/55R19 tire: 19" rim diameter, 55%-of-235mm sidewall = 370.55mm
+      // overall radius) instead of the stock wheel's own modeled radius —
+      // that radius isn't necessarily an accurate 19"/20"/... reference.
+      // Crucially, this scene is NOT built at a clean 1-world-unit-per-real-
+      // metre scale (this wheel hierarchy's own parentScale is ~1.06, not
+      // 1.0) — treating a computed real-metres radius as a world-space value
+      // directly undersized every custom rim by that same margin, which is
+      // also exactly what was leaving a gap against the tire. So the real
+      // spec is calibrated against the model's OWN stock tire (assumed to be
+      // the 235/55R19 the UI defaults to) rather than assumed to equal real
+      // metres: measure the stock tire's actual outer tread radius in this
+      // scene's world units, and derive metres-per-world-unit from that.
       const REAL_INCH_TO_M = 0.0254;
+      const REAL_STOCK_TIRE_OUTER_RADIUS_M = 0.37055; // 235/55R19 overall radius
+      let stockTireOuterRadiusWorld = 0;
+      if (firstMesh) {
+        const _calV = new THREE.Vector3();
+        orig._tireWheels.forEach(m => {
+          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
+            m.updateWorldMatrix(true, false);
+            const pos = m.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+              _calV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+              const rel = _calV.clone().sub(firstMesh._pivot);
+              const axialProj = rel.dot(firstMesh._rollAxis);
+              const radial = rel.addScaledVector(firstMesh._rollAxis, -axialProj).length();
+              if (radial > stockTireOuterRadiusWorld) stockTireOuterRadiusWorld = radial;
+            }
+          }
+        });
+      }
+      const rawMetersPerWorldUnit = stockTireOuterRadiusWorld > 1e-6
+        ? REAL_STOCK_TIRE_OUTER_RADIUS_M / stockTireOuterRadiusWorld
+        : (1 / scaleFactor);
+      // Visually verified against real reference photos: even after the tire-
+      // spec calibration above, a selected 21" still only looked as big as a
+      // real 19" should — i.e. still undersized by ~19/21, on top of the
+      // tire-spec fix. Whatever the exact cause (the stock tire mesh isn't a
+      // precise 235/55R19 profile, extra geometry inflating the measured
+      // outer radius, etc.), correct for it directly here rather than chase
+      // a theoretically "perfect" tire measurement further.
+      const EMPIRICAL_SIZE_CORRECTION = 21 / 19;
+      const metersPerWorldUnit = rawMetersPerWorldUnit / EMPIRICAL_SIZE_CORRECTION;
+      console.log(`[onWheelStyle] Scale calibration: stock tire outer radius ${stockTireOuterRadiusWorld.toFixed(5)} world-units => ${metersPerWorldUnit.toFixed(5)} metres/world-unit (raw ${rawMetersPerWorldUnit.toFixed(5)}, empirical correction ${EMPIRICAL_SIZE_CORRECTION.toFixed(4)})`);
+
       const inchSize = this.state.wheelSizeInch || 20;
-      const realRimRadiusM = (inchSize * REAL_INCH_TO_M) / 2;
+      // Real physical rim radius, converted from metres into this scene's
+      // own world units via the calibration above.
+      const realRimRadiusM = ((inchSize * REAL_INCH_TO_M) / 2) / metersPerWorldUnit;
       // Depth (Z / axle-direction) math below is independent of the chosen
       // rim diameter — it's always anchored to a fixed real 20" radius, same
-      // as before, just now grounded in real units instead of the stock
-      // wheel's (inaccurate) modeled size.
-      const DEPTH_BASELINE_RADIUS_M = (20 * REAL_INCH_TO_M) / 2;
+      // as before, likewise converted into this scene's world units.
+      const DEPTH_BASELINE_RADIUS_M = ((20 * REAL_INCH_TO_M) / 2) / metersPerWorldUnit;
 
       // Measures the ORIGINAL TIRE's own axial span relative to the wheel
       // centre (firstMesh._pivot). Grounding the fit in the tire's real
@@ -4987,13 +5068,18 @@ class Component extends DCLogic {
         const outwardDir = item.axle.clone().multiplyScalar(isRight ? 1 : -1);
 
         // Align the custom rim's own outer face with the tire's outer face —
-        // not its midpoint (see the tireOuterFace comment above for why).
+        // not its midpoint (see the tireOuterFace comment above for why) —
+        // then nudge it a hair further out. A perfectly flush edge tends to
+        // read as slightly recessed in practice (the tire's sidewall has
+        // some curvature right at the opening), whereas real wheels usually
+        // sit a touch proud so the rim's lip visibly overlaps the tire.
         const localOuterZAdj = this._customRimLocalOuterZ !== undefined ? this._customRimLocalOuterZ : 0.15;
         const customOutwardExtent = localOuterZAdj * DEPTH_BASELINE_RADIUS_M * depthFitScale;
-        const shiftAmount = customOutwardExtent - tireOuterFace;
+        const PROUD_BIAS_M = 0.003; // 3mm real-world
+        const shiftAmount = customOutwardExtent - tireOuterFace - (PROUD_BIAS_M / metersPerWorldUnit);
         if (item.side === 'fl') flShiftAmount = shiftAmount;
 
-        // Base aligned position (face flush with the tire's outer edge)
+        // Base aligned position (face proud of the tire's outer edge)
         const finalPos = item.center.clone().addScaledVector(outwardDir, -shiftAmount);
 
         const targetOutwardAxle = isRight ? item.axle : item.axle.clone().negate();
