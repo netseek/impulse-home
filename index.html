@@ -4720,10 +4720,15 @@ class Component extends DCLogic {
   // resized rim never clips through / gaps away from the tire — the outer
   // tread radius stays fixed, only the region near the bore grows, blended
   // smoothly outward so it reads as a shrinking/growing sidewall rather than
-  // a hard seam. `factor` is the rim's size ratio vs the 20" baseline (1.0 =
-  // no change). Always recomputed from the pristine cached geometry so
+  // a hard seam. Always recomputed from the pristine cached geometry so
   // repeated resizes never compound.
-  _deformTireBore(factor) {
+  // `target` is a plain ratio applied directly to the pristine bore radius
+  // (factor === 1.0 resets it to the as-authored geometry) UNLESS
+  // `absoluteRadius` is true, in which case `target` is a real-world WORLD
+  // radius in metres for the bore opening itself — each tire converts that
+  // to the equivalent ratio using its own pristine bore radius (captured
+  // below on first use) and `scaleFactor` (world units per local unit).
+  _deformTireBore(target, absoluteRadius, scaleFactor) {
     const THREE = this.THREE;
     if (!THREE || !this._tireWheels) return;
 
@@ -4760,6 +4765,10 @@ class Component extends DCLogic {
         tire._boreR = minR;
         tire._blendR = minR + (maxR - minR) * 0.35;
       }
+
+      const factor = absoluteRadius
+        ? (tire._boreR > 1e-9 ? (target / (scaleFactor || 1.0)) / tire._boreR : 1.0)
+        : target;
 
       if (factor === 1.0) {
         pos.array.set(tire._origLocalPos);
@@ -4850,51 +4859,46 @@ class Component extends DCLogic {
         m.visible = true;
       });
 
-      // Stretch the tire's inner bore to meet the (possibly resized) rim,
-      // keeping the outer tread radius fixed — same idea as a real lower-
-      // profile tire on a bigger rim.
-      this._deformTireBore((this.state.wheelSizeInch || 20) / 20);
-
       const parentScale = new THREE.Vector3();
       if (firstMesh && firstMesh.parent) {
         firstMesh.parent.getWorldScale(parentScale);
       }
       const scaleFactor = parentScale.x || 1.0;
 
-      // Rotation-invariant radius: an axis-aligned bounding box on a
-      // non-circular (spoked) stock-wheel silhouette overestimates or
-      // underestimates by up to sqrt(2) depending on whatever roll angle the
-      // wheel happens to be at when a custom rim is applied (see the matching
-      // fix in _generateBlurredWheelTexture). Since worldRadius directly
-      // scales the custom rim's diameter (targetWorldRadius below) and its
-      // depth-fit math, an unlucky angle made custom wheels come out visibly
-      // undersized — a small rim sitting deep in an oversized tire bore.
-      const _stockRimVtx = new THREE.Vector3();
-      let worldRadius = 0;
-      orig._frontLeftWheels.forEach(m => {
-        if (!orig._spokesWheels.includes(m) || !m.geometry || !m.geometry.attributes.position) return;
-        m.updateWorldMatrix(true, false);
-        const posAttr = m.geometry.attributes.position;
-        for (let i = 0; i < posAttr.count; i++) {
-          _stockRimVtx.fromBufferAttribute(posAttr, i).applyMatrix4(m.matrixWorld);
-          const d = _stockRimVtx.distanceTo(firstMesh._pivot);
-          if (d > worldRadius) worldRadius = d;
-        }
-      });
+      // Real physical sizing, anchored to actual tire-spec math (e.g. a
+      // 235/55R19 tire: 19" rim diameter, 55%-of-235mm sidewall) instead of
+      // the stock wheel's own modeled radius — that radius isn't necessarily
+      // an accurate 19"/20"/... reference, so scaling off it (as the code
+      // used to) doesn't track real rim sizes and can't be fixed by tuning a
+      // multiplier. Rim radius follows the inch spec directly; the tire's
+      // OUTER tread radius stays fixed (matching the "plus sizing" idea
+      // already used for the bore stretch below) and its sidewall/bore
+      // simply absorbs the difference.
+      const REAL_INCH_TO_M = 0.0254;
+      const inchSize = this.state.wheelSizeInch || 20;
+      const realRimRadiusM = (inchSize * REAL_INCH_TO_M) / 2;
+      // Depth (Z / axle-direction) math below is independent of the chosen
+      // rim diameter — it's always anchored to a fixed real 20" radius, same
+      // as before, just now grounded in real units instead of the stock
+      // wheel's (inaccurate) modeled size.
+      const DEPTH_BASELINE_RADIUS_M = (20 * REAL_INCH_TO_M) / 2;
 
-      // Measure the ORIGINAL TIRE's own axial span relative to the wheel
+      // Measures the ORIGINAL TIRE's own axial span relative to the wheel
       // centre (firstMesh._pivot). Grounding the fit in the tire's real
       // geometry (rather than the stock rim's face) is still the goal, but
       // aligning to the tire's OUTER face — not its midpoint — is what
       // actually matters: a wheel's face sits near the tire's front opening
       // in reality. Centring broke down for unusually thin/flat rim models
       // (e.g. a 6cm-deep disc) by burying the whole thing at the tire's
-      // depth midpoint, nowhere near the visible opening.
-      let tireAxialCenter = 0.0;
-      let tireHalfSpan = 0.0;
-      let tireOuterFace = 0.0;
-      let tireBoreRadius = 0.0;
-      if (firstMesh) {
+      // depth midpoint, nowhere near the visible opening. Also returns the
+      // radial bore opening (smallest radial distance, from the axle line,
+      // among tire vertices near that outer face) — the true "hole" the rim
+      // shows through, which _deformTireBore's own bore/blend classification
+      // doesn't map 1:1 onto (it isn't necessarily at the visible face), so
+      // this is measured independently and re-checked after deforming.
+      const measureTire = () => {
+        let axialCenter = 0.0, halfSpan = 0.0, outerFace = 0.0, boreRadius = 0.0;
+        if (!firstMesh) return { axialCenter, halfSpan, outerFace, boreRadius };
         const axle = firstMesh._rollAxis;
         const outwardDir = axle.clone().multiplyScalar(-1); // left side outward is -axle
         let minProj = Infinity, maxProj = -Infinity;
@@ -4911,47 +4915,55 @@ class Component extends DCLogic {
             }
           }
         });
-        if (isFinite(minProj) && isFinite(maxProj)) {
-          tireAxialCenter = (minProj + maxProj) / 2;
-          tireHalfSpan = (maxProj - minProj) / 2;
-          tireOuterFace = maxProj;
+        if (!isFinite(minProj) || !isFinite(maxProj)) return { axialCenter, halfSpan, outerFace, boreRadius };
+        axialCenter = (minProj + maxProj) / 2;
+        halfSpan = (maxProj - minProj) / 2;
+        outerFace = maxProj;
 
-          // Radial bore opening: the smallest radial distance (from the axle
-          // line, not just the pivot point) among tire vertices near the
-          // outer face — i.e. the true "hole" the rim shows through. Some
-          // custom rim models pack most of their outer barrel surface right
-          // up against their own normalized max radius (unlike thinner/
-          // spoke-tip-only designs), so a rim sized purely off the stock
-          // wheel's radius can end up wider than this opening and have its
-          // whole outer band hidden behind the tire's inner lip.
-          const faceBand = 0.02; // metres
-          let minRadiusNearFace = Infinity;
-          orig._tireWheels.forEach(m => {
-            if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
-              const pos = m.geometry.attributes.position;
-              const tempV = new THREE.Vector3();
-              m.updateWorldMatrix(true, false);
-              for (let i = 0; i < pos.count; i++) {
-                tempV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
-                const rel = tempV.clone().sub(firstMesh._pivot);
-                const proj = rel.dot(outwardDir);
-                if (proj > maxProj - faceBand) {
-                  const radial = rel.addScaledVector(outwardDir, -proj).length();
-                  if (radial < minRadiusNearFace) minRadiusNearFace = radial;
-                }
+        const faceBand = 0.02; // metres
+        let minRadiusNearFace = Infinity;
+        orig._tireWheels.forEach(m => {
+          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
+            const pos = m.geometry.attributes.position;
+            const tempV = new THREE.Vector3();
+            m.updateWorldMatrix(true, false);
+            for (let i = 0; i < pos.count; i++) {
+              tempV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+              const rel = tempV.clone().sub(firstMesh._pivot);
+              const proj = rel.dot(outwardDir);
+              if (proj > maxProj - faceBand) {
+                const radial = rel.addScaledVector(outwardDir, -proj).length();
+                if (radial < minRadiusNearFace) minRadiusNearFace = radial;
               }
             }
-          });
-          if (isFinite(minRadiusNearFace)) tireBoreRadius = minRadiusNearFace;
-        }
+          }
+        });
+        if (isFinite(minRadiusNearFace)) boreRadius = minRadiusNearFace;
+        return { axialCenter, halfSpan, outerFace, boreRadius };
+      };
+
+      // Stretch the tire's inner bore to meet the resized rim exactly,
+      // keeping the outer tread radius fixed — same idea as a real lower-
+      // profile tire on a bigger rim. _deformTireBore's bore/blend
+      // classification isn't measured at the visible face specifically, so
+      // one correction pass (re-deform using the ratio between what we
+      // actually got and what we wanted) reliably converges on the real
+      // target instead of leaving a systematic shortfall.
+      this._deformTireBore(realRimRadiusM, true, scaleFactor);
+      let tireMeasure = measureTire();
+      if (tireMeasure.boreRadius > 1e-6 && Math.abs(tireMeasure.boreRadius - realRimRadiusM) > realRimRadiusM * 0.01) {
+        const correctedTarget = realRimRadiusM * (realRimRadiusM / tireMeasure.boreRadius);
+        this._deformTireBore(correctedTarget, true, scaleFactor);
+        tireMeasure = measureTire();
       }
+      const { axialCenter: tireAxialCenter, halfSpan: tireHalfSpan, outerFace: tireOuterFace, boreRadius: tireBoreRadius } = tireMeasure;
       console.log(`[onWheelStyle] Measured tire axial centre (bore midpoint): ${tireAxialCenter.toFixed(5)} meters, half-span: ${tireHalfSpan.toFixed(5)} meters, outer face: ${tireOuterFace.toFixed(5)} meters, bore radius: ${tireBoreRadius.toFixed(5)} meters`);
 
       // Clamp the rim's depth scale so a naturally deep-dish design can't
       // out-scale the tire's real bore and poke out past its sidewalls —
       // wheels that already fit (nativeRimHalfSpanWorld <= tireHalfSpan) are
       // completely unaffected (depthFitScale stays 1).
-      const nativeRimHalfSpanWorld = (this._customRimLocalHalfSpan !== undefined ? this._customRimLocalHalfSpan : 0.15) * (worldRadius * 0.80);
+      const nativeRimHalfSpanWorld = (this._customRimLocalHalfSpan !== undefined ? this._customRimLocalHalfSpan : 0.15) * DEPTH_BASELINE_RADIUS_M;
       const depthFitScale = (tireHalfSpan > 0 && nativeRimHalfSpanWorld > 0) ? Math.min(1, tireHalfSpan / nativeRimHalfSpanWorld) : 1;
       console.log(`[onWheelStyle] Rim depth-fit scale: ${depthFitScale.toFixed(3)} (native half-span ${nativeRimHalfSpanWorld.toFixed(5)}m vs tire half-span ${tireHalfSpan.toFixed(5)}m)`);
 
@@ -4977,7 +4989,7 @@ class Component extends DCLogic {
         // Align the custom rim's own outer face with the tire's outer face —
         // not its midpoint (see the tireOuterFace comment above for why).
         const localOuterZAdj = this._customRimLocalOuterZ !== undefined ? this._customRimLocalOuterZ : 0.15;
-        const customOutwardExtent = localOuterZAdj * (worldRadius * 0.80) * depthFitScale;
+        const customOutwardExtent = localOuterZAdj * DEPTH_BASELINE_RADIUS_M * depthFitScale;
         const shiftAmount = customOutwardExtent - tireOuterFace;
         if (item.side === 'fl') flShiftAmount = shiftAmount;
 
@@ -4996,24 +5008,21 @@ class Component extends DCLogic {
             cloneMesh.name = "Custom_Wheel_Mesh_" + item.side + "_" + c.name;
             
             // Construct the desired world transform matrix W
-            // Since the geometry's radius is normalized to 1.0, we scale X & Y by targetWorldRadius.
-            // 20" is our baseline (sizeScale = 0.80). Larger diameters scale linearly (sizeScale = (inch / 20) * 0.80).
-            // To maintain depth alignment, the Z-axis (axle depth) is kept constant at the 20" baseline radius.
-            const inchSize = this.state.wheelSizeInch || 20;
-            const sizeScale = (inchSize / 20) * 0.80;
-            // Clamp so the rim's own farthest point (== targetWorldRadius,
-            // since every custom rim is normalized so its max vertex sits at
-            // local radius 1.0) never exceeds the tire's actual bore opening
-            // — otherwise its outer edge/barrel renders behind the tire's
-            // inner lip instead of inside it. A small inset keeps a
-            // consistent, natural-looking sliver of tire visible all around
-            // rather than a perfectly flush (and depth-fighting-prone) edge.
-            const boreRadiusCap = tireBoreRadius > 0 ? tireBoreRadius * 0.96 : Infinity;
-            const targetWorldRadius = Math.min(worldRadius * sizeScale, boreRadiusCap);
+            // Since the geometry's radius is normalized to 1.0, we scale X & Y
+            // by targetWorldRadius, which is the real physical rim radius for
+            // the selected inch size (see realRimRadiusM above).
+            // Safety net only (should rarely bind now that the tire's bore was
+            // already deformed to this exact target above): clamp so the
+            // rim's own farthest point never exceeds the tire's actual,
+            // just-measured bore opening — otherwise its outer edge/barrel
+            // would render behind the tire's inner lip instead of inside it.
+            // A tiny inset avoids a perfectly flush (depth-fighting-prone) edge.
+            const boreRadiusCap = tireBoreRadius > 0 ? tireBoreRadius * 0.99 : Infinity;
+            const targetWorldRadius = Math.min(realRimRadiusM, boreRadiusCap);
             // depthFitScale (<=1) compresses an overly deep-dish rim so it
             // never scales past the tire's real bore depth — see its
             // computation above for why.
-            const baselineWorldRadius = worldRadius * 0.80 * depthFitScale;
+            const baselineWorldRadius = DEPTH_BASELINE_RADIUS_M * depthFitScale;
 
             const W = new THREE.Matrix4().compose(
               finalPos,
@@ -5082,7 +5091,7 @@ class Component extends DCLogic {
         this._pendingAutoDepthFit = false;
 
         const centerRayZ = this._customRimLocalCenterRayZ !== undefined ? this._customRimLocalCenterRayZ : this._customRimLocalCenterZ;
-        const hubDepthRelPivot = -flShiftAmount + (worldRadius * 0.80 * depthFitScale) * centerRayZ;
+        const hubDepthRelPivot = -flShiftAmount + (DEPTH_BASELINE_RADIUS_M * depthFitScale) * centerRayZ;
 
         const flAxle = firstMesh._rollAxis;
         const flOutwardDir = flAxle.clone().multiplyScalar(-1);
