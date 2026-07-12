@@ -1103,18 +1103,33 @@ class Component extends DCLogic {
     const applyRot = (m, rollAngle, doSteer) => {
       if (!m._initWorld || !m._pivot) return;
       const P = m._pivot;
-      // Extra world rotation about P: roll (spin) first, then steer (turn).
-      // Negative roll about the axle ⇒ contact patch moves backward = forward drive.
-      // Spin about the wheel's REAL axle (PCA) — using the car lateral instead
-      // makes the disc tumble (wobble) because the model's wheels are tilted.
+      // Roll (spin) about the wheel's REAL axle (PCA) at this mesh's OWN
+      // concentric-fit centre — using the car lateral instead makes the disc
+      // tumble (wobble) because the model's wheels are tilted; using a
+      // shared cluster centre instead of the per-mesh fit reintroduces the
+      // in-tyre wobble _pivot's per-mesh fit was added to fix.
       const rollAxis = m._rollAxis || lateral;
-      const R = new THREE.Matrix4().makeRotationAxis(rollAxis, -rollAngle);
-      if (doSteer) R.premultiply(new THREE.Matrix4().makeRotationAxis(worldUp, -steerRad));
-      const newWorld = new THREE.Matrix4()
+      const Rroll = new THREE.Matrix4().makeRotationAxis(rollAxis, -rollAngle);
+      let newWorld = new THREE.Matrix4()
         .makeTranslation(P.x, P.y, P.z)
-        .multiply(R)
+        .multiply(Rroll)
         .multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z))
         .multiply(m._initWorld);
+      if (doSteer) {
+        // Steer (turn) rotates the whole knuckle as one rigid body, so every
+        // mesh in the cluster (rim, tire, disc) MUST pivot about the same
+        // shared centre (_steerPivot) rather than each mesh's own per-mesh
+        // roll pivot — otherwise rim/tire/disc trace slightly different arcs
+        // that diverge visibly at large steer angles. Falls back to P for
+        // meshes that never got a distinct _steerPivot assigned.
+        const Ps = m._steerPivot || P;
+        const Rsteer = new THREE.Matrix4().makeRotationAxis(worldUp, -steerRad);
+        newWorld = new THREE.Matrix4()
+          .makeTranslation(Ps.x, Ps.y, Ps.z)
+          .multiply(Rsteer)
+          .multiply(new THREE.Matrix4().makeTranslation(-Ps.x, -Ps.y, -Ps.z))
+          .multiply(newWorld);
+      }
       if (heightShiftY) {
         newWorld.premultiply(new THREE.Matrix4().makeTranslation(0, heightShiftY, 0));
       }
@@ -1927,6 +1942,15 @@ class Component extends DCLogic {
       info.forEach(o => {
         o.c._pivot = o.fit || (o.tire ? clusterCenter : rimCenter);
         o.c._rollAxis = clusterAxle;
+        // Steering must rotate the whole knuckle (rim + tire + disc) as one
+        // rigid body about a SINGLE shared centre. Using each mesh's own
+        // concentric-fit _pivot (a few mm off between rim/tire by design,
+        // see the comment above) for the steer rotation too made rim and
+        // tire trace slightly different arcs — invisible near centre, but
+        // growing with the steer angle until it was a visible gap at full
+        // lock (~35°). _steerPivot is always the cluster centre so every
+        // part in the cluster steers around the exact same axis.
+        o.c._steerPivot = clusterCenter;
       });
     };
     assignPivots(fl, flCenter, flP.axle);
@@ -3357,7 +3381,16 @@ class Component extends DCLogic {
     // back to the model's own defaults (prevents HEV assignments bleeding into GT).
     const DEFAULTS = (profile && profile.fogDefaults) || {
       fogFront: ['BuildingMesh-00026|HeadlightMain'],
-      fogRear:  ['BuildingMesh-00027|Glass (Rear Lights)|f16'],
+      // f144: BuildingMesh-00027's 171 faces span 11 disconnected islands (verified
+      // via flood-fill against assets/haval-h6-hev.glb) — most are the left/right
+      // taillight lens shells (world Z ≈ ±0.79-0.99, overlapping BrakeLight/
+      // PositionLight_Rear/Light Turn bboxes). Only the island seeded at face 144
+      // (10 faces, world bbox Z: -0.156..0.155, centered on the car's midline) is
+      // the actual center rear fog strip. The old seed (f16, calibrated against
+      // the pre-rebake model) now lands in one of the taillight-lens islands
+      // instead, since this session's model rebake reordered the mesh's faces —
+      // that's the regression where the center fog light stopped lighting up.
+      fogRear:  ['BuildingMesh-00027|Glass (Rear Lights)|f144'],
     };
     try {
       const stored = JSON.parse(localStorage.getItem(this._fogStorageKey()) || '{}');
@@ -3682,14 +3715,14 @@ class Component extends DCLogic {
   // enable it, so it never shows up unannounced. Never touches the picked
   // object's material/color (no highlight-on-pick).
   _initMaterialPicker() {
-    // Test-only toggle: compare the wheel-arch trim ring's current glossy
-    // finish against a rough/matte alternative, across HEV/PHEV and GT at
-    // once. Identified via the picker below: HEV/PHEV uses raw "Plastic
-    // Black" (roughness 0, envMapIntensity 1.3 — mirror-like); GT already
-    // runs this part through its "GT Black Matte" collapse (roughness 0.25).
-    // Console-driven since this is for side-by-side comparison, not a
-    // shipped feature: window.__archCapRough(true) / (false). Available
-    // regardless of the ?debug=1 picker flag below.
+    // Wheel-arch trim ring + shared lower-body cladding finish, applied by
+    // default at model load (see onModelLoaded). Identified via the picker
+    // below: HEV/PHEV used raw glossy "Plastic Black" (roughness 0,
+    // envMapIntensity 1.3 — mirror-like) on both the per-wheel ring meshes
+    // and the shared "08_car_body_plastic" shell; GT's per-wheel ring
+    // meshes already ran through its "GT Black Matte" collapse. Kept as a
+    // console toggle too, to compare back to the original glossy look:
+    // window.__archCapRough(true) / (false).
     window.__archCapRough = (rough = true) => this._setArchCapRough(rough);
 
     const params = new URLSearchParams(location.search);
@@ -3799,9 +3832,12 @@ class Component extends DCLogic {
       activeMats.forEach(m => {
         if (!m || !m._archCapOrig) return;
         if (rough) {
-          m.roughness = 0.8;
+          // Match "GT Black Matte" — the material GT's own version of this
+          // exact part already uses (see _collapseGtBlackMaterials), rather
+          // than inventing a new roughness/env recipe for HEV/PHEV.
+          m.roughness = 0.25;
           m.metalness = 0;
-          if ('envMapIntensity' in m) m.envMapIntensity = 0.25;
+          if ('envMapIntensity' in m) m.envMapIntensity = 0;
         } else {
           m.roughness = m._archCapOrig.roughness;
           m.metalness = m._archCapOrig.metalness;
@@ -6841,6 +6877,12 @@ class Component extends DCLogic {
     this._initDoors(obj, profile);
     this._initTrunk(obj, profile);
     this._initGtCosmeticFixes(obj, profile);
+    // Wheel-arch trim ring + shared lower-body cladding: was raw glossy
+    // "Plastic Black" (roughness 0, envMapIntensity 1.3 — mirror-like) on
+    // HEV/PHEV, and on the "08_car_body_plastic" shell shared with GT.
+    // Applied by default now (was a console-only test toggle); still
+    // reachable as window.__archCapRough(false) to compare back.
+    this._setArchCapRough(true);
     this._captureVariant(profile.key, obj);
 
     // If a secondary model delegates wheel rendering to a source variant, hide its
