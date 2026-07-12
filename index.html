@@ -22,10 +22,28 @@
     @keyframes vp-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
     .hv-toolbar { scrollbar-width: none; -ms-overflow-style: none; }
     .hv-toolbar::-webkit-scrollbar { display: none; }
+    .slim-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(79, 214, 232, 0.4) transparent;
+    }
+    .slim-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .slim-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .slim-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(79, 214, 232, 0.35);
+      border-radius: 4px;
+    }
+    .slim-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(79, 214, 232, 0.6);
+    }
     @media (max-width: 640px) {
       .hv-toolbar { left: 14px !important; right: 14px !important; max-width: none !important; gap: 6px !important; }
       .hv-toolbar > button { width: 36px !important; height: 36px !important; }
-      .hv-config-panel { top: 70px !important; right: 14px !important; max-height: calc(100vh - 84px); overflow-y: auto; }
+      .hv-config-panel { top: 70px !important; right: 14px !important; max-height: calc(100vh - 84px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
     }
   </style>
 </helmet>
@@ -126,7 +144,7 @@
   </div>
 
   <!-- configure panel -->
-  <div class="hv-config-panel" style="position: absolute; top: 22px; right: 26px; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; transition: width 0.2s ease;">
+  <div class="hv-config-panel slim-scrollbar" style="position: absolute; top: 22px; right: 26px; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; transition: width 0.2s ease;">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div style="font-size: 10px; letter-spacing: .3em; opacity: .55; font-weight: 600;">CONFIGURE</div>
@@ -311,10 +329,9 @@
     <!-- ── WHEELS TAB ── -->
     <sc-if value="{{ tabIsWheels }}" hint-placeholder-val="{{ false }}">
 
-      <!-- sub-tab pills: CATALOG / FINISH / SETTINGS / CUSTOM -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 5px; margin-bottom: 16px;">
+      <!-- sub-tab pills: CATALOG / SETTINGS / CUSTOM -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 16px;">
         <button onClick="{{ setWheelSubCatalog }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subCatalogBorder }}; background: {{ subCatalogBg }}; color: {{ subCatalogCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">CATALOG</button>
-        <button onClick="{{ setWheelSubFinish }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subFinishBorder }}; background: {{ subFinishBg }}; color: {{ subFinishCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">FINISH</button>
         <button onClick="{{ setWheelSubSettings }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subSettingsBorder }}; background: {{ subSettingsBg }}; color: {{ subSettingsCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">SETTINGS</button>
         <button onClick="{{ setWheelSubCustom }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subCustomBorder }}; background: {{ subCustomBg }}; color: {{ subCustomCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">CUSTOM</button>
       </div>
@@ -322,11 +339,9 @@
       <!-- ── 1. RIM CATALOG ── -->
       <sc-if value="{{ subIsCatalog }}" hint-placeholder-val="{{ true }}">
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM CATALOG</div>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: calc(100vh - 210px); overflow-y: auto; margin-bottom: 6px; padding-right: 2px;">
+        <div class="slim-scrollbar" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: calc(100vh - 210px); overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: 6px; padding-right: 2px;">
           <button onClick="{{ onSelectStockWheel }}" title="Stock" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ stockRing }}; background: {{ stockBg }}; cursor: pointer; transition: all 0.15s ease;">
-            <div style="width: 100%; aspect-ratio: 1; border-radius: 7px; background: rgba(255,255,255,.04); display: flex; align-items: center; justify-content: center;">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="{{ stockCol }}" stroke-width="1.6"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-            </div>
+            <img src="{{ stockThumb }}" style="width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 7px; background: rgba(255,255,255,.04); opacity: {{ stockImgOpacity }}; animation: {{ stockImgAnim }};" />
             <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .02em; color: {{ stockCol }}; text-align: center; line-height: 1.2; word-break: break-word;">STOCK</span>
           </button>
           <sc-for list="{{ catalogItems }}" as="cw" hint-placeholder-count="21">
@@ -338,8 +353,27 @@
         </div>
       </sc-if>
 
-      <!-- ── 2. RIM FINISH ── -->
-      <sc-if value="{{ subIsFinish }}" hint-placeholder-val="{{ false }}">
+      <!-- ── 2. CUSTOM WHEEL ── -->
+      <sc-if value="{{ subIsCustom }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">UPLOAD WHEEL MODEL</div>
+        <label style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px 9px; border: 1px dashed rgba(79,214,232,.35); border-radius: 8px; background: rgba(79,214,232,.02); color: #9fe6f0; cursor: pointer; margin-bottom: 18px; text-align: center; transition: all 0.15s ease;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; line-height: 1.3; word-break: break-all;">
+            {{ uploadedWheelLabel }}
+          </span>
+          <input type="file" accept=".glb,.gltf" onChange="{{ onUploadWheel }}" style="display: none;" />
+        </label>
+
+        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CALIPER DEPTH</div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+          <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">INWARD ←  → OUTWARD</span>
+          <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelDepthOffsetLabel }}</span>
+        </div>
+        <input type="range" min="-15" max="15" step="0.5" value="{{ wheelDepthOffsetVal }}" onChange="{{ onWheelDepthOffset }}" onInput="{{ onWheelDepthOffset }}" style="width: 100%; accent-color: #4fd6e8;" />
+      </sc-if>
+
+      <!-- ── 3. WHEEL SETTINGS (finish + ride height + size) ── -->
+      <sc-if value="{{ subIsSettings }}" hint-placeholder-val="{{ false }}">
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM FINISH</div>
 
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .8;">
@@ -363,7 +397,7 @@
             </div>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;">
+          <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px;">
             <div style="display: flex; justify-content: space-between; align-items: baseline;">
               <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">METALNESS / GLOSS</span>
               <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelMetalnessLabel }}</span>
@@ -371,28 +405,6 @@
             <input type="range" min="0" max="1" step="0.02" value="{{ wheelMetalness }}" onChange="{{ onWheelMetalness }}" onInput="{{ onWheelMetalness }}" disabled="{{ tintControlsDisabled }}" style="width: 100%; accent-color: #4fd6e8;" />
           </div>
         </div>
-      </sc-if>
-
-      <!-- ── 3. CUSTOM WHEEL ── -->
-      <sc-if value="{{ subIsCustom }}" hint-placeholder-val="{{ false }}">
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">UPLOAD WHEEL MODEL</div>
-        <label style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px 9px; border: 1px dashed rgba(79,214,232,.35); border-radius: 8px; background: rgba(79,214,232,.02); color: #9fe6f0; cursor: pointer; margin-bottom: 18px; text-align: center; transition: all 0.15s ease;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; line-height: 1.3; word-break: break-all;">
-            {{ uploadedWheelLabel }}
-          </span>
-          <input type="file" accept=".glb,.gltf" onChange="{{ onUploadWheel }}" style="display: none;" />
-        </label>
-      </sc-if>
-
-      <!-- ── 4. WHEEL SETTINGS ── -->
-      <sc-if value="{{ subIsSettings }}" hint-placeholder-val="{{ false }}">
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CALIPER DEPTH</div>
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-          <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">INWARD ←  → OUTWARD</span>
-          <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelDepthOffsetLabel }}</span>
-        </div>
-        <input type="range" min="-15" max="15" step="0.5" value="{{ wheelDepthOffsetVal }}" onChange="{{ onWheelDepthOffset }}" onInput="{{ onWheelDepthOffset }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 18px;" />
 
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIDE HEIGHT</div>
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
@@ -408,7 +420,7 @@
           <button onClick="{{ setSize21 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size21Bg }}; color: {{ size21Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">21"</button>
           <button onClick="{{ setSize22 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size22Bg }}; color: {{ size22Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">22"</button>
         </div>
-        <div style="font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; opacity: .4; line-height: 1.4;">Depth &amp; size also apply to wheels picked from the catalog.</div>
+        <div style="font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; opacity: .4; line-height: 1.4;">Size also applies to wheels picked from the catalog.</div>
       </sc-if>
 
     </sc-if>
@@ -461,8 +473,8 @@ class Component extends DCLogic {
     glassTweaks: { opacity: 0.1, iridescence: 0, iridIOR: 1.8, thickMin: 100, thickMax: 400, clearcoat: 1.0, envMap: 1.0, color: '#ffffff', fresnel: 0 },
     showRearGlassTweaks: false,
     rearGlassTweaks: { opacity: 0.6, roughness: 0.15, transmission: 0.6, envMap: 0.5, clearcoat: 1.0, color: '#5c0808' },
-    wheelStyle: 'default', // 'default' | 'custom' — HEV/PHEV's own stock rim (baked into haval-h6v2.glb) is correct now, so start on STOCK
-    wheelSubTab: 'catalog', // 'catalog' | 'finish' | 'custom'
+    wheelStyle: 'default', // 'default' | 'custom' — set to 'custom' once the initial stock catalog wheel load lands (see onModelLoaded)
+    wheelSubTab: 'catalog', // 'catalog' | 'settings' | 'custom'
     wheelColor: '#3a3a3d',
     wheelRoughness: 0.15,
     wheelMetalness: 0.95,
@@ -470,6 +482,7 @@ class Component extends DCLogic {
     wheelSizeInch: 19, // 19inch — smallest of the four selectable sizes (19"-22")
     wheelTintOverride: false,
     uploadedWheelName: null,
+    isCustomUpload: false, // true only for a real file upload, not a catalog/stock pick — see _handleUploadedWheelModel
     selectedCatalogKey: null,
     catalogThumbs: {},
     catalogLoadingKey: null,
@@ -495,12 +508,14 @@ class Component extends DCLogic {
     this._curtainTarget = 0;
     this._wheelsShareCarRoot = true;
     this._wheelCatalog = [
-      // Haval PHEV is no longer a catalog entry — the real PHEV rim is now
-      // baked into haval-h6v2.glb and shown via the STOCK button instead.
-      // Haval GT stays as a catalog wheel (GT's own car GLB doesn't have its
-      // stock rim fixed yet) and leads the list so it's the first alternative
-      // right after STOCK.
+      // haval_gt and haval_phev are each variant's own extracted stock rim —
+      // besides being regular catalog entries (so either can be put on the
+      // OTHER variant), they double as what the STOCK button loads for the
+      // currently active variant (see _stockCatalogKeyFor), which is what
+      // gives STOCK a real thumbnail and lets it resize like every other
+      // wheel instead of being a separate fixed, non-resizable mesh.
       { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT' },
+      { key: 'haval_phev',         file: 'HavalPHEV-wheel.glb',            label: 'Haval PHEV' },
       { key: 'vossen_lc104t',      file: '3d_vossen_lc104t.glb',           label: 'Vossen LC104T' },
       { key: 'audi_rs5',           file: 'Audi-RS5.glb',                   label: 'Audi RS5' },
       { key: 'bmw_19',             file: 'bmw_wheel_19inch_model_859.glb', label: 'BMW 19"' },
@@ -517,6 +532,7 @@ class Component extends DCLogic {
       { key: 'vorsteiner_vfe404',  file: 'vorsteiner_vfe404.glb',          label: 'Vorsteiner VFE404' },
       { key: 'vossen_cg203',       file: 'vossen_cg203.glb',               label: 'Vossen CG203' },
       { key: 'vossen_hf5',         file: 'vossen_hf-5.glb',                label: 'Vossen HF-5' },
+      { key: 'vossen_hf5_black',   file: 'vossen_hf-5-black.glb',          label: 'Vossen HF-5 Black' },
       { key: 'vossen_lc109t',      file: 'vossen_lc109t.glb',              label: 'Vossen LC109T' },
       { key: 'vossen_vfs1',        file: 'vossen_vfs1.glb',                label: 'Vossen VFS1' },
       { key: 'vossen_vfs4',        file: 'vossen_vfs4.glb',                label: 'Vossen VFS4' },
@@ -531,9 +547,12 @@ class Component extends DCLogic {
 
   renderVals() {
     const s = this.state;
-    // The panel widens (220px → 300px) for the wheels/catalog grid — push the
-    // top icon row out by the same amount so it doesn't overlap the panel.
-    const wideExtra = (s.configTab === 'wheels' && s.wheelSubTab === 'catalog') ? 80 : 0;
+    // Computed once and reused below for stockRing/stockBg/stockCol/
+    // stockThumb/stockImgOpacity/stockImgAnim, instead of each independently
+    // recomputing the same key/lookup on every render.
+    const stockKey = this._stockCatalogKeyFor(s.modelVariant);
+    const stockThumbVal = s.catalogThumbs[stockKey];
+    const stockReady = !!(stockThumbVal && stockThumbVal !== 'error');
     const palette = [
       { key: '#F4F5F7', hex: '#F4F5F7', title: 'Branco Ágata' },
       { key: '#121214', hex: '#121214', title: 'Preto Hematita' },
@@ -574,14 +593,14 @@ class Component extends DCLogic {
       panelDisplay: s.loading || s.error ? 'none' : 'block',
       panelOpen: s.panelOpen,
       panelBodyDisplay: (!s.loading && !s.error && s.panelOpen) ? 'block' : 'none',
-      panelWidth: (s.configTab === 'wheels' && s.wheelSubTab === 'catalog') ? '300px' : '220px',
+      panelWidth: '220px',
       panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
       dayNightDisplay: (!s.loading && !s.error) ? 'flex' : 'none',
       // All 8 icons now live in one flex row (order set per-button below), so a
       // single container offset replaces what used to be 8 hand-computed
       // per-button `right` values — it just needs to match the old rightmost
       // (color-tab) offset since flexbox gap handles the rest.
-      toolbarRight: s.panelOpen ? (254 + wideExtra) + 'px' : '26px',
+      toolbarRight: s.panelOpen ? '254px' : '26px',
       doorsBtnBorder: (s.panelOpen && s.configTab === 'doors') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       doorsBtnCol:    (s.panelOpen && s.configTab === 'doors') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       toggleDoors:    () => this.toggleDoors(),
@@ -661,36 +680,40 @@ class Component extends DCLogic {
       onWheelColor: (e) => this.onWheelColor(e),
       onWheelRoughness: (e) => this.onWheelRoughness(e),
       onWheelMetalness: (e) => this.onWheelMetalness(e),
-      setWheelDefault: () => this.onWheelStyle('default'),
-      setWheelCustom: () => this.onWheelStyle('custom'),
-      // Wheels sub-tabs: CATALOG / FINISH / CUSTOM / SETTINGS
+      // Wheels sub-tabs: CATALOG / SETTINGS / CUSTOM
       wheelSubTab: s.wheelSubTab,
       subIsCatalog:  s.wheelSubTab === 'catalog',
-      subIsFinish:   s.wheelSubTab === 'finish',
       subIsCustom:   s.wheelSubTab === 'custom',
       subIsSettings: s.wheelSubTab === 'settings',
       setWheelSubCatalog:  () => this.setWheelSubTab('catalog'),
-      setWheelSubFinish:   () => this.setWheelSubTab('finish'),
       setWheelSubCustom:   () => this.setWheelSubTab('custom'),
       setWheelSubSettings: () => this.setWheelSubTab('settings'),
       subCatalogBg:  s.wheelSubTab === 'catalog'  ? 'rgba(79,214,232,.18)' : 'transparent',
-      subFinishBg:   s.wheelSubTab === 'finish'   ? 'rgba(79,214,232,.18)' : 'transparent',
       subCustomBg:   s.wheelSubTab === 'custom'   ? 'rgba(79,214,232,.18)' : 'transparent',
       subSettingsBg: s.wheelSubTab === 'settings' ? 'rgba(79,214,232,.18)' : 'transparent',
       subCatalogCol:  s.wheelSubTab === 'catalog'  ? '#4fd6e8' : 'rgba(255,255,255,.6)',
-      subFinishCol:   s.wheelSubTab === 'finish'   ? '#4fd6e8' : 'rgba(255,255,255,.6)',
       subCustomCol:   s.wheelSubTab === 'custom'   ? '#4fd6e8' : 'rgba(255,255,255,.6)',
       subSettingsCol: s.wheelSubTab === 'settings' ? '#4fd6e8' : 'rgba(255,255,255,.6)',
       subCatalogBorder:  s.wheelSubTab === 'catalog'  ? '#4fd6e8' : 'rgba(255,255,255,.12)',
-      subFinishBorder:   s.wheelSubTab === 'finish'   ? '#4fd6e8' : 'rgba(255,255,255,.12)',
       subCustomBorder:   s.wheelSubTab === 'custom'   ? '#4fd6e8' : 'rgba(255,255,255,.12)',
       subSettingsBorder: s.wheelSubTab === 'settings' ? '#4fd6e8' : 'rgba(255,255,255,.12)',
-      // Catalog grid
-      stockRing: s.wheelStyle === 'default' ? '#4fd6e8' : 'rgba(255,255,255,.12)',
-      stockBg:   s.wheelStyle === 'default' ? 'rgba(79,214,232,.14)' : 'transparent',
-      stockCol:  s.wheelStyle === 'default' ? '#4fd6e8' : 'rgba(255,255,255,.7)',
+      // Catalog grid — STOCK now shows (and resizes) via the same catalog
+      // pipeline as every other wheel, backed by the current variant's own
+      // extracted rim (see _stockCatalogKeyFor), so its highlight/thumbnail
+      // follow selectedCatalogKey exactly like a regular catalog entry.
+      stockRing: s.selectedCatalogKey === stockKey ? '#4fd6e8' : 'rgba(255,255,255,.12)',
+      stockBg:   s.selectedCatalogKey === stockKey ? 'rgba(79,214,232,.14)' : 'transparent',
+      stockCol:  s.selectedCatalogKey === stockKey ? '#4fd6e8' : 'rgba(255,255,255,.7)',
+      stockThumb: stockReady ? stockThumbVal : this._catalogPlaceholderThumb,
+      stockImgOpacity: stockReady ? '1' : '.4',
+      stockImgAnim: stockReady ? 'none' : 'vp-pulse 1.6s ease-in-out infinite',
       onSelectStockWheel: () => this.onSelectStockWheel(),
-      catalogItems: this._wheelCatalog.map((item) => {
+      // The current variant's own stock rim is already shown via the STOCK
+      // slot itself — listing it again here would just be a redundant
+      // duplicate of the same wheel, so it's the one entry filtered out of
+      // the regular grid (the OTHER variant's stock rim stays, as the
+      // easiest way to try that variant's look on this one).
+      catalogItems: this._wheelCatalog.filter((item) => item.key !== this._stockCatalogKeyFor(s.modelVariant)).map((item) => {
         const active = s.selectedCatalogKey === item.key;
         const thumbVal = s.catalogThumbs[item.key];
         const ready = thumbVal && thumbVal !== 'error';
@@ -3622,6 +3645,20 @@ class Component extends DCLogic {
   }
 
   // Raycast against a specific pool of meshes (or all visible if pool is null)
+  // c.visible only reflects the node's own flag — HEV/PHEV and GT are both
+  // kept loaded at all times (only their root group's visibility toggles
+  // when switching variants), so an "invisible" model's meshes still report
+  // visible=true individually. Walk the full ancestor chain so raycasts
+  // never hit geometry from the currently-hidden variant.
+  _isWorldVisible(obj) {
+    let o = obj;
+    while (o) {
+      if (o.visible === false) return false;
+      o = o.parent;
+    }
+    return true;
+  }
+
   _raycastMesh(e, pool) {
     if (!this.renderer || !this.camera || !this.scene) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
@@ -3631,29 +3668,74 @@ class Component extends DCLogic {
     );
     const rc = new this.THREE.Raycaster();
     rc.setFromCamera(mouse, this.camera);
-    const targets = pool ? pool.filter(c => c.visible) : [];
-    if (!pool) this.scene.traverse(c => { if (c.isMesh && c.visible) targets.push(c); });
+    const targets = pool ? pool.filter(c => this._isWorldVisible(c)) : [];
+    if (!pool) this.scene.traverse(c => { if (c.isMesh && this._isWorldVisible(c)) targets.push(c); });
     const hits = rc.intersectObjects(targets, false);
     return hits.length ? hits[0].object : null;
   }
 
   // Debug object/material picker — click any part of the car to log its mesh
   // name, parent chain, and material properties (color/roughness/metalness/
-  // envMapIntensity) to the console and a small on-screen overlay. Off by
-  // default. Enable via ?debug=materials (or ?debug=1) in the URL, or from
-  // devtools with window.__pickerOn() — that also persists via localStorage
-  // so it stays on across reloads/sessions until window.__pickerOff().
+  // envMapIntensity) to the console and a small on-screen overlay with a
+  // copy button (for pasting the info elsewhere). Only active when the page
+  // is loaded with ?debug=1 in the URL — no persistence, no other way to
+  // enable it, so it never shows up unannounced. Never touches the picked
+  // object's material/color (no highlight-on-pick).
   _initMaterialPicker() {
+    // Test-only toggle: compare the wheel-arch trim ring's current glossy
+    // finish against a rough/matte alternative, across HEV/PHEV and GT at
+    // once. Identified via the picker below: HEV/PHEV uses raw "Plastic
+    // Black" (roughness 0, envMapIntensity 1.3 — mirror-like); GT already
+    // runs this part through its "GT Black Matte" collapse (roughness 0.25).
+    // Console-driven since this is for side-by-side comparison, not a
+    // shipped feature: window.__archCapRough(true) / (false). Available
+    // regardless of the ?debug=1 picker flag below.
+    window.__archCapRough = (rough = true) => this._setArchCapRough(rough);
+
     const params = new URLSearchParams(location.search);
-    this._pickerEnabled = params.get('debug') === 'materials' || params.get('debug') === '1'
-      || localStorage.getItem('hv_debug_picker') === '1';
+    this._pickerEnabled = params.get('debug') === '1';
+    if (!this._pickerEnabled) return;
 
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;left:14px;top:14px;z-index:9999;max-width:440px;' +
-      'font-family:"Space Mono",monospace;font-size:11px;line-height:1.6;white-space:pre-wrap;' +
+      'font-family:"Space Mono",monospace;font-size:11px;line-height:1.6;' +
       'color:#4fd6e8;background:rgba(10,14,18,.92);backdrop-filter:blur(6px);' +
       '-webkit-backdrop-filter:blur(6px);padding:9px 11px;border-radius:7px;' +
-      'border:1px solid rgba(79,214,232,.3);pointer-events:none;display:none;';
+      'border:1px solid rgba(79,214,232,.3);display:none;';
+    const textEl = document.createElement('div');
+    textEl.style.cssText = 'white-space:pre-wrap;margin-bottom:7px;';
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = 'COPY';
+    copyBtn.style.cssText = 'font-family:"Space Mono",monospace;font-size:9px;letter-spacing:.08em;' +
+      'padding:4px 10px;border-radius:5px;border:1px solid rgba(79,214,232,.4);' +
+      'background:rgba(79,214,232,.12);color:#4fd6e8;cursor:pointer;';
+    let lastText = '';
+    const fallbackCopy = (text) => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      return ok;
+    };
+    copyBtn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const showResult = (ok) => {
+        copyBtn.textContent = ok ? 'COPIED' : 'COPY FAILED';
+        setTimeout(() => { copyBtn.textContent = 'COPY'; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lastText).then(() => showResult(true)).catch(() => showResult(fallbackCopy(lastText)));
+      } else {
+        showResult(fallbackCopy(lastText));
+      }
+    });
+    overlay.appendChild(textEl);
+    overlay.appendChild(copyBtn);
     document.body.appendChild(overlay);
     this._pickerOverlay = overlay;
 
@@ -3674,35 +3756,13 @@ class Component extends DCLogic {
       const variant = this.state && this.state.modelVariant;
       const text = `variant: ${variant}\nmesh: "${hit.name || '(unnamed)'}"\nparents: ${chain.join(' > ') || '(none)'}\nmaterials:\n${info}`;
       console.log('[picker]', text, hit);
-      overlay.textContent = text;
+      lastText = text;
+      textEl.textContent = text;
+      copyBtn.textContent = 'COPY';
       overlay.style.display = 'block';
-      this._flashMesh(hit, true);
-      if (this._pickerFlashTimer) clearTimeout(this._pickerFlashTimer);
-      this._pickerFlashTimer = setTimeout(() => this._flashMesh(hit, false), 1200);
     };
     canvas.addEventListener('click', this._onPickerClick);
-
-    window.__pickerOn  = () => {
-      this._pickerEnabled = true;
-      localStorage.setItem('hv_debug_picker', '1');
-      console.log('[picker] enabled — click any part of the car (window.__pickerOff() to disable)');
-    };
-    window.__pickerOff = () => {
-      this._pickerEnabled = false;
-      localStorage.setItem('hv_debug_picker', '0');
-      overlay.style.display = 'none';
-      console.log('[picker] disabled');
-    };
-    if (this._pickerEnabled) console.log('[picker] enabled — click any part of the car (window.__pickerOff() to disable)');
-
-    // Test-only toggle: compare the wheel-arch trim ring's current glossy
-    // finish against a rough/matte alternative, across HEV/PHEV and GT at
-    // once. Identified via the picker above: HEV/PHEV uses raw "Plastic
-    // Black" (roughness 0, envMapIntensity 1.3 — mirror-like); GT already
-    // runs this part through its "GT Black Matte" collapse (roughness 0.25).
-    // Console-driven since this is for side-by-side comparison, not a
-    // shipped feature: window.__archCapRough(true) / (false).
-    window.__archCapRough = (rough = true) => this._setArchCapRough(rough);
+    console.log('[picker] enabled via ?debug=1 — click any part of the car');
   }
 
   _archCapMeshNames() {
@@ -3710,6 +3770,11 @@ class Component extends DCLogic {
       'BuildingMesh-00014_1', 'BuildingMesh-00014_2', 'BuildingMesh-00119',
       'BuildingMesh-00121_1', 'BuildingMesh-00121_2', 'BuildingMesh-00122',
       '30_LF_door_plastic', '43_RF_door_plastic', '37_LB_door_plastic', '50_RB_door_plastic',
+      // Shared lower-body cladding shell (rocker panels + bumper skirts +
+      // wheel-arch wrap) — same mesh name/material on both HEV/PHEV and GT,
+      // picked directly via the debug picker (?debug=1). Currently glossy
+      // "Plastic Black" (rough 0, env 1.3) on both variants.
+      '08_car_body_plastic',
     ];
   }
 
@@ -4205,7 +4270,7 @@ class Component extends DCLogic {
     const file = e.target.files && e.target.files[0];
     if (!file || !THREE) return;
 
-    this.setState({ progress: 20, progressText: 'LOADING UPLOADED WHEEL...', loading: true, selectedCatalogKey: null });
+    this.setState({ progress: 20, progressText: 'LOADING UPLOADED WHEEL...', loading: true, selectedCatalogKey: null, wheelSizeInch: 21 }); // non-stock wheels default to 21" when picked
     const url = URL.createObjectURL(file);
     const loader = new THREE.GLTFLoader();
     const draco = new THREE.DRACOLoader();
@@ -4245,9 +4310,15 @@ class Component extends DCLogic {
     if (tab === 'catalog') this._generateCatalogThumbnails();
   }
 
+  // Which catalog wheel represents a given variant's own stock rim.
+  _stockCatalogKeyFor(variant) {
+    return variant === 'gt' ? 'haval_gt' : 'haval_phev';
+  }
+
   onSelectStockWheel() {
-    this.onWheelStyle('default');
-    this.setState({ selectedCatalogKey: null, uploadedWheelName: null });
+    if (this.state.catalogLoadingKey) return;
+    this.setState({ wheelSizeInch: 19, isCustomUpload: false }); // stock defaults to 19", separate from the 21" default for everything else
+    this._loadCatalogWheelByKey(this._stockCatalogKeyFor(this.state.modelVariant));
   }
 
   _loadCatalogWheelByKey(key, callback) {
@@ -4275,7 +4346,7 @@ class Component extends DCLogic {
       'assets/wheels/' + item.file,
       (gltf) => {
         try {
-          this._handleUploadedWheelModel(gltf.scene, item.label);
+          this._handleUploadedWheelModel(gltf.scene, item.label, true);
           this.setState({ loading: false, catalogLoadingKey: null, selectedCatalogKey: item.key });
           if (callback) callback();
         } catch (err) {
@@ -4299,6 +4370,7 @@ class Component extends DCLogic {
 
   onSelectCatalogWheel(item) {
     if (this.state.catalogLoadingKey) return;
+    this.setState({ wheelSizeInch: 21, isCustomUpload: false }); // non-stock catalog wheels default to 21" when picked
     this._loadCatalogWheelByKey(item.key);
   }
 
@@ -4378,9 +4450,13 @@ class Component extends DCLogic {
 
           // Weighted mean coordinate along the axle (sampled, not exhaustive —
           // this only needs to pick a side, not be precise) tells us which
-          // side the visually rich face (spokes) sits on.
+          // side the visually rich face (spokes) sits on. The same sampling
+          // pass also collects each vertex's radial distance from centre
+          // within the FACE plane (the two axes perpendicular to the axle),
+          // used below for framing.
           let sum = 0, count = 0;
           const v = new THREE.Vector3();
+          const radialSamples = [];
           obj.traverse((c) => {
             if (c.isMesh && c.geometry && c.geometry.attributes.position) {
               c.updateWorldMatrix(true, false);
@@ -4390,6 +4466,11 @@ class Component extends DCLogic {
                 v.fromBufferAttribute(pos, i).applyMatrix4(c.matrixWorld);
                 sum += axis === 'x' ? v.x : axis === 'y' ? v.y : v.z;
                 count++;
+                let rx = 0, ry = 0, rz = 0;
+                if (axis === 'x') { ry = v.y - center.y; rz = v.z - center.z; }
+                else if (axis === 'y') { rx = v.x - center.x; rz = v.z - center.z; }
+                else { rx = v.x - center.x; ry = v.y - center.y; }
+                radialSamples.push(Math.sqrt(rx * rx + ry * ry + rz * rz));
               }
             }
           });
@@ -4402,16 +4483,36 @@ class Component extends DCLogic {
             axis === 'z' ? sign : 0
           );
 
+          // Frame using a high percentile of the FACE-PLANE radial samples,
+          // not the raw bounding box — a model with extra depth-wise
+          // geometry (deep barrel, backing plate, brake-disc mockup) would
+          // otherwise get a bigger sphere.radius and be pushed further back
+          // than a shallow wheel, and even a face-plane box can be thrown
+          // off by one outlier vertex (a valve stem, bolt, badge) sticking
+          // out radially. A percentile of many sampled vertices ignores a
+          // few stray outliers the way box/sphere extents can't.
+          radialSamples.sort((a, b) => a - b);
+          const faceRadius = radialSamples.length
+            ? radialSamples[Math.min(radialSamples.length - 1, Math.floor(radialSamples.length * 0.97))]
+            : Math.max(size.x, size.y, size.z) / 2;
+
           const fovRad = this._thumbCamera.fov * Math.PI / 180;
-          const dist = (sphere.radius / Math.sin(fovRad / 2)) * 1.25;
+          const dist = (faceRadius / Math.sin(fovRad / 2)) * 1.25;
 
           // Avoid a degenerate lookAt when the axle points straight along the
           // default world-up (0,1,0) — pick a perpendicular up vector instead.
           this._thumbCamera.up.set(0, axis === 'y' ? 0 : 1, axis === 'y' ? 1 : 0);
 
           this._thumbCamera.position.copy(sphere.center).addScaledVector(dir, dist);
-          this._thumbCamera.near = Math.max(0.001, dist - sphere.radius * 3);
-          this._thumbCamera.far = dist + sphere.radius * 3;
+          // Near/far only need to clear the geometry's extent ALONG the
+          // viewing axis (the wheel's own thickness) — using the full 3D
+          // sphere.radius here (as before) over-estimates that for a
+          // deep-dish wheel now that dist itself is based on the smaller
+          // face-plane faceRadius, pushing near toward 0 and far way out,
+          // which starves z-buffer precision across the actual scene depth.
+          const axisExtent = axis === 'x' ? size.x : axis === 'y' ? size.y : size.z;
+          this._thumbCamera.near = Math.max(0.001, dist - axisExtent);
+          this._thumbCamera.far = dist + axisExtent;
           this._thumbCamera.updateProjectionMatrix();
           this._thumbCamera.lookAt(sphere.center);
 
@@ -4434,7 +4535,7 @@ class Component extends DCLogic {
     });
   }
 
-  _handleUploadedWheelModel(scene, name) {
+  _handleUploadedWheelModel(scene, name, fromCatalog = false) {
     const THREE = this.THREE;
     if (!THREE || !scene) return;
 
@@ -4707,21 +4808,40 @@ class Component extends DCLogic {
 
       const rayMeshes = [];
       wrapper.traverse(c => { if (c.isMesh) rayMeshes.push(c); });
-      const outerRayRadius = meshMaxRadius * 0.92;
       const rayCaster = new THREE.Raycaster();
-      const hitZs = [];
-      const RAYS = 24;
-      for (let i = 0; i < RAYS; i++) {
-        const angle = (i / RAYS) * Math.PI * 2;
-        rayCaster.set(
-          new THREE.Vector3(outerRayRadius * Math.cos(angle), outerRayRadius * Math.sin(angle), 10),
-          new THREE.Vector3(0, 0, -1)
-        );
-        const hits = rayCaster.intersectObjects(rayMeshes, false);
-        if (hits.length) hitZs.push(hits[0].point.z);
+      const RAYS = 48;
+      // Scan radius bands from the true outer edge inward, and use the
+      // OUTERMOST band backed by a consistent surface (most rays landing at
+      // a similar depth) as the outer face — not a single fixed radius.
+      // Some deep-lip designs (e.g. concave aftermarket wheels) have their
+      // whole visible lip sitting right at the outer edge, past a fixed
+      // 0.92 sample radius, which previously undershot it and left the lip
+      // poking out past the tire once flush-aligned. A lone tab/bolt/valve
+      // -stem boss only ever clips a couple of the 48 angular rays at any
+      // radius, so it fails the "majority" check below and gets skipped in
+      // favour of the real surface further in — same outlier rejection as
+      // before, just no longer anchored to one guessed-in-advance radius.
+      const radiusFractions = [0.99, 0.97, 0.95, 0.92, 0.88, 0.84, 0.80];
+      let found = null;
+      for (const frac of radiusFractions) {
+        const outerRayRadius = meshMaxRadius * frac;
+        const hitZs = [];
+        for (let i = 0; i < RAYS; i++) {
+          const angle = (i / RAYS) * Math.PI * 2;
+          rayCaster.set(
+            new THREE.Vector3(outerRayRadius * Math.cos(angle), outerRayRadius * Math.sin(angle), 10),
+            new THREE.Vector3(0, 0, -1)
+          );
+          const hits = rayCaster.intersectObjects(rayMeshes, false);
+          if (hits.length) hitZs.push(hits[0].point.z);
+        }
+        if (hitZs.length < RAYS * 0.5) continue;
+        hitZs.sort((a, b) => a - b);
+        const median = hitZs[Math.floor(hitZs.length / 2)];
+        const closeCount = hitZs.filter(z => Math.abs(z - median) < meshMaxRadius * 0.02).length;
+        if (closeCount >= hitZs.length * 0.6) { found = median; break; }
       }
-      hitZs.sort((a, b) => a - b);
-      maxZ = hitZs.length >= RAYS * 0.5 ? hitZs[Math.floor(hitZs.length / 2)] : percentileFallback;
+      maxZ = found !== null ? found : percentileFallback;
     }
     console.log(`[UploadWheel] Programmatically computed normalized localOuterZ (occlusion-aware outer-band median): ${maxZ}`);
     this._customRimLocalOuterZ = isFinite(maxZ) ? maxZ : 0.15;
@@ -4761,7 +4881,14 @@ class Component extends DCLogic {
     // aren't overwritten.
     this._pendingAutoDepthFit = true;
 
-    this.setState({ uploadedWheelName: name.replace(/\.[^.]+$/, '').slice(0, 16) });
+    // Only a real file upload should show a filename in the CUSTOM tab or
+    // count as a "deliberate custom pick" that survives a variant switch —
+    // catalog/stock selections reuse this same pipeline but pass a catalog
+    // item's label here, not a filename.
+    this.setState({
+      uploadedWheelName: fromCatalog ? null : name.replace(/\.[^.]+$/, '').slice(0, 16),
+      isCustomUpload: !fromCatalog
+    });
     this.onWheelStyle('custom');
 
     // Auto-export the fixed GLB if it is a Tripo model
@@ -5102,7 +5229,7 @@ class Component extends DCLogic {
       // the rubber visibly hugs/overlaps the rim's edge instead of leaving
       // a gap — rather than growing the rim to meet an imperfectly-measured
       // tire opening, which is what left that gap in the first place.
-      const TIRE_BORE_UNDERSHOOT = 0.99;
+      const TIRE_BORE_UNDERSHOOT = 0.965;
       const tireMeasure = deformTireToTarget(realRimRadiusM * TIRE_BORE_UNDERSHOOT);
       const { axialCenter: tireAxialCenter, halfSpan: tireHalfSpan, outerFace: tireOuterFace } = tireMeasure;
       console.log(`[onWheelStyle] Rim radius: ${realRimRadiusM.toFixed(5)}m (inch ${inchSize}). Tire axial centre: ${tireAxialCenter.toFixed(5)}m, half-span: ${tireHalfSpan.toFixed(5)}m, outer face: ${tireOuterFace.toFixed(5)}m, bore undershoot target: ${(realRimRadiusM * TIRE_BORE_UNDERSHOOT).toFixed(5)}m`);
@@ -5671,7 +5798,7 @@ class Component extends DCLogic {
       if (window.MeshoptDecoder) {
         loader.setMeshoptDecoder(window.MeshoptDecoder);
       }
-      const HEV_URL = 'assets/haval-h6-phev-baked.glb'; // real PHEV stock rim baked in via export from the known-good original — materials/lights untouched
+      const HEV_URL = 'assets/haval-h6-hev.glb'; // real PHEV stock rim baked in via export from the known-good original — materials/lights untouched
       const GT_URL  = 'assets/haval-h6-gt.glb';
       const profiles = this._modelProfiles();
       // Eager-load BOTH variants. The HEV/PHEV car is PRIMARY: it is visible at
@@ -5684,10 +5811,7 @@ class Component extends DCLogic {
         undefined,
         (err) => console.warn('GT model failed to load', err)
       );
-      // Load the rear-light fix source FIRST (it has the corrected face→material
-      // split with a dedicated Chrome group), stash its 3 rear clusters, then load
-      // the main car and splice the corrected rear clusters in during onModelLoaded.
-      const loadMain = () => loader.load(
+      loader.load(
         HEV_URL,
         (gltf) => { this.onModelLoaded(gltf.scene, profiles.hev, { primary: true }); loadGT(); },
         (e) => {
@@ -5700,12 +5824,6 @@ class Component extends DCLogic {
           console.error('GLB load error', err);
           this.setState({ error: 'The model failed to load. Check the file path and that the Draco decoder is reachable.' });
         }
-      );
-      loader.load(
-        'assets/haval-h6-rear-fix.glb',
-        (gltf) => { this._rearFixScene = gltf.scene; loadMain(); },
-        undefined,
-        (err) => { console.warn('rear-fix source failed to load; using base rear lights', err); loadMain(); }
       );
 
       // --- Resize ---
@@ -6046,61 +6164,6 @@ class Component extends DCLogic {
     }
   }
 
-  // Splice the corrected rear-light clusters from the rear-fix source into the
-  // main car. The fix source has the proper face→material split (notably a
-  // dedicated Chrome group for the non-emitting faces that v5 wrongly baked into
-  // BrakeLight/PositionLight). We keep the main car's MATERIAL instances (all our
-  // runtime tuning lives on them) and only adopt the new file's GEOMETRY +
-  // face→material assignment, rebinding each primitive to our material by name.
-  _swapRearLights(obj) {
-    const src = this._rearFixScene;
-    if (!src) return;
-    // Map existing scene materials by name so new primitives reuse OUR instances.
-    const matByName = new Map();
-    obj.traverse((c) => {
-      if (!c.isMesh) return;
-      (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => {
-        if (m && m.name && !matByName.has(m.name)) matByName.set(m.name, m);
-      });
-    });
-    const rebind = (m) => (m && m.name && matByName.has(m.name)) ? matByName.get(m.name) : m;
-    // GLTFLoader sanitizes node names (spaces→underscores, etc). Match by a
-    // normalized key so "Rear Headlight Left (Internals #1)" finds
-    // "Rear_Headlight_Left_(Internals_#1)".
-    const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-    const findNode = (root, name) => {
-      const key = norm(name);
-      let hit = null;
-      root.traverse((c) => { if (!hit && norm(c.name) === key) hit = c; });
-      return hit;
-    };
-    const clusters = [
-      'Rear Headlight Left (Internals #1)',
-      'Rear Headlight Right (Internals #1)',
-      'Rear Headlight Center (Internals #1)',
-    ];
-    let swapped = 0;
-    clusters.forEach((name) => {
-      const oldNode = findNode(obj, name);
-      const newNode = findNode(src, name);
-      if (!oldNode || !newNode) { console.warn('rear-swap: node missing', name, 'old=', !!oldNode, 'new=', !!newNode); return; }
-      // Remove old per-primitive meshes.
-      const oldMeshes = [];
-      oldNode.traverse((c) => { if (c.isMesh) oldMeshes.push(c); });
-      oldMeshes.forEach((m) => { if (m.parent) m.parent.remove(m); if (m.geometry && m.geometry.dispose) m.geometry.dispose(); });
-      // Clone the new per-primitive meshes, rebind materials by name, attach.
-      newNode.traverse((c) => {
-        if (!c.isMesh) return;
-        const mesh = c.clone();
-        mesh.geometry = c.geometry.clone();
-        mesh.material = Array.isArray(c.material) ? c.material.map(rebind) : rebind(c.material);
-        oldNode.add(mesh);
-        swapped++;
-      });
-    });
-    this._rearFixScene = null; // release the source scene
-    console.log('rear-swap: spliced', swapped, 'corrected rear-light meshes');
-  }
 
   // ── Model variants ───────────────────────────────────────────────────────
   // Per-model name conventions so ONE processing pipeline handles both the
@@ -6110,7 +6173,6 @@ class Component extends DCLogic {
     return {
       hev: {
         key: 'hev',
-        applyRearFix: true,
         // Legacy: HEV headlight glass is identified by mesh name.
         isHeadlightGlassMesh: (c) => c.name === 'BuildingMesh-00106' || c.name === 'BuildingMesh-00107',
         isHeadlightGlassMat: () => false,
@@ -6121,13 +6183,26 @@ class Component extends DCLogic {
         bodyPaintRe: /^(body|roof)$/i,
         splitMultiMatLamps: false,
         hasExplicitHighbeam: false,
-        sunroof: { front: 'Sunroof Front', rear: 'Sunroof Rear', struct: 'SunRoof Structure' },
-        // HEV curtain: hard-measured placement under the sunroof opening.
-        curtain: { mode: 'fixed', width: 1.35, depth: 0.82, x: 1.265, y: 1.62, z: -0.366, baseX: 1.94, frameBorder: 0.05 },
+        // "rear" must match the actual mesh name ("Sunroof Back") — it was
+        // "Sunroof Rear" here, which never matched anything (findMesh
+        // normalizes away spaces/underscores/case, but not "rear" vs "back"),
+        // silently no-oping the rear-glass frame/material-match below and
+        // (now that curtain placement is computed from these two meshes'
+        // combined bounds, see below) leaving the curtain sized/positioned
+        // from the FRONT panel alone.
+        sunroof: { front: 'Sunroof Front', rear: 'Sunroof Back', struct: 'SunRoof Structure' },
+        // HEV curtain: computed from the live sunroof glass bounds, same as
+        // GT (mode: 'auto' below) — hand-measured fixed pixel coordinates
+        // were tried here previously, but they're calibrated against one
+        // exact export of the car model and silently go stale (curtain
+        // drifts out from under the actual glass) the moment the model is
+        // ever re-baked/re-exported at a different scale or position, which
+        // is exactly what happened this session. hasFrame stays true since,
+        // unlike GT, HEV's sunroof has a visible border frame.
+        curtain: { mode: 'auto', hasFrame: true },
       },
       gt: {
         key: 'gt',
-        applyRearFix: false,
         // GT headlight glass is identified by material name (Glass (Headlight)).
         isHeadlightGlassMesh: () => false,
         isHeadlightGlassMat: (m) => /^Glass \(Headlight\)/i.test((m && m.name) || ''),
@@ -6248,9 +6323,6 @@ class Component extends DCLogic {
     profile = profile || this._modelProfiles().hev;
     const primary = !opts || opts.primary !== false;
 
-    // Splice the corrected rear-light clusters in BEFORE scale/centre so they get
-    // the same treatment as the rest of the car. (HEV only.)
-    if (profile.applyRearFix) this._swapRearLights(obj);
 
     // GT: separate combined lamp clusters into single-material meshes so each
     // light toggles independently (see _splitMultiMaterialLamps).
@@ -6258,9 +6330,18 @@ class Component extends DCLogic {
 
     // Keep the model's own (Blender) floor, but flag it so it doesn't dominate
     // the bounding box used to scale and frame the car.
+    const FLOOR_NAMES = new Set(['floor', 'ground', 'backdrop']);
+    // Both mesh- and material-name checks must be exact matches (after
+    // stripping a Blender-style ".001"/".002" duplicate suffix, the same
+    // pattern this file already special-cases for e.g. "Body.001"/"Body.002"
+    // in the GT profile's sharedAliases) — a loose substring test also
+    // matched legitimate interior materials that merely contain the word
+    // "floor" as part of a longer name (e.g. "Trunk Floor Matte"),
+    // incorrectly overwriting them with the flat ground-plane color.
+    const normalizeFloorName = (n) => (n || '').toLowerCase().trim().replace(/\.\d+$/, '');
     const isFloor = (c) => {
       const mat = Array.isArray(c.material) ? c.material[0] : c.material;
-      return /floor|ground|backdrop/i.test(c.name || '') || /floor|ground/i.test((mat && mat.name) || '');
+      return FLOOR_NAMES.has(normalizeFloorName(c.name)) || FLOOR_NAMES.has(normalizeFloorName(mat && mat.name));
     };
     const carBounds = () => {
       const b = new THREE.Box3();
@@ -6646,8 +6727,12 @@ class Component extends DCLogic {
     }
 
     // Create and add the sunroof curtain (roller blind) mesh + opening frame.
-    // HEV uses hand-measured local placement; GT derives placement from the
-    // sunroof glass panels' bounds (converted into the model's local space).
+    // Placement is always derived from the live sunroof glass panels' bounds
+    // (converted into the model's local space) rather than hand-measured —
+    // hand-measured constants only stay correct for one exact export of the
+    // car model and silently drift the moment it's re-baked at a different
+    // scale/position. profile.curtain.hasFrame controls whether a border
+    // frame is added (HEV has one; GT's sunroof is frameless glass).
     if (THREE && this.sunroofFront) {
       let cw, cd, cx, cy, cz, baseX, hasFrame;
       if (profile.curtain.mode === 'fixed') {
@@ -6662,7 +6747,7 @@ class Component extends DCLogic {
         const inv = 1 / (obj.scale.x || 1);
         cw = ws.x * inv * 0.92; cd = ws.z * inv * 0.92;
         cx = localC.x; cz = localC.z; cy = localC.y - ws.y * inv * 0.5 - 0.025;
-        baseX = cx + cw / 2; hasFrame = false;
+        baseX = cx + cw / 2; hasFrame = !!profile.curtain.hasFrame;
       }
       const curtainGeom = new THREE.PlaneGeometry(cw, cd);
       curtainGeom.rotateX(-Math.PI / 2);
@@ -6846,8 +6931,13 @@ class Component extends DCLogic {
 
     this._warmupLights();
 
-    if (primary && this.state.selectedCatalogKey) {
-      this._loadCatalogWheelByKey(this.state.selectedCatalogKey, () => {
+    if (primary) {
+      // Nothing explicitly selected yet (fresh load) means STOCK — load it
+      // through the catalog pipeline too, same as a saved selection, so it's
+      // resizable and has a real thumbnail from the very first frame instead
+      // of only after the user clicks STOCK once.
+      const key = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
+      this._loadCatalogWheelByKey(key, () => {
         this.setState({ loading: false, progress: 100 });
       });
     } else {
@@ -6986,13 +7076,15 @@ class Component extends DCLogic {
   _setModelVariant(v) {
     if (v === this.state.modelVariant) return;
 
-    // Auto-swap the default-looking wheel when switching variants. HEV/PHEV's
-    // own stock rim is correct now (baked into haval-h6v2.glb), so leaving it
-    // on STOCK is fine; GT's native stock rim isn't fixed yet, so it still
-    // borrows the "Haval GT" catalog wheel as a stand-in whenever the user
-    // hasn't already picked something else.
+    // Auto-swap the stock-looking wheel when switching variants: if the user
+    // is still on either variant's own stock rim (or hasn't picked anything
+    // yet), follow the switch onto the NEW variant's own stock rim too. Any
+    // other deliberate pick (a real catalog wheel, or an uploaded custom
+    // wheel — selectedCatalogKey is also null in that case, so isCustomUpload
+    // is the only thing telling the two apart) is left alone.
     const currentKey = this.state.selectedCatalogKey;
-    const onPlaceholderWheel = (this.state.wheelStyle === 'default' && !currentKey) || currentKey === 'haval_gt';
+    const onPlaceholderWheel = !this.state.isCustomUpload &&
+      (!currentKey || currentKey === 'haval_gt' || currentKey === 'haval_phev');
 
     if (onPlaceholderWheel) {
       this.setState({ modelVariant: v, wheelSizeInch: 19 }); // catalog wheel default size is the smallest selectable (19"), below the general 21" catalog default
@@ -7001,12 +7093,7 @@ class Component extends DCLogic {
         this._activateVariant(v);
       }
 
-      if (v === 'gt') {
-        this._loadCatalogWheelByKey('haval_gt');
-      } else {
-        this.onWheelStyle('default');
-        this.setState({ selectedCatalogKey: null, uploadedWheelName: null });
-      }
+      this._loadCatalogWheelByKey(this._stockCatalogKeyFor(v));
     } else {
       this.setState({ modelVariant: v });
       if (this._variants && this._variants[v]) this._activateVariant(v);
