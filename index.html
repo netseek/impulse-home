@@ -3909,7 +3909,12 @@ class Component extends DCLogic {
                     key === 'positionFrontRAmber' ? 'positionFrontR' : key;
     const meshes = this.lightGroups && this.lightGroups[meshKey];
     if (!meshes || !meshes.length) { console.warn('[Lights] no meshes for', key); return; }
-    const cfg = this._lightCfg()[key];
+    // positionFrontL / positionFrontR are mesh-split aliases of the white DRL
+    // strip and have no dedicated emissive config — fall back to positionFront
+    // so turning them on doesn't dereference an undefined cfg. (Their amber
+    // counterparts keep their own *Amber config.)
+    const cfgKey = (key === 'positionFrontL' || key === 'positionFrontR') ? 'positionFront' : key;
+    const cfg = this._lightCfg()[cfgKey];
     const BL = this.BLOOM_LAYER || 1;
     const SL = this.STREAK_LAYER || 2;
     const isStreakGroup = /^(headlight|highbeam|reverse|fogFront)$/.test(key);
@@ -4004,7 +4009,11 @@ class Component extends DCLogic {
           if (!m.emissive) m.emissive = new this.THREE.Color();
           m.emissive.setRGB(...cfg.color);
           m.emissiveIntensity = cfg.intensity;
-          if (cfg.toneMapped === false) m.toneMapped = false;
+          // Set deterministically (not just when false) so a group toggled on
+          // after a different group left toneMapped=false returns to its own
+          // baseline — otherwise the white DRL keeps the amber pass's
+          // toneMapped=false and reads as a subtly different material.
+          m.toneMapped = cfg.toneMapped === false ? false : true;
           // MeshPhysicalMaterial: ensure emissive isn't blocked by low opacity
           if (m.isMeshPhysicalMaterial) {
             m.opacity = Math.max(m.opacity, 0.55);
@@ -4388,7 +4397,7 @@ class Component extends DCLogic {
     this._loadCatalogWheelByKey(this._stockCatalogKeyFor(this.state.modelVariant));
   }
 
-  _loadCatalogWheelByKey(key, callback) {
+  _loadCatalogWheelByKey(key, callback, opts = {}) {
     const item = this._wheelCatalog.find(i => i.key === key);
     if (!item) {
       if (callback) callback();
@@ -4400,7 +4409,47 @@ class Component extends DCLogic {
       return;
     }
 
-    this.setState({ progress: 20, progressText: 'LOADING ' + item.label.toUpperCase() + '...', loading: true, processing: false, catalogLoadingKey: item.key });
+    // opts.initial: the cold-start STOCK swap fired right after the car is
+    // processed. The car's loader overlay is still up, so keep it in the
+    // PROCESSING state instead of resetting the bar to 20% — that reset read as
+    // a jarring "second load". User-initiated picks show their own fresh sweep.
+    if (opts.initial) {
+      this.setState({ loading: true, processing: true, catalogLoadingKey: item.key });
+    } else {
+      this.setState({ progress: 20, progressText: 'LOADING ' + item.label.toUpperCase() + '...', loading: true, processing: false, catalogLoadingKey: item.key });
+    }
+
+    // Turn a loaded/preloaded wheel scene into the installed, resizable rim.
+    const install = (scene) => {
+      try {
+        this._handleUploadedWheelModel(scene, item.label, true);
+        this.setState({ loading: false, processing: false, catalogLoadingKey: null, selectedCatalogKey: item.key });
+        if (callback) callback();
+      } catch (err) {
+        console.error(err);
+        this.setState({ error: 'Failed to process wheel model: ' + err.message, loading: false, processing: false, catalogLoadingKey: null });
+        if (callback) callback();
+      }
+    };
+
+    // Fast path: this rim's bytes were preloaded in parallel with the car (see
+    // componentDidMount), so the cold-start swap needs no extra fetch. Use the
+    // parsed scene once — install() mutates it (centers/clones from it).
+    const pre = this._preloadedStock;
+    if (pre && pre.key === key && pre.promise) {
+      this._preloadedStock = null;
+      pre.promise.then((scene) => {
+        if (scene) install(scene);
+        else this._fetchCatalogWheel(item, install, callback); // preload failed → fetch
+      });
+      return;
+    }
+
+    this._fetchCatalogWheel(item, install, callback);
+  }
+
+  _fetchCatalogWheel(item, install, callback) {
+    const THREE = this.THREE;
     const loader = new THREE.GLTFLoader();
     const draco = new THREE.DRACOLoader();
     draco.setDecoderPath('vendor/draco/');
@@ -4408,28 +4457,18 @@ class Component extends DCLogic {
     if (window.MeshoptDecoder) {
       loader.setMeshoptDecoder(window.MeshoptDecoder);
     }
-
     loader.load(
       'assets/wheels/' + item.file,
-      (gltf) => {
-        try {
-          this._handleUploadedWheelModel(gltf.scene, item.label, true);
-          this.setState({ loading: false, catalogLoadingKey: null, selectedCatalogKey: item.key });
-          if (callback) callback();
-        } catch (err) {
-          console.error(err);
-          this.setState({ error: 'Failed to process wheel model: ' + err.message, loading: false, catalogLoadingKey: null });
-          if (callback) callback();
-        }
-      },
+      (gltf) => install(gltf.scene),
       (xhr) => {
-        if (xhr.lengthComputable) {
+        // Don't fight the continuous PROCESSING state during the cold-start swap.
+        if (xhr.lengthComputable && !this.state.processing) {
           this.setState({ progress: (xhr.loaded / xhr.total) * 100 });
         }
       },
       (err) => {
         console.error(err);
-        this.setState({ error: 'Failed to load "' + item.label + '".', loading: false, catalogLoadingKey: null });
+        this.setState({ error: 'Failed to load "' + item.label + '".', loading: false, processing: false, catalogLoadingKey: null });
         if (callback) callback();
       }
     );
@@ -5988,6 +6027,27 @@ class Component extends DCLogic {
         }
       );
 
+      // Preload the initial STOCK rim IN PARALLEL with the car. The cold-start
+      // stock swap (onModelLoaded → _loadCatalogWheelByKey with {initial:true})
+      // then reuses this already-parsed scene instead of fetching after the car
+      // finishes, so it adds no network wait on the tail — only the fit/clone
+      // work runs then. Reuses the car's loader (Draco/meshopt already set).
+      {
+        const stockKey = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
+        const stockItem = this._wheelCatalog.find(i => i.key === stockKey);
+        if (stockItem) {
+          this._preloadedStock = {
+            key: stockKey,
+            promise: new Promise((resolve) => {
+              loader.load('assets/wheels/' + stockItem.file,
+                (gltf) => resolve(gltf.scene),
+                undefined,
+                (err) => { console.warn('Stock wheel preload failed', err); resolve(null); });
+            }),
+          };
+        }
+      }
+
       // --- Resize ---
       this._onResize = () => {
         const W = container.clientWidth, H = container.clientHeight;
@@ -7106,8 +7166,8 @@ class Component extends DCLogic {
       // of only after the user clicks STOCK once.
       const key = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
       this._loadCatalogWheelByKey(key, () => {
-        this.setState({ loading: false, progress: 100 });
-      });
+        this.setState({ loading: false, processing: false, progress: 100 });
+      }, { initial: true });
     } else {
       this.setState({ loading: false, progress: 100 });
     }
