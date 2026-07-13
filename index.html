@@ -1985,6 +1985,14 @@ class Component extends DCLogic {
       // Pivot uses the SAME centre as its wheel cluster (front discs steer
       // around it; rear discs never move but get one for consistency).
       c._pivot = isFront ? (isRight ? frCenter : flCenter) : (isRight ? rrCenter : rlCenter);
+      // Dedicated clone (NOT the shared cluster-centre object above) so the
+      // caliper depth-offset shift below — which mutates c._pivot in place —
+      // can never corrupt the shared centre that every rim/tire/spoke mesh
+      // in this cluster also uses as ITS _steerPivot. Without this, swapping
+      // in a custom wheel (which sets a depth offset) shifts the one shared
+      // Vector3 for the whole cluster, throwing the tire and rim off their
+      // shared steer axis together as soon as the wheel turns.
+      c._steerPivot = c._pivot.clone();
       const key = (isFront ? 'f' : 'r') + (isRight ? 'r' : 'l');
       this._steerOnlyMeshes[key].push(c);
       console.log('[BreakDisk]', nm, '→', key);
@@ -4977,13 +4985,20 @@ class Component extends DCLogic {
         tire._origLocalPos = pos.array.slice();
 
         // Derive the axle pivot/direction in this mesh's LOCAL (object) space
-        // once, via a world<->local round trip — stable regardless of the
-        // mesh's current steer/roll orientation, since local space doesn't
-        // rotate with the object.
-        tire.updateWorldMatrix(true, false);
-        const invWorld = tire.matrixWorld.clone().invert();
-        tire._localPivot = tire._pivot.clone().applyMatrix4(invWorld);
-        const localAxisPoint = tire._pivot.clone().add(tire._rollAxis).applyMatrix4(invWorld);
+        // once, via a world<->local round trip through the CACHED UNsteered
+        // _initWorld — not the live matrixWorld. tire._pivot sits AT the shared
+        // steer pivot, so it round-trips to the same local point regardless of
+        // which world matrix is used (translation only). But tire._rollAxis is
+        // a fixed unsteered direction vector, and a direction is rotation-
+        // covariant: round-tripping "pivot + rollAxis" through the CURRENT
+        // matrixWorld while the wheel happens to be turned bakes in a local
+        // axis that's rotated off by the steer angle at that moment — and
+        // since this whole block only runs ONCE per tire (guarded above),
+        // that wrong axis would silently corrupt every future bore-deform
+        // for the rest of the session, at any wheel angle. _initWorld is
+        // always the steer=0 pose, so the round-trip is angle-independent.
+        tire._localPivot = tire._pivot.clone().applyMatrix4(tire._initWorld.clone().invert());
+        const localAxisPoint = tire._pivot.clone().add(tire._rollAxis).applyMatrix4(tire._initWorld.clone().invert());
         tire._localAxis = localAxisPoint.sub(tire._localPivot).normalize();
 
         // Classify the bore (inner mounting hole) vs. tread (outer contact
@@ -5120,11 +5135,35 @@ class Component extends DCLogic {
       if (firstMesh) {
         const _calV = new THREE.Vector3();
         orig._tireWheels.forEach(m => {
-          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
-            m.updateWorldMatrix(true, false);
-            const pos = m.geometry.attributes.position;
-            for (let i = 0; i < pos.count; i++) {
-              _calV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position && m._initWorld) {
+            // Measure from the PRISTINE pre-bore-stretch positions when available
+            // (_deformTireBore caches them the first time it runs), not the live
+            // attribute. _deformTireBore mutates vertex positions in place to open
+            // the bore for whatever rim was last selected, and a vertex just inside
+            // its blend radius can get pushed out past the tire's true tread edge
+            // by that stretch. Re-measuring "stock tire radius" off that already-
+            // stretched geometry feeds the inflated number into metersPerWorldUnit,
+            // which enlarges the NEXT selection's target rim radius, stretching the
+            // bore even further — a runaway feedback loop that grows without bound
+            // across consecutive wheel-style picks instead of staying anchored to
+            // the tire's one true, unstretched tread radius.
+            //
+            // Also transform through the CACHED unsteered _initWorld, not the live
+            // (possibly currently-steered) matrixWorld — the tire mesh is one of the
+            // meshes _applyWheelTransforms rotates every frame, so if the wheel angle
+            // is non-zero at the moment a rim is swapped, matrixWorld already has that
+            // steer rotation baked in. firstMesh._pivot/_rollAxis are fixed, UNsteered
+            // reference points, so projecting a steered vertex onto them distorts the
+            // axial/radial split (a vertex that's actually straight out along the axle
+            // reads as radially further out, etc.) — the more the wheel is turned, the
+            // more this measurement (and everything it feeds: metersPerWorldUnit, rim
+            // radius, flush-fit shift) is thrown off, exactly reproducing "swapping a
+            // rim while steered messes up the fit" even though the runtime steering
+            // rotation itself (which DOES use a shared, uncorrupted pivot) is correct.
+            const src = m._origLocalPos || m.geometry.attributes.position.array;
+            const count = src.length / 3;
+            for (let i = 0; i < count; i++) {
+              _calV.set(src[i * 3], src[i * 3 + 1], src[i * 3 + 2]).applyMatrix4(m._initWorld);
               const rel = _calV.clone().sub(firstMesh._pivot);
               const axialProj = rel.dot(firstMesh._rollAxis);
               const radial = rel.addScaledVector(firstMesh._rollAxis, -axialProj).length();
@@ -5166,6 +5205,14 @@ class Component extends DCLogic {
       // shows through, which _deformTireBore's own bore/blend classification
       // doesn't map 1:1 onto (it isn't necessarily at the visible face), so
       // this is measured independently and re-checked after deforming.
+      // NOTE: every vertex transform below goes through the mesh's cached UNsteered
+      // _initWorld, never the live matrixWorld. The tire mesh is one of the meshes
+      // _applyWheelTransforms rotates every frame, so matrixWorld already has the
+      // CURRENT steer angle baked in — but firstMesh._pivot/_rollAxis (axle,
+      // outwardDir) are fixed, unsteered reference directions. Projecting an
+      // already-steered vertex onto them distorts the axial/radial split, and the
+      // distortion grows with the steer angle, so a rim swapped while the wheel is
+      // turned would get measured and flush-fit against a skewed tire shape.
       const measureTire = () => {
         let axialCenter = 0.0, halfSpan = 0.0, outerFace = 0.0, boreRadius = 0.0;
         if (!firstMesh) return { axialCenter, halfSpan, outerFace, boreRadius };
@@ -5173,12 +5220,11 @@ class Component extends DCLogic {
         const outwardDir = axle.clone().multiplyScalar(-1); // left side outward is -axle
         let minProj = Infinity, maxProj = -Infinity;
         orig._tireWheels.forEach(m => {
-          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
+          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position && m._initWorld) {
             const pos = m.geometry.attributes.position;
             const tempV = new THREE.Vector3();
-            m.updateWorldMatrix(true, false);
             for (let i = 0; i < pos.count; i++) {
-              tempV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+              tempV.fromBufferAttribute(pos, i).applyMatrix4(m._initWorld);
               const proj = tempV.clone().sub(firstMesh._pivot).dot(outwardDir);
               if (proj < minProj) minProj = proj;
               if (proj > maxProj) maxProj = proj;
@@ -5193,12 +5239,11 @@ class Component extends DCLogic {
         const faceBand = 0.02; // metres
         let minRadiusNearFace = Infinity;
         orig._tireWheels.forEach(m => {
-          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position) {
+          if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position && m._initWorld) {
             const pos = m.geometry.attributes.position;
             const tempV = new THREE.Vector3();
-            m.updateWorldMatrix(true, false);
             for (let i = 0; i < pos.count; i++) {
-              tempV.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+              tempV.fromBufferAttribute(pos, i).applyMatrix4(m._initWorld);
               const rel = tempV.clone().sub(firstMesh._pivot);
               const proj = rel.dot(outwardDir);
               if (proj > maxProj - faceBand) {
@@ -5281,10 +5326,10 @@ class Component extends DCLogic {
       const flClones = [], frClones = [], rlClones = [], rrClones = [];
 
       const clusters = [
-        { center: firstMesh._pivot, axle: firstMesh._rollAxis, side: 'fl', arr: flClones, parentMesh: orig._frontLeftWheels[0] },
-        { center: orig._frontRightWheels[0]._pivot, axle: orig._frontRightWheels[0]._rollAxis, side: 'fr', arr: frClones, parentMesh: orig._frontRightWheels[0] },
-        { center: orig._rearLeftWheels[0]._pivot, axle: orig._rearLeftWheels[0]._rollAxis, side: 'rl', arr: rlClones, parentMesh: orig._rearLeftWheels[0] },
-        { center: orig._rearRightWheels[0]._pivot, axle: orig._rearRightWheels[0]._rollAxis, side: 'rr', arr: rrClones, parentMesh: orig._rearRightWheels[0] }
+        { center: firstMesh._pivot, steerPivot: firstMesh._steerPivot, axle: firstMesh._rollAxis, side: 'fl', arr: flClones, parentMesh: orig._frontLeftWheels[0] },
+        { center: orig._frontRightWheels[0]._pivot, steerPivot: orig._frontRightWheels[0]._steerPivot, axle: orig._frontRightWheels[0]._rollAxis, side: 'fr', arr: frClones, parentMesh: orig._frontRightWheels[0] },
+        { center: orig._rearLeftWheels[0]._pivot, steerPivot: orig._rearLeftWheels[0]._steerPivot, axle: orig._rearLeftWheels[0]._rollAxis, side: 'rl', arr: rlClones, parentMesh: orig._rearLeftWheels[0] },
+        { center: orig._rearRightWheels[0]._pivot, steerPivot: orig._rearRightWheels[0]._steerPivot, axle: orig._rearRightWheels[0]._rollAxis, side: 'rr', arr: rrClones, parentMesh: orig._rearRightWheels[0] }
       ];
 
       // Captured from the FL cluster below — used after the loop for the
@@ -5356,6 +5401,17 @@ class Component extends DCLogic {
             cloneMesh._rollAngle = 0;
             cloneMesh._wheelSide = item.side;
             cloneMesh._pivot = finalPos;
+            // Steering must rotate the whole knuckle about the wheel's true
+            // centre, NOT finalPos — finalPos is deliberately offset from
+            // that centre along the axle (to flush the rim's face against
+            // the tire's opening), which is harmless for roll (rotation
+            // about a line is unaffected by moving the pivot along that
+            // same line) but wrong for steer (about worldUp, not the axle):
+            // a pivot offset along the axle traces a different arc than the
+            // tire's, growing with the steer angle until it was a visible
+            // gap at full lock. Reuse the same shared centre the stock tire
+            // itself steers around so rim and tire stay rigidly locked.
+            cloneMesh._steerPivot = item.steerPivot || item.center;
             cloneMesh._rollAxis = item.axle;
             cloneMesh._initWorld = cloneMesh.matrixWorld.clone();
             // _applyWheelTransforms's heightShiftY compensation only cancels out
@@ -5453,9 +5509,15 @@ class Component extends DCLogic {
             m._originalInitWorld = m._initWorld.clone();
             m._originalPivot = m._pivot.clone();
           }
-          // Reset to original and shift by offsetVec
-          m._pivot.copy(m._originalPivot).add(offsetVec);
-          
+          // Reassign to a NEW vector rather than mutating m._pivot in place —
+          // m._pivot started out as the SAME shared cluster-centre object
+          // that every rim/tire/spoke mesh's _steerPivot also points at
+          // (see its assignment above), so an in-place .copy()/.add() here
+          // would corrupt that shared centre for the whole cluster, not just
+          // this caliper. m._steerPivot (set once, above) stays untouched
+          // either way, so the caliper still steers around the true centre.
+          m._pivot = m._originalPivot.clone().add(offsetVec);
+
           const shiftMat = new THREE.Matrix4().makeTranslation(offsetVec.x, offsetVec.y, offsetVec.z);
           m._initWorld.copy(m._originalInitWorld).premultiply(shiftMat);
         });
