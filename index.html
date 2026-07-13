@@ -3347,7 +3347,11 @@ class Component extends DCLogic {
         if (!m || !/rear.lights|glass.*rear/i.test(m.name || '')) return;
         m.opacity        = tweaks.opacity;
         m.roughness      = tweaks.roughness;
-        m.transmission   = tweaks.transmission;
+        // Low tier: transmission>0 forces an extra full-scene render pass every
+        // frame (expensive on the Adreno 640). Drop it and lean on opacity-based
+        // translucency instead, so the rear glass still reads as tinted glass.
+        m.transmission   = this._perfLow ? 0 : tweaks.transmission;
+        if (this._perfLow) m.transparent = true;
         m.envMapIntensity = tweaks.envMap;
         m.clearcoat      = tweaks.clearcoat;
         if (tweaks.color && m.color) {
@@ -3960,12 +3964,20 @@ class Component extends DCLogic {
           m.needsUpdate = true;
         });
       }
-      // positionFront white: restore original base color
+      // positionFront white: when lit, show the true light lens colour so the
+      // DRL reads as bright white. When off, return the amber-shared meshes to
+      // the dark resting colour the amber path uses (also the warmup/initial
+      // look) — restoring the bright original here left the strip visibly
+      // "lighter" than off after a turn/hazard cycle. Only meshes that the
+      // amber path actually darkens carry _turnOrigColor; pure-white meshes
+      // without it keep their natural colour untouched.
       if (key === 'positionFront' || key === 'positionFrontL' || key === 'positionFrontR') {
         const pmats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         pmats.forEach(m => {
-          if (!m) return;
-          if (m._turnOrigColor) { m.color.copy(m._turnOrigColor); m.needsUpdate = true; }
+          if (!m || !m._turnOrigColor) return;
+          if (on) m.color.copy(m._turnOrigColor);
+          else    m.color.setRGB(0.03, 0.015, 0.00);
+          m.needsUpdate = true;
         });
       }
       // brake/reverse: restore original base color when ON, darken when OFF
@@ -5842,14 +5854,34 @@ class Component extends DCLogic {
       if (!container) return;
       const w = container.clientWidth, h = container.clientHeight;
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      // ── Performance tier ──────────────────────────────────────────────────
+      // Opt-in via ?perf=low (the target Haval H6 MMI runs a Snapdragon 8155 /
+      // Adreno 640 — a fill-rate-bound mobile GPU driving a large screen). Low
+      // tier trims the pixel-cost drivers (no MSAA, DPR≤1.0, cheap glass, a
+      // lighter anamorphic streak, smaller/harder shadow) while keeping bloom.
+      // Desktop (no param) is unchanged. Read window.__perfLow() to check.
+      // Accept EITHER ?perf=low OR #perf=low: some static hosts (and `npx serve`
+      // on /index.html) drop the query string on redirect, but the hash always
+      // survives client-side — so #perf=low is the reliable form on the car.
+      {
+        const qp = new URLSearchParams(location.search).get('perf');
+        const hp = new URLSearchParams((location.hash || '').replace(/^#/, '')).get('perf');
+        this._perfLow = (qp || hp) === 'low';
+      }
+      window.__perfLow = () => this._perfLow;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: !this._perfLow, preserveDrawingBuffer: true });
+      // Low tier starts at its lowest DPR step (0.75) — smooth-first; the
+      // adaptive loop ramps it up only if the GPU shows headroom. This matches
+      // _dprIdx=0 below so the renderer and the bookkeeping agree from frame 1.
+      renderer.setPixelRatio(this._perfLow ? 0.75 : Math.min(window.devicePixelRatio, 1.5));
       renderer.setSize(w, h);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = this.state.exposure;
       if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      // Soft PCF is a per-fragment cost every frame; low tier uses hard PCF.
+      renderer.shadowMap.type = this._perfLow ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
       // The car and sun are static, so the soft shadow never changes frame to
       // frame — re-rendering a 2048² PCF-soft map every frame is pure waste.
       // Update it only on demand; the shadowMap.needsUpdate=true calls already
@@ -5916,9 +5948,9 @@ class Component extends DCLogic {
       const dir = new THREE.DirectionalLight(0xffffff, this.state.lightIntensity);
       dir.position.copy(sun).multiplyScalar(26);
       dir.castShadow = true;
-      dir.shadow.mapSize.set(2048, 2048);
+      dir.shadow.mapSize.set(this._perfLow ? 1024 : 2048, this._perfLow ? 1024 : 2048);
       dir.shadow.bias = -0.0003;
-      dir.shadow.radius = 15;
+      dir.shadow.radius = this._perfLow ? 4 : 15;
       scene.add(dir);
       this.dirLight = dir;
       const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0b4bc, 0.28);
@@ -5947,12 +5979,16 @@ class Component extends DCLogic {
       // ── Adaptive pixel ratio ───────────────────────────────────────────────
       // Step DPR within [1.0 .. cap] from sustained render cost (rendered frames
       // only), so weak GPUs stay smooth and strong ones stay crisp.
-      this._dprCap   = Math.min(window.devicePixelRatio || 1, 1.5);
+      this._dprCap   = this._perfLow ? 1.0 : Math.min(window.devicePixelRatio || 1, 1.5);
       // Steps never exceed the device cap (rendering above 1× the display is
-      // pure waste). Floor at 1.0 to avoid a blurry under-sampled image.
-      this._dprSteps = [...new Set([1.0, 1.25, 1.5].filter(v => v <= this._dprCap).concat(this._dprCap))]
-        .sort((a, b) => a - b);
-      this._dprIdx   = this._dprSteps.length - 1; // start crisp
+      // pure waste). Desktop floors at 1.0; low tier may under-sample down to
+      // 0.75 to hold framerate on the weak mobile GPU (a large screen hides it).
+      this._dprSteps = this._perfLow
+        ? [0.75, 0.85, 1.0]
+        : [...new Set([1.0, 1.25, 1.5].filter(v => v <= this._dprCap).concat(this._dprCap))].sort((a, b) => a - b);
+      // Low tier starts at its lowest step (smooth-first, ramp up if there's
+      // headroom); desktop starts crisp.
+      this._dprIdx   = this._perfLow ? 0 : this._dprSteps.length - 1;
       this._frameMsAvg = 16;
       this._perf = { fps: 0, lastMs: 0, renderedFrames: 0, dpr: this._dprSteps[this._dprIdx] };
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
@@ -6063,6 +6099,14 @@ class Component extends DCLogic {
       window.addEventListener('resize', this._onResize);
 
       // --- Post-processing: Bloom + Anamorphic flare ---
+      // The streak is the heaviest fragment pass (2 dependent texture fetches
+      // per tap, across the whole buffer). Low tier cuts taps 56→20 and widens
+      // the per-tap step so the streak keeps ~the same on-screen length and
+      // falloff (decay is held constant per-pixel-of-reach), then renders the
+      // buffer at half-res (see streakRT) — together ~7× less streak-pass cost.
+      const STREAK_TAPS  = this._perfLow ? 20 : 56;
+      const STREAK_STEP  = this._perfLow ? 10.0 : 4.0;          // px of reach per tap
+      const STREAK_DECAY = (0.065 / 4.0) * STREAK_STEP;         // matches original falloff-vs-reach
       const AnamorphicShader = {
         uniforms: {
           tDiffuse:   { value: null },
@@ -6083,11 +6127,11 @@ class Component extends DCLogic {
           void main() {
             vec4 base = texture2D(tDiffuse, vUv);
             vec3 streak = vec3(0.0);
-            for (int i = 1; i <= 56; i++) {
+            for (int i = 1; i <= ${STREAK_TAPS}; i++) {
               float fi = float(i);
-              float weight = exp(-fi * 0.065);
-              vec2 oL = vec2(-fi * 4.0 / resolution.x, 0.0);
-              vec2 oR = vec2( fi * 4.0 / resolution.x, 0.0);
+              float weight = exp(-fi * ${STREAK_DECAY.toFixed(5)});
+              vec2 oL = vec2(-fi * ${STREAK_STEP.toFixed(1)} / resolution.x, 0.0);
+              vec2 oR = vec2( fi * ${STREAK_STEP.toFixed(1)} / resolution.x, 0.0);
               vec3 sL = texture2D(tDiffuse, vUv + oL).rgb;
               vec3 sR = texture2D(tDiffuse, vUv + oR).rgb;
               float lL = dot(sL, vec3(0.2126,0.7152,0.0722));
@@ -6132,7 +6176,12 @@ class Component extends DCLogic {
       this.bloomComposer = bloomComposer;
 
       // --- Streak composer: layer 2 → AnamorphicShader only ---
-      const streakRT = makeRT();
+      // Half-res buffer in low tier (the streak is a soft glow — the upscale is
+      // invisible). The shader's `resolution` uniform stays full-res so the
+      // streak's UV reach is unchanged; only the sampled buffer is cheaper.
+      const streakRT = this._perfLow
+        ? new THREE.WebGLRenderTarget(Math.round(w * 0.5), Math.round(h * 0.5), { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat })
+        : makeRT();
       const streakCam = camera.clone();
       streakCam.layers.enableAll(); // sees all meshes for depth occlusion
       this.streakCam = streakCam;
@@ -6682,10 +6731,13 @@ class Component extends DCLogic {
           if (this.bodyOrigHex == null && m.color) this.bodyOrigHex = '#' + m.color.getHexString();
         }
 
-        // Rear light glass: matte, transmission-based, less reflective
+        // Rear light glass: matte, transmission-based, less reflective.
+        // (Low tier drops transmission — see _applyRearGlassTweaks — to avoid
+        // the per-frame transmission render pass on the mobile GPU.)
         if (/rear.lights|glass.*rear/i.test(m.name || '')) {
           m.roughness = 0.15;
-          m.transmission = 0.6;
+          m.transmission = this._perfLow ? 0 : 0.6;
+          if (this._perfLow) m.transparent = true;
           m.envMapIntensity = 0.5;
           m.needsUpdate = true;
         }
