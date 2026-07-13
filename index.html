@@ -7088,8 +7088,12 @@ class Component extends DCLogic {
     this._applyInitialFogStates();
     // Compute true forward direction from headlight positions so wheel
     // FL/FR/RL/RR classification is correct regardless of model orientation.
-    const _fwdBox = new THREE.Box3().setFromObject(obj);
-    const _fwdCenter = _fwdBox.getCenter(new THREE.Vector3());
+    // Use carBounds() (not setFromObject(obj)) for the reference centre: each
+    // GLB carries an invisible full-scene "Floor" plane that is off-centre in Z
+    // (z≈2.9 on GT, z≈0.4 on HEV). Including it drags the "car centre" sideways,
+    // which on GT rotated the forward axis ~65° toward Z — so the speed-driven
+    // reflection flow streamed side-to-side instead of front-to-rear.
+    const _fwdCenter = carBounds().getCenter(new THREE.Vector3());
     const _hlMeshes = this.lightGroups && this.lightGroups['headlight'];
     if (_hlMeshes && _hlMeshes.length) {
       const _hlBox = new THREE.Box3();
