@@ -4318,7 +4318,7 @@ class Component extends DCLogic {
     const url = URL.createObjectURL(file);
     const loader = new THREE.GLTFLoader();
     const draco = new THREE.DRACOLoader();
-    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    draco.setDecoderPath('vendor/draco/');
     loader.setDRACOLoader(draco);
     if (window.MeshoptDecoder) {
       loader.setMeshoptDecoder(window.MeshoptDecoder);
@@ -4380,7 +4380,7 @@ class Component extends DCLogic {
     this.setState({ progress: 20, progressText: 'LOADING ' + item.label.toUpperCase() + '...', loading: true, catalogLoadingKey: item.key });
     const loader = new THREE.GLTFLoader();
     const draco = new THREE.DRACOLoader();
-    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    draco.setDecoderPath('vendor/draco/');
     loader.setDRACOLoader(draco);
     if (window.MeshoptDecoder) {
       loader.setMeshoptDecoder(window.MeshoptDecoder);
@@ -4465,7 +4465,7 @@ class Component extends DCLogic {
     return new Promise((resolve, reject) => {
       const loader = new THREE.GLTFLoader();
       const draco = new THREE.DRACOLoader();
-      draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+      draco.setDecoderPath('vendor/draco/');
       loader.setDRACOLoader(draco);
       if (window.MeshoptDecoder) {
         loader.setMeshoptDecoder(window.MeshoptDecoder);
@@ -5742,26 +5742,34 @@ class Component extends DCLogic {
       this.outerRef.current.classList.remove('bg-grain');
     }
     try {
-      const B = 'https://unpkg.com/three@0.137.0/';
-      // Classic global builds, loaded strictly in dependency order.
+      const B = 'vendor/three/';
+      // Classic global builds. three.min.js must load alone first (it defines
+      // the global THREE). The rest load in dependency tiers, parallel within
+      // each tier: tier 1 only needs THREE (EffectComposer.js also defines
+      // THREE.Pass); tier 2 (RenderPass/ShaderPass/UnrealBloomPass) subclasses
+      // THREE.Pass and references the shaders loaded in tier 1.
       await this.loadScript(B + 'build/three.min.js');
-      await this.loadScript(B + 'examples/js/loaders/GLTFLoader.js');
-      await this.loadScript(B + 'examples/js/loaders/DRACOLoader.js');
-      await this.loadScript(B + 'examples/js/libs/meshopt_decoder.js');
-      await this.loadScript(B + 'examples/js/exporters/GLTFExporter.js');
-      await this.loadScript(B + 'examples/js/controls/OrbitControls.js');
-      await this.loadScript(B + 'examples/js/objects/Sky.js');
-      await this.loadScript(B + 'examples/js/loaders/RGBELoader.js');
-      await this.loadScript(B + 'examples/js/environments/RoomEnvironment.js');
-      await this.loadScript(B + 'examples/js/shaders/HorizontalBlurShader.js');
-      await this.loadScript(B + 'examples/js/shaders/VerticalBlurShader.js');
-      await this.loadScript(B + 'examples/js/shaders/CopyShader.js');
-      await this.loadScript(B + 'examples/js/shaders/LuminosityHighPassShader.js');
-      await this.loadScript(B + 'examples/js/postprocessing/EffectComposer.js');
-      await this.loadScript(B + 'examples/js/postprocessing/RenderPass.js');
-      await this.loadScript(B + 'examples/js/postprocessing/ShaderPass.js');
-      await this.loadScript(B + 'examples/js/postprocessing/UnrealBloomPass.js');
-      await this.loadScript(B + 'examples/js/shaders/GammaCorrectionShader.js');
+      await Promise.all([
+        this.loadScript(B + 'examples/js/loaders/GLTFLoader.js'),
+        this.loadScript(B + 'examples/js/loaders/DRACOLoader.js'),
+        this.loadScript(B + 'examples/js/libs/meshopt_decoder.js'),
+        this.loadScript(B + 'examples/js/exporters/GLTFExporter.js'),
+        this.loadScript(B + 'examples/js/controls/OrbitControls.js'),
+        this.loadScript(B + 'examples/js/objects/Sky.js'),
+        this.loadScript(B + 'examples/js/loaders/RGBELoader.js'),
+        this.loadScript(B + 'examples/js/environments/RoomEnvironment.js'),
+        this.loadScript(B + 'examples/js/shaders/HorizontalBlurShader.js'),
+        this.loadScript(B + 'examples/js/shaders/VerticalBlurShader.js'),
+        this.loadScript(B + 'examples/js/shaders/CopyShader.js'),
+        this.loadScript(B + 'examples/js/shaders/LuminosityHighPassShader.js'),
+        this.loadScript(B + 'examples/js/shaders/GammaCorrectionShader.js'),
+        this.loadScript(B + 'examples/js/postprocessing/EffectComposer.js'),
+      ]);
+      await Promise.all([
+        this.loadScript(B + 'examples/js/postprocessing/RenderPass.js'),
+        this.loadScript(B + 'examples/js/postprocessing/ShaderPass.js'),
+        this.loadScript(B + 'examples/js/postprocessing/UnrealBloomPass.js'),
+      ]);
 
       const THREE = window.THREE;
       const OrbitControls = THREE.OrbitControls;
@@ -5890,7 +5898,7 @@ class Component extends DCLogic {
 
       // --- Load GLBs (Draco-compressed glTF with PBR materials) ---
       const draco = new THREE.DRACOLoader();
-      draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+      draco.setDecoderPath('vendor/draco/');
       const loader = new THREE.GLTFLoader();
       loader.setDRACOLoader(draco);
       if (window.MeshoptDecoder) {
