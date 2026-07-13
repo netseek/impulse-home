@@ -3069,6 +3069,7 @@ class Component extends DCLogic {
     if (!this._blackMat) this._blackMat = new this.THREE.MeshBasicMaterial({ color: 0x000000 });
     if (!this._matStore) this._matStore = new Map();
     if (!this._hiddenForBloom) this._hiddenForBloom = [];
+    if (this._windGroup && this._windGroup.visible) { this._windGroup.visible = false; this._windWasHidden = true; }
     const set = this._streakMeshSet || new Set();
     scene.traverse((o) => {
       if (!o.isMesh || !o.visible || set.has(o)) return;
@@ -3087,6 +3088,7 @@ class Component extends DCLogic {
     if (!this._blackMat) this._blackMat = new this.THREE.MeshBasicMaterial({ color: 0x000000 });
     if (!this._matStore) this._matStore = new Map();
     if (!this._hiddenForBloom) this._hiddenForBloom = [];
+    if (this._windGroup && this._windGroup.visible) { this._windGroup.visible = false; this._windWasHidden = true; }
     const set = this._bloomMeshSet || new Set();
     scene.traverse((o) => {
       if (!o.isMesh || !o.visible || set.has(o)) return;
@@ -3110,6 +3112,157 @@ class Component extends DCLogic {
       this._hiddenForBloom.forEach((o) => { o.visible = true; });
       this._hiddenForBloom.length = 0;
     }
+    // Wind streaks are THREE.Line (not isMesh) so the darken passes above skip
+    // them — restore the visibility we forced off before the bloom/streak render.
+    if (this._windWasHidden) {
+      if (this._windGroup) this._windGroup.visible = true;
+      this._windWasHidden = false;
+    }
+  }
+
+  // ── Wind streaks ─────────────────────────────────────────────────────────
+  // A few thin additive polylines that stream front→rear past the car while
+  // it's moving, hugging the body silhouette (top view) and arcing over the
+  // roof (side view). They bow laterally toward the rear when the wheels are
+  // steered. Built once (both variants share the same framing) and animated in
+  // the render loop only while motionSpeed != 0. Rendered in the MAIN scene
+  // pass so the body occludes far-side lines; hidden during the bloom/streak
+  // passes (see _restoreMaterials) so they aren't double-added or bloomed.
+  _setupWindLines(center, size, groundY) {
+    if (!this.THREE || !this.scene || this._windGroup) return;
+    const THREE = this.THREE;
+    const F  = (this._carForwardDir || new THREE.Vector3(-1, 0, 0)).clone().setY(0).normalize();
+    const Lt = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), F).normalize();
+    const carL = Math.abs(size.x * F.x)  + Math.abs(size.z * F.z);   // length along forward
+    const carW = Math.abs(size.x * Lt.x) + Math.abs(size.z * Lt.z);  // width across
+    const H = size.y;
+    this._windCfg = { center: center.clone(), F, Lt, carL, carW, H, groundY };
+
+    // Lane layout: two heights per flank + one over the roof. "Just a few."
+    const lanes = [
+      { side: -1, hFrac: 0.34, kind: 'side', rate: 1.00, bright: 0.90, phase: 0.00 },
+      { side:  1, hFrac: 0.34, kind: 'side', rate: 1.06, bright: 0.90, phase: 0.37 },
+      { side: -1, hFrac: 0.60, kind: 'side', rate: 0.94, bright: 0.75, phase: 0.62 },
+      { side:  1, hFrac: 0.60, kind: 'side', rate: 1.00, bright: 0.75, phase: 0.18 },
+      { side:  0, hFrac: 1.00, kind: 'roof', rate: 0.90, bright: 0.70, phase: 0.80 },
+    ];
+
+    const K = 48; // samples per streak
+    const group = new THREE.Group();
+    group.name = 'windStreaks';
+    group.visible = false;
+    const streaks = [];
+    for (const lane of lanes) {
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(K * 3);
+      const colors = new Float32Array(K * 3);
+      const ts = new Float32Array(K);
+      for (let i = 0; i < K; i++) ts[i] = i / (K - 1);
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+      const mat = new THREE.LineBasicMaterial({
+        vertexColors: true, transparent: true, depthWrite: false, depthTest: true,
+        blending: THREE.AdditiveBlending, toneMapped: false,
+      });
+      const line = new THREE.Line(geo, mat);
+      line.frustumCulled = false;
+      line.renderOrder = 3;
+      group.add(line);
+      streaks.push({ lane, geo, positions, colors, ts, head: lane.phase });
+    }
+    this.scene.add(group);
+    this._windGroup = group;
+    this._windStreaks = streaks;
+    this._windSteerCached = null;
+    this._windColor = new THREE.Color(0.62, 0.80, 1.0); // cool pale blue
+    this._rebuildWindPaths(0);
+  }
+
+  // Rebuild each streak's static path for the given steering angle. Cheap
+  // (5 lanes x 48 pts); only called on setup and when the wheel angle changes.
+  _rebuildWindPaths(wheelAngleDeg) {
+    if (!this._windStreaks || !this._windCfg) return;
+    const { center, F, Lt, carL, carW, H, groundY } = this._windCfg;
+    const steer = Math.sin((wheelAngleDeg || 0) * Math.PI / 180); // -0.57..0.57 @ ±35°
+    const gap = carW * 0.10;
+    const bl = carL * 0.5;       // body half-length
+    const uFront =  carL * 0.72; // path start, ahead of the nose
+    const uRear  = -carL * 0.98; // path end, behind the tail
+    const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    for (const s of this._windStreaks) {
+      const { lane, positions, ts } = s;
+      for (let i = 0; i < ts.length; i++) {
+        const t = ts[i];
+        const u = uFront + (uRear - uFront) * t;
+        const x = u / bl; // -1..1 across the body, |x|>1 fore/aft of it
+        // Top-view silhouette width: full across the cabin, converging fore/aft.
+        const wf = Math.sqrt(Math.max(0, 1 - x * x * x * x));
+        // Lateral: hug just outside the flank; the roof lane rides the centreline.
+        let lat = lane.side * wf * (carW * 0.5 + gap);
+        // Steering: airflow bows toward the steer side, growing toward the tail.
+        lat += steer * carW * 0.85 * ss(0.30, 1.0, t);
+        // Height: side lanes ~constant with a slight rise over the cabin;
+        // the roof lane arcs up to the roofline through the middle.
+        let y;
+        if (lane.kind === 'roof') {
+          const bump = Math.max(0, 1 - x * x);
+          y = groundY + H * (0.52 + 0.50 * bump);
+        } else {
+          y = groundY + H * lane.hFrac + H * 0.05 * wf;
+        }
+        positions[i * 3]     = center.x + F.x * u + Lt.x * lat;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = center.z + F.z * u + Lt.z * lat;
+      }
+      s.geo.attributes.position.needsUpdate = true;
+      s.geo.computeBoundingSphere();
+    }
+    this._windSteerCached = wheelAngleDeg || 0;
+  }
+
+  // Per-frame: advance each comet along its path and paint the moving window
+  // via per-vertex colour (additive → black vertices are invisible, no alpha
+  // needed). Returns true if a render is warranted this frame.
+  _updateWindLines(delta) {
+    if (!this._windGroup || !this._windStreaks) return false;
+    const speed = this.state.motionSpeed || 0;
+    if (speed === 0) {
+      if (this._windGroup.visible) { this._windGroup.visible = false; return true; }
+      return false;
+    }
+    // Paths depend on steering — rebuild only when the wheel angle changes.
+    const wa = this.state.wheelAngle || 0;
+    if (wa !== this._windSteerCached) this._rebuildWindPaths(wa);
+    this._windGroup.visible = true;
+
+    const dir = speed > 0 ? 1 : -1;                 // forward → flow front(0)→rear(1)
+    const aspeed = Math.abs(speed);
+    const speedBright = Math.min(1, aspeed / 1.2);  // fade in with speed
+    const TL = 0.32;                                // comet tail length (in t)
+    const GAIN = 1.35;                              // additive read boost
+    const col = this._windColor;
+    for (const s of this._windStreaks) {
+      const { lane, colors, ts } = s;
+      s.head += dir * (aspeed * 0.55 * lane.rate) * delta; // t-units/sec
+      s.head = ((s.head % 1) + 1) % 1;
+      const head = s.head;
+      const laneBright = speedBright * lane.bright * GAIN;
+      for (let i = 0; i < ts.length; i++) {
+        const t = ts[i];
+        // Fade both open ends of the path so the wrap-around is invisible.
+        const env = Math.min(1, t / 0.10) * Math.min(1, (1 - t) / 0.10);
+        // Distance behind the head in travel direction (no wrap → no ghost tail).
+        const d = dir > 0 ? (head - t) : (t - head);
+        let c = (d >= 0 && d <= TL) ? (1 - d / TL) : 0;
+        c *= c;                                     // sharpen toward the head
+        const b = env * c * laneBright;
+        colors[i * 3]     = col.r * b;
+        colors[i * 3 + 1] = col.g * b;
+        colors[i * 3 + 2] = col.b * b;
+      }
+      s.geo.attributes.color.needsUpdate = true;
+    }
+    return true;
   }
 
   // Trim a mesh in place to keep only triangles whose world-Y centroid is at or
@@ -6286,6 +6439,11 @@ class Component extends DCLogic {
           needRender = true;
         }
 
+        // Wind streaks — only alive while moving; also self-hides on stop
+        if (this._windGroup) {
+          if (this._updateWindLines(delta)) needRender = true;
+        }
+
         // Smooth doors animation
         let doorsNeedRender = false;
         if (this._doorProgress && this._doorTargets) {
@@ -7182,6 +7340,7 @@ class Component extends DCLogic {
     // castShadow so it doesn't punch a fake opaque hole in the shadow.
     this.addShadowCatcher(center3, size3, box3.min.y);
     this._setupNightSceneLights(center3, size3, box3.min.y);
+    this._setupWindLines(center3, size3, box3.min.y);
     const radius = Math.max(size3.x, size3.y, size3.z) * 0.6;
     const fov = this.camera.fov * Math.PI / 180;
     const dist = (radius / Math.sin(fov / 2)) * 1.02;
