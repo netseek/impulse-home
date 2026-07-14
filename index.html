@@ -4648,26 +4648,33 @@ class Component extends DCLogic {
     this['_blink_' + timerKey] = null;
   }
 
-  _warmupLights() {
-    if (!this.lightGroups || !this.renderer || !this.scene || !this.camera) return;
-    console.log('[Lights Warmup] Starting sequential shader pre-warm...');
-
-    const warmupKeys = [
+  _warmupKeys() {
+    return [
       'headlight', 'highbeam', 'fogFront', 'fogRear', 'brake', 'reverse',
       'turnL', 'turnR', 'hazard',
       'positionFront', 'positionFrontL', 'positionFrontR',
       'positionFrontAmber', 'positionFrontLAmber', 'positionFrontRAmber',
       'positionRear', 'position'
     ];
+  }
 
-    warmupKeys.forEach(k => {
-      try {
-        // 1. Turn this specific group ON
-        this._setGroupEmissive(k, true);
+  // One light group's worth of shader pre-compile: turn it on, force the
+  // main/bloom/streak programs to compile+render once, turn it back off.
+  // Shared by the synchronous and chunked-async warmup runners below.
+  _warmupLightKey(k) {
+    try {
+      // 1. Turn this specific group ON
+      this._setGroupEmissive(k, true);
 
-        // 2. Compile main scene with this light ON
-        this.renderer.compile(this.scene, this.camera);
+      // 2. Compile main scene with this light ON
+      this.renderer.compile(this.scene, this.camera);
 
+      // Low tier: the bloom/streak RENDERS below (not just the compile above)
+      // are the expensive part — measured ~100ms total on a desktop GPU with
+      // shaders already cached, so real cost on the target Adreno 640 is
+      // considerably higher. Skip them; the on-demand render loop compiles
+      // those composer passes the first time a light is actually toggled.
+      if (!this._perfLow) {
         // 3. Compile Bloom composer with this light ON
         if (this.bloomComposer && this.bloomCam) {
           this.bloomCam.position.copy(this.camera.position);
@@ -4696,16 +4703,18 @@ class Component extends DCLogic {
           this._restoreMaterials();
           this.scene.background = savedBg;
         }
-
-        // 5. Turn this specific group OFF
-        this._setGroupEmissive(k, false);
-
-      } catch (err) {
-        console.warn(`[Lights Warmup] Error warming up group ${k}:`, err);
       }
-    });
 
-    // 6. Warm up Additive Overlay
+      // 5. Turn this specific group OFF
+      this._setGroupEmissive(k, false);
+
+    } catch (err) {
+      console.warn(`[Lights Warmup] Error warming up group ${k}:`, err);
+    }
+  }
+
+  _warmupOverlayOnce() {
+    if (this._perfLow) return; // low tier skips the composer renders this depends on
     try {
       if (this.bloomMat && this.streakMat && this.bloomComposer && this.streakComposer) {
         this.bloomMat.map = this.bloomComposer.readBuffer.texture;
@@ -4724,8 +4733,65 @@ class Component extends DCLogic {
     } catch (err) {
       console.warn('[Lights Warmup] Error during overlay warmup:', err);
     }
+  }
 
+  // Synchronous, blocking warmup: pre-compiles every light-group shader
+  // variant back-to-back before returning. Used for the SECONDARY (GT) model,
+  // which needs to stay temporarily visible for the whole warmup (renderer.
+  // compile only walks visible objects) — chunking that across frames would
+  // risk a stray visible GT frame before _activateVariant restores state, so
+  // it's kept simple/synchronous there. GT is already lazy-loaded behind its
+  // own loading overlay, so blocking briefly there is an acceptable trade-off.
+  _warmupLights() {
+    if (!this.lightGroups || !this.renderer || !this.scene || !this.camera) return;
+    console.log('[Lights Warmup] Starting sequential shader pre-warm...');
+    this._warmupKeys().forEach(k => this._warmupLightKey(k));
+    this._warmupOverlayOnce();
     console.log('[Lights Warmup] Sequential pre-warm completed.');
+  }
+
+  // Non-blocking warmup: identical work to _warmupLights, but spread one
+  // light group per animation frame instead of all 17 back-to-back. This is
+  // what made the post-download "processing" stall on the target Adreno
+  // 640 longer than it needed to be — the car couldn't appear until every
+  // light's shader variant had compiled AND rendered once. Used for the
+  // PRIMARY model, which is already visible (no visibility-during-compile
+  // concern like GT above), so warmup can safely run in the background after
+  // the loading overlay has already cleared.
+  //
+  // Each step's on→compile→off sequence completes synchronously within a
+  // single call before yielding, and the composer renders here write to
+  // offscreen render targets (not the visible canvas) — so nothing on screen
+  // can show a half-toggled light. The one exception is the final overlay
+  // compile (_warmupOverlayOnce), which briefly draws to the visible canvas;
+  // requestRender() right after guarantees the very next frame repaints
+  // correctly over it.
+  //
+  // If the user toggles a real light while this is still running, this
+  // function's own on/off bookkeeping could transiently clobber that choice
+  // for a single frame — _reapplyLights() at the end restores the true
+  // requested state regardless, so the end result is always correct even if
+  // a light was toggled mid-warmup.
+  _warmupLightsAsync() {
+    if (!this.lightGroups || !this.renderer || !this.scene || !this.camera) return;
+    if (this._warmupInFlight) return; // already running
+    this._warmupInFlight = true;
+    const keys = this._warmupKeys().slice();
+    console.log('[Lights Warmup] Starting background shader pre-warm...');
+    const step = () => {
+      const k = keys.shift();
+      if (k === undefined) {
+        this._warmupOverlayOnce();
+        this._warmupInFlight = false;
+        this._reapplyLights();
+        if (this.requestRender) this.requestRender(2);
+        console.log('[Lights Warmup] Background pre-warm completed.');
+        return;
+      }
+      this._warmupLightKey(k);
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   componentWillUnmount() {
@@ -7675,18 +7741,27 @@ class Component extends DCLogic {
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(4);
 
-    this._warmupLights();
-
     if (primary) {
       // Nothing explicitly selected yet (fresh load) means STOCK — load it
       // through the catalog pipeline too, same as a saved selection, so it's
       // resizable and has a real thumbnail from the very first frame instead
-      // of only after the user clicks STOCK once.
+      // of only after the user clicks STOCK once. Kicked off BEFORE the light
+      // warmup (and not gated on it) so the overlay clears as soon as the
+      // (already-preloaded) stock wheel is installed — see _warmupLightsAsync.
       const key = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
       this._loadCatalogWheelByKey(key, () => {
         this.setState({ loading: false, processing: false, progress: 100 });
       }, { initial: true });
+      // Light-shader pre-warm is the single biggest chunk of the post-download
+      // "processing" stall (measured ~100ms of RENDER cost alone on a desktop
+      // GPU with shaders already cached — first-time compile adds more, and
+      // more so on the target Adreno 640). Run it chunked/in the background
+      // instead of blocking the overlay from clearing.
+      this._warmupLightsAsync();
     } else {
+      // Unreachable: the !primary (GT) case already returned earlier in this
+      // function (see the early-return block above, which runs its own
+      // synchronous _warmupLights()). Kept as a harmless fallback.
       this.setState({ loading: false, progress: 100 });
     }
   }
