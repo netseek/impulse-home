@@ -3125,7 +3125,7 @@ class Component extends DCLogic {
   // it's moving, hugging the body silhouette (top view) and arcing over the
   // roof (side view). They bow laterally toward the rear when the wheels are
   // steered. Built once (both variants share the same framing) and animated in
-  // the render loop only while motionSpeed != 0. Rendered in the MAIN scene
+  // the render loop only above ~40 km/h. Rendered in the MAIN scene
   // pass so the body occludes far-side lines; hidden during the bloom/streak
   // passes (see _restoreMaterials) so they aren't double-added or bloomed.
   _setupWindLines(center, size, groundY) {
@@ -3139,12 +3139,14 @@ class Component extends DCLogic {
     this._windCfg = { center: center.clone(), F, Lt, carL, carW, H, groundY };
 
     // Lane layout: two heights per flank + one over the roof. "Just a few."
+    // endSpread scales how far this lane's entry/exit can wander off-centre
+    // (roof lane kept tamer so it doesn't fling out to the side up high).
     const lanes = [
-      { side: -1, hFrac: 0.34, kind: 'side', rate: 1.00, bright: 0.90, phase: 0.00 },
-      { side:  1, hFrac: 0.34, kind: 'side', rate: 1.06, bright: 0.90, phase: 0.37 },
-      { side: -1, hFrac: 0.60, kind: 'side', rate: 0.94, bright: 0.75, phase: 0.62 },
-      { side:  1, hFrac: 0.60, kind: 'side', rate: 1.00, bright: 0.75, phase: 0.18 },
-      { side:  0, hFrac: 1.00, kind: 'roof', rate: 0.90, bright: 0.70, phase: 0.80 },
+      { side: -1, hFrac: 0.34, kind: 'side', rate: 1.00, bright: 0.90, phase: 0.00, endSpread: 1.00 },
+      { side:  1, hFrac: 0.34, kind: 'side', rate: 1.06, bright: 0.90, phase: 0.37, endSpread: 1.00 },
+      { side: -1, hFrac: 0.60, kind: 'side', rate: 0.94, bright: 0.75, phase: 0.62, endSpread: 0.85 },
+      { side:  1, hFrac: 0.60, kind: 'side', rate: 1.00, bright: 0.75, phase: 0.18, endSpread: 0.85 },
+      { side:  0, hFrac: 1.00, kind: 'roof', rate: 0.90, bright: 0.70, phase: 0.80, endSpread: 0.45 },
     ];
 
     const K = 48; // samples per streak
@@ -3168,20 +3170,49 @@ class Component extends DCLogic {
       line.frustumCulled = false;
       line.renderOrder = 3;
       group.add(line);
-      streaks.push({ lane, geo, positions, colors, ts, head: lane.phase });
+      // latIn/latOut: randomized lateral offset at the entry/exit ends so the
+      // stream can sweep in from a side instead of always the centreline.
+      const s = { lane, geo, positions, colors, ts, head: lane.phase, latIn: 0, latOut: 0 };
+      this._randomizeStreakEnds(s);
+      streaks.push(s);
     }
     this.scene.add(group);
     this._windGroup = group;
     this._windStreaks = streaks;
     this._windSteerCached = null;
-    this._windColor = new THREE.Color(0.62, 0.80, 1.0); // cool pale blue
+    this._windColor = new THREE.Color(0.82, 0.82, 0.82); // light gray
     this._rebuildWindPaths(0);
   }
 
-  // Rebuild each streak's static path for the given steering angle. Cheap
-  // (5 lanes x 48 pts); only called on setup and when the wheel angle changes.
+  // Pick fresh entry/exit lateral offsets for one streak. Either end can land
+  // on either side of the car, roughly 0.15–0.9 car-widths off centre (scaled
+  // by the lane's endSpread) — this is what makes wind arrive/leave from the
+  // sides rather than only from the nose/tail centreline.
+  _randomizeStreakEnds(s) {
+    if (!this._windCfg) return;
+    const carW = this._windCfg.carW;
+    const spread = (s.lane && s.lane.endSpread) || 1;
+    const pick = () => (Math.random() < 0.5 ? -1 : 1) * carW * (0.15 + Math.random() * 0.75) * spread;
+    s.latIn = pick();
+    s.latOut = pick();
+  }
+
+  // Rebuild every streak's static path for the current steering angle.
   _rebuildWindPaths(wheelAngleDeg) {
     if (!this._windStreaks || !this._windCfg) return;
+    for (const s of this._windStreaks) this._buildStreakPath(s, wheelAngleDeg || 0);
+    this._windSteerCached = wheelAngleDeg || 0;
+  }
+
+  // Build one streak's polyline. Mid-body it hugs the flank silhouette; near the
+  // ends it blends to that streak's random latIn/latOut so entry/exit direction
+  // varies. Steering bows the whole line toward the steer side at the tail.
+  // The shape is defined by a handful of control points and then run through a
+  // Catmull-Rom spline, which rounds off any angular joins (side-entry meeting
+  // the flank, the steer bow) into a smooth flowing curve.
+  _buildStreakPath(s, wheelAngleDeg) {
+    if (!this._windCfg || !this.THREE) return;
+    const THREE = this.THREE;
     const { center, F, Lt, carL, carW, H, groundY } = this._windCfg;
     const steer = Math.sin((wheelAngleDeg || 0) * Math.PI / 180); // -0.57..0.57 @ ±35°
     const gap = carW * 0.10;
@@ -3189,35 +3220,58 @@ class Component extends DCLogic {
     const uFront =  carL * 0.72; // path start, ahead of the nose
     const uRear  = -carL * 0.98; // path end, behind the tail
     const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-    for (const s of this._windStreaks) {
-      const { lane, positions, ts } = s;
-      for (let i = 0; i < ts.length; i++) {
-        const t = ts[i];
-        const u = uFront + (uRear - uFront) * t;
-        const x = u / bl; // -1..1 across the body, |x|>1 fore/aft of it
-        // Top-view silhouette width: full across the cabin, converging fore/aft.
-        const wf = Math.sqrt(Math.max(0, 1 - x * x * x * x));
-        // Lateral: hug just outside the flank; the roof lane rides the centreline.
-        let lat = lane.side * wf * (carW * 0.5 + gap);
-        // Steering: airflow bows toward the steer side, growing toward the tail.
-        lat += steer * carW * 0.85 * ss(0.30, 1.0, t);
-        // Height: side lanes ~constant with a slight rise over the cabin;
-        // the roof lane arcs up to the roofline through the middle.
-        let y;
-        if (lane.kind === 'roof') {
-          const bump = Math.max(0, 1 - x * x);
-          y = groundY + H * (0.52 + 0.50 * bump);
-        } else {
-          y = groundY + H * lane.hFrac + H * 0.05 * wf;
-        }
-        positions[i * 3]     = center.x + F.x * u + Lt.x * lat;
-        positions[i * 3 + 1] = y;
-        positions[i * 3 + 2] = center.z + F.z * u + Lt.z * lat;
+    const { lane, positions, ts } = s;
+    const latIn = s.latIn || 0, latOut = s.latOut || 0;
+
+    // A few control points along the length; the spline smooths between them.
+    const NC = 9;
+    const ctrl = [];
+    for (let j = 0; j < NC; j++) {
+      const t = j / (NC - 1);
+      const u = uFront + (uRear - uFront) * t;
+      const x = u / bl; // -1..1 across the body, |x|>1 fore/aft of it
+      const wf = Math.sqrt(Math.max(0, 1 - x * x * x * x)); // top-view silhouette width
+      const entry = 1 - ss(0.0, 0.42, t);                  // dominates near t=0
+      const exit  = ss(0.58, 1.0, t);                      // dominates near t=1
+      const lat = lane.side * wf * (carW * 0.5 + gap) * (1 - entry) * (1 - exit)
+                + latIn * entry + latOut * exit
+                + steer * carW * 0.85 * ss(0.30, 1.0, t);   // steer bow, grows to the tail
+      let y;
+      if (lane.kind === 'roof') {
+        const bump = Math.max(0, 1 - x * x);
+        y = groundY + H * (0.52 + 0.50 * bump);             // arc up to the roofline
+      } else {
+        y = groundY + H * lane.hFrac + H * 0.05 * wf;       // ~constant, slight cabin rise
       }
-      s.geo.attributes.position.needsUpdate = true;
-      s.geo.computeBoundingSphere();
+      ctrl.push(new THREE.Vector3(
+        center.x + F.x * u + Lt.x * lat,
+        y,
+        center.z + F.z * u + Lt.z * lat,
+      ));
     }
-    this._windSteerCached = wheelAngleDeg || 0;
+    // centripetal Catmull-Rom avoids overshoot/cusps at the sharper control points
+    const curve = new THREE.CatmullRomCurve3(ctrl, false, 'centripetal', 0.5);
+    const pts = curve.getPoints(ts.length - 1); // → ts.length points along the curve
+    for (let i = 0; i < ts.length; i++) {
+      positions[i * 3]     = pts[i].x;
+      positions[i * 3 + 1] = pts[i].y;
+      positions[i * 3 + 2] = pts[i].z;
+    }
+    // A few Laplacian passes relax any residual tight turns (e.g. where a far
+    // side-entry sweeps into the flank) into a gently flowing curve. Endpoints
+    // are pinned so the random entry/exit positions are preserved.
+    const n = ts.length;
+    const tmp = this._windSmoothBuf || (this._windSmoothBuf = new Float32Array(positions.length));
+    for (let p = 0; p < 4; p++) {
+      tmp.set(positions);
+      for (let i = 1; i < n - 1; i++) {
+        for (let k = 0; k < 3; k++) {
+          positions[i * 3 + k] = tmp[i * 3 + k] * 0.5 + tmp[(i - 1) * 3 + k] * 0.25 + tmp[(i + 1) * 3 + k] * 0.25;
+        }
+      }
+    }
+    s.geo.attributes.position.needsUpdate = true;
+    s.geo.computeBoundingSphere();
   }
 
   // Per-frame: advance each comet along its path and paint the moving window
@@ -3226,7 +3280,10 @@ class Component extends DCLogic {
   _updateWindLines(delta) {
     if (!this._windGroup || !this._windStreaks) return false;
     const speed = this.state.motionSpeed || 0;
-    if (speed === 0) {
+    const aspeed = Math.abs(speed);
+    // Only kick in above ~40 km/h (speedKmh = |speed| * 40 → 1.0 == 40).
+    const WIND_ON = 1.0;
+    if (aspeed < WIND_ON) {
       if (this._windGroup.visible) { this._windGroup.visible = false; return true; }
       return false;
     }
@@ -3236,15 +3293,19 @@ class Component extends DCLogic {
     this._windGroup.visible = true;
 
     const dir = speed > 0 ? 1 : -1;                 // forward → flow front(0)→rear(1)
-    const aspeed = Math.abs(speed);
-    const speedBright = Math.min(1, aspeed / 1.2);  // fade in with speed
+    const speedBright = Math.min(1, 0.35 + (aspeed - WIND_ON) / 0.45); // present at 40, full ~52 km/h
     const TL = 0.32;                                // comet tail length (in t)
     const GAIN = 1.35;                              // additive read boost
     const col = this._windColor;
     for (const s of this._windStreaks) {
       const { lane, colors, ts } = s;
       s.head += dir * (aspeed * 0.55 * lane.rate) * delta; // t-units/sec
-      s.head = ((s.head % 1) + 1) % 1;
+      // On each recycle, re-pick this streak's entry/exit sides for variety.
+      if (s.head >= 1 || s.head < 0) {
+        s.head = ((s.head % 1) + 1) % 1;
+        this._randomizeStreakEnds(s);
+        this._buildStreakPath(s, this._windSteerCached || 0);
+      }
       const head = s.head;
       const laneBright = speedBright * lane.bright * GAIN;
       for (let i = 0; i < ts.length; i++) {
@@ -6013,13 +6074,15 @@ class Component extends DCLogic {
       // tier trims the pixel-cost drivers (no MSAA, DPR≤1.0, cheap glass, a
       // lighter anamorphic streak, smaller/harder shadow) while keeping bloom.
       // Desktop (no param) is unchanged. Read window.__perfLow() to check.
-      // Accept EITHER ?perf=low OR #perf=low: some static hosts (and `npx serve`
-      // on /index.html) drop the query string on redirect, but the hash always
-      // survives client-side — so #perf=low is the reliable form on the car.
+      // Activated by ANY of: #lite, ?lite, #perf=low, ?perf=low. The bare
+      // #lite form needs no "=" (awkward to type on the car keyboard) and, being
+      // a hash, survives hosts that drop the query on redirect (`npx serve` on
+      // /index.html does) — so "append #lite to the URL" is the on-car recipe.
       {
-        const qp = new URLSearchParams(location.search).get('perf');
-        const hp = new URLSearchParams((location.hash || '').replace(/^#/, '')).get('perf');
-        this._perfLow = (qp || hp) === 'low';
+        const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
+        const qs = parse(location.search), hs = parse(location.hash);
+        this._perfLow = (qs.get('perf') === 'low') || (hs.get('perf') === 'low')
+          || qs.has('lite') || hs.has('lite');
       }
       window.__perfLow = () => this._perfLow;
 
