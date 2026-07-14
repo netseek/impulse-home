@@ -1409,6 +1409,129 @@ class Component extends DCLogic {
 
     renderer.setRenderTarget(oldRenderTarget);
     renderer.setClearColor(oldClearColor, oldClearAlpha);
+
+    // The captured texture always fills the sprite (the ortho camera reframes
+    // to the current rim's radius `r` each call), but the sprite disc geometry
+    // was sized for whatever rim was present at build time. After a rim swap
+    // the new rim's world radius differs, so rescale the discs to match — else
+    // the spinning-blur sprite keeps the old rim's size.
+    this._resizeBlurredDiscs(r);
+    // Custom rims mount their face proud of the tire opening, further out along
+    // the axle than the fixed 0.115 the discs were built at — so also re-seat
+    // the sprites onto the current rim's front face, or they render recessed
+    // deep inside the tire barrel.
+    this._placeBlurredDiscs();
+  }
+
+  // Rescales the blurred-wheel + backing sprite discs so their world radius
+  // tracks `worldRadius` (the current FL-rim radius measured in
+  // _generateBlurredWheelTexture), relative to the radius they were built at.
+  // Geometry is rebuilt rather than scaling the mesh, so the roll/steer
+  // matrices (_initWorld/_initParentInv) stay untouched.
+  _resizeBlurredDiscs(worldRadius) {
+    if (!this.THREE || !this._blurDiscInitWorldRadius || this._blurDiscInitWorldRadius < 1e-6) return;
+    const ratio = worldRadius / this._blurDiscInitWorldRadius;
+    if (!isFinite(ratio) || ratio <= 0) return;
+    const THREE = this.THREE;
+    const discs = [...(this._blurredDiscs || []), ...(this._backingDiscs || [])];
+    discs.forEach(d => {
+      if (d._baseGeoRadius === undefined) return;
+      const target = d._baseGeoRadius * ratio;
+      // Skip if already within 0.5% — avoids churning geometry on the many
+      // _generateBlurredWheelTexture calls that don't change rim size.
+      if (d._appliedGeoRadius !== undefined && Math.abs(d._appliedGeoRadius - target) <= target * 0.005) return;
+      const old = d.geometry;
+      d.geometry = new THREE.CircleGeometry(target, 32);
+      d._appliedGeoRadius = target;
+      if (old && old.dispose) old.dispose();
+    });
+  }
+
+  // Re-seats the blur + backing sprites so their edge tucks JUST BEHIND the
+  // tire material at the sprite's own radius (the bore edge), the way a real
+  // tire bead sits proud of the wheel face. The discs are built at a fixed
+  // 0.115m outward offset tuned for the stock rim; custom rims mount their face
+  // further out, so without this the sprite renders recessed deep in the barrel.
+  //
+  // Crucially we measure the tire's outward extent at the DISC'S radius, not
+  // its global outermost point: the global max is the sidewall bulge (bigger
+  // radius, further out), so seating against it leaves the disc's rim floating
+  // proud of the tire opening with a visible gap. Anchoring to the tire surface
+  // at the disc's own edge radius, then recessing a hair behind it, lets the
+  // tire lip cover the edge cleanly.
+  //
+  // Works by shifting each disc's resting matrix (_initWorld) along the axle;
+  // the shift is along the spin axis, so roll/steer are unaffected. Idempotent:
+  // always recomputed from a pristine cached _baseInitWorld, so repeated calls
+  // (tint/HDRI/size changes) never accumulate drift.
+  _placeBlurredDiscs() {
+    if (!this.THREE || !this._blurredDiscs) return;
+    const THREE = this.THREE;
+    const BUILD_OUTWARD = 0.115; // the offset discs are created at (see _finalizeWheels)
+    const RECESS = 0.004;        // tuck the sprite edge this far behind the tire's bore-edge face
+    const sideArr = {
+      fl: this._frontLeftWheels, fr: this._frontRightWheels,
+      rl: this._rearLeftWheels,  rr: this._rearRightWheels
+    };
+    const tmp = new THREE.Vector3();
+    ['fl', 'fr', 'rl', 'rr'].forEach(side => {
+      const rimArr = sideArr[side] || [];
+      const blur = this._blurredDiscs.find(d => d._side === side);
+      const back = (this._backingDiscs || []).find(d => d._side === side);
+      const ref = blur || back;
+      if (!ref || !rimArr.length) return;
+
+      const center = ref._pivot;
+      const axle = ref._rollAxis.clone().normalize();
+      const outwardDir = axle.clone().multiplyScalar(side.endsWith('r') ? 1 : -1);
+
+      // Disc edge radius in world units (geometry radius × the disc's own world
+      // scale), taken from the pristine baseline pose.
+      const geoR = (blur && blur.geometry.parameters && blur.geometry.parameters.radius) || 0;
+      const bScale = new THREE.Vector3();
+      (blur || ref)._baseInitWorld
+        ? (blur || ref)._baseInitWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), bScale)
+        : (blur || ref)._initWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), bScale);
+      const discWorldR = geoR * (bScale.x || 1);
+
+      // Restrict to the tires belonging to THIS cluster (nearest by centre) so a
+      // stray far-side tire can't be picked. Measured from the UNsteered resting
+      // pose (_initWorld) to match the discs' own baseline.
+      const clusterTires = (this._tireWheels || []).filter(m => {
+        const p = m._pivot || m._steerPivot;
+        return p && p.distanceTo(center) < 0.5;
+      });
+      const tires = (clusterTires.length ? clusterTires : (this._tireWheels || []));
+      const src = tires.length ? tires : rimArr;
+
+      // Tire's outward face AT the disc's edge radius (a thin radial band around
+      // discWorldR), falling back to the global max if the band is empty.
+      const band = 0.035;
+      let faceAtEdge = -Infinity, globalMax = -Infinity;
+      src.forEach(m => {
+        const pos = m.geometry && m.geometry.attributes.position;
+        if (!pos) return;
+        const wm = m._initWorld || m.matrixWorld;
+        for (let i = 0; i < pos.count; i++) {
+          const rel = tmp.fromBufferAttribute(pos, i).applyMatrix4(wm).sub(center);
+          const o = rel.dot(outwardDir);
+          if (o > globalMax) globalMax = o;
+          const radial = rel.addScaledVector(outwardDir, -o).length();
+          if (discWorldR > 0 && Math.abs(radial - discWorldR) <= band && o > faceAtEdge) faceAtEdge = o;
+        }
+      });
+      const faceOut = isFinite(faceAtEdge) ? faceAtEdge : globalMax;
+      if (!isFinite(faceOut)) return;
+
+      const delta = (faceOut - RECESS) - BUILD_OUTWARD;
+      const shift = new THREE.Matrix4().makeTranslation(
+        outwardDir.x * delta, outwardDir.y * delta, outwardDir.z * delta);
+      [blur, back].forEach(d => {
+        if (!d) return;
+        if (!d._baseInitWorld) d._baseInitWorld = d._initWorld.clone();
+        d._initWorld = shift.clone().multiply(d._baseInitWorld);
+      });
+    });
   }
 
   _initDoors(obj, profile) {
@@ -2109,6 +2232,10 @@ class Component extends DCLogic {
       flBox.getSize(sizeVec);
       const worldRadius = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
       const localRadius = worldRadius / scaleFactor;
+      // Reference the discs were built at, so a later rim swap (which changes
+      // the rim's world radius) can rescale the blur sprites to match — see
+      // _resizeBlurredDiscs, called from _generateBlurredWheelTexture.
+      this._blurDiscInitWorldRadius = worldRadius;
 
       const clusters = [
         { arr: fl, center: flCenter, axle: flP.axle, side: 'fl' },
@@ -2144,6 +2271,7 @@ class Component extends DCLogic {
         disc._rollAxis = item.axle.clone();
         disc._side = item.side;
         disc._rollAngle = 0;
+        disc._baseGeoRadius = localRadius;
         disc.updateWorldMatrix(true, false);
         disc._initWorld = disc.matrixWorld.clone();
         disc._initParentInv = disc.parent ? disc.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
@@ -2171,6 +2299,7 @@ class Component extends DCLogic {
         backingDisc._pivot = item.center.clone();
         backingDisc._rollAxis = item.axle.clone();
         backingDisc._side = item.side;
+        backingDisc._baseGeoRadius = localRadius;
         backingDisc.updateWorldMatrix(true, false);
         backingDisc._initWorld = backingDisc.matrixWorld.clone();
         backingDisc._initParentInv = backingDisc.parent ? backingDisc.parent.matrixWorld.clone().invert() : new THREE.Matrix4();
@@ -3137,16 +3266,15 @@ class Component extends DCLogic {
     const carW = Math.abs(size.x * Lt.x) + Math.abs(size.z * Lt.z);  // width across
     const H = size.y;
     this._windCfg = { center: center.clone(), F, Lt, carL, carW, H, groundY };
+    // Sample the car's real top silhouette so the roof line traces bumper →
+    // hood → windshield → roof → tailgate instead of an approximated curve.
+    this._sampleCarTopProfile();
 
-    // Lane layout: two heights per flank + one over the roof. "Just a few."
-    // endSpread scales how far this lane's entry/exit can wander off-centre
-    // (roof lane kept tamer so it doesn't fling out to the side up high).
+    // Lane layout: one line down each flank + one over the roof. "Just a few."
     const lanes = [
-      { side: -1, hFrac: 0.34, kind: 'side', rate: 1.00, bright: 0.90, phase: 0.00, endSpread: 1.00 },
-      { side:  1, hFrac: 0.34, kind: 'side', rate: 1.06, bright: 0.90, phase: 0.37, endSpread: 1.00 },
-      { side: -1, hFrac: 0.60, kind: 'side', rate: 0.94, bright: 0.75, phase: 0.62, endSpread: 0.85 },
-      { side:  1, hFrac: 0.60, kind: 'side', rate: 1.00, bright: 0.75, phase: 0.18, endSpread: 0.85 },
-      { side:  0, hFrac: 1.00, kind: 'roof', rate: 0.90, bright: 0.70, phase: 0.80, endSpread: 0.45 },
+      { side: -1, hFrac: 0.46, kind: 'side', rate: 1.00, bright: 0.95, phase: 0.00 },
+      { side:  1, hFrac: 0.46, kind: 'side', rate: 1.05, bright: 0.95, phase: 0.45 },
+      { side:  0, hFrac: 1.00, kind: 'roof', rate: 0.92, bright: 0.75, phase: 0.78 },
     ];
 
     const K = 48; // samples per streak
@@ -3170,9 +3298,10 @@ class Component extends DCLogic {
       line.frustumCulled = false;
       line.renderOrder = 3;
       group.add(line);
-      // latIn/latOut: randomized lateral offset at the entry/exit ends so the
-      // stream can sweep in from a side instead of always the centreline.
-      const s = { lane, geo, positions, colors, ts, head: lane.phase, latIn: 0, latOut: 0 };
+      // head: position of the comet along the path (0=entry, 1=exit).
+      // delay: seconds to stay dark before the next pass — a random initial value
+      // staggers the lines so they don't all start together.
+      const s = { lane, geo, positions, colors, ts, head: 0, delay: Math.random() * 2.5, dark: false, latIn: 0, latOut: 0 };
       this._randomizeStreakEnds(s);
       streaks.push(s);
     }
@@ -3184,17 +3313,88 @@ class Component extends DCLogic {
     this._rebuildWindPaths(0);
   }
 
-  // Pick fresh entry/exit lateral offsets for one streak. Either end can land
-  // on either side of the car, roughly 0.15–0.9 car-widths off centre (scaled
-  // by the lane's endSpread) — this is what makes wind arrive/leave from the
-  // sides rather than only from the nose/tail centreline.
+  // Pick fresh entry/exit lateral offsets for one streak. A flank lane enters
+  // and leaves close to the centreline (but still on ITS OWN side, never
+  // crossing) — like an airflow streamline that arrives near the nose, bows out
+  // around the body, then converges back in behind the tail. The bulge outward
+  // is added in _buildStreakPath; here we just set how far inward the ends sit.
   _randomizeStreakEnds(s) {
     if (!this._windCfg) return;
     const carW = this._windCfg.carW;
-    const spread = (s.lane && s.lane.endSpread) || 1;
-    const pick = () => (Math.random() < 0.5 ? -1 : 1) * carW * (0.15 + Math.random() * 0.75) * spread;
-    s.latIn = pick();
-    s.latOut = pick();
+    const side = (s.lane && s.lane.side) || 0;
+    if (side === 0) {
+      const pick = () => (Math.random() < 0.5 ? -1 : 1) * carW * (0.05 + Math.random() * 0.15);
+      s.latIn = pick();
+      s.latOut = pick();
+    } else {
+      // The entry comes in almost straight — near the flank distance, not from
+      // the centreline — so the front of the line runs roughly parallel to the
+      // car. The exit still eases inward behind the tail. Per-line variance keeps
+      // the two flanks from being identical and reshapes them on each recycle.
+      s.latIn  = side * carW * (0.52 + Math.random() * 0.12); // ~flank → near-straight entry
+      s.latOut = side * carW * (0.30 + Math.random() * 0.16); // eases inward at the rear
+      s.flankScale = 0.95 + Math.random() * 0.15;             // how far the bulge reaches
+      s.hOff = (Math.random() * 2 - 1) * this._windCfg.H * 0.06; // small height offset
+    }
+  }
+
+  // Sample the car's top silhouette: for bins along the length, the highest
+  // world-Y of any body vertex. This traces the real bumper/hood/windshield/
+  // roof/tailgate profile so the roof wind line can follow the car shape.
+  _sampleCarTopProfile() {
+    if (!this.THREE || !this._windCfg || !this.scene) return;
+    const THREE = this.THREE;
+    const { center, F, carL, H, groundY } = this._windCfg;
+    const bl = carL * 0.5;
+    const NB = 56;
+    const uMin = -bl * 1.05, uMax = bl * 1.05;
+    const maxY = new Float32Array(NB).fill(-Infinity);
+    // Wheels/tyres/brakes/floor/shadow can't be the top of the car — skip them
+    // (also speeds up the pass). Wind lines don't exist in the scene yet.
+    const SKIP = /wheel|tire|tyre|brake|break|hub|rim|disc|disk|caliper|floor|shadow|ground/i;
+    const v = new THREE.Vector3();
+    this.scene.traverse((o) => {
+      if (!o.isMesh || !o.visible || SKIP.test(o.name || '')) return;
+      const pos = o.geometry && o.geometry.attributes && o.geometry.attributes.position;
+      if (!pos) return;
+      o.updateWorldMatrix(true, false);
+      const step = pos.count > 15000 ? 4 : 1; // subsample dense meshes
+      for (let i = 0; i < pos.count; i += step) {
+        v.fromBufferAttribute(pos, i); o.localToWorld(v);
+        const u = (v.x - center.x) * F.x + (v.z - center.z) * F.z;
+        const b = ((u - uMin) / (uMax - uMin) * NB) | 0;
+        if (b < 0 || b >= NB || v.y <= maxY[b]) continue;
+        maxY[b] = v.y;
+      }
+    });
+    // Fill any empty bins from the nearest filled neighbour (both directions).
+    let last = groundY + H * 0.5;
+    for (let b = 0; b < NB; b++) { if (maxY[b] === -Infinity) maxY[b] = last; else last = maxY[b]; }
+    for (let b = NB - 1; b >= 0; b--) { if (maxY[b] === -Infinity) maxY[b] = last; else last = maxY[b]; }
+    // Light smoothing over panel gaps, then float slightly above the surface.
+    const sm = maxY.slice();
+    for (let p = 0; p < 2; p++) {
+      for (let b = 1; b < NB - 1; b++) sm[b] = maxY[b - 1] * 0.25 + maxY[b] * 0.5 + maxY[b + 1] * 0.25;
+      maxY.set(sm);
+    }
+    for (let b = 0; b < NB; b++) maxY[b] += H * 0.02;
+    this._roofProfile = { uMin, uMax, prof: maxY };
+  }
+
+  // Roof-line world-Y at longitudinal position u, from the sampled silhouette,
+  // tapering down to a low baseline fore/aft of the car.
+  _roofHeightAtU(u) {
+    const cfg = this._windCfg, rp = this._roofProfile;
+    const base = cfg.groundY + cfg.H * 0.42;
+    if (!rp) return cfg.groundY + cfg.H * 0.95;
+    const { uMin, uMax, prof } = rp, NB = prof.length;
+    const cu = Math.min(uMax, Math.max(uMin, u));
+    const g = (cu - uMin) / (uMax - uMin) * (NB - 1);
+    const i0 = g | 0, i1 = Math.min(NB - 1, i0 + 1), fr = g - i0;
+    let y = prof[i0] * (1 - fr) + prof[i1] * fr;
+    const over = u > uMax ? (u - uMax) : (u < uMin ? (uMin - u) : 0);
+    if (over > 0) { const k = Math.min(1, over / (cfg.carL * 0.4)); const s = k * k * (3 - 2 * k); y = y * (1 - s) + base * s; }
+    return y;
   }
 
   // Rebuild every streak's static path for the current steering angle.
@@ -3229,19 +3429,43 @@ class Component extends DCLogic {
     for (let j = 0; j < NC; j++) {
       const t = j / (NC - 1);
       const u = uFront + (uRear - uFront) * t;
-      const x = u / bl; // -1..1 across the body, |x|>1 fore/aft of it
-      const wf = Math.sqrt(Math.max(0, 1 - x * x * x * x)); // top-view silhouette width
-      const entry = 1 - ss(0.0, 0.42, t);                  // dominates near t=0
-      const exit  = ss(0.58, 1.0, t);                      // dominates near t=1
-      const lat = lane.side * wf * (carW * 0.5 + gap) * (1 - entry) * (1 - exit)
-                + latIn * entry + latOut * exit
-                + steer * carW * 0.85 * ss(0.30, 1.0, t);   // steer bow, grows to the tail
+      const x = u / bl;                             // -1..1 across the body, |x|>1 fore/aft
+      const midBump = Math.max(0, 1 - x * x);       // 1 mid-body → 0 at the body ends
+      // Partition of unity along the length: the inward latIn ahead of the nose,
+      // the outward flank distance ALONGSIDE the body, and the inward latOut
+      // behind the tail. The two ramps finish just outside the nose/tail, so the
+      // flank distance holds across the WHOLE body — the line only ever moves
+      // inward fore/aft of the car (where there's nothing to hit), giving the
+      // streamline shape: in at the nose → bow out around the body → in at the
+      // tail. All anchors stay on the lane's own side so it never crosses centre.
+      const aheadW  = 1 - ss(0.0, 0.13, t);         // →latIn, just ahead of the nose
+      const behindW = ss(0.72, 1.0, t);             // →latOut, behind the tail
+      const bodyW   = Math.max(0, 1 - aheadW - behindW);
+      let lat;
+      if (lane.side === 0) {
+        lat = latIn * aheadW + latOut * behindW;    // roof rides the centreline over the body
+      } else {
+        const flankTerm = lane.side * (carW * 0.5 + gap) * (s.flankScale || 1) * (1 + 0.10 * midBump); // gentler bow
+        lat = latIn * aheadW + flankTerm * bodyW + latOut * behindW;
+      }
+      // Steer lean: swing the EXIT (behind the tail, t>0.74) toward the steer
+      // side. wheelAngle>0 (steering right) → car-right (−Lt), matching the front
+      // wheels. Confined behind the body so it never pulls the line inward.
+      lat -= steer * carW * 0.70 * ss(0.74, 1.0, t);
       let y;
       if (lane.kind === 'roof') {
-        const bump = Math.max(0, 1 - x * x);
-        y = groundY + H * (0.52 + 0.50 * bump);             // arc up to the roofline
+        // Start from the car's real top silhouette (sampled at setup) as a floor,
+        // then add an aerodynamic "lead" that lifts the line earlier: a first
+        // rise ahead of the front, a gentler rise up to the windshield, a flat
+        // roof, and a steep drop past the rear. max() keeps it above the body.
+        const yBody = this._roofHeightAtU(u);
+        const rFront = ss(1.35, 1.00, x);   // first rise, ahead of the front
+        const rHood  = ss(1.00, 0.15, x);   // gentler rise over the hood/windshield
+        const dRear  = ss(-0.90, -0.50, x); // 1 across the roof/front, 0 past the rear (steep drop)
+        const arc = 0.50 + (0.18 * rFront + 0.32 * rHood) * dRear;
+        y = Math.max(yBody, groundY + H * arc);
       } else {
-        y = groundY + H * lane.hFrac + H * 0.05 * wf;       // ~constant, slight cabin rise
+        y = groundY + H * lane.hFrac + H * 0.05 * midBump + (s.hOff || 0); // slight rise + per-line variance
       }
       ctrl.push(new THREE.Vector3(
         center.x + F.x * u + Lt.x * lat,
@@ -3299,18 +3523,34 @@ class Component extends DCLogic {
     const col = this._windColor;
     for (const s of this._windStreaks) {
       const { lane, colors, ts } = s;
-      s.head += dir * (aspeed * 0.55 * lane.rate) * delta; // t-units/sec
-      // On each recycle, re-pick this streak's entry/exit sides for variety.
-      if (s.head >= 1 || s.head < 0) {
-        s.head = ((s.head % 1) + 1) % 1;
+
+      // Gap between passes: stay dark, count the delay down, then launch a fresh
+      // pass from the entry end. The delay is random per line, so the lines fire
+      // at different times and are spaced apart rather than streaming constantly.
+      if (s.delay > 0) {
+        s.delay -= delta;
+        if (!s.dark) { colors.fill(0); s.geo.attributes.color.needsUpdate = true; s.dark = true; }
+        if (s.delay > 0) continue;
+        s.head = dir > 0 ? 0 : 1;                  // start of a fresh pass
         this._randomizeStreakEnds(s);
         this._buildStreakPath(s, this._windSteerCached || 0);
+        s.dark = false;
       }
+
+      s.head += dir * (aspeed * 0.55 * lane.rate) * delta; // t-units/sec
+      // Pass finished → go dark and wait a random gap before the next one.
+      if (s.head >= 1 || s.head < 0) {
+        s.head = dir > 0 ? 1 : 0;
+        s.delay = 0.7 + Math.random() * 2.1;       // seconds between passes
+        colors.fill(0); s.geo.attributes.color.needsUpdate = true; s.dark = true;
+        continue;
+      }
+
       const head = s.head;
       const laneBright = speedBright * lane.bright * GAIN;
       for (let i = 0; i < ts.length; i++) {
         const t = ts[i];
-        // Fade both open ends of the path so the wrap-around is invisible.
+        // Fade both open ends of the path so the head appears/exits smoothly.
         const env = Math.min(1, t / 0.10) * Math.min(1, (1 - t) / 0.10);
         // Distance behind the head in travel direction (no wrap → no ghost tail).
         const d = dir > 0 ? (head - t) : (t - head);
