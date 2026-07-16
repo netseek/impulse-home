@@ -6415,17 +6415,35 @@ class Component extends DCLogic {
       this.renderer = renderer;
 
       // FPS HUD (bottom-left). Shows rendered frames/sec; "idle" under
-      // on-demand rendering when nothing is being drawn.
+      // on-demand rendering when nothing is being drawn. Wrapped in a flex row
+      // so an optional LITE badge (perf=low/#lite) can sit to its right
+      // without needing to know the FPS pill's (text-dependent) width.
+      const hudEl = document.createElement('div');
+      hudEl.style.cssText = 'position:absolute;left:14px;bottom:14px;z-index:30;' +
+        'display:flex;align-items:center;gap:6px;pointer-events:none;user-select:none;';
+      container.appendChild(hudEl);
+
       const fpsEl = document.createElement('div');
-      fpsEl.style.cssText = 'position:absolute;left:14px;bottom:14px;z-index:30;' +
+      fpsEl.style.cssText =
         'font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;' +
         'color:#4fd6e8;background:rgba(10,14,18,.55);backdrop-filter:blur(6px);' +
         '-webkit-backdrop-filter:blur(6px);padding:4px 9px;border-radius:6px;' +
-        'border:1px solid rgba(79,214,232,.18);pointer-events:none;user-select:none;';
+        'border:1px solid rgba(79,214,232,.18);';
       fpsEl.textContent = '— FPS';
-      container.appendChild(fpsEl);
+      hudEl.appendChild(fpsEl);
       this._fpsEl = fpsEl;
       this._renderTimes = [];
+
+      if (this._perfLow) {
+        const liteEl = document.createElement('div');
+        liteEl.style.cssText =
+          'font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;' +
+          'color:#ffb454;background:rgba(10,14,18,.55);backdrop-filter:blur(6px);' +
+          '-webkit-backdrop-filter:blur(6px);padding:4px 9px;border-radius:6px;' +
+          'border:1px solid rgba(255,180,84,.3);';
+        liteEl.textContent = 'LITE';
+        hudEl.appendChild(liteEl);
+      }
 
       const scene = new THREE.Scene();
       this.scene = scene;
