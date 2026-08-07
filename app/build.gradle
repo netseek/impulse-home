@@ -1,0 +1,49 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.havalh6.viewer"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.havalh6.viewer"
+        minSdk 23
+        targetSdk 28
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
+    sourceSets.main.assets.srcDir("$buildDir/generated/viewerAssets")
+}
+
+def viewerAssets = tasks.register("syncViewerAssets", Sync) {
+    into(layout.buildDirectory.dir("generated/viewerAssets/www"))
+    from(rootProject.projectDir) {
+        include "index.html"
+        include "support.js"
+        include "telemetryClient.js"
+        include "appLauncherClient.js"
+    }
+    from(rootProject.file("vendor")) {
+        into "vendor"
+    }
+    from(rootProject.file("assets")) {
+        into "assets"
+        exclude "_backup/**"
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name.startsWith("merge") && task.name.endsWith("Assets")) {
+        task.dependsOn(viewerAssets)
+    }
+}

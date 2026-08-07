@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
+<script src="./telemetryClient.js"></script>
+<script src="./appLauncherClient.js"></script>
 </head>
 <body>
 <x-dc>
@@ -6389,6 +6391,7 @@ class Component extends DCLogic {
         const qs = parse(location.search), hs = parse(location.hash);
         this._perfLow = (qs.get('perf') === 'low') || (hs.get('perf') === 'low')
           || qs.has('lite') || hs.has('lite');
+        this._androidApp = qs.has('android') || hs.has('android');
       }
       window.__perfLow = () => this._perfLow;
 
@@ -6537,6 +6540,14 @@ class Component extends DCLogic {
       // --- Load GLBs (Draco-compressed glTF with PBR materials) ---
       const draco = new THREE.DRACOLoader();
       draco.setDecoderPath('vendor/draco/');
+      // Android System WebView 91 on the Haval MMI advertises WASM/SIMD but its
+      // 2021 runtime crashes Draco workers with signature/memory errors. The JS
+      // decoder is slower only during initial model decode and is reliable on
+      // that WebView. A single worker also keeps peak MMI memory predictable.
+      if (this._androidApp) {
+        draco.setDecoderConfig({ type: 'js' });
+        draco.setWorkerLimit(1);
+      }
       const loader = new THREE.GLTFLoader();
       loader.setDRACOLoader(draco);
       if (window.MeshoptDecoder) {
