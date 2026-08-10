@@ -187,7 +187,7 @@ public final class MainActivity extends Activity {
      * {@code adb shell settings put global enable_freeform_support 1}
      * {@code adb shell settings put global force_resizable_activities 1}
      */
-    private static final Rect LEFT_POPUP_BOUNDS = new Rect(135, 60, 640, 480);
+    private static final Rect LEFT_POPUP_BOUNDS = new Rect(48, 100, 740, 530);
     private static final Rect FULLSCREEN_BOUNDS = new Rect(0, 0, 1920, 720);
     /** {@code WindowConfiguration.WINDOWING_MODE_FREEFORM} (API 28+). */
     private static final int WINDOWING_MODE_FREEFORM = 5;
@@ -350,6 +350,24 @@ public final class MainActivity extends Activity {
         if (popupControls != null) {
             popupControls.setVisibility(visible ? View.VISIBLE : View.GONE);
         }
+        notifyViewerPopupLayout(visible);
+    }
+
+    /**
+     * Contract with the WebView viewer:
+     * {@code window.onAndroidLauncherPopup(active:boolean)} /
+     * {@code __app.applyLauncherPopupLayout(active)} —
+     * when a left freeform app is open, frame the car slightly right + zoomed out;
+     * when closed/maximized, restore the default fit.
+     */
+    private void notifyViewerPopupLayout(boolean active) {
+        if (webView == null) return;
+        final String js = "try{"
+                + "if(window.onAndroidLauncherPopup){window.onAndroidLauncherPopup(" + active + ");}"
+                + "else if(window.__app&&window.__app.applyLauncherPopupLayout){"
+                + "window.__app.applyLauncherPopupLayout(" + active + ");}"
+                + "}catch(e){}";
+        webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
     private void launchAppInLeftSlot(String packageName) {

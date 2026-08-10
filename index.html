@@ -8488,12 +8488,12 @@ class Component extends DCLogic {
     const radius = Math.max(size3.x, size3.y, size3.z) * 0.6;
     const fov = this.camera.fov * Math.PI / 180;
     const dist = (radius / Math.sin(fov / 2)) * 1.02;
-    this.controls.target.copy(center3);
-    this.camera.position.set(center3.x - dist * 0.66, center3.y + dist * 0.30, center3.z + dist * 0.70);
-    this.camera.near = dist / 120;
-    this.camera.far = dist * 120;
-    this.camera.updateProjectionMatrix();
-    this.controls.update();
+    this._fitCenter = center3.clone();
+    this._fitSize = size3.clone();
+    this._fitRadius = radius;
+    this._fitDist = dist;
+    this._popupLayoutActive = false;
+    this._applyFitCamera(!!window.__androidPopupActive);
     this.renderOnce = () => this.renderer.render(this.scene, this.camera);
     window.__renderOnce = this.renderOnce;
     window.__scene = this.scene;
@@ -8501,6 +8501,17 @@ class Component extends DCLogic {
     window.__controls = this.controls;
     window.__renderer = this.renderer;
     window.__app = this;
+    // Native launcher contract: MainActivity calls this when a freeform popup opens/closes.
+    window.onAndroidLauncherPopup = (active) => {
+      try {
+        window.__androidPopupActive = !!active;
+        if (window.__app && typeof window.__app.applyLauncherPopupLayout === 'function') {
+          window.__app.applyLauncherPopupLayout(!!active);
+        }
+      } catch (e) {
+        console.warn('[AndroidPopup]', e);
+      }
+    };
 
     // Shadow camera bounds around the car
     const d = this.dirLight;
@@ -8552,6 +8563,48 @@ class Component extends DCLogic {
       '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels', '_allWheels',
       '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels', '_steerOnlyMeshes',
       '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges', '_trunkHinge'];
+  }
+
+  /**
+   * Default vs launcher-popup camera framing.
+   * Popup mode: slightly zoomed out + car biased to the right so the left freeform
+   * app window does not cover the vehicle.
+   */
+  _applyFitCamera(popupActive) {
+    if (!this.camera || !this.controls || !this._fitCenter || !this._fitDist) return;
+    const THREE2 = window.THREE;
+    const active = !!popupActive;
+    const distMul = active ? 1.34 : 1.0;
+    const dist = this._fitDist * distMul;
+    const c = this._fitCenter.clone();
+    this.camera.position.set(
+      c.x - dist * 0.66,
+      c.y + dist * 0.30,
+      c.z + dist * 0.70
+    );
+    this.controls.target.copy(c);
+    if (active) {
+      // Shift look-at opposite camera-right so the car sits slightly right of center.
+      this.camera.updateMatrixWorld(true);
+      const right = new THREE2.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).normalize();
+      const shift = (this._fitRadius || 1) * 0.42;
+      this.controls.target.addScaledVector(right, -shift);
+      this.camera.position.addScaledVector(right, -shift);
+    }
+    this.camera.near = dist / 120;
+    this.camera.far = dist * 120;
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+    if (this.requestRender) this.requestRender(5);
+  }
+
+  applyLauncherPopupLayout(active) {
+    const next = !!active;
+    if (this._popupLayoutActive === next && this._fitCenter) {
+      // Still re-apply in case the user orbited away.
+    }
+    this._popupLayoutActive = next;
+    this._applyFitCamera(next);
   }
 
   _captureVariant(key, root) {
