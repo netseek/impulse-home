@@ -35,17 +35,18 @@ gradle assembleRelease
 The build copies `index.html`, `support.js`, `vendor/`, and production files
 under `assets/` into the APK. It intentionally excludes `assets/_backup/`.
 
-## Install on a normal Android test device
+## Freeform popups (emulator)
+
+Stock Android emulators often have freeform disabled, so app launches ignore
+windowing-mode options and open fullscreen. Enable once per AVD:
 
 ```powershell
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n com.havalh6.viewer/.MainActivity
+adb shell settings put global enable_freeform_support 1
+adb shell settings put global force_resizable_activities 1
 ```
 
-Validate touch orbit/zoom, model loading, wheel switching, and resume after
-leaving the app before trying the vehicle MMI. The Haval-specific install flow
-is deliberately not included here; use the `haval-app-tool-multimidia` project
-for that later step.
+Then relaunch the viewer and tap an app icon — it should float over the launcher.
+On the Haval MMI, freeform is typically already available from the OEM.
 
 ## Runtime design
 
@@ -61,3 +62,17 @@ for that later step.
 The Three.js/WebGL feature set still depends on the Android System WebView
 version installed by the MMI. Test the debug APK on the actual head unit before
 locking the release SDK/signing configuration.
+
+## Time mode (Day / Night / Auto)
+
+The viewer config panel exposes `timeMode`: `day`, `night`, or `auto`.
+
+- **Day / Night** force the scene lighting locally.
+- **Auto** follows car telemetry key `isNight` (`"true"` / `"false"` strings).
+
+Native path already exists: `havalshisuku` broadcast → `MainActivity` →
+`onCarDataUpdate` → `carTelemetry`. Publish `isNight` from the car app for Auto
+alignment; the viewer listens via `carTelemetry.onUpdate` / `carTelemetry.isNight()`.
+
+Persisted viewer preferences (including `timeMode`) are stored in WebView
+`localStorage` under `h6_settings_v1` when the user taps **Save**.

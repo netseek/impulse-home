@@ -1,5 +1,21 @@
+/**
+ * Car telemetry bus for the Haval H6 viewer.
+ *
+ * Contract used by Time → Auto (viewer consumes; car/app publishes):
+ *   key:   "isNight"
+ *   value: "true" | "false"  (string, matching Android evaluateJavascript)
+ *          also accepts boolean true/false and "1"/"0"
+ *
+ * Ingress paths:
+ *   1. Android: MainActivity broadcast → onCarDataUpdate(key, value)
+ *   2. Desktop: WebSocket ws://127.0.0.1:8888  { event: 'car_data', key, value }
+ */
 (function() {
   'use strict';
+
+  function parseIsNight(value) {
+    return value === true || value === 'true' || value === '1' || value === 1;
+  }
 
   var carTelemetry = {
     data: {},
@@ -27,9 +43,14 @@
       if (this.data.hasOwnProperty(key)) return this.data[key];
       if (window.TelemetryBridge && typeof window.TelemetryBridge.getCarData === 'function') {
         var bridgeVal = window.TelemetryBridge.getCarData(key);
-        if (bridgeVal) return bridgeVal;
+        if (bridgeVal !== undefined && bridgeVal !== null && bridgeVal !== '') return bridgeVal;
       }
       return fallback !== undefined ? fallback : '';
+    },
+
+    /** Effective cabin/UI night from the contracted isNight key. */
+    isNight: function() {
+      return parseIsNight(this.get('isNight', 'false'));
     }
   };
 
@@ -81,8 +102,11 @@
     }
   }
 
-  // Auto-connect WebSocket if available
-  if (typeof WebSocket !== 'undefined') {
+  // Auto-connect WebSocket on desktop/dev hosts only. The Android WebView APK
+  // has no INTERNET permission and no local telemetry broker.
+  var isAndroidApp = /[?&#]android(?:&|$)/.test(String(location.search || ''))
+    || /(?:^|[&#])android(?:&|$)/.test(String(location.hash || '').replace(/^#/, ''));
+  if (typeof WebSocket !== 'undefined' && !isAndroidApp) {
     connectWebSocket();
   }
 })();

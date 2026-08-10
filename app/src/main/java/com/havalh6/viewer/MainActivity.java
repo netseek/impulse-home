@@ -49,6 +49,10 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> pendingFiles;
     private final ConcurrentHashMap<String, String> telemetryCache = new ConcurrentHashMap<>();
+    private View popupControls;
+    private View launchAnchor;
+    private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable pinBoundsRunnable;
 
     private final BroadcastReceiver telemetryReceiver = new BroadcastReceiver() {
         @Override
@@ -155,82 +159,335 @@ public final class MainActivity extends Activity {
             return appsArray.toString();
         }
 
-        private String activePopupPackage = "";
-
         @JavascriptInterface
         public void launchAppInPopup(String packageName) {
-            launchAppInPopup(packageName, "left");
-        }
-
-        @JavascriptInterface
-        public void launchAppInPopup(String packageName, String slot) {
-            try {
-                if (packageName != null && !packageName.isEmpty()) {
-                    activePopupPackage = packageName;
-                    Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
-                    if (intent == null) return;
-
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT);
-                    ActivityOptions options = ActivityOptions.makeBasic();
-
-                    try {
-                        java.lang.reflect.Method method = ActivityOptions.class.getMethod("setLaunchWindowingMode", int.class);
-                        method.invoke(options, 5); // 5 = WINDOWING_MODE_FREEFORM
-                    } catch (Exception ignored) {}
-
-                    try {
-                        java.lang.reflect.Method methodOnTop = ActivityOptions.class.getMethod("setAlwaysOnTop", boolean.class);
-                        methodOnTop.invoke(options, true);
-                    } catch (Exception ignored) {}
-
-                    // Freeform bounds: "right" -> (1275, 60) to (1780, 480) | "left" -> (135, 60) to (640, 480)
-                    if ("right".equalsIgnoreCase(slot)) {
-                        options.setLaunchBounds(new Rect(1275, 60, 1780, 480));
-                    } else {
-                        options.setLaunchBounds(new Rect(135, 60, 640, 480));
-                    }
-                    startActivity(intent, options.toBundle());
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error launching app in popup " + packageName, e);
-            }
+            launchAppInLeftSlot(packageName);
         }
 
         @JavascriptInterface
         public void closeApp(String packageName) {
-            try {
-                String targetPkg = (packageName != null && !packageName.isEmpty()) ? packageName : activePopupPackage;
-                if (targetPkg != null && !targetPkg.isEmpty()) {
-                    android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                    if (am != null) am.killBackgroundProcesses(targetPkg);
-                    Runtime.getRuntime().exec("am force-stop " + targetPkg);
-                    activePopupPackage = "";
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error closing app " + packageName, e);
-            }
+            closePopupApp(packageName);
         }
 
         @JavascriptInterface
         public void maximizeApp(String packageName) {
-            try {
-                String targetPkg = (packageName != null && !packageName.isEmpty()) ? packageName : activePopupPackage;
-                if (targetPkg != null && !targetPkg.isEmpty()) {
-                    Intent intent = getPackageManager().getLaunchIntentForPackage(targetPkg);
-                    if (intent != null) {
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-                        ActivityOptions options = ActivityOptions.makeBasic();
-                        try {
-                            java.lang.reflect.Method method = ActivityOptions.class.getMethod("setLaunchWindowingMode", int.class);
-                            method.invoke(options, 1); // 1 = WINDOWING_MODE_FULLSCREEN
-                        } catch (Exception ignored) {}
-                        options.setLaunchBounds(new Rect(0, 0, 1920, 720));
-                        startActivity(intent, options.toBundle());
-                    }
+            maximizePopupApp(packageName);
+        }
+    }
+
+    private String activePopupPackage = "";
+    private int activePopupTaskId = -1;
+
+    /**
+     * Left freeform slot over our fullscreen launcher (not split-screen).
+     * Right side reserved for future media UI.
+     * Bounds are screen pixels for the Haval ~1920×720 panel.
+     * <p>
+     * Emulator note: stock AVDs ship with freeform off. Enable once:
+     * {@code adb shell settings put global enable_freeform_support 1}
+     * {@code adb shell settings put global force_resizable_activities 1}
+     */
+    private static final Rect LEFT_POPUP_BOUNDS = new Rect(135, 60, 640, 480);
+    private static final Rect FULLSCREEN_BOUNDS = new Rect(0, 0, 1920, 720);
+    /** {@code WindowConfiguration.WINDOWING_MODE_FREEFORM} (API 28+). */
+    private static final int WINDOWING_MODE_FREEFORM = 5;
+    private static final int WINDOWING_MODE_FULLSCREEN = 1;
+    private static final String KEY_LAUNCH_WINDOWING_MODE = "android.activity.windowingMode";
+    private static final String KEY_LAUNCH_BOUNDS = "android:activity.launchBounds";
+    /** Debug/test: {@code adb shell am start -n com.havalh6.viewer/.MainActivity --es launch_freeform <pkg>} */
+    private static final String EXTRA_LAUNCH_FREEFORM = "launch_freeform";
+
+    /** Best-effort: emulator needs this; car MMI usually already has freeform. */
+    private void ensureFreeformSettings() {
+        try {
+            android.provider.Settings.Global.putInt(getContentResolver(), "enable_freeform_support", 1);
+        } catch (SecurityException e) {
+            Log.i(TAG, "Cannot write enable_freeform_support (need shell / WRITE_SECURE_SETTINGS)");
+        }
+        try {
+            android.provider.Settings.Global.putInt(getContentResolver(), "force_resizable_activities", 1);
+        } catch (SecurityException ignored) {}
+    }
+
+    private static void allowHiddenApis() {
+        try {
+            java.lang.reflect.Method forName = Class.class.getDeclaredMethod("forName", String.class);
+            java.lang.reflect.Method getDeclaredMethod = Class.class.getDeclaredMethod(
+                    "getDeclaredMethod", String.class, Class[].class);
+            Class<?> vmRuntimeClass = (Class<?>) forName.invoke(null, "dalvik.system.VMRuntime");
+            java.lang.reflect.Method getRuntime =
+                    (java.lang.reflect.Method) getDeclaredMethod.invoke(vmRuntimeClass, "getRuntime", null);
+            java.lang.reflect.Method setHiddenApiExemptions =
+                    (java.lang.reflect.Method) getDeclaredMethod.invoke(
+                            vmRuntimeClass, "setHiddenApiExemptions", new Class[]{String[].class});
+            Object vmRuntime = getRuntime.invoke(null);
+            setHiddenApiExemptions.invoke(vmRuntime, new Object[]{new String[]{"L"}});
+        } catch (Throwable ignored) {}
+    }
+
+    private Bundle buildWindowOptions(int windowingMode, Rect bounds) {
+        allowHiddenApis();
+        ActivityOptions options;
+        // Clip-reveal from the fixed left-slot anchor so the system prefers that screen region
+        // (helps when an app remembers a previous freeform position).
+        if (windowingMode == WINDOWING_MODE_FREEFORM && launchAnchor != null
+                && launchAnchor.getWidth() > 0 && launchAnchor.getHeight() > 0) {
+            options = ActivityOptions.makeClipRevealAnimation(
+                    launchAnchor, 0, 0, launchAnchor.getWidth(), launchAnchor.getHeight());
+        } else {
+            options = ActivityOptions.makeBasic();
+        }
+        try {
+            java.lang.reflect.Method method =
+                    ActivityOptions.class.getMethod("setLaunchWindowingMode", int.class);
+            method.invoke(options, windowingMode);
+        } catch (Exception e) {
+            Log.w(TAG, "setLaunchWindowingMode reflection failed; using bundle key", e);
+        }
+        if (bounds != null) options.setLaunchBounds(new Rect(bounds));
+        Bundle bundle = options.toBundle();
+        if (bundle == null) bundle = new Bundle();
+        bundle.putInt(KEY_LAUNCH_WINDOWING_MODE, windowingMode);
+        if (bounds != null) bundle.putParcelable(KEY_LAUNCH_BOUNDS, new Rect(bounds));
+        return bundle;
+    }
+
+    private void forceStopPackage(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return;
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) am.killBackgroundProcesses(packageName);
+        } catch (Exception ignored) {}
+        try {
+            new ProcessBuilder("am", "force-stop", packageName)
+                    .redirectErrorStream(true)
+                    .start();
+        } catch (Exception e) {
+            Log.w(TAG, "force-stop failed for " + packageName, e);
+        }
+    }
+
+    private int findTaskIdForPackage(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return -1;
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am == null) return -1;
+            @SuppressWarnings("deprecation")
+            List<android.app.ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(32);
+            if (tasks == null) return -1;
+            for (android.app.ActivityManager.RunningTaskInfo task : tasks) {
+                if (task == null) continue;
+                android.content.ComponentName top = task.topActivity;
+                android.content.ComponentName base = task.baseActivity;
+                if ((top != null && packageName.equals(top.getPackageName()))
+                        || (base != null && packageName.equals(base.getPackageName()))) {
+                    return task.id;
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Error maximizing app " + packageName, e);
             }
+        } catch (Exception e) {
+            Log.w(TAG, "getRunningTasks failed", e);
+        }
+        return -1;
+    }
+
+    /** Best-effort pin of freeform task to {@link #LEFT_POPUP_BOUNDS}. */
+    private boolean resizeTaskToBounds(int taskId, Rect bounds) {
+        if (taskId < 0 || bounds == null) return false;
+        allowHiddenApis();
+        try {
+            Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+            java.lang.reflect.Method getService = atmClass.getDeclaredMethod("getService");
+            getService.setAccessible(true);
+            Object service = getService.invoke(null);
+            java.lang.reflect.Method resize = null;
+            for (java.lang.reflect.Method m : service.getClass().getMethods()) {
+                if (!"resizeTask".equals(m.getName())) continue;
+                Class<?>[] p = m.getParameterTypes();
+                if (p.length >= 2 && p[0] == int.class && Rect.class.isAssignableFrom(p[1])) {
+                    resize = m;
+                    break;
+                }
+            }
+            if (resize == null) return false;
+            Class<?>[] p = resize.getParameterTypes();
+            if (p.length == 2) {
+                resize.invoke(service, taskId, new Rect(bounds));
+            } else if (p.length >= 3 && p[2] == int.class) {
+                resize.invoke(service, taskId, new Rect(bounds), 0);
+            } else {
+                return false;
+            }
+            Log.i(TAG, "Pinned task " + taskId + " to " + bounds);
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "resizeTask failed for task " + taskId, e);
+            return false;
+        }
+    }
+
+    private void schedulePinPopupBounds(String packageName) {
+        if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+        final int[] attempts = {0};
+        pinBoundsRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (packageName == null || !packageName.equals(activePopupPackage)) return;
+                int taskId = findTaskIdForPackage(packageName);
+                if (taskId >= 0) {
+                    activePopupTaskId = taskId;
+                    if (resizeTaskToBounds(taskId, LEFT_POPUP_BOUNDS)) return;
+                }
+                attempts[0]++;
+                if (attempts[0] < 8) mainHandler.postDelayed(this, 250);
+            }
+        };
+        mainHandler.postDelayed(pinBoundsRunnable, 200);
+    }
+
+    private void setPopupControlsVisible(boolean visible) {
+        if (popupControls != null) {
+            popupControls.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void launchAppInLeftSlot(String packageName) {
+        try {
+            if (packageName == null || packageName.isEmpty()) return;
+            PackageManager pm = getPackageManager();
+            Intent resolve = pm.getLaunchIntentForPackage(packageName);
+            if (resolve == null || resolve.getComponent() == null) return;
+
+            ensureFreeformSettings();
+
+            // Close the previous freeform window when switching apps.
+            if (activePopupPackage != null && !activePopupPackage.isEmpty()
+                    && !activePopupPackage.equals(packageName)) {
+                dismissPopup(activePopupPackage);
+            } else if (activePopupPackage != null && activePopupPackage.equals(packageName)) {
+                dismissPopup(packageName);
+            } else {
+                forceStopPackage(packageName);
+            }
+
+            activePopupPackage = packageName;
+            activePopupTaskId = -1;
+            setPopupControlsVisible(true);
+
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setComponent(resolve.getComponent());
+            intent.setPackage(packageName);
+            // Never use FLAG_ACTIVITY_LAUNCH_ADJACENT — forces split-screen on tablets/A12L+.
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+                    | Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+
+            Bundle opts = buildWindowOptions(WINDOWING_MODE_FREEFORM, LEFT_POPUP_BOUNDS);
+            Log.i(TAG, "Freeform launch " + resolve.getComponent()
+                    + " bounds=" + LEFT_POPUP_BOUNDS
+                    + " windowingMode=" + opts.getInt(KEY_LAUNCH_WINDOWING_MODE, -1));
+            startActivity(intent, opts);
+            schedulePinPopupBounds(packageName);
+        } catch (Exception e) {
+            Log.e(TAG, "Error launching app in left slot " + packageName, e);
+        }
+    }
+
+    private void maybeLaunchFreeformFromIntent(Intent intent) {
+        if (intent == null) return;
+        String pkg = intent.getStringExtra(EXTRA_LAUNCH_FREEFORM);
+        if (pkg != null && !pkg.isEmpty()) {
+            intent.removeExtra(EXTRA_LAUNCH_FREEFORM);
+            launchAppInLeftSlot(pkg);
+        }
+    }
+
+    private void removeTaskById(int taskId) {
+        if (taskId < 0) return;
+        allowHiddenApis();
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            java.lang.reflect.Method remove = android.app.ActivityManager.class.getMethod("removeTask", int.class);
+            remove.invoke(am, taskId);
+            Log.i(TAG, "Removed task " + taskId);
+            return;
+        } catch (Exception e) {
+            Log.w(TAG, "ActivityManager.removeTask failed", e);
+        }
+        try {
+            Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+            java.lang.reflect.Method getService = atmClass.getDeclaredMethod("getService");
+            getService.setAccessible(true);
+            Object service = getService.invoke(null);
+            java.lang.reflect.Method remove = service.getClass().getMethod("removeTask", int.class);
+            remove.invoke(service, taskId);
+            Log.i(TAG, "ATM removed task " + taskId);
+        } catch (Exception e) {
+            Log.w(TAG, "ATM.removeTask failed for " + taskId, e);
+        }
+    }
+
+    private void dismissPopup(String packageName) {
+        String targetPkg = (packageName != null && !packageName.isEmpty())
+                ? packageName : activePopupPackage;
+        if (targetPkg == null || targetPkg.isEmpty()) return;
+        if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+
+        int taskId = activePopupTaskId;
+        if (taskId < 0 || (packageName != null && !packageName.equals(activePopupPackage))) {
+            taskId = findTaskIdForPackage(targetPkg);
+        }
+        removeTaskById(taskId);
+        forceStopPackage(targetPkg);
+
+        if (targetPkg.equals(activePopupPackage)) {
+            activePopupPackage = "";
+            activePopupTaskId = -1;
+            setPopupControlsVisible(false);
+        }
+    }
+
+    private void closePopupApp(String packageName) {
+        try {
+            dismissPopup(packageName);
+        } catch (Exception e) {
+            Log.e(TAG, "Error closing app " + packageName, e);
+        }
+    }
+
+    private void maximizePopupApp(String packageName) {
+        try {
+            String targetPkg = (packageName != null && !packageName.isEmpty())
+                    ? packageName : activePopupPackage;
+            if (targetPkg == null || targetPkg.isEmpty()) return;
+            Intent resolve = getPackageManager().getLaunchIntentForPackage(targetPkg);
+            if (resolve == null || resolve.getComponent() == null) return;
+
+            if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setComponent(resolve.getComponent());
+            intent.setPackage(targetPkg);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+
+            Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
+            startActivity(intent, opts);
+
+            // If we know the task, also force-resize to fullscreen.
+            int taskId = activePopupTaskId >= 0 ? activePopupTaskId : findTaskIdForPackage(targetPkg);
+            if (taskId >= 0) resizeTaskToBounds(taskId, FULLSCREEN_BOUNDS);
+
+            activePopupPackage = "";
+            activePopupTaskId = -1;
+            setPopupControlsVisible(false);
+        } catch (Exception e) {
+            Log.e(TAG, "Error maximizing app " + packageName, e);
         }
     }
 
@@ -277,7 +534,14 @@ public final class MainActivity extends Activity {
                 String assetPath = uri.getPath().substring(ASSET_PREFIX.length());
                 try {
                     InputStream stream = getAssets().open(assetPath);
-                    return new WebResourceResponse(mimeType(assetPath), null, stream);
+                    String mime = mimeType(assetPath);
+                    String encoding = needsUtf8(assetPath) ? "UTF-8" : null;
+                    java.util.Map<String, String> headers = new java.util.HashMap<>();
+                    // THREE.GLTFLoader / fetch() require CORS even for same-origin
+                    // intercepts on some WebView builds.
+                    headers.put("Access-Control-Allow-Origin", "*");
+                    return new WebResourceResponse(
+                            mime, encoding, 200, "OK", headers, stream);
                 } catch (IOException error) {
                     Log.e(TAG, "Missing packaged asset: " + assetPath, error);
                     return null;
@@ -332,39 +596,58 @@ public final class MainActivity extends Activity {
         setContentView(rootLayout);
         if (savedInstanceState == null) webView.loadUrl(VIEWER_URL);
         else webView.restoreState(savedInstanceState);
+
+        ensureFreeformSettings();
+        maybeLaunchFreeformFromIntent(getIntent());
     }
 
-    private String activeNativeSlot = "left";
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        maybeLaunchFreeformFromIntent(intent);
+    }
 
     private void setupNativeLauncherUI(FrameLayout rootLayout) {
         float density = getResources().getDisplayMetrics().density;
         int iconSizePx = Math.round(52 * density);
         int itemWidthPx = Math.round(78 * density);
-        int marginLeftPx = Math.round(135 * density);
         int marginBottomPx = Math.round(40 * density);
+        int fadeLengthPx = Math.round(72 * density);
+        int stripHeightPx = Math.round(110 * density);
 
-        // Main container for native launcher at left: 135px, bottom: 40px
-        android.widget.LinearLayout launcherContainer = new android.widget.LinearLayout(this);
-        launcherContainer.setOrientation(android.widget.LinearLayout.VERTICAL);
+        // Full-width bottom icon strip (right side reserved later for media management)
+        FrameLayout stripContainer = new FrameLayout(this);
         FrameLayout.LayoutParams containerParams = new FrameLayout.LayoutParams(
-                Math.round(505 * density), FrameLayout.LayoutParams.WRAP_CONTENT);
-        containerParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.LEFT;
-        containerParams.leftMargin = marginLeftPx;
+                FrameLayout.LayoutParams.MATCH_PARENT, stripHeightPx);
+        containerParams.gravity = android.view.Gravity.BOTTOM;
         containerParams.bottomMargin = marginBottomPx;
-        launcherContainer.setLayoutParams(containerParams);
-        launcherContainer.setBackgroundColor(0x00000000); // 100% transparent - NO card background
+        stripContainer.setLayoutParams(containerParams);
+        stripContainer.setBackgroundColor(0x00000000);
 
-        // Horizontal scroll view for floating icons
-        android.widget.HorizontalScrollView scrollView = new android.widget.HorizontalScrollView(this);
+        android.widget.HorizontalScrollView scrollView = new android.widget.HorizontalScrollView(this) {
+            @Override
+            protected float getLeftFadingEdgeStrength() {
+                return 1.0f;
+            }
+
+            @Override
+            protected float getRightFadingEdgeStrength() {
+                return 1.0f;
+            }
+        };
         scrollView.setHorizontalScrollBarEnabled(false);
         scrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scrollView.setBackgroundColor(0x00000000); // 100% transparent - NO card
+        scrollView.setHorizontalFadingEdgeEnabled(true);
+        scrollView.setFadingEdgeLength(fadeLengthPx);
+        scrollView.setBackgroundColor(0x00000000);
+        scrollView.setClipToPadding(false);
 
         android.widget.LinearLayout iconsLayout = new android.widget.LinearLayout(this);
         iconsLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        iconsLayout.setPadding(4, 4, 4, 4);
+        iconsLayout.setGravity(android.view.Gravity.CENTER);
+        iconsLayout.setPadding(Math.round(24 * density), 4, Math.round(24 * density), 4);
 
-        // Load filtered apps
         PackageManager pm = getPackageManager();
         Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
         mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -377,7 +660,6 @@ public final class MainActivity extends Activity {
             String labelStr = info.loadLabel(pm).toString();
             Drawable iconDrawable = info.loadIcon(pm);
 
-            // Single App Item Container (Icons Only - 100% transparent background)
             android.widget.LinearLayout itemLayout = new android.widget.LinearLayout(this);
             itemLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
             itemLayout.setGravity(android.view.Gravity.CENTER);
@@ -385,18 +667,18 @@ public final class MainActivity extends Activity {
                     itemWidthPx, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
             itemParams.rightMargin = Math.round(12 * density);
             itemLayout.setLayoutParams(itemParams);
-            itemLayout.setBackgroundColor(0x00000000); // Transparent - NO icon card background
+            itemLayout.setBackgroundColor(0x00000000);
+            itemLayout.setClickable(true);
+            itemLayout.setFocusable(true);
 
-            // App Icon ImageView (Floating 52dp x 52dp)
             android.widget.ImageView iconView = new android.widget.ImageView(this);
-            android.widget.LinearLayout.LayoutParams iconParams = new android.widget.LinearLayout.LayoutParams(iconSizePx, iconSizePx);
-            iconView.setLayoutParams(iconParams);
+            iconView.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSizePx, iconSizePx));
             iconView.setImageDrawable(iconDrawable);
 
-            // App Name TextView below icon
             android.widget.TextView labelView = new android.widget.TextView(this);
             android.widget.LinearLayout.LayoutParams labelParams = new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
             labelParams.topMargin = Math.round(4 * density);
             labelView.setLayoutParams(labelParams);
             labelView.setText(labelStr);
@@ -405,73 +687,91 @@ public final class MainActivity extends Activity {
             labelView.setGravity(android.view.Gravity.CENTER);
             labelView.setSingleLine(true);
             labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            labelView.setShadowLayer(4f, 0f, 2f, 0xFF000000); // High contrast text shadow
+            labelView.setShadowLayer(4f, 0f, 2f, 0xFF000000);
 
             itemLayout.addView(iconView);
             itemLayout.addView(labelView);
 
             final String targetPkg = pkg;
-            itemLayout.setOnClickListener(v -> {
-                AppLauncherBridge bridge = new AppLauncherBridge();
-                bridge.launchAppInPopup(targetPkg, activeNativeSlot);
-            });
+            itemLayout.setOnClickListener(v -> launchAppInLeftSlot(targetPkg));
 
             iconsLayout.addView(itemLayout);
         }
 
-        scrollView.addView(iconsLayout);
+        scrollView.addView(iconsLayout, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Target Slot Selector Buttons Container (LEFT / RIGHT)
-        android.widget.LinearLayout selectorsLayout = new android.widget.LinearLayout(this);
-        selectorsLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        selectorsLayout.setGravity(android.view.Gravity.CENTER);
-        android.widget.LinearLayout.LayoutParams selectorContainerParams = new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        selectorContainerParams.topMargin = Math.round(6 * density);
-        selectorsLayout.setLayoutParams(selectorContainerParams);
-
-        android.widget.Button btnLeft = new android.widget.Button(this);
-        btnLeft.setText("◧ LEFT");
-        btnLeft.setTextSize(10f);
-        btnLeft.setTextColor(0xFF4FD6E8);
-        btnLeft.setBackgroundColor(0x444FD6E8);
-
-        android.widget.Button btnRight = new android.widget.Button(this);
-        btnRight.setText("RIGHT ◨");
-        btnRight.setTextSize(10f);
-        btnRight.setTextColor(0xBBFFFFFF);
-        btnRight.setBackgroundColor(0x22FFFFFF);
-
-        android.widget.LinearLayout.LayoutParams btnParamsL = new android.widget.LinearLayout.LayoutParams(Math.round(88 * density), Math.round(34 * density));
-        btnParamsL.rightMargin = Math.round(12 * density);
-        btnLeft.setLayoutParams(btnParamsL);
-
-        android.widget.LinearLayout.LayoutParams btnParamsR = new android.widget.LinearLayout.LayoutParams(Math.round(88 * density), Math.round(34 * density));
-        btnRight.setLayoutParams(btnParamsR);
-
-        btnLeft.setOnClickListener(v -> {
-            activeNativeSlot = "left";
-            btnLeft.setTextColor(0xFF4FD6E8);
-            btnLeft.setBackgroundColor(0x444FD6E8);
-            btnRight.setTextColor(0xBBFFFFFF);
-            btnRight.setBackgroundColor(0x22FFFFFF);
+        // When icons fit on screen, keep the row centered; when they overflow, allow scroll + edge fade.
+        scrollView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            int avail = scrollView.getWidth();
+            if (avail <= 0) return;
+            iconsLayout.setMinimumWidth(avail);
+            iconsLayout.setGravity(android.view.Gravity.CENTER);
         });
 
-        btnRight.setOnClickListener(v -> {
-            activeNativeSlot = "right";
-            btnRight.setTextColor(0xFF4FD6E8);
-            btnRight.setBackgroundColor(0x444FD6E8);
-            btnLeft.setTextColor(0xBBFFFFFF);
-            btnLeft.setBackgroundColor(0x22FFFFFF);
-        });
+        stripContainer.addView(scrollView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        rootLayout.addView(stripContainer);
 
-        selectorsLayout.addView(btnLeft);
-        selectorsLayout.addView(btnRight);
+        // Maximize / Close controls for the active left freeform popup.
+        android.widget.LinearLayout controls = new android.widget.LinearLayout(this);
+        controls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        controls.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        controls.setPadding(Math.round(8 * density), Math.round(6 * density),
+                Math.round(8 * density), Math.round(6 * density));
+        controls.setBackgroundColor(0xCC10151C);
+        controls.setVisibility(View.GONE);
 
-        launcherContainer.addView(scrollView);
-        launcherContainer.addView(selectorsLayout);
+        android.widget.Button btnMax = new android.widget.Button(this);
+        btnMax.setText("Maximize");
+        btnMax.setTextSize(11f);
+        btnMax.setAllCaps(false);
+        btnMax.setTextColor(0xFF4FD6E8);
+        btnMax.setBackgroundColor(0x334FD6E8);
+        btnMax.setPadding(Math.round(14 * density), Math.round(6 * density),
+                Math.round(14 * density), Math.round(6 * density));
+        btnMax.setOnClickListener(v -> maximizePopupApp(null));
 
-        rootLayout.addView(launcherContainer);
+        android.widget.Button btnClose = new android.widget.Button(this);
+        btnClose.setText("Close");
+        btnClose.setTextSize(11f);
+        btnClose.setAllCaps(false);
+        btnClose.setTextColor(0xFFFFFFFF);
+        btnClose.setBackgroundColor(0x55FF5555);
+        btnClose.setPadding(Math.round(14 * density), Math.round(6 * density),
+                Math.round(14 * density), Math.round(6 * density));
+        android.widget.LinearLayout.LayoutParams closeLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        closeLp.leftMargin = Math.round(8 * density);
+        btnClose.setLayoutParams(closeLp);
+        btnClose.setOnClickListener(v -> closePopupApp(null));
+
+        controls.addView(btnMax);
+        controls.addView(btnClose);
+
+        FrameLayout.LayoutParams controlsLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        // Sit just above the freeform slot, aligned to its right edge.
+        controlsLp.leftMargin = Math.max(0, LEFT_POPUP_BOUNDS.right - Math.round(220 * density));
+        controlsLp.topMargin = Math.max(8, LEFT_POPUP_BOUNDS.top - Math.round(48 * density));
+        rootLayout.addView(controls, controlsLp);
+        popupControls = controls;
+
+        // Invisible anchor matching the freeform slot — used for clip-reveal launch placement.
+        View anchor = new View(this);
+        anchor.setBackgroundColor(0x00000000);
+        anchor.setClickable(false);
+        anchor.setFocusable(false);
+        FrameLayout.LayoutParams anchorLp = new FrameLayout.LayoutParams(
+                LEFT_POPUP_BOUNDS.width(), LEFT_POPUP_BOUNDS.height());
+        anchorLp.leftMargin = LEFT_POPUP_BOUNDS.left;
+        anchorLp.topMargin = LEFT_POPUP_BOUNDS.top;
+        rootLayout.addView(anchor, anchorLp);
+        launchAnchor = anchor;
     }
 
     private static String mimeType(String path) {
@@ -486,7 +786,17 @@ public final class MainActivity extends Activity {
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
         if (lower.endsWith(".svg")) return "image/svg+xml";
         if (lower.endsWith(".glb")) return "model/gltf-binary";
+        if (lower.endsWith(".hdr")) return "application/octet-stream";
         return "application/octet-stream";
+    }
+
+    private static boolean needsUtf8(String path) {
+        String lower = path.toLowerCase();
+        return lower.endsWith(".html")
+                || lower.endsWith(".js")
+                || lower.endsWith(".css")
+                || lower.endsWith(".json")
+                || lower.endsWith(".svg");
     }
 
     private void enterImmersiveMode() {
@@ -544,6 +854,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
         try {
             unregisterReceiver(telemetryReceiver);
         } catch (Exception ignored) {}

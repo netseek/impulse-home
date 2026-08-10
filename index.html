@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haval H6 3D</title>
 <script src="./support.js"></script>
 <script src="./telemetryClient.js"></script>
 <script src="./appLauncherClient.js"></script>
@@ -45,8 +46,99 @@
     * { box-sizing: border-box; }
     @keyframes vp-spin { to { transform: rotate(360deg); } }
     @keyframes vp-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
-    .hv-toolbar { scrollbar-width: none; -ms-overflow-style: none; }
+    .hv-toolbar {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      flex-direction: column !important;
+      align-items: flex-end;
+      overflow: visible !important;
+      max-width: min(72vw, 520px) !important;
+      transition: right 0.18s ease, top 0.18s ease;
+    }
+    .hv-toolbar-row {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .hv-tool-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .hv-tool-children {
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
     .hv-toolbar::-webkit-scrollbar { display: none; }
+    .hv-toolbar button.hv-tool-btn {
+      width: 58px !important;
+      min-width: 58px !important;
+      height: auto !important;
+      min-height: 58px !important;
+      padding: 8px 4px 6px !important;
+      border-radius: 12px !important;
+      flex-shrink: 0;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 4px !important;
+      box-sizing: border-box;
+    }
+    .hv-toolbar button.hv-tool-btn.hv-tool-btn-text {
+      gap: 0 !important;
+    }
+    .hv-toolbar button.hv-tool-btn.hv-tool-btn-text .hv-tool-label {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      opacity: 1;
+    }
+    .hv-toolbar button.hv-tool-btn .hv-tool-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      line-height: 1;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .hv-toolbar button.hv-tool-btn .hv-tool-icon svg {
+      width: 20px !important;
+      height: 20px !important;
+      display: block;
+    }
+    .hv-toolbar button.hv-tool-btn .hv-tool-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      line-height: 1.1;
+      opacity: 0.85;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .hv-config-panel {
+      height: auto;
+      max-height: calc(100vh - 182px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    /* Slightly larger panel type without rewriting every inline size. */
+    .hv-config-panel { font-size: 13px; }
+    .hv-config-panel [style*="font-size: 7px"] { font-size: 9px !important; }
+    .hv-config-panel [style*="font-size: 8px"] { font-size: 10px !important; }
+    .hv-config-panel [style*="font-size: 9px"] { font-size: 11px !important; }
+    .hv-config-panel [style*="font-size: 10px"] { font-size: 12px !important; }
+    .hv-config-panel [style*="font-size: 12px"] { font-size: 14px !important; }
     .slim-scrollbar {
       scrollbar-width: thin;
       scrollbar-color: rgba(79, 214, 232, 0.4) transparent;
@@ -66,9 +158,8 @@
       background: rgba(79, 214, 232, 0.6);
     }
     @media (max-width: 640px) {
-      .hv-toolbar { left: 14px !important; right: 14px !important; max-width: none !important; gap: 6px !important; }
-      .hv-toolbar > button { width: 36px !important; height: 36px !important; }
-      .hv-config-panel { top: 70px !important; right: 14px !important; max-height: calc(100vh - 84px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+      .hv-toolbar button.hv-tool-btn { width: 54px !important; min-width: 54px !important; }
+      .hv-config-panel { top: 22px !important; right: 14px !important; max-height: calc(100vh - 182px); height: auto; }
     }
   </style>
 </helmet>
@@ -80,7 +171,6 @@
   <div style="position: absolute; top: 26px; left: 30px; color: {{ labelColor }}; pointer-events: none; user-select: none; transition: color 0.6s ease;">
     <div style="font-size: 11px; letter-spacing: .42em; font-weight: 600; opacity: .55;">HAVAL</div>
     <div style="font-size: 30px; font-weight: 600; letter-spacing: .04em; line-height: 1.05; margin-top: 2px;">H6</div>
-    <div style="font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .18em; opacity: .45; margin-top: 6px;">REV 1.10 · GLB</div>
   </div>
 
   <!-- bottom hint -->
@@ -91,97 +181,127 @@
   <!-- cyan accent corner ticks -->
   <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
 
-  <!-- top icon toolbar: single flex row, `order` controls visual sequence so it
-       can scroll horizontally as one unit instead of each button carrying its
-       own hardcoded right-offset (which clipped off-screen on narrow viewports) -->
-  <div class="hv-toolbar" style="position: absolute; top: 22px; right: {{ toolbarRight }}; display: {{ dayNightDisplay }}; gap: 8px; max-width: calc(100vw - 40px); overflow-x: auto; -webkit-overflow-scrolling: touch; transition: right 0.3s ease; z-index: 10;">
+  <!-- config rail: top-right when collapsed; docks left of the details panel when open -->
+  <div class="hv-toolbar" style="position: absolute; top: {{ toolbarTop }}; right: {{ toolbarRight }}; left: auto; display: {{ dayNightDisplay }}; gap: 8px; z-index: 12;">
+    <div class="hv-toolbar-row">
+      <button class="hv-tool-btn" onClick="{{ toggleConfigPanel }}" title="Configuration" style="background: {{ configBtnBg }}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ configBtnBorder }}; color: {{ configBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;">
+        <span class="hv-tool-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </span>
+        <span class="hv-tool-label">CONFIG</span>
+      </button>
 
-  <!-- day-night switch button -->
-  <button onClick="{{ toggleNightMode }}" title="{{ nightTooltip }}" style="order: 1; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;">
-    <sc-if value="{{ nightMode }}" hint-placeholder-val="{{ false }}">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-    </sc-if>
-    <sc-if value="{{ isDayMode }}" hint-placeholder-val="{{ true }}">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-    </sc-if>
-  </button>
+      <sc-if value="{{ configExpanded }}" hint-placeholder-val="{{ false }}">
+        <div class="hv-tool-stack">
+          <button class="hv-tool-btn" onClick="{{ openSectionTuning }}" title="Car Tuning" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabTuningBorder }}; color: {{ tabTuningCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+            <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="2" x2="12" y2="9"></line><line x1="12" y1="15" x2="12" y2="22"></line><line x1="2" y1="12" x2="9" y2="12"></line><line x1="15" y1="12" x2="22" y2="12"></line></svg></span>
+            <span class="hv-tool-label">TUNE</span>
+          </button>
+          <sc-if value="{{ showTuningSubmenu }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-tool-children">
+              <button class="hv-tool-btn" onClick="{{ setTuningPaint }}" title="Paint color" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tunPaintBorder }}; color: {{ tunPaintCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-icon"><div style="width: 18px; height: 18px; border-radius: 50%; background: {{ currentCarPaintHex }}; border: 1.5px solid rgba(255,255,255,.35);"></div></span>
+                <span class="hv-tool-label">COLOR</span>
+              </button>
+              <button class="hv-tool-btn" onClick="{{ setTuningWheels }}" title="Wheels" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tunWheelsBorder }}; color: {{ tunWheelsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg></span>
+                <span class="hv-tool-label">WHEELS</span>
+              </button>
+            </div>
+          </sc-if>
+        </div>
 
-  <!-- model toggle button -->
-  <button onClick="{{ toggleModel }}" title="Switch model variant" style="order: 2; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: #4fd6e8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; font-family: 'Space Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: 0.05em;">
-    {{ modelLabel }}
-  </button>
+        <div class="hv-tool-stack">
+          <button class="hv-tool-btn" onClick="{{ openSectionOverride }}" title="Car Override" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabOverrideBorder }}; color: {{ tabOverrideCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+            <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3" /><line x1="6" y1="8" x2="2" y2="6" /><line x1="18" y1="8" x2="22" y2="6" /><line x1="6" y1="16" x2="2" y2="14" /><line x1="18" y1="16" x2="22" y2="14" /></svg></span>
+            <span class="hv-tool-label">DRIVE</span>
+          </button>
+          <sc-if value="{{ showOverrideSubmenu }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-tool-children">
+              <button class="hv-tool-btn" onClick="{{ setOverrideModel }}" title="Model" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovModelBorder }}; color: {{ ovModelCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-icon">{{ modelLabel }}</span>
+                <span class="hv-tool-label">MODEL</span>
+              </button>
+              <button class="hv-tool-btn" onClick="{{ setOverrideMotion }}" title="Speed" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovMotionBorder }}; color: {{ ovMotionCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4" /><path d="M3.34 19a10 10 0 1 1 17.32 0" /></svg></span>
+                <span class="hv-tool-label">SPEED</span>
+              </button>
+              <button class="hv-tool-btn" onClick="{{ setOverrideDoors }}" title="Doors" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovDoorsBorder }}; color: {{ ovDoorsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M10 12h.01" /></svg></span>
+                <span class="hv-tool-label">DOORS</span>
+              </button>
+              <button class="hv-tool-btn" onClick="{{ setOverrideLights }}" title="Lights" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovLightsBorder }}; color: {{ ovLightsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h6" /><path d="M2 12h7" /><path d="M2 16h6" /><path d="M13 5v14" /><path d="M13 5a7 7 0 0 1 0 14" /></svg></span>
+                <span class="hv-tool-label">LIGHTS</span>
+              </button>
+            </div>
+          </sc-if>
+        </div>
 
-  <!-- wheels tab button -->
-  <button onClick="{{ clickTabWheels }}" title="Wheels customization" style="order: 3; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabWheelsBorder }}; color: {{ tabWheelsCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"></circle>
-      <circle cx="12" cy="12" r="3"></circle>
-      <line x1="12" y1="2" x2="12" y2="9"></line>
-      <line x1="12" y1="15" x2="12" y2="22"></line>
-      <line x1="2" y1="12" x2="9" y2="12"></line>
-      <line x1="15" y1="12" x2="22" y2="12"></line>
-      <line x1="4.93" y1="4.93" x2="9.88" y2="9.88"></line>
-      <line x1="14.12" y1="14.12" x2="19.07" y2="19.07"></line>
-      <line x1="4.93" y1="19.07" x2="9.88" y2="14.12"></line>
-      <line x1="14.12" y1="9.88" x2="19.07" y2="4.93"></line>
-    </svg>
-  </button>
+        <button class="hv-tool-btn" onClick="{{ openSectionEnv }}" title="Environment" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabEnvBorder }}; color: {{ tabEnvCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span>
+          <span class="hv-tool-label">ENV</span>
+        </button>
+        <button class="hv-tool-btn" onClick="{{ toggleFpsHud }}" title="{{ fpsTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ fpsBtnBorder }}; color: {{ fpsBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon">FPS</span>
+          <span class="hv-tool-label">FPS</span>
+        </button>
 
-  <!-- lights tab button -->
-  <button onClick="{{ clickTabLights }}" title="Lights settings" style="order: 6; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabLightsBorder }}; color: {{ tabLightsCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M2 8h6" />
-      <path d="M2 12h7" />
-      <path d="M2 16h6" />
-      <path d="M13 5v14" />
-      <path d="M13 5a7 7 0 0 1 0 14" />
-    </svg>
-  </button>
+        <div class="hv-tool-stack">
+          <button class="hv-tool-btn" onClick="{{ openTimeSubmenu }}" title="{{ timeModeHint }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabTimeBorder }}; color: {{ tabTimeCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+            <span class="hv-tool-icon">
+              <sc-if value="{{ timeIconIsDay }}" hint-placeholder-val="{{ true }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+              </sc-if>
+              <sc-if value="{{ timeIconIsNight }}" hint-placeholder-val="{{ false }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              </sc-if>
+              <sc-if value="{{ timeIconIsAuto }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size: 9px; letter-spacing: 0.06em;">AUTO</span>
+              </sc-if>
+            </span>
+            <span class="hv-tool-label">TIME</span>
+          </button>
+          <sc-if value="{{ showTimeSubmenu }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-tool-children">
+              <button class="hv-tool-btn" onClick="{{ setTimeDay }}" title="Day" style="background: rgba(16,21,28,.82); border: 1px solid {{ timeDayBorder }}; color: {{ timeDayCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
+                <span class="hv-tool-label">DAY</span>
+              </button>
+              <button class="hv-tool-btn" onClick="{{ setTimeNight }}" title="Night" style="background: rgba(16,21,28,.82); border: 1px solid {{ timeNightBorder }}; color: {{ timeNightCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
+                <span class="hv-tool-label">NIGHT</span>
+              </button>
+              <button class="hv-tool-btn hv-tool-btn-text" onClick="{{ setTimeAuto }}" title="Auto (follow car)" style="background: rgba(16,21,28,.82); border: 1px solid {{ timeAutoBorder }}; color: {{ timeAutoCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+                <span class="hv-tool-label">AUTO</span>
+              </button>
+            </div>
+          </sc-if>
+        </div>
 
-  <!-- doors control button -->
-  <button onClick="{{ clickTabDoors }}" title="Doors, sunroof &amp; curtain" style="order: 5; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ doorsBtnBorder }}; color: {{ doorsBtnCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="6" y="2" width="12" height="20" rx="3" />
-      <line x1="6" y1="8" x2="2" y2="6" />
-      <line x1="18" y1="8" x2="22" y2="6" />
-      <line x1="6" y1="16" x2="2" y2="14" />
-      <line x1="18" y1="16" x2="22" y2="14" />
-    </svg>
-  </button>
-
-  <!-- motion tab button -->
-  <button onClick="{{ clickTabMotion }}" title="Motion and sunroof settings" style="order: 4; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabMotionBorder }}; color: {{ tabMotionCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="m12 14 4-4" />
-      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
-    </svg>
-  </button>
-
-  <!-- env tab button -->
-  <button onClick="{{ clickTabEnv }}" title="Environment settings" style="order: 7; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabEnvBorder }}; color: {{ tabEnvCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-  </button>
-
-  <!-- color tab button -->
-  <button onClick="{{ clickTabColor }}" title="Car paint color" style="order: 8; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabColorBorder }}; color: {{ tabColorCol }}; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease;">
-    <div style="width: 18px; height: 18px; border-radius: 50%; background: {{ currentCarPaintHex }}; border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></div>
-  </button>
+        <button class="hv-tool-btn" onClick="{{ onSaveSettings }}" title="Save settings" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ saveBtnBorder }}; color: {{ saveBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
+          <span class="hv-tool-label">SAVE</span>
+        </button>
+      </sc-if>
+    </div>
   </div>
 
-  <!-- configure panel -->
-  <div class="hv-config-panel slim-scrollbar" style="position: absolute; top: 22px; right: 26px; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; transition: width 0.2s ease;">
+  <!-- configure panel on the right -->
+  <div class="hv-config-panel slim-scrollbar" style="position: absolute; top: 22px; right: 26px; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; height: auto; max-height: calc(100vh - 182px); overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 11;">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <div style="font-size: 10px; letter-spacing: .3em; opacity: .55; font-weight: 600;">CONFIGURE</div>
-      <div style="display: flex; align-items: center; gap: 4px;">
-        <button onClick="{{ togglePanel }}" title="Collapse" style="background: none; border: none; color: rgba(79,214,232,.7); cursor: pointer; padding: 2px 4px; font-size: 16px; line-height: 1; border-radius: 4px;">×</button>
-      </div>
+      <div style="font-size: 12px; letter-spacing: .3em; opacity: .55; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ configHeaderTitle }}</div>
+      <button onClick="{{ closeConfigPanel }}" title="Close panel" style="background: none; border: none; color: rgba(79,214,232,.7); cursor: pointer; padding: 2px 4px; font-size: 16px; line-height: 1; border-radius: 4px;">×</button>
     </div>
 
-    <!-- ── COLOR TAB ── -->
-    <sc-if value="{{ tabIsColor }}" hint-placeholder-val="{{ true }}">
+    <!-- ── CAR TUNING: PAINT ── -->
+    <sc-if value="{{ sectionIsPaint }}" hint-placeholder-val="{{ true }}">
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">PAINT</div>
-      <div style="display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 18px;">
+      <div style="display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 8px;">
         <sc-for list="{{ swatches }}" as="sw" hint-placeholder-count="7">
           <button onClick="{{ sw.onClick }}" title="{{ sw.title }}" style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; background: {{ sw.hex }}; border: 2px solid {{ sw.ring }}; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: border-color .15s ease;"></button>
         </sc-for>
@@ -189,7 +309,7 @@
     </sc-if>
 
     <!-- ── ENV TAB ── -->
-    <sc-if value="{{ tabIsEnv }}" hint-placeholder-val="{{ false }}">
+    <sc-if value="{{ sectionIsEnv }}" hint-placeholder-val="{{ false }}">
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
         <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">LIGHT</span>
         <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ lightLabel }}</span>
@@ -252,8 +372,17 @@
       </label>
     </sc-if>
 
-    <!-- ── LIGHTS TAB ── -->
-    <sc-if value="{{ tabIsLights }}" hint-placeholder-val="{{ false }}">
+    <!-- ── CAR OVERRIDE ── -->
+    <sc-if value="{{ sectionIsOverride }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ overrideIsModel }}" hint-placeholder-val="{{ true }}">
+        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">MODEL</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+          <button onClick="{{ setModelHev }}" style="padding: 10px 4px; border-radius: 7px; border: 1px solid {{ modelHevBorder }}; background: {{ modelHevBg }}; color: {{ modelHevCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .1em; font-weight: 600;">HEV</button>
+          <button onClick="{{ setModelGt }}" style="padding: 10px 4px; border-radius: 7px; border: 1px solid {{ modelGtBorder }}; background: {{ modelGtBg }}; color: {{ modelGtCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .1em; font-weight: 600;">GT</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ overrideIsLights }}" hint-placeholder-val="{{ false }}">
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 7px;">
         <sc-for list="{{ lightBtns }}" as="lb" hint-placeholder-count="8">
           <button onClick="{{ lb.onClick }}" onContextMenu="{{ lb.onContextMenu }}" title="{{ lb.label }}"
@@ -262,10 +391,9 @@
           </button>
         </sc-for>
       </div>
-    </sc-if>
+      </sc-if>
 
-    <!-- ── MOTION TAB ── -->
-    <sc-if value="{{ tabIsMotion }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ overrideIsMotion }}" hint-placeholder-val="{{ false }}">
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL ANGLE</div>
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">LEFT ←  → RIGHT</span>
@@ -280,10 +408,9 @@
       </div>
       <input type="range" min="-5" max="5" step="0.05" value="{{ motionSpeed }}" onChange="{{ onMotionSpeed }}" onInput="{{ onMotionSpeed }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 14px;" />
       <button onClick="{{ onMotionStop }}" style="width: 100%; padding: 7px; border-radius: 7px; border: 1px solid rgba(79,214,232,.3); background: rgba(79,214,232,.08); color: #4fd6e8; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em;">STOP</button>
-    </sc-if>
+      </sc-if>
 
-    <!-- ── DOORS TAB ── -->
-    <sc-if value="{{ tabIsDoors }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ overrideIsDoors }}" hint-placeholder-val="{{ false }}">
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CONTROLS</div>
       <!-- 2x2 grid mirroring physical door layout, then trunk + sunroof (drives sunroof & curtain together) -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
@@ -349,10 +476,11 @@
           <input type="range" min="0" max="100" step="1" value="{{ curtainOpen }}" onChange="{{ onCurtainOpen }}" onInput="{{ onCurtainOpen }}" style="width: 100%; accent-color: #4fd6e8;" />
         </div>
       </div>
+      </sc-if>
     </sc-if>
 
-    <!-- ── WHEELS TAB ── -->
-    <sc-if value="{{ tabIsWheels }}" hint-placeholder-val="{{ false }}">
+    <!-- ── WHEELS ── -->
+    <sc-if value="{{ sectionIsWheels }}" hint-placeholder-val="{{ false }}">
 
       <!-- sub-tab pills: CATALOG / SETTINGS / CUSTOM -->
       <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 16px;">
@@ -364,7 +492,7 @@
       <!-- ── 1. RIM CATALOG ── -->
       <sc-if value="{{ subIsCatalog }}" hint-placeholder-val="{{ true }}">
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM CATALOG</div>
-        <div class="slim-scrollbar" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: calc(100vh - 210px); overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: 6px; padding-right: 2px;">
+        <div class="slim-scrollbar" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: min(480px, calc(100vh - 210px)); overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: 6px; padding-right: 2px;">
           <button onClick="{{ onSelectStockWheel }}" title="Stock" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ stockRing }}; background: {{ stockBg }}; cursor: pointer; transition: all 0.15s ease;">
             <img src="{{ stockThumb }}" style="width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 7px; background: rgba(255,255,255,.04); opacity: {{ stockImgOpacity }}; animation: {{ stockImgAnim }};" />
             <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .02em; color: {{ stockCol }}; text-align: center; line-height: 1.2; word-break: break-word;">STOCK</span>
@@ -480,9 +608,12 @@
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 0.66, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: true, nightMode: false,
+  state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, saveFlash: false,
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
-    configTab: 'color',
+    configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env'
+    tuningSubTab: 'paint', // 'paint' | 'wheels'
+    overrideSubTab: 'model', // 'model' | 'motion' | 'doors' | 'lights'
+    activeGroup: null, // 'tuning' | 'override' | 'env' | 'time' | null — which top-level section owns the submenu
     modelVariant: 'hev',
     motionSpeed: 0,
     wheelAngle: 0,
@@ -492,7 +623,7 @@ class Component extends DCLogic {
     motionActive: false,
     dayBg: '#efefef',
     nightBg: '#131415',
-    vignette: { color: '#000000', intensity: 0 },
+    vignette: { color: '#000000', intensity: 30 },
     grainEnabled: false,
     showGlassTweaks: false,
     glassTweaks: { opacity: 0.1, iridescence: 0, iridIOR: 1.8, thickMin: 100, thickMax: 400, clearcoat: 1.0, envMap: 1.0, color: '#ffffff', fresnel: 0 },
@@ -540,7 +671,7 @@ class Component extends DCLogic {
       // gives STOCK a real thumbnail and lets it resize like every other
       // wheel instead of being a separate fixed, non-resizable mesh.
       { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT' },
-      { key: 'haval_phev',         file: 'HavalPHEV-wheel.glb',            label: 'Haval PHEV' },
+      { key: 'haval_phev',         file: 'HavalPHEV-wheel.glb', liteFile: 'HavalPHEV-wheel-lite.glb?rev=2', label: 'Haval PHEV' },
       { key: 'vossen_lc104t',      file: '3d_vossen_lc104t.glb',           label: 'Vossen LC104T' },
       { key: 'audi_rs5',           file: 'Audi-RS5.glb',                   label: 'Audi RS5' },
       { key: 'bmw_19',             file: 'bmw_wheel_19inch_model_859.glb', label: 'BMW 19"' },
@@ -564,10 +695,245 @@ class Component extends DCLogic {
       { key: 'vossen_vps310t',     file: 'vossen_vps_310t.glb',            label: 'Vossen VPS 310T' },
       { key: 'vossen_vps315t',     file: 'vossen_vps_315t.glb',            label: 'Vossen VPS 315T' },
     ];
+    // Catalog previews are build artifacts, not runtime renders. This avoids
+    // loading every wheel GLB and creating a second WebGL context on the MMI.
+    this.state.catalogThumbs = {};
+    for (const item of this._wheelCatalog) {
+      this.state.catalogThumbs[item.key] =
+        'assets/wheel-thumbnails/' + item.key + '.png?rev=1';
+    }
     this._catalogPlaceholderThumb = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='none' stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'/%3E%3Cg stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'%3E%3Cline x1='32' y1='10' x2='32' y2='21'/%3E%3Cline x1='32' y1='43' x2='32' y2='54'/%3E%3Cline x1='10' y1='32' x2='21' y2='32'/%3E%3Cline x1='43' y1='32' x2='54' y2='32'/%3E%3C/g%3E%3C/svg%3E";
     // Restore saved glass tweaks (if user hit Save previously)
     try { const sg = localStorage.getItem('h6_glassTweaks'); if (sg) this.state.glassTweaks = { ...this.state.glassTweaks, ...JSON.parse(sg) }; } catch(e) {}
     try { const sr = localStorage.getItem('h6_rearGlassTweaks'); if (sr) this.state.rearGlassTweaks = { ...this.state.rearGlassTweaks, ...JSON.parse(sr) }; } catch(e) {}
+    this._loadSavedSettingsIntoState();
+    this._wireCarTelemetry();
+  }
+
+  _settingsStorageKey() { return 'h6_settings_v1'; }
+
+  _loadSavedSettingsIntoState() {
+    let saved = null;
+    try {
+      const raw = localStorage.getItem(this._settingsStorageKey());
+      if (raw) saved = JSON.parse(raw);
+    } catch (e) { saved = null; }
+    if (!saved || typeof saved !== 'object') return;
+    this._savedSettings = saved;
+    const s = this.state;
+    if (saved.timeMode === 'day' || saved.timeMode === 'night' || saved.timeMode === 'auto') s.timeMode = saved.timeMode;
+    if (typeof saved.nightMode === 'boolean' && saved.timeMode !== 'auto') s.nightMode = saved.nightMode;
+    // Primary load is always HEV; apply saved model after the scene is ready.
+    if (saved.modelVariant === 'hev' || saved.modelVariant === 'gt') this._pendingModelVariant = saved.modelVariant;
+    if (typeof saved.carColor === 'string' || saved.carColor === null) s.carColor = saved.carColor;
+    if (typeof saved.lightIntensity === 'number') s.lightIntensity = saved.lightIntensity;
+    if (typeof saved.exposure === 'number') s.exposure = saved.exposure;
+    if (typeof saved.hdriKey === 'string') s.hdriKey = saved.hdriKey;
+    if (typeof saved.dayBg === 'string') s.dayBg = saved.dayBg;
+    if (typeof saved.nightBg === 'string') s.nightBg = saved.nightBg;
+    if (saved.vignette && typeof saved.vignette === 'object') s.vignette = { ...s.vignette, ...saved.vignette };
+    if (typeof saved.grainEnabled === 'boolean') s.grainEnabled = saved.grainEnabled;
+    if (saved.lights && typeof saved.lights === 'object') s.lights = { ...s.lights, ...saved.lights };
+    if (typeof saved.motionSpeed === 'number') s.motionSpeed = saved.motionSpeed;
+    if (typeof saved.wheelAngle === 'number') s.wheelAngle = saved.wheelAngle;
+    if (typeof saved.carHeightOffset === 'number') s.carHeightOffset = saved.carHeightOffset;
+    if (typeof saved.doorFLOpen === 'number') s.doorFLOpen = saved.doorFLOpen;
+    if (typeof saved.doorFROpen === 'number') s.doorFROpen = saved.doorFROpen;
+    if (typeof saved.doorRLOpen === 'number') s.doorRLOpen = saved.doorRLOpen;
+    if (typeof saved.doorRROpen === 'number') s.doorRROpen = saved.doorRROpen;
+    if (typeof saved.trunkOpen === 'number') s.trunkOpen = saved.trunkOpen;
+    if (typeof saved.sunroofOpen === 'number') s.sunroofOpen = saved.sunroofOpen;
+    if (typeof saved.curtainOpen === 'number') s.curtainOpen = saved.curtainOpen;
+    if (typeof saved.selectedCatalogKey === 'string' || saved.selectedCatalogKey === null) s.selectedCatalogKey = saved.selectedCatalogKey;
+    if (typeof saved.wheelSizeInch === 'number') s.wheelSizeInch = saved.wheelSizeInch;
+    if (typeof saved.wheelColor === 'string') s.wheelColor = saved.wheelColor;
+    if (typeof saved.wheelRoughness === 'number') s.wheelRoughness = saved.wheelRoughness;
+    if (typeof saved.wheelMetalness === 'number') s.wheelMetalness = saved.wheelMetalness;
+    if (typeof saved.wheelDepthOffset === 'number') s.wheelDepthOffset = saved.wheelDepthOffset;
+    if (typeof saved.wheelTintOverride === 'boolean') s.wheelTintOverride = saved.wheelTintOverride;
+    if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
+    this._pendingSceneSettings = true;
+  }
+
+  _wireCarTelemetry() {
+    if (!window.carTelemetry || typeof window.carTelemetry.onUpdate !== 'function') return;
+    window.carTelemetry.onUpdate((key) => {
+      if (key === 'isNight' && this.state.timeMode === 'auto') this._syncAutoNightMode();
+    });
+  }
+
+  _readCarIsNight() {
+    if (window.carTelemetry && typeof window.carTelemetry.isNight === 'function') {
+      return !!window.carTelemetry.isNight();
+    }
+    if (window.carTelemetry && typeof window.carTelemetry.get === 'function') {
+      const v = window.carTelemetry.get('isNight', '');
+      return v === true || v === 'true' || v === '1' || v === 1;
+    }
+    return false;
+  }
+
+  setTimeMode(mode) {
+    if (mode !== 'day' && mode !== 'night' && mode !== 'auto') return;
+    this.setState({ timeMode: mode });
+    if (mode === 'day') this._applyNightMode(false, true);
+    else if (mode === 'night') this._applyNightMode(true, true);
+    else this._syncAutoNightMode(true);
+  }
+
+  _syncAutoNightMode(force) {
+    this._applyNightMode(this._readCarIsNight(), !!force);
+  }
+
+  openConfigSection(section) {
+    // Legacy 'tuning' maps to paint panel + tuning submenu.
+    if (section === 'tuning') section = 'paint';
+    if (section === 'time') {
+      this.setState((st) => ({
+        configExpanded: true,
+        activeGroup: st.activeGroup === 'time' ? null : 'time',
+      }));
+      return;
+    }
+    const patch = { configExpanded: true, panelOpen: true, configSection: section };
+    if (section === 'paint' || section === 'wheels') {
+      patch.activeGroup = 'tuning';
+      patch.tuningSubTab = section;
+    } else if (section === 'env') {
+      patch.activeGroup = 'env';
+    } else if (section === 'override') {
+      patch.activeGroup = 'override';
+    }
+    this.setState(patch);
+    if (section === 'wheels') this._generateCatalogThumbnails();
+  }
+
+  toggleConfigRail() {
+    if (this.state.configExpanded) {
+      this.setState({ configExpanded: false, panelOpen: false, activeGroup: null });
+    } else {
+      this.setState({
+        configExpanded: true,
+        panelOpen: true,
+        activeGroup: 'tuning',
+        configSection: 'paint',
+        tuningSubTab: 'paint',
+      });
+    }
+  }
+
+  cycleTimeMode() {
+    const order = ['day', 'night', 'auto'];
+    const cur = this.state.timeMode || 'auto';
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    this.setTimeMode(next);
+  }
+
+  saveSettings() {
+    const s = this.state;
+    const payload = {
+      timeMode: s.timeMode,
+      nightMode: s.nightMode,
+      modelVariant: s.modelVariant,
+      carColor: s.carColor,
+      lightIntensity: s.lightIntensity,
+      exposure: s.exposure,
+      hdriKey: s.hdriKey,
+      dayBg: s.dayBg,
+      nightBg: s.nightBg,
+      vignette: { ...s.vignette },
+      grainEnabled: s.grainEnabled,
+      lights: { ...s.lights },
+      motionSpeed: s.motionSpeed,
+      wheelAngle: s.wheelAngle,
+      carHeightOffset: s.carHeightOffset,
+      doorFLOpen: s.doorFLOpen,
+      doorFROpen: s.doorFROpen,
+      doorRLOpen: s.doorRLOpen,
+      doorRROpen: s.doorRROpen,
+      trunkOpen: s.trunkOpen,
+      sunroofOpen: s.sunroofOpen,
+      curtainOpen: s.curtainOpen,
+      selectedCatalogKey: s.selectedCatalogKey,
+      wheelSizeInch: s.wheelSizeInch,
+      wheelColor: s.wheelColor,
+      wheelRoughness: s.wheelRoughness,
+      wheelMetalness: s.wheelMetalness,
+      wheelDepthOffset: s.wheelDepthOffset,
+      wheelTintOverride: s.wheelTintOverride,
+      wheelStyle: s.wheelStyle,
+    };
+    try {
+      localStorage.setItem(this._settingsStorageKey(), JSON.stringify(payload));
+    } catch (e) {
+      console.warn('[Settings] Failed to save', e);
+      return;
+    }
+    this.setState({ saveFlash: true });
+    clearTimeout(this._saveFlashTimer);
+    this._saveFlashTimer = setTimeout(() => {
+      if (!this._unmounted) this.setState({ saveFlash: false });
+    }, 1400);
+  }
+
+  _applyPendingSceneSettings() {
+    if (!this._pendingSceneSettings) {
+      if (this.state.timeMode === 'auto') this._syncAutoNightMode(true);
+      else if (this.state.timeMode === 'night') this._applyNightMode(true, true);
+      return;
+    }
+    this._pendingSceneSettings = false;
+    const saved = this._savedSettings || {};
+
+    const wantModel = this._pendingModelVariant || saved.modelVariant;
+    this._pendingModelVariant = null;
+    if ((wantModel === 'gt' || wantModel === 'hev') && wantModel !== this.state.modelVariant) {
+      this._setModelVariant(wantModel);
+    }
+    if (saved.carColor !== undefined && typeof this.setColor === 'function') {
+      this.setColor(saved.carColor);
+    }
+    if (typeof saved.exposure === 'number' && this.renderer) {
+      this.renderer.toneMappingExposure = saved.exposure;
+    }
+    if (typeof saved.lightIntensity === 'number' && this.dirLight) {
+      this._dayLightIntensity = saved.lightIntensity;
+      if (!this.state.nightMode) this.dirLight.intensity = saved.lightIntensity;
+    }
+    if (typeof saved.hdriKey === 'string' && saved.hdriKey !== 'custom' && typeof this.loadHDRI === 'function') {
+      try { this.loadHDRI(saved.hdriKey); } catch (e) {}
+    }
+    if (typeof saved.wheelAngle === 'number') this._setWheelAngle(saved.wheelAngle);
+    if (typeof saved.motionSpeed === 'number') this._setMotionSpeed(saved.motionSpeed);
+    if (typeof saved.carHeightOffset === 'number') this._applyCarHeightOffset();
+    const doorMap = { fl: 'doorFLOpen', fr: 'doorFROpen', rl: 'doorRLOpen', rr: 'doorRROpen' };
+    Object.keys(doorMap).forEach((k) => {
+      if (typeof saved[doorMap[k]] === 'number') this._setDoorOpen(k, saved[doorMap[k]]);
+    });
+    if (typeof saved.trunkOpen === 'number') this._setTrunkOpen(saved.trunkOpen);
+    if (typeof saved.sunroofOpen === 'number') this._setSunroofOpen(saved.sunroofOpen);
+    if (typeof saved.curtainOpen === 'number') this._setCurtainOpen(saved.curtainOpen);
+    this._restoreLightsFromState();
+    if (typeof saved.wheelSizeInch === 'number' && typeof this.onWheelSizeInch === 'function') {
+      this.onWheelSizeInch(saved.wheelSizeInch);
+    }
+    if (saved.wheelTintOverride && typeof this._generateBlurredWheelTexture === 'function') {
+      try { this._generateBlurredWheelTexture(); } catch (e) {}
+    }
+
+    if (this.state.timeMode === 'day') this._applyNightMode(false, true);
+    else if (this.state.timeMode === 'night') this._applyNightMode(true, true);
+    else this._syncAutoNightMode(true);
+  }
+
+  _restoreLightsFromState() {
+    const desired = { ...this.state.lights };
+    const off = {};
+    Object.keys(desired).forEach((k) => { off[k] = false; });
+    this.state.lights = off;
+    Object.keys(desired).forEach((k) => {
+      if (desired[k]) this.toggleLight(k);
+    });
   }
 
   renderVals() {
@@ -599,14 +965,22 @@ class Component extends DCLogic {
       outerRef: this.outerRef,
       nightMode: s.nightMode,
       isDayMode: !s.nightMode,
-      toggleNightMode: () => this.toggleNightMode(),
-      nightTooltip: s.nightMode ? 'Switch to day' : 'Switch to night',
-      setDayMode:   () => { if (s.nightMode)  this.toggleNightMode(); },
-      setNightMode: () => { if (!s.nightMode) this.toggleNightMode(); },
-      modeDayBg:    !s.nightMode ? 'rgba(79,214,232,.18)' : 'transparent',
-      modeNightBg:   s.nightMode ? 'rgba(79,214,232,.18)' : 'transparent',
-      modeDayCol:   !s.nightMode ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      modeNightCol:  s.nightMode ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      timeMode: s.timeMode,
+      setTimeDay:   () => { this.setTimeMode('day'); this.setState({ activeGroup: 'time' }); },
+      setTimeNight: () => { this.setTimeMode('night'); this.setState({ activeGroup: 'time' }); },
+      setTimeAuto:  () => { this.setTimeMode('auto'); this.setState({ activeGroup: 'time' }); },
+      timeDayBg:    s.timeMode === 'day'   ? 'rgba(79,214,232,.18)' : 'transparent',
+      timeNightBg:  s.timeMode === 'night' ? 'rgba(79,214,232,.18)' : 'transparent',
+      timeAutoBg:   s.timeMode === 'auto'  ? 'rgba(79,214,232,.18)' : 'transparent',
+      timeDayBorder:   s.timeMode === 'day'   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      timeNightBorder: s.timeMode === 'night' ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      timeAutoBorder:  s.timeMode === 'auto'  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      timeDayCol:   s.timeMode === 'day'   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      timeNightCol: s.timeMode === 'night' ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      timeAutoCol:  s.timeMode === 'auto'  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      timeModeHint: s.timeMode === 'auto'
+        ? (s.nightMode ? 'Auto · following car (night)' : 'Auto · following car (day)')
+        : (s.timeMode === 'night' ? 'Forced night' : 'Forced day'),
       labelColor: s.nightMode ? '#c8daea' : '#2b3037',
       hintColor: s.nightMode ? 'rgba(180,210,235,0.55)' : '#6a7077',
       loaderDisplay: s.loading && !s.error ? 'flex' : 'none',
@@ -617,20 +991,112 @@ class Component extends DCLogic {
       hintOpacity: s.loading ? '0' : '0.85',
       panelDisplay: s.loading || s.error ? 'none' : 'block',
       panelOpen: s.panelOpen,
-      panelBodyDisplay: (!s.loading && !s.error && s.panelOpen) ? 'block' : 'none',
-      panelWidth: '220px',
+      panelBodyDisplay: (!s.loading && !s.error && s.panelOpen && s.configExpanded) ? 'block' : 'none',
+      panelWidth: '248px',
       panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
       dayNightDisplay: (!s.loading && !s.error) ? 'flex' : 'none',
-      // All 8 icons now live in one flex row (order set per-button below), so a
-      // single container offset replaces what used to be 8 hand-computed
-      // per-button `right` values — it just needs to match the old rightmost
-      // (color-tab) offset since flexbox gap handles the rest.
-      toolbarRight: s.panelOpen ? '254px' : '26px',
-      doorsBtnBorder: (s.panelOpen && s.configTab === 'doors') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      doorsBtnCol:    (s.panelOpen && s.configTab === 'doors') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      // Dock left of the details panel when open; otherwise park top-right.
+      toolbarTop: '22px',
+      toolbarRight: (s.panelOpen && s.configExpanded) ? '286px' : '26px',
+      timeModeLabel: s.timeMode === 'day' ? 'DAY' : (s.timeMode === 'night' ? 'NIGHT' : 'AUTO'),
+      configExpanded: !!s.configExpanded,
+      showTuningSubmenu: !!(s.configExpanded && s.activeGroup === 'tuning'),
+      showOverrideSubmenu: !!(s.configExpanded && s.activeGroup === 'override'),
+      showTimeSubmenu: !!(s.configExpanded && s.activeGroup === 'time'),
+      showFps: s.showFps,
+      fpsBtnBorder: s.showFps ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      fpsBtnCol:    s.showFps ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      fpsTooltip:   s.showFps ? 'Hide FPS' : 'Show FPS',
+      toggleFpsHud: () => this.setState((st) => {
+        const showFps = !st.showFps;
+        if (this._fpsEl) this._fpsEl.style.display = showFps ? '' : 'none';
+        return { showFps };
+      }),
+      configBtnBorder: s.configExpanded ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      configBtnCol:    s.configExpanded ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      configBtnBg:     s.configExpanded ? 'rgba(79,214,232,.16)' : 'rgba(16,21,28,.82)',
+      toggleConfigPanel: () => this.toggleConfigRail(),
+      closeConfigPanel: () => this.setState({ panelOpen: false }),
+      openTimeSubmenu: () => {
+        this.setState((st) => ({
+          activeGroup: st.activeGroup === 'time' ? null : 'time',
+        }));
+      },
+      timeIconIsDay:   s.timeMode === 'day',
+      timeIconIsNight: s.timeMode === 'night',
+      timeIconIsAuto:  s.timeMode === 'auto',
+      configHeaderTitle: s.configSection === 'paint' ? 'PAINT'
+        : s.configSection === 'wheels' ? 'WHEELS'
+        : s.configSection === 'env' ? 'ENVIRONMENT'
+        : s.configSection === 'override' ? (
+            s.overrideSubTab === 'motion' ? 'SPEED'
+            : s.overrideSubTab === 'doors' ? 'DOORS'
+            : s.overrideSubTab === 'lights' ? 'LIGHTS'
+            : 'MODEL'
+          )
+        : 'CONFIGURE',
+      sectionIsPaint:    s.configSection === 'paint',
+      sectionIsWheels:   s.configSection === 'wheels',
+      sectionIsOverride: s.configSection === 'override',
+      sectionIsEnv:      s.configSection === 'env',
+      tabTimeBorder:     (s.activeGroup === 'time') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabTimeCol:        (s.activeGroup === 'time') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tabTuningBorder:   (s.activeGroup === 'tuning')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabTuningCol:      (s.activeGroup === 'tuning')   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tabOverrideBorder: (s.activeGroup === 'override') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabOverrideCol:    (s.activeGroup === 'override') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tabEnvBorder:      (s.activeGroup === 'env')      ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabEnvCol:         (s.activeGroup === 'env')      ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      openSectionTuning:   () => {
+        this.setState({
+          configExpanded: true, panelOpen: true, activeGroup: 'tuning',
+          configSection: 'paint', tuningSubTab: 'paint',
+        });
+      },
+      openSectionOverride: () => {
+        this.setState({
+          configExpanded: true, panelOpen: true, activeGroup: 'override',
+          configSection: 'override', overrideSubTab: 'model',
+        });
+      },
+      openSectionEnv: () => this.openConfigSection('env'),
+      onSaveSettings: () => this.saveSettings(),
+      saveBtnBorder: s.saveFlash ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      saveBtnCol:    s.saveFlash ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      setTuningPaint:  () => this.setState({
+        activeGroup: 'tuning', configSection: 'paint', tuningSubTab: 'paint', panelOpen: true, configExpanded: true,
+      }),
+      setTuningWheels: () => {
+        this.setState({
+          activeGroup: 'tuning', configSection: 'wheels', tuningSubTab: 'wheels', panelOpen: true, configExpanded: true,
+        });
+        this._generateCatalogThumbnails();
+      },
+      tunPaintBorder:  s.configSection === 'paint'  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tunWheelsBorder: s.configSection === 'wheels' ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tunPaintCol:  s.configSection === 'paint'  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tunWheelsCol: s.configSection === 'wheels' ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      overrideIsModel:  s.overrideSubTab === 'model',
+      overrideIsMotion: s.overrideSubTab === 'motion',
+      overrideIsDoors:  s.overrideSubTab === 'doors',
+      overrideIsLights: s.overrideSubTab === 'lights',
+      setOverrideModel:  () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'model', panelOpen: true, configExpanded: true }),
+      setOverrideMotion: () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'motion', panelOpen: true, configExpanded: true }),
+      setOverrideDoors:  () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'doors', panelOpen: true, configExpanded: true }),
+      setOverrideLights: () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'lights', panelOpen: true, configExpanded: true }),
+      ovModelBg:  s.overrideSubTab === 'model'  ? 'rgba(79,214,232,.18)' : 'transparent',
+      ovMotionBg: s.overrideSubTab === 'motion' ? 'rgba(79,214,232,.18)' : 'transparent',
+      ovDoorsBg:  s.overrideSubTab === 'doors'  ? 'rgba(79,214,232,.18)' : 'transparent',
+      ovLightsBg: s.overrideSubTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
+      ovModelBorder:  (s.activeGroup === 'override' && s.overrideSubTab === 'model')  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      ovMotionBorder: (s.activeGroup === 'override' && s.overrideSubTab === 'motion') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      ovDoorsBorder:  (s.activeGroup === 'override' && s.overrideSubTab === 'doors')  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      ovLightsBorder: (s.activeGroup === 'override' && s.overrideSubTab === 'lights') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      ovModelCol:  (s.activeGroup === 'override' && s.overrideSubTab === 'model')  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      ovMotionCol: (s.activeGroup === 'override' && s.overrideSubTab === 'motion') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      ovDoorsCol:  (s.activeGroup === 'override' && s.overrideSubTab === 'doors')  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      ovLightsCol: (s.activeGroup === 'override' && s.overrideSubTab === 'lights') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       toggleDoors:    () => this.toggleDoors(),
-      clickTabDoors:  () => this.selectTab('doors'),
-      tabIsDoors:     s.configTab === 'doors',
       doorBtns: [
         { key: 'fl', label: 'FRONT LEFT',  title: 'Toggle front-left door',  onClick: () => this._setDoorOpen('fl', s.doorFLOpen > 0 ? 0 : 100),
           border: s.doorFLOpen > 0 ? '#4fd6e8' : 'rgba(79,214,232,.20)', bg: s.doorFLOpen > 0 ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)', col: s.doorFLOpen > 0 ? '#4fd6e8' : 'rgba(255,255,255,.70)' },
@@ -641,28 +1107,8 @@ class Component extends DCLogic {
         { key: 'rr', label: 'REAR RIGHT',  title: 'Toggle rear-right door',  onClick: () => this._setDoorOpen('rr', s.doorRROpen > 0 ? 0 : 100),
           border: s.doorRROpen > 0 ? '#4fd6e8' : 'rgba(79,214,232,.20)', bg: s.doorRROpen > 0 ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)', col: s.doorRROpen > 0 ? '#4fd6e8' : 'rgba(255,255,255,.70)' },
       ],
-      tabColorBorder: (s.panelOpen && s.configTab === 'color') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabColorCol:    (s.panelOpen && s.configTab === 'color') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabEnvBorder:   (s.panelOpen && s.configTab === 'env')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabEnvCol:      (s.panelOpen && s.configTab === 'env')   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabLightsBorder:(s.panelOpen && s.configTab === 'lights')? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabLightsCol:   (s.panelOpen && s.configTab === 'lights')? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabMotionBorder:(s.panelOpen && s.configTab === 'motion')? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabMotionCol:   (s.panelOpen && s.configTab === 'motion')? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabWheelsBorder:(s.panelOpen && s.configTab === 'wheels')? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabWheelsCol:   (s.panelOpen && s.configTab === 'wheels')? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      clickTabColor:  () => this.selectTab('color'),
-      clickTabEnv:    () => this.selectTab('env'),
-      clickTabLights: () => this.selectTab('lights'),
-      clickTabMotion: () => this.selectTab('motion'),
-      clickTabWheels: () => this.selectTab('wheels'),
-      toggleModel:    () => {
-        const next = s.modelVariant === 'hev' ? 'gt' : 'hev';
-        this._setModelVariant(next);
-      },
       modelLabel: s.modelVariant === 'gt' ? 'GT' : 'HEV',
       currentCarPaintHex: activeKey,
-      togglePanel: () => this.setState(st => ({ panelOpen: !st.panelOpen })),
       swatches,
       lightIntensity: s.lightIntensity,
       lightLabel: s.lightIntensity.toFixed(1),
@@ -677,17 +1123,7 @@ class Component extends DCLogic {
       onUploadHdri: (e) => this.onUploadHdri(e),
       showRearGlassTweaks: s.showRearGlassTweaks,
       rearGlassTweaks: s.rearGlassTweaks,
-      configTab: s.configTab,
-      tabIsColor:  s.configTab === 'color',
-      tabIsEnv:    s.configTab === 'env',
-      tabIsLights: s.configTab === 'lights',
-      tabIsMotion: s.configTab === 'motion',
-      tabIsWheels: s.configTab === 'wheels',
-      setTabColor:  () => this.setState({ configTab: 'color'  }),
-      setTabEnv:    () => this.setState({ configTab: 'env'    }),
-      setTabLights: () => this.setState({ configTab: 'lights' }),
-      setTabMotion: () => this.setState({ configTab: 'motion' }),
-      setTabWheels: () => this.setState({ configTab: 'wheels' }),
+      configSection: s.configSection,
       wheelColor: s.wheelColor,
       wheelRoughness: s.wheelRoughness,
       wheelRoughnessLabel: Math.round(s.wheelRoughness * 100) + '%',
@@ -785,6 +1221,8 @@ class Component extends DCLogic {
       modelGtBg:   s.modelVariant === 'gt'  ? 'rgba(79,214,232,.18)' : 'transparent',
       modelHevCol: s.modelVariant === 'hev' ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       modelGtCol:  s.modelVariant === 'gt'  ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      modelHevBorder: s.modelVariant === 'hev' ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      modelGtBorder:  s.modelVariant === 'gt'  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       wheelAngle:      s.wheelAngle,
       wheelAngleLabel: s.wheelAngle + '°',
       motionSpeed:      s.motionSpeed,
@@ -826,14 +1264,14 @@ class Component extends DCLogic {
       trunkBtnBorder:   s.trunkOpen > 0 ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       trunkBtnBg:       s.trunkOpen > 0 ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
       trunkBtnCol:      s.trunkOpen > 0 ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabBgColor:  s.configTab === 'color'  ? 'rgba(79,214,232,.18)' : 'transparent',
-      tabBgEnv:    s.configTab === 'env'    ? 'rgba(79,214,232,.18)' : 'transparent',
-      tabBgLights: s.configTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
-      tabBgMotion: s.configTab === 'motion' ? 'rgba(79,214,232,.18)' : 'transparent',
-      tabColColor:  s.configTab === 'color'  ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      tabColEnv:    s.configTab === 'env'    ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      tabColLights: s.configTab === 'lights' ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      tabColMotion: s.configTab === 'motion' ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+      tabBgColor:  'transparent',
+      tabBgEnv:    'transparent',
+      tabBgLights: 'transparent',
+      tabBgMotion: 'transparent',
+      tabColColor:  'rgba(255,255,255,.45)',
+      tabColEnv:    'rgba(255,255,255,.45)',
+      tabColLights: 'rgba(255,255,255,.45)',
+      tabColMotion: 'rgba(255,255,255,.45)',
       dayBg: s.dayBg,
       nightBg: s.nightBg,
       vignetteColor:    s.vignette.color,
@@ -929,7 +1367,17 @@ class Component extends DCLogic {
     const vi = vig.intensity ?? 0;
     // Flat scene background — vignette handled by the WebGL shader overlay
     if (this.scene && this.THREE) {
-      this.scene.background = this._makeBgTex(bg, vc, 0, grain);
+      const textureKey = `${bg}|${grain ? 1 : 0}`;
+      if (!this._backgroundTex || this._backgroundTexKey !== textureKey) {
+        const nextTexture = this._makeBgTex(bg, vc, 0, grain);
+        const previousTexture = this._backgroundTex;
+        this._backgroundTex = nextTexture;
+        this._backgroundTexKey = textureKey;
+        this.scene.background = nextTexture;
+        if (previousTexture && previousTexture !== nextTexture) previousTexture.dispose();
+      } else if (this.scene.background !== this._backgroundTex) {
+        this.scene.background = this._backgroundTex;
+      }
     }
     // Update vignette shader uniforms (float precision, no banding)
     if (this.vignetteMat) {
@@ -1078,9 +1526,34 @@ class Component extends DCLogic {
     if (!this.THREE || !this._allWheels) return;
     const THREE    = this.THREE;
     const steerRad = (this.state.wheelAngle || 0) * Math.PI / 180;
-    const lateral  = this._carLateralDir || new THREE.Vector3(0,0,1);
-    const worldUp  = new THREE.Vector3(0,1,0);
-    const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
+    // Keep temporary math objects in one reusable bundle. This method runs on
+    // every rendered motion frame, so allocating matrices/vectors here causes
+    // avoidable garbage collection pauses on memory-constrained devices.
+    if (!this._wheelTransformScratch) {
+      this._wheelTransformScratch = {
+        defaultLateral: new THREE.Vector3(0, 0, 1),
+        worldUp: new THREE.Vector3(0, 1, 0),
+        position: new THREE.Vector3(),
+        quaternion: new THREE.Quaternion(),
+        scale: new THREE.Vector3(),
+        roll: new THREE.Matrix4(),
+        steer: new THREE.Matrix4(),
+        translateToPivot: new THREE.Matrix4(),
+        translateFromPivot: new THREE.Matrix4(),
+        translateToSteerPivot: new THREE.Matrix4(),
+        translateFromSteerPivot: new THREE.Matrix4(),
+        height: new THREE.Matrix4(),
+        world: new THREE.Matrix4(),
+        steeredWorld: new THREE.Matrix4(),
+        parentLocal: new THREE.Matrix4(),
+        identity: new THREE.Matrix4(),
+        wheelAndTireSet: new Set(),
+      };
+    }
+    const scratch = this._wheelTransformScratch;
+    const lateral = this._carLateralDir || scratch.defaultLateral;
+    const worldUp = scratch.worldUp;
+    const _p = scratch.position, _q = scratch.quaternion, _s = scratch.scale;
 
     const speed = this.state.motionSpeed || 0;
     const speedKmh = Math.abs(speed) * 40;
@@ -1134,11 +1607,11 @@ class Component extends DCLogic {
       // shared cluster centre instead of the per-mesh fit reintroduces the
       // in-tyre wobble _pivot's per-mesh fit was added to fix.
       const rollAxis = m._rollAxis || lateral;
-      const Rroll = new THREE.Matrix4().makeRotationAxis(rollAxis, -rollAngle);
-      let newWorld = new THREE.Matrix4()
-        .makeTranslation(P.x, P.y, P.z)
-        .multiply(Rroll)
-        .multiply(new THREE.Matrix4().makeTranslation(-P.x, -P.y, -P.z))
+      scratch.roll.makeRotationAxis(rollAxis, -rollAngle);
+      scratch.world
+        .copy(scratch.translateToPivot.makeTranslation(P.x, P.y, P.z))
+        .multiply(scratch.roll)
+        .multiply(scratch.translateFromPivot.makeTranslation(-P.x, -P.y, -P.z))
         .multiply(m._initWorld);
       if (doSteer) {
         // Steer (turn) rotates the whole knuckle as one rigid body, so every
@@ -1148,18 +1621,19 @@ class Component extends DCLogic {
         // that diverge visibly at large steer angles. Falls back to P for
         // meshes that never got a distinct _steerPivot assigned.
         const Ps = m._steerPivot || P;
-        const Rsteer = new THREE.Matrix4().makeRotationAxis(worldUp, -steerRad);
-        newWorld = new THREE.Matrix4()
-          .makeTranslation(Ps.x, Ps.y, Ps.z)
-          .multiply(Rsteer)
-          .multiply(new THREE.Matrix4().makeTranslation(-Ps.x, -Ps.y, -Ps.z))
-          .multiply(newWorld);
+        scratch.steer.makeRotationAxis(worldUp, -steerRad);
+        scratch.steeredWorld
+          .copy(scratch.translateToSteerPivot.makeTranslation(Ps.x, Ps.y, Ps.z))
+          .multiply(scratch.steer)
+          .multiply(scratch.translateFromSteerPivot.makeTranslation(-Ps.x, -Ps.y, -Ps.z))
+          .multiply(scratch.world);
+        scratch.world.copy(scratch.steeredWorld);
       }
       if (heightShiftY) {
-        newWorld.premultiply(new THREE.Matrix4().makeTranslation(0, heightShiftY, 0));
+        scratch.world.premultiply(scratch.height.makeTranslation(0, heightShiftY, 0));
       }
       // World → parent-local using the cached init parent-inverse, then apply all.
-      (m._initParentInv || new THREE.Matrix4()).clone().multiply(newWorld)
+      scratch.parentLocal.copy(m._initParentInv || scratch.identity).multiply(scratch.world)
         .decompose(_p, _q, _s);
 
       m.position.copy(_p);
@@ -1171,7 +1645,10 @@ class Component extends DCLogic {
     // to just the new rim clones, which would otherwise drop the original
     // tires out of this pass entirely — leaving them ungrounded and just
     // rigidly following whatever moves their parent (e.g. ride height).
-    const wheelAndTireSet = new Set([...this._allWheels, ...(this._tireWheels || [])]);
+    const wheelAndTireSet = scratch.wheelAndTireSet;
+    wheelAndTireSet.clear();
+    this._allWheels.forEach(m => wheelAndTireSet.add(m));
+    (this._tireWheels || []).forEach(m => wheelAndTireSet.add(m));
     wheelAndTireSet.forEach(m => {
       const isFront = m._wheelSide === 'fl' || m._wheelSide === 'fr';
       applyRot(m, m._rollAngle || 0, isFront);
@@ -1179,12 +1656,10 @@ class Component extends DCLogic {
 
     // Brake discs: steer only (front), no steer (rear), no roll
     if (this._steerOnlyMeshes) {
-      [...(this._steerOnlyMeshes.fl||[]), ...(this._steerOnlyMeshes.fr||[])].forEach(m => {
-        applyRot(m, 0, true);
-      });
-      [...(this._steerOnlyMeshes.rl||[]), ...(this._steerOnlyMeshes.rr||[])].forEach(m => {
-        applyRot(m, 0, false);
-      });
+      (this._steerOnlyMeshes.fl || []).forEach(m => applyRot(m, 0, true));
+      (this._steerOnlyMeshes.fr || []).forEach(m => applyRot(m, 0, true));
+      (this._steerOnlyMeshes.rl || []).forEach(m => applyRot(m, 0, false));
+      (this._steerOnlyMeshes.rr || []).forEach(m => applyRot(m, 0, false));
     }
 
     // Blurred discs: steer and roll
@@ -1213,8 +1688,9 @@ class Component extends DCLogic {
   // keeping the wheels planted on the ground — see the heightShiftY comment
   // in _applyWheelTransforms for how the wheel side is kept grounded.
   _setCarHeight(cm) {
-    this.setState({ carHeightOffset: cm / 100 });
-    this._applyCarHeightOffset();
+    this.setState({ carHeightOffset: cm / 100 }, () => {
+      this._applyCarHeightOffset();
+    });
   }
 
   // Re-applies the current carHeightOffset to whichever model root is active —
@@ -1305,6 +1781,7 @@ class Component extends DCLogic {
     // Setting near/far to -1 and 1 prevents the quad at Z=0 from being clipped by the camera near plane
     this._blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
     const quad = new THREE.PlaneGeometry(2, 2);
+    this._blurQuadGeometry = quad;
     const quadMesh = new THREE.Mesh(quad, this._blurShaderMat);
     this._blurScene.add(quadMesh);
 
@@ -1393,21 +1870,24 @@ class Component extends DCLogic {
     renderer.clear();
     renderer.render(this._blurScene, this._blurCamera);
 
-    // Diagnostics check: Read pixels to see if the texture has any contents
-    const size = 256;
-    const testPixels = new Uint8Array(size * size * 4);
-    renderer.readRenderTargetPixels(this._rtBlurred, 0, 0, size, size, testPixels);
-    let maxVal = 0, opaqueCount = 0;
-    for (let i = 0; i < testPixels.length; i += 4) {
-      const a = testPixels[i+3];
-      if (a > 10) opaqueCount++;
-      for (let j = 0; j < 4; j++) {
-        if (testPixels[i+j] > maxVal) maxVal = testPixels[i+j];
+    // GPU readback is a synchronous pipeline stall. Keep this diagnostic only
+    // for explicit debug sessions; it never contributes to the blur texture.
+    if (new URLSearchParams(location.search).get('debug') === '1') {
+      const size = 256;
+      const testPixels = new Uint8Array(size * size * 4);
+      renderer.readRenderTargetPixels(this._rtBlurred, 0, 0, size, size, testPixels);
+      let maxVal = 0, opaqueCount = 0;
+      for (let i = 0; i < testPixels.length; i += 4) {
+        const a = testPixels[i+3];
+        if (a > 10) opaqueCount++;
+        for (let j = 0; j < 4; j++) {
+          if (testPixels[i+j] > maxVal) maxVal = testPixels[i+j];
+        }
       }
+      const pixelCorner = Array.from(testPixels.slice(10 * size * 4 + 10 * 4, 10 * size * 4 + 10 * 4 + 4));
+      const pixelCenter = Array.from(testPixels.slice(128 * size * 4 + 128 * 4, 128 * size * 4 + 128 * 4 + 4));
+      console.log('[WheelBlur Diagnostics] MaxVal:', maxVal, 'OpaqueCount:', opaqueCount, 'Corner:', pixelCorner, 'Center:', pixelCenter);
     }
-    const pixelCorner = Array.from(testPixels.slice(10 * size * 4 + 10 * 4, 10 * size * 4 + 10 * 4 + 4));
-    const pixelCenter = Array.from(testPixels.slice(128 * size * 4 + 128 * 4, 128 * size * 4 + 128 * 4 + 4));
-    console.log('[WheelBlur Diagnostics] MaxVal:', maxVal, 'OpaqueCount:', opaqueCount, 'Corner:', pixelCorner, 'Center:', pixelCenter);
 
     renderer.setRenderTarget(oldRenderTarget);
     renderer.setClearColor(oldClearColor, oldClearAlpha);
@@ -2408,16 +2888,26 @@ class Component extends DCLogic {
   }
 
   selectTab(tab) {
-    if (this.state.panelOpen && this.state.configTab === tab) {
-      this.setState({ panelOpen: false });
-    } else {
-      this.setState({ panelOpen: true, configTab: tab });
+    // Legacy helper — route old tab ids into the new section nav.
+    if (tab === 'color') { this.openConfigSection('paint'); return; }
+    if (tab === 'wheels') { this.openConfigSection('wheels'); return; }
+    if (tab === 'env') { this.openConfigSection('env'); return; }
+    if (tab === 'lights' || tab === 'motion' || tab === 'doors') {
+      this.setState({
+        configExpanded: true, panelOpen: true, activeGroup: 'override',
+        configSection: 'override', overrideSubTab: tab,
+      });
+      return;
     }
-    if (tab === 'wheels' && this.state.wheelSubTab === 'catalog') this._generateCatalogThumbnails();
+    this.openConfigSection('paint');
   }
 
   toggleNightMode() {
-    const next = !this.state.nightMode;
+    this.setTimeMode(this.state.nightMode ? 'day' : 'night');
+  }
+
+  _applyNightMode(next, force) {
+    if (!force && this.state.nightMode === next) return;
     this.setState({ nightMode: next });
     // Body paint: re-apply metalness/roughness/envMapIntensity for the current
     // colour under the new day/night mode (see _bodyPaintParams — at night the
@@ -3704,6 +4194,10 @@ class Component extends DCLogic {
     const pos = geo.attributes.position;
     if (!pos) return null;
     const triCount = idx.length / 3;
+    if (!Number.isInteger(faceIndex) || faceIndex < 0 || faceIndex >= triCount) {
+      console.warn('[FogLoad] invalid face index', faceIndex, 'for', this._meshStableId(mesh), '(' + triCount + ' faces)');
+      return null;
+    }
 
     // Build vertex → triangle adjacency (which tris share each vertex)
     const vertToTris = new Map();
@@ -4155,7 +4649,7 @@ class Component extends DCLogic {
     this._onAssignMove = null;
     this._onAssignClick = null;
     this._onAssignKey = null;
-    this.setState({ assignMode: null });
+    if (!this._unmounted) this.setState({ assignMode: null });
   }
 
   _getGlassMeshes() {
@@ -4783,6 +5277,7 @@ class Component extends DCLogic {
     const step = () => {
       const k = keys.shift();
       if (k === undefined) {
+        this._warmupRaf = null;
         this._warmupOverlayOnce();
         this._warmupInFlight = false;
         this._reapplyLights();
@@ -4791,14 +5286,9 @@ class Component extends DCLogic {
         return;
       }
       this._warmupLightKey(k);
-      requestAnimationFrame(step);
+      this._warmupRaf = requestAnimationFrame(step);
     };
-    requestAnimationFrame(step);
-  }
-
-  componentWillUnmount() {
-    ['turnL', 'turnR', 'hazard'].forEach(k => this._stopBlink(k));
-    if (this.renderer) { this.renderer.dispose(); this.animFrameId && cancelAnimationFrame(this.animFrameId); }
+    this._warmupRaf = requestAnimationFrame(step);
   }
 
   // Bake an equirectangular HDR through a ground-mask shader: pixels below the
@@ -4830,28 +5320,119 @@ class Component extends DCLogic {
         }`,
       depthTest: false, depthWrite: false,
     });
-    orthoScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+    const quadGeo = new THREE.PlaneGeometry(2, 2);
+    orthoScene.add(new THREE.Mesh(quadGeo, mat));
     const prev = renderer.getRenderTarget();
     renderer.setRenderTarget(rt);
     renderer.render(orthoScene, orthoCamera);
     renderer.setRenderTarget(prev);
     mat.dispose();
+    quadGeo.dispose();
     rt.texture.mapping = THREE.EquirectangularReflectionMapping;
     return rt;
+  }
+
+  // Replace a generated PMREM target without retaining every environment the
+  // user has tried. The built-in studio target is owned separately and is kept
+  // alive for instant switching back to Studio.
+  _setGeneratedEnvironment(target) {
+    if (this._generatedEnvironmentTarget && this._generatedEnvironmentTarget !== target) {
+      this._generatedEnvironmentTarget.dispose();
+    }
+    this._generatedEnvironmentTarget = target || null;
+    this._staticPMREM = target ? target.texture : null;
+    if (this.scene) this.scene.environment = target ? target.texture : this.roomEnv;
+  }
+
+  // Dispose one self-contained loaded object. Call this only for assets owned
+  // by a replacement pipeline (catalog/upload/thumbnail), never for meshes from
+  // the shared HEV/GT car scenes.
+  _disposeOwnedObject(root) {
+    if (!root) return;
+    const geometries = new Set();
+    const materials = new Set();
+    const textures = new Set();
+    const renderTargets = new Set();
+    root.traverse((obj) => {
+      if (obj.isLight && obj.shadow && obj.shadow.map) renderTargets.add(obj.shadow.map);
+      if (!obj.isMesh && !obj.isLine && !obj.isPoints) return;
+      if (obj.geometry) geometries.add(obj.geometry);
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((mat) => {
+        if (!mat) return;
+        materials.add(mat);
+        Object.keys(mat).forEach((key) => {
+          const value = mat[key];
+          if (value && value.isTexture) textures.add(value);
+        });
+        if (mat.uniforms) {
+          Object.values(mat.uniforms).forEach((uniform) => {
+            const value = uniform && uniform.value;
+            if (value && value.isTexture) textures.add(value);
+          });
+        }
+      });
+    });
+    textures.forEach((texture) => texture.dispose());
+    materials.forEach((material) => material.dispose());
+    geometries.forEach((geometry) => geometry.dispose());
+    renderTargets.forEach((target) => target.dispose());
+  }
+
+  _removeCustomWheelClones() {
+    if (this._customClonedWheels) {
+      const sourceMaterials = new Set();
+      if (this._customRimSource) {
+        this._customRimSource.traverse((obj) => {
+          if (!obj.isMesh) return;
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach((material) => { if (material) sourceMaterials.add(material); });
+        });
+      }
+      const cloneOnlyMaterials = new Set();
+      this._customClonedWheels.forEach((clone) => {
+        clone.traverse((obj) => {
+          if (!obj.isMesh) return;
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach((material) => {
+            if (material && !sourceMaterials.has(material)) cloneOnlyMaterials.add(material);
+          });
+        });
+        if (clone.parent) clone.parent.remove(clone);
+      });
+      // Geometry and textures remain owned by _customRimSource. Only the
+      // per-clone material instances created for live tint/roughness controls
+      // belong to the detached clones.
+      cloneOnlyMaterials.forEach((material) => material.dispose());
+      this._customClonedWheels = null;
+    }
+  }
+
+  _disposeCustomWheelResources() {
+    this._removeCustomWheelClones();
+    if (this._customRimSource) this._disposeOwnedObject(this._customRimSource);
+    this._customRimSource = null;
   }
 
   onUploadHdri(e) {
     const THREE = this.THREE;
     const file = e.target.files && e.target.files[0];
     if (!file || !this.rgbe || !this.pmrem || !THREE) return;
+    const requestId = (this._hdriRequestId || 0) + 1;
+    this._hdriRequestId = requestId;
     const url = URL.createObjectURL(file);
     this.rgbe.load(
       url,
       (hdr) => {
+        if (this._unmounted || requestId !== this._hdriRequestId) {
+          hdr.dispose();
+          URL.revokeObjectURL(url);
+          return;
+        }
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         const rt = this._maskHDRBelowHorizon(hdr);
-        const env = this.pmrem.fromEquirectangular(rt.texture).texture;
-        if (this.scene) this.scene.environment = env;
+        const envTarget = this.pmrem.fromEquirectangular(rt.texture);
+        this._setGeneratedEnvironment(envTarget);
         hdr.dispose(); rt.dispose();
         URL.revokeObjectURL(url);
         // _generateBlurredWheelTexture hides every mesh except one wheel rim
@@ -4893,6 +5474,7 @@ class Component extends DCLogic {
     loader.load(
       url,
       (gltf) => {
+        draco.dispose();
         URL.revokeObjectURL(url);
         try {
           this._handleUploadedWheelModel(gltf.scene, file.name);
@@ -4908,6 +5490,7 @@ class Component extends DCLogic {
         }
       },
       (err) => {
+        draco.dispose();
         URL.revokeObjectURL(url);
         console.error(err);
         this.setState({ error: 'Failed to load glTF/GLB file.', loading: false });
@@ -4923,6 +5506,10 @@ class Component extends DCLogic {
   // Which catalog wheel represents a given variant's own stock rim.
   _stockCatalogKeyFor(variant) {
     return variant === 'gt' ? 'haval_gt' : 'haval_phev';
+  }
+
+  _wheelAssetFile(item) {
+    return (this._perfLow && item.liteFile) ? item.liteFile : item.file;
   }
 
   onSelectStockWheel() {
@@ -4992,8 +5579,11 @@ class Component extends DCLogic {
       loader.setMeshoptDecoder(window.MeshoptDecoder);
     }
     loader.load(
-      'assets/wheels/' + item.file,
-      (gltf) => install(gltf.scene),
+      'assets/wheels/' + this._wheelAssetFile(item),
+      (gltf) => {
+        draco.dispose();
+        install(gltf.scene);
+      },
       (xhr) => {
         // Don't fight the continuous PROCESSING state during the cold-start swap.
         if (xhr.lengthComputable && !this.state.processing) {
@@ -5001,6 +5591,7 @@ class Component extends DCLogic {
         }
       },
       (err) => {
+        draco.dispose();
         console.error(err);
         this.setState({ error: 'Failed to load "' + item.label + '".', loading: false, processing: false, catalogLoadingKey: null });
         if (callback) callback();
@@ -5019,15 +5610,20 @@ class Component extends DCLogic {
   // sequential (not parallel) so 20+ multi-MB GLBs don't all hit the network /
   // GPU at once.
   async _generateCatalogThumbnails() {
+    // PNGs are pre-rendered build artifacts. Do not create a second WebGL
+    // context or fetch all catalog GLBs on the resource-limited MMI.
     if (this._catalogThumbsStarted) return;
     this._catalogThumbsStarted = true;
-    for (const item of this._wheelCatalog) {
-      const dataUrl = await this._renderCatalogThumb(item).catch((err) => {
-        console.warn('[Catalog] thumb failed', item.file, err);
-        return null;
-      });
-      this.setState((st) => ({ catalogThumbs: { ...st.catalogThumbs, [item.key]: dataUrl || 'error' } }));
+  }
+
+  _disposeThumbRenderer() {
+    if (this._thumbRenderer) {
+      this._thumbRenderer.dispose();
+      if (this._thumbRenderer.forceContextLoss) this._thumbRenderer.forceContextLoss();
+      this._thumbRenderer = null;
     }
+    this._thumbScene = null;
+    this._thumbCamera = null;
   }
 
   _ensureThumbRenderer() {
@@ -5067,8 +5663,9 @@ class Component extends DCLogic {
         loader.setMeshoptDecoder(window.MeshoptDecoder);
       }
       loader.load(
-        'assets/wheels/' + item.file,
+        'assets/wheels/' + this._wheelAssetFile(item),
         (gltf) => {
+          draco.dispose();
           const obj = gltf.scene;
           this._thumbScene.add(obj);
           obj.updateMatrixWorld(true);
@@ -5160,17 +5757,14 @@ class Component extends DCLogic {
           const dataUrl = this._thumbRenderer.domElement.toDataURL('image/png');
 
           this._thumbScene.remove(obj);
-          obj.traverse((c) => {
-            if (c.isMesh) {
-              if (c.geometry) c.geometry.dispose();
-              const mats = Array.isArray(c.material) ? c.material : [c.material];
-              mats.forEach((m) => { if (m) { Object.keys(m).forEach(k => { if (m[k] && m[k].isTexture) m[k].dispose(); }); m.dispose(); } });
-            }
-          });
+          this._disposeOwnedObject(obj);
           resolve(dataUrl);
         },
         undefined,
-        (err) => reject(err)
+        (err) => {
+          draco.dispose();
+          reject(err);
+        }
       );
     });
   }
@@ -5511,6 +6105,10 @@ class Component extends DCLogic {
       console.log(`[UploadWheel] Centre-ray depth (occlusion-aware): ${this._customRimLocalCenterRayZ}`);
     }
 
+    // The four installed clones share this source's geometry/materials. Remove
+    // them and dispose the previous source only after the replacement has been
+    // fully normalized, so a failed import leaves the current wheel intact.
+    this._disposeCustomWheelResources();
     this._customRimSource = wrapper;
     this._customRimNativeRadius = 1.0; // The radius is now normalized to exactly 1.0!
     this._customRimLocalAxle = new THREE.Vector3(0, 0, 1); // Always Z-facing!
@@ -5654,10 +6252,7 @@ class Component extends DCLogic {
     this.setState({ wheelStyle: style });
 
     if (this._customClonedWheels) {
-      this._customClonedWheels.forEach(c => {
-        if (c.parent) c.parent.remove(c);
-      });
-      this._customClonedWheels = null;
+      this._removeCustomWheelClones();
     }
 
     if (!this._originalWheelsState) {
@@ -6240,8 +6835,9 @@ class Component extends DCLogic {
   loadHDRI(key) {
     const THREE = this.THREE;
     if (key === 'studio') {
+      this._hdriRequestId = (this._hdriRequestId || 0) + 1;
       if (this.roomEnv && this.scene) {
-        this.scene.environment = this.roomEnv;
+        this._setGeneratedEnvironment(null);
         // _generateBlurredWheelTexture hides every mesh except one wheel rim
         // for its capture pass — must run BEFORE the needsUpdate flag is set,
         // or that internal render consumes the flag against a scene where the
@@ -6267,14 +6863,19 @@ class Component extends DCLogic {
         : 'https://threejs.org/examples/textures/equirectangular/' + entry)
       : null;
     if (!file || !this.rgbe || !this.pmrem || !THREE) return;
+    const requestId = (this._hdriRequestId || 0) + 1;
+    this._hdriRequestId = requestId;
     this.rgbe.load(
       file,
       (hdr) => {
+        if (this._unmounted || requestId !== this._hdriRequestId) {
+          hdr.dispose();
+          return;
+        }
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         const rt = this._maskHDRBelowHorizon(hdr);
-        const env = this.pmrem.fromEquirectangular(rt.texture).texture;
-        this._staticPMREM = env;
-        if (this.scene) this.scene.environment = env;
+        const envTarget = this.pmrem.fromEquirectangular(rt.texture);
+        this._setGeneratedEnvironment(envTarget);
         // Inject hemisphere flow into car materials (animated reflections)
         this._setupReflectionFlow();
         hdr.dispose(); rt.dispose();
@@ -6313,21 +6914,73 @@ class Component extends DCLogic {
   }
 
   // Step the device pixel ratio toward smoothness/crispness based on sustained
-  // render cost. Hysteresis + a cooldown prevent resolution flapping.
+  // presented-frame cadence. WebGL render() returns after submitting commands,
+  // not after the GPU finishes them, so synchronous JS timing is not a reliable
+  // load signal. Non-overlapping 60-frame windows include the real GPU/vsync
+  // delay; idle gaps reset the sample instead of looking like very slow frames.
+  _recordRenderCadence(now) {
+    const c = this._frameCadence;
+    if (!c) return;
+    if (!c.last || now - c.last > 80) {
+      c.last = now;
+      c.samples.length = 0;
+      c.goodWindows = 0;
+      c.badWindows = 0;
+      c.windowReady = false;
+      return;
+    }
+
+    const dt = now - c.last;
+    c.last = now;
+    c.samples.push(dt);
+    if (c.samples.length < 60) return;
+
+    const avg = c.samples.reduce((sum, value) => sum + value, 0) / c.samples.length;
+    const slow25 = c.samples.filter(value => value > 25).length / c.samples.length;
+    const slow20 = c.samples.filter(value => value > 20).length / c.samples.length;
+    c.samples.length = 0;
+    c.avg = avg;
+    c.windowReady = true;
+
+    if (avg > 22 || slow25 >= 0.20) {
+      c.badWindows++;
+      c.goodWindows = 0;
+    } else if (avg < 18.5 && slow20 <= 0.05) {
+      c.goodWindows++;
+      c.badWindows = 0;
+    } else {
+      c.goodWindows = 0;
+      c.badWindows = 0;
+    }
+
+    if (this._perf) {
+      this._perf.cadenceMs = +avg.toFixed(2);
+      this._perf.cadenceSamples = 60;
+    }
+  }
+
+  // Hysteresis + consecutive good/bad windows + a cooldown prevent resolution
+  // flapping around the target frame rate.
   _maybeAdaptDPR() {
-    if (!this.renderer || !this._dprSteps) return;
+    const c = this._frameCadence;
+    if (!this.renderer || !this._dprSteps || !c || !c.windowReady) return;
+    c.windowReady = false;
     const t = performance.now();
-    if (t - (this._lastDprChange || 0) < 1200) return;
+    if (t - (this._lastDprChange || 0) < 2000) return;
     let idx = this._dprIdx;
-    if (this._frameMsAvg > 26 && idx > 0) idx--;                       // <~38fps → coarser
-    else if (this._frameMsAvg < 10 && idx < this._dprSteps.length - 1) idx++; // big headroom → crisper
+    if (c.badWindows >= 2 && idx > 0) idx--;
+    else if (c.goodWindows >= 3 && idx < this._dprSteps.length - 1) idx++;
     if (idx === this._dprIdx) return;
     this._dprIdx = idx;
     const dpr = this._dprSteps[idx];
     this.renderer.setPixelRatio(dpr);
     if (this._onResize) this._onResize(); // re-apply renderer + composer sizes
     this._perf.dpr = dpr;
-    this._frameMsAvg = 16;        // reset measurement after a change
+    c.last = 0;
+    c.samples.length = 0;
+    c.goodWindows = 0;
+    c.badWindows = 0;
+    c.windowReady = false;
     this._lastDprChange = t;
     this.requestRender(3);
   }
@@ -6344,12 +6997,20 @@ class Component extends DCLogic {
       // each tier: tier 1 only needs THREE (EffectComposer.js also defines
       // THREE.Pass); tier 2 (RenderPass/ShaderPass/UnrealBloomPass) subclasses
       // THREE.Pass and references the shaders loaded in tier 1.
+      // Detect Android before script loads — MainActivity serves ?android and
+      // the packaged GLTFExporter still uses optional chaining that WebView 69
+      // (API 28 emulator) cannot parse. Export is desktop-only anyway.
+      {
+        const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
+        const qs = parse(location.search), hs = parse(location.hash);
+        this._androidApp = qs.has('android') || hs.has('android');
+      }
       await this.loadScript(B + 'build/three.min.js');
       await Promise.all([
         this.loadScript(B + 'examples/js/loaders/GLTFLoader.js'),
         this.loadScript(B + 'examples/js/loaders/DRACOLoader.js'),
         this.loadScript(B + 'examples/js/libs/meshopt_decoder.js'),
-        this.loadScript(B + 'examples/js/exporters/GLTFExporter.js'),
+        this._androidApp ? Promise.resolve() : this.loadScript(B + 'examples/js/exporters/GLTFExporter.js'),
         this.loadScript(B + 'examples/js/controls/OrbitControls.js'),
         this.loadScript(B + 'examples/js/objects/Sky.js'),
         this.loadScript(B + 'examples/js/loaders/RGBELoader.js'),
@@ -6425,13 +7086,14 @@ class Component extends DCLogic {
       hudEl.style.cssText = 'position:absolute;left:14px;bottom:14px;z-index:30;' +
         'display:flex;align-items:center;gap:6px;pointer-events:none;user-select:none;';
       container.appendChild(hudEl);
+      this._hudEl = hudEl;
 
       const fpsEl = document.createElement('div');
       fpsEl.style.cssText =
         'font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;' +
         'color:#4fd6e8;background:rgba(10,14,18,.55);backdrop-filter:blur(6px);' +
         '-webkit-backdrop-filter:blur(6px);padding:4px 9px;border-radius:6px;' +
-        'border:1px solid rgba(79,214,232,.18);';
+        'border:1px solid rgba(79,214,232,.18);display:none;';
       fpsEl.textContent = '— FPS';
       hudEl.appendChild(fpsEl);
       this._fpsEl = fpsEl;
@@ -6476,9 +7138,12 @@ class Component extends DCLogic {
       // the default. Dark surround with bright HDR softboxes => the clearcoat and
       // glass show crisp bright reflection streaks (like the reference render)
       // without washing the paint color the way a uniformly-bright env does.
-      const studioEnv = pmrem.fromScene(this.makeStudioEnv(), 0.015).texture;
-      this.roomEnv = studioEnv;
-      scene.environment = studioEnv;
+      const studioEnvScene = this.makeStudioEnv();
+      const studioEnvTarget = pmrem.fromScene(studioEnvScene, 0.015);
+      this._disposeOwnedObject(studioEnvScene);
+      this._studioEnvironmentTarget = studioEnvTarget;
+      this.roomEnv = studioEnvTarget.texture;
+      scene.environment = this.roomEnv;
 
       // --- Configurable HDRI: drives reflections (background stays flat gray) ---
       const rgbe = new THREE.RGBELoader();
@@ -6517,7 +7182,16 @@ class Component extends DCLogic {
       // damping/async work settles. requestRender() is the single entry point;
       // componentDidUpdate (any setState), resize, and async loads all call it.
       this._renderFrames = 6;
-      this.requestRender = (n = 3) => { this._renderFrames = Math.max(this._renderFrames || 0, n); };
+      this._wheelTransformsDirty = true;
+      // Bloom/streak are screen-space results. Keep them until something that
+      // can change the camera, light emitters or their occlusion requests a
+      // redraw. Continuous wheel roll/reflection flow can then reuse the last
+      // result instead of rendering the full car two extra times per frame.
+      this._postFxDirty = true;
+      this.requestRender = (n = 3) => {
+        this._renderFrames = Math.max(this._renderFrames || 0, n);
+        this._postFxDirty = true;
+      };
       controls.addEventListener('change', () => this.requestRender(2));
       // ── Adaptive pixel ratio ───────────────────────────────────────────────
       // Step DPR within [1.0 .. cap] from sustained render cost (rendered frames
@@ -6532,7 +7206,10 @@ class Component extends DCLogic {
       // Low tier starts at its lowest step (smooth-first, ramp up if there's
       // headroom); desktop starts crisp.
       this._dprIdx   = this._perfLow ? 0 : this._dprSteps.length - 1;
-      this._frameMsAvg = 16;
+      this._frameCadence = {
+        last: 0, samples: [], avg: 0,
+        goodWindows: 0, badWindows: 0, windowReady: false,
+      };
       this._perf = { fps: 0, lastMs: 0, renderedFrames: 0, dpr: this._dprSteps[this._dprIdx] };
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
@@ -6548,13 +7225,23 @@ class Component extends DCLogic {
         draco.setDecoderConfig({ type: 'js' });
         draco.setWorkerLimit(1);
       }
+      this._dracoLoader = draco;
       const loader = new THREE.GLTFLoader();
       loader.setDRACOLoader(draco);
       if (window.MeshoptDecoder) {
         loader.setMeshoptDecoder(window.MeshoptDecoder);
       }
-      const HEV_URL = 'assets/haval-h6-hev.glb'; // real PHEV stock rim baked in via export from the known-good original — materials/lights untouched
-      const GT_URL  = 'assets/haval-h6-gt.glb';
+      // The four full-detail stock rims were removed from the car GLB because
+      // the catalog pipeline immediately installs the resizable stock rim below.
+      // Tires, brakes and wheel transforms remain embedded as its anchors.
+      const HEV_URL = this._perfLow
+        ? 'assets/haval-h6-hev-lite.glb?rev=1'
+        : 'assets/haval-h6-hev.glb?rev=2';
+      const GT_URL = this._perfLow
+        ? 'assets/haval-h6-gt-lite.glb?rev=1'
+        : 'assets/haval-h6-gt.glb';
+      const HEV_BYTES = this._perfLow ? 2900940 : 5748792;
+      const GT_BYTES = this._perfLow ? 3009120 : 4871268;
       const profiles = this._modelProfiles();
       // The HEV/PHEV car is PRIMARY: visible at start, drives the camera framing,
       // contact shadow and night-light rig. The GT is LAZY — most sessions never
@@ -6580,7 +7267,7 @@ class Component extends DCLogic {
           (e) => {
             let p;
             if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
-            else p = Math.min(99, (e.loaded / 4871268) * 100); // current haval-h6-gt.glb size
+            else p = Math.min(99, (e.loaded / GT_BYTES) * 100);
             this.setState({ progress: p, processing: p >= 99 });
           },
           (err) => {
@@ -6603,7 +7290,7 @@ class Component extends DCLogic {
           // over-shoots. (Was 24129420 before the texture-shrink pass.)
           let p;
           if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
-          else p = Math.min(99, (e.loaded / 8450136) * 100);
+          else p = Math.min(99, (e.loaded / HEV_BYTES) * 100);
           // Once bytes are in, the frozen tail is Draco/JPEG decode + scene
           // setup — label it honestly instead of a stuck percent.
           this.setState({ progress: p, processing: p >= 99 });
@@ -6626,7 +7313,7 @@ class Component extends DCLogic {
           this._preloadedStock = {
             key: stockKey,
             promise: new Promise((resolve) => {
-              loader.load('assets/wheels/' + stockItem.file,
+              loader.load('assets/wheels/' + this._wheelAssetFile(stockItem),
                 (gltf) => resolve(gltf.scene),
                 undefined,
                 (err) => { console.warn('Stock wheel preload failed', err); resolve(null); });
@@ -6635,6 +7322,37 @@ class Component extends DCLogic {
         }
       }
 
+      // Keep post-processing tied to the renderer's adaptive DPR in LITE mode.
+      // A 2/3 scale means the initial 0.75 DPR produces the same half-CSS-size
+      // streak target as before, while bloom drops from full CSS resolution to
+      // half. If DPR rises, the soft effects gain resolution with the main view.
+      // Normal mode stays at its existing 1 CSS pixel per target pixel.
+      this._resizePostFX = (W, H) => {
+        const postFxScale = this._perfLow ? renderer.getPixelRatio() * (2 / 3) : 1;
+        const targetW = Math.max(1, Math.round(W * postFxScale));
+        const targetH = Math.max(1, Math.round(H * postFxScale));
+        const resizeComposer = (composer) => {
+          if (!composer) return;
+          // Custom render targets already use physical pixels, so keep the
+          // composer ratio at 1 and pass explicit integer target dimensions.
+          if (composer._pixelRatio !== 1) composer.setPixelRatio(1);
+          composer.setSize(targetW, targetH);
+        };
+        resizeComposer(this.bloomComposer);
+        resizeComposer(this.streakComposer);
+        // Keep the shader's offsets expressed in CSS pixels so flare length
+        // does not change when its render-target resolution changes.
+        if (this.sAnaPass) this.sAnaPass.uniforms.resolution.value.set(W, H);
+        if (this._perf) {
+          this._perf.postFxScale = +postFxScale.toFixed(3);
+          const target = this.bloomComposer && this.bloomComposer.renderTarget1;
+          if (target) {
+            this._perf.postFxWidth = target.width;
+            this._perf.postFxHeight = target.height;
+          }
+        }
+      };
+
       // --- Resize ---
       this._onResize = () => {
         const W = container.clientWidth, H = container.clientHeight;
@@ -6642,9 +7360,7 @@ class Component extends DCLogic {
         camera.updateProjectionMatrix();
         renderer.setSize(W, H);
         if (this.occluderCam) { this.occluderCam.aspect = W/H; this.occluderCam.updateProjectionMatrix(); }
-        if (this.bloomComposer) this.bloomComposer.setSize(W, H);
-        if (this.bloomRT) this.bloomRT.setSize(W, H);
-        if (this.bAnaPass) this.bAnaPass.uniforms.resolution.value.set(W, H);
+        this._resizePostFX(W, H);
         if (this.requestRender) this.requestRender(2);
       };
       window.addEventListener('resize', this._onResize);
@@ -6727,12 +7443,9 @@ class Component extends DCLogic {
       this.bloomComposer = bloomComposer;
 
       // --- Streak composer: layer 2 → AnamorphicShader only ---
-      // Half-res buffer in low tier (the streak is a soft glow — the upscale is
-      // invisible). The shader's `resolution` uniform stays full-res so the
-      // streak's UV reach is unchanged; only the sampled buffer is cheaper.
-      const streakRT = this._perfLow
-        ? new THREE.WebGLRenderTarget(Math.round(w * 0.5), Math.round(h * 0.5), { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat })
-        : makeRT();
+      // The shared resize helper applies LITE's reduced adaptive resolution to
+      // both composers. One sizing path prevents resize from restoring full-res.
+      const streakRT = makeRT();
       const streakCam = camera.clone();
       streakCam.layers.enableAll(); // sees all meshes for depth occlusion
       this.streakCam = streakCam;
@@ -6745,6 +7458,7 @@ class Component extends DCLogic {
       streakComposer.addPass(sAna);
       this.streakComposer = streakComposer;
       this.sAnaPass = sAna;
+      this._resizePostFX(w, h);
 
       // Additive overlay material — reused for both bloom and streak
       const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -6757,6 +7471,7 @@ class Component extends DCLogic {
         depthTest: false, depthWrite: false, toneMapped: false,
       });
       const quad = new THREE.PlaneGeometry(2, 2);
+      this._overlayQuadGeometry = quad;
       const overlayScene = new THREE.Scene();
       const bloomQuad = new THREE.Mesh(quad, bloomMat);
       const streakQuad = new THREE.Mesh(quad, streakMat);
@@ -6828,7 +7543,11 @@ class Component extends DCLogic {
             // tires can be excluded from _allWheels (custom/catalog wheels)
             // but must still keep rolling, without double-incrementing when
             // they're already part of _allWheels (default wheels).
-            const rollSet = new Set([...(this._allWheels || []), ...(this._tireWheels || [])]);
+            if (!this._wheelRollSet) this._wheelRollSet = new Set();
+            const rollSet = this._wheelRollSet;
+            rollSet.clear();
+            (this._allWheels || []).forEach(m => rollSet.add(m));
+            (this._tireWheels || []).forEach(m => rollSet.add(m));
             rollSet.forEach(m => { m._rollAngle = (m._rollAngle || 0) + rollDelta; });
           }
           if (this._blurredDiscs) {
@@ -6859,6 +7578,7 @@ class Component extends DCLogic {
           if (doorsNeedRender) {
             this._applyDoorsTransform();
             needRender = true;
+            this._postFxDirty = true;
             if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
           }
         }
@@ -6873,6 +7593,7 @@ class Component extends DCLogic {
           }
           this._applyTrunkTransform();
           needRender = true;
+          this._postFxDirty = true;
           if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
         }
 
@@ -6886,6 +7607,7 @@ class Component extends DCLogic {
           }
           this._applySunroofTransform(this._sunroofProgress * 100);
           needRender = true;
+          this._postFxDirty = true;
           if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
         }
 
@@ -6899,14 +7621,20 @@ class Component extends DCLogic {
           }
           this._applyCurtainTransform(this._curtainProgress * 100);
           needRender = true;
+          this._postFxDirty = true;
           if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
         }
 
-        // Always apply wheel transforms to keep steer + roll + visibility (rim vs disc) in sync
+        // Keep steer + roll + high-speed sprite visibility synchronized. This
+        // intentionally matches the committed implementation: visibility must
+        // not depend on a dirty flag that can be cleared by another UI update.
         this._applyWheelTransforms();
 
         // controls.update() must run every frame for damping; true = camera moved
-        if (controls.update()) needRender = true;
+        if (controls.update()) {
+          needRender = true;
+          this._postFxDirty = true;
+        }
         // Forced frames after UI changes / async loads (componentDidUpdate, etc.)
         if (this._renderFrames > 0) { this._renderFrames--; needRender = true; }
         // Idle — nothing changed: skip ALL GPU work this frame
@@ -6932,33 +7660,49 @@ class Component extends DCLogic {
         this._perf.mainTris  = renderer.info.render.triangles;
 
         if (anyLight && this.bloomComposer) {
-          syncCam(this.bloomCam);
-          const savedBg = scene.background;
-          scene.background = null;
+          if (this._postFxDirty) {
+            syncCam(this.bloomCam);
+            const savedBg = scene.background;
+            scene.background = null;
 
-          // 2) Bloom pass (all lights). Black out non-light meshes so solid body
-          //    occludes hidden lights via real depth; emissive lights stay bright.
-          this._darkenNonBloom(scene);
-          this.bloomComposer.render();
-          this._restoreMaterials();
-
-          // 3) Streak pass (layer 2 — headlight + reverse only)
-          if (anyStreak && this.streakComposer) {
-            syncCam(this.streakCam);
-            this._darkenNonStreak(scene);
-            this.streakComposer.render();
+            // 2) Bloom pass (all lights). Black out non-light meshes so solid body
+            //    occludes hidden lights via real depth; emissive lights stay bright.
+            this._darkenNonBloom(scene);
+            this.bloomComposer.render();
             this._restoreMaterials();
+
+            // 3) Streak pass (layer 2 — headlight + reverse only)
+            if (anyStreak && this.streakComposer) {
+              syncCam(this.streakCam);
+              this._darkenNonStreak(scene);
+              this.streakComposer.render();
+              this._restoreMaterials();
+            }
+
+            scene.background = savedBg;
+            this._postFxDirty = false;
+            this._perf.postFxRenders = (this._perf.postFxRenders || 0) + 1;
+          } else {
+            this._perf.postFxCacheHits = (this._perf.postFxCacheHits || 0) + 1;
           }
 
-          scene.background = savedBg;
-
-          // 4) Additive overlay: bloom + streak quads
-          this.bloomMat.map = this.bloomComposer.readBuffer.texture;
+          // 4) Additive overlay: cached bloom + streak quads. Reassigning a
+          // texture uniform does not need material recompilation unless USE_MAP
+          // changes because the map becomes present/absent.
+          const bloomTexture = this.bloomComposer.readBuffer.texture;
+          if (this.bloomMat.map !== bloomTexture) {
+            const hadMap = !!this.bloomMat.map;
+            this.bloomMat.map = bloomTexture;
+            if (hadMap !== !!bloomTexture) this.bloomMat.needsUpdate = true;
+          }
           this.bloomMat.visible = true;
-          this.bloomMat.needsUpdate = true;
-          this.streakMat.map = anyStreak && this.streakComposer ? this.streakComposer.readBuffer.texture : null;
+          const streakTexture = anyStreak && this.streakComposer ? this.streakComposer.readBuffer.texture : null;
+          if (this.streakMat.map !== streakTexture) {
+            const hadMap = !!this.streakMat.map;
+            this.streakMat.map = streakTexture;
+            if (hadMap !== !!streakTexture) this.streakMat.needsUpdate = true;
+          }
           this.streakMat.visible = !!(anyStreak && this.streakComposer);
-          this.streakMat.needsUpdate = true;
           renderer.autoClear = false;
           renderer.render(this.overlayScene, this.orthoCamera);
           renderer.autoClear = true;
@@ -6971,17 +7715,19 @@ class Component extends DCLogic {
           renderer.autoClear = true;
         }
 
-        // Profiler + adaptive pixel ratio (measured on rendered frames only)
+        // Profiler + adaptive pixel ratio (rendered frames only). Keep CPU
+        // submission time as a diagnostic, but use actual rAF cadence for DPR.
         this._renderTimes.push(now);
         const _ms = performance.now() - _t0;
-        this._frameMsAvg = this._frameMsAvg * 0.9 + _ms * 0.1;
         this._perf.lastMs = +_ms.toFixed(2);
+        this._perf.submitMs = this._perf.lastMs;
         this._perf.renderedFrames++;
         _fpsCount++;
         if (now - _fpsT >= 500) {
           this._perf.fps = Math.round(_fpsCount * 1000 / (now - _fpsT));
           _fpsCount = 0; _fpsT = now;
         }
+        this._recordRenderCadence(now);
         this._maybeAdaptDPR();
       };
       loop();
@@ -7780,6 +8526,7 @@ class Component extends DCLogic {
       const key = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
       this._loadCatalogWheelByKey(key, () => {
         this.setState({ loading: false, processing: false, progress: 100 });
+        try { this._applyPendingSceneSettings(); } catch (e) { console.warn('[Settings] apply failed', e); }
       }, { initial: true });
       // Light-shader pre-warm is the single biggest chunk of the post-download
       // "processing" stall (measured ~100ms of RENDER cost alone on a desktop
@@ -7839,6 +8586,8 @@ class Component extends DCLogic {
         const keepSet = new Set([
           ...(b._allWheels || []),
           ...Object.values(b._steerOnlyMeshes || {}).flat(),
+          ...(b._blurredDiscs || []),
+          ...(b._backingDiscs || []),
         ]);
         const hidden = [];
         srcV.root.traverse(c => {
@@ -7966,13 +8715,66 @@ class Component extends DCLogic {
   }
 
   componentWillUnmount() {
+    this._unmounted = true;
+    clearTimeout(this._saveFlashTimer);
+    this._hdriRequestId = (this._hdriRequestId || 0) + 1;
     if (this._raf) cancelAnimationFrame(this._raf);
+    if (this._warmupRaf) cancelAnimationFrame(this._warmupRaf);
+    ['turnL', 'turnR', 'hazard'].forEach((key) => this._stopBlink(key));
+    this.exitAssignMode();
     if (this._onResize) window.removeEventListener('resize', this._onResize);
+
+    if (this.controls && this.controls.dispose) this.controls.dispose();
+    if (this._dracoLoader && this._dracoLoader.dispose) this._dracoLoader.dispose();
+    this._disposeThumbRenderer();
+    this._disposeCustomWheelResources();
+
+    const disposedPasses = new Set();
+    [this.bloomComposer, this.streakComposer].forEach((composer) => {
+      if (!composer) return;
+      (composer.passes || []).forEach((pass) => {
+        if (pass && pass.dispose && !disposedPasses.has(pass)) {
+          disposedPasses.add(pass);
+          pass.dispose();
+        }
+      });
+      if (composer.dispose) composer.dispose();
+    });
+
+    [this._rtSource, this._rtBlurred].forEach((target) => {
+      if (target && target.dispose) target.dispose();
+    });
+    [this.scene, this._blurScene, this.overlayScene, this.vignetteScene].forEach((scene) => {
+      this._disposeOwnedObject(scene);
+    });
+    if (this._blackMat) this._blackMat.dispose();
+
+    if (this._generatedEnvironmentTarget) this._generatedEnvironmentTarget.dispose();
+    if (this._studioEnvironmentTarget) this._studioEnvironmentTarget.dispose();
+    this._generatedEnvironmentTarget = null;
+    this._studioEnvironmentTarget = null;
+    if (this.pmrem && this.pmrem.dispose) this.pmrem.dispose();
+    if (this._backgroundTex) this._backgroundTex.dispose();
+
+    if (this._onPickerClick && this.renderer && this.renderer.domElement) {
+      this.renderer.domElement.removeEventListener('click', this._onPickerClick);
+    }
+    if (this._pickerOverlay && this._pickerOverlay.parentNode) {
+      this._pickerOverlay.parentNode.removeChild(this._pickerOverlay);
+    }
+
     if (this.renderer) {
+      if (this.renderer.renderLists) this.renderer.renderLists.dispose();
       this.renderer.dispose();
       const el = this.renderer.domElement;
       if (el && el.parentNode) el.parentNode.removeChild(el);
     }
+    if (this._hudEl && this._hudEl.parentNode) this._hudEl.parentNode.removeChild(this._hudEl);
+    try {
+      ['__perf', '__perfLow', '__archCapRough', '__renderOnce', '__scene',
+       '__camera', '__controls', '__renderer', '__app', '__lightGroups']
+        .forEach((key) => { delete window[key]; });
+    } catch (_) {}
   }
 }
 </script>

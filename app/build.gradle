@@ -25,16 +25,29 @@ android {
     sourceSets.main.assets.srcDir("$buildDir/generated/viewerAssets")
 }
 
+def prepareViewerSource = tasks.register("prepareViewerSource", Exec) {
+    workingDir rootProject.projectDir
+    commandLine "node", "scripts/prepare-android-www.mjs"
+    inputs.files(
+        rootProject.file("support.js"),
+        rootProject.file("index.html"),
+        rootProject.file("telemetryClient.js"),
+        rootProject.file("appLauncherClient.js"),
+        rootProject.file("scripts/prepare-android-www.mjs")
+    )
+    inputs.dir(rootProject.file("vendor"))
+    outputs.dir(rootProject.layout.projectDirectory.dir("app/build/generated/viewerSource"))
+}
+
 def viewerAssets = tasks.register("syncViewerAssets", Sync) {
+    dependsOn(prepareViewerSource)
     into(layout.buildDirectory.dir("generated/viewerAssets/www"))
-    from(rootProject.projectDir) {
+    from(rootProject.layout.projectDirectory.dir("app/build/generated/viewerSource")) {
         include "index.html"
         include "support.js"
         include "telemetryClient.js"
         include "appLauncherClient.js"
-    }
-    from(rootProject.file("vendor")) {
-        into "vendor"
+        include "vendor/**"
     }
     from(rootProject.file("assets")) {
         into "assets"
@@ -47,3 +60,7 @@ tasks.configureEach { task ->
         task.dependsOn(viewerAssets)
     }
 }
+
+// Android Studio sync asks for this Kotlin IDE model task even on Java-only
+// modules. Provide a no-op so Sync/Run from the IDE does not fail.
+tasks.register("prepareKotlinBuildScriptModel") {}
