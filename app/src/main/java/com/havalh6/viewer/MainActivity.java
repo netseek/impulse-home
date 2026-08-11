@@ -31,6 +31,7 @@ import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.content.ComponentName;
 import android.util.Base64;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
@@ -49,7 +50,6 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> pendingFiles;
     private final ConcurrentHashMap<String, String> telemetryCache = new ConcurrentHashMap<>();
-    private View popupControls;
     private View launchAnchor;
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable pinBoundsRunnable;
@@ -81,6 +81,53 @@ public final class MainActivity extends Activity {
         }
     }
 
+    public class MediaBridge {
+        @JavascriptInterface
+        public void prev() {
+            Log.i(TAG, "MediaBridge.prev");
+            mainHandler.post(mediaNowPlaying::prev);
+        }
+
+        @JavascriptInterface
+        public void playPause() {
+            Log.i(TAG, "MediaBridge.playPause");
+            mainHandler.post(mediaNowPlaying::playPause);
+        }
+
+        @JavascriptInterface
+        public void next() {
+            Log.i(TAG, "MediaBridge.next");
+            mainHandler.post(mediaNowPlaying::next);
+        }
+
+        /** Called by the viewer once the model loader overlay can clear. */
+        @JavascriptInterface
+        public void onViewerReady() {
+            mainHandler.post(() -> {
+                try {
+                    mediaNowPlaying.start();
+                    mediaNowPlaying.pushNow();
+                } catch (Throwable t) {
+                    Log.w(TAG, "mediaNowPlaying.start failed", t);
+                }
+            });
+        }
+
+        /** Hide the right freeform music app (keep playback); return to idle rail. */
+        @JavascriptInterface
+        public void dismissSlot() {
+            mainHandler.post(() -> {
+                try {
+                    if (activeMediaPackage != null && !activeMediaPackage.isEmpty()) {
+                        dismissMediaPopup(activeMediaPackage);
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "dismissSlot failed", t);
+                }
+            });
+        }
+    }
+
     private static final java.util.Set<String> IGNORED_PACKAGES = new java.util.HashSet<>(java.util.Arrays.asList(
         "com.beantechs.hvac",
         "com.beantechs.vehiclecenter",
@@ -96,6 +143,8 @@ public final class MainActivity extends Activity {
         "com.beantechs.adaptertool.client",
         "com.beantechs.sshost.client",
         "com.android.car.media",
+        "com.beantechs.mediacenter.h5.ui",
+        "com.beantechs.mediacenter.h5.core",
         "com.android.support.car.lenspicker",
         "com.autolink.enginmode",
         "com.apical.cj1005",
@@ -161,7 +210,7 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public void launchAppInPopup(String packageName) {
-            launchAppInLeftSlot(packageName);
+            launchAppForPackage(packageName, "");
         }
 
         @JavascriptInterface
@@ -173,14 +222,74 @@ public final class MainActivity extends Activity {
         public void maximizeApp(String packageName) {
             maximizePopupApp(packageName);
         }
+
+        @JavascriptInterface
+        public void setShellMode(String mode) {
+            mainHandler.post(() -> applyShellMode(mode));
+        }
+
+        @JavascriptInterface
+        public void setLaunchSide(String side) {
+            mainHandler.post(() -> applyLaunchSide(side));
+        }
+
+        /** Close freeform slots so WebView chrome (layout menu) can sit on top. */
+        @JavascriptInterface
+        public void dismissOverlays() {
+            mainHandler.post(() -> dismissAllOverlays());
+        }
+
+        @JavascriptInterface
+        public void setSlotUse(String side, String use) {
+            mainHandler.post(() -> applySlotUse(side, use));
+        }
+
+        @JavascriptInterface
+        public void saveWidgets(String json) {
+            getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                    .edit()
+                    .putString("widgets", json != null ? json : "")
+                    .apply();
+        }
+
+        @JavascriptInterface
+        public String loadWidgets() {
+            return getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).getString("widgets", "");
+        }
     }
 
     private String activePopupPackage = "";
     private int activePopupTaskId = -1;
+    private ComponentName activePopupComponent;
+    private String activeMediaPackage = "";
+    private int activeMediaTaskId = -1;
+    private ComponentName activeMediaComponent;
+    private long lastOverlayRaiseMs;
+    private long overlayLaunchUntilMs;
+    private Object taskStackListener;
+    private final Runnable overlayWatchdog = new Runnable() {
+        @Override
+            public void run() {
+            syncOverlaySlots(false);
+            if (hasOverlayWindow()) mainHandler.postDelayed(this, 1000);
+        }
+    };
+    private View mediaLaunchAnchor;
+    private View stripContainer;
+    private FrameLayout rootLayout;
+    private String shellMode = SHELL_TRIPLE;
+    private String launchSidePref = "auto";
+    private boolean nextLaunchLeft = true;
+    /** Side that most recently received a freeform launch (for L/R HUD). */
+    private String lastLaunchSide = "";
+    private String leftSlotUse = "app";
+    private String rightSlotUse = "app";
+    private Runnable pinMediaBoundsRunnable;
+    private final MediaNowPlaying mediaNowPlaying = new MediaNowPlaying();
 
     /**
      * Left freeform slot over our fullscreen launcher (not split-screen).
-     * Right side reserved for future media UI.
+     * Right slot: slim idle now-playing in the WebView; music apps open wider.
      * Bounds are screen pixels for the Haval ~1920×720 panel.
      * <p>
      * Emulator note: stock AVDs ship with freeform off. Enable once:
@@ -188,6 +297,13 @@ public final class MainActivity extends Activity {
      * {@code adb shell settings put global force_resizable_activities 1}
      */
     private static final Rect LEFT_POPUP_BOUNDS = new Rect(48, 100, 740, 530);
+    /** Right media slot (idle now-playing + music apps share these bounds). */
+    private static final Rect RIGHT_APP_BOUNDS = new Rect(1180, 100, 1872, 530);
+    private static final Rect RIGHT_IDLE_BOUNDS = RIGHT_APP_BOUNDS;
+    private static final String SHELL_TRIPLE = "triple";
+    private static final String SHELL_APP_CAR = "appCar";
+    private static final String SHELL_APPS = "appsOnly";
+    private static final String PREFS_SHELL = "h6_shell";
     private static final Rect FULLSCREEN_BOUNDS = new Rect(0, 0, 1920, 720);
     /** {@code WindowConfiguration.WINDOWING_MODE_FREEFORM} (API 28+). */
     private static final int WINDOWING_MODE_FREEFORM = 5;
@@ -228,12 +344,13 @@ public final class MainActivity extends Activity {
     private Bundle buildWindowOptions(int windowingMode, Rect bounds) {
         allowHiddenApis();
         ActivityOptions options;
-        // Clip-reveal from the fixed left-slot anchor so the system prefers that screen region
+        // Clip-reveal from the matching slot anchor so the system prefers that screen region
         // (helps when an app remembers a previous freeform position).
-        if (windowingMode == WINDOWING_MODE_FREEFORM && launchAnchor != null
-                && launchAnchor.getWidth() > 0 && launchAnchor.getHeight() > 0) {
+        View anchor = launchAnchorForBounds(bounds);
+        if (windowingMode == WINDOWING_MODE_FREEFORM && anchor != null
+                && anchor.getWidth() > 0 && anchor.getHeight() > 0) {
             options = ActivityOptions.makeClipRevealAnimation(
-                    launchAnchor, 0, 0, launchAnchor.getWidth(), launchAnchor.getHeight());
+                    anchor, 0, 0, anchor.getWidth(), anchor.getHeight());
         } else {
             options = ActivityOptions.makeBasic();
         }
@@ -249,7 +366,239 @@ public final class MainActivity extends Activity {
         if (bundle == null) bundle = new Bundle();
         bundle.putInt(KEY_LAUNCH_WINDOWING_MODE, windowingMode);
         if (bounds != null) bundle.putParcelable(KEY_LAUNCH_BOUNDS, new Rect(bounds));
+        // Do NOT set taskAlwaysOnTop here. Android 12+ (this emulator) throws
+        // SecurityException and aborts the entire startActivity. Stay-on-top is
+        // applied after the task exists via setTaskAlwaysOnTop / moveTaskToFront.
         return bundle;
+    }
+
+    private View launchAnchorForBounds(Rect bounds) {
+        Rect d = displayRect();
+        if (bounds != null && bounds.left >= d.width() / 2) return mediaLaunchAnchor;
+        return launchAnchor;
+    }
+
+    private Rect leftFreeformBounds() {
+        Rect d = displayRect();
+        int dock = dockReservePx();
+        if (SHELL_APPS.equals(shellMode)) {
+            int inset = Math.max(6, Math.round(d.width() * 0.004f));
+            int gap = Math.max(6, Math.round(d.width() * 0.004f));
+            int top = Math.max(inset, Math.round(d.height() * 0.055f));
+            return new Rect(inset, top, d.width() / 2 - gap / 2, d.height() - dock);
+        }
+        if (SHELL_APP_CAR.equals(shellMode)) {
+            return new Rect(
+                    Math.round(d.width() * 0.016f),
+                    Math.round(d.height() * 0.11f),
+                    Math.round(d.width() * 0.54f),
+                    d.height() - dock);
+        }
+        return new Rect(LEFT_POPUP_BOUNDS);
+    }
+
+    private Rect rightFreeformBounds() {
+        Rect d = displayRect();
+        int dock = dockReservePx();
+        if (SHELL_APPS.equals(shellMode)) {
+            int inset = Math.max(6, Math.round(d.width() * 0.004f));
+            int gap = Math.max(6, Math.round(d.width() * 0.004f));
+            int top = Math.max(inset, Math.round(d.height() * 0.055f));
+            return new Rect(d.width() / 2 + gap / 2, top, d.width() - inset, d.height() - dock);
+        }
+        return new Rect(RIGHT_APP_BOUNDS);
+    }
+
+    private Rect displayRect() {
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        return new Rect(0, 0, dm.widthPixels, dm.heightPixels);
+    }
+
+    private int dockReservePx() {
+        float density = getResources().getDisplayMetrics().density;
+        return Math.round((110f + 40f + 8f) * density);
+    }
+
+    private void updateSlotAnchors() {
+        applyAnchorRect(launchAnchor, leftFreeformBounds());
+        applyAnchorRect(mediaLaunchAnchor, rightFreeformBounds());
+    }
+
+    private static void applyAnchorRect(View anchor, Rect bounds) {
+        if (anchor == null || bounds == null) return;
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) anchor.getLayoutParams();
+        if (lp == null) return;
+        lp.width = bounds.width();
+        lp.height = bounds.height();
+        lp.leftMargin = bounds.left;
+        lp.topMargin = bounds.top;
+        anchor.setLayoutParams(lp);
+    }
+
+    private String boundsToCssJson(Rect bounds) {
+        float density = getResources().getDisplayMetrics().density;
+        if (density <= 0f) density = 1f;
+        return "{l:" + (bounds.left / density)
+                + ",t:" + (bounds.top / density)
+                + ",r:" + (bounds.right / density)
+                + ",b:" + (bounds.bottom / density) + "}";
+    }
+
+    private void launchAppForPackage(String packageName, String label) {
+        if (packageName == null || packageName.isEmpty()) return;
+        if (packageName.equals(activePopupPackage)) {
+            dismissPopup(packageName);
+            return;
+        }
+        if (packageName.equals(activeMediaPackage)) {
+            dismissMediaPopup(packageName);
+            return;
+        }
+        String side = resolveLaunchSide();
+        if (side == null || side.isEmpty()) {
+            Log.i(TAG, "No APP slot available for launch (widgets-only)");
+            return;
+        }
+        if ("right".equals(side)) launchAppInRightSlot(packageName);
+        else launchAppInLeftSlot(packageName);
+    }
+
+    private void loadShellPrefs() {
+        android.content.SharedPreferences prefs = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE);
+        String mode = prefs.getString("mode", SHELL_TRIPLE);
+        if (SHELL_APPS.equals(mode)) mode = SHELL_TRIPLE;
+        shellMode = mode;
+        launchSidePref = prefs.getString("launchSide", "auto");
+        nextLaunchLeft = prefs.getBoolean("nextLeft", true);
+        loadSlotUsesForMode();
+    }
+
+    private void saveShellPrefs() {
+        android.content.SharedPreferences.Editor ed = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).edit();
+        if (!SHELL_APPS.equals(shellMode)) ed.putString("mode", shellMode);
+        ed.putString("launchSide", launchSidePref);
+        ed.putBoolean("nextLeft", nextLaunchLeft);
+        ed.apply();
+    }
+
+    private void applyShellMode(String mode) {
+        if (mode == null) return;
+        if (!SHELL_TRIPLE.equals(mode) && !SHELL_APP_CAR.equals(mode) && !SHELL_APPS.equals(mode)) {
+            mode = SHELL_TRIPLE;
+        }
+        String prev = shellMode;
+        shellMode = mode;
+        saveShellPrefs();
+        loadSlotUsesForMode();
+        updateSlotAnchors();
+
+        boolean leftOpen = activePopupPackage != null && !activePopupPackage.isEmpty();
+        boolean rightOpen = activeMediaPackage != null && !activeMediaPackage.isEmpty();
+
+        // APP+CAR has no right freeform slot — close the right app if open.
+        if (SHELL_APP_CAR.equals(shellMode) && rightOpen) {
+            dismissMediaPopup(activeMediaPackage);
+            rightOpen = false;
+        }
+
+        // APP+APP is full-bleed halves: if somehow only the "wrong" slot matters,
+        // still keep both when present. Switching away from appsOnly just re-pins
+        // to the smaller triple/appCar rects below.
+
+        // Resize remaining freeform windows to the new layout bounds.
+        if (leftOpen && activePopupComponent != null) {
+            schedulePinPopupBounds(activePopupPackage, activePopupComponent, leftFreeformBounds(), false);
+        }
+        if (rightOpen && activeMediaComponent != null) {
+            schedulePinPopupBounds(activeMediaPackage, activeMediaComponent, rightFreeformBounds(), true);
+        }
+
+        // Entering app+car from a two-app layout already closed right; if left is
+        // still open, the pin above expands it into the wide left slot.
+        if (!prev.equals(shellMode)) {
+            Log.i(TAG, "Shell mode " + prev + " → " + shellMode
+                    + " leftOpen=" + leftOpen + " rightOpen=" + rightOpen);
+        }
+        notifyViewerShellLayout();
+    }
+
+    private void applyLaunchSide(String side) {
+        if ("left".equals(side) || "right".equals(side) || "auto".equals(side)) {
+            launchSidePref = side;
+        } else {
+            launchSidePref = "auto";
+        }
+        // When locking a side, mirror that onto the next-side indicator.
+        if ("left".equals(launchSidePref)) nextLaunchLeft = true;
+        else if ("right".equals(launchSidePref)) nextLaunchLeft = false;
+        saveShellPrefs();
+        notifyViewerShellLayout();
+    }
+
+    private void loadSlotUsesForMode() {
+        android.content.SharedPreferences prefs = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE);
+        leftSlotUse = prefs.getString("slot_" + shellMode + "_left", "app");
+        rightSlotUse = prefs.getString("slot_" + shellMode + "_right", "app");
+        if (!"widgets".equals(leftSlotUse)) leftSlotUse = "app";
+        if (!"widgets".equals(rightSlotUse)) rightSlotUse = "app";
+    }
+
+    private boolean slotAllowsApp(String side) {
+        if ("right".equals(side)) {
+            if (SHELL_APP_CAR.equals(shellMode)) return false;
+            return !"widgets".equals(rightSlotUse);
+        }
+        return !"widgets".equals(leftSlotUse);
+    }
+
+    private void applySlotUse(String side, String use) {
+        if (!"widgets".equals(use)) use = "app";
+        if ("right".equals(side)) rightSlotUse = use;
+        else leftSlotUse = use;
+        getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                .edit()
+                .putString("slot_" + shellMode + "_" + (("right".equals(side) ? "right" : "left")), use)
+                .apply();
+        if ("widgets".equals(use)) {
+            if ("right".equals(side) && activeMediaPackage != null && !activeMediaPackage.isEmpty()) {
+                dismissMediaPopup(activeMediaPackage);
+            } else if ("left".equals(side) && activePopupPackage != null && !activePopupPackage.isEmpty()) {
+                dismissPopup(activePopupPackage);
+            }
+        }
+        notifyViewerShellLayout();
+    }
+
+    private String resolveLaunchSide() {
+        boolean leftFree = (activePopupPackage == null || activePopupPackage.isEmpty()) && slotAllowsApp("left");
+        boolean rightFree = (activeMediaPackage == null || activeMediaPackage.isEmpty()) && slotAllowsApp("right");
+        if (!leftFree && !rightFree) return "";
+        if (SHELL_APP_CAR.equals(shellMode)) return leftFree ? "left" : "";
+
+        String want;
+        if ("left".equals(launchSidePref) || "right".equals(launchSidePref)) {
+            want = launchSidePref;
+            if ("left".equals(want) && !leftFree) want = rightFree ? "right" : "";
+            else if ("right".equals(want) && !rightFree) want = leftFree ? "left" : "";
+        } else {
+            // Auto round-robin: pick the pending side, then prefer an empty slot.
+            want = nextLaunchLeft ? "left" : "right";
+            if (!slotAllowsApp(want)) want = "left".equals(want) ? "right" : "left";
+            if (SHELL_APPS.equals(shellMode)) {
+                if (leftFree && !rightFree) want = "left";
+                else if (rightFree && !leftFree) want = "right";
+            }
+            if ("left".equals(want) && !leftFree && rightFree) want = "right";
+            else if ("right".equals(want) && !rightFree && leftFree) want = "left";
+            if (!slotAllowsApp(want)) want = "";
+
+            if (!want.isEmpty()) {
+                nextLaunchLeft = !"left".equals(want);
+                saveShellPrefs();
+            }
+        }
+        lastLaunchSide = want;
+        return want;
     }
 
     private void forceStopPackage(String packageName) {
@@ -276,26 +625,177 @@ public final class MainActivity extends Activity {
             if (am == null) return -1;
             @SuppressWarnings("deprecation")
             List<android.app.ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(32);
-            if (tasks == null) return -1;
-            for (android.app.ActivityManager.RunningTaskInfo task : tasks) {
-                if (task == null) continue;
-                android.content.ComponentName top = task.topActivity;
-                android.content.ComponentName base = task.baseActivity;
-                if ((top != null && packageName.equals(top.getPackageName()))
-                        || (base != null && packageName.equals(base.getPackageName()))) {
-                    return task.id;
+            if (tasks != null) {
+                for (android.app.ActivityManager.RunningTaskInfo task : tasks) {
+                    int id = taskIdIfPackage(task, packageName);
+                    if (id >= 0) return id;
                 }
             }
+            @SuppressWarnings("deprecation")
+            List<android.app.ActivityManager.RecentTaskInfo> recent =
+                    am.getRecentTasks(32, android.app.ActivityManager.RECENT_WITH_EXCLUDED);
+            if (recent != null) {
+                for (android.app.ActivityManager.RecentTaskInfo task : recent) {
+                    int id = recentTaskIdIfPackage(task, packageName);
+                    if (id >= 0) return id;
+                }
+            }
+            int hiddenId = findTaskIdViaActivityTaskManager(packageName);
+            if (hiddenId >= 0) return hiddenId;
         } catch (Exception e) {
-            Log.w(TAG, "getRunningTasks failed", e);
+            Log.w(TAG, "findTaskIdForPackage failed", e);
         }
         return -1;
     }
 
-    /** Best-effort pin of freeform task to {@link #LEFT_POPUP_BOUNDS}. */
+    /** 1 visible, 0 gone, -1 ATM tasks filtered/unavailable. */
+    private int overlayVisibleViaAtm(String packageName) {
+        allowHiddenApis();
+        try {
+            Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+            Object instance = null;
+            try {
+                instance = atmClass.getMethod("getInstance").invoke(null);
+            } catch (Exception ignored) {}
+            if (instance == null) return -1;
+            java.lang.reflect.Method getTasks = null;
+            for (java.lang.reflect.Method cand : instance.getClass().getMethods()) {
+                if ("getTasks".equals(cand.getName()) && cand.getParameterTypes().length >= 1) {
+                    getTasks = cand;
+                    break;
+                }
+            }
+            if (getTasks == null) return -1;
+            Class<?>[] p = getTasks.getParameterTypes();
+            Object result;
+            if (p.length == 1) result = getTasks.invoke(instance, 32);
+            else if (p.length == 2 && p[1] == boolean.class) result = getTasks.invoke(instance, 32, false);
+            else if (p.length >= 3) result = getTasks.invoke(instance, 32, false, false);
+            else return -1;
+            if (!(result instanceof List)) return -1;
+            boolean sawForeign = false;
+            for (Object item : (List<?>) result) {
+                if (!(item instanceof android.app.ActivityManager.RunningTaskInfo)) continue;
+                android.app.ActivityManager.RunningTaskInfo task =
+                        (android.app.ActivityManager.RunningTaskInfo) item;
+                android.content.ComponentName top = task.topActivity;
+                android.content.ComponentName base = task.baseActivity;
+                String pkg = top != null ? top.getPackageName()
+                        : (base != null ? base.getPackageName() : null);
+                if (pkg == null) continue;
+                if (!getPackageName().equals(pkg)) sawForeign = true;
+                if (packageName.equals(pkg)) return runningTaskIsVisible(task) ? 1 : 0;
+            }
+            if (!sawForeign) return -1;
+            return 0;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private int findTaskIdViaActivityTaskManager(String packageName) {
+        allowHiddenApis();
+        try {
+            Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+            Object instance = null;
+            try {
+                instance = atmClass.getMethod("getInstance").invoke(null);
+            } catch (Exception ignored) {}
+            if (instance == null) return -1;
+            java.lang.reflect.Method getTasks = null;
+            for (java.lang.reflect.Method cand : instance.getClass().getMethods()) {
+                if ("getTasks".equals(cand.getName()) && cand.getParameterTypes().length >= 1) {
+                    getTasks = cand;
+                    break;
+                }
+            }
+            if (getTasks == null) return -1;
+            Class<?>[] p = getTasks.getParameterTypes();
+            Object result;
+            if (p.length == 1) result = getTasks.invoke(instance, 32);
+            else if (p.length == 2 && p[1] == boolean.class) result = getTasks.invoke(instance, 32, false);
+            else if (p.length >= 3) result = getTasks.invoke(instance, 32, false, false);
+            else return -1;
+            if (!(result instanceof List)) return -1;
+            for (Object item : (List<?>) result) {
+                if (item instanceof android.app.ActivityManager.RunningTaskInfo) {
+                    int id = taskIdIfPackage((android.app.ActivityManager.RunningTaskInfo) item, packageName);
+                    if (id >= 0) return id;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "ATM.getTasks failed", e);
+        }
+        return -1;
+    }
+
+    private static int taskIdIfPackage(android.app.ActivityManager.RunningTaskInfo task, String packageName) {
+        if (task == null) return -1;
+        android.content.ComponentName top = task.topActivity;
+        android.content.ComponentName base = task.baseActivity;
+        if ((top != null && packageName.equals(top.getPackageName()))
+                || (base != null && packageName.equals(base.getPackageName()))) {
+            return task.id;
+        }
+        return -1;
+    }
+
+    private static int recentTaskIdIfPackage(android.app.ActivityManager.RecentTaskInfo task, String packageName) {
+        if (task == null) return -1;
+        android.content.ComponentName orig = task.origActivity;
+        android.content.ComponentName base = task.baseIntent != null ? task.baseIntent.getComponent() : null;
+        // realActivity is API 29+; read it reflectively so API 28 compile still works.
+        android.content.ComponentName real = recentTaskRealActivity(task);
+        if ((orig != null && packageName.equals(orig.getPackageName()))
+                || (real != null && packageName.equals(real.getPackageName()))
+                || (base != null && packageName.equals(base.getPackageName()))) {
+            return task.persistentId > 0 ? task.persistentId : task.id;
+        }
+        return -1;
+    }
+
+    private static android.content.ComponentName recentTaskRealActivity(
+            android.app.ActivityManager.RecentTaskInfo task) {
+        try {
+            java.lang.reflect.Field field =
+                    android.app.ActivityManager.RecentTaskInfo.class.getField("realActivity");
+            Object value = field.get(task);
+            if (value instanceof android.content.ComponentName) {
+                return (android.content.ComponentName) value;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    /** Best-effort pin of a freeform task to a slot rect. */
     private boolean resizeTaskToBounds(int taskId, Rect bounds) {
         if (taskId < 0 || bounds == null) return false;
         allowHiddenApis();
+        Rect copy = new Rect(bounds);
+
+        // Android 7–9: ActivityManager.resizeTask (hidden).
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            try {
+                java.lang.reflect.Method m = android.app.ActivityManager.class.getMethod(
+                        "resizeTask", int.class, Rect.class);
+                m.invoke(am, taskId, copy);
+                Log.i(TAG, "Pinned task " + taskId + " via AM.resizeTask(2) " + copy);
+                return true;
+            } catch (NoSuchMethodException ignored) {}
+            try {
+                java.lang.reflect.Method m = android.app.ActivityManager.class.getMethod(
+                        "resizeTask", int.class, Rect.class, int.class);
+                m.invoke(am, taskId, copy, 0);
+                Log.i(TAG, "Pinned task " + taskId + " via AM.resizeTask(3) " + copy);
+                return true;
+            } catch (NoSuchMethodException ignored) {}
+        } catch (Exception e) {
+            Log.w(TAG, "AM.resizeTask failed for task " + taskId, e);
+        }
+
+        // Android 10+: ActivityTaskManager.getService().resizeTask
         try {
             Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
             java.lang.reflect.Method getService = atmClass.getDeclaredMethod("getService");
@@ -310,64 +810,392 @@ public final class MainActivity extends Activity {
                     break;
                 }
             }
-            if (resize == null) return false;
-            Class<?>[] p = resize.getParameterTypes();
-            if (p.length == 2) {
-                resize.invoke(service, taskId, new Rect(bounds));
-            } else if (p.length >= 3 && p[2] == int.class) {
-                resize.invoke(service, taskId, new Rect(bounds), 0);
-            } else {
-                return false;
+            if (resize != null) {
+                Class<?>[] p = resize.getParameterTypes();
+                if (p.length == 2) {
+                    resize.invoke(service, taskId, copy);
+                } else if (p.length >= 3 && p[2] == int.class) {
+                    resize.invoke(service, taskId, copy, 0);
+                } else {
+                    return false;
+                }
+                Log.i(TAG, "Pinned task " + taskId + " via ATM.resizeTask " + copy);
+                return true;
             }
-            Log.i(TAG, "Pinned task " + taskId + " to " + bounds);
-            return true;
         } catch (Exception e) {
-            Log.w(TAG, "resizeTask failed for task " + taskId, e);
-            return false;
+            Log.w(TAG, "ATM.resizeTask failed for task " + taskId, e);
         }
+        return false;
     }
 
-    private void schedulePinPopupBounds(String packageName) {
-        if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+    /**
+     * Apps often restore a previous freeform rect after first layout. Keep
+     * re-applying the slot bounds for a few seconds, and re-issue
+     * startActivity with the same bounds so LaunchParams pick them up.
+     */
+    private void schedulePinPopupBounds(final String packageName,
+            final android.content.ComponentName component, final Rect bounds, final boolean rightSlot) {
+        Runnable prev = rightSlot ? pinMediaBoundsRunnable : pinBoundsRunnable;
+        if (prev != null) mainHandler.removeCallbacks(prev);
         final int[] attempts = {0};
-        pinBoundsRunnable = new Runnable() {
+        Runnable pin = new Runnable() {
             @Override
             public void run() {
-                if (packageName == null || !packageName.equals(activePopupPackage)) return;
+                String active = rightSlot ? activeMediaPackage : activePopupPackage;
+                if (packageName == null || !packageName.equals(active)) return;
                 int taskId = findTaskIdForPackage(packageName);
                 if (taskId >= 0) {
-                    activePopupTaskId = taskId;
-                    if (resizeTaskToBounds(taskId, LEFT_POPUP_BOUNDS)) return;
+                    if (rightSlot) activeMediaTaskId = taskId;
+                    else activePopupTaskId = taskId;
+                    resizeTaskToBounds(taskId, bounds);
+                    setTaskAlwaysOnTop(taskId, true);
+                }
+                // Second start on the same task (no MULTIPLE_TASK) re-applies launch bounds
+                // when resizeTask is blocked or the app overwrote saved window size.
+                if (attempts[0] == 1 && component != null) {
+                    try {
+                        Intent again = new Intent(Intent.ACTION_MAIN);
+                        again.addCategory(Intent.CATEGORY_LAUNCHER);
+                        again.setComponent(component);
+                        again.setPackage(packageName);
+                        again.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                        startActivity(again, buildWindowOptions(WINDOWING_MODE_FREEFORM, bounds));
+                    } catch (Exception e) {
+                        Log.w(TAG, "Re-apply launch bounds failed", e);
+                    }
                 }
                 attempts[0]++;
-                if (attempts[0] < 8) mainHandler.postDelayed(this, 250);
+                if (attempts[0] < 16) mainHandler.postDelayed(this, 200);
             }
         };
-        mainHandler.postDelayed(pinBoundsRunnable, 200);
-    }
-
-    private void setPopupControlsVisible(boolean visible) {
-        if (popupControls != null) {
-            popupControls.setVisibility(visible ? View.VISIBLE : View.GONE);
-        }
-        notifyViewerPopupLayout(visible);
+        if (rightSlot) pinMediaBoundsRunnable = pin;
+        else pinBoundsRunnable = pin;
+        mainHandler.postDelayed(pin, 150);
     }
 
     /**
      * Contract with the WebView viewer:
-     * {@code window.onAndroidLauncherPopup(active:boolean)} /
-     * {@code __app.applyLauncherPopupLayout(active)} —
-     * when a left freeform app is open, frame the car slightly right + zoomed out;
-     * when closed/maximized, restore the default fit.
+     * {@code window.onAndroidShellLayout({left, right})} where right is
+     * {@code 'idle'|'app'}. Also keeps {@code onAndroidLauncherPopup(left)}
+     * for older viewer builds.
      */
-    private void notifyViewerPopupLayout(boolean active) {
+    private void notifyViewerShellLayout() {
         if (webView == null) return;
+        boolean left = activePopupPackage != null && !activePopupPackage.isEmpty();
+        String right = (activeMediaPackage != null && !activeMediaPackage.isEmpty())
+                ? "\"app\"" : "\"idle\"";
+        applyLauncherFocusPolicy();
+        String nextSide = nextLaunchLeft ? "left" : "right";
+        if ("left".equals(launchSidePref) || "right".equals(launchSidePref)) nextSide = launchSidePref;
+        String lastSide = (lastLaunchSide != null && !lastLaunchSide.isEmpty())
+                ? lastLaunchSide : nextSide;
+        // Prefer the richer shell contract; fall back to the legacy left-only callback.
         final String js = "try{"
-                + "if(window.onAndroidLauncherPopup){window.onAndroidLauncherPopup(" + active + ");}"
+                + "if(window.onAndroidShellLayout){window.onAndroidShellLayout({left:" + left
+                + ",right:" + right
+                + ",mode:\"" + shellMode + "\""
+                + ",launchSide:\"" + launchSidePref + "\""
+                + ",nextSide:\"" + nextSide + "\""
+                + ",lastSide:\"" + lastSide + "\""
+                + ",leftUse:\"" + leftSlotUse + "\""
+                + ",rightUse:\"" + rightSlotUse + "\""
+                + ",leftBounds:" + boundsToCssJson(leftFreeformBounds())
+                + ",rightBounds:" + boundsToCssJson(rightFreeformBounds())
+                + "});}"
+                + "else if(window.onAndroidLauncherPopup){window.onAndroidLauncherPopup(" + left + ");}"
                 + "else if(window.__app&&window.__app.applyLauncherPopupLayout){"
-                + "window.__app.applyLauncherPopupLayout(" + active + ");}"
+                + "window.__app.applyLauncherPopupLayout(" + left + ");}"
                 + "}catch(e){}";
         webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    private void notifyMediaNowPlaying(JSONObject payload) {
+        if (webView == null || payload == null) return;
+        final String js = "try{if(window.onMediaNowPlaying){window.onMediaNowPlaying("
+                + payload.toString() + ");}}catch(e){}";
+        webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    private void notifyMediaPosition(long positionMs) {
+        if (webView == null) return;
+        final String js = "try{if(window.onMediaPosition){window.onMediaPosition("
+                + positionMs + ");}}catch(e){}";
+        webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    private boolean hasOverlayWindow() {
+        return (activePopupPackage != null && !activePopupPackage.isEmpty())
+                || (activeMediaPackage != null && !activeMediaPackage.isEmpty());
+    }
+
+    /**
+     * While a freeform slot is open, do not take window focus. Taps on the 3D
+     * scene still reach our views, but the system will not raise this task over
+     * the floating app (which is what hides it and replays the open animation).
+     */
+    private void applyLauncherFocusPolicy() {
+        if (getWindow() == null) return;
+        WindowManager.LayoutParams lp = getWindow().getAttributes();
+        if (lp == null) return;
+        int flags = lp.flags;
+        if (hasOverlayWindow()) {
+            flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        } else {
+            flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        }
+        if (flags == lp.flags) return;
+        lp.flags = flags;
+        getWindow().setAttributes(lp);
+        Log.i(TAG, hasOverlayWindow()
+                ? "Launcher NOT_FOCUSABLE while freeform overlay is open"
+                : "Launcher focusable");
+        if (hasOverlayWindow()) startOverlayWatchdog();
+        else stopOverlayWatchdog();
+    }
+
+    private void markOverlayLaunch() {
+        overlayLaunchUntilMs = android.os.SystemClock.uptimeMillis() + 2000;
+    }
+
+    private boolean isOverlayLaunching() {
+        return android.os.SystemClock.uptimeMillis() < overlayLaunchUntilMs;
+    }
+
+    /** Close any leftover task for this package so a slot never stacks two windows. */
+    private void closeExistingTasksForPackage(String packageName) {
+        int safety = 0;
+        while (safety++ < 4) {
+            int id = findTaskIdForPackage(packageName);
+            if (id < 0) break;
+            removeTaskById(id);
+        }
+    }
+
+    private void dismissAllOverlays() {
+        if (activePopupPackage != null && !activePopupPackage.isEmpty()) {
+            dismissPopup(activePopupPackage);
+        }
+        if (activeMediaPackage != null && !activeMediaPackage.isEmpty()) {
+            dismissMediaPopup(activeMediaPackage);
+        }
+    }
+
+    /**
+     * @return 1 visible, 0 gone/minimized, -1 unknown (can't see other apps' tasks)
+     */
+    private int overlayTaskState(String packageName, int knownTaskId) {
+        if (packageName == null || packageName.isEmpty()) return 0;
+        int dump = overlayVisibleInDumpsys(packageName);
+        if (dump >= 0) return dump;
+        int atm = overlayVisibleViaAtm(packageName);
+        if (atm >= 0) return atm;
+        int imp = overlayImportance(packageName);
+        if (imp >= 0) return imp;
+        boolean sawForeignTask = false;
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am == null) return -1;
+            @SuppressWarnings("deprecation")
+            List<android.app.ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(32);
+            if (tasks != null) {
+                for (android.app.ActivityManager.RunningTaskInfo task : tasks) {
+                    if (task == null) continue;
+                    android.content.ComponentName top = task.topActivity;
+                    android.content.ComponentName base = task.baseActivity;
+                    String pkg = top != null ? top.getPackageName()
+                            : (base != null ? base.getPackageName() : null);
+                    if (pkg == null) continue;
+                    if (!getPackageName().equals(pkg)) sawForeignTask = true;
+                    boolean match = packageName.equals(pkg)
+                            || (knownTaskId >= 0 && task.id == knownTaskId);
+                    if (match) {
+                        return runningTaskIsVisible(task) ? 1 : 0;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "overlayTaskState failed", e);
+            return -1;
+        }
+        if (!sawForeignTask) return -1;
+        return 0;
+    }
+
+    private int overlayImportance(String packageName) {
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am == null) return -1;
+            List<android.app.ActivityManager.RunningAppProcessInfo> procs = am.getRunningAppProcesses();
+            if (procs == null || procs.isEmpty()) return -1;
+            boolean sawForeign = false;
+            for (android.app.ActivityManager.RunningAppProcessInfo proc : procs) {
+                if (proc.pkgList == null) continue;
+                for (String pkg : proc.pkgList) {
+                    if (pkg == null) continue;
+                    if (!getPackageName().equals(pkg)) sawForeign = true;
+                    if (packageName.equals(pkg)) {
+                        return proc.importance <= android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
+                                ? 1 : 0;
+                    }
+                }
+            }
+            if (!sawForeign) return -1;
+            return 0;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    /** 1 visible freeform, 0 gone/minimized, -1 dumpsys unavailable. */
+    private int overlayVisibleInDumpsys(String packageName) {
+        Process process = null;
+        try {
+            process = new ProcessBuilder("/system/bin/dumpsys", "activity", "activities")
+                    .redirectErrorStream(true)
+                    .start();
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream()), 8192);
+            StringBuilder sb = new StringBuilder();
+            String line;
+            long deadline = System.currentTimeMillis() + 900;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+                if (sb.length() > 350000 || System.currentTimeMillis() > deadline) break;
+            }
+            try { process.destroy(); } catch (Exception ignored) {}
+            String dump = sb.toString();
+            if (dump.length() < 40 || dump.contains("Permission Denial")) return -1;
+            boolean sawPkg = false;
+            int idx = 0;
+            while ((idx = dump.indexOf(packageName, idx)) >= 0) {
+                int from = Math.max(0, idx - 400);
+                int to = Math.min(dump.length(), idx + 600);
+                String chunk = dump.substring(from, to);
+                sawPkg = true;
+                if (chunk.contains("visible=true")) return 1;
+                idx += packageName.length();
+            }
+            if (!sawPkg) return -1;
+            return 0;
+        } catch (Exception e) {
+            Log.w(TAG, "dumpsys overlay probe failed", e);
+            return -1;
+        } finally {
+            if (process != null) {
+                try { process.destroy(); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private static boolean runningTaskIsVisible(android.app.ActivityManager.RunningTaskInfo task) {
+        try {
+            java.lang.reflect.Field field =
+                    android.app.ActivityManager.RunningTaskInfo.class.getField("isVisible");
+            Object value = field.get(task);
+            if (value instanceof Boolean) return (Boolean) value;
+        } catch (Exception ignored) {}
+        return true;
+    }
+
+    private void syncOverlaySlots() {
+        syncOverlaySlots(false);
+    }
+
+    private void syncOverlaySlots(boolean assumeUnknownGone) {
+        if (isOverlayLaunching()) return;
+        if (activePopupPackage != null && !activePopupPackage.isEmpty()) {
+            int state = overlayTaskState(activePopupPackage, activePopupTaskId);
+            if (state == 0 || (assumeUnknownGone && state < 0)) {
+                Log.i(TAG, "Left freeform gone/minimized: " + activePopupPackage + " state=" + state);
+                clearLeftSlot();
+            }
+        }
+        if (activeMediaPackage != null && !activeMediaPackage.isEmpty()) {
+            int state = overlayTaskState(activeMediaPackage, activeMediaTaskId);
+            if (state == 0 || (assumeUnknownGone && state < 0)) {
+                Log.i(TAG, "Right freeform gone/minimized: " + activeMediaPackage + " state=" + state);
+                clearRightSlot();
+            }
+        }
+    }
+
+    private void startOverlayWatchdog() {
+        mainHandler.removeCallbacks(overlayWatchdog);
+        mainHandler.postDelayed(overlayWatchdog, 700);
+    }
+
+    private void stopOverlayWatchdog() {
+        mainHandler.removeCallbacks(overlayWatchdog);
+    }
+
+    private void registerOverlayTaskListener() {
+        allowHiddenApis();
+        try {
+            Class<?> listenerClass = Class.forName("android.app.ITaskStackListener");
+            final java.lang.reflect.InvocationHandler handler = (proxy, method, args) -> {
+                String name = method.getName();
+                if ("onTaskStackChanged".equals(name)
+                        || "onTaskRemoved".equals(name)
+                        || "onTaskRemovalStarted".equals(name)
+                        || "onRecentTaskListUpdated".equals(name)
+                        || "onTaskMovedToFront".equals(name)
+                        || "onActivityUnpinned".equals(name)) {
+                    mainHandler.post(this::syncOverlaySlots);
+                }
+                Class<?> ret = method.getReturnType();
+                if (ret == boolean.class) return false;
+                if (ret == int.class) return 0;
+                if (ret == long.class) return 0L;
+                return null;
+            };
+            Object listener = java.lang.reflect.Proxy.newProxyInstance(
+                    listenerClass.getClassLoader(), new Class<?>[]{listenerClass}, handler);
+            boolean registered = false;
+            try {
+                android.app.ActivityManager am =
+                        (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                am.getClass().getMethod("registerTaskStackListener", listenerClass)
+                        .invoke(am, listener);
+                registered = true;
+            } catch (Exception ignored) {}
+            if (!registered) {
+                Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+                java.lang.reflect.Method getService = atmClass.getDeclaredMethod("getService");
+                getService.setAccessible(true);
+                Object service = getService.invoke(null);
+                service.getClass().getMethod("registerTaskStackListener", listenerClass)
+                        .invoke(service, listener);
+            }
+            taskStackListener = listener;
+            Log.i(TAG, "Registered TaskStackListener");
+        } catch (Throwable t) {
+            Log.w(TAG, "TaskStackListener unavailable", t);
+        }
+    }
+
+    private void unregisterOverlayTaskListener() {
+        if (taskStackListener == null) return;
+        try {
+            Class<?> listenerClass = Class.forName("android.app.ITaskStackListener");
+            try {
+                android.app.ActivityManager am =
+                        (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                am.getClass().getMethod("unregisterTaskStackListener", listenerClass)
+                        .invoke(am, taskStackListener);
+            } catch (Exception e) {
+                Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+                java.lang.reflect.Method getService = atmClass.getDeclaredMethod("getService");
+                getService.setAccessible(true);
+                Object service = getService.invoke(null);
+                service.getClass().getMethod("unregisterTaskStackListener", listenerClass)
+                        .invoke(service, taskStackListener);
+            }
+        } catch (Throwable ignored) {}
+        taskStackListener = null;
     }
 
     private void launchAppInLeftSlot(String packageName) {
@@ -379,37 +1207,83 @@ public final class MainActivity extends Activity {
 
             ensureFreeformSettings();
 
-            // Close the previous freeform window when switching apps.
-            if (activePopupPackage != null && !activePopupPackage.isEmpty()
-                    && !activePopupPackage.equals(packageName)) {
-                dismissPopup(activePopupPackage);
-            } else if (activePopupPackage != null && activePopupPackage.equals(packageName)) {
+            // One left-slot app at a time. Re-tap closes.
+            if (activePopupPackage != null && activePopupPackage.equals(packageName)) {
                 dismissPopup(packageName);
-            } else {
-                forceStopPackage(packageName);
+                return;
             }
+            if (activePopupPackage != null && !activePopupPackage.isEmpty()) {
+                dismissPopup(activePopupPackage);
+            }
+            closeExistingTasksForPackage(packageName);
 
             activePopupPackage = packageName;
             activePopupTaskId = -1;
-            setPopupControlsVisible(true);
+            activePopupComponent = resolve.getComponent();
+            markOverlayLaunch();
+            notifyViewerShellLayout();
 
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             intent.setComponent(resolve.getComponent());
             intent.setPackage(packageName);
             // Never use FLAG_ACTIVITY_LAUNCH_ADJACENT — forces split-screen on tablets/A12L+.
+            // No MULTIPLE_TASK/NEW_DOCUMENT: those spawn extra freeform windows.
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_MULTIPLE_TASK
-                    | Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    | Intent.FLAG_ACTIVITY_TASK_ON_HOME);
 
-            Bundle opts = buildWindowOptions(WINDOWING_MODE_FREEFORM, LEFT_POPUP_BOUNDS);
+            Bundle opts = buildWindowOptions(WINDOWING_MODE_FREEFORM, leftFreeformBounds());
             Log.i(TAG, "Freeform launch " + resolve.getComponent()
-                    + " bounds=" + LEFT_POPUP_BOUNDS
+                    + " bounds=" + leftFreeformBounds()
                     + " windowingMode=" + opts.getInt(KEY_LAUNCH_WINDOWING_MODE, -1));
             startActivity(intent, opts);
-            schedulePinPopupBounds(packageName);
+            schedulePinPopupBounds(packageName, resolve.getComponent(), leftFreeformBounds(), false);
         } catch (Exception e) {
             Log.e(TAG, "Error launching app in left slot " + packageName, e);
+        }
+    }
+
+    private void launchAppInRightSlot(String packageName) {
+        try {
+            if (packageName == null || packageName.isEmpty()) return;
+            PackageManager pm = getPackageManager();
+            Intent resolve = pm.getLaunchIntentForPackage(packageName);
+            if (resolve == null || resolve.getComponent() == null) return;
+
+            ensureFreeformSettings();
+
+            // Re-tap the same music app: dismiss only, return to idle now-playing.
+            if (packageName.equals(activeMediaPackage)) {
+                dismissMediaPopup(packageName);
+                return;
+            }
+            if (activeMediaPackage != null && !activeMediaPackage.isEmpty()) {
+                dismissMediaPopup(activeMediaPackage);
+            }
+            closeExistingTasksForPackage(packageName);
+
+            activeMediaPackage = packageName;
+            activeMediaTaskId = -1;
+            activeMediaComponent = resolve.getComponent();
+            markOverlayLaunch();
+            notifyViewerShellLayout();
+
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setComponent(resolve.getComponent());
+            intent.setPackage(packageName);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    | Intent.FLAG_ACTIVITY_TASK_ON_HOME);
+
+            Bundle opts = buildWindowOptions(WINDOWING_MODE_FREEFORM, rightFreeformBounds());
+            Log.i(TAG, "Media freeform launch " + resolve.getComponent()
+                    + " bounds=" + rightFreeformBounds());
+            startActivity(intent, opts);
+            schedulePinPopupBounds(packageName, resolve.getComponent(), rightFreeformBounds(), true);
+        } catch (Exception e) {
+            Log.e(TAG, "Error launching app in right slot " + packageName, e);
         }
     }
 
@@ -418,7 +1292,7 @@ public final class MainActivity extends Activity {
         String pkg = intent.getStringExtra(EXTRA_LAUNCH_FREEFORM);
         if (pkg != null && !pkg.isEmpty()) {
             intent.removeExtra(EXTRA_LAUNCH_FREEFORM);
-            launchAppInLeftSlot(pkg);
+            launchAppForPackage(pkg, "");
         }
     }
 
@@ -461,16 +1335,48 @@ public final class MainActivity extends Activity {
         removeTaskById(taskId);
         forceStopPackage(targetPkg);
 
-        if (targetPkg.equals(activePopupPackage)) {
-            activePopupPackage = "";
-            activePopupTaskId = -1;
-            setPopupControlsVisible(false);
+        if (targetPkg.equals(activePopupPackage)) clearLeftSlot();
+    }
+
+    private void clearLeftSlot() {
+        if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+        activePopupPackage = "";
+        activePopupTaskId = -1;
+        activePopupComponent = null;
+        notifyViewerShellLayout();
+    }
+
+    /** Close the right freeform window but keep playback (no force-stop). */
+    private void dismissMediaPopup(String packageName) {
+        String targetPkg = (packageName != null && !packageName.isEmpty())
+                ? packageName : activeMediaPackage;
+        if (targetPkg == null || targetPkg.isEmpty()) return;
+        if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
+
+        int taskId = activeMediaTaskId;
+        if (taskId < 0 || (packageName != null && !packageName.equals(activeMediaPackage))) {
+            taskId = findTaskIdForPackage(targetPkg);
         }
+        removeTaskById(taskId);
+
+        if (targetPkg.equals(activeMediaPackage)) clearRightSlot();
+    }
+
+    private void clearRightSlot() {
+        if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
+        activeMediaPackage = "";
+        activeMediaTaskId = -1;
+        activeMediaComponent = null;
+        notifyViewerShellLayout();
     }
 
     private void closePopupApp(String packageName) {
         try {
-            dismissPopup(packageName);
+            if (packageName != null && packageName.equals(activeMediaPackage)) {
+                dismissMediaPopup(packageName);
+            } else {
+                dismissPopup(packageName);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error closing app " + packageName, e);
         }
@@ -478,13 +1384,16 @@ public final class MainActivity extends Activity {
 
     private void maximizePopupApp(String packageName) {
         try {
+            boolean media = packageName != null && packageName.equals(activeMediaPackage);
             String targetPkg = (packageName != null && !packageName.isEmpty())
-                    ? packageName : activePopupPackage;
+                    ? packageName
+                    : (media ? activeMediaPackage : activePopupPackage);
             if (targetPkg == null || targetPkg.isEmpty()) return;
             Intent resolve = getPackageManager().getLaunchIntentForPackage(targetPkg);
             if (resolve == null || resolve.getComponent() == null) return;
 
             if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+            if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
 
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -497,13 +1406,22 @@ public final class MainActivity extends Activity {
             Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
             startActivity(intent, opts);
 
-            // If we know the task, also force-resize to fullscreen.
-            int taskId = activePopupTaskId >= 0 ? activePopupTaskId : findTaskIdForPackage(targetPkg);
+            int taskId = media
+                    ? (activeMediaTaskId >= 0 ? activeMediaTaskId : findTaskIdForPackage(targetPkg))
+                    : (activePopupTaskId >= 0 ? activePopupTaskId : findTaskIdForPackage(targetPkg));
             if (taskId >= 0) resizeTaskToBounds(taskId, FULLSCREEN_BOUNDS);
 
-            activePopupPackage = "";
-            activePopupTaskId = -1;
-            setPopupControlsVisible(false);
+            if (targetPkg.equals(activePopupPackage)) {
+                activePopupPackage = "";
+                activePopupTaskId = -1;
+                activePopupComponent = null;
+            }
+            if (targetPkg.equals(activeMediaPackage)) {
+                activeMediaPackage = "";
+                activeMediaTaskId = -1;
+                activeMediaComponent = null;
+            }
+            notifyViewerShellLayout();
         } catch (Exception e) {
             Log.e(TAG, "Error maximizing app " + packageName, e);
         }
@@ -540,6 +1458,7 @@ public final class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         webView.addJavascriptInterface(new TelemetryBridge(), "TelemetryBridge");
         webView.addJavascriptInterface(new AppLauncherBridge(), "AppLauncherBridge");
+        webView.addJavascriptInterface(new MediaBridge(), "MediaBridge");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -569,6 +1488,18 @@ public final class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 Log.i(TAG, "Page finished: " + url);
+                notifyViewerShellLayout();
+                // Media session starts when JS calls MediaBridge.onViewerReady()
+                // after the model loader clears (avoids stalling WebGL startup).
+                // Fallback if that signal never arrives:
+                mainHandler.postDelayed(() -> {
+                    try {
+                        mediaNowPlaying.start();
+                        mediaNowPlaying.pushNow();
+                    } catch (Throwable t) {
+                        Log.w(TAG, "mediaNowPlaying fallback start failed", t);
+                    }
+                }, 20000);
                 view.evaluateJavascript(
                         "JSON.stringify({ready:document.readyState,title:document.title," +
                                 "body:document.body&&document.body.innerText.slice(0,160)," +
@@ -601,7 +1532,7 @@ public final class MainActivity extends Activity {
             }
         });
 
-        FrameLayout rootLayout = new FrameLayout(this);
+        rootLayout = new FrameLayout(this);
         rootLayout.setLayoutParams(new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT));
@@ -611,11 +1542,27 @@ public final class MainActivity extends Activity {
 
         setupNativeLauncherUI(rootLayout);
 
+        mediaNowPlaying.attach(this, new MediaNowPlaying.Callback() {
+            @Override
+            public void onUpdate(org.json.JSONObject payload) {
+                notifyMediaNowPlaying(payload);
+            }
+
+            @Override
+            public void onPosition(long positionMs) {
+                notifyMediaPosition(positionMs);
+            }
+        });
+        // Defer session listen until after first paint so a broken MediaSession
+        // path cannot stall WebView startup / model loading.
+
         setContentView(rootLayout);
         if (savedInstanceState == null) webView.loadUrl(VIEWER_URL);
         else webView.restoreState(savedInstanceState);
 
         ensureFreeformSettings();
+        loadShellPrefs();
+        registerOverlayTaskListener();
         maybeLaunchFreeformFromIntent(getIntent());
     }
 
@@ -634,14 +1581,15 @@ public final class MainActivity extends Activity {
         int fadeLengthPx = Math.round(72 * density);
         int stripHeightPx = Math.round(110 * density);
 
-        // Full-width bottom icon strip (right side reserved later for media management)
-        FrameLayout stripContainer = new FrameLayout(this);
+        // Bottom icon strip — full width (media column sits above the dock band).
+        FrameLayout strip = new FrameLayout(this);
         FrameLayout.LayoutParams containerParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, stripHeightPx);
         containerParams.gravity = android.view.Gravity.BOTTOM;
         containerParams.bottomMargin = marginBottomPx;
-        stripContainer.setLayoutParams(containerParams);
-        stripContainer.setBackgroundColor(0x00000000);
+        strip.setLayoutParams(containerParams);
+        strip.setBackgroundColor(0x00000000);
+        stripContainer = strip;
 
         android.widget.HorizontalScrollView scrollView = new android.widget.HorizontalScrollView(this) {
             @Override
@@ -711,7 +1659,8 @@ public final class MainActivity extends Activity {
             itemLayout.addView(labelView);
 
             final String targetPkg = pkg;
-            itemLayout.setOnClickListener(v -> launchAppInLeftSlot(targetPkg));
+            final String targetLabel = labelStr;
+            itemLayout.setOnClickListener(v -> launchAppForPackage(targetPkg, targetLabel));
 
             iconsLayout.addView(itemLayout);
         }
@@ -728,68 +1677,37 @@ public final class MainActivity extends Activity {
             iconsLayout.setGravity(android.view.Gravity.CENTER);
         });
 
-        stripContainer.addView(scrollView, new FrameLayout.LayoutParams(
+        strip.addView(scrollView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
-        rootLayout.addView(stripContainer);
+        rootLayout.addView(strip);
 
-        // Maximize / Close controls for the active left freeform popup.
-        android.widget.LinearLayout controls = new android.widget.LinearLayout(this);
-        controls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        controls.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        controls.setPadding(Math.round(8 * density), Math.round(6 * density),
-                Math.round(8 * density), Math.round(6 * density));
-        controls.setBackgroundColor(0xCC10151C);
-        controls.setVisibility(View.GONE);
-
-        android.widget.Button btnMax = new android.widget.Button(this);
-        btnMax.setText("Maximize");
-        btnMax.setTextSize(11f);
-        btnMax.setAllCaps(false);
-        btnMax.setTextColor(0xFF4FD6E8);
-        btnMax.setBackgroundColor(0x334FD6E8);
-        btnMax.setPadding(Math.round(14 * density), Math.round(6 * density),
-                Math.round(14 * density), Math.round(6 * density));
-        btnMax.setOnClickListener(v -> maximizePopupApp(null));
-
-        android.widget.Button btnClose = new android.widget.Button(this);
-        btnClose.setText("Close");
-        btnClose.setTextSize(11f);
-        btnClose.setAllCaps(false);
-        btnClose.setTextColor(0xFFFFFFFF);
-        btnClose.setBackgroundColor(0x55FF5555);
-        btnClose.setPadding(Math.round(14 * density), Math.round(6 * density),
-                Math.round(14 * density), Math.round(6 * density));
-        android.widget.LinearLayout.LayoutParams closeLp = new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        closeLp.leftMargin = Math.round(8 * density);
-        btnClose.setLayoutParams(closeLp);
-        btnClose.setOnClickListener(v -> closePopupApp(null));
-
-        controls.addView(btnMax);
-        controls.addView(btnClose);
-
-        FrameLayout.LayoutParams controlsLp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        // Sit just above the freeform slot, aligned to its right edge.
-        controlsLp.leftMargin = Math.max(0, LEFT_POPUP_BOUNDS.right - Math.round(220 * density));
-        controlsLp.topMargin = Math.max(8, LEFT_POPUP_BOUNDS.top - Math.round(48 * density));
-        rootLayout.addView(controls, controlsLp);
-        popupControls = controls;
-
-        // Invisible anchor matching the freeform slot — used for clip-reveal launch placement.
+        // Invisible anchors matching freeform slots — used for clip-reveal launch placement.
+        // Keep them behind the WebView and non-interactive so they never steal touches
+        // from the media rail / orbit canvas.
         View anchor = new View(this);
         anchor.setBackgroundColor(0x00000000);
         anchor.setClickable(false);
         anchor.setFocusable(false);
+        anchor.setVisibility(View.INVISIBLE);
         FrameLayout.LayoutParams anchorLp = new FrameLayout.LayoutParams(
                 LEFT_POPUP_BOUNDS.width(), LEFT_POPUP_BOUNDS.height());
         anchorLp.leftMargin = LEFT_POPUP_BOUNDS.left;
         anchorLp.topMargin = LEFT_POPUP_BOUNDS.top;
-        rootLayout.addView(anchor, anchorLp);
+        rootLayout.addView(anchor, 0, anchorLp);
         launchAnchor = anchor;
+
+        View mediaAnchor = new View(this);
+        mediaAnchor.setBackgroundColor(0x00000000);
+        mediaAnchor.setClickable(false);
+        mediaAnchor.setFocusable(false);
+        mediaAnchor.setVisibility(View.INVISIBLE);
+        FrameLayout.LayoutParams mediaAnchorLp = new FrameLayout.LayoutParams(
+                RIGHT_APP_BOUNDS.width(), RIGHT_APP_BOUNDS.height());
+        mediaAnchorLp.leftMargin = RIGHT_APP_BOUNDS.left;
+        mediaAnchorLp.topMargin = RIGHT_APP_BOUNDS.top;
+        rootLayout.addView(mediaAnchor, 0, mediaAnchorLp);
+        mediaLaunchAnchor = mediaAnchor;
     }
 
     private static String mimeType(String path) {
@@ -830,7 +1748,59 @@ public final class MainActivity extends Activity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) enterImmersiveMode();
+        if (hasFocus) {
+            enterImmersiveMode();
+            if (hasOverlayWindow()) applyLauncherFocusPolicy();
+            syncOverlaySlots(false);
+        }
+    }
+
+    /**
+     * Best-effort always-on-top after a task exists. Do not startActivity here:
+     * that replays the freeform enter animation (slide up from the bottom).
+     */
+    private void keepOverlayTasksOnTop() {
+        if (!hasOverlayWindow()) return;
+        long now = android.os.SystemClock.uptimeMillis();
+        if (now - lastOverlayRaiseMs < 250) return;
+        lastOverlayRaiseMs = now;
+        pinOverlayAlwaysOnTop(activePopupPackage, activePopupTaskId, false);
+        pinOverlayAlwaysOnTop(activeMediaPackage, activeMediaTaskId, true);
+    }
+
+    private void pinOverlayAlwaysOnTop(String packageName, int knownTaskId, boolean rightSlot) {
+        if (packageName == null || packageName.isEmpty()) return;
+        int taskId = knownTaskId >= 0 ? knownTaskId : findTaskIdForPackage(packageName);
+        if (taskId < 0) return;
+        if (rightSlot) activeMediaTaskId = taskId;
+        else activePopupTaskId = taskId;
+        setTaskAlwaysOnTop(taskId, true);
+    }
+
+    private void setTaskAlwaysOnTop(int taskId, boolean alwaysOnTop) {
+        if (taskId < 0) return;
+        allowHiddenApis();
+        try {
+            Class<?> atmClass = Class.forName("android.app.ActivityTaskManager");
+            java.lang.reflect.Method getService = atmClass.getDeclaredMethod("getService");
+            getService.setAccessible(true);
+            Object service = getService.invoke(null);
+            java.lang.reflect.Method m = null;
+            for (java.lang.reflect.Method cand : service.getClass().getMethods()) {
+                if (!"setTaskAlwaysOnTop".equals(cand.getName())) continue;
+                Class<?>[] p = cand.getParameterTypes();
+                if (p.length == 2 && p[0] == int.class && p[1] == boolean.class) {
+                    m = cand;
+                    break;
+                }
+            }
+            if (m != null) {
+                m.invoke(service, taskId, alwaysOnTop);
+                Log.i(TAG, "setTaskAlwaysOnTop task=" + taskId + " " + alwaysOnTop);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "ATM.setTaskAlwaysOnTop failed for " + taskId, e);
+        }
     }
 
     @Override
@@ -855,7 +1825,8 @@ public final class MainActivity extends Activity {
         try {
             unregisterReceiver(telemetryReceiver);
         } catch (Exception ignored) {}
-        webView.onPause();
+        // Keep the 3D surface alive while a freeform slot has focus.
+        if (!hasOverlayWindow()) webView.onPause();
         super.onPause();
     }
 
@@ -868,11 +1839,31 @@ public final class MainActivity extends Activity {
         } catch (Exception ignored) {}
         webView.onResume();
         enterImmersiveMode();
+        mediaNowPlaying.start();
+        notifyViewerShellLayout();
+        keepOverlayTasksOnTop();
+        syncOverlaySlots(false);
+        mainHandler.postDelayed(() -> syncOverlaySlots(true), 500);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (isChangingConfigurations() || isOverlayLaunching()) return;
+        View decor = getWindow() != null ? getWindow().getDecorView() : null;
+        // Freeform on top keeps our window visible. A fullscreen app covering
+        // the MMI hides it — that's when we close both slots.
+        if (decor != null && decor.getWindowVisibility() == View.VISIBLE) return;
+        dismissAllOverlays();
     }
 
     @Override
     protected void onDestroy() {
+        stopOverlayWatchdog();
+        unregisterOverlayTaskListener();
+        mediaNowPlaying.stop();
         if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+        if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
         try {
             unregisterReceiver(telemetryReceiver);
         } catch (Exception ignored) {}

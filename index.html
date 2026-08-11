@@ -71,13 +71,13 @@
     }
     .hv-tool-children {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       align-items: stretch;
       gap: 8px;
-      flex-wrap: wrap;
     }
     .hv-toolbar::-webkit-scrollbar { display: none; }
     .hv-toolbar button.hv-tool-btn {
+      display: inline-flex !important;
       width: 58px !important;
       min-width: 58px !important;
       height: auto !important;
@@ -90,6 +90,7 @@
       justify-content: center !important;
       gap: 4px !important;
       box-sizing: border-box;
+      text-align: center;
     }
     .hv-toolbar button.hv-tool-btn.hv-tool-btn-text {
       gap: 0 !important;
@@ -103,13 +104,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 22px;
+      width: 100%;
       height: 22px;
       line-height: 1;
       font-family: 'Space Mono', monospace;
       font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.02em;
+      text-align: center;
     }
     .hv-toolbar button.hv-tool-btn .hv-tool-icon svg {
       width: 20px !important;
@@ -117,6 +119,8 @@
       display: block;
     }
     .hv-toolbar button.hv-tool-btn .hv-tool-label {
+      display: block;
+      width: 100%;
       font-family: 'Space Mono', monospace;
       font-size: 8px;
       font-weight: 600;
@@ -124,6 +128,7 @@
       line-height: 1.1;
       opacity: 0.85;
       white-space: nowrap;
+      text-align: center;
       pointer-events: none;
     }
     .hv-config-panel {
@@ -161,21 +166,558 @@
       .hv-toolbar button.hv-tool-btn { width: 54px !important; min-width: 54px !important; }
       .hv-config-panel { top: 22px !important; right: 14px !important; max-height: calc(100vh - 182px); height: auto; }
     }
+    .hv-widget-board {
+      position: absolute;
+      z-index: 20;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 0;
+      pointer-events: auto;
+      color: #eaf2f8;
+    }
+    .hv-widget-toolbar {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .hv-widget-chip {
+      height: 26px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(16,21,28,.72);
+      color: rgba(234,242,248,.75);
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .1em;
+      cursor: pointer;
+    }
+    .hv-widget-chip.on { border-color: #4fd6e8; color: #4fd6e8; background: rgba(79,214,232,.16); }
+    .hv-widget-add {
+      width: 26px; height: 26px; margin-left: auto;
+      border-radius: 8px;
+      border: 1px solid rgba(79,214,232,.35);
+      background: rgba(16,21,28,.72);
+      color: #4fd6e8;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .hv-widget-grid {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      gap: 8px;
+    }
+    .hv-widget-card {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(16, 21, 28, 0.42);
+      backdrop-filter: blur(22px) saturate(1.25);
+      -webkit-backdrop-filter: blur(22px) saturate(1.25);
+      box-shadow: 0 14px 40px rgba(0,0,0,.22);
+    }
+    .hv-widget-remove {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 4;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(8,12,18,.7);
+      color: #eaf2f8;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .hv-widget-stub {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 14px;
+      box-sizing: border-box;
+    }
+    .hv-widget-stub-kicker {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .16em;
+      opacity: .55;
+    }
+    .hv-widget-stub-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .hv-widget-stub-hint { font-size: 11px; opacity: .45; margin-top: 6px; }
+    .hv-widget-cell {
+      border-radius: 10px;
+      border: 1px dashed rgba(79,214,232,.28);
+      background: rgba(16,21,28,.18);
+      cursor: pointer;
+    }
+    .hv-widget-cell.on { border-style: solid; border-color: #4fd6e8; background: rgba(79,214,232,.16); }
+    .hv-widget-picker {
+      position: absolute;
+      z-index: 50;
+      top: 96px;
+      left: 30px;
+      min-width: 240px;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(16,21,28,.94);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 14px 36px rgba(0,0,0,.45);
+    }
+    .hv-widget-picker button {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: transparent;
+      color: #eaf2f8;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .08em;
+      cursor: pointer;
+    }
+    .hv-widget-picker button:disabled { opacity: .35; cursor: default; }
+    .hv-media-rail {
+      position: absolute;
+      inset: 0;
+      width: auto;
+      height: auto;
+      z-index: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      color: #eaf2f8;
+      user-select: none;
+      pointer-events: auto;
+    }
+    .hv-media-art-wrap {
+      position: absolute;
+      inset: 0;
+      width: auto;
+      height: auto;
+      margin: 0;
+      border-radius: 0;
+      overflow: hidden;
+      background: rgba(255,255,255,.04);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 0;
+    }
+    .hv-media-art-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .hv-media-source {
+      position: absolute;
+      top: 14px;
+      left: 18px;
+      right: 18px;
+      z-index: 2;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      opacity: .7;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 8px rgba(0,0,0,.55);
+      pointer-events: none;
+    }
+    .hv-media-chrome {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 28px 14px 12px;
+      background: linear-gradient(
+        to top,
+        rgba(8, 12, 18, 0.92) 0%,
+        rgba(8, 12, 18, 0.72) 42%,
+        rgba(8, 12, 18, 0.28) 78%,
+        rgba(8, 12, 18, 0) 100%
+      );
+      box-shadow: 0 -28px 48px rgba(0, 0, 0, 0.45);
+    }
+    .hv-media-title {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      line-height: 1.2;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 10px rgba(0,0,0,.5);
+    }
+    .hv-media-artist {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: .06em;
+      opacity: .7;
+      text-align: left;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 8px rgba(0,0,0,.45);
+    }
+    .hv-media-progress {
+      height: 4px;
+      margin: 8px 0 6px;
+      background: rgba(255,255,255,.22);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .hv-media-progress > span {
+      display: block;
+      height: 100%;
+      background: #4fd6e8;
+      border-radius: 4px;
+      width: 0;
+      box-shadow: 0 0 8px rgba(79,214,232,.45);
+    }
+    .hv-media-times {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .08em;
+      opacity: .65;
+      margin: 0 0 8px;
+    }
+    .hv-media-transport {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      margin-top: 0;
+      padding-bottom: 2px;
+    }
+    .hv-media-transport button {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: 1px solid rgba(79,214,232,.35);
+      background: rgba(16, 21, 28, 0.55);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #eaf2f8;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      box-shadow: 0 6px 18px rgba(0,0,0,.35);
+      pointer-events: auto;
+    }
+    .hv-media-transport button.hv-media-play {
+      width: 60px;
+      height: 60px;
+      background: rgba(79,214,232,.22);
+      border-color: #4fd6e8;
+      color: #4fd6e8;
+      box-shadow: 0 8px 22px rgba(0,0,0,.4), 0 0 16px rgba(79,214,232,.2);
+    }
+    .hv-media-transport button:active { transform: scale(0.96); }
+    .hv-brand {
+      position: absolute;
+      top: 22px;
+      left: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      z-index: 24;
+      pointer-events: none;
+      user-select: none;
+    }
+    .hv-brand-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      margin-top: 2px;
+    }
+    .hv-shell-hud {
+      pointer-events: auto;
+      position: absolute;
+      top: 0;
+      left: 168px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .hv-shell-btns { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+    .hv-shell-btn {
+      width: 58px; height: 58px;
+      min-width: 58px;
+      border-radius: 12px;
+      border: 1px solid rgba(79,214,232,.28);
+      background: rgba(16,21,28,.82);
+      color: #eaf2f8;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      box-shadow: 0 4px 18px rgba(0,0,0,.32);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .hv-shell-btn.on { border-color: #4fd6e8; background: rgba(79,214,232,.18); color: #4fd6e8; }
+    .hv-shell-glyph { display: flex; align-items: center; gap: 3px; height: 22px; }
+    .hv-shell-glyph i {
+      display: block; height: 18px; border-radius: 2px;
+      background: currentColor; opacity: .85;
+    }
+    .hv-shell-glyph .g-app { width: 8px; }
+    .hv-shell-glyph .g-car { width: 14px; height: 12px; border-radius: 3px; opacity: .55; }
+    .hv-shell-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px;
+      border-radius: 12px;
+      background: rgba(16,21,28,.94);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 14px 36px rgba(0,0,0,.45);
+      white-space: nowrap;
+    }
+    .hv-shell-opt {
+      display: flex; align-items: center; gap: 10px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: transparent;
+      color: #eaf2f8;
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .08em;
+    }
+    .hv-shell-opt.on { border-color: #4fd6e8; background: rgba(79,214,232,.12); color: #4fd6e8; }
+    .hv-side-btn {
+      width: 58px;
+      font-family: 'Space Mono', monospace;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: .1em;
+    }
   </style>
 </helmet>
 <div ref="{{ outerRef }}" style="position: fixed; inset: 0; background: radial-gradient(130% 120% at 50% 38%, #efefef 0%, #dcdee0 78%, #cfd1d4 100%); font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease;">
 
   <div ref="{{ containerRef }}" style="position: absolute; inset: 0;"></div>
 
-  <!-- top-left model label -->
-  <div style="position: absolute; top: 26px; left: 30px; color: {{ labelColor }}; pointer-events: none; user-select: none; transition: color 0.6s ease;">
+  <!-- top-left model label + shell layout -->
+  <div class="hv-brand" style="color: {{ labelColor }}; transition: color 0.6s ease;">
     <div style="font-size: 11px; letter-spacing: .42em; font-weight: 600; opacity: .55;">HAVAL</div>
-    <div style="font-size: 30px; font-weight: 600; letter-spacing: .04em; line-height: 1.05; margin-top: 2px;">H6</div>
+    <div class="hv-brand-row">
+      <div style="font-size: 30px; font-weight: 600; letter-spacing: .04em; line-height: 1.05;">H6</div>
+    </div>
+    <div class="hv-shell-hud" style="display: {{ shellHudDisplay }};">
+      <div class="hv-shell-btns">
+        <button type="button" class="hv-shell-btn {{ shellModeBtnClass }}" onClick="{{ toggleShellMenu }}" title="Layout">
+          <span class="hv-shell-glyph" style="color:#4fd6e8; display: {{ shellGlyphTripleDisplay }};"><i class="g-app"></i><i class="g-car"></i><i class="g-app"></i></span>
+          <span class="hv-shell-glyph" style="color:#4fd6e8; display: {{ shellGlyphAppCarDisplay }};"><i class="g-app"></i><i class="g-car"></i></span>
+          <span class="hv-shell-glyph" style="color:#4fd6e8; display: {{ shellGlyphAppsDisplay }};"><i class="g-app"></i><i class="g-app"></i></span>
+        </button>
+        <button type="button" class="hv-shell-btn hv-side-btn {{ shellLeftBtnClass }}" style="display: {{ shellSideBtnsDisplay }};" onClick="{{ setLaunchSideLeft }}" title="Open apps on the left">L</button>
+        <button type="button" class="hv-shell-btn hv-side-btn {{ shellRightBtnClass }}" style="display: {{ shellSideBtnsDisplay }};" onClick="{{ setLaunchSideRight }}" title="Open apps on the right">R</button>
+      </div>
+      <div class="hv-shell-menu" style="display: {{ shellMenuDisplay }};">
+        <button type="button" class="hv-shell-opt {{ shellOptTripleClass }}" onClick="{{ setShellTriple }}">
+          <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-car"></i><i class="g-app"></i></span>
+          APP + CAR + APP
+        </button>
+        <button type="button" class="hv-shell-opt {{ shellOptAppCarClass }}" onClick="{{ setShellAppCar }}">
+          <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-car"></i></span>
+          APP + CAR
+        </button>
+        <button type="button" class="hv-shell-opt {{ shellOptAppsClass }}" onClick="{{ setShellApps }}">
+          <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-app"></i></span>
+          APP + APP
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- bottom hint -->
   <div style="position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .14em; color: {{ hintColor }}; pointer-events: none; user-select: none; transition: opacity .6s ease, color 0.6s ease; opacity: {{ hintOpacity }};">
     DRAG TO ORBIT &nbsp;·&nbsp; SCROLL TO ZOOM &nbsp;·&nbsp; RIGHT-DRAG TO PAN
+  </div>
+
+  <!-- widget boards occupy the same rects as freeform app slots -->
+  <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};">
+    <div class="hv-widget-toolbar">
+      <button type="button" class="hv-widget-chip {{ leftUseAppClass }}" onClick="{{ setLeftSlotApp }}">APP</button>
+      <button type="button" class="hv-widget-chip {{ leftUseWidClass }}" onClick="{{ setLeftSlotWidgets }}">WIDGETS</button>
+      <button type="button" class="hv-widget-add" onClick="{{ addWidgetLeft }}" title="Add widget">+</button>
+    </div>
+    <div class="hv-widget-grid" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);">
+      <sc-for list="{{ leftPlaceCells }}" as="pc" hint-placeholder-count="0">
+        <button type="button" class="hv-widget-cell {{ pc.cls }}" style="{{ pc.gridStyle }}" onClick="{{ pc.onClick }}"></button>
+      </sc-for>
+      <sc-for list="{{ leftWidgetItems }}" as="wg" hint-placeholder-count="0">
+        <div class="hv-widget-card" style="{{ wg.gridStyle }}">
+          <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
+          <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-media-rail" style="opacity: {{ mediaRailOpacity }};">
+              <div class="hv-media-art-wrap">
+                <sc-if value="{{ mediaHasArt }}" hint-placeholder-val="{{ false }}">
+                  <img src="{{ mediaArt }}" alt="">
+                </sc-if>
+                <sc-if value="{{ mediaShowPlaceholder }}" hint-placeholder-val="{{ true }}">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(79,214,232,.45)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="6.5" cy="17.5" r="2.5"></circle>
+                    <circle cx="17.5" cy="15.5" r="2.5"></circle>
+                    <path d="M9 17.5V6l11-2v11.5"></path>
+                  </svg>
+                </sc-if>
+              </div>
+              <div class="hv-media-source">{{ mediaAppLabel }}</div>
+              <div class="hv-media-chrome">
+                <div class="hv-media-title">{{ mediaTitle }}</div>
+                <div class="hv-media-artist">{{ mediaArtist }}</div>
+                <div class="hv-media-progress"><span id="hv-media-progress-fill" style="width: {{ mediaProgressWidth }};"></span></div>
+                <div class="hv-media-times"><span id="hv-media-time-cur">{{ mediaTimeCur }}</span><span id="hv-media-time-dur">{{ mediaTimeDur }}</span></div>
+                <div class="hv-media-transport" style="pointer-events: {{ mediaTransportEvents }}; opacity: {{ mediaTransportOpacity }};">
+                  <button type="button" onClick="{{ mediaPrev }}" title="Previous">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg>
+                  </button>
+                  <button type="button" class="hv-media-play" onClick="{{ mediaPlayPause }}" title="Play/Pause">
+                    <sc-if value="{{ mediaPlaying }}" hint-placeholder-val="{{ false }}">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"></path></svg>
+                    </sc-if>
+                    <sc-if value="{{ mediaShowPlay }}" hint-placeholder-val="{{ true }}">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"></path></svg>
+                    </sc-if>
+                  </button>
+                  <button type="button" onClick="{{ mediaNext }}" title="Next">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ wg.isStub }}" hint-placeholder-val="{{ true }}">
+            <div class="hv-widget-stub">
+              <div class="hv-widget-stub-kicker">{{ wg.label }}</div>
+              <div class="hv-widget-stub-title">{{ wg.stubTitle }}</div>
+              <div class="hv-widget-stub-hint">{{ wg.stubHint }}</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div class="hv-widget-board" style="display: {{ rightBoardDisplay }}; left: {{ rightBoardLeft }}; top: {{ rightBoardTop }}; width: {{ rightBoardWidth }}; height: {{ rightBoardHeight }};">
+    <div class="hv-widget-toolbar">
+      <button type="button" class="hv-widget-chip {{ rightUseAppClass }}" onClick="{{ setRightSlotApp }}">APP</button>
+      <button type="button" class="hv-widget-chip {{ rightUseWidClass }}" onClick="{{ setRightSlotWidgets }}">WIDGETS</button>
+      <button type="button" class="hv-widget-add" onClick="{{ addWidgetRight }}" title="Add widget">+</button>
+    </div>
+    <div class="hv-widget-grid" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);">
+      <sc-for list="{{ rightPlaceCells }}" as="pc" hint-placeholder-count="0">
+        <button type="button" class="hv-widget-cell {{ pc.cls }}" style="{{ pc.gridStyle }}" onClick="{{ pc.onClick }}"></button>
+      </sc-for>
+      <sc-for list="{{ rightWidgetItems }}" as="wg" hint-placeholder-count="0">
+        <div class="hv-widget-card" style="{{ wg.gridStyle }}">
+          <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
+          <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-media-rail" style="opacity: {{ mediaRailOpacity }};">
+              <div class="hv-media-art-wrap">
+                <sc-if value="{{ mediaHasArt }}" hint-placeholder-val="{{ false }}">
+                  <img src="{{ mediaArt }}" alt="">
+                </sc-if>
+                <sc-if value="{{ mediaShowPlaceholder }}" hint-placeholder-val="{{ true }}">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(79,214,232,.45)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="6.5" cy="17.5" r="2.5"></circle>
+                    <circle cx="17.5" cy="15.5" r="2.5"></circle>
+                    <path d="M9 17.5V6l11-2v11.5"></path>
+                  </svg>
+                </sc-if>
+              </div>
+              <div class="hv-media-source">{{ mediaAppLabel }}</div>
+              <div class="hv-media-chrome">
+                <div class="hv-media-title">{{ mediaTitle }}</div>
+                <div class="hv-media-artist">{{ mediaArtist }}</div>
+                <div class="hv-media-progress"><span style="width: {{ mediaProgressWidth }};"></span></div>
+                <div class="hv-media-times"><span>{{ mediaTimeCur }}</span><span>{{ mediaTimeDur }}</span></div>
+                <div class="hv-media-transport" style="pointer-events: {{ mediaTransportEvents }}; opacity: {{ mediaTransportOpacity }};">
+                  <button type="button" onClick="{{ mediaPrev }}" title="Previous">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg>
+                  </button>
+                  <button type="button" class="hv-media-play" onClick="{{ mediaPlayPause }}" title="Play/Pause">
+                    <sc-if value="{{ mediaPlaying }}" hint-placeholder-val="{{ false }}">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"></path></svg>
+                    </sc-if>
+                    <sc-if value="{{ mediaShowPlay }}" hint-placeholder-val="{{ true }}">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"></path></svg>
+                    </sc-if>
+                  </button>
+                  <button type="button" onClick="{{ mediaNext }}" title="Next">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ wg.isStub }}" hint-placeholder-val="{{ true }}">
+            <div class="hv-widget-stub">
+              <div class="hv-widget-stub-kicker">{{ wg.label }}</div>
+              <div class="hv-widget-stub-title">{{ wg.stubTitle }}</div>
+              <div class="hv-widget-stub-hint">{{ wg.stubHint }}</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div class="hv-widget-picker" style="display: {{ widgetPickerDisplay }};">
+    <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.14em;opacity:.55;padding:2px 4px 6px;">{{ widgetPickerTitle }}</div>
+    <sc-for list="{{ widgetPickerItems }}" as="pi" hint-placeholder-count="0">
+      <button type="button" onClick="{{ pi.onClick }}" style="opacity: {{ pi.opacity }};">{{ pi.label }}</button>
+    </sc-for>
   </div>
 
   <!-- cyan accent corner ticks -->
@@ -245,6 +787,10 @@
           <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span>
           <span class="hv-tool-label">ENV</span>
         </button>
+        <button class="hv-tool-btn" onClick="{{ openSectionCamera }}" title="Camera" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabCameraBorder }}; color: {{ tabCameraCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+          <span class="hv-tool-label">CAM</span>
+        </button>
         <button class="hv-tool-btn" onClick="{{ toggleFpsHud }}" title="{{ fpsTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ fpsBtnBorder }}; color: {{ fpsBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
           <span class="hv-tool-icon">FPS</span>
           <span class="hv-tool-label">FPS</span>
@@ -291,7 +837,7 @@
   </div>
 
   <!-- configure panel on the right -->
-  <div class="hv-config-panel slim-scrollbar" style="position: absolute; top: 22px; right: 26px; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; height: auto; max-height: calc(100vh - 182px); overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 11;">
+  <div class="hv-config-panel slim-scrollbar" style="position: absolute; top: 22px; right: {{ configPanelRight }}; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; height: auto; max-height: calc(100vh - 182px); overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 11;">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div style="font-size: 12px; letter-spacing: .3em; opacity: .55; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ configHeaderTitle }}</div>
@@ -306,6 +852,17 @@
           <button onClick="{{ sw.onClick }}" title="{{ sw.title }}" style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; background: {{ sw.hex }}; border: 2px solid {{ sw.ring }}; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: border-color .15s ease;"></button>
         </sc-for>
       </div>
+    </sc-if>
+
+    <!-- ── CAMERA TAB ── -->
+    <sc-if value="{{ sectionIsCamera }}" hint-placeholder-val="{{ false }}">
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CAMERA</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+        <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="6">
+          <button onClick="{{ cp.onClick }}" title="{{ cp.title }}" style="padding: 10px 6px; border-radius: 7px; border: 1px solid {{ cp.border }}; background: {{ cp.bg }}; color: {{ cp.col }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; font-weight: 600; line-height: 1.35; text-align: center;">{{ cp.label }}</button>
+        </sc-for>
+      </div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 4px;">Orbit drag still works after a preset settles.</div>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -610,10 +1167,11 @@
 class Component extends DCLogic {
   state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, saveFlash: false,
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
-    configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env'
+    configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
     overrideSubTab: 'model', // 'model' | 'motion' | 'doors' | 'lights'
-    activeGroup: null, // 'tuning' | 'override' | 'env' | 'time' | null — which top-level section owns the submenu
+    cameraPreset: null, // null | 'front' | 'side' | 'frontSide' | 'frontTopSide' | 'rearTopSide' | 'rearSide' | 'home'
+    activeGroup: null, // 'tuning' | 'override' | 'env' | 'camera' | 'time' | null — which top-level section owns the submenu
     modelVariant: 'hev',
     motionSpeed: 0,
     wheelAngle: 0,
@@ -647,7 +1205,32 @@ class Component extends DCLogic {
     doorFROpen: 0,
     doorRLOpen: 0,
     doorRROpen: 0,
-    trunkOpen: 0
+    trunkOpen: 0,
+    mediaColumnVisible: false,
+    mediaRight: false,
+    mediaLeftOpen: false,
+    mediaTitle: '',
+    mediaArtist: '',
+    mediaAlbum: '',
+    mediaPlaying: false,
+    mediaDurationMs: 0,
+    mediaPositionMs: 0,
+    mediaAppLabel: '',
+    mediaArt: '',
+    mediaHasTrack: false,
+    shellMode: 'triple',
+    launchSide: 'auto',
+    nextLaunchSide: 'left',
+    lastLaunchSide: null,
+    shellMenuOpen: false,
+    leftSlotUse: 'app',
+    rightSlotUse: 'app',
+    widgetRev: 0,
+    widgetPickerStep: null,
+    widgetPlaceSide: null,
+    widgetPlaceType: null,
+    widgetPlaceW: 0,
+    widgetPlaceH: 0
   };
 
   constructor(props) {
@@ -708,6 +1291,21 @@ class Component extends DCLogic {
     try { const sr = localStorage.getItem('h6_rearGlassTweaks'); if (sr) this.state.rearGlassTweaks = { ...this.state.rearGlassTweaks, ...JSON.parse(sr) }; } catch(e) {}
     this._loadSavedSettingsIntoState();
     this._wireCarTelemetry();
+    try {
+      const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
+      const qs = parse(location.search), hs = parse(location.hash);
+      this._androidApp = qs.has('android') || hs.has('android');
+    } catch (e) {
+      this._androidApp = false;
+    }
+    this._shellLeft = false;
+    this._shellRight = this._androidApp ? 'idle' : false;
+    if (this._androidApp) {
+      this.state.mediaColumnVisible = true;
+      this.state.mediaRight = 'idle';
+    }
+    this._pendingMediaPayload = null;
+    this._loadSafetyTimer = null;
   }
 
   _settingsStorageKey() { return 'h6_settings_v1'; }
@@ -801,6 +1399,8 @@ class Component extends DCLogic {
       patch.tuningSubTab = section;
     } else if (section === 'env') {
       patch.activeGroup = 'env';
+    } else if (section === 'camera') {
+      patch.activeGroup = 'camera';
     } else if (section === 'override') {
       patch.activeGroup = 'override';
     }
@@ -810,15 +1410,30 @@ class Component extends DCLogic {
 
   toggleConfigRail() {
     if (this.state.configExpanded) {
-      this.setState({ configExpanded: false, panelOpen: false, activeGroup: null });
+      // Closing config — restore the media rail on Android.
+      const patch = { configExpanded: false, panelOpen: false, activeGroup: null };
+      if (this._androidApp && this.state.shellMode !== 'appsOnly') {
+        patch.mediaColumnVisible = true;
+        patch.mediaRight = this._shellRight || 'idle';
+      }
+      this.setState(patch);
+      this._applyFitCamera();
     } else {
+      // Opening config — hide media widget and dismiss any right-slot music app.
       this.setState({
         configExpanded: true,
         panelOpen: true,
         activeGroup: 'tuning',
         configSection: 'paint',
         tuningSubTab: 'paint',
+        mediaColumnVisible: false,
       });
+      try {
+        if (window.MediaBridge && typeof window.MediaBridge.dismissSlot === 'function') {
+          window.MediaBridge.dismissSlot();
+        }
+      } catch (e) {}
+      this._applyFitCamera();
     }
   }
 
@@ -988,16 +1603,73 @@ class Component extends DCLogic {
       errorMsg: s.error || '',
       progressText: s.processing ? 'PROCESSING…' : (Math.round(s.progress) + '%'),
       progressWidth: s.progress + '%',
-      hintOpacity: s.loading ? '0' : '0.85',
+      hintOpacity: (s.loading || this._androidApp) ? '0' : '0.85',
       panelDisplay: s.loading || s.error ? 'none' : 'block',
       panelOpen: s.panelOpen,
       panelBodyDisplay: (!s.loading && !s.error && s.panelOpen && s.configExpanded) ? 'block' : 'none',
       panelWidth: '248px',
       panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
       dayNightDisplay: (!s.loading && !s.error) ? 'flex' : 'none',
-      // Dock left of the details panel when open; otherwise park top-right.
+      // CONFIG stays top-right; opening it hides the media column (no inset).
       toolbarTop: '22px',
-      toolbarRight: (s.panelOpen && s.configExpanded) ? '286px' : '26px',
+      toolbarRight: ((s.panelOpen && s.configExpanded) ? 286 : 26) + 'px',
+      configPanelRight: '26px',
+      mediaRailDisplay: 'none',
+      shellHudDisplay: (!s.error && this._androidApp) ? 'flex' : 'none',
+      shellMenuDisplay: s.shellMenuOpen ? 'flex' : 'none',
+      shellModeBtnClass: s.shellMenuOpen ? 'on' : '',
+      shellSideBtnsDisplay: (s.shellMode === 'triple' || s.shellMode === 'appsOnly') ? 'inline-flex' : 'none',
+      // Locked L/R wins; in auto, highlight the side that just received an app
+      // (lastLaunchSide), else the upcoming round-robin side.
+      shellLeftBtnClass: (s.launchSide === 'left' || (s.launchSide === 'auto' && (s.lastLaunchSide || s.nextLaunchSide) === 'left')) ? 'on' : '',
+      shellRightBtnClass: (s.launchSide === 'right' || (s.launchSide === 'auto' && (s.lastLaunchSide || s.nextLaunchSide) === 'right')) ? 'on' : '',
+      shellOptTripleClass: s.shellMode === 'triple' ? 'on' : '',
+      shellOptAppCarClass: s.shellMode === 'appCar' ? 'on' : '',
+      shellOptAppsClass: s.shellMode === 'appsOnly' ? 'on' : '',
+      shellGlyphTripleDisplay: s.shellMode === 'triple' ? 'flex' : 'none',
+      shellGlyphAppCarDisplay: s.shellMode === 'appCar' ? 'flex' : 'none',
+      shellGlyphAppsDisplay: s.shellMode === 'appsOnly' ? 'flex' : 'none',
+      toggleShellMenu: () => {
+        const opening = !this.state.shellMenuOpen;
+        if (opening) {
+          // Freeform windows sit above the WebView — dismiss them so the menu is visible.
+          try {
+            if (window.AppLauncherBridge && typeof window.AppLauncherBridge.dismissOverlays === 'function') {
+              window.AppLauncherBridge.dismissOverlays();
+            }
+          } catch (e) {}
+        }
+        this.setState({ shellMenuOpen: opening });
+      },
+      setShellTriple: () => this._setShellMode('triple'),
+      setShellAppCar: () => this._setShellMode('appCar'),
+      setShellApps: () => this._setShellMode('appsOnly'),
+      setLaunchSideLeft: () => this._setLaunchSide('left'),
+      setLaunchSideRight: () => this._setLaunchSide('right'),
+      ...this._widgetRenderFields(s),
+      mediaRailOpacity: s.mediaHasTrack ? '1' : '0.92',
+      mediaHasArt: !!(s.mediaArt && s.mediaHasTrack),
+      mediaShowPlaceholder: !(s.mediaArt && s.mediaHasTrack),
+      mediaTitle: s.mediaHasTrack
+        ? (s.mediaTitle || 'Unknown')
+        : (s.mediaNeedsListener ? 'Notification access required' : 'Nothing playing'),
+      mediaArtist: s.mediaHasTrack
+        ? (s.mediaArtist || '')
+        : (s.mediaNeedsListener ? 'Enable H6 3D in Notification access' : ''),
+      mediaAppLabel: s.mediaAppLabel || 'MEDIA',
+      mediaArt: s.mediaArt || '',
+      mediaPlaying: !!s.mediaPlaying,
+      mediaShowPlay: !s.mediaPlaying,
+      mediaProgressWidth: (s.mediaDurationMs > 0)
+        ? Math.min(100, Math.max(0, ((this._mediaPositionMs != null ? this._mediaPositionMs : s.mediaPositionMs) / s.mediaDurationMs) * 100)) + '%'
+        : '0%',
+      mediaTimeCur: this._fmtMediaTime(this._mediaPositionMs != null ? this._mediaPositionMs : s.mediaPositionMs),
+      mediaTimeDur: this._fmtMediaTime(s.mediaDurationMs),
+      mediaTransportEvents: s.mediaHasTrack ? 'auto' : 'none',
+      mediaTransportOpacity: s.mediaHasTrack ? '1' : '0.35',
+      mediaPrev: () => this._mediaTransport('prev'),
+      mediaPlayPause: () => this._mediaTransport('playPause'),
+      mediaNext: () => this._mediaTransport('next'),
       timeModeLabel: s.timeMode === 'day' ? 'DAY' : (s.timeMode === 'night' ? 'NIGHT' : 'AUTO'),
       configExpanded: !!s.configExpanded,
       showTuningSubmenu: !!(s.configExpanded && s.activeGroup === 'tuning'),
@@ -1028,6 +1700,7 @@ class Component extends DCLogic {
       configHeaderTitle: s.configSection === 'paint' ? 'PAINT'
         : s.configSection === 'wheels' ? 'WHEELS'
         : s.configSection === 'env' ? 'ENVIRONMENT'
+        : s.configSection === 'camera' ? 'CAMERA'
         : s.configSection === 'override' ? (
             s.overrideSubTab === 'motion' ? 'SPEED'
             : s.overrideSubTab === 'doors' ? 'DOORS'
@@ -1039,6 +1712,7 @@ class Component extends DCLogic {
       sectionIsWheels:   s.configSection === 'wheels',
       sectionIsOverride: s.configSection === 'override',
       sectionIsEnv:      s.configSection === 'env',
+      sectionIsCamera:   s.configSection === 'camera',
       tabTimeBorder:     (s.activeGroup === 'time') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       tabTimeCol:        (s.activeGroup === 'time') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       tabTuningBorder:   (s.activeGroup === 'tuning')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
@@ -1047,6 +1721,8 @@ class Component extends DCLogic {
       tabOverrideCol:    (s.activeGroup === 'override') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       tabEnvBorder:      (s.activeGroup === 'env')      ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       tabEnvCol:         (s.activeGroup === 'env')      ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      tabCameraBorder:   (s.activeGroup === 'camera')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      tabCameraCol:      (s.activeGroup === 'camera')   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       openSectionTuning:   () => {
         this.setState({
           configExpanded: true, panelOpen: true, activeGroup: 'tuning',
@@ -1060,6 +1736,27 @@ class Component extends DCLogic {
         });
       },
       openSectionEnv: () => this.openConfigSection('env'),
+      openSectionCamera: () => this.openConfigSection('camera'),
+      cameraPresets: (() => {
+        const defs = [
+          { key: 'front',        label: 'FRONT',         title: 'Front view' },
+          { key: 'side',         label: 'SIDE',          title: 'Side view' },
+          { key: 'frontSide',    label: 'FRONT SIDE',    title: 'Front three-quarter' },
+          { key: 'frontTopSide', label: 'FRONT TOP SIDE', title: 'Elevated front three-quarter' },
+          { key: 'rearTopSide',  label: 'REAR TOP SIDE',  title: 'Elevated rear three-quarter' },
+          { key: 'rearSide',     label: 'REAR SIDE',     title: 'Rear three-quarter' },
+        ];
+        return defs.map((d) => {
+          const on = s.cameraPreset === d.key;
+          return {
+            ...d,
+            border: on ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+            bg: on ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
+            col: on ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+            onClick: () => this.setCameraPreset(d.key),
+          };
+        });
+      })(),
       onSaveSettings: () => this.saveSettings(),
       saveBtnBorder: s.saveFlash ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       saveBtnCol:    s.saveFlash ? '#4fd6e8' : 'rgba(255,255,255,.70)',
@@ -2977,7 +3674,9 @@ class Component extends DCLogic {
       });
     }
     // Night floor (MeshStandardMaterial — reacts to SpotLights, shown only at night)
-    if (this.nightFloor) this.nightFloor.visible = next;
+    if (this.nightFloor) {
+      this.nightFloor.visible = !!next && this._carSceneVisible === true;
+    }
     // Sync active car lights → their ground spot lights
     const ls = this.state.lights || {};
     if (next) {
@@ -5544,12 +6243,20 @@ class Component extends DCLogic {
     const install = (scene) => {
       try {
         this._handleUploadedWheelModel(scene, item.label, true);
-        this.setState({ loading: false, processing: false, catalogLoadingKey: null, selectedCatalogKey: item.key });
-        if (callback) callback();
+        if (callback) {
+          callback();
+        } else {
+          this._finishLoading({
+            catalogLoadingKey: null,
+            selectedCatalogKey: item.key,
+          });
+        }
       } catch (err) {
         console.error(err);
-        this.setState({ error: 'Failed to process wheel model: ' + err.message, loading: false, processing: false, catalogLoadingKey: null });
-        if (callback) callback();
+        this._finishLoading({
+          error: 'Failed to process wheel model: ' + err.message,
+          catalogLoadingKey: null,
+        });
       }
     };
 
@@ -5559,7 +6266,12 @@ class Component extends DCLogic {
     const pre = this._preloadedStock;
     if (pre && pre.key === key && pre.promise) {
       this._preloadedStock = null;
+      const preloadWatchdog = setTimeout(() => {
+        console.warn('[Load] Stock preload stalled — fetching wheel directly');
+        this._fetchCatalogWheel(item, install, callback);
+      }, 12000);
       pre.promise.then((scene) => {
+        clearTimeout(preloadWatchdog);
         if (scene) install(scene);
         else this._fetchCatalogWheel(item, install, callback); // preload failed → fetch
       });
@@ -5593,8 +6305,10 @@ class Component extends DCLogic {
       (err) => {
         draco.dispose();
         console.error(err);
-        this.setState({ error: 'Failed to load "' + item.label + '".', loading: false, processing: false, catalogLoadingKey: null });
-        if (callback) callback();
+        this._finishLoading({
+          error: 'Failed to load "' + item.label + '".',
+          catalogLoadingKey: null,
+        });
       }
     );
   }
@@ -6911,6 +7625,15 @@ class Component extends DCLogic {
   // means the scene may look different — request a redraw under on-demand mode.
   componentDidUpdate() {
     if (this.requestRender) this.requestRender(3);
+    // Start the load intro only after the loading overlay has actually cleared.
+    if (this._introWaitingForLoader && !this.state.loading && !this.state.error) {
+      this._introWaitingForLoader = false;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!this._unmounted) this._startIntroAnimation();
+        });
+      });
+    }
   }
 
   // Step the device pixel ratio toward smoothness/crispness based on sustained
@@ -6990,6 +7713,12 @@ class Component extends DCLogic {
     if (this.outerRef && this.outerRef.current) {
       this.outerRef.current.classList.remove('bg-grain');
     }
+    // If the stock-wheel / GLB pipeline never finishes on the MMI, still reveal chrome.
+    this._loadSafetyTimer = setTimeout(() => {
+      if (!this.state.loading) return;
+      console.warn('[Load] Safety timeout — clearing loader overlay');
+      this._finishLoading({ error: null });
+    }, 45000);
     try {
       const B = 'vendor/three/';
       // Classic global builds. three.min.js must load alone first (it defines
@@ -7359,6 +8088,7 @@ class Component extends DCLogic {
         camera.aspect = W / H;
         camera.updateProjectionMatrix();
         renderer.setSize(W, H);
+        if (this._fitCam) this._applyShellViewOffset(this._fitCam.viewShift || 0);
         if (this.occluderCam) { this.occluderCam.aspect = W/H; this.occluderCam.updateProjectionMatrix(); }
         this._resizePostFX(W, H);
         if (this.requestRender) this.requestRender(2);
@@ -7630,6 +8360,24 @@ class Component extends DCLogic {
         // not depend on a dirty flag that can be cleared by another UI update.
         this._applyWheelTransforms();
 
+        const _now = performance.now();
+        const _dt = Math.min(0.05, Math.max(0.008, (this._fitCamLastMs ? (_now - this._fitCamLastMs) : 16) / 1000));
+        this._fitCamLastMs = _now;
+        if (this._tickIntro(_dt)) {
+          needRender = true;
+          this._postFxDirty = true;
+          this.requestRender(2);
+        }
+        if (this._tickCamAnim(_dt)) {
+          needRender = true;
+          this._postFxDirty = true;
+          this.requestRender(2);
+        }
+        if (!this._introActive && !this._camAnim && this._tickFitCamera(_dt)) {
+          needRender = true;
+          this._postFxDirty = true;
+          this.requestRender(2);
+        }
         // controls.update() must run every frame for damping; true = camera moved
         if (controls.update()) {
           needRender = true;
@@ -7646,11 +8394,20 @@ class Component extends DCLogic {
           dst.quaternion.copy(camera.quaternion);
           dst.fov = camera.fov; dst.aspect = camera.aspect;
           dst.near = camera.near; dst.far = camera.far;
+          // Keep bloom/streak aligned with shell view-offset on the main camera.
+          // Without this, light glows stay put while the car slides on screen.
+          if (camera.view && typeof dst.setViewOffset === 'function') {
+            const v = camera.view;
+            dst.setViewOffset(v.fullWidth, v.fullHeight, v.offsetX, v.offsetY, v.width, v.height);
+          } else if (typeof dst.clearViewOffset === 'function') {
+            dst.clearViewOffset();
+          }
           dst.updateProjectionMatrix();
         };
 
-        const anyLight = this.state.lights && Object.values(this.state.lights).some(Boolean);
-        const anyStreak = this.state.lights && (this.state.lights.headlight || this.state.lights.reverse || this.state.lights.fogFront);
+        const flashOn = !!(this._intro && this._intro.flashOn);
+        const anyLight = flashOn || (this.state.lights && Object.values(this.state.lights).some(Boolean));
+        const anyStreak = flashOn || (this.state.lights && (this.state.lights.headlight || this.state.lights.reverse || this.state.lights.fogFront));
 
         // 1) Main scene
         renderer.autoClear = true;
@@ -7942,6 +8699,13 @@ class Component extends DCLogic {
     obj.position.y -= box.min.y;
     this.scene.add(obj);
     obj.updateMatrixWorld(true);
+    this._modelHomePos = obj.position.clone();
+    // Keep the car invisible until loading fully finishes and the intro starts
+    // (also used to hide it in APP+APP layouts).
+    if (primary) {
+      obj.visible = false;
+      this._carSceneVisible = false;
+    }
 
     // Material reuse: the SECONDARY model adopts the primary scene's shared
     // material instances (paint, chrome, lights, leather, …) by name, so the two
@@ -8493,7 +9257,14 @@ class Component extends DCLogic {
     this._fitRadius = radius;
     this._fitDist = dist;
     this._popupLayoutActive = false;
-    this._applyFitCamera(!!window.__androidPopupActive);
+    // Defer snap-to-fit: primary load plays an intro (approach + headlight flash
+    // + orbit to home). Secondary/GT reuse already has framing from primary.
+    this._fitCam = this._shellCameraTarget(!!window.__androidPopupActive);
+    this._pendingIntro = true;
+    // Park at the far-front intro pose under the loader so the first revealed
+    // frame isn't a random default angle. Keep the whole car scene hidden.
+    this._parkIntroCamera();
+    this._setCarSceneVisible(false);
     this.renderOnce = () => this.renderer.render(this.scene, this.camera);
     window.__renderOnce = this.renderOnce;
     window.__scene = this.scene;
@@ -8501,17 +9272,9 @@ class Component extends DCLogic {
     window.__controls = this.controls;
     window.__renderer = this.renderer;
     window.__app = this;
-    // Native launcher contract: MainActivity calls this when a freeform popup opens/closes.
-    window.onAndroidLauncherPopup = (active) => {
-      try {
-        window.__androidPopupActive = !!active;
-        if (window.__app && typeof window.__app.applyLauncherPopupLayout === 'function') {
-          window.__app.applyLauncherPopupLayout(!!active);
-        }
-      } catch (e) {
-        console.warn('[AndroidPopup]', e);
-      }
-    };
+    if (typeof window.__flushAndroidShell === 'function') {
+      try { window.__flushAndroidShell(); } catch (e) { console.warn('[AndroidShell]', e); }
+    }
 
     // Shadow camera bounds around the car
     const d = this.dirLight;
@@ -8536,7 +9299,15 @@ class Component extends DCLogic {
       // (already-preloaded) stock wheel is installed — see _warmupLightsAsync.
       const key = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
       this._loadCatalogWheelByKey(key, () => {
-        this.setState({ loading: false, processing: false, progress: 100 });
+        const done = {
+          catalogLoadingKey: null,
+          selectedCatalogKey: key,
+        };
+        if (this._pendingShellPatch) {
+          Object.assign(done, this._pendingShellPatch);
+          this._pendingShellPatch = null;
+        }
+        this._finishLoading(done);
         try { this._applyPendingSceneSettings(); } catch (e) { console.warn('[Settings] apply failed', e); }
       }, { initial: true });
       // Light-shader pre-warm is the single biggest chunk of the post-download
@@ -8566,15 +9337,59 @@ class Component extends DCLogic {
   }
 
   /**
-   * Default vs launcher-popup camera framing.
-   * Popup mode: slightly zoomed out + car biased to the right so the left freeform
-   * app window does not cover the vehicle.
+   * Shell camera framing from the remaining gap between left/right slots.
+   * Orbit target stays on the car; on-screen shift uses a projection view
+   * offset so rotation still pivots around the car centre.
    */
-  _applyFitCamera(popupActive) {
+  _shellCameraTarget(popupActive) {
+    const mode = this._shellMode || this.state.shellMode || 'triple';
+    const w = window.innerWidth || 1920;
+    const leftB = this._shellLeftBounds || { l: 48, t: 100, r: 740, b: 530 };
+    const rightB = this._shellRightBounds || { l: 1180, t: 100, r: 1872, b: 530 };
+    if (mode === 'appsOnly') {
+      return { distMul: 1.12, viewShift: 0 };
+    }
+    // Widget/app slots are always reserved in the current template.
+    if (mode === 'appCar') {
+      const gapL = leftB.r;
+      const gapR = w;
+      const gapW = Math.max(280, gapR - gapL);
+      const remaining = Math.max(0.32, Math.min(0.62, gapW / w));
+      const gapCenter = (gapL + gapR) * 0.5;
+      const offsetFrac = (gapCenter - w * 0.5) / (w * 0.5);
+      return {
+        distMul: Math.max(0.74, Math.min(0.92, 0.58 + remaining * 0.45)),
+        viewShift: Math.max(0.08, Math.min(0.36, offsetFrac * 0.55)),
+      };
+    }
+    const gapL = leftB.r;
+    const gapR = rightB.l;
+    const gapW = Math.max(160, gapR - gapL);
+    const remaining = Math.max(0.28, Math.min(1, gapW / w));
+    const gapCenter = (gapL + gapR) * 0.5;
+    const offsetFrac = (gapCenter - w * 0.5) / (w * 0.5);
+    return {
+      distMul: 1 + (1 - remaining) * 0.78,
+      viewShift: Math.max(-0.36, Math.min(0.36, offsetFrac * 0.45)),
+    };
+  }
+
+  _applyShellViewOffset(shift) {
+    if (!this.camera) return;
+    const el = this.renderer && this.renderer.domElement;
+    const w = (el && (el.clientWidth || el.width)) || window.innerWidth || 1920;
+    const h = (el && (el.clientHeight || el.height)) || window.innerHeight || 720;
+    if (!shift) {
+      if (typeof this.camera.clearViewOffset === 'function') this.camera.clearViewOffset();
+    } else if (typeof this.camera.setViewOffset === 'function') {
+      this.camera.setViewOffset(w, h, -shift * w, 0, w, h);
+    }
+    this.camera.updateProjectionMatrix();
+  }
+
+  _snapFitCamera(pose) {
     if (!this.camera || !this.controls || !this._fitCenter || !this._fitDist) return;
-    const THREE2 = window.THREE;
-    const active = !!popupActive;
-    const distMul = active ? 1.34 : 1.0;
+    const distMul = pose.distMul;
     const dist = this._fitDist * distMul;
     const c = this._fitCenter.clone();
     this.camera.position.set(
@@ -8583,28 +9398,938 @@ class Component extends DCLogic {
       c.z + dist * 0.70
     );
     this.controls.target.copy(c);
-    if (active) {
-      // Shift look-at opposite camera-right so the car sits slightly right of center.
-      this.camera.updateMatrixWorld(true);
-      const right = new THREE2.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).normalize();
-      const shift = (this._fitRadius || 1) * 0.42;
-      this.controls.target.addScaledVector(right, -shift);
-      this.camera.position.addScaledVector(right, -shift);
-    }
     this.camera.near = dist / 120;
     this.camera.far = dist * 120;
+    this._applyShellViewOffset(pose.viewShift || 0);
+    this.controls.update();
+  }
+
+  _applyFitCamera(popupActive) {
+    if (!this.camera || !this.controls || !this._fitCenter || !this._fitDist) return;
+    const target = this._shellCameraTarget(popupActive);
+    // While the load intro (or a preset tween) owns the camera, only remember
+    // the shell framing — don't snap or apply view-offset over the animation.
+    // Applying view-offset here desyncs bloom/streak overlays from the car.
+    if (this._introActive || this._camAnim) {
+      this._fitCam = { distMul: target.distMul, viewShift: target.viewShift || 0 };
+      return;
+    }
+    if (!this._fitCam) {
+      this._fitCam = { distMul: target.distMul, viewShift: target.viewShift || 0 };
+      this._snapFitCamera(this._fitCam);
+      if (this.requestRender) this.requestRender(5);
+      return;
+    }
+    const same = Math.abs(this._fitCam.distMul - target.distMul) < 0.002
+      && Math.abs((this._fitCam.viewShift || 0) - (target.viewShift || 0)) < 0.002;
+    if (same && !this._fitCamTo) {
+      this._snapFitCamera(this._fitCam);
+      return;
+    }
+    this._fitCamFrom = { distMul: this._fitCam.distMul, viewShift: this._fitCam.viewShift || 0 };
+    this._fitCamTo = target;
+    this._fitCamT = 0;
+    if (this.requestRender) this.requestRender(30);
+  }
+
+  _tickFitCamera(dt) {
+    if (!this._fitCamTo || !this._fitCamFrom) return false;
+    this._fitCamT = Math.min(1, (this._fitCamT || 0) + dt / 0.42);
+    const e = 1 - Math.pow(1 - this._fitCamT, 3);
+    this._fitCam = {
+      distMul: this._fitCamFrom.distMul + (this._fitCamTo.distMul - this._fitCamFrom.distMul) * e,
+      viewShift: (this._fitCamFrom.viewShift || 0)
+        + ((this._fitCamTo.viewShift || 0) - (this._fitCamFrom.viewShift || 0)) * e,
+    };
+    this._snapFitCamera(this._fitCam);
+    if (this._fitCamT >= 1) this._fitCamTo = null;
+    return true;
+  }
+
+  _carBasis() {
+    const THREE = window.THREE;
+    const up = new THREE.Vector3(0, 1, 0);
+    const F = (this._carForwardDir || new THREE.Vector3(-1, 0, 0)).clone().setY(0);
+    if (F.lengthSq() < 1e-8) F.set(-1, 0, 0);
+    F.normalize();
+    const R = new THREE.Vector3().crossVectors(up, F).normalize();
+    return { F, R, up };
+  }
+
+  _homeCameraPose() {
+    if (!this._fitCenter || !this._fitDist) return null;
+    const THREE = window.THREE;
+    const pose = this._fitCam || this._shellCameraTarget(!!window.__androidPopupActive);
+    const distMul = pose.distMul != null ? pose.distMul : 1;
+    const dist = this._fitDist * distMul;
+    const c = this._fitCenter.clone();
+    const position = new THREE.Vector3(
+      c.x - dist * 0.66,
+      c.y + dist * 0.30,
+      c.z + dist * 0.70
+    );
+    return { position, target: c };
+  }
+
+  _getCameraPresetPose(key) {
+    if (!this._fitCenter || !this._fitDist) return null;
+    if (key === 'home') return this._homeCameraPose();
+    const THREE = window.THREE;
+    const c = this._fitCenter.clone();
+    const d = this._fitDist;
+    const { F, R } = this._carBasis();
+    const pos = (f, r, y) => c.clone()
+      .addScaledVector(F, d * f)
+      .addScaledVector(R, d * r)
+      .add(new THREE.Vector3(0, d * y, 0));
+    const map = {
+      front:        pos(1.12,  0.00, 0.14),
+      side:         pos(0.05,  1.18, 0.20),
+      frontSide:    pos(0.78,  0.78, 0.22),
+      frontTopSide: pos(0.66,  0.70, 0.38),
+      rearTopSide:  pos(-0.66, 0.70, 0.38),
+      rearSide:     pos(-0.78, 0.78, 0.22),
+    };
+    const position = map[key];
+    if (!position) return null;
+    return { position, target: c.clone() };
+  }
+
+  _setHeadlightFlash(on) {
+    this._setGroupEmissive('headlight', !!on);
+    if (this.lightGroups && this.lightGroups.positionRear) {
+      const rearOn = !!on || !!(this.state.lights && (this.state.lights.headlight || this.state.lights.brake));
+      this._setGroupEmissive('positionRear', rearOn);
+    }
+    this._updateNightLight('headlight', !!on);
+    this._postFxDirty = true;
+  }
+
+  _restoreHeadlightsAfterFlash() {
+    const on = !!(this.state.lights && this.state.lights.headlight);
+    this._setHeadlightFlash(on);
+  }
+
+  _animateCameraTo(pose, durationSec) {
+    if (!pose || !this.camera || !this.controls) return;
+    this._camAnim = {
+      fromPos: this.camera.position.clone(),
+      fromTarget: this.controls.target.clone(),
+      toPos: pose.position.clone(),
+      toTarget: pose.target.clone(),
+      t: 0,
+      dur: Math.max(0.2, durationSec || 1.1),
+    };
+    this._fitCamTo = null;
+    if (this.controls) this.controls.enabled = false;
+    if (this.requestRender) this.requestRender(90);
+  }
+
+  _tickCamAnim(dt) {
+    if (!this._camAnim || !this.camera || !this.controls) return false;
+    const a = this._camAnim;
+    a.t = Math.min(1, a.t + dt / a.dur);
+    const e = 1 - Math.pow(1 - a.t, 3);
+    this.camera.position.lerpVectors(a.fromPos, a.toPos, e);
+    this.controls.target.lerpVectors(a.fromTarget, a.toTarget, e);
+    const dist = this.camera.position.distanceTo(this.controls.target);
+    this.camera.near = Math.max(0.05, dist / 120);
+    this.camera.far = Math.max(100, dist * 120);
     this.camera.updateProjectionMatrix();
     this.controls.update();
-    if (this.requestRender) this.requestRender(5);
+    if (a.t >= 1) {
+      this._camAnim = null;
+      if (!this._introActive && this.controls) this.controls.enabled = true;
+    }
+    return true;
+  }
+
+  setCameraPreset(key) {
+    if (this._introActive) return;
+    const pose = this._getCameraPresetPose(key);
+    if (!pose) return;
+    this.setState({ cameraPreset: key });
+    this._animateCameraTo(pose, 1.05);
+  }
+
+  _shouldShowCar() {
+    const mode = this._shellMode || (this.state && this.state.shellMode) || 'triple';
+    return mode !== 'appsOnly';
+  }
+
+  /**
+   * Show/hide the car and its ground companions. Used to keep the model
+   * invisible while loading / before the intro, and in APP+APP layouts.
+   */
+  _setCarSceneVisible(visible) {
+    const show = !!visible && this._shouldShowCar();
+    this._carSceneVisible = show;
+
+    const activeKey = (this.state && this.state.modelVariant) || 'hev';
+    if (this._variants) {
+      Object.keys(this._variants).forEach((k) => {
+        const b = this._variants[k];
+        const r = b && b.root;
+        if (!r) return;
+        if (!show) {
+          r.visible = false;
+          return;
+        }
+        // Active variant on; inherited-wheels donor stays on too (meshes culled elsewhere).
+        const isActive = k === activeKey;
+        const isDonor = !!(this._variants[activeKey]
+          && this._variants[activeKey]._inheritedWheelsFrom === k);
+        r.visible = isActive || isDonor;
+      });
+    } else if (this.model) {
+      this.model.visible = show;
+    }
+
+    if (this.shadowCatcher) this.shadowCatcher.visible = show;
+    if (this.floorMesh) this.floorMesh.visible = show;
+    if (this.nightFloor) this.nightFloor.visible = show && !!(this.state && this.state.nightMode);
+    if (this._windGroup) this._windGroup.visible = show && !!(this.state && this.state.motionSpeed);
+
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(4);
+  }
+
+  _syncCarSceneForShell() {
+    // Still loading / waiting to start intro — keep hidden.
+    if (this.state.loading || this._introWaitingForLoader || this._pendingIntro) {
+      this._setCarSceneVisible(false);
+      return;
+    }
+    if (!this._shouldShowCar()) {
+      // Abort an in-flight intro if we switched to APP+APP.
+      if (this._introActive) {
+        this._intro = null;
+        this._introActive = false;
+        this._camAnim = null;
+        if (this.controls) this.controls.enabled = true;
+      }
+      this._setCarSceneVisible(false);
+      return;
+    }
+    // Car layout is active and loading is done.
+    if (!this._introPlayed) {
+      this._startIntroAnimation();
+    } else {
+      this._setCarSceneVisible(true);
+    }
+  }
+
+  _introFrontPoses() {
+    if (!this._fitCenter || !this._fitDist) return null;
+    const THREE = window.THREE;
+    const { F } = this._carBasis();
+    const c = this._fitCenter.clone();
+    const distMul = (this._fitCam && this._fitCam.distMul != null) ? this._fitCam.distMul : 1;
+    const home = this._homeCameraPose();
+    const defaultDist = home
+      ? home.position.distanceTo(home.target)
+      : this._fitDist * distMul;
+    const elev = this._fitDist * 0.12;
+    return {
+      center: c,
+      near: c.clone().addScaledVector(F, defaultDist).add(new THREE.Vector3(0, elev, 0)),
+      far: c.clone().addScaledVector(F, defaultDist * 2.75).add(new THREE.Vector3(0, elev * 1.15, 0)),
+      defaultDist,
+    };
+  }
+
+  _parkIntroCamera() {
+    const poses = this._introFrontPoses();
+    if (!poses || !this.camera || !this.controls) return;
+    this.camera.position.copy(poses.far);
+    this.controls.target.copy(poses.center);
+    this.camera.near = Math.max(0.05, poses.defaultDist / 120);
+    this.camera.far = Math.max(200, poses.defaultDist * 120);
+    this.camera.updateProjectionMatrix();
+    this._applyShellViewOffset(0);
+    this.controls.update();
+    if (this.requestRender) this.requestRender(2);
+  }
+
+  _startIntroAnimation() {
+    if (this._introPlayed || !this.model || !this.camera || !this.controls) return;
+    if (!this._fitCenter || !this._fitDist) return;
+    // Don't start under the loading overlay.
+    if (this.state.loading) {
+      this._introWaitingForLoader = true;
+      return;
+    }
+    // APP+APP has no car — skip intro until a car layout is selected.
+    if (!this._shouldShowCar()) {
+      this._setCarSceneVisible(false);
+      return;
+    }
+    this._introPlayed = true;
+    this._introActive = true;
+    this._fitCamTo = null;
+    this._camAnim = null;
+    if (this.controls) this.controls.enabled = false;
+
+    // Reveal only now that loading is done and the intro is about to run.
+    this._setCarSceneVisible(true);
+
+    // Camera-only intro — never translate the model (wheels bake _initWorld).
+    // 1) Front-centered, far  →  dolly in to default framing distance
+    // 2) Headlight flash
+    // 3) Orbit to the normal top-side (home) pose
+    if (this._modelHomePos) this.model.position.copy(this._modelHomePos);
+    else this._modelHomePos = this.model.position.clone();
+
+    if (!this._fitCam) this._fitCam = this._shellCameraTarget(!!window.__androidPopupActive);
+    const poses = this._introFrontPoses();
+    if (!poses) return;
+    this.camera.position.copy(poses.far);
+    this.controls.target.copy(poses.center);
+    this.camera.near = Math.max(0.05, poses.defaultDist / 120);
+    this.camera.far = Math.max(200, poses.defaultDist * 120);
+    this.camera.updateProjectionMatrix();
+    this._applyShellViewOffset(0);
+    this.controls.update();
+
+    this._intro = {
+      phase: 'approach',
+      t: 0,
+      camFrom: poses.far.clone(),
+      camFromTarget: poses.center.clone(),
+      camTo: poses.near.clone(),
+      camToTarget: poses.center.clone(),
+    };
+    if (this.requestRender) this.requestRender(240);
+  }
+
+  _endIntroAnimation() {
+    if (this.model && this._modelHomePos) this.model.position.copy(this._modelHomePos);
+    this._restoreHeadlightsAfterFlash();
+    this._intro = null;
+    this._introActive = false;
+    this._camAnim = null;
+    if (this.controls) this.controls.enabled = true;
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    // Settle on the shell-aware top-side home framing (incl. view-offset).
+    this._applyFitCamera(!!window.__androidPopupActive);
+    if (this.requestRender) this.requestRender(8);
+  }
+
+  _tickIntro(dt) {
+    if (!this._intro || !this.camera || !this.controls) return false;
+    const intro = this._intro;
+    intro.t += dt;
+
+    const applyCamLerp = (fromPos, toPos, fromTarget, toTarget, e, viewShift) => {
+      this.camera.position.lerpVectors(fromPos, toPos, e);
+      this.controls.target.lerpVectors(fromTarget, toTarget, e);
+      const dist = this.camera.position.distanceTo(this.controls.target);
+      this.camera.near = Math.max(0.05, dist / 120);
+      this.camera.far = Math.max(200, dist * 120);
+      this.camera.updateProjectionMatrix();
+      if (viewShift != null) this._applyShellViewOffset(viewShift);
+      this.controls.update();
+    };
+
+    if (intro.phase === 'approach') {
+      // Dolly zoom: front-centered far → front-centered at default distance.
+      const dur = 2.2;
+      const u = Math.min(1, intro.t / dur);
+      const e = 1 - Math.pow(1 - u, 3);
+      applyCamLerp(intro.camFrom, intro.camTo, intro.camFromTarget, intro.camToTarget, e, 0);
+      if (u >= 1) {
+        this.camera.position.copy(intro.camTo);
+        this.controls.target.copy(intro.camToTarget);
+        intro.phase = 'flash';
+        intro.t = 0;
+        intro.flashOn = false;
+        this._setHeadlightFlash(false);
+      }
+      return true;
+    }
+
+    if (intro.phase === 'flash') {
+      // Double flash: on → off → on → off, then orbit to top-side home.
+      const steps = [
+        { at: 0.00, on: true },
+        { at: 0.14, on: false },
+        { at: 0.28, on: true },
+        { at: 0.42, on: false },
+        { at: 0.62, done: true },
+      ];
+      let desired = false;
+      for (let i = 0; i < steps.length; i++) {
+        if (intro.t >= steps[i].at) {
+          if (steps[i].done) {
+            intro.flashOn = false;
+            this._restoreHeadlightsAfterFlash();
+            const home = this._homeCameraPose();
+            if (!home) {
+              this._endIntroAnimation();
+              return true;
+            }
+            // Same camera-only strategy as the dolly: lerp pose, don't move meshes.
+            intro.phase = 'orbit';
+            intro.t = 0;
+            intro.camFrom = this.camera.position.clone();
+            intro.camFromTarget = this.controls.target.clone();
+            intro.camTo = home.position.clone();
+            intro.camToTarget = home.target.clone();
+            intro.viewShiftFrom = 0;
+            intro.viewShiftTo = (this._fitCam && this._fitCam.viewShift) || 0;
+            return true;
+          }
+          desired = !!steps[i].on;
+        }
+      }
+      if (desired !== intro.flashOn) {
+        intro.flashOn = desired;
+        this._setHeadlightFlash(desired);
+      }
+      return true;
+    }
+
+    if (intro.phase === 'orbit') {
+      const dur = 1.35;
+      const u = Math.min(1, intro.t / dur);
+      const e = 1 - Math.pow(1 - u, 3);
+      const shift = (intro.viewShiftFrom || 0)
+        + ((intro.viewShiftTo || 0) - (intro.viewShiftFrom || 0)) * e;
+      applyCamLerp(intro.camFrom, intro.camTo, intro.camFromTarget, intro.camToTarget, e, shift);
+      if (u >= 1) {
+        this.camera.position.copy(intro.camTo);
+        this.controls.target.copy(intro.camToTarget);
+        this._applyShellViewOffset(intro.viewShiftTo || 0);
+        this._endIntroAnimation();
+      }
+      return true;
+    }
+
+    return false;
   }
 
   applyLauncherPopupLayout(active) {
-    const next = !!active;
-    if (this._popupLayoutActive === next && this._fitCenter) {
-      // Still re-apply in case the user orbited away.
+    this.applyShellLayout({
+      left: !!active,
+      right: this._shellRight || (this._androidApp ? 'idle' : false),
+    });
+  }
+
+  applyShellLayout(layout) {
+    const next = layout || {};
+    this._shellLeft = !!next.left;
+    if (next.leftBounds) this._shellLeftBounds = next.leftBounds;
+    if (next.rightBounds) this._shellRightBounds = next.rightBounds;
+    // Any shell notify from native implies the Android shell is active.
+    if (next.right === 'idle' || next.right === 'app') {
+      this._androidApp = true;
+      this._shellRight = next.right;
+    } else {
+      this._shellRight = next.right || (this._androidApp ? 'idle' : false);
     }
-    this._popupLayoutActive = next;
-    this._applyFitCamera(next);
+    this._popupLayoutActive = this._shellLeft;
+    const mode = next.mode || this.state.shellMode || 'triple';
+    this._shellMode = mode;
+    this._ensureWidgetsLoaded();
+    const appsOnly = mode === 'appsOnly';
+    if (this._pendingSlotSync) {
+      this._pendingSlotSync = false;
+      this._syncSlotUseToNative();
+    }
+    const patch = {
+      mediaLeftOpen: this._shellLeft,
+      mediaRight: this._shellRight,
+      shellMode: mode,
+      launchSide: next.launchSide || this.state.launchSide || 'auto',
+      nextLaunchSide: next.nextSide || this.state.nextLaunchSide || 'left',
+      lastLaunchSide: next.lastSide || this.state.lastLaunchSide || null,
+      leftSlotUse: this._board('left', mode).use || 'app',
+      rightSlotUse: this._board('right', mode).use || 'app',
+      mediaColumnVisible: !!this._androidApp && !this.state.configExpanded && !appsOnly,
+    };
+    if (this._shellRight === 'app' && (this.state.panelOpen || this.state.configExpanded)) {
+      patch.panelOpen = false;
+      patch.configExpanded = false;
+      patch.mediaColumnVisible = !!this._androidApp && !appsOnly;
+    }
+    // Avoid React state churn while the GLB/wheel pipeline is still running.
+    if (this.state.loading) {
+      this._pendingShellPatch = patch;
+      this._applyFitCamera();
+      return;
+    }
+    this._pendingShellPatch = null;
+    this.setState(patch);
+    this._applyFitCamera();
+    this._syncCarSceneForShell();
+  }
+
+  _setShellMode(mode) {
+    this._shellMode = mode;
+    this.setState({
+      shellMode: mode,
+      shellMenuOpen: false,
+      widgetPickerStep: null,
+      widgetPlaceSide: null,
+    });
+    this._applyFitCamera();
+    this._syncCarSceneForShell();
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setShellMode === 'function') {
+        window.AppLauncherBridge.setShellMode(mode);
+      }
+    } catch (e) {}
+    this._syncSlotUseToNative();
+  }
+
+  _setLaunchSide(side) {
+    const next = this.state.launchSide === side ? 'auto' : side;
+    this.setState({ launchSide: next });
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setLaunchSide === 'function') {
+        window.AppLauncherBridge.setLaunchSide(next);
+      }
+    } catch (e) {}
+  }
+
+  _widgetCatalog() {
+    return {
+      media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2]] },
+      power: { label: 'POWER', title: 'Power', hint: 'Draft — coming next', sizes: [[1, 1], [2, 1], [3, 1], [2, 2]] },
+      modes: { label: 'MODES', title: 'Car modes', hint: 'Draft — coming next', sizes: [[2, 1], [3, 1], [1, 2]] },
+      graphs: { label: 'GRAPHS', title: 'Graphs', hint: 'Draft — coming next', sizes: [[2, 1], [3, 1], [2, 2], [3, 2]] },
+    };
+  }
+
+  _defaultWidgetLayout() {
+    const media = { id: 'w-media', type: 'media', x: 0, y: 0, w: 2, h: 2 };
+    return {
+      triple: {
+        left: { use: 'app', items: [] },
+        right: { use: 'app', items: [Object.assign({}, media)] },
+      },
+      appCar: {
+        left: { use: 'app', items: [Object.assign({}, media)] },
+      },
+      appsOnly: {
+        left: { use: 'app', items: [] },
+        right: { use: 'app', items: [Object.assign({}, media)] },
+      },
+    };
+  }
+
+  _parseWidgetLayout(raw) {
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!parsed || !parsed.triple) return this._defaultWidgetLayout();
+      return parsed;
+    } catch (e) {
+      return this._defaultWidgetLayout();
+    }
+  }
+
+  _ensureWidgetsLoaded() {
+    if (this._widgetsReady) return;
+    let raw = null;
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.loadWidgets === 'function') {
+        raw = window.AppLauncherBridge.loadWidgets();
+      }
+    } catch (e) {}
+    if (!raw) {
+      try { raw = localStorage.getItem('h6_widgets'); } catch (e) {}
+    }
+    this._widgetLayout = raw ? this._parseWidgetLayout(raw) : this._defaultWidgetLayout();
+    this._widgetsReady = true;
+    this._pendingSlotSync = true;
+  }
+
+  _persistWidgets() {
+    if (!this._widgetLayout) return;
+    const json = JSON.stringify(this._widgetLayout);
+    try { localStorage.setItem('h6_widgets', json); } catch (e) {}
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.saveWidgets === 'function') {
+        window.AppLauncherBridge.saveWidgets(json);
+      }
+    } catch (e) {}
+  }
+
+  _gridColsForMode(mode) {
+    return mode === 'triple' ? 2 : 3;
+  }
+
+  _currentBoards(mode) {
+    this._ensureWidgetsLoaded();
+    const key = mode || this._shellMode || this.state.shellMode || 'triple';
+    if (!this._widgetLayout[key]) this._widgetLayout[key] = this._defaultWidgetLayout()[key];
+    return this._widgetLayout[key];
+  }
+
+  _board(side, mode) {
+    const boards = this._currentBoards(mode);
+    if (side === 'right') return boards.right || { use: 'app', items: [] };
+    return boards.left || { use: 'app', items: [] };
+  }
+
+  _rectCss(bounds, fallback) {
+    const b = bounds || fallback;
+    return {
+      left: (b.l || 0) + 'px',
+      top: (b.t || 0) + 'px',
+      width: Math.max(0, (b.r || 0) - (b.l || 0)) + 'px',
+      height: Math.max(0, (b.b || 0) - (b.t || 0)) + 'px',
+    };
+  }
+
+  _widgetItemView(item, side) {
+    const cat = this._widgetCatalog()[item.type] || { label: (item.type || '').toUpperCase(), title: item.type, hint: '' };
+    return {
+      id: item.id,
+      label: cat.label,
+      stubTitle: cat.title,
+      stubHint: cat.hint || 'Draft — coming next',
+      isMedia: item.type === 'media',
+      isStub: item.type !== 'media',
+      gridStyle: 'grid-column:' + (item.x + 1) + ' / span ' + item.w + ';grid-row:' + (item.y + 1) + ' / span ' + item.h,
+      onRemove: () => this._removeWidget(side, item.id),
+    };
+  }
+
+  _fits(items, cols, x, y, w, h, ignoreId) {
+    if (x < 0 || y < 0 || x + w > cols || y + h > 2) return false;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (ignoreId && it.id === ignoreId) continue;
+      if (x < it.x + it.w && x + w > it.x && y < it.y + it.h && y + h > it.y) return false;
+    }
+    return true;
+  }
+
+  _placeCells(side) {
+    const s = this.state;
+    if (s.widgetPlaceSide !== side || !s.widgetPlaceType) return [];
+    const cols = this._gridColsForMode(s.shellMode);
+    const items = this._board(side).items || [];
+    const w = s.widgetPlaceW;
+    const h = s.widgetPlaceH;
+    const cells = [];
+    for (let y = 0; y < 2; y++) {
+      for (let x = 0; x < cols; x++) {
+        if (!this._fits(items, cols, x, y, w, h)) continue;
+        cells.push({
+          cls: 'on',
+          gridStyle: 'grid-column:' + (x + 1) + ' / span 1;grid-row:' + (y + 1) + ' / span 1',
+          onClick: () => this._commitWidget(side, x, y, w, h),
+        });
+      }
+    }
+    return cells;
+  }
+
+  _widgetRenderFields(s) {
+    this._ensureWidgetsLoaded();
+    const mode = s.shellMode || 'triple';
+    const android = !!this._androidApp && !s.error && !s.loading;
+    const leftApp = !!this._shellLeft;
+    const rightApp = this._shellRight === 'app';
+    const leftUse = (this._board('left', mode).use) || s.leftSlotUse || 'app';
+    const rightUse = (this._board('right', mode).use) || s.rightSlotUse || 'app';
+    const showLeft = android && (mode === 'triple' || mode === 'appCar' || mode === 'appsOnly')
+      && !(leftApp && leftUse === 'app');
+    const showRight = android && mode !== 'appCar' && !s.configExpanded
+      && !(rightApp && rightUse === 'app');
+    const leftRect = this._rectCss(this._shellLeftBounds, { l: 48, t: 100, r: 740, b: 530 });
+    const rightRect = this._rectCss(this._shellRightBounds, { l: 1180, t: 100, r: 1872, b: 530 });
+    const cols = this._gridColsForMode(mode);
+    const pickerOpen = !!s.widgetPickerStep;
+    let pickerItems = [];
+    let pickerTitle = 'ADD WIDGET';
+    if (s.widgetPickerStep === 'type') {
+      const cat = this._widgetCatalog();
+      const usedMedia = this._hasWidgetType(mode, 'media');
+      pickerItems = Object.keys(cat).map((key) => {
+        const blocked = key === 'media' && usedMedia;
+        return {
+          label: cat[key].label + (blocked ? '  ·  added' : ''),
+          opacity: blocked ? '0.35' : '1',
+          onClick: blocked ? () => {} : () => this._pickWidgetType(key),
+        };
+      });
+    } else if (s.widgetPickerStep === 'size') {
+      pickerTitle = 'SIZE';
+      const def = this._widgetCatalog()[s.widgetPlaceType] || { sizes: [[2, 1]] };
+      const items = this._board(s.widgetPlaceSide).items || [];
+      pickerItems = def.sizes
+        .filter((sz) => sz[0] <= cols)
+        .filter((sz) => {
+          for (let y = 0; y < 2; y++) {
+            for (let x = 0; x < cols; x++) {
+              if (this._fits(items, cols, x, y, sz[0], sz[1])) return true;
+            }
+          }
+          return false;
+        })
+        .map((sz) => ({
+          label: sz[0] + ' × ' + sz[1],
+          opacity: '1',
+          onClick: () => this._pickWidgetSize(sz[0], sz[1]),
+        }));
+    }
+    return {
+      leftBoardDisplay: showLeft ? 'flex' : 'none',
+      rightBoardDisplay: showRight ? 'flex' : 'none',
+      leftBoardLeft: leftRect.left,
+      leftBoardTop: leftRect.top,
+      leftBoardWidth: leftRect.width,
+      leftBoardHeight: leftRect.height,
+      rightBoardLeft: rightRect.left,
+      rightBoardTop: rightRect.top,
+      rightBoardWidth: rightRect.width,
+      rightBoardHeight: rightRect.height,
+      leftGridCols: 'repeat(' + cols + ', 1fr)',
+      rightGridCols: 'repeat(' + cols + ', 1fr)',
+      leftUseAppClass: leftUse === 'app' ? 'on' : '',
+      leftUseWidClass: leftUse === 'widgets' ? 'on' : '',
+      rightUseAppClass: rightUse === 'app' ? 'on' : '',
+      rightUseWidClass: rightUse === 'widgets' ? 'on' : '',
+      leftWidgetItems: (this._board('left', mode).items || []).map((it) => this._widgetItemView(it, 'left')),
+      rightWidgetItems: (this._board('right', mode).items || []).map((it) => this._widgetItemView(it, 'right')),
+      leftPlaceCells: this._placeCells('left'),
+      rightPlaceCells: this._placeCells('right'),
+      setLeftSlotApp: () => this._setSlotUse('left', 'app'),
+      setLeftSlotWidgets: () => this._setSlotUse('left', 'widgets'),
+      setRightSlotApp: () => this._setSlotUse('right', 'app'),
+      setRightSlotWidgets: () => this._setSlotUse('right', 'widgets'),
+      addWidgetLeft: () => this._openWidgetPicker('left'),
+      addWidgetRight: () => this._openWidgetPicker('right'),
+      widgetPickerDisplay: pickerOpen ? 'block' : 'none',
+      widgetPickerTitle: pickerTitle,
+      widgetPickerItems: pickerItems,
+    };
+  }
+
+  _hasWidgetType(mode, type) {
+    const boards = this._currentBoards(mode);
+    const sides = [boards.left, boards.right].filter(Boolean);
+    return sides.some((b) => (b.items || []).some((it) => it.type === type));
+  }
+
+  _openWidgetPicker(side) {
+    this.setState({
+      widgetPickerStep: 'type',
+      widgetPlaceSide: side,
+      widgetPlaceType: null,
+      widgetPlaceW: 0,
+      widgetPlaceH: 0,
+    });
+  }
+
+  _pickWidgetType(type) {
+    const mode = this.state.shellMode || 'triple';
+    const cols = this._gridColsForMode(mode);
+    const def = this._widgetCatalog()[type];
+    const items = this._board(this.state.widgetPlaceSide).items || [];
+    const sizes = (def.sizes || [[2, 1]]).filter((sz) => sz[0] <= cols)
+      .filter((sz) => {
+        for (let y = 0; y < 2; y++) {
+          for (let x = 0; x < cols; x++) {
+            if (this._fits(items, cols, x, y, sz[0], sz[1])) return true;
+          }
+        }
+        return false;
+      });
+    if (!sizes.length) {
+      this.setState({ widgetPickerStep: null });
+      return;
+    }
+    if (sizes.length === 1) {
+      this._pickWidgetSize(sizes[0][0], sizes[0][1], type);
+      return;
+    }
+    this.setState({ widgetPickerStep: 'size', widgetPlaceType: type });
+  }
+
+  _pickWidgetSize(w, h, type) {
+    this.setState({
+      widgetPickerStep: null,
+      widgetPlaceType: type || this.state.widgetPlaceType,
+      widgetPlaceW: w,
+      widgetPlaceH: h,
+    });
+  }
+
+  _commitWidget(side, x, y, w, h) {
+    const mode = this.state.shellMode || 'triple';
+    const board = this._board(side, mode);
+    const type = this.state.widgetPlaceType;
+    if (!type) return;
+    board.items = (board.items || []).concat([{
+      id: 'w-' + type + '-' + Date.now().toString(36),
+      type, x, y, w, h,
+    }]);
+    this._persistWidgets();
+    this.setState({
+      widgetRev: (this.state.widgetRev || 0) + 1,
+      widgetPlaceSide: null,
+      widgetPlaceType: null,
+      widgetPlaceW: 0,
+      widgetPlaceH: 0,
+      widgetPickerStep: null,
+    });
+  }
+
+  _removeWidget(side, id) {
+    const board = this._board(side);
+    board.items = (board.items || []).filter((it) => it.id !== id);
+    this._persistWidgets();
+    this.setState({ widgetRev: (this.state.widgetRev || 0) + 1 });
+  }
+
+  _setSlotUse(side, use) {
+    const mode = this.state.shellMode || 'triple';
+    const board = this._board(side, mode);
+    board.use = use === 'widgets' ? 'widgets' : 'app';
+    this._persistWidgets();
+    const patch = { widgetRev: (this.state.widgetRev || 0) + 1 };
+    if (side === 'right') patch.rightSlotUse = board.use;
+    else patch.leftSlotUse = board.use;
+    this.setState(patch);
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setSlotUse === 'function') {
+        window.AppLauncherBridge.setSlotUse(side, board.use);
+      }
+    } catch (e) {}
+  }
+
+  _syncSlotUseToNative() {
+    const mode = this._shellMode || this.state.shellMode || 'triple';
+    const left = this._board('left', mode).use || 'app';
+    const right = this._board('right', mode).use || 'app';
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setSlotUse === 'function') {
+        window.AppLauncherBridge.setSlotUse('left', left);
+        if (mode !== 'appCar') window.AppLauncherBridge.setSlotUse('right', right);
+      }
+    } catch (e) {}
+  }
+
+  _fmtMediaTime(ms) {
+    const total = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  _mediaTransport(cmd) {
+    try {
+      if (!window.MediaBridge) {
+        console.warn('[media] MediaBridge missing');
+        return;
+      }
+      if (cmd === 'prev') window.MediaBridge.prev();
+      else if (cmd === 'next') window.MediaBridge.next();
+      else window.MediaBridge.playPause();
+    } catch (e) {
+      console.warn('[media] transport failed', cmd, e);
+    }
+  }
+
+  applyMediaNowPlaying(payload) {
+    const p = payload || {};
+    // Don't inject album-art base64 into React state while the GLB pipeline is
+    // still running — that stalls the MMI WebView and keeps the loader up.
+    if (this.state.loading) {
+      this._pendingMediaPayload = p;
+      return;
+    }
+    this._applyMediaNowPlayingNow(p);
+  }
+
+  _applyMediaNowPlayingNow(payload) {
+    const p = payload || {};
+    const hasTrack = !!p.hasTrack || !!(p.title || p.artist);
+    const art = p.artDataUrl || '';
+    this.setState({
+      mediaTitle: p.title || '',
+      mediaArtist: p.artist || '',
+      mediaAlbum: p.album || '',
+      mediaPlaying: !!p.playing,
+      mediaDurationMs: Number(p.durationMs) || 0,
+      mediaPositionMs: Number(p.positionMs) || 0,
+      mediaAppLabel: p.appLabel || (p.needsListener ? 'ENABLE MEDIA ACCESS' : 'MEDIA'),
+      mediaNeedsListener: !!p.needsListener,
+      // Apply metadata first; attach art on the next frame if present.
+      mediaArt: '',
+      mediaHasTrack: hasTrack,
+    });
+    this._mediaPositionMs = Number(p.positionMs) || 0;
+    this._syncMediaPositionDom(this._mediaPositionMs, Number(p.durationMs) || 0);
+    if (art) {
+      setTimeout(() => {
+        if (this.state.loading) return;
+        this.setState({ mediaArt: art });
+      }, 0);
+    }
+  }
+
+  applyMediaPosition(ms) {
+    if (this.state.loading) return;
+    const pos = Number(ms) || 0;
+    this._mediaPositionMs = pos;
+    // Keep React state in sync so re-renders (e.g. art attach) don't reset the bar to 0.
+    if (Math.abs((this.state.mediaPositionMs || 0) - pos) >= 400) {
+      this.setState({ mediaPositionMs: pos });
+    }
+    this._syncMediaPositionDom(pos, this.state.mediaDurationMs || 0);
+  }
+
+  _syncMediaPositionDom(pos, dur) {
+    const width = (dur > 0 ? Math.min(100, Math.max(0, (pos / dur) * 100)) : 0) + '%';
+    const time = this._fmtMediaTime(pos);
+    document.querySelectorAll('.hv-media-progress > span').forEach((el) => { el.style.width = width; });
+    document.querySelectorAll('.hv-media-times span:first-child').forEach((el) => { el.textContent = time; });
+  }
+
+  _finishLoading(extra) {
+    if (this._loadSafetyTimer) {
+      clearTimeout(this._loadSafetyTimer);
+      this._loadSafetyTimer = null;
+    }
+    // Defer intro until after loading=false has painted (see componentDidUpdate).
+    // Keep the car hidden the whole time — including APP+APP where there is no intro.
+    if (this._pendingIntro) {
+      this._pendingIntro = false;
+      this._setCarSceneVisible(false);
+      if (this._shouldShowCar()) {
+        this._introWaitingForLoader = true;
+      }
+    }
+    const patch = Object.assign({
+      loading: false,
+      processing: false,
+      progress: 100,
+    }, extra || {});
+    if (this._pendingShellPatch) {
+      Object.assign(patch, this._pendingShellPatch);
+      this._pendingShellPatch = null;
+    }
+    this.setState(patch);
+    this._notifyViewerReady();
+    const pendingMedia = this._pendingMediaPayload;
+    this._pendingMediaPayload = null;
+    if (pendingMedia) {
+      setTimeout(() => this._applyMediaNowPlayingNow(pendingMedia), 0);
+    }
+  }
+
+  _notifyViewerReady() {
+    window.__viewerReadyForMedia = true;
+    try {
+      if (window.MediaBridge && typeof window.MediaBridge.onViewerReady === 'function') {
+        window.MediaBridge.onViewerReady();
+      }
+    } catch (e) {}
   }
 
   _captureVariant(key, root) {
@@ -8624,15 +10349,17 @@ class Component extends DCLogic {
       this._variantHiddenMeshes = null;
     }
 
-    // Show the chosen model, hide the others.
+    // Show the chosen model, hide the others — still respect car-scene gate
+    // (loading / appsOnly / pre-intro).
+    const showCar = this._carSceneVisible === true;
     Object.keys(this._variants).forEach((k) => {
       const r = this._variants[k] && this._variants[k].root;
-      if (r) r.visible = (k === key);
+      if (r) r.visible = showCar && (k === key);
     });
 
     // If this variant uses another model's wheels, keep that model's root visible
     // but hide every mesh in it that isn't a wheel or brake disc.
-    if (b._inheritedWheelsFrom) {
+    if (showCar && b._inheritedWheelsFrom) {
       const srcV = this._variants[b._inheritedWheelsFrom];
       if (srcV && srcV.root) {
         srcV.root.visible = true;
@@ -8736,6 +10463,11 @@ class Component extends DCLogic {
       this._loadVariantModel(v, (err) => {
         if (err) return; // loader already rolled the overlay back
         this._applyModelVariant(v);
+        // Non-stock catalog picks don't start another wheel fetch, so nothing
+        // else would clear the overlay that _setModelVariant just raised.
+        if (this.state.loading && !this.state.catalogLoadingKey) {
+          this._finishLoading();
+        }
       });
       return;
     }

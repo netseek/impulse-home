@@ -3,3 +3,4 @@
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
+-keep class com.havalh6.viewer.MediaNotificationListener

@@ -48,6 +48,27 @@ adb shell settings put global force_resizable_activities 1
 Then relaunch the viewer and tap an app icon — it should float over the launcher.
 On the Haval MMI, freeform is typically already available from the OEM.
 
+Maps / browser / generic apps open in the **left** freeform slot. Spotify, YouTube
+Music, Deezer, and similar music apps open in the **right** slot. Re-tapping the
+same music icon closes that window and restores the idle now-playing card.
+
+## Now playing (notification listener)
+
+The idle media card reads the active `MediaSession` via a notification listener
+(session watch runs inside `MediaNotificationListener`). Without that access the
+column shows “Notification access required”; music apps still launch into the
+right slot. Enable once (re-run after each reinstall):
+
+```powershell
+adb shell cmd notification allow_listener com.havalh6.viewer/com.havalh6.viewer.MediaNotificationListener
+```
+
+Then reopen the viewer. Transport buttons (prev / play-pause / next) talk to the
+session’s `MediaController`.
+
+Opening **CONFIG** (top-right) hides the media rail and dismisses any right-slot
+music app; closing CONFIG restores the idle rail.
+
 ## Runtime design
 
 - Native Java activity; no Capacitor, Cordova, React Native, or AndroidX.
