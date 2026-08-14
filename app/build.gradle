@@ -23,6 +23,13 @@ android {
     }
 
     sourceSets.main.assets.srcDir("$buildDir/generated/viewerAssets")
+
+    // NOTE: do NOT add "glb"/"hdr" to androidResources.noCompress. It was tried
+    // and it is measurably worse. Storing assets uncompressed lets them be read
+    // without an inflate pass, but on this head unit the bottleneck is flash
+    // I/O, not CPU: reading the same 10.79MB car model cold measured 2221ms
+    // stored vs 516ms deflated (8.4MB on disk). Fewer bytes off flash wins by a
+    // wide margin, so let AAPT compress them.
 }
 
 def prepareViewerSource = tasks.register("prepareViewerSource", Exec) {

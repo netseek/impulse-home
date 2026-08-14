@@ -164,7 +164,7 @@
     }
     @media (max-width: 640px) {
       .hv-toolbar button.hv-tool-btn { width: 54px !important; min-width: 54px !important; }
-      .hv-config-panel { top: 22px !important; right: 14px !important; max-height: calc(100vh - 182px); height: auto; }
+      .hv-config-panel { top: var(--hv-safe-top, 22px) !important; right: 14px !important; max-height: calc(100vh - 182px); height: auto; }
     }
     .hv-widget-board {
       position: absolute;
@@ -455,7 +455,7 @@
     .hv-media-transport button:active { transform: scale(0.96); }
     .hv-brand {
       position: absolute;
-      top: 22px;
+      top: var(--hv-safe-top, 22px);
       left: 30px;
       display: flex;
       flex-direction: column;
@@ -542,7 +542,7 @@
     }
   </style>
 </helmet>
-<div ref="{{ outerRef }}" style="position: fixed; inset: 0; background: radial-gradient(130% 120% at 50% 38%, #efefef 0%, #dcdee0 78%, #cfd1d4 100%); font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease;">
+<div ref="{{ outerRef }}" style="position: fixed; inset: 0; background: radial-gradient(130% 120% at 50% 38%, #efefef 0%, #dcdee0 78%, #cfd1d4 100%); font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }};">
 
   <div ref="{{ containerRef }}" style="position: absolute; inset: 0;"></div>
 
@@ -837,7 +837,7 @@
   </div>
 
   <!-- configure panel on the right -->
-  <div class="hv-config-panel slim-scrollbar" style="position: absolute; top: 22px; right: {{ configPanelRight }}; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; height: auto; max-height: calc(100vh - 182px); overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 11;">
+  <div class="hv-config-panel slim-scrollbar" style="position: absolute; top: {{ safeTop }}; right: {{ configPanelRight }}; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; height: auto; max-height: calc(100vh - 182px); overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 11;">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div style="font-size: 12px; letter-spacing: .3em; opacity: .55; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ configHeaderTitle }}</div>
@@ -1164,6 +1164,62 @@
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script>
+// ── Car signal contract ─────────────────────────────────────────────────────
+// Publisher: havalshisuku ServiceManager.OnDataChanged → TelemetryPublisher
+//   → broadcast "br.com.redesurftank.havalshisuku.CAR_DATA_UPDATE" {key,value}
+//   → MainActivity.telemetryReceiver → window.onCarDataUpdate → carTelemetry.
+// Keys are CarConstants values; every value arrives as a STRING.
+//
+// Only keys listed here are consumed — the bus caches everything else.
+const CAR_SIGNALS = {
+  doors: 'car.basic.door_status',
+  speed: 'car.basic.vehicle_speed',
+  night: 'isNight',
+  // Glass roof. There is no dedicated trunk/tailgate key in CarConstants —
+  // the tailgate rides in the door_status vector (CAR_DOOR_SLOTS.trunk).
+  sunroof: 'car.basic.sunroof_status',
+  curtain: 'car.basic.sunshade_status',
+  steering: 'car.basic.steering_wheel_angle',
+  // Viewer light group → car key. The car exposes low/high beam separately;
+  // the viewer's "headlight" group is the low beam.
+  lights: {
+    headlight: 'car.basic.low_beam_light_status',
+    highbeam:  'car.basic.high_beam_light_status',
+    position:  'car.basic.low_light_status',
+    fogFront:  'car.basic.front_fog_light_status',
+    fogRear:   'car.basic.rear_fog_light_status',
+    hazard:    'car.basic.hazard_light_status',
+    turnL:     'car.basic.left_turn_light_status',
+    turnR:     'car.basic.right_turn_light_status',
+  },
+};
+
+// door_status is a brace-wrapped per-opening vector, not a bitmask. Captured off
+// the car (Its_IntelligentVehicleControlService):
+//   {1,0,0,0,0,0} → driver door open       (slot 0 CONFIRMED)
+//   {0,0,0,0,0,N} → tailgate               (slot 5 CONFIRMED)
+//   {0,0,0,0,0,0} → everything shut
+// Slots 1-3 (fr, rl, rr) still follow the conventional order and are unconfirmed.
+// Slot 4 is unidentified — likely the bonnet; nothing is mapped to it.
+const CAR_DOOR_SLOTS = { fl: 0, fr: 1, rl: 2, rr: 3, trunk: 5 };
+
+// Slot values are NOT all binary. The powered tailgate reports travel states:
+// opening/closing cycle observed as -1 → 3 → 1 → 5 → 4 → -1 → 0.
+// Treat any positive value as "not shut", 0 as shut, and negative as unknown
+// (leave the mesh where it is rather than guessing).
+const CAR_OPENING_UNKNOWN = -1;
+
+// car.basic.steering_wheel_angle is the STEERING WHEEL angle (roughly +/-500 deg,
+// lock to lock); the viewer's wheelAngle is the ROAD WHEEL angle, capped at +/-35.
+// UNCALIBRATED: turn the wheel to full lock with ?cartrace on, read the peak
+// value, and set this to peak/35.
+const CAR_STEERING_RATIO = 14.3;
+const CAR_ROAD_WHEEL_MAX_DEG = 35;
+
+// ASSUMPTION: vehicle_speed is km/h. The viewer's motionSpeed unit is km/h/40
+// (see motionSpeedLabel, which renders Math.abs(motionSpeed) * 40 + ' km/h').
+const CAR_SPEED_KMH_PER_UNIT = 40;
+
 class Component extends DCLogic {
   state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, saveFlash: false,
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
@@ -1355,9 +1411,167 @@ class Component extends DCLogic {
 
   _wireCarTelemetry() {
     if (!window.carTelemetry || typeof window.carTelemetry.onUpdate !== 'function') return;
-    window.carTelemetry.onUpdate((key) => {
-      if (key === 'isNight' && this.state.timeMode === 'auto') this._syncAutoNightMode();
+    try {
+      const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
+      this._carTrace = parse(location.search).has('cartrace')
+        || parse(location.hash).has('cartrace');
+    } catch (e) {
+      this._carTrace = false;
+    }
+    window.carTelemetry.onUpdate((key, value) => this._applyCarSignal(key, value));
+  }
+
+  /** Every car key this viewer consumes, flattened for snapshot replay. */
+  _carSignalKeys() {
+    const lights = CAR_SIGNALS.lights;
+    return [CAR_SIGNALS.doors, CAR_SIGNALS.speed, CAR_SIGNALS.night,
+            CAR_SIGNALS.sunroof, CAR_SIGNALS.curtain, CAR_SIGNALS.steering]
+      .concat(Object.keys(lights).map((k) => lights[k]));
+  }
+
+  /**
+   * Pull current values out of the bus/native cache and apply them.
+   *
+   * The broadcast path has no snapshot event (unlike the WebSocket path, which
+   * gets one on connect), and the native cache only fills as broadcasts arrive.
+   * Without this the car would be stuck at defaults on load until some signal
+   * happened to change.
+   */
+  _replayCarTelemetry() {
+    if (!window.carTelemetry || typeof window.carTelemetry.get !== 'function') return;
+    this._carSignalKeys().forEach((key) => {
+      let value;
+      try { value = window.carTelemetry.get(key, ''); } catch (e) { return; }
+      if (value === '' || value === null || value === undefined) return;
+      this._applyCarSignal(key, value);
     });
+  }
+
+  _applyCarSignal(key, value) {
+    if (this._carTrace) console.log('[CarSignal]', key, '=', value);
+    if (key === CAR_SIGNALS.night) {
+      if (this.state.timeMode === 'auto') this._syncAutoNightMode();
+      return;
+    }
+    if (key === CAR_SIGNALS.doors)  { this._applyCarDoors(value); return; }
+    if (key === CAR_SIGNALS.speed)  { this._applyCarSpeed(value); return; }
+    if (key === CAR_SIGNALS.sunroof) { this._applyCarOpening('_setSunroofOpen', value); return; }
+    if (key === CAR_SIGNALS.curtain) { this._applyCarOpening('_setCurtainOpen', value); return; }
+    if (key === CAR_SIGNALS.steering) { this._applyCarSteering(value); return; }
+    const lights = CAR_SIGNALS.lights;
+    for (const group of Object.keys(lights)) {
+      if (lights[group] === key) { this._setLightFromCar(group, this._carBool(value)); return; }
+    }
+  }
+
+  /**
+   * Car booleans arrive as "1"/"0" or "true"/"false" depending on the key.
+   * Some signals use the same brace-vector shape as door_status ("{1,0}"), so
+   * unwrap that and read the first element rather than failing the compare.
+   */
+  _carBool(value) {
+    if (value === true || value === 1) return true;
+    let s = String(value).trim();
+    if (s.charAt(0) === '{') s = s.replace(/^\{|\}$/g, '').split(',')[0].trim();
+    return s === '1' || s === 'true';
+  }
+
+  /**
+   * Accepts the vector the car actually sends ("{1,0,0,0,0,0}") and, as a
+   * fallback, a plain integer bitmask — the shape the other publisher build
+   * uses. Anything else is left alone rather than slamming every door shut.
+   */
+  _applyCarDoors(value) {
+    const raw = String(value).trim();
+    let slots = null;
+    if (raw.charAt(0) === '{' || raw.indexOf(',') >= 0) {
+      slots = raw.replace(/^\{|\}$/g, '').split(',').map((s) => parseInt(s.trim(), 10));
+      if (slots.some((n) => !isFinite(n))) slots = null;
+    } else {
+      const mask = parseInt(raw, 10);
+      if (isFinite(mask)) {
+        slots = [];
+        for (let i = 0; i < 6; i++) slots.push((mask >> i) & 1);
+      }
+    }
+    if (!slots) {
+      if (this._carTrace) console.warn('[CarSignal] door_status unparsed:', value);
+      return;
+    }
+    // n > 0 not shut, n === 0 shut, n < 0 unknown → leave the mesh alone.
+    const applySlot = (n, apply) => {
+      if (n === undefined || !isFinite(n) || n < 0) return;
+      apply(n > 0 ? 100 : 0);
+    };
+    for (const door of ['fl', 'fr', 'rl', 'rr']) {
+      applySlot(slots[CAR_DOOR_SLOTS[door]], (pct) => this._setDoorOpen(door, pct));
+    }
+    if (typeof this._setTrunkOpen === 'function') {
+      applySlot(slots[CAR_DOOR_SLOTS.trunk], (pct) => this._setTrunkOpen(pct));
+    }
+  }
+
+  /**
+   * Sunroof / sunshade openness → the viewer's 0-100 percentage.
+   *
+   * UNVERIFIED: neither key has been observed on the car (see below), so this
+   * accepts both plausible shapes — a 0-100 percentage, or an open/shut enum.
+   * Values of 0 and 1 are ambiguous between the two; 1 is read as fully open,
+   * because a 1% opening is not a state the car would report.
+   */
+  _applyCarOpening(setter, value) {
+    if (typeof this[setter] !== 'function') return;
+    let raw = String(value).trim();
+    if (raw.charAt(0) === '{') raw = raw.replace(/^\{|\}$/g, '').split(',')[0].trim();
+    const n = parseFloat(raw);
+    if (!isFinite(n)) {
+      if (this._carTrace) console.warn('[CarSignal] opening unparsed:', value);
+      return;
+    }
+    this[setter](n <= 1 ? (n > 0 ? 100 : 0) : Math.min(100, n));
+  }
+
+  /** Steering-wheel degrees → road-wheel degrees, clamped to the model's range. */
+  _applyCarSteering(value) {
+    if (typeof this._setWheelAngle !== 'function') return;
+    let raw = String(value).trim();
+    if (raw.charAt(0) === '{') raw = raw.replace(/^\{|\}$/g, '').split(',')[0].trim();
+    const wheelDeg = parseFloat(raw);
+    if (!isFinite(wheelDeg)) {
+      if (this._carTrace) console.warn('[CarSignal] steering angle unparsed:', value);
+      return;
+    }
+    const road = wheelDeg / CAR_STEERING_RATIO;
+    const clamped = Math.max(-CAR_ROAD_WHEEL_MAX_DEG, Math.min(CAR_ROAD_WHEEL_MAX_DEG, road));
+    // Sub-degree jitter would re-run the wheel transform every frame on a live bus.
+    if (this._lastCarSteerDeg !== undefined && Math.abs(clamped - this._lastCarSteerDeg) < 0.5) return;
+    this._lastCarSteerDeg = clamped;
+    this._setWheelAngle(clamped);
+  }
+
+  _applyCarSpeed(value) {
+    const kmh = parseFloat(String(value).trim());
+    if (!isFinite(kmh)) {
+      if (this._carTrace) console.warn('[CarSignal] vehicle_speed not a number:', value);
+      return;
+    }
+    this._setMotionSpeed(kmh / CAR_SPEED_KMH_PER_UNIT);
+  }
+
+  /**
+   * toggleLight() is a toggle and owns the composite rules (high beam needs
+   * head, hazard drives both indicators), so drive it to the target rather than
+   * writing state.lights directly. Before the scene exists there are no meshes
+   * to light — stage the value and let _restoreLightsFromState() apply it.
+   */
+  _setLightFromCar(group, on) {
+    if (!(group in this.state.lights)) return;
+    if (!!this.state.lights[group] === !!on) return;
+    if (!this._carSceneReady) {
+      this.state.lights[group] = !!on;
+      return;
+    }
+    this.toggleLight(group);
   }
 
   _readCarIsNight() {
@@ -1495,6 +1709,8 @@ class Component extends DCLogic {
     if (!this._pendingSceneSettings) {
       if (this.state.timeMode === 'auto') this._syncAutoNightMode(true);
       else if (this.state.timeMode === 'night') this._applyNightMode(true, true);
+      this._carSceneReady = true;
+      this._replayCarTelemetry();
       return;
     }
     this._pendingSceneSettings = false;
@@ -1539,6 +1755,10 @@ class Component extends DCLogic {
     if (this.state.timeMode === 'day') this._applyNightMode(false, true);
     else if (this.state.timeMode === 'night') this._applyNightMode(true, true);
     else this._syncAutoNightMode(true);
+
+    // Saved settings are applied above; live car state wins over them.
+    this._carSceneReady = true;
+    this._replayCarTelemetry();
   }
 
   _restoreLightsFromState() {
@@ -1610,6 +1830,9 @@ class Component extends DCLogic {
       panelWidth: '248px',
       panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
       dayNightDisplay: (!s.loading && !s.error) ? 'flex' : 'none',
+      // The MMI StatusBar is its own window and no longer overlaps ours, so the
+      // old 68px Android inset was dead space above the brand and the buttons.
+      safeTop: '22px',
       // CONFIG stays top-right; opening it hides the media column (no inset).
       toolbarTop: '22px',
       toolbarRight: ((s.panelOpen && s.configExpanded) ? 286 : 26) + 'px',
@@ -1631,14 +1854,16 @@ class Component extends DCLogic {
       shellGlyphAppsDisplay: s.shellMode === 'appsOnly' ? 'flex' : 'none',
       toggleShellMenu: () => {
         const opening = !this.state.shellMenuOpen;
-        if (opening) {
-          // Freeform windows sit above the WebView — dismiss them so the menu is visible.
-          try {
-            if (window.AppLauncherBridge && typeof window.AppLauncherBridge.dismissOverlays === 'function') {
-              window.AppLauncherBridge.dismissOverlays();
-            }
-          } catch (e) {}
-        }
+        // Freeform windows sit above the WebView. Raise our own task while the
+        // menu is open rather than closing them (older builds dismissed them).
+        try {
+          const bridge = window.AppLauncherBridge;
+          if (bridge && typeof bridge.setChromeOnTop === 'function') {
+            bridge.setChromeOnTop(opening);
+          } else if (opening && bridge && typeof bridge.dismissOverlays === 'function') {
+            bridge.dismissOverlays();
+          }
+        } catch (e) {}
         this.setState({ shellMenuOpen: opening });
       },
       setShellTriple: () => this._setShellMode('triple'),
@@ -6117,6 +6342,10 @@ class Component extends DCLogic {
     const THREE = this.THREE;
     const file = e.target.files && e.target.files[0];
     if (!file || !this.rgbe || !this.pmrem || !THREE) return;
+    // A custom upload replaces whatever named HDRI was applied, so clear the
+    // dedupe key — otherwise re-picking that same name afterwards would be
+    // skipped as "already active" and the upload would stay on screen.
+    this._hdriActiveKey = null;
     const requestId = (this._hdriRequestId || 0) + 1;
     this._hdriRequestId = requestId;
     const url = URL.createObjectURL(file);
@@ -7549,6 +7778,7 @@ class Component extends DCLogic {
   loadHDRI(key) {
     const THREE = this.THREE;
     if (key === 'studio') {
+      this._hdriActiveKey = 'studio';
       this._hdriRequestId = (this._hdriRequestId || 0) + 1;
       if (this.roomEnv && this.scene) {
         this._setGeneratedEnvironment(null);
@@ -7564,7 +7794,18 @@ class Component extends DCLogic {
       return;
     }
     const map = {
-      st_peters: 'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/st_peters_square_night_1k.hdr',
+      // st_peters is the DEFAULT hdriKey, so it is on the boot path and is
+      // packaged rather than fetched. It used to point at dl.polyhaven.org,
+      // which from the car is a real internet fetch: measured ~5-10s when the
+      // head unit has connectivity, and an outright failure when it does not —
+      // in which case _setGeneratedEnvironment() never ran and the car rendered
+      // with no HDRI environment at all.
+      //
+      // This is the same 1024x512 Radiance file polyhaven serves, so the look
+      // is unchanged; it just loads from the APK. The remaining entries are
+      // opt-in picks from the config panel and stay remote — they simply fail
+      // when the car is offline.
+      st_peters: 'assets/st_peters_square_night_1k.hdr',
       venice: 'venice_sunset_1k.hdr',
       quarry: 'quarry_01_1k.hdr',
       overpass: 'pedestrian_overpass_1k.hdr',
@@ -7577,6 +7818,14 @@ class Component extends DCLogic {
         : 'https://threejs.org/examples/textures/equirectangular/' + entry)
       : null;
     if (!file || !this.rgbe || !this.pmrem || !THREE) return;
+    // Boot calls this twice for the same key: once from componentDidMount for
+    // state.hdriKey, then again from the restore-saved-settings pass for the
+    // identical saved.hdriKey. The second pass re-fetched the HDR and re-ran the
+    // PMREM convolution for no visible change, so skip a key that is already
+    // applied or in flight. Cleared on failure (below) and on custom upload so
+    // re-selecting the same entry can still recover.
+    if (key === this._hdriActiveKey) return;
+    this._hdriActiveKey = key;
     const requestId = (this._hdriRequestId || 0) + 1;
     this._hdriRequestId = requestId;
     this.rgbe.load(
@@ -7606,7 +7855,12 @@ class Component extends DCLogic {
         if (this.requestRender) this.requestRender(4);
       },
       undefined,
-      (err) => console.warn('[Haval H6] HDRI failed to load: ' + key, err)
+      (err) => {
+        // Let a later selection of this same key retry (the remote entries fail
+        // whenever the car is offline).
+        if (this._hdriActiveKey === key) this._hdriActiveKey = null;
+        console.warn('[Haval H6] HDRI failed to load: ' + key, err);
+      }
     );
   }
 
@@ -7943,15 +8197,27 @@ class Component extends DCLogic {
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
 
-      // --- Load GLBs (Draco-compressed glTF with PBR materials) ---
+      // --- Load GLBs (glTF with PBR materials) ---
+      // The boot-critical HEV pair ships UNCOMPRESSED (see
+      // scripts/build-fast-models.mjs): Draco decode of the car was ~10.3s of
+      // the cold start on the MMI, and the GLBs are read from the APK, so
+      // compressing them saves nothing that matters here. The GT pair and the
+      // wheel catalog are still Draco — they are off the cold path (GT is lazy,
+      // wheels are small) and uncompressed geometry is bulky.
+      //
+      // So DRACOLoader is still needed, but it is lazy: it only fetches
+      // vendor/draco/* when it actually meets a Draco primitive, which on a
+      // normal boot is either never or just the small stock rim.
+      //
+      // Android was pinned to Draco's JS decoder after WASM *worker* crashes on
+      // this WebView. Re-measured on the car (WebView 91.0.4472.114, SA8155)
+      // the WASM decoder ran clean across repeated cold decodes and is ~3x
+      // faster — 3.4s vs 10.3s on a car-sized model — so it is used again. A
+      // single worker keeps peak MMI memory predictable.
       const draco = new THREE.DRACOLoader();
       draco.setDecoderPath('vendor/draco/');
-      // Android System WebView 91 on the Haval MMI advertises WASM/SIMD but its
-      // 2021 runtime crashes Draco workers with signature/memory errors. The JS
-      // decoder is slower only during initial model decode and is reliable on
-      // that WebView. A single worker also keeps peak MMI memory predictable.
       if (this._androidApp) {
-        draco.setDecoderConfig({ type: 'js' });
+        draco.setDecoderConfig({ type: 'wasm' });
         draco.setWorkerLimit(1);
       }
       this._dracoLoader = draco;
@@ -7964,12 +8230,16 @@ class Component extends DCLogic {
       // the catalog pipeline immediately installs the resizable stock rim below.
       // Tires, brakes and wheel transforms remain embedded as its anchors.
       const HEV_URL = this._perfLow
-        ? 'assets/haval-h6-hev-lite.glb?rev=1'
-        : 'assets/haval-h6-hev.glb?rev=2';
+        ? 'assets/haval-h6-hev-lite.glb?rev=3'
+        : 'assets/haval-h6-hev.glb?rev=4';
       const GT_URL = this._perfLow
         ? 'assets/haval-h6-gt-lite.glb?rev=1'
         : 'assets/haval-h6-gt.glb';
-      const HEV_BYTES = this._perfLow ? 2900940 : 5748792;
+      // KEEP IN SYNC with the on-disk sizes — the MMI asset stream has no
+      // Content-Length, so the progress bar divides by these. The HEV pair is
+      // shipped uncompressed by scripts/build-fast-models.mjs (hence the jump
+      // from ~5.7MB); the GT pair is still Draco.
+      const HEV_BYTES = this._perfLow ? 8473284 : 11321360;
       const GT_BYTES = this._perfLow ? 3009120 : 4871268;
       const profiles = this._modelProfiles();
       // The HEV/PHEV car is PRIMARY: visible at start, drives the camera framing,
@@ -9872,6 +10142,12 @@ class Component extends DCLogic {
       widgetPickerStep: null,
       widgetPlaceSide: null,
     });
+    // Menu is gone — hand the z-order back to the freeform slots.
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setChromeOnTop === 'function') {
+        window.AppLauncherBridge.setChromeOnTop(false);
+      }
+    } catch (e) {}
     this._applyFitCamera();
     this._syncCarSceneForShell();
     try {
