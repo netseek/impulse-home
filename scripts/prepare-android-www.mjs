@@ -92,8 +92,10 @@ await copyDownlevelJs(
   path.join(outDir, 'vendor', 'three'),
 );
 
-// Non-Three vendor assets (fonts, draco, react) copy as-is.
-for (const name of ['draco', 'fonts', 'react']) {
+// Non-Three vendor assets (fonts, draco, basis, react) copy as-is.
+// basis/ is the Basis Universal transcoder backing KTX2Loader — emscripten
+// output, same situation as draco/, so it is copied rather than downleveled.
+for (const name of ['draco', 'fonts', 'basis', 'react']) {
   const from = path.join(root, 'vendor', name);
   const to = path.join(outDir, 'vendor', name);
   fs.cpSync(from, to, { recursive: true });

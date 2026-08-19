@@ -69,16 +69,72 @@ session’s `MediaController`.
 Opening **CONFIG** (top-right) hides the media rail and dismisses any right-slot
 music app; closing CONFIG restores the idle rail.
 
+### Projection audio never has a MediaSession
+
+Android Auto and CarPlay play through the projection stack, which registers no
+`MediaSession` at all — the notification listener sees nothing while either is
+playing. Both are read straight off the head unit's own binders instead
+(transaction ids and parcel layouts mirror Haval Impulse, which drives the same
+services):
+
+| Source | Class | Service | How |
+|---|---|---|---|
+| Android Auto, USB | `MediaCenterSource` | `com.beantechs.mediacenter` | poll `getCurrentSource`, then media info + play state for source `402` (AA) or `2` (USB) |
+| CarPlay | `CarPlaySource` | `com.ts.carplay` | register a now-playing callback binder; artwork arrives as raw JPEG bytes |
+
+`MediaNowPlaying` keeps the latest track per source and picks a winner —
+playing beats paused, and between equals projection beats a plain session — so
+a paused Android Auto session cannot hide the app you are actually listening to.
+Play/pause routes back to whichever source won (MediaCenter `resume`/`pause` by
+source, CarPlay HID over iAP); skip falls back to media keys.
+
+### Cover art resolution
+
+Bitmaps sent inside `MediaMetadata` are capped at 320dp by the framework, which
+on this 160dpi unit means 320px stretched across a ~620px card. So art is taken
+from the highest-resolution source available: an art *URI* is decoded locally
+(uncapped) and wins over the parceled bitmap, and the encode cap is 720px.
+
+The YouTube app is a special case — it publishes **no** artwork: no bitmap, no
+art URI, not even a video id (`TITLE`, `ARTIST`, `ALBUM_ARTIST`, `DURATION` and
+two video-size keys, and `largeIcon=null` on the notification). Its title is
+exact, so the video is looked up by name and the `i.ytimg.com` thumbnail is used
+— one request per track, cached, tried maxres → hq720 → hq → mq.
+
+### Logging
+
+The head unit sets `persist.log.tag=WARN`, so **`Log.i` never reaches logcat**.
+Media diagnostics use `Log.w` for that reason. To see everything for a session:
+
+```powershell
+adb shell setprop log.tag.H6Media DEBUG
+```
+
 ## Runtime design
 
 - Native Java activity; no Capacitor, Cordova, React Native, or AndroidX.
 - Fullscreen immersive landscape with navigation/status bars hidden.
 - Hardware-accelerated WebGL through the MMI's system WebView.
 - Offline packaged resources with no `INTERNET` permission.
-- `?android` keeps regular rendering while forcing the JavaScript Draco decoder
-  required by the Haval MMI's older System WebView.
+- `?android` selects the mobile performance tier (`_perfMobile`): reduced
+  post-processing resolution, fewer anamorphic streak taps, no transmission
+  render target, no framebuffer preservation, and an adaptive pixel-ratio floor
+  of 0.7. None of these change what the car looks like — the visible-quality
+  reductions live in the separate opt-in `?lite` tier (`_perfLow`).
+- Draco uses the WASM decoder with a single worker on Android. It was previously
+  pinned to the JavaScript decoder after WASM worker crashes, but on
+  WebView 91.0.4472.114 / SA8155 it measures clean and roughly 3x faster.
+- Textures are KTX2/UASTC (`KHR_texture_basisu`) and transcode to ASTC 4x4 on
+  the Adreno 640, so a 2048² map costs 4 MB of VRAM instead of 16 MB. Requires
+  `vendor/basis/` in the APK — see `scripts/build-ktx2-textures.mjs`.
 - Backup models are not packaged, keeping approximately 176 MB of development
   assets out of the APK.
+
+Frame metrics reach logcat from debug builds via `TelemetryBridge.reportPerf`:
+
+```bash
+adb logcat -s H6Perf
+```
 
 The Three.js/WebGL feature set still depends on the Android System WebView
 version installed by the MMI. Test the debug APK on the actual head unit before
@@ -146,7 +202,7 @@ caches every key it sees; the viewer consumes only the ones in `CAR_SIGNALS`
 | Steering (road wheels) | `car.basic.steering_wheel_angle` |
 | Low beam (`headlight`) | `car.basic.low_beam_light_status` |
 | High beam | `car.basic.high_beam_light_status` |
-| Position / DRL | `car.basic.low_light_status` |
+| Position / clearance lamps | **UNRESOLVED** — see below |
 | Front / rear fog | `car.basic.front_fog_light_status`, `car.basic.rear_fog_light_status` |
 | Hazard | `car.basic.hazard_light_status` |
 | Turn L / R | `car.basic.left_turn_light_status`, `car.basic.right_turn_light_status` |
@@ -182,6 +238,61 @@ negative value as unknown (the mesh is left where it is rather than guessing).
 
 `car.basic.vehicle_speed` is still assumed to be km/h — unconfirmed, the car has
 not moved during testing.
+
+### Sunroof is tilt + slide, not one axis
+
+`getSkylightLevel()` reported **200 with the lid merely tilted** (raised at the
+rear edge, not slid back), confirmed on the car. Scaling that linearly showed a
+vent as fully open. `_applySunroofTransform` already models both phases — below
+ratio 0.25 it lifts with no rearward slide, above it slides — so tilt maps onto
+that lift point:
+
+| Value | Meaning | Viewer |
+| --- | --- | --- |
+| `0` | shut | 0% |
+| `200` | tilted / vented (**confirmed**) | 25% — lift only |
+| `1-100` | slide position (**assumed**) | 25-100% |
+
+The slide range still needs a full open sweep to confirm.
+
+### Position lamps: the car exposes no AUTO-mode state
+
+Established by capturing every signal the vehicle service pushed to every app
+while cycling the stalk OFF -> position -> AUTO -> low beam -> AUTO. In that
+whole window exactly **two** light keys moved, and nothing else:
+
+| Key | Behaviour |
+| --- | --- |
+| `car.drive.setting.outline_lamps_state` | `1` while the stalk is on position, else `0` |
+| `car.basic.low_beam_light_status` | `1` while the stalk is on low beam, else `0` |
+
+Both read `0` on AUTO — even with the lamps visibly lit. `outline_lamps_state`
+is the **stalk selection**, not lamp output, which is exactly why manual modes
+looked right and AUTO did not.
+
+Ruled out along the way:
+
+- `car.basic.low_light_status` and `car.basic.head_light_status` — in
+  `DEFAULT_KEYS`, but the vehicle returns empty for both, so `dispatchAllData`
+  skips them. Dead on this car.
+- `car.ipk_light.*` cluster tell-tales — no position-lamp indicator exists.
+
+So the viewer derives what it can: position lamps are physically always lit when
+a beam is on, giving
+
+```text
+position = stalk-selected OR low beam OR high beam
+```
+
+This is correct for every manual position and for AUTO at night. **AUTO in
+daylight is not solvable from the available signals** — the lit lamps are most
+likely DRLs, which are not published at all.
+
+Untried next step, if it matters enough: add `CAR_CONFIGURE_AUTO_HEADLIGHT`,
+`CAR_CONFIGURE_LIGHT_AUTO_SWITCH_SYSTEM`, `CAR_CONFIGURE_COMB_FRONT_LIGHT_SRC`
+and `CAR_CONFIGURE_PARKING_LIGHT` to `DEFAULT_KEYS` and re-snapshot. They are
+`configure.*` keys so they may only report the setting, but one of them might
+expose the AUTO output. Needs a havalshisuku rebuild.
 
 `car.basic.steering_wheel_angle` is the **steering wheel** angle (roughly +/-500
 deg lock to lock), while the viewer's `wheelAngle` is the **road wheel** angle,

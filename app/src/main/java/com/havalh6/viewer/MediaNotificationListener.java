@@ -1,13 +1,22 @@
 package com.havalh6.viewer;
 
+import android.app.Notification;
 import android.content.ComponentName;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.Icon;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
+import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.notification.NotificationListenerService;
+import android.service.notification.StatusBarNotification;
 import android.util.Log;
 
 import java.util.List;
@@ -211,7 +220,138 @@ public final class MediaNotificationListener extends NotificationListenerService
         MediaNowPlaying.syncPositionFromListener(controller);
     }
 
+    @Override
+    public void onNotificationPosted(StatusBarNotification sbn) {
+        if (controller == null || sbn == null) return;
+        if (!sbn.getPackageName().equals(controller.getPackageName())) return;
+        if (!MediaNowPlaying.needsArtwork()) return;
+        emitCurrent();
+    }
+
     private void emitCurrent() {
         MediaNowPlaying.emitFromController(this, controller);
+    }
+
+    /**
+     * YouTube (and some other players) put the video thumbnail on the media
+     * notification instead of {@code MediaMetadata} album art.
+     */
+    Bitmap artworkFromNotification(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return null;
+        StatusBarNotification[] notifs;
+        try {
+            notifs = getActiveNotifications();
+        } catch (Throwable t) {
+            Log.w(TAG, "getActiveNotifications failed", t);
+            return null;
+        }
+        if (notifs == null) return null;
+        Bitmap best = null;
+        int bestArea = 0;
+        for (StatusBarNotification sbn : notifs) {
+            if (sbn == null || !packageName.equals(sbn.getPackageName())) continue;
+            Bitmap candidate = bitmapFromNotification(sbn.getNotification());
+            if (candidate == null || candidate.isRecycled()) continue;
+            int area = candidate.getWidth() * candidate.getHeight();
+            if (area > bestArea) {
+                best = candidate;
+                bestArea = area;
+            }
+        }
+        return best;
+    }
+
+    private Bitmap bitmapFromNotification(Notification n) {
+        if (n == null) return null;
+        Bitmap best = null;
+        Bundle extras = n.extras;
+        if (extras != null) {
+            best = larger(best, extraBitmap(extras, Notification.EXTRA_PICTURE));
+            best = larger(best, extraBitmap(extras, Notification.EXTRA_LARGE_ICON_BIG));
+            best = larger(best, extraBitmap(extras, Notification.EXTRA_LARGE_ICON));
+            if (Build.VERSION.SDK_INT >= 31) {
+                best = larger(best, iconToBitmap(extraIcon(extras, Notification.EXTRA_PICTURE_ICON)));
+            }
+        }
+        best = larger(best, iconToBitmap(n.getLargeIcon()));
+        return usableArt(best);
+    }
+
+    private static Bitmap larger(Bitmap a, Bitmap b) {
+        if (b == null || b.isRecycled()) return a;
+        if (a == null || a.isRecycled()) return b;
+        int aArea = a.getWidth() * a.getHeight();
+        int bArea = b.getWidth() * b.getHeight();
+        return bArea > aArea ? b : a;
+    }
+
+    /** Skip empty / tiny frames; keep small non-square thumbs (YouTube 16:9). */
+    private static Bitmap usableArt(Bitmap bmp) {
+        if (bmp == null || bmp.isRecycled()) return null;
+        int w = bmp.getWidth();
+        int h = bmp.getHeight();
+        int max = Math.max(w, h);
+        if (max < 48) return null;
+        if (w <= 120 && h <= 90) return null;
+        if (max < 96 && Math.abs(w - h) < 8) return null;
+        return bmp;
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Bitmap extraBitmap(Bundle extras, String key) {
+        if (extras == null || key == null) return null;
+        try {
+            Object v;
+            if (Build.VERSION.SDK_INT >= 33) {
+                v = extras.getParcelable(key, Bitmap.class);
+            } else {
+                v = extras.getParcelable(key);
+            }
+            return v instanceof Bitmap ? (Bitmap) v : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Icon extraIcon(Bundle extras, String key) {
+        if (extras == null || key == null) return null;
+        try {
+            Object v;
+            if (Build.VERSION.SDK_INT >= 33) {
+                v = extras.getParcelable(key, Icon.class);
+            } else {
+                v = extras.getParcelable(key);
+            }
+            return v instanceof Icon ? (Icon) v : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private Bitmap iconToBitmap(Icon icon) {
+        if (icon == null) return null;
+        try {
+            return drawableToBitmap(icon.loadDrawable(this));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static Bitmap drawableToBitmap(Drawable d) {
+        if (d == null) return null;
+        if (d instanceof BitmapDrawable) {
+            Bitmap bmp = ((BitmapDrawable) d).getBitmap();
+            return bmp == null || bmp.isRecycled() ? null : bmp;
+        }
+        int w = d.getIntrinsicWidth();
+        int h = d.getIntrinsicHeight();
+        if (w <= 0) w = 256;
+        if (h <= 0) h = 256;
+        Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
+        d.setBounds(0, 0, w, h);
+        d.draw(c);
+        return bmp;
     }
 }
