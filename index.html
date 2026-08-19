@@ -40,6 +40,20 @@
     background: #000; pointer-events: none; z-index: 3;
   }
   #hv-splash.hv-splash-holding canvas { display: block; }
+  #hv-splash-skip {
+    position: absolute; z-index: 20; pointer-events: auto;
+    left: 24px; bottom: 20px;
+    padding: 8px 16px;
+    border: 1px solid rgba(255,255,255,.28);
+    border-radius: 4px;
+    background: rgba(0,0,0,.42);
+    color: rgba(255,255,255,.88);
+    font: 600 12px/1 "Space Grotesk", system-ui, sans-serif;
+    letter-spacing: 0.16em;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #hv-splash-skip:active { background: rgba(79,214,232,.22); }
 </style>
 </head>
 <!-- hv-boot holds the widget boards back until the reveal — see .hv-widget-board. -->
@@ -60,6 +74,7 @@
        overlay. webkit-playsinline keeps WebView 91 from promoting to fullscreen. -->
   <video id="hv-splash-video" src="assets/app-splash.mp4" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay muted playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
   <canvas id="hv-splash-canvas"></canvas>
+  <button type="button" id="hv-splash-skip">SKIP</button>
 </div>
 <script>
 window.HavalSplash = (function () {
@@ -74,6 +89,13 @@ window.HavalSplash = (function () {
   var finished = false;
   var faded = false;
   var holding = false;
+  var skipped = false;
+  var skipBtn = document.getElementById('hv-splash-skip');
+
+  function hideSkip() {
+    if (!skipBtn) return;
+    skipBtn.style.display = 'none';
+  }
 
   function finish() {
     if (finished) return;
@@ -101,6 +123,8 @@ window.HavalSplash = (function () {
       active: false, fadeMs: 0,
       whenDone: function (cb) { cb(); },
       fadeOut: function () {},
+      skip: function () {},
+      wasSkipped: function () { return false; },
       isDone: function () { return true; },
       forceHold: function () {},
       clipLooksFinished: function () { return true; },
@@ -233,7 +257,7 @@ window.HavalSplash = (function () {
   });
   video.addEventListener('ended', holdLastFrame);
   video.addEventListener('error', function () {
-    console.warn('[Splash] video error', video.error && video.error.code);
+    console.warn('[Splash] video error', video && video.error && video.error.code);
     finish();
   });
 
@@ -293,6 +317,11 @@ window.HavalSplash = (function () {
   });
   video.addEventListener('timeupdate', revealVideo);
   video.addEventListener('loadeddata', revealVideo);
+  // Keep a canvas copy of the last decoded frame so fadeOut can opacity-fade
+  // a real bitmap. The hole-punched <video> itself ignores CSS opacity.
+  video.addEventListener('timeupdate', function () {
+    if (!faded) drawFrame();
+  });
   window.addEventListener('resize', function () {
     if (!holding && !faded) layoutVideo();
   });
@@ -306,7 +335,7 @@ window.HavalSplash = (function () {
   video.addEventListener('loadeddata', play);
   setTimeout(function () {
     // readyState < HAVE_CURRENT_DATA means not one frame has decoded yet.
-    if (!finished && video.readyState < 2) blobFallback();
+    if (!finished && video && video.readyState < 2) blobFallback();
   }, 1500);
 
   // Stall watchdog. The failure that matters most here is a WebView that refuses
@@ -335,10 +364,23 @@ window.HavalSplash = (function () {
     lastTime = video.currentTime;
   }, 1200);
 
-  // Tapping the splash jumps to the hold frame. The overlay stays up until the
-  // car is drawn — skip means "don't make me watch the rest", not "show a hole".
-  el.addEventListener('click', holdLastFrame);
-  el.addEventListener('touchend', holdLastFrame);
+  function skip() {
+    if (faded || skipped) return;
+    skipped = true;
+    hideSkip();
+    finish();
+    try {
+      if (window.__app && typeof window.__app._trySplashHandOff === 'function') {
+        window.__app._trySplashHandOff();
+      }
+    } catch (e) {}
+  }
+  if (skipBtn) {
+    skipBtn.addEventListener('click', function (ev) {
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      skip();
+    });
+  }
 
   return {
     active: true,
@@ -346,6 +388,8 @@ window.HavalSplash = (function () {
     fadeMs: 1100,
     /** True once the clip has ended, been skipped, or failed. Overlay may still be up. */
     isDone: function () { return finished; },
+    wasSkipped: function () { return skipped; },
+    skip: skip,
     /** Resolve once the clip has ended, been skipped, or failed. */
     whenDone: function (cb) {
       if (finished) { cb(); return; }
@@ -355,22 +399,40 @@ window.HavalSplash = (function () {
     fadeOut: function () {
       if (faded) return;
       faded = true;
+      hideSkip();
       clearTimeout(guard);
       clearInterval(watchdog);
-      destroyVideo();
-      // CSS opacity cannot hide a hole-punched <video>, and a canvas snapshot
-      // of that overlay just becomes another opaque last frame. Yank the whole
-      // splash node so the 3D canvas is actually on screen.
-      if (el) {
-        el.style.display = 'none';
-        if (el.parentNode) el.parentNode.removeChild(el);
-      }
-      el = null;
-      try {
-        if (window.AppLauncherBridge && typeof window.AppLauncherBridge.endSplashOverlay === 'function') {
-          window.AppLauncherBridge.endSplashOverlay();
+      drawFrame();
+      var nativeFade = window.AppLauncherBridge
+        && typeof window.AppLauncherBridge.beginSplashFade === 'function';
+      if (nativeFade) {
+        // Android: the <video> is a hole-punched overlay CSS cannot fade.
+        // Native puts the last clip frame in an ImageView, we drop the
+        // <video>, and that ImageView opacity-fades over the 3D canvas.
+        try { window.AppLauncherBridge.beginSplashFade(1100); } catch (e) {}
+        destroyVideo();
+        if (el) {
+          el.style.display = 'none';
+          if (el.parentNode) el.parentNode.removeChild(el);
         }
-      } catch (e) {}
+        el = null;
+        return;
+      }
+      if (el) {
+        el.classList.add('hv-splash-holding');
+        el.classList.remove('hv-splash-playing');
+      }
+      destroyVideo();
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          if (!el) return;
+          el.classList.add('hv-splash-out');
+          setTimeout(function () {
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+            el = null;
+          }, 1100);
+        });
+      });
     },
     forceHold: holdLastFrame,
     clipLooksFinished: clipLooksFinished,
@@ -2176,8 +2238,12 @@ class Component extends DCLogic {
     const s = this.state;
     if (saved.timeMode === 'day' || saved.timeMode === 'night' || saved.timeMode === 'auto') s.timeMode = saved.timeMode;
     if (typeof saved.nightMode === 'boolean' && saved.timeMode !== 'auto') s.nightMode = saved.nightMode;
-    // Primary load is always HEV; apply saved model after the scene is ready.
-    if (saved.modelVariant === 'hev' || saved.modelVariant === 'gt') this._pendingModelVariant = saved.modelVariant;
+    // Boot the saved body (GT or HEV) as the primary GLB so a GT session
+    // does not also download PHEV at startup. The other variant stays lazy
+    // until the MODEL toggle (see _loadVariantModel).
+    if (saved.modelVariant === 'hev' || saved.modelVariant === 'gt') {
+      s.modelVariant = saved.modelVariant;
+    }
     if (typeof saved.carColor === 'string' || saved.carColor === null) s.carColor = saved.carColor;
     if (typeof saved.lightIntensity === 'number') s.lightIntensity = saved.lightIntensity;
     if (typeof saved.exposure === 'number') s.exposure = saved.exposure;
@@ -2207,6 +2273,24 @@ class Component extends DCLogic {
     if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
     if (typeof saved.showFps === 'boolean') s.showFps = saved.showFps;
     this._pendingSceneSettings = true;
+  }
+
+  _resolvedBootVariant() {
+    if (this.state && this.state.modelVariant === 'gt') return 'gt';
+    if (this._savedSettings && this._savedSettings.modelVariant === 'gt') return 'gt';
+    return 'hev';
+  }
+
+  _persistModelVariant(v) {
+    if (v !== 'gt' && v !== 'hev') return;
+    try {
+      const raw = localStorage.getItem(this._settingsStorageKey());
+      const saved = raw ? JSON.parse(raw) : {};
+      if (!saved || typeof saved !== 'object') return;
+      saved.modelVariant = v;
+      localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
+    } catch (e) {}
+    if (this._savedSettings) this._savedSettings.modelVariant = v;
   }
 
   _wireCarTelemetry() {
@@ -2958,11 +3042,9 @@ class Component extends DCLogic {
     this._pendingSceneSettings = false;
     const saved = this._savedSettings || {};
 
-    const wantModel = this._pendingModelVariant || saved.modelVariant;
-    this._pendingModelVariant = null;
-    if ((wantModel === 'gt' || wantModel === 'hev') && wantModel !== this.state.modelVariant) {
-      this._setModelVariant(wantModel);
-    }
+    // Boot already loaded saved.modelVariant as the primary GLB. Do not call
+    // _setModelVariant here — that was fetching the other body (and a second
+    // loader) on every GT cold start.
     if (saved.carColor !== undefined && typeof this.setColor === 'function') {
       this.setColor(saved.carColor);
     }
@@ -3063,7 +3145,7 @@ class Component extends DCLogic {
       // Spinner + progress bar are the fallback, not the boot experience: while
       // the splash clip is up it covers them anyway, and if the clip is skipped
       // or fails early they take over for whatever is left of the load.
-      loaderDisplay: s.loading && !s.error && !s.splashActive ? 'flex' : 'none',
+      loaderDisplay: s.loading && !s.error && !s.splashActive && !this._androidApp ? 'flex' : 'none',
       errorDisplay: s.error ? 'flex' : 'none',
       errorMsg: s.error || '',
       progressText: s.processing ? 'PROCESSING…' : (Math.round(s.progress) + '%'),
@@ -9122,13 +9204,14 @@ class Component extends DCLogic {
       '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels',
       '_allWheels', '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels'
     ];
-    Object.keys(this._variants).forEach(k => {
+    const active = (this.state && this.state.modelVariant) || 'hev';
+    const targets = new Set([active]);
+    const activeV = this._variants[active];
+    if (activeV && activeV._inheritedWheelsFrom) targets.add(activeV._inheritedWheelsFrom);
+    targets.forEach((k) => {
       const v = this._variants[k];
-      if (k === 'hev') {
-        fields.forEach(f => { v[f] = this[f]; });
-      } else if (k === 'gt' && v._inheritedWheelsFrom === 'hev') {
-        fields.forEach(f => { v[f] = this[f]; });
-      }
+      if (!v) return;
+      fields.forEach(f => { v[f] = this[f]; });
     });
   }
 
@@ -9340,8 +9423,7 @@ class Component extends DCLogic {
     // timeout is the floor: whichever fires first wins, and _startIntroAnimation
     // is idempotent via _introPlayed.
     if (this._introWaitingForLoader && !this.state.loading && !this.state.error) {
-      this._introWaitingForLoader = false;
-      this._kickIntroReveal();
+      this._trySplashHandOff();
     }
   }
 
@@ -9496,7 +9578,7 @@ class Component extends DCLogic {
     if (splash && splash.active) {
       splash.whenDone(() => {
         if (this._unmounted) return;
-        this._kickIntroReveal();
+        this._trySplashHandOff();
       });
     } else {
       this._revealShellChrome();
@@ -9895,54 +9977,79 @@ class Component extends DCLogic {
       const HEV_BYTES = this._perfLow ? 8473284 : 11321360;
       const GT_BYTES = this._perfLow ? 3009120 : 4871268;
       const profiles = this._modelProfiles();
-      // The HEV/PHEV car is PRIMARY: visible at start, drives the camera framing,
-      // contact shadow and night-light rig. The GT is LAZY — most sessions never
-      // switch to it, so its ~4.9MB download + Draco/JPEG decode + scene setup is
-      // deferred to the first MODEL-toggle to GT (see _setModelVariant). It still
-      // runs through the same pipeline with the GT profile and starts hidden.
-      // Depends only on HEV already being captured (it always is by then).
-      this._loadVariantModel = (v, onReady) => {
-        if (v !== 'gt') { if (onReady) onReady(); return; }
-        if (this._gtLoadState === 'ready') { if (onReady) onReady(); return; }
-        this._gtOnReady = onReady;
-        if (this._gtLoadState === 'loading') return; // coalesce repeat toggles
-        this._gtLoadState = 'loading';
+      // Boot whichever body was last selected (default HEV). The other GLB is
+      // lazy — fetched on the first MODEL toggle (see _setModelVariant) so a
+      // GT session does not also download PHEV at startup. Secondary still
+      // runs the same pipeline and starts hidden.
+      const bootKey = this._resolvedBootVariant();
+      if (this.state.modelVariant !== bootKey) this.state.modelVariant = bootKey;
+      const bootUrl = bootKey === 'gt' ? GT_URL : HEV_URL;
+      const bootBytes = bootKey === 'gt' ? GT_BYTES : HEV_BYTES;
+      this._variantLoadState = { hev: 'idle', gt: 'idle' };
+      this._variantOnReady = {};
+      this._variantLoadState[bootKey] = 'loading';
+      this._loadVariantModel = (v, onReady, opts) => {
+        const silent = !!(opts && opts.silent);
+        if (v !== 'gt' && v !== 'hev') { if (onReady) onReady(); return; }
+        if (this._variants && this._variants[v]) { if (onReady) onReady(); return; }
+        if (this._variantLoadState[v] === 'ready') { if (onReady) onReady(); return; }
+        this._variantOnReady[v] = onReady;
+        if (this._variantLoadState[v] === 'loading') return; // coalesce repeat toggles
+        this._variantLoadState[v] = 'loading';
+        const url = v === 'gt' ? GT_URL : HEV_URL;
+        const bytes = v === 'gt' ? GT_BYTES : HEV_BYTES;
         loader.load(
-          GT_URL,
+          url,
           (gltf) => {
-            try { this.onModelLoaded(gltf.scene, profiles.gt, { primary: false }); }
-            catch (e) { console.error('GT process error', e); }
-            this._gtLoadState = 'ready';
-            const cb = this._gtOnReady; this._gtOnReady = null;
+            try {
+              this.onModelLoaded(gltf.scene, profiles[v], {
+                primary: false,
+                donor: silent && v === 'hev',
+              });
+            } catch (e) {
+              console.error(v.toUpperCase() + ' process error', e);
+              if (v === 'hev') this._runHevDonorWaiters();
+            }
+            this._variantLoadState[v] = 'ready';
+            const cb = this._variantOnReady[v]; this._variantOnReady[v] = null;
             if (cb) cb();
           },
           (e) => {
+            if (silent) return;
             let p;
             if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
-            else p = Math.min(99, (e.loaded / GT_BYTES) * 100);
+            else p = Math.min(99, (e.loaded / bytes) * 100);
             this.setState({ progress: p, processing: p >= 99 });
           },
           (err) => {
-            console.warn('GT model failed to load', err);
-            this._gtLoadState = 'idle';
-            const cb = this._gtOnReady; this._gtOnReady = null;
-            // Roll the loader back so the UI doesn't hang on a failed switch.
-            this.setState({ loading: false, processing: false });
+            console.warn(v.toUpperCase() + ' model failed to load', err);
+            this._variantLoadState[v] = 'idle';
+            const cb = this._variantOnReady[v]; this._variantOnReady[v] = null;
+            if (!silent) this.setState({ loading: false, processing: false });
+            this._runHevDonorWaiters();
             if (cb) cb(err);
           }
         );
       };
+      if (bootKey === 'gt') {
+        // GT body is on screen; HEV is only a hidden wheel/caliper donor.
+        // Fetch it in parallel with no second progress HUD.
+        this._loadVariantModel('hev', null, { silent: true });
+      }
       loader.load(
-        HEV_URL,
-        (gltf) => { this.onModelLoaded(gltf.scene, profiles.hev, { primary: true }); },
+        bootUrl,
+        (gltf) => {
+          this._variantLoadState[bootKey] = 'ready';
+          this.onModelLoaded(gltf.scene, profiles[bootKey], { primary: true });
+        },
         (e) => {
           // The MMI server may omit Content-Length, so fall back to the known
-          // on-disk byte size of the CURRENT haval-h6-hev.glb. KEEP THIS IN SYNC
+          // on-disk byte size of the CURRENT boot GLB. KEEP THIS IN SYNC
           // whenever the model is re-exported/re-optimized, or the bar under- or
           // over-shoots. (Was 24129420 before the texture-shrink pass.)
           let p;
           if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
-          else p = Math.min(99, (e.loaded / HEV_BYTES) * 100);
+          else p = Math.min(99, (e.loaded / bootBytes) * 100);
           // Once bytes are in, the frozen tail is Draco/JPEG decode + scene
           // setup — label it honestly instead of a stuck percent.
           this.setState({ progress: p, processing: p >= 99 });
@@ -10371,8 +10478,10 @@ class Component extends DCLogic {
           dst.fov = camera.fov; dst.aspect = camera.aspect;
           dst.near = camera.near; dst.far = camera.far;
           // Keep bloom/streak aligned with shell view-offset on the main camera.
-          // Without this, light glows stay put while the car slides on screen.
-          if (camera.view && typeof dst.setViewOffset === 'function') {
+          // clearViewOffset() only sets view.enabled = false — the old offsetX
+          // stays on the object — so copying view blindly leaves light glows
+          // sitting where the layout camera was (ghost headlights off to the side).
+          if (camera.view && camera.view.enabled && typeof dst.setViewOffset === 'function') {
             const v = camera.view;
             dst.setViewOffset(v.fullWidth, v.fullHeight, v.offsetX, v.offsetY, v.width, v.height);
           } else if (typeof dst.clearViewOffset === 'function') {
@@ -10519,7 +10628,7 @@ class Component extends DCLogic {
         // GT headlight glass is identified by material name (Glass (Headlight)).
         isHeadlightGlassMesh: () => false,
         isHeadlightGlassMat: (m) => /^Glass \(Headlight\)/i.test((m && m.name) || ''),
-        bodyPaintRe: /^body$/i,
+        bodyPaintRe: /^(body)(\.\d+)?$/i,
         splitMultiMatLamps: true,
         hasExplicitHighbeam: true,
         // Soft-touch interior + trim plastics → matte black (no reflection).
@@ -10557,9 +10666,10 @@ class Component extends DCLogic {
             '13_Headlight_Map_c_b|Reflecting Red|f3',  // center-strip right component
           ],
         },
-        // Reuse HEV's validated wheel meshes — GT's own wheel classification
-        // has pivot/axis issues and tire-side detachment. Both models share the
-        // same wheel geometry so this is a safe substitution.
+        // Reuse HEV's validated wheel meshes when HEV is already loaded (GT as
+        // a secondary). GT's own wheel classification has pivot/axis issues
+        // and tire-side detachment. Skipped when GT is the boot primary so a
+        // GT session does not also download PHEV.
         inheritWheelsFrom: 'hev',
         // GT's own brake calipers (front AND rear) are hidden explicitly by
         // name — NOT by the front/rear spatial median-split, which is
@@ -10682,7 +10792,7 @@ class Component extends DCLogic {
     obj.position.y -= box.min.y;
     this.scene.add(obj);
     obj.updateMatrixWorld(true);
-    this._modelHomePos = obj.position.clone();
+    if (primary) this._modelHomePos = obj.position.clone();
     // Keep the car invisible until loading fully finishes and the intro starts
     // (also used to hide it in APP+APP layouts).
     if (primary) {
@@ -10694,7 +10804,7 @@ class Component extends DCLogic {
     // material instances (paint, chrome, lights, leather, …) by name, so the two
     // cars stay in sync and we don't duplicate materials on the GPU. Glass is
     // excluded — each model keeps its own and is processed independently below.
-    if (!primary && this._sharedMats) {
+    if (!primary && this._sharedMats && !(opts && opts.donor)) {
       const shareSet = this._sharedMatNames();
       const aliases = profile.sharedAliases || {};
       const swap = (m) => {
@@ -10761,7 +10871,8 @@ class Component extends DCLogic {
         // (Body + Panel + Roof are the visible painted shell; exclude glass/chrome/
         // lights/tires/trim).
         // Match the known painted-shell material names.
-        const isBodyMesh = profile.bodyPaintRe.test(m.name || '');
+        const aliases = profile.sharedAliases || {};
+        const isBodyMesh = profile.bodyPaintRe.test(m.name || '') || aliases[m.name] === 'Body';
         if (isBodyMesh) {
           if (!this._paintOrig) this._paintOrig = new Map();
           if (!this._paintOrig.has(m) && m.color) this._paintOrig.set(m, m.color.clone());
@@ -10960,6 +11071,25 @@ class Component extends DCLogic {
       });
     }
 
+    // GT-as-primary: mesh overrides normally run on the secondary (they look
+    // up HEV's shared Body/Plastic Black). Apply them from this GLB too so a
+    // GT boot does not leave trunk chrome / 3rd-brake on the raw Blender mats.
+    if (primary && profile.meshMaterialOverrides) {
+      const byName = new Map();
+      obj.traverse((c) => {
+        if (!c.isMesh) return;
+        (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => {
+          if (m && m.name && !byName.has(m.name)) byName.set(m.name, m);
+        });
+      });
+      const meshOverrides = profile.meshMaterialOverrides;
+      obj.traverse((c) => {
+        if (!c.isMesh || !meshOverrides[c.name]) return;
+        const mat = byName.get(meshOverrides[c.name]);
+        if (mat) c.material = Array.isArray(c.material) ? c.material.map(() => mat) : mat;
+      });
+    }
+
     this.bodyMats = bodyMats;
     if (this.bodyOrigHex) this.setState({ origHex: this.bodyOrigHex });
     // After the PRIMARY model is processed, record its shared material instances
@@ -11153,7 +11283,8 @@ class Component extends DCLogic {
       this._carForwardDir = new THREE.Vector3(-1, 0, 0);
     }
     console.log('[Car] forwardDir:', JSON.stringify(this._carForwardDir));
-    this._skipWheelBlur = !!profile.inheritWheelsFrom;
+    const inheriting = !primary && !!(profile.inheritWheelsFrom && this._variants[profile.inheritWheelsFrom]);
+    this._skipWheelBlur = inheriting;
     this._collectWheelMeshes(obj);
     this._skipWheelBlur = false;
     // Save car centre
@@ -11178,28 +11309,13 @@ class Component extends DCLogic {
 
     // If a secondary model delegates wheel rendering to a source variant, hide its
     // own (buggy) wheel meshes and redirect all wheel arrays to the validated source.
-    if (!primary && profile.inheritWheelsFrom && this._variants[profile.inheritWheelsFrom]) {
-      const srcV = this._variants[profile.inheritWheelsFrom];
-      const dstV = this._variants[profile.key];
-      // Permanently hide the secondary's own wheel meshes.
-      (dstV._allWheels || []).forEach(m => { m.visible = false; });
-      // Hide its own front brake calipers by explicit name (profile.hiddenMeshes) —
-      // NOT via _steerOnlyMeshes, whose front/rear spatial split is unreliable on GT.
-      if (profile.hiddenMeshes && profile.hiddenMeshes.length) {
-        const hideSet = new Set(profile.hiddenMeshes);
-        obj.traverse(c => { if (c.isMesh && hideSet.has(c.name)) c.visible = false; });
-      }
-      // Remove the secondary's scene-level blur/backing discs — we'll use the source's.
-      [...(dstV._blurredDiscs || []), ...(dstV._backingDiscs || [])].forEach(d => {
-        if (this.scene) this.scene.remove(d);
-      });
-      // Point all wheel arrays at the source variant's (already correct) data.
-      ['_frontLeftWheels','_frontRightWheels','_rearLeftWheels','_rearRightWheels',
-       '_allWheels','_tireWheels','_rimWheels','_spokesWheels','_otherRimWheels',
-       '_steerOnlyMeshes','_blurredDiscs','_backingDiscs','_carLateralDir',
-      ].forEach(f => { dstV[f] = srcV[f]; });
-      dstV._inheritedWheelsFrom = profile.inheritWheelsFrom;
-      console.log('[Wheels] GT inheriting wheels from', profile.inheritWheelsFrom);
+    // When GT is the boot primary, HEV is not loaded yet — keep GT's own wheels
+    // (catalog stock rim still replaces the rims) and only hide the hub logo.
+    if (inheriting) {
+      this._inheritWheels(profile.key, profile.inheritWheelsFrom);
+    } else if (profile.hiddenMeshes && profile.hiddenMeshes.length) {
+      const hideSet = new Set(profile.hiddenMeshes.filter((n) => n === '21_car_hub_metal_mirror_1'));
+      if (hideSet.size) obj.traverse(c => { if (c.isMesh && hideSet.has(c.name)) c.visible = false; });
     }
 
     // The SECONDARY model starts hidden — it shares the primary's camera framing,
@@ -11209,9 +11325,9 @@ class Component extends DCLogic {
       obj.visible = true;
       this._warmupLights();
       obj.visible = false;
-      // Processing the secondary left the live this.* refs pointing at it; restore
-      // whichever variant is currently selected (default: the primary, 'hev').
+      this._inheritWheelsIfNeeded();
       this._activateVariant(this.state.modelVariant);
+      this._runHevDonorWaiters();
       if (this.requestRender) this.requestRender(2);
       return;
     }
@@ -11244,8 +11360,9 @@ class Component extends DCLogic {
     // + orbit to home). Secondary/GT reuse already has framing from primary.
     this._fitCam = this._shellCameraTarget(!!window.__androidPopupActive);
     this._pendingIntro = true;
-    // Park at the far-front intro pose under the loader so the first revealed
-    // frame isn't a random default angle. Keep the whole car scene hidden.
+    // Park on the splash-matching front pose under the overlay so the first
+    // revealed frame is already the hand-off shot — not a far pullback, and
+    // not a random default angle.
     this._parkIntroCamera();
     this._setCarSceneVisible(false);
     this.renderOnce = () => this.renderer.render(this.scene, this.camera);
@@ -11274,25 +11391,25 @@ class Component extends DCLogic {
     if (this.requestRender) this.requestRender(4);
 
     if (primary) {
-      // Nothing explicitly selected yet (fresh load) means STOCK — load it
-      // through the catalog pipeline too, same as a saved selection, so it's
-      // resizable and has a real thumbnail from the very first frame instead
-      // of only after the user clicks STOCK once. Kicked off BEFORE the light
-      // warmup (and not gated on it) so the overlay clears as soon as the
-      // (already-preloaded) stock wheel is installed — see _warmupLightsAsync.
-      const key = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
-      this._loadCatalogWheelByKey(key, () => {
-        const done = {
-          catalogLoadingKey: null,
-          selectedCatalogKey: key,
-        };
-        if (this._pendingShellPatch) {
-          Object.assign(done, this._pendingShellPatch);
-          this._pendingShellPatch = null;
-        }
-        this._finishLoading(done);
-        try { this._applyPendingSceneSettings(); } catch (e) { console.warn('[Settings] apply failed', e); }
-      }, { initial: true });
+      // Catalog rims need validated wheel pivots. GT's own classification is
+      // wrong, so wait for the hidden HEV donor before installing STOCK.
+      const installStock = () => {
+        const key = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
+        this._loadCatalogWheelByKey(key, () => {
+          const done = {
+            catalogLoadingKey: null,
+            selectedCatalogKey: key,
+          };
+          if (this._pendingShellPatch) {
+            Object.assign(done, this._pendingShellPatch);
+            this._pendingShellPatch = null;
+          }
+          this._finishLoading(done);
+          try { this._applyPendingSceneSettings(); } catch (e) { console.warn('[Settings] apply failed', e); }
+        }, { initial: true });
+      };
+      if (profile.key === 'gt') this._whenHevDonorReady(installStock);
+      else installStock();
       // Light-shader pre-warm is the single biggest chunk of the post-download
       // "processing" stall (measured ~100ms of RENDER cost alone on a desktop
       // GPU with shaders already cached — first-time compile adds more, and
@@ -11378,6 +11495,7 @@ class Component extends DCLogic {
       this.camera.setViewOffset(w, h, -shift * w, 0, w, h);
     }
     this.camera.updateProjectionMatrix();
+    this._postFxDirty = true;
   }
 
   _currentViewShift() {
@@ -11729,11 +11847,17 @@ class Component extends DCLogic {
           r.visible = false;
           return;
         }
-        // Active variant on; inherited-wheels donor stays on too (meshes culled elsewhere).
         const isActive = k === activeKey;
         const isDonor = !!(this._variants[activeKey]
           && this._variants[activeKey]._inheritedWheelsFrom === k);
-        r.visible = isActive || isDonor;
+        if (isActive) {
+          r.visible = true;
+        } else if (isDonor) {
+          r.visible = true;
+          this._cullDonorMeshes(activeKey);
+        } else {
+          r.visible = false;
+        }
       });
     } else if (this.model) {
       this.model.visible = show;
@@ -11767,7 +11891,7 @@ class Component extends DCLogic {
     }
     // Car layout is active and loading is done.
     if (!this._introPlayed) {
-      this._startIntroAnimation();
+      this._trySplashHandOff();
     } else {
       this._setCarSceneVisible(true);
     }
@@ -11781,15 +11905,10 @@ class Component extends DCLogic {
    * within ~15% of the size it is in the clip (32% of viewport width at 16:9,
    * ~21% at the MMI's ~2.7:1 — the letterboxed clip holds it at ~27% and ~18%),
    * so the cross-fade reads as one continuous shot rather than a cut.
-   *
-   * `revealStart` is the same pose pulled back by REVEAL_PULLBACK. Easing that
-   * small gap out during the fade keeps the camera moving into the car the way
-   * the clip was, instead of snapping to a dead stop the instant it ends.
    */
   _introFrontPoses() {
     if (!this._fitCenter || !this._fitDist) return null;
     const THREE = window.THREE;
-    const REVEAL_PULLBACK = 1.12;
     const { F } = this._carBasis();
     const c = this._fitCenter.clone();
     const distMul = (this._fitCam && this._fitCam.distMul != null) ? this._fitCam.distMul : 1;
@@ -11801,21 +11920,18 @@ class Component extends DCLogic {
     return {
       center: c,
       front: c.clone().addScaledVector(F, defaultDist).add(new THREE.Vector3(0, elev, 0)),
-      revealStart: c.clone()
-        .addScaledVector(F, defaultDist * REVEAL_PULLBACK)
-        .add(new THREE.Vector3(0, elev * REVEAL_PULLBACK, 0)),
       defaultDist,
     };
   }
 
   /**
-   * Put the camera on the reveal's opening pose while the splash is still up, so
-   * the very first frame the car is visible in is already the right one.
+   * Put the camera on the splash-matching front pose while the overlay is still
+   * up, so the very first frame the car is visible in is already the right one.
    */
   _parkIntroCamera() {
     const poses = this._introFrontPoses();
     if (!poses || !this.camera || !this.controls) return;
-    this.camera.position.copy(poses.revealStart);
+    this.camera.position.copy(poses.front);
     this.controls.target.copy(poses.center);
     this.camera.near = Math.max(0.05, poses.defaultDist / 120);
     this.camera.far = Math.max(200, poses.defaultDist * 120);
@@ -11853,18 +11969,44 @@ class Component extends DCLogic {
     }
   }
 
+  /**
+   * Gate for splash → live model. The clip is allowed to play out even if the
+   * GLB finished early. Skip is the only path that tears the overlay down
+   * before the model is ready (loader stays up). Natural end holds the last
+   * frame until load completes, then fades from the front pose.
+   */
+  _trySplashHandOff() {
+    if (this._unmounted || this._introPlayed) return;
+    const splash = window.HavalSplash;
+    const splashPlaying = !!(splash && splash.active && splash.isDone && !splash.isDone());
+    const skipped = !!(splash && splash.wasSkipped && splash.wasSkipped());
+    if (splashPlaying && !skipped) return;
+
+    if (this.state.loading && !this.state.error) {
+      if (skipped || !splash || !splash.active) {
+        if (splash && splash.fadeOut) splash.fadeOut();
+        this.setState({ splashActive: false });
+        // Keep the boot HUD up — chrome reveal would hide it while the GLB
+        // is still arriving.
+        this._introWaitingForLoader = true;
+      }
+      return;
+    }
+    if (this.state.error) {
+      if (splash && splash.fadeOut) splash.fadeOut();
+      this.setState({ splashActive: false });
+      this._revealShellChrome();
+      this._introPlayed = true;
+      return;
+    }
+    this._kickIntroReveal();
+  }
+
   _kickIntroReveal() {
     if (this._unmounted || this._introPlayed) return;
     if (this.state.loading || this.state.error) return;
     this._introWaitingForLoader = false;
     this._pendingIntro = false;
-    const splash = window.HavalSplash;
-    // Pull the hole-punched <video> off screen FIRST. Drawing the car while
-    // that overlay is up wastes frames into a discarded buffer (mobile
-    // preserveDrawingBuffer is off) and a later layer-type switch used to
-    // kill the GL context — both look like a black screen.
-    if (splash && splash.forceHold) splash.forceHold();
-    if (splash && splash.fadeOut) splash.fadeOut();
     this.setState({ splashActive: false });
     this._forceViewerLayout();
     try {
@@ -11875,7 +12017,10 @@ class Component extends DCLogic {
     } catch (e) { console.warn('[Splash] reveal draw failed', e); }
     if (this.model && this.camera && this.controls && this._fitCenter && this._fitDist) {
       this._startIntroAnimation();
+      return;
     }
+    const splash = window.HavalSplash;
+    if (splash && splash.fadeOut) splash.fadeOut();
     this._revealShellChrome();
     this._introPlayed = true;
   }
@@ -11883,17 +12028,19 @@ class Component extends DCLogic {
   /**
    * Hand off from the boot splash to the live model.
    *
-   * The old version of this played the whole opening in 3D: park far out in
-   * front, dolly in, flash the headlights twice, then orbit to home. All of
-   * that now lives in assets/app-splash.mp4, which is why only the orbit is
-   * left here. Two gates have to clear first — the model has to be loaded
-   * (`state.loading`) and the clip has to have finished (`HavalSplash`) — and
-   * either can win the race, so each one re-enters this method when it clears.
+   * The opening approach and headlight flash live in assets/app-splash.mp4.
+   * Here we only: sit on the matching front pose through the fade, then orbit
+   * to the layout home. The clip must have finished (or been skipped) and the
+   * model must be loaded — `_trySplashHandOff` is the race coordinator.
    */
   _startIntroAnimation() {
     if (this._introPlayed || !this.model || !this.camera || !this.controls) return;
     if (!this._fitCenter || !this._fitDist) return;
     const splash = window.HavalSplash;
+    if (splash && splash.active && splash.isDone && !splash.isDone()
+        && !(splash.wasSkipped && splash.wasSkipped())) {
+      return;
+    }
     // Don't start under the loading overlay.
     if (this.state.loading) {
       this._introWaitingForLoader = true;
@@ -11908,7 +12055,6 @@ class Component extends DCLogic {
       this._introPlayed = true;
       return;
     }
-    if (splash && splash.forceHold) splash.forceHold();
 
     this._introPlayed = true;
     this._introActive = true;
@@ -11916,7 +12062,6 @@ class Component extends DCLogic {
       clearTimeout(this._introKickTimer);
       this._introKickTimer = null;
     }
-    // The reveal won the race against the bounded-hold cap in componentDidMount.
     clearTimeout(this._splashHoldTimer);
     this._fitCamTo = null;
     this._camAnim = null;
@@ -11929,8 +12074,6 @@ class Component extends DCLogic {
     if (!this._fitCam) this._fitCam = this._shellCameraTarget(!!window.__androidPopupActive);
     const poses = this._introFrontPoses();
     if (!poses) {
-      // Can't frame the reveal — don't leave the viewer mid-intro with the car
-      // hidden and the controls locked. Show it and hand control straight back.
       this._introActive = false;
       if (this.controls) this.controls.enabled = true;
       this._setCarSceneVisible(true);
@@ -11939,7 +12082,7 @@ class Component extends DCLogic {
       this._revealShellChrome();
       return;
     }
-    this.camera.position.copy(poses.revealStart);
+    this.camera.position.copy(poses.front);
     this.controls.target.copy(poses.center);
     this.camera.near = Math.max(0.05, poses.defaultDist / 120);
     this.camera.far = Math.max(200, poses.defaultDist * 120);
@@ -11947,24 +12090,27 @@ class Component extends DCLogic {
     this._applyShellViewOffset(0);
     this.controls.update();
 
-    // Show the car and draw it at the front pose BEFORE the splash starts
-    // fading, so the clip dissolves into a real frame rather than into whatever
-    // the canvas last held.
+    // Show the car at the front pose BEFORE the splash starts fading.
     this._setCarSceneVisible(true);
     if (this.renderOnce) { try { this.renderOnce(); } catch (e) {} }
     if (splash && splash.fadeOut) splash.fadeOut();
     this.setState({ splashActive: false });
     this._revealShellChrome();
 
-    // 1) settle: ease the last of the clip's approach out under the cross-fade
-    // 2) orbit:  swing round to the normal top-side (home) framing
+    const home = this._homeCameraPose();
+    const fadeSec = Math.max(0.2, ((splash && splash.fadeMs) || 1100) / 1000);
     this._intro = {
-      phase: 'settle',
+      phase: 'hold',
       t: 0,
-      camFrom: poses.revealStart.clone(),
+      holdDur: fadeSec,
+      camFrom: poses.front.clone(),
       camFromTarget: poses.center.clone(),
-      camTo: poses.front.clone(),
-      camToTarget: poses.center.clone(),
+      camTo: home ? home.position.clone() : poses.front.clone(),
+      camToTarget: home ? home.target.clone() : poses.center.clone(),
+      viewShiftFrom: 0,
+      viewShiftTo: (home && home.viewShift != null)
+        ? home.viewShift
+        : ((this._fitCam && this._fitCam.viewShift) || 0),
     };
     if (this.requestRender) this.requestRender(240);
   }
@@ -11997,31 +12143,24 @@ class Component extends DCLogic {
       this.controls.update();
     };
 
-    if (intro.phase === 'settle') {
-      // Runs under the splash cross-fade (800ms), and slightly longer than it so
-      // the camera is still drifting in when the clip is fully gone.
-      const dur = 1.1;
-      const u = Math.min(1, intro.t / dur);
-      const e = 1 - Math.pow(1 - u, 3);
-      applyCamLerp(intro.camFrom, intro.camTo, intro.camFromTarget, intro.camToTarget, e, 0);
-      if (u >= 1) {
-        this.camera.position.copy(intro.camTo);
-        this.controls.target.copy(intro.camToTarget);
-        const home = this._homeCameraPose();
-        if (!home) {
+    if (intro.phase === 'hold') {
+      // Stay on the splash-matching front pose until the overlay fade finishes.
+      this.camera.position.copy(intro.camFrom);
+      this.controls.target.copy(intro.camFromTarget);
+      const dist = this.camera.position.distanceTo(this.controls.target);
+      this.camera.near = Math.max(0.05, dist / 120);
+      this.camera.far = Math.max(200, dist * 120);
+      this.camera.updateProjectionMatrix();
+      this._applyShellViewOffset(0);
+      this.controls.update();
+      const holdDur = intro.holdDur != null ? intro.holdDur : 1.1;
+      if (intro.t >= holdDur) {
+        if (!intro.camTo || intro.camTo.distanceToSquared(intro.camFrom) < 1e-6) {
           this._endIntroAnimation();
           return true;
         }
         intro.phase = 'orbit';
         intro.t = 0;
-        intro.camFrom = this.camera.position.clone();
-        intro.camFromTarget = this.controls.target.clone();
-        intro.camTo = home.position.clone();
-        intro.camToTarget = home.target.clone();
-        intro.viewShiftFrom = 0;
-        intro.viewShiftTo = (home.viewShift != null)
-          ? home.viewShift
-          : ((this._fitCam && this._fitCam.viewShift) || 0);
       }
       return true;
     }
@@ -12635,7 +12774,7 @@ class Component extends DCLogic {
       Object.assign(patch, this._pendingShellPatch);
       this._pendingShellPatch = null;
     }
-    this.setState(patch, () => { this._kickIntroReveal(); });
+    this.setState(patch, () => { this._trySplashHandOff(); });
     this._notifyViewerReady();
     const pendingMedia = this._pendingMediaPayload;
     this._pendingMediaPayload = null;
@@ -12660,6 +12799,91 @@ class Component extends DCLogic {
     this._variants[key] = b;
   }
 
+  _whenHevDonorReady(cb) {
+    if (typeof cb !== 'function') return;
+    if (this._variants && this._variants.hev) {
+      this._inheritWheelsIfNeeded();
+      if (this.state.modelVariant === 'gt' && this._variants.gt) this._activateVariant('gt');
+      cb();
+      return;
+    }
+    if (this._variantLoadState && this._variantLoadState.hev === 'ready') {
+      cb();
+      return;
+    }
+    if (!this._hevDonorWaiters) this._hevDonorWaiters = [];
+    this._hevDonorWaiters.push(cb);
+    if (!this._hevDonorTimer) {
+      this._hevDonorTimer = setTimeout(() => {
+        this._hevDonorTimer = null;
+        console.warn('[Wheels] HEV donor timed out — installing stock on GT pivots');
+        this._runHevDonorWaiters();
+      }, 20000);
+    }
+    if (this._loadVariantModel && (!this._variantLoadState || this._variantLoadState.hev === 'idle')) {
+      this._loadVariantModel('hev', null, { silent: true });
+    }
+  }
+
+  _runHevDonorWaiters() {
+    if (this._hevDonorTimer) {
+      clearTimeout(this._hevDonorTimer);
+      this._hevDonorTimer = null;
+    }
+    const q = this._hevDonorWaiters || [];
+    this._hevDonorWaiters = [];
+    q.forEach((fn) => { try { fn(); } catch (e) { console.warn('[Wheels] donor waiter', e); } });
+  }
+
+  _inheritWheelsIfNeeded() {
+    if (!this._variants || !this._variants.gt || !this._variants.hev) return;
+    if (this._variants.gt._inheritedWheelsFrom === 'hev') return;
+    this._inheritWheels('gt', 'hev');
+  }
+
+  _inheritWheels(dstKey, srcKey) {
+    const srcV = this._variants && this._variants[srcKey];
+    const dstV = this._variants && this._variants[dstKey];
+    if (!srcV || !dstV) return;
+    (dstV._allWheels || []).forEach((m) => { m.visible = false; });
+    const profile = this._modelProfiles()[dstKey];
+    if (profile && profile.hiddenMeshes && dstV.root) {
+      const hideSet = new Set(profile.hiddenMeshes);
+      dstV.root.traverse((c) => { if (c.isMesh && hideSet.has(c.name)) c.visible = false; });
+    }
+    [...(dstV._blurredDiscs || []), ...(dstV._backingDiscs || [])].forEach((d) => {
+      if (this.scene) this.scene.remove(d);
+    });
+    ['_frontLeftWheels','_frontRightWheels','_rearLeftWheels','_rearRightWheels',
+     '_allWheels','_tireWheels','_rimWheels','_spokesWheels','_otherRimWheels',
+     '_steerOnlyMeshes','_blurredDiscs','_backingDiscs','_carLateralDir',
+    ].forEach((f) => { dstV[f] = srcV[f]; });
+    dstV._inheritedWheelsFrom = srcKey;
+    console.log('[Wheels]', dstKey, 'inheriting wheels from', srcKey);
+  }
+
+  _cullDonorMeshes(activeKey) {
+    const b = this._variants && this._variants[activeKey];
+    if (!b || !b._inheritedWheelsFrom) return;
+    const srcV = this._variants[b._inheritedWheelsFrom];
+    if (!srcV || !srcV.root) return;
+    if (this._variantHiddenMeshes) return;
+    const keepSet = new Set([
+      ...(b._allWheels || []),
+      ...Object.values(b._steerOnlyMeshes || {}).flat(),
+      ...(b._blurredDiscs || []),
+      ...(b._backingDiscs || []),
+    ]);
+    const hidden = [];
+    srcV.root.traverse(c => {
+      if (c.isMesh && !keepSet.has(c)) {
+        hidden.push({ mesh: c, wasVisible: c.visible });
+        c.visible = false;
+      }
+    });
+    this._variantHiddenMeshes = hidden;
+  }
+
   _activateVariant(key) {
     if (!this._variants || !this._variants[key]) return;
     const b = this._variants[key];
@@ -12671,33 +12895,20 @@ class Component extends DCLogic {
     }
 
     // Show the chosen model, hide the others — still respect car-scene gate
-    // (loading / appsOnly / pre-intro).
+    // (loading / appsOnly / pre-intro). Donor wheels stay available, but the
+    // donor BODY must never draw: cull it even while the car is still hidden
+    // so the first visible frame cannot stack GT + PHEV.
     const showCar = this._carSceneVisible === true;
     Object.keys(this._variants).forEach((k) => {
       const r = this._variants[k] && this._variants[k].root;
       if (r) r.visible = showCar && (k === key);
     });
 
-    // If this variant uses another model's wheels, keep that model's root visible
-    // but hide every mesh in it that isn't a wheel or brake disc.
-    if (showCar && b._inheritedWheelsFrom) {
+    if (b._inheritedWheelsFrom) {
       const srcV = this._variants[b._inheritedWheelsFrom];
       if (srcV && srcV.root) {
-        srcV.root.visible = true;
-        const keepSet = new Set([
-          ...(b._allWheels || []),
-          ...Object.values(b._steerOnlyMeshes || {}).flat(),
-          ...(b._blurredDiscs || []),
-          ...(b._backingDiscs || []),
-        ]);
-        const hidden = [];
-        srcV.root.traverse(c => {
-          if (c.isMesh && !keepSet.has(c)) {
-            hidden.push({ mesh: c, wasVisible: c.visible });
-            c.visible = false;
-          }
-        });
-        this._variantHiddenMeshes = hidden;
+        srcV.root.visible = showCar;
+        this._cullDonorMeshes(key);
       }
     }
 
@@ -12776,9 +12987,9 @@ class Component extends DCLogic {
   _setModelVariant(v) {
     if (v === this.state.modelVariant) return;
 
-    // Lazy variant load: GT isn't fetched at startup. On the first switch to a
-    // not-yet-loaded variant, show the loader, fetch + process it, then fall
-    // through to the normal activation/wheel-follow path once it's ready.
+    // Lazy variant load: the other body isn't fetched at startup. On the first
+    // switch to a not-yet-loaded variant, show the loader, fetch + process it,
+    // then fall through to the normal activation/wheel-follow path once ready.
     if ((!this._variants || !this._variants[v]) && this._loadVariantModel) {
       this.setState({ loading: true, processing: false, progress: 5 });
       this._loadVariantModel(v, (err) => {
@@ -12796,6 +13007,7 @@ class Component extends DCLogic {
   }
 
   _applyModelVariant(v) {
+    this._persistModelVariant(v);
     // Auto-swap the stock-looking wheel when switching variants: if the user
     // is still on either variant's own stock rim (or hasn't picked anything
     // yet), follow the switch onto the NEW variant's own stock rim too. Any

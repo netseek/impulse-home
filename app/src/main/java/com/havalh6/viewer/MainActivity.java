@@ -16,10 +16,13 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.JavascriptInterface;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IntentFilter;
-import android.webkit.JavascriptInterface;
+import android.media.MediaMetadataRetriever;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.ConcurrentHashMap;
@@ -442,6 +445,31 @@ public final class MainActivity extends Activity {
         }
 
         /**
+         * Viewer → shell: cross-fade the last splash frame over the 3D car.
+         * Duration is milliseconds; matches HavalSplash.fadeMs.
+         */
+        @JavascriptInterface
+        public void beginSplashFade(int durationMs) {
+            final int ms = durationMs;
+            final java.util.concurrent.CountDownLatch latch =
+                    new java.util.concurrent.CountDownLatch(1);
+            runOnUiThread(() -> {
+                try {
+                    MainActivity.this.beginSplashFade(ms);
+                } finally {
+                    latch.countDown();
+                }
+            });
+            // Hold JS until the still is on screen, otherwise destroyVideo()
+            // uncovers the car for a frame before the fade cover exists.
+            try {
+                latch.await(400, java.util.concurrent.TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        /**
          * Viewer → shell: the splash <video> overlay is coming down. Switch the
          * WebView back to a hardware layer NOW so the 3D canvas is actually
          * composited under the fading HTML. Waiting until the launcher icons
@@ -466,12 +494,7 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public void hideBootProgress() {
-            runOnUiThread(() -> {
-                hideBootHud();
-                if (splashOverlayEnded || splashDropScheduled) return;
-                splashDropScheduled = true;
-                mainHandler.postDelayed(forceDropSplash, 250);
-            });
+            runOnUiThread(() -> hideBootHud());
         }
     }
 
@@ -569,6 +592,10 @@ public final class MainActivity extends Activity {
     private View bootHudFill;
     private int bootHudBarWidthPx;
     private boolean bootHudHidden;
+    private View splashSkipBtn;
+    private android.widget.ImageView splashFadeView;
+    private Bitmap splashHoldFrame;
+    private boolean splashFadeStarted;
     private boolean splashOverlayEnded;
     private boolean splashDropScheduled;
     private final Runnable forceDropSplash = new Runnable() {
@@ -2391,6 +2418,8 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
         setupBootHud(rootLayout);
+        setupSplashSkip(rootLayout);
+        setupSplashFade(rootLayout);
 
         setupNativeLauncherUI(rootLayout);
 
@@ -2572,6 +2601,7 @@ public final class MainActivity extends Activity {
         if (splashOverlayEnded) return;
         splashOverlayEnded = true;
         hideBootHud();
+        hideSplashSkip();
         if (webView != null) {
             final int shellBg = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
                     .getInt("shellBg", DEFAULT_SHELL_BG);
@@ -2605,6 +2635,89 @@ public final class MainActivity extends Activity {
                         + "try{if(a._startIntroAnimation&&!a._introPlayed)a._startIntroAnimation();}catch(e){}"
                         + "})()",
                 null);
+    }
+
+    /**
+     * Last clip frame, shown as a real View so it can opacity-fade. The HTML
+     * <video> is hole-punched and ignores CSS opacity.
+     */
+    private void setupSplashFade(FrameLayout root) {
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setBackgroundColor(0xFF000000);
+        iv.setVisibility(View.GONE);
+        iv.setClickable(false);
+        iv.setFocusable(false);
+        root.addView(iv, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        splashFadeView = iv;
+        new Thread(this::preloadSplashHoldFrame, "splash-frame").start();
+    }
+
+    private void preloadSplashHoldFrame() {
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            File tmp = new File(getCacheDir(), "app-splash.mp4");
+            if (!tmp.exists() || tmp.length() == 0) {
+                try (InputStream in = getAssets().open("www/assets/app-splash.mp4");
+                     FileOutputStream out = new FileOutputStream(tmp)) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                }
+            }
+            retriever.setDataSource(tmp.getAbsolutePath());
+            long us = 15_000_000L;
+            String dur = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            if (dur != null) {
+                try {
+                    us = Math.max(0L, Long.parseLong(dur) - 80L) * 1000L;
+                } catch (NumberFormatException ignored) {}
+            }
+            Bitmap bmp = retriever.getFrameAtTime(us, MediaMetadataRetriever.OPTION_CLOSEST);
+            if (bmp != null) splashHoldFrame = bmp;
+        } catch (Exception e) {
+            Log.w(TAG, "Could not extract splash hold frame", e);
+        } finally {
+            try { retriever.release(); } catch (Exception ignored) {}
+        }
+    }
+
+    /**
+     * Cover the hole-punched video with the last clip frame, then fade that
+     * still out over the already-drawn 3D car.
+     */
+    private void beginSplashFade(int durationMs) {
+        if (splashFadeStarted) return;
+        splashFadeStarted = true;
+        hideBootHud();
+        hideSplashSkip();
+        if (splashFadeView == null) {
+            endSplashOverlay();
+            return;
+        }
+        if (splashHoldFrame != null) {
+            splashFadeView.setImageBitmap(splashHoldFrame);
+            splashFadeView.setBackgroundColor(0xFF000000);
+        } else {
+            splashFadeView.setImageDrawable(null);
+            splashFadeView.setBackgroundColor(0xFF000000);
+        }
+        splashFadeView.setAlpha(1f);
+        splashFadeView.setVisibility(View.VISIBLE);
+        splashFadeView.bringToFront();
+        int ms = Math.max(200, durationMs);
+        splashFadeView.animate()
+                .alpha(0f)
+                .setDuration(ms)
+                .setStartDelay(48)
+                .withEndAction(() -> {
+                    splashFadeView.setVisibility(View.GONE);
+                    splashFadeView.setImageDrawable(null);
+                    endSplashOverlay();
+                })
+                .start();
     }
 
     /**
@@ -2687,6 +2800,46 @@ public final class MainActivity extends Activity {
     private void hideBootHud() {
         bootHudHidden = true;
         if (bootHud != null) bootHud.setVisibility(View.GONE);
+    }
+
+    /**
+     * SKIP sits in native chrome because the splash &lt;video&gt; hole-punches
+     * through the WebView — an HTML button on the clip would be covered. The
+     * page still has a matching control for desktop / nosplash.
+     */
+    private void setupSplashSkip(FrameLayout root) {
+        float d = getResources().getDisplayMetrics().density;
+        android.widget.TextView skip = new android.widget.TextView(this);
+        skip.setText("SKIP");
+        skip.setTextColor(0xE8FFFFFF);
+        skip.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        skip.setLetterSpacing(0.16f);
+        skip.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        int padH = Math.round(16 * d);
+        int padV = Math.round(8 * d);
+        skip.setPadding(padH, padV, padH, padV);
+        skip.setBackgroundColor(0x6B000000);
+        skip.setElevation(24f * d);
+        skip.setClickable(true);
+        skip.setFocusable(true);
+        skip.setOnClickListener(v -> {
+            if (webView == null) return;
+            webView.evaluateJavascript(
+                    "(function(){try{if(window.HavalSplash&&window.HavalSplash.skip)window.HavalSplash.skip();}catch(e){}})()",
+                    null);
+        });
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        lp.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.START;
+        lp.leftMargin = Math.round(24 * d);
+        lp.bottomMargin = Math.round(20 * d);
+        root.addView(skip, lp);
+        splashSkipBtn = skip;
+    }
+
+    private void hideSplashSkip() {
+        if (splashSkipBtn != null) splashSkipBtn.setVisibility(View.GONE);
     }
 
     private void setupNativeLauncherUI(FrameLayout rootLayout) {
