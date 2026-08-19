@@ -35,12 +35,14 @@ import android.graphics.drawable.Drawable;
 import android.content.ComponentName;
 import android.util.Base64;
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "H6Viewer";
+    private static final String PERF_TAG = "H6Perf";
     /**
      * Public telemetry broadcast from havalshisuku
      * ({@code ServiceManager.dispatchTelemetryOnly}). Both actions carry the same
@@ -69,6 +71,26 @@ public final class MainActivity extends Activity {
             "br.com.redesurftank.havalshisuku.ACTION_RESOLVE_TASK";
     private static final String ACTION_TASK_RESOLVED =
             "br.com.redesurftank.havalshisuku.ACTION_TASK_RESOLVED";
+    private static final String ACTION_SET_TASK_BOUNDS =
+            "br.com.redesurftank.havalshisuku.ACTION_SET_TASK_BOUNDS";
+
+    /** Names shared with Impulse's API gate. */
+    private static final class ImpulseApi {
+        static final String EXTRA_CALLER = "caller";
+    }
+
+    private android.app.PendingIntent apiCallerToken;
+    /** Viewer → Impulse: write an allowlisted vehicle setting (MODES widget). */
+    private static final String ACTION_UPDATE_CAR_DATA =
+            "br.com.redesurftank.havalshisuku.ACTION_UPDATE_CAR_DATA";
+    private static final java.util.Set<String> WRITABLE_CAR_KEYS =
+            new java.util.HashSet<>(java.util.Arrays.asList(
+                    "car.drive_setting.drive_mode",
+                    "car.ev_setting.power_model_config",
+                    "car.drive_setting.steering_wheel_assist_mode",
+                    "car.ev_setting.energy_recovery_level",
+                    "car.drive_setting.esp_enable"
+            ));
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final String ASSET_HOST = "appassets.androidplatform.net";
     private static final String ASSET_PREFIX = "/assets/";
@@ -164,6 +186,48 @@ public final class MainActivity extends Activity {
         public String getCarData(String key) {
             String val = telemetryCache.get(key);
             return val != null ? val : "";
+        }
+
+        @JavascriptInterface
+        public void setCarData(String key, String value) {
+            if (key == null || key.isEmpty() || !WRITABLE_CAR_KEYS.contains(key)) {
+                Log.w(TAG, "Blocked setCarData for " + key);
+                return;
+            }
+            final String safeValue = value == null ? "" : value;
+            if (safeValue.length() > 64) {
+                Log.w(TAG, "Blocked oversized setCarData for " + key);
+                return;
+            }
+            mainHandler.post(() -> {
+                try {
+                    Intent request = new Intent(ACTION_UPDATE_CAR_DATA);
+                    request.setPackage(IMPULSE_PACKAGE);
+                    request.putExtra("key", key);
+                    request.putExtra("value", safeValue);
+                    sendBroadcast(request);
+                } catch (Exception e) {
+                    Log.w(TAG, "setCarData broadcast failed for " + key
+                            + " (" + e.getClass().getSimpleName() + ")");
+                }
+            });
+        }
+
+        /**
+         * Frame metrics from the viewer's window.__perf(). Renderer performance
+         * otherwise never leaves the WebView: the only readouts are the on-screen
+         * FPS pill and a devtools console, both of which need someone physically
+         * at the head unit with a laptop attached. Piping them to logcat makes a
+         * before/after comparison something you can capture with:
+         *
+         *     adb logcat -s H6Perf
+         *
+         * Debug builds only — this is a measurement tool, not telemetry, and it
+         * should not spam a release logcat.
+         */
+        @JavascriptInterface
+        public void reportPerf(String json) {
+            if (isDebuggableBuild()) Log.i(PERF_TAG, json);
         }
     }
 
@@ -351,6 +415,92 @@ public final class MainActivity extends Activity {
         public String loadWidgets() {
             return getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).getString("widgets", "");
         }
+
+        /**
+         * Remember the shell background so the NEXT cold start can paint the
+         * WebView with it. The WebView's own colour is what fills the screen
+         * between Activity start and the page's first paint, so without this a
+         * night-mode car flashes light grey on every launch.
+         */
+        @JavascriptInterface
+        public void saveShellBackground(String css) {
+            int color = parseCssColor(css, DEFAULT_SHELL_BG);
+            getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                    .edit()
+                    .putInt("shellBg", color)
+                    .apply();
+        }
+
+        /**
+         * Viewer → shell: the boot splash has handed off to the car, bring the
+         * launcher icons in. The page owns the timing because it is the only side
+         * that knows when the clip ended and the cross-fade finished.
+         */
+        @JavascriptInterface
+        public void revealLauncher() {
+            runOnUiThread(MainActivity.this::revealLauncherStrip);
+        }
+
+        /**
+         * Viewer → shell: the splash <video> overlay is coming down. Switch the
+         * WebView back to a hardware layer NOW so the 3D canvas is actually
+         * composited under the fading HTML. Waiting until the launcher icons
+         * fly in leaves LAYER_TYPE_NONE for the whole cross-fade, which hides
+         * WebGL and makes the clip look like it never hands off.
+         */
+        @JavascriptInterface
+        public void endSplashOverlay() {
+            runOnUiThread(MainActivity.this::endSplashOverlay);
+        }
+
+        /**
+         * Boot HUD while the splash overlay covers the HTML loader. Progress is
+         * 0–100; {@code text} is the short status ("42%", "PROCESSING…").
+         */
+        @JavascriptInterface
+        public void setBootProgress(int progress, String text) {
+            final int pct = Math.max(0, Math.min(100, progress));
+            final String label = text != null ? text : (pct + "%");
+            runOnUiThread(() -> showBootHud(pct, label));
+        }
+
+        @JavascriptInterface
+        public void hideBootProgress() {
+            runOnUiThread(() -> {
+                hideBootHud();
+                if (splashOverlayEnded || splashDropScheduled) return;
+                splashDropScheduled = true;
+                mainHandler.postDelayed(forceDropSplash, 250);
+            });
+        }
+    }
+
+    /**
+     * Fallback shell background when nothing has been saved yet. Black, because
+     * every cold start now opens on the splash clip (assets/app-splash.mp4),
+     * which is pure black edge to edge — so the window, the root container and
+     * the WebView all match it and the gap before the page's first paint is
+     * invisible instead of a grey flash.
+     */
+    private static final int DEFAULT_SHELL_BG = 0xff000000;
+
+    /** Parse "#rgb"/"#rrggbb" into an opaque ARGB int, or fall back. */
+    private static int parseCssColor(String css, int fallback) {
+        if (css == null) return fallback;
+        String s = css.trim();
+        if (!s.startsWith("#")) return fallback;
+        s = s.substring(1);
+        if (s.length() == 3) {
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; i < 3; i++) { b.append(s.charAt(i)).append(s.charAt(i)); }
+            s = b.toString();
+        }
+        if (s.length() != 6) return fallback;
+        try {
+            return 0xff000000 | Integer.parseInt(s, 16);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private String activePopupPackage = "";
@@ -385,6 +535,25 @@ public final class MainActivity extends Activity {
     };
     private View mediaLaunchAnchor;
     private View stripContainer;
+    /** Launcher icons, left to right — the order the boot reveal staggers them in. */
+    private final List<MotionTrailLayout> launcherItems = new ArrayList<>();
+    /** One-shot: the boot reveal must not replay on a later viewer reload. */
+    private boolean launcherRevealed;
+    /**
+     * Backstop for the launcher reveal. The strip starts hidden and normally
+     * comes back when the page calls AppLauncherBridge.revealLauncher() — but if
+     * the page fails to load, throws before that, or is an older build without
+     * the call, the launcher would be gone for the whole session. Comfortably
+     * longer than a cold start (~14s) plus the splash hand-off.
+     */
+    private final Runnable launcherRevealFallback = new Runnable() {
+        @Override
+        public void run() {
+            if (launcherRevealed) return;
+            Log.w(TAG, "Viewer never signalled splash hand-off — revealing launcher anyway");
+            revealLauncherStrip();
+        }
+    };
     private FrameLayout rootLayout;
     private String shellMode = SHELL_TRIPLE;
     private String launchSidePref = "auto";
@@ -395,6 +564,19 @@ public final class MainActivity extends Activity {
     private String rightSlotUse = "app";
     private Runnable pinMediaBoundsRunnable;
     private final MediaNowPlaying mediaNowPlaying = new MediaNowPlaying();
+    private View bootHud;
+    private android.widget.TextView bootHudPct;
+    private View bootHudFill;
+    private int bootHudBarWidthPx;
+    private boolean bootHudHidden;
+    private boolean splashOverlayEnded;
+    private boolean splashDropScheduled;
+    private final Runnable forceDropSplash = new Runnable() {
+        @Override
+        public void run() {
+            dropSplashFromShell();
+        }
+    };
 
     /**
      * Left freeform slot over our fullscreen launcher (not split-screen).
@@ -541,6 +723,9 @@ public final class MainActivity extends Activity {
             View decor = getWindow() != null ? getWindow().getDecorView() : null;
             android.view.WindowInsets insets = decor != null ? decor.getRootWindowInsets() : null;
             if (insets != null) {
+                // Remember the rail's real width from a moment it was reported, so
+                // slots still clear it while we have it hidden.
+                widestNavInsetPx = Math.max(widestNavInsetPx, insets.getSystemWindowInsetLeft());
                 r.left += insets.getSystemWindowInsetLeft();
                 r.top += insets.getSystemWindowInsetTop();
                 r.right -= insets.getSystemWindowInsetRight();
@@ -578,14 +763,47 @@ public final class MainActivity extends Activity {
         return Math.round(96f * density);
     }
 
+    /**
+     * Width of the MMI's left nav rail. We hide it while we hold focus, so the
+     * window insets then report 0 — but a freeform popup that takes focus brings
+     * it back (a multi-window window cannot control system bars on Android 9), and
+     * it draws above every app window. Slots must clear it whatever the insets say,
+     * or the popup's left edge ends up underneath it.
+     */
+    /** The MMI's rail measured off the panel: NavigationBar window is [0,0][128,720]. */
+    private static final float NAV_RAIL_FALLBACK_DP = 128f;
+
+    private int navRailReservePx() {
+        int id = getResources().getIdentifier("navigation_bar_width", "dimen", "android");
+        int fromRes = id > 0 ? getResources().getDimensionPixelSize(id) : 0;
+        // The resource is not guaranteed to describe this ROM's side rail, and the
+        // insets read 0 whenever we have it hidden, so floor it at the measured width.
+        float density = getResources().getDisplayMetrics().density;
+        int floor = Math.round(NAV_RAIL_FALLBACK_DP * (density <= 0f ? 1f : density));
+        int reserve = Math.max(Math.max(fromRes, widestNavInsetPx), floor);
+        if (reserve != loggedNavReservePx) {
+            loggedNavReservePx = reserve;
+            Log.w(TAG, "Nav rail reserve=" + reserve + " (res=" + fromRes
+                    + " observed=" + widestNavInsetPx + ")");
+        }
+        return reserve;
+    }
+
     private Rect clampSlot(Rect r, Rect usable) {
         int top = Math.max(r.top, usable.top + chromeReservePx());
         int bottom = Math.min(r.bottom, usable.bottom - dockReservePx());
         if (bottom - top < 200) bottom = Math.min(usable.bottom, top + 200);
+        // Symmetric side band: the rail's width is kept clear on both edges.
+        int rail = navRailReservePx();
+        android.graphics.Point real = new android.graphics.Point();
+        try {
+            getWindowManager().getDefaultDisplay().getRealSize(real);
+        } catch (Exception ignored) {}
+        int rightLimit = real.x > 0 ? real.x - rail : usable.right;
         return new Rect(
-                Math.max(r.left, usable.left),
+                Math.max(Math.max(r.left, usable.left), rail),
                 top,
-                Math.min(r.right, usable.right),
+                Math.min(Math.min(r.right, usable.right), rightLimit),
                 bottom);
     }
 
@@ -594,15 +812,21 @@ public final class MainActivity extends Activity {
         return new Rect(0, 0, dm.widthPixels, dm.heightPixels);
     }
 
+    /** Gap between the launcher icon strip and the OEM climate dock. */
+    private int launcherBottomGapPx() {
+        float density = getResources().getDisplayMetrics().density;
+        // +5px lifts the strip slightly above the OEM climate dock.
+        return Math.round(40 * density) + 5;
+    }
+
     private int dockReservePx() {
         float density = getResources().getDisplayMetrics().density;
         return Math.round((110f + 40f + 8f) * density);
     }
 
     private void updateSlotAnchors() {
-        // Slot rects are display-relative; the anchors live inside our window,
-        // which the OEM bars have pushed in by the inset origin.
-        Rect usable = usableDisplayRect();
+        // Slot rects are display-relative; the anchors live inside our window.
+        Rect usable = pageOriginRect();
         applyAnchorRect(launchAnchor, toWindowRect(leftFreeformBounds(), usable));
         applyAnchorRect(mediaLaunchAnchor, toWindowRect(rightFreeformBounds(), usable));
     }
@@ -624,13 +848,85 @@ public final class MainActivity extends Activity {
         anchor.setLayoutParams(lp);
     }
 
+    private float cssPx(int px) {
+        float density = getResources().getDisplayMetrics().density;
+        return px / (density <= 0f ? 1f : density);
+    }
+
+    /**
+     * Margin the page must keep clear on one side so chrome, widgets and icons sit
+     * inside a band matching the nav rail — the WebView itself stays full-bleed, so
+     * the 3D background still runs edge to edge behind it.
+     * <p>
+     * While the rail is up our window is already inset by it, so that part of the
+     * margin is subtracted and the content does not shift when the rail toggles.
+     */
+    private int pageSideInsetPx(boolean rightSide) {
+        android.graphics.Point real = new android.graphics.Point();
+        try {
+            getWindowManager().getDefaultDisplay().getRealSize(real);
+        } catch (Exception ignored) {}
+        // Full-bleed: nothing is reserved for us, so the page keeps the whole band.
+        if (laidOutFullBleed()) return navRailReservePx();
+        // Inset: the system reserves the rail when it is up; we top up the rest.
+        Rect usable = usableDisplayRect();
+        int windowInset = rightSide
+                ? Math.max(0, real.x - usable.right)
+                : Math.max(0, usable.left);
+        return Math.max(0, navRailReservePx() - windowInset);
+    }
+
+    /**
+     * Where our window actually sits on the display. LAYOUT_STABLE insets keep
+     * reporting bars we have hidden, which made the side band collapse on one edge
+     * in the full-bleed modes; the decor view's real position does not lie.
+     */
+    /**
+     * Display-space rect the page's (0,0) maps to, measured from the content view.
+     * <p>
+     * Neither of the obvious sources works: the decor view always spans the whole
+     * display, and LAYOUT_STABLE insets keep reporting bars as inset even in the
+     * full-bleed modes where they are not. The content view is where the system
+     * actually put us, so it answers "are we inset right now" for both axes.
+     */
+    private Rect pageOriginRect() {
+        if (!laidOutFullBleed()) return usableDisplayRect();
+        android.graphics.Point real = new android.graphics.Point();
+        try {
+            getWindowManager().getDefaultDisplay().getRealSize(real);
+        } catch (Exception ignored) {}
+        if (real.x <= 0 || real.y <= 0) return usableDisplayRect();
+        return new Rect(0, 0, real.x, real.y);
+    }
+
+    private int statusBarHeightPx() {
+        int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        return id > 0 ? getResources().getDimensionPixelSize(id) : 0;
+    }
+
+    /**
+     * Top margin the page must keep clear. Zero when the window already starts
+     * below the header; the header's height when it floats over us.
+     */
+    /**
+     * Mode-driven, not measured: measuring the content view raced the relayout that
+     * follows a mode switch, so the page briefly used the wrong offset and the
+     * chrome landed under the header.
+     */
+    private int pageTopInsetPx() {
+        if (!statusBarShown()) return 0;      // full: no header at all
+        if (!laidOutFullBleed()) return 0;    // inset: the system already cleared it
+        return statusBarHeightPx();           // floating: header floats over us
+    }
+
     private String boundsToCssJson(Rect bounds) {
         float density = getResources().getDisplayMetrics().density;
         if (density <= 0f) density = 1f;
-        // Slot rects are display-relative, but the page's origin is our window,
-        // which the OEM bars inset. Sending raw display coords pushed every widget
-        // board right and down by the inset and ran its bottom into the app dock.
-        Rect r = toWindowRect(bounds, usableDisplayRect());
+        // Slot rects are display-relative, but the page's origin is our window.
+        // Must be the window's real position: in the full-bleed modes the stable
+        // insets still claim bars we have hidden, which shifted the boards out of
+        // the side band.
+        Rect r = toWindowRect(bounds, pageOriginRect());
         return "{l:" + (r.left / density)
                 + ",t:" + (r.top / density)
                 + ",r:" + (r.right / density)
@@ -649,9 +945,14 @@ public final class MainActivity extends Activity {
         }
         String side = resolveLaunchSide();
         if (side == null || side.isEmpty()) {
-            Log.i(TAG, "No APP slot available for launch (widgets-only)");
+            // Log.w, not Log.i: the ROM drops info level, and this path is a
+            // tapped icon doing nothing — the reason has to be visible.
+            Log.w(TAG, "No APP slot for " + packageName + ": mode=" + shellMode
+                    + " leftUse=" + leftSlotUse + " rightUse=" + rightSlotUse
+                    + " leftApp=" + activePopupPackage + " rightApp=" + activeMediaPackage);
             return;
         }
+        applySlotUse(side, "app");
         if ("right".equals(side)) launchAppInRightSlot(packageName);
         else launchAppInLeftSlot(packageName);
     }
@@ -663,6 +964,7 @@ public final class MainActivity extends Activity {
         shellMode = mode;
         launchSidePref = prefs.getString("launchSide", "auto");
         nextLaunchLeft = prefs.getBoolean("nextLeft", true);
+        uiMode = readUiModePref();
         loadSlotUsesForMode();
     }
 
@@ -671,6 +973,7 @@ public final class MainActivity extends Activity {
         if (!SHELL_APPS.equals(shellMode)) ed.putString("mode", shellMode);
         ed.putString("launchSide", launchSidePref);
         ed.putBoolean("nextLeft", nextLaunchLeft);
+        ed.putString("uiMode", uiMode);
         ed.apply();
     }
 
@@ -730,22 +1033,26 @@ public final class MainActivity extends Activity {
 
     private void loadSlotUsesForMode() {
         android.content.SharedPreferences prefs = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE);
-        leftSlotUse = prefs.getString("slot_" + shellMode + "_left", "app");
-        rightSlotUse = prefs.getString("slot_" + shellMode + "_right", "app");
-        if (!"widgets".equals(leftSlotUse)) leftSlotUse = "app";
-        if (!"widgets".equals(rightSlotUse)) rightSlotUse = "app";
+        // Retired concept: boards are always widgets and apps float over them.
+        // Reported as "widgets" so the page keeps drawing the board underneath.
+        leftSlotUse = "widgets";
+        rightSlotUse = "widgets";
     }
 
+    /**
+     * Which sides can host an app, decided by the layout alone. The old per-slot
+     * "app vs widgets" switch is gone: widgets are always present and a launched
+     * app simply floats above them, so a slot never stops accepting apps.
+     */
     private boolean slotAllowsApp(String side) {
-        if ("right".equals(side)) {
-            if (SHELL_APP_CAR.equals(shellMode)) return false;
-            return !"widgets".equals(rightSlotUse);
-        }
-        return !"widgets".equals(leftSlotUse);
+        if ("right".equals(side)) return !SHELL_APP_CAR.equals(shellMode);
+        return true;
     }
 
     private void applySlotUse(String side, String use) {
         if (!"widgets".equals(use)) use = "app";
+        String current = "right".equals(side) ? rightSlotUse : leftSlotUse;
+        if (use.equals(current)) return;
         if ("right".equals(side)) rightSlotUse = use;
         else leftSlotUse = use;
         getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
@@ -784,11 +1091,18 @@ public final class MainActivity extends Activity {
             if ("left".equals(want) && !leftFree && rightFree) want = "right";
             else if ("right".equals(want) && !rightFree && leftFree) want = "left";
             if (!slotAllowsApp(want)) want = "";
+        }
 
-            if (!want.isEmpty()) {
-                nextLaunchLeft = !"left".equals(want);
-                saveShellPrefs();
+        // L / R name where the *next* app lands, so every launch hands the
+        // pointer to the other side — including an explicitly picked one, and
+        // including a launch that had to fall back to the free slot.
+        if (!want.isEmpty()) {
+            nextLaunchLeft = !"left".equals(want);
+            if ("left".equals(launchSidePref) || "right".equals(launchSidePref)) {
+                launchSidePref = nextLaunchLeft ? "left" : "right";
             }
+            saveShellPrefs();
+            mainHandler.post(this::notifyViewerShellLayout);
         }
         lastLaunchSide = want;
         return want;
@@ -1088,8 +1402,24 @@ public final class MainActivity extends Activity {
      * {@code 'idle'|'app'}. Also keeps {@code onAndroidLauncherPopup(left)}
      * for older viewer builds.
      */
+    /** Keep the native icon strip inside the same side band as the page chrome. */
+    private void applyChromeSideInsets() {
+        if (stripContainer == null) return;
+        stripContainer.setPadding(pageSideInsetPx(false), stripContainer.getPaddingTop(),
+                pageSideInsetPx(true), stripContainer.getPaddingBottom());
+    }
+
     private void notifyViewerShellLayout() {
         if (webView == null) return;
+        // Before the first layout pass rootLayout has no size, so pageOriginRect()
+        // falls back to insets that describe a window we are not in yet — which
+        // sent safeTop=22 during startup and put the chrome under the header.
+        // Re-push once it is measured.
+        if (rootLayout == null || rootLayout.getWidth() <= 0 || rootLayout.getHeight() <= 0) {
+            mainHandler.postDelayed(this::notifyViewerShellLayout, 300);
+            return;
+        }
+        applyChromeSideInsets();
         boolean left = activePopupPackage != null && !activePopupPackage.isEmpty();
         String right = (activeMediaPackage != null && !activeMediaPackage.isEmpty())
                 ? "\"app\"" : "\"idle\"";
@@ -1110,6 +1440,12 @@ public final class MainActivity extends Activity {
                 + ",rightUse:\"" + rightSlotUse + "\""
                 + ",leftBounds:" + boundsToCssJson(leftFreeformBounds())
                 + ",rightBounds:" + boundsToCssJson(rightFreeformBounds())
+                + ",safeLeft:" + cssPx(pageSideInsetPx(false))
+                + ",safeRight:" + cssPx(pageSideInsetPx(true))
+                + ",safeTop:" + (cssPx(pageTopInsetPx()) + 22f)
+                + ",safeBottom:" + cssPx(dockReservePx())
+                + ",launcherBottom:" + cssPx(launcherBottomGapPx())
+                + ",uiMode:\"" + uiMode + "\""
                 + "});}"
                 + "else if(window.onAndroidLauncherPopup){window.onAndroidLauncherPopup(" + left + ");}"
                 + "else if(window.__app&&window.__app.applyLauncherPopupLayout){"
@@ -1170,24 +1506,32 @@ public final class MainActivity extends Activity {
      */
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (ev != null && hasOverlayWindow()) {
-            int action = ev.getActionMasked();
-            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_UP) {
-                // A tap on our own top chrome may be the layout button, whose
-                // WebView click lands ~300 ms later and calls setChromeOnTop().
-                // Give that click time to cancel the raise, or the popup would be
-                // back on top before the menu it opened has rendered.
-                raiseOverlayTasksSoon(ev.getY() <= chromeReservePx() ? 700 : 0);
-            }
+        // ACTION_UP only: scheduling on DOWN too meant a tap (DOWN then UP) armed
+        // the raise twice, and a drag armed it again on release.
+        if (ev != null && hasOverlayWindow() && ev.getActionMasked() == MotionEvent.ACTION_UP) {
+            // A tap on our own top chrome may be the layout button, whose
+            // WebView click lands ~300 ms later and calls setChromeOnTop().
+            // Give that click time to cancel the raise, or the popup would be
+            // back on top before the menu it opened has rendered.
+            raiseOverlayTasksSoon(ev.getY() <= chromeReservePx() ? 700 : 0);
         }
         return super.dispatchTouchEvent(ev);
     }
 
     /**
-     * The ROM can reorder tasks well after the tap (and again when its animation
-     * settles), so retry instead of raising once.
+     * One raise per gesture. Every moveTaskToFront re-composites the freeform
+     * window, so the 60/250/600 ms retry ladder this replaced read as a flicker
+     * on each tap. A late ROM reorder is covered by onWindowFocusChanged, which
+     * schedules its own raise when our task actually comes forward.
      */
-    private static final long[] RAISE_DELAYS_MS = {60, 250, 600};
+    private static final long RAISE_DELAY_MS = 60;
+    /** Window in which a follow-up raise is treated as an echo of the last one. */
+    private static final long RAISE_ECHO_COOLDOWN_MS = 350;
+    private long lastRaiseCompletedMs;
+    private int lastRaisedTaskId = -1;
+    /** Largest left inset ever reported — the nav rail's width while it was up. */
+    private int widestNavInsetPx;
+    private int loggedNavReservePx = -1;
 
     /**
      * While the viewer's own menu is open its window must win the z-order, so we
@@ -1218,6 +1562,10 @@ public final class MainActivity extends Activity {
             }
             mainHandler.postDelayed(chromeOnTopTimeout, 20000);
         } else {
+            // Menu closed: this raise is wanted even if one just ran, so it must
+            // not be mistaken for an echo.
+            lastRaiseCompletedMs = 0;
+            lastRaisedTaskId = -1;
             raiseOverlayTasksSoon();
         }
     }
@@ -1233,15 +1581,20 @@ public final class MainActivity extends Activity {
         mainHandler.removeCallbacks(raiseOverlayRunnable);
         // A slot covered by our own tap is not a closed slot — hold off the watchdog.
         overlayRaiseGraceUntilMs = android.os.SystemClock.uptimeMillis() + 1600 + leadInMs;
-        for (long delay : RAISE_DELAYS_MS) {
-            mainHandler.postDelayed(raiseOverlayRunnable, delay + leadInMs);
-        }
+        mainHandler.postDelayed(raiseOverlayRunnable, RAISE_DELAY_MS + leadInMs);
     }
 
     private void raiseOverlayTasksNow() {
         if (chromeOnTop || !hasOverlayWindow()) return;
+        // Repeat suppression lives in moveTaskToFrontNoAnim so every path that
+        // reacts to the same tap collapses, per task rather than globally.
         raiseOverlayTask(activePopupPackage, activePopupTaskId, activePopupComponent, false);
-        raiseOverlayTask(activeMediaPackage, activeMediaTaskId, activeMediaComponent, true);
+        // Both slots can end up naming the same package; raising that one task
+        // twice is a second re-composite for nothing.
+        if (activeMediaPackage != null && !activeMediaPackage.equals(activePopupPackage)) {
+            raiseOverlayTask(activeMediaPackage, activeMediaTaskId, activeMediaComponent, true);
+        }
+        // A slot covered by our own tap is not a closed slot — hold the watchdog off.
         overlayRaiseGraceUntilMs = android.os.SystemClock.uptimeMillis() + 1200;
     }
 
@@ -1268,6 +1621,45 @@ public final class MainActivity extends Activity {
      * Ask Impulse to resolve this package's task id. One lookup per popup (or per
      * failed raise), never per tap — it costs Impulse a Shizuku shell round trip.
      */
+    /**
+     * Unforgeable proof of who we are, for Impulse's API gate. Only the system can
+     * set a PendingIntent's creator, so the receiver reads our package off this
+     * rather than trusting an extra we could have written ourselves.
+     */
+    private android.app.PendingIntent apiCallerToken() {
+        if (apiCallerToken == null) {
+            Intent noop = new Intent("com.havalh6.viewer.API_IDENTITY").setPackage(getPackageName());
+            apiCallerToken = android.app.PendingIntent.getBroadcast(
+                    this, 0, noop, android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+        }
+        return apiCallerToken;
+    }
+
+    /**
+     * Ask Impulse to force a package's window to a rect. Needed because this ROM
+     * leaves stale bounds behind in two cases we cannot fix ourselves: the freeform
+     * caption's maximize (mode changes to fullscreen, bounds do not), and apps that
+     * ignore launch bounds and reopen at their remembered rect.
+     */
+    private void requestTaskBounds(String packageName, Rect bounds) {
+        if (packageName == null || packageName.isEmpty() || bounds == null) return;
+        try {
+            Intent request = new Intent(ACTION_SET_TASK_BOUNDS);
+            request.setPackage(IMPULSE_PACKAGE);
+            request.putExtra(ImpulseApi.EXTRA_CALLER, apiCallerToken());
+            request.putExtra("package", packageName);
+            request.putExtra("l", bounds.left);
+            request.putExtra("t", bounds.top);
+            request.putExtra("r", bounds.right);
+            request.putExtra("b", bounds.bottom);
+            sendBroadcast(request);
+            Log.w(TAG, "Bounds request " + packageName + " -> " + bounds);
+        } catch (Exception e) {
+            Log.w(TAG, "Bounds request failed for " + packageName + " ("
+                    + e.getClass().getSimpleName() + ")");
+        }
+    }
+
     private void requestTaskId(String packageName, boolean rightSlot) {
         if (packageName == null || packageName.isEmpty()) return;
         long now = android.os.SystemClock.uptimeMillis();
@@ -1280,6 +1672,7 @@ public final class MainActivity extends Activity {
             // Explicit: Android 8+ will not start a manifest receiver from an
             // implicit broadcast.
             request.setPackage(IMPULSE_PACKAGE);
+            request.putExtra(ImpulseApi.EXTRA_CALLER, apiCallerToken());
             request.putExtra("package", packageName);
             request.putExtra("slot", rightSlot ? "right" : "left");
             sendBroadcast(request);
@@ -1295,6 +1688,15 @@ public final class MainActivity extends Activity {
      */
     private boolean moveTaskToFrontNoAnim(int taskId) {
         if (taskId < 0) return false;
+        // Several paths react to the same tap (touch, focus change, resume) and
+        // each reorder re-composites the freeform window. Collapse repeats of the
+        // same task: report success so callers don't fall back to a relaunch.
+        long now = android.os.SystemClock.uptimeMillis();
+        if (taskId == lastRaisedTaskId && now - lastRaiseCompletedMs < RAISE_ECHO_COOLDOWN_MS) {
+            return true;
+        }
+        lastRaisedTaskId = taskId;
+        lastRaiseCompletedMs = now;
         try {
             android.app.ActivityManager am =
                     (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -1614,8 +2016,11 @@ public final class MainActivity extends Activity {
                     + " windowingMode=" + opts.getInt(KEY_LAUNCH_WINDOWING_MODE, -1));
             startActivity(intent, opts);
             schedulePinPopupBounds(packageName, resolve.getComponent(), leftFreeformBounds(), false);
-            // Let the task exist before asking Impulse to look it up.
+            // Let the task exist before asking Impulse to look it up, then have it
+            // enforce the slot rect for apps that reopen at a remembered position.
             mainHandler.postDelayed(() -> requestTaskId(packageName, false), 700);
+            final Rect leftRect = leftFreeformBounds();
+            mainHandler.postDelayed(() -> requestTaskBounds(packageName, leftRect), 1200);
         } catch (Exception e) {
             Log.e(TAG, "Error launching app in left slot " + packageName, e);
         }
@@ -1660,6 +2065,8 @@ public final class MainActivity extends Activity {
             startActivity(intent, opts);
             schedulePinPopupBounds(packageName, resolve.getComponent(), rightFreeformBounds(), true);
             mainHandler.postDelayed(() -> requestTaskId(packageName, true), 700);
+            final Rect rightRect = rightFreeformBounds();
+            mainHandler.postDelayed(() -> requestTaskBounds(packageName, rightRect), 1200);
         } catch (Exception e) {
             Log.e(TAG, "Error launching app in right slot " + packageName, e);
         }
@@ -1680,6 +2087,18 @@ public final class MainActivity extends Activity {
 
     private void maybeLaunchFreeformFromIntent(Intent intent) {
         if (intent == null) return;
+        String mode = intent.getStringExtra("ui_mode");
+        if (mode != null && !mode.isEmpty()) {
+            intent.removeExtra("ui_mode");
+            if (UI_MODE_INSET.equals(mode) || UI_MODE_FLOATING.equals(mode)
+                    || UI_MODE_FULL.equals(mode)) {
+                uiMode = mode;
+                Log.w(TAG, "UI mode: " + uiMode);
+                saveShellPrefs();
+                enterImmersiveMode();
+                mainHandler.postDelayed(this::notifyViewerShellLayout, 250);
+            }
+        }
         maybeRaiseTaskFromIntent(intent);
         String pkg = intent.getStringExtra(EXTRA_LAUNCH_FREEFORM);
         if (pkg != null && !pkg.isEmpty()) {
@@ -1801,6 +2220,10 @@ public final class MainActivity extends Activity {
                     ? (activeMediaTaskId >= 0 ? activeMediaTaskId : findTaskIdForPackage(targetPkg))
                     : (activePopupTaskId >= 0 ? activePopupTaskId : findTaskIdForPackage(targetPkg));
             if (taskId >= 0) resizeTaskToBounds(taskId, FULLSCREEN_BOUNDS);
+            // resizeTaskToBounds is permission-blocked for us, so the bounds would
+            // stay at the slot rect and the app would paint small inside a black
+            // screen. Impulse has MANAGE_ACTIVITY_STACKS and does it for real.
+            requestTaskBounds(targetPkg, FULLSCREEN_BOUNDS);
 
             if (targetPkg.equals(activePopupPackage)) {
                 activePopupPackage = "";
@@ -1824,12 +2247,24 @@ public final class MainActivity extends Activity {
         // No LAYOUT_NO_LIMITS / LAYOUT_IN_SCREEN: those let the window extend under
         // the MMI's own bars, which is what hid the left nav rail and top header.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // Before enterImmersiveMode below: the stored mode decides its flags.
+        uiMode = readUiModePref();
         enterImmersiveMode();
 
         webView = new WebView(this);
         WebView.setWebContentsDebuggingEnabled(true);
-        webView.setBackgroundColor(0xffe7e7e7);
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        // Paint the WebView with the background the web layer last settled on,
+        // so the gap before the page's first paint matches the app instead of
+        // flashing a fixed light grey (see AppLauncherBridge.saveShellBackground).
+        final int shellBg = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                .getInt("shellBg", DEFAULT_SHELL_BG);
+        // TRANSPARENT + LAYER_TYPE_NONE so the boot splash <video> can hole-punch
+        // its hardware overlay through the page. LAYER_TYPE_HARDWARE draws the
+        // WebView into an opaque FBO that covers the overlay: you hear the clip
+        // and see black. Restored to HARDWARE in revealLauncherStrip() once the
+        // splash has handed off to the 3D scene.
+        webView.setBackgroundColor(0x00000000);
+        webView.setLayerType(View.LAYER_TYPE_NONE, null);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
@@ -1845,7 +2280,15 @@ public final class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setSupportZoom(false);
-        settings.setMediaPlaybackRequiresUserGesture(true);
+        // false, so the boot splash (<video id="hv-splash-video"> in index.html)
+        // can autoplay. Left at the default true, WebView refuses play(), paints
+        // its own full-screen tap-to-play button over the splash overlay, and the
+        // viewer never gets past it. The clip is muted and is the only media the
+        // page ever plays, so nothing else is affected.
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setBlockNetworkImage(false);
+        settings.setBlockNetworkLoads(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         webView.addJavascriptInterface(new TelemetryBridge(), "TelemetryBridge");
         webView.addJavascriptInterface(new AppLauncherBridge(), "AppLauncherBridge");
@@ -1868,6 +2311,17 @@ public final class MainActivity extends Activity {
                     // THREE.GLTFLoader / fetch() require CORS even for same-origin
                     // intercepts on some WebView builds.
                     headers.put("Access-Control-Allow-Origin", "*");
+                    // <video> will not start on a body with no Content-Length and no
+                    // Range support — Chromium leaves the element paused and paints
+                    // its full-screen tap-to-play overlay. The splash MP4 is <1 MB,
+                    // so buffer it and advertise the size. GLBs stay streamed.
+                    if ("video/mp4".equals(mime)) {
+                        byte[] bytes = readAllBytes(stream);
+                        stream.close();
+                        headers.put("Content-Length", Integer.toString(bytes.length));
+                        headers.put("Accept-Ranges", "none");
+                        stream = new java.io.ByteArrayInputStream(bytes);
+                    }
                     return new WebResourceResponse(
                             mime, encoding, 200, "OK", headers, stream);
                 } catch (IOException error) {
@@ -1924,12 +2378,19 @@ public final class MainActivity extends Activity {
         });
 
         rootLayout = new FrameLayout(this);
+        // AppTheme derives from Theme.Material.Light, so the window and this
+        // container both default to a light background and would show through
+        // ahead of (and around) the WebView. Match the shell colour too.
+        rootLayout.setBackgroundColor(shellBg);
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(shellBg));
         rootLayout.setLayoutParams(new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT));
         rootLayout.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
+
+        setupBootHud(rootLayout);
 
         setupNativeLauncherUI(rootLayout);
 
@@ -1965,8 +2426,26 @@ public final class MainActivity extends Activity {
         }
 
         setContentView(rootLayout);
-        if (savedInstanceState == null) webView.loadUrl(VIEWER_URL);
-        else webView.restoreState(savedInstanceState);
+        navRailReservePx();  // logs the reserve once, for slot-geometry debugging
+        // The rail comes and goes with focus, which re-insets our window. Without
+        // this the page keeps its old side band and the whole layout double-shifts.
+        // Layout changes catch it; an insets listener alone does not, because the
+        // window is re-framed without a fresh insets dispatch.
+        rootLayout.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or_, ob) -> {
+            if (l == ol && t == ot && r == or_ && b == ob) return;
+            mainHandler.post(this::notifyViewerShellLayout);
+        });
+        if (savedInstanceState == null) {
+            // `--ez nosplash true` on the launch intent appends ?...&nosplash so a
+            // cold start can be timed without the boot clip. See HavalSplash.
+            String url = VIEWER_URL;
+            if (getIntent() != null && getIntent().getBooleanExtra("nosplash", false)) {
+                url = url + "&nosplash";
+            }
+            webView.loadUrl(url);
+        } else {
+            webView.restoreState(savedInstanceState);
+        }
 
         ensureFreeformSettings();
         loadShellPrefs();
@@ -1981,12 +2460,240 @@ public final class MainActivity extends Activity {
         maybeLaunchFreeformFromIntent(intent);
     }
 
+    /**
+     * A launcher icon that can smear along X while it moves.
+     *
+     * There is no directional blur available here: RenderEffect.createBlurEffect
+     * is API 31+ (this ships targetSdk 28 against a WebView-91-era head unit) and
+     * BlurMaskFilter is isotropic, so it would fuzz the icon evenly instead of
+     * trailing it. Drawing the view several times along the direction of travel
+     * with falling alpha gives a real directional smear on any API, and costs a
+     * handful of extra draws for well under a second at boot.
+     *
+     * `trailPx` is the length of the smear; the reveal drives it from the
+     * animation's instantaneous speed, so it stretches out at the start and is
+     * gone by the time the icon settles.
+     */
+    private static class MotionTrailLayout extends android.widget.LinearLayout {
+        /** Ghost copies behind the icon. 6 is smooth without banding at this size. */
+        private static final int SAMPLES = 6;
+        private float trailPx;
+
+        MotionTrailLayout(Context context) {
+            super(context);
+            // The smear reaches outside the icon's own bounds; the parent row sets
+            // clipChildren false so it isn't cut off at the item edge either.
+            setClipChildren(false);
+            setClipToPadding(false);
+        }
+
+        void setTrailPx(float px) {
+            if (px == trailPx) return;
+            trailPx = px;
+            invalidate();
+        }
+
+        @Override
+        protected void dispatchDraw(android.graphics.Canvas canvas) {
+            if (trailPx <= 0.5f) {
+                super.dispatchDraw(canvas);
+                return;
+            }
+            // Back to front: the furthest ghost is the faintest.
+            for (int i = SAMPLES; i >= 1; i--) {
+                float f = i / (float) SAMPLES;
+                int alpha = (int) (150f * (1f - f));
+                if (alpha < 3) continue;
+                int save = canvas.saveLayerAlpha(
+                        -trailPx, 0, getWidth(), getHeight(), alpha);
+                canvas.translate(-trailPx * f, 0);
+                super.dispatchDraw(canvas);
+                canvas.restoreToCount(save);
+            }
+            super.dispatchDraw(canvas);
+        }
+    }
+
+    /**
+     * Bring the launcher icons in once the boot splash has handed off: each one
+     * slides in from the left with a motion smear and an ease-out, 200ms apart,
+     * leftmost first. Idempotent — only the first call animates.
+     */
+    private void revealLauncherStrip() {
+        endSplashOverlay();
+        if (launcherRevealed) return;
+        launcherRevealed = true;
+        mainHandler.removeCallbacks(launcherRevealFallback);
+        if (stripContainer != null) stripContainer.setVisibility(View.VISIBLE);
+        if (launcherItems.isEmpty()) return;
+
+        float density = getResources().getDisplayMetrics().density;
+        final float travelPx = 120f * density;
+        final float maxTrailPx = 90f * density;
+
+        // Rightmost icon leads and the sequence walks back toward the left edge.
+        // Every icon still travels left-to-right into its slot — it is the ORDER
+        // that is reversed, so the icon with furthest to go sets off first.
+        final int count = launcherItems.size();
+        for (int i = 0; i < count; i++) {
+            final MotionTrailLayout item = launcherItems.get(i);
+            android.animation.ValueAnimator anim = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            anim.setDuration(520);
+            anim.setStartDelay((count - 1 - i) * 200L);
+            anim.setInterpolator(new android.view.animation.DecelerateInterpolator(1.8f));
+            anim.addUpdateListener(a -> {
+                float e = (Float) a.getAnimatedValue();
+                item.setTranslationX(-travelPx * (1f - e));
+                item.setAlpha(Math.min(1f, e * 1.6f));
+                // Speed under a decelerate curve falls off as the icon arrives, so
+                // tying the smear to (1 - e) makes it fade out with the movement.
+                item.setTrailPx(maxTrailPx * (1f - e));
+            });
+            anim.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(android.animation.Animator a) {
+                    item.setTranslationX(0f);
+                    item.setAlpha(1f);
+                    item.setTrailPx(0f);
+                }
+            });
+            anim.start();
+        }
+    }
+
+    /**
+     * Video overlay is gone. Do NOT switch the WebView to LAYER_TYPE_HARDWARE
+     * here: that reallocates the compositor FBO and drops the WebGL context
+     * created under LAYER_TYPE_NONE, which is exactly the black screen after
+     * the last splash frame disappears. NONE is what the 3D canvas was born
+     * on; leave it there.
+     */
+    private void endSplashOverlay() {
+        if (splashOverlayEnded) return;
+        splashOverlayEnded = true;
+        hideBootHud();
+        if (webView != null) {
+            final int shellBg = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                    .getInt("shellBg", DEFAULT_SHELL_BG);
+            webView.setBackgroundColor(shellBg);
+        }
+    }
+
+    /**
+     * Last-resort splash teardown from the native side. JS fadeOut is supposed
+     * to remove #hv-splash; this covers the case where that never runs.
+     */
+    private void dropSplashFromShell() {
+        endSplashOverlay();
+        if (webView == null) return;
+        webView.evaluateJavascript(
+                "(function(){"
+                        + "try{if(window.HavalSplash&&window.HavalSplash.fadeOut)window.HavalSplash.fadeOut();}catch(e){}"
+                        + "var e=document.getElementById('hv-splash');"
+                        + "if(e){e.style.display='none';if(e.parentNode)e.parentNode.removeChild(e);}"
+                        + "var v=document.getElementById('hv-splash-video');"
+                        + "if(v){try{v.pause();}catch(e){}try{v.removeAttribute('src');v.src='';v.load();}catch(e){}"
+                        + "if(v.parentNode)v.parentNode.removeChild(v);}"
+                        + "var a=window.__app;"
+                        + "if(!a)return;"
+                        + "try{a._introWaitingForLoader=false;a._pendingIntro=false;}catch(e){}"
+                        + "try{if(a._forceViewerLayout)a._forceViewerLayout();}catch(e){}"
+                        + "try{if(a._setCarSceneVisible)a._setCarSceneVisible(true);}catch(e){}"
+                        + "try{if(a._onResize)a._onResize();}catch(e){}"
+                        + "try{if(a.requestRender)a.requestRender(30);}catch(e){}"
+                        + "try{if(a.renderOnce)a.renderOnce();}catch(e){}"
+                        + "try{if(a._startIntroAnimation&&!a._introPlayed)a._startIntroAnimation();}catch(e){}"
+                        + "})()",
+                null);
+    }
+
+    /**
+     * Load-progress chip above the WebView. The splash <video> hole-punches
+     * through in-page HTML, so the percentage would otherwise vanish for the
+     * whole clip + hold. Hidden when the splash hands off to the car.
+     */
+    private void setupBootHud(FrameLayout root) {
+        float d = getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setGravity(android.view.Gravity.START);
+        int pad = Math.round(8 * d);
+        box.setPadding(pad, pad, pad, pad);
+        box.setClickable(false);
+        box.setFocusable(false);
+        box.setElevation(24f * d);
+
+        android.widget.TextView label = new android.widget.TextView(this);
+        label.setText("LOADING MODEL");
+        label.setTextColor(0xFFE8F1F8);
+        label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        label.setLetterSpacing(0.18f);
+        label.setShadowLayer(8f, 0, 1, 0xFF000000);
+
+        android.widget.TextView pct = new android.widget.TextView(this);
+        pct.setText("…");
+        pct.setTextColor(0xFFE8F1F8);
+        pct.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
+        pct.setTypeface(android.graphics.Typeface.MONOSPACE);
+        pct.setShadowLayer(8f, 0, 1, 0xFF000000);
+        android.widget.LinearLayout.LayoutParams pctLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        pctLp.topMargin = Math.round(4 * d);
+        pct.setLayoutParams(pctLp);
+        bootHudPct = pct;
+
+        FrameLayout bar = new FrameLayout(this);
+        bootHudBarWidthPx = Math.round(140 * d);
+        android.widget.LinearLayout.LayoutParams barLp = new android.widget.LinearLayout.LayoutParams(
+                bootHudBarWidthPx, Math.round(2 * d));
+        barLp.topMargin = Math.round(8 * d);
+        barLp.gravity = android.view.Gravity.START;
+        bar.setLayoutParams(barLp);
+        bar.setBackgroundColor(0x2EFFFFFF);
+        View fill = new View(this);
+        fill.setBackgroundColor(0xFF4FD6E8);
+        fill.setLayoutParams(new FrameLayout.LayoutParams(0, FrameLayout.LayoutParams.MATCH_PARENT));
+        bar.addView(fill);
+        bootHudFill = fill;
+
+        box.addView(label);
+        box.addView(pct);
+        box.addView(bar);
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+        // Left pillar of the 1920×720 clip, below the MMI clock / inside the
+        // black bar so it does not sit on the car or the status icons.
+        lp.topMargin = Math.round(48 * d);
+        lp.leftMargin = Math.round(132 * d);
+        root.addView(box, lp);
+        bootHud = box;
+    }
+
+    private void showBootHud(int pct, String text) {
+        if (bootHudHidden || bootHud == null) return;
+        bootHud.setVisibility(View.VISIBLE);
+        if (bootHudPct != null) bootHudPct.setText(text != null ? text : (pct + "%"));
+        if (bootHudFill != null) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) bootHudFill.getLayoutParams();
+            lp.width = Math.round(bootHudBarWidthPx * (Math.max(0, Math.min(100, pct)) / 100f));
+            bootHudFill.setLayoutParams(lp);
+        }
+    }
+
+    private void hideBootHud() {
+        bootHudHidden = true;
+        if (bootHud != null) bootHud.setVisibility(View.GONE);
+    }
+
     private void setupNativeLauncherUI(FrameLayout rootLayout) {
         float density = getResources().getDisplayMetrics().density;
         int iconSizePx = Math.round(52 * density);
         int itemWidthPx = Math.round(78 * density);
-        // +5px lifts the strip slightly above the OEM climate dock.
-        int marginBottomPx = Math.round(40 * density) + 5;
+        int marginBottomPx = launcherBottomGapPx();
         int fadeLengthPx = Math.round(72 * density);
         int stripHeightPx = Math.round(110 * density);
 
@@ -1998,6 +2705,11 @@ public final class MainActivity extends Activity {
         containerParams.bottomMargin = marginBottomPx;
         strip.setLayoutParams(containerParams);
         strip.setBackgroundColor(0x00000000);
+        strip.setClipChildren(false);
+        // Hidden until the boot splash hands off — the launcher is not part of the
+        // opening shot. revealLauncherStrip() brings it back, driven from the page
+        // (AppLauncherBridge.revealLauncher) so it lands with the car, not before.
+        strip.setVisibility(View.INVISIBLE);
         stripContainer = strip;
 
         android.widget.HorizontalScrollView scrollView = new android.widget.HorizontalScrollView(this) {
@@ -2022,6 +2734,9 @@ public final class MainActivity extends Activity {
         iconsLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         iconsLayout.setGravity(android.view.Gravity.CENTER);
         iconsLayout.setPadding(Math.round(24 * density), 4, Math.round(24 * density), 4);
+        // Let the reveal's motion smear draw past each item's own edges.
+        iconsLayout.setClipChildren(false);
+        scrollView.setClipChildren(false);
 
         PackageManager pm = getPackageManager();
         Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
@@ -2035,9 +2750,13 @@ public final class MainActivity extends Activity {
             String labelStr = info.loadLabel(pm).toString();
             Drawable iconDrawable = info.loadIcon(pm);
 
-            android.widget.LinearLayout itemLayout = new android.widget.LinearLayout(this);
+            MotionTrailLayout itemLayout = new MotionTrailLayout(this);
             itemLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
             itemLayout.setGravity(android.view.Gravity.CENTER);
+            // Starts off-screen-left and transparent; revealLauncherStrip() flies
+            // it in. If that never runs, the strip stays INVISIBLE anyway, so no
+            // half-faded icons can be left on screen.
+            itemLayout.setAlpha(0f);
             android.widget.LinearLayout.LayoutParams itemParams = new android.widget.LinearLayout.LayoutParams(
                     itemWidthPx, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
             itemParams.rightMargin = Math.round(12 * density);
@@ -2072,6 +2791,7 @@ public final class MainActivity extends Activity {
             itemLayout.setOnClickListener(v -> launchAppForPackage(targetPkg, targetLabel));
 
             iconsLayout.addView(itemLayout);
+            launcherItems.add(itemLayout);
         }
 
         scrollView.addView(iconsLayout, new FrameLayout.LayoutParams(
@@ -2089,7 +2809,16 @@ public final class MainActivity extends Activity {
         strip.addView(scrollView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
+        // Icons live inside the same side band as the rest of the chrome.
+        strip.setPadding(pageSideInsetPx(false), strip.getPaddingTop(),
+                pageSideInsetPx(true), strip.getPaddingBottom());
         rootLayout.addView(strip);
+        // 60s, not 30s: a cold start measured ~28s to the reveal on this unit
+        // (15s clip + model load), and at 30s this backstop was beating the real
+        // hand-off — the launcher popped in un-animated on every slow boot. This
+        // is a "something is broken" net, so it must sit well clear of the worst
+        // legitimate boot.
+        mainHandler.postDelayed(launcherRevealFallback, 60000);
 
         // Invisible anchors matching freeform slots — used for clip-reveal launch placement.
         // Keep them behind the WebView and non-interactive so they never steal touches
@@ -2119,6 +2848,15 @@ public final class MainActivity extends Activity {
         mediaLaunchAnchor = mediaAnchor;
     }
 
+    /** minSdk 23 has no InputStream.readAllBytes(). */
+    private static byte[] readAllBytes(InputStream stream) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[16 * 1024];
+        int n;
+        while ((n = stream.read(buf)) != -1) out.write(buf, 0, n);
+        return out.toByteArray();
+    }
+
     private static String mimeType(String path) {
         String lower = path.toLowerCase();
         if (lower.endsWith(".html")) return "text/html";
@@ -2131,6 +2869,9 @@ public final class MainActivity extends Activity {
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
         if (lower.endsWith(".svg")) return "image/svg+xml";
         if (lower.endsWith(".glb")) return "model/gltf-binary";
+        // The boot splash clip. Served as octet-stream, Chromium's media stack
+        // will not pick a decoder for it and <video> fires an error.
+        if (lower.endsWith(".mp4")) return "video/mp4";
         if (lower.endsWith(".hdr")) return "application/octet-stream";
         return "application/octet-stream";
     }
@@ -2144,12 +2885,62 @@ public final class MainActivity extends Activity {
                 || lower.endsWith(".svg");
     }
 
+    /**
+     * How the viewer coexists with the MMI's bars. Switch at runtime:
+     * {@code adb shell am start -n com.havalh6.viewer/.MainActivity --es ui_mode <mode>}
+     * <ul>
+     *   <li>{@code inset} (default) — header visible, page laid out below it. The
+     *       rail hides while we hold focus, but the OEM forces it back when
+     *       something else does (Android Auto, a focused freeform popup).</li>
+     *   <li>{@code floating} — header visible but drawn <em>over</em> the page: we
+     *       lay out fullscreen without hiding the status bar. The background runs
+     *       under the header; chrome still starts below it.</li>
+     *   <li>{@code full} — YouTube's fullscreen set. Both bars gone; beats the
+     *       Android Auto case, loses the header.</li>
+     * </ul>
+     */
+    private static final String UI_MODE_INSET = "inset";
+    private static final String UI_MODE_FLOATING = "floating";
+    private static final String UI_MODE_FULL = "full";
+    /**
+     * Default is {@link #UI_MODE_FLOATING}: it is the only mode where the viewer's
+     * background runs under the MMI's bars, so the transparent scrims show the
+     * scene instead of black strips. Persisted in {@link #PREFS_SHELL}.
+     */
+    private String uiMode = UI_MODE_FLOATING;
+
+    private String readUiModePref() {
+        String stored = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                .getString("uiMode", UI_MODE_FLOATING);
+        if (UI_MODE_INSET.equals(stored) || UI_MODE_FLOATING.equals(stored)
+                || UI_MODE_FULL.equals(stored)) {
+            return stored;
+        }
+        return UI_MODE_FLOATING;
+    }
+
+    /** True when the MMI header is still drawn (every mode except {@code full}). */
+    private boolean statusBarShown() {
+        return !UI_MODE_FULL.equals(uiMode);
+    }
+
+    /** True when our window is laid out over the bars rather than inside them. */
+    private boolean laidOutFullBleed() {
+        return !UI_MODE_INSET.equals(uiMode);
+    }
+
     private void enterImmersiveMode() {
-        getWindow().getDecorView().setSystemUiVisibility(
-                // Not immersive: the MMI's status header and left nav bar stay on
-                // screen, so the viewer lives inside the remaining app area.
-                // LAYOUT_STABLE keeps getRootWindowInsets() steady for slot maths.
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        if (laidOutFullBleed()) {
+            flags |= View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+        }
+        if (UI_MODE_FULL.equals(uiMode)) {
+            flags |= View.SYSTEM_UI_FLAG_FULLSCREEN;
+        }
+        getWindow().getDecorView().setSystemUiVisibility(flags);
     }
 
     @Override

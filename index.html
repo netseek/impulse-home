@@ -7,8 +7,379 @@
 <script src="./support.js"></script>
 <script src="./telemetryClient.js"></script>
 <script src="./appLauncherClient.js"></script>
+<style>
+  /* Boot splash. This block lives in <head> rather than in the x-dc <helmet>
+     below, because the helmet's styles are only injected once the template
+     mounts — by then the WebView has already painted a frame, and anything but
+     black there is a visible flash before the clip appears. */
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; }
+  /* support.js hides the source template with `x-dc{display:none}`. If a refetch
+     accidentally nests that tag inside #dc-root, keep its children in layout. */
+  #dc-root x-dc { display: contents !important; }
+  #hv-splash {
+    position: fixed; inset: 0; z-index: 200; background: #000;
+    opacity: 1; transition: opacity 1100ms ease;
+    overflow: hidden;
+  }
+  #hv-splash.hv-splash-out { opacity: 0; }
+  #hv-splash.hv-splash-gone { display: none; }
+  /* This WebView paints <video> on a hole-punched overlay. Covering it (canvas,
+     opacity, a black div) hides the frames and leaves audio over black.
+     drawImage from a tiny element also copies black. So: keep the element
+     small until a frame exists (no full-screen tap-to-play placeholder), then
+     size it to a 16:9 letterbox and let the overlay be the picture. Canvas is
+     only used at the end, after a snapshot, so the fade can opacity-out. */
+  #hv-splash.hv-splash-playing { background: transparent; }
+  #hv-splash video {
+    position: absolute; left: 0; top: 0;
+    pointer-events: none;
+  }
+  #hv-splash canvas {
+    display: none;
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    background: #000; pointer-events: none; z-index: 3;
+  }
+  #hv-splash.hv-splash-holding canvas { display: block; }
+</style>
 </head>
-<body>
+<!-- hv-boot holds the widget boards back until the reveal — see .hv-widget-board. -->
+<body class="hv-boot">
+
+<!-- ── Boot splash ───────────────────────────────────────────────────────────
+     Deliberately outside the design-component template: plain markup paints on the
+     very first frame, well before React, three.js or the 10MB car GLB exist,
+     which is the whole point of a splash on a head unit that takes ~14s to cold
+     start. The clip runs the approach and the headlight flash that the viewer's
+     camera intro used to do in 3D (see _startIntroAnimation), and ends holding
+     a front-on shot of the car — the viewer cross-fades from that held frame
+     into the real model at its own front pose, so the two read as one shot.
+     HavalSplash below owns playback; the viewer only calls whenDone().        -->
+<div id="hv-splash">
+  <!-- autoplay+muted must be content attributes (not just JS play()) or
+       Chromium treats this as a paused media element and draws its tap-to-play
+       overlay. webkit-playsinline keeps WebView 91 from promoting to fullscreen. -->
+  <video id="hv-splash-video" src="assets/app-splash.mp4" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay muted playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
+  <canvas id="hv-splash-canvas"></canvas>
+</div>
+<script>
+window.HavalSplash = (function () {
+  var el = document.getElementById('hv-splash');
+  var video = document.getElementById('hv-splash-video');
+  // The splash must never be able to strand the viewer behind a black screen,
+  // so every failure path below (missing element, decode error, autoplay
+  // refused, stalled buffer) funnels into finish() and the car reveals anyway.
+  // finish() means "the clip has reached its hold frame" — the overlay STAYS
+  // up on that frame until the viewer draws the car and calls fadeOut().
+  var doneCbs = [];
+  var finished = false;
+  var faded = false;
+  var holding = false;
+
+  function finish() {
+    if (finished) return;
+    finished = true;
+    var cbs = doneCbs; doneCbs = [];
+    for (var i = 0; i < cbs.length; i++) { try { cbs[i](); } catch (e) { console.warn('[Splash]', e); } }
+  }
+
+  // ?nosplash — boot straight to the loader with no clip and no decoding, so a
+  // cold start can be timed with the splash's cost removed. Kept in because
+  // "is the splash slowing the boot down?" is otherwise unanswerable without a
+  // rebuild, and the answer decides whether the clip needs re-encoding.
+  var noSplash = /[?&#]nosplash\b/.test(location.search + location.hash);
+  if (noSplash && video && video.parentNode) {
+    try { video.pause(); } catch (e) {}
+    video.removeAttribute('src');
+    video.parentNode.removeChild(video);
+    video = null;
+  }
+  if (noSplash && el) el.parentNode.removeChild(el);
+
+  if (!el || !video) {
+    finish();
+    return {
+      active: false, fadeMs: 0,
+      whenDone: function (cb) { cb(); },
+      fadeOut: function () {},
+      isDone: function () { return true; },
+      forceHold: function () {},
+      clipLooksFinished: function () { return true; },
+      setStatus: function () {},
+    };
+  }
+
+  // ── Presenter ─────────────────────────────────────────────────────────────
+  // Playback is the WebView's own video overlay, letterboxed. A canvas is only
+  // snapped at hold-time so fadeOut can opacity-out page content (the overlay
+  // ignores CSS opacity).
+  var canvas = document.getElementById('hv-splash-canvas');
+  var ctx = canvas ? canvas.getContext('2d', { alpha: false }) : null;
+
+  function layoutVideo() {
+    if (!video || !el) return;
+    // The clip is encoded to the panel (1920×720, 16:9 content pillarboxed).
+    // The hardware overlay often ignores object-fit, so the FILE must already
+    // match the screen — CSS here is only for the canvas snapshot / fade.
+    var W = el.clientWidth || window.innerWidth || 1920;
+    var H = el.clientHeight || window.innerHeight || 720;
+    video.style.position = 'absolute';
+    video.style.width = W + 'px';
+    video.style.height = H + 'px';
+    video.style.left = '0px';
+    video.style.top = '0px';
+    video.style.objectFit = 'contain';
+    video.style.zIndex = '2';
+  }
+
+  var hud = null;
+  function setStatus() {}
+
+  function revealVideo() {
+    if (!video || holding || faded) return;
+    layoutVideo();
+    el.classList.add('hv-splash-playing');
+  }
+
+  function sizeCanvas() {
+    if (!canvas) return;
+    var w = Math.max(1, Math.round(el.clientWidth || window.innerWidth));
+    var h = Math.max(1, Math.round(el.clientHeight || window.innerHeight));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+  }
+
+  function drawFrame() {
+    if (!ctx || !video) return false;
+    var vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return false;
+    sizeCanvas();
+    var cw = canvas.width, ch = canvas.height;
+    var scale = Math.min(cw / vw, ch / vh);
+    var dw = vw * scale, dh = vh * scale;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cw, ch);
+    try {
+      ctx.drawImage(video, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+    } catch (e) {
+      return false;
+    }
+    return true;
+  }
+
+  function destroyVideo() {
+    var node = video || document.getElementById('hv-splash-video');
+    video = null;
+    if (!node) return;
+    try { node.pause(); } catch (e) {}
+    try { node.muted = true; node.volume = 0; } catch (e) {}
+    try {
+      node.style.width = '1px';
+      node.style.height = '1px';
+      node.style.opacity = '0';
+      node.style.display = 'none';
+    } catch (e) {}
+    try {
+      node.removeAttribute('src');
+      node.src = '';
+      node.srcObject = null;
+    } catch (e) {}
+    if (node.parentNode) node.parentNode.removeChild(node);
+    // Detached load() releases the WebView's hole-punched decoder surface.
+    // Doing this while the node is still attached paints the tap-to-play overlay.
+    try { node.load(); } catch (e) {}
+  }
+
+  function clipLooksFinished() {
+    if (finished || holding || faded) return true;
+    if (!video) return true;
+    if (video.ended) return true;
+    var d = video.duration;
+    if (d && isFinite(d) && d > 0 && video.currentTime >= d - 0.25) return true;
+    if (video.paused && video.currentTime > 1) return true;
+    if (video.currentTime >= 14) return true;
+    return false;
+  }
+
+  function holdLastFrame() {
+    if (holding) { finish(); return; }
+    holding = true;
+    // Keep the <video> in the document so the hardware overlay can sit on the
+    // last frame while the GLB finishes. Destroying it here made a canvas
+    // snapshot that was often black, and CSS opacity cannot hide the overlay
+    // anyway — teardown happens in fadeOut once the 3D car has been drawn.
+    if (video) {
+      try { video.pause(); } catch (e) {}
+      layoutVideo();
+    }
+    finish();
+  }
+
+  function teardownOverlay() {
+    drawFrame();
+    el.classList.add('hv-splash-holding');
+    el.classList.remove('hv-splash-playing');
+    destroyVideo();
+  }
+
+  // Hard ceiling. The clip is ~15.1s; if it has not reported `ended` a couple of
+  // seconds past that, freeze whatever frame we have rather than waiting forever.
+  var guard = setTimeout(holdLastFrame, 19000);
+  video.addEventListener('timeupdate', function () {
+    if (holding || finished || !video) return;
+    var d = video.duration;
+    if (d && isFinite(d) && d > 0 && video.currentTime >= d - 0.08) holdLastFrame();
+  });
+  video.addEventListener('ended', holdLastFrame);
+  video.addEventListener('error', function () {
+    console.warn('[Splash] video error', video.error && video.error.code);
+    finish();
+  });
+
+  // The MMI serves this file through MainActivity.shouldInterceptRequest, which
+  // hands Chromium a plain APK asset stream with no Content-Length and no Range
+  // support. Direct <video src> playback of that is build-dependent, so if the
+  // element has not produced a decoded frame shortly after load, refetch the
+  // whole file (fetch() goes through the same intercept and is known to work —
+  // it is how every GLB gets here) and hand the player a fully seekable blob.
+  var blobTried = false;
+  function blobFallback() {
+    if (blobTried || finished || holding || !video) return;
+    blobTried = true;
+    console.warn('[Splash] direct playback stalled — retrying via blob');
+    fetch(video.getAttribute('src'))
+      .then(function (r) { return r.blob(); })
+      .then(function (b) {
+        if (finished || holding || !video) return;
+        video.src = URL.createObjectURL(b);
+        video.load();
+        play();
+      })
+      .catch(function (e) { console.warn('[Splash] blob fallback failed', e); finish(); });
+  }
+
+  function play() {
+    if (!video || holding || finished || faded) return;
+    // canplay/loadeddata re-fire after the first play(); don't remute a clip
+    // that is already running — that is what killed the soundtrack.
+    if (video.currentTime > 0.05 && !video.paused) {
+      unmute();
+      return;
+    }
+    video.muted = true;
+    video.defaultMuted = true;
+    video.volume = 1;
+    video.playsInline = true;
+    var p = video.play();
+    if (p && p.catch) p.catch(function (e) {
+      console.warn('[Splash] play rejected', e);
+      blobFallback();
+    });
+  }
+
+  function unmute() {
+    if (!video || holding || faded) return;
+    try {
+      video.muted = false;
+      video.defaultMuted = false;
+      video.volume = 1;
+    } catch (e) {}
+  }
+
+  video.addEventListener('playing', function () {
+    revealVideo();
+    unmute();
+  });
+  video.addEventListener('timeupdate', revealVideo);
+  video.addEventListener('loadeddata', revealVideo);
+  window.addEventListener('resize', function () {
+    if (!holding && !faded) layoutVideo();
+  });
+
+  // Size the overlay NOW, before the GLB load starves the main thread.
+  // Autoplay can run on the media thread for the full clip without a single
+  // timeupdate; waiting for that event left the element at 64x36 on black.
+  revealVideo();
+  play();
+  video.addEventListener('canplay', play);
+  video.addEventListener('loadeddata', play);
+  setTimeout(function () {
+    // readyState < HAVE_CURRENT_DATA means not one frame has decoded yet.
+    if (!finished && video.readyState < 2) blobFallback();
+  }, 1500);
+
+  // Stall watchdog. The failure that matters most here is a WebView that refuses
+  // to autoplay: `play()` rejects, no `error` event ever fires, and the element
+  // just sits there showing Chromium's tap-to-play button over the whole screen
+  // with the viewer hidden behind it. That is a black hole, not a splash — so if
+  // the playhead has not moved across two checks, give up and reveal the car.
+  // (MainActivity calls setMediaPlaybackRequiresUserGesture(false) so this
+  // should not trigger on the MMI, but a stuck splash must never be possible.)
+  var lastTime = -1;
+  var stalls = 0;
+  var watchdog = setInterval(function () {
+    if (finished || !video) { clearInterval(watchdog); return; }
+    if (video.currentTime > 0.4) { clearInterval(watchdog); return; }
+    if (video.currentTime === lastTime) {
+      stalls++;
+      if (stalls === 1) blobFallback();
+      if (stalls >= 3) {
+        console.warn('[Splash] playback never started — skipping splash');
+        clearInterval(watchdog);
+        finish();
+      }
+    } else {
+      stalls = 0;
+    }
+    lastTime = video.currentTime;
+  }, 1200);
+
+  // Tapping the splash jumps to the hold frame. The overlay stays up until the
+  // car is drawn — skip means "don't make me watch the rest", not "show a hole".
+  el.addEventListener('click', holdLastFrame);
+  el.addEventListener('touchend', holdLastFrame);
+
+  return {
+    active: true,
+    /** Kept in step with the #hv-splash opacity transition in <head>. */
+    fadeMs: 1100,
+    /** True once the clip has ended, been skipped, or failed. Overlay may still be up. */
+    isDone: function () { return finished; },
+    /** Resolve once the clip has ended, been skipped, or failed. */
+    whenDone: function (cb) {
+      if (finished) { cb(); return; }
+      doneCbs.push(cb);
+    },
+    /** Cross-fade the held last frame out over the now-visible 3D car. */
+    fadeOut: function () {
+      if (faded) return;
+      faded = true;
+      clearTimeout(guard);
+      clearInterval(watchdog);
+      destroyVideo();
+      // CSS opacity cannot hide a hole-punched <video>, and a canvas snapshot
+      // of that overlay just becomes another opaque last frame. Yank the whole
+      // splash node so the 3D canvas is actually on screen.
+      if (el) {
+        el.style.display = 'none';
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }
+      el = null;
+      try {
+        if (window.AppLauncherBridge && typeof window.AppLauncherBridge.endSplashOverlay === 'function') {
+          window.AppLauncherBridge.endSplashOverlay();
+        }
+      } catch (e) {}
+    },
+    forceHold: holdLastFrame,
+    clipLooksFinished: clipLooksFinished,
+    /** Boot progress while the overlay (or its held frame) is still up. */
+    setStatus: setStatus,
+  };
+})();
+</script>
+
 <x-dc>
 <helmet>
 <style>
@@ -42,7 +413,9 @@
     }
   </style>
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #0b1016; overflow: hidden; }
+    /* Black, not the old #0b1016: this is what shows around/behind #hv-root, and
+       the boot splash clip is pure black (see #hv-splash in <head>). */
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
     * { box-sizing: border-box; }
     @keyframes vp-spin { to { transform: rotate(360deg); } }
     @keyframes vp-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
@@ -176,7 +549,16 @@
       padding: 0;
       pointer-events: auto;
       color: #eaf2f8;
+      transition: opacity 900ms ease;
     }
+    /* Boot: the opening shot is the clip and then the car, nothing else. The
+       widget boards are held back and faded in last (see _revealShellChrome),
+       two seconds after the launcher icons start flying in. The class is on
+       <body> in the static markup rather than added from JS, so the boards are
+       already hidden on the first paint instead of flashing once and then
+       going. pointer-events off too, so an invisible board can't swallow a tap
+       in the meantime. */
+    body.hv-boot .hv-widget-board { opacity: 0; pointer-events: none; }
     .hv-widget-toolbar {
       display: flex;
       flex-direction: row;
@@ -184,29 +566,22 @@
       gap: 6px;
       flex-shrink: 0;
     }
-    .hv-widget-chip {
+    .hv-widget-add {
       height: 26px;
       padding: 0 10px;
-      border-radius: 8px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(16,21,28,.72);
-      color: rgba(234,242,248,.75);
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: .1em;
-      cursor: pointer;
-    }
-    .hv-widget-chip.on { border-color: #4fd6e8; color: #4fd6e8; background: rgba(79,214,232,.16); }
-    .hv-widget-add {
-      width: 26px; height: 26px; margin-left: auto;
       border-radius: 8px;
       border: 1px solid rgba(79,214,232,.35);
       background: rgba(16,21,28,.72);
       color: #4fd6e8;
-      font-size: 16px;
-      line-height: 1;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .1em;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
+    .hv-widget-add.on { border-color: #4fd6e8; background: rgba(79,214,232,.16); }
     .hv-widget-grid {
       position: relative;
       flex: 1;
@@ -260,6 +635,168 @@
       margin-top: 4px;
     }
     .hv-widget-stub-hint { font-size: 11px; opacity: .45; margin-top: 6px; }
+    .hv-modes {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      min-height: 0;
+      overflow: hidden;
+      padding: 8px 10px;
+      box-sizing: border-box;
+      display: grid;
+      gap: 6px;
+      touch-action: pan-y;
+    }
+    .hv-modes-1x2,
+    .hv-modes-2x2,
+    .hv-modes-3x2 {
+      grid-template-rows: 3fr 1fr 1fr 1fr;
+    }
+    .hv-modes-2x1,
+    .hv-modes-3x1 {
+      grid-template-rows: auto 1fr 1fr 1fr;
+    }
+    .hv-modes-row {
+      min-height: 0;
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+    .hv-modes-row.drive { grid-template-rows: auto 1fr 1fr 1fr; }
+    .hv-modes-row:not(.drive) { grid-template-rows: auto 1fr; }
+    .hv-modes-kicker {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .14em;
+      opacity: .5;
+    }
+    .hv-modes-chips {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-auto-rows: 1fr;
+      gap: 4px;
+    }
+    .hv-modes-chip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      padding: 0 4px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.04);
+      color: rgba(255,255,255,.42);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hv-modes-chip.on {
+      border-color: #fff;
+      background: #f2f5f8;
+      color: #0b1016;
+      font-weight: 700;
+    }
+    .hv-modes-chip.ghost {
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .hv-modes-wide-kickers {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 4px;
+    }
+    .hv-modes-wide-kicker {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .14em;
+      opacity: .5;
+    }
+    .hv-modes-wide-kicker.span3 { grid-column: span 3; }
+    .hv-modes-wide-grid { display: contents; }
+    .hv-modes-2x1 .hv-modes-chips,
+    .hv-modes-3x1 .hv-modes-chips {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+    .hv-modes-1x2 .hv-modes-chip,
+    .hv-modes-2x2 .hv-modes-chip,
+    .hv-modes-3x2 .hv-modes-chip { font-size: 12px; }
+    .hv-graphs {
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      min-height: 0;
+      overflow: hidden;
+      padding: 10px 12px 8px;
+      box-sizing: border-box;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 6px;
+    }
+    .hv-graphs-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+    .hv-graphs-kicker {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .14em;
+      opacity: .5;
+    }
+    .hv-graphs-readout {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      min-width: 0;
+      font-family: 'Space Mono', monospace;
+    }
+    .hv-graphs-mode {
+      font-size: 9px;
+      letter-spacing: .12em;
+      opacity: .45;
+    }
+    .hv-graphs-mode.regen { opacity: .85; color: #f2f5f8; }
+    .hv-graphs-value {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      color: #f2f5f8;
+    }
+    .hv-graphs-2x1 .hv-graphs-value,
+    .hv-graphs-3x1 .hv-graphs-value { font-size: 16px; }
+    .hv-graphs-unit {
+      font-size: 9px;
+      letter-spacing: .1em;
+      opacity: .45;
+    }
+    .hv-graphs-plot {
+      position: relative;
+      min-height: 0;
+      min-width: 0;
+    }
+    .hv-graphs-canvas {
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: transparent;
+      pointer-events: none;
+    }
     .hv-widget-cell {
       border-radius: 10px;
       border: 1px dashed rgba(79,214,232,.28);
@@ -453,10 +990,26 @@
       box-shadow: 0 8px 22px rgba(0,0,0,.4), 0 0 16px rgba(79,214,232,.2);
     }
     .hv-media-transport button:active { transform: scale(0.96); }
+    .hv-media-1x2 .hv-media-source {
+      top: 12px;
+      left: 12px;
+      right: 12px;
+    }
+    .hv-media-1x2 .hv-media-chrome { padding: 22px 12px 10px; }
+    .hv-media-1x2 .hv-media-title { font-size: 14px; }
+    .hv-media-1x2 .hv-media-transport { gap: 10px; }
+    .hv-media-1x2 .hv-media-transport button {
+      width: 44px;
+      height: 44px;
+    }
+    .hv-media-1x2 .hv-media-transport button.hv-media-play {
+      width: 52px;
+      height: 52px;
+    }
     .hv-brand {
       position: absolute;
       top: var(--hv-safe-top, 22px);
-      left: 30px;
+      left: calc(var(--hv-safe-left, 0px) + 30px);
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -507,13 +1060,18 @@
     .hv-shell-glyph .g-car { width: 14px; height: 12px; border-radius: 3px; opacity: .55; }
     .hv-shell-menu {
       position: absolute;
-      top: calc(100% + 8px);
-      left: 0;
+      /* Beside the buttons, not below them. Freeform windows start just under
+         the chrome band (MainActivity.chromeReservePx), so a dropdown lands
+         behind them — they are separate OS windows and always paint on top.
+         Staying inside the band keeps the menu visible with the apps open. */
+      top: 0;
+      left: calc(100% + 8px);
       z-index: 40;
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
+      align-items: center;
       gap: 4px;
-      padding: 8px;
+      padding: 6px;
       border-radius: 12px;
       background: rgba(16,21,28,.94);
       border: 1px solid rgba(255,255,255,.14);
@@ -542,9 +1100,9 @@
     }
   </style>
 </helmet>
-<div ref="{{ outerRef }}" style="position: fixed; inset: 0; background: radial-gradient(130% 120% at 50% 38%, #efefef 0%, #dcdee0 78%, #cfd1d4 100%); font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }};">
+<div id="hv-root" ref="{{ outerRef }}" style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; background: {{ shellBg }}; font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }}; --hv-safe-left: {{ safeLeft }}; --hv-safe-right: {{ safeRight }}; --hv-safe-bottom: {{ safeBottom }}; --hv-launcher-bottom: {{ launcherBottom }};">
 
-  <div ref="{{ containerRef }}" style="position: absolute; inset: 0;"></div>
+  <div ref="{{ containerRef }}" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%;"></div>
 
   <!-- top-left model label + shell layout -->
   <div class="hv-brand" style="color: {{ labelColor }}; transition: color 0.6s ease;">
@@ -587,9 +1145,7 @@
   <!-- widget boards occupy the same rects as freeform app slots -->
   <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};">
     <div class="hv-widget-toolbar">
-      <button type="button" class="hv-widget-chip {{ leftUseAppClass }}" onClick="{{ setLeftSlotApp }}">APP</button>
-      <button type="button" class="hv-widget-chip {{ leftUseWidClass }}" onClick="{{ setLeftSlotWidgets }}">WIDGETS</button>
-      <button type="button" class="hv-widget-add" onClick="{{ addWidgetLeft }}" title="Add widget">+</button>
+      <button type="button" class="hv-widget-add {{ leftAddClass }}" onClick="{{ addWidgetLeft }}" title="Add widget">+ ADD WIDGET</button>
     </div>
     <div class="hv-widget-grid" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);">
       <sc-for list="{{ leftPlaceCells }}" as="pc" hint-placeholder-count="0">
@@ -599,17 +1155,10 @@
         <div class="hv-widget-card" style="{{ wg.gridStyle }}">
           <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-media-rail" style="opacity: {{ mediaRailOpacity }};">
+            <div class="hv-media-rail {{ wg.mediaSizeClass }}" style="opacity: {{ mediaRailOpacity }};">
               <div class="hv-media-art-wrap">
                 <sc-if value="{{ mediaHasArt }}" hint-placeholder-val="{{ false }}">
                   <img src="{{ mediaArt }}" alt="">
-                </sc-if>
-                <sc-if value="{{ mediaShowPlaceholder }}" hint-placeholder-val="{{ true }}">
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(79,214,232,.45)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="6.5" cy="17.5" r="2.5"></circle>
-                    <circle cx="17.5" cy="15.5" r="2.5"></circle>
-                    <path d="M9 17.5V6l11-2v11.5"></path>
-                  </svg>
                 </sc-if>
               </div>
               <div class="hv-media-source">{{ mediaAppLabel }}</div>
@@ -637,6 +1186,55 @@
               </div>
             </div>
           </sc-if>
+          <sc-if value="{{ wg.isModes }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-modes {{ wg.modeSizeClass }}">
+              <sc-if value="{{ wg.isModeWide }}" hint-placeholder-val="{{ false }}">
+                <div class="hv-modes-wide-kickers">
+                  <sc-for list="{{ wg.modeWideKickers }}" as="mk" hint-placeholder-count="0">
+                    <div class="hv-modes-wide-kicker {{ mk.spanClass }}">{{ mk.label }}</div>
+                  </sc-for>
+                </div>
+                <div class="hv-modes-wide-grid">
+                  <sc-for list="{{ wg.modeWideLines }}" as="ln" hint-placeholder-count="0">
+                    <div class="hv-modes-chips">
+                      <sc-for list="{{ ln.chips }}" as="ch" hint-placeholder-count="0">
+                        <button type="button" class="hv-modes-chip {{ ch.cls }}" onClick="{{ ch.onClick }}">{{ ch.label }}</button>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ wg.isModeStack }}" hint-placeholder-val="{{ true }}">
+                <sc-for list="{{ wg.modeRows }}" as="mr" hint-placeholder-count="0">
+                  <div class="hv-modes-row {{ mr.growClass }}">
+                    <div class="hv-modes-kicker">{{ mr.label }}</div>
+                    <sc-for list="{{ mr.lines }}" as="ln" hint-placeholder-count="0">
+                      <div class="hv-modes-chips">
+                        <sc-for list="{{ ln.chips }}" as="ch" hint-placeholder-count="0">
+                          <button type="button" class="hv-modes-chip {{ ch.cls }}" onClick="{{ ch.onClick }}">{{ ch.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-graphs {{ wg.graphSizeClass }}">
+              <div class="hv-graphs-head">
+                <div class="hv-graphs-kicker">POWER</div>
+                <div class="hv-graphs-readout">
+                  <span class="hv-graphs-mode">EV</span>
+                  <span class="hv-graphs-value">0.0</span>
+                  <span class="hv-graphs-unit">kW</span>
+                </div>
+              </div>
+              <div class="hv-graphs-plot">
+                <canvas class="hv-graphs-canvas"></canvas>
+              </div>
+            </div>
+          </sc-if>
           <sc-if value="{{ wg.isStub }}" hint-placeholder-val="{{ true }}">
             <div class="hv-widget-stub">
               <div class="hv-widget-stub-kicker">{{ wg.label }}</div>
@@ -651,9 +1249,7 @@
 
   <div class="hv-widget-board" style="display: {{ rightBoardDisplay }}; left: {{ rightBoardLeft }}; top: {{ rightBoardTop }}; width: {{ rightBoardWidth }}; height: {{ rightBoardHeight }};">
     <div class="hv-widget-toolbar">
-      <button type="button" class="hv-widget-chip {{ rightUseAppClass }}" onClick="{{ setRightSlotApp }}">APP</button>
-      <button type="button" class="hv-widget-chip {{ rightUseWidClass }}" onClick="{{ setRightSlotWidgets }}">WIDGETS</button>
-      <button type="button" class="hv-widget-add" onClick="{{ addWidgetRight }}" title="Add widget">+</button>
+      <button type="button" class="hv-widget-add {{ rightAddClass }}" onClick="{{ addWidgetRight }}" title="Add widget">+ ADD WIDGET</button>
     </div>
     <div class="hv-widget-grid" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);">
       <sc-for list="{{ rightPlaceCells }}" as="pc" hint-placeholder-count="0">
@@ -663,17 +1259,10 @@
         <div class="hv-widget-card" style="{{ wg.gridStyle }}">
           <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-media-rail" style="opacity: {{ mediaRailOpacity }};">
+            <div class="hv-media-rail {{ wg.mediaSizeClass }}" style="opacity: {{ mediaRailOpacity }};">
               <div class="hv-media-art-wrap">
                 <sc-if value="{{ mediaHasArt }}" hint-placeholder-val="{{ false }}">
                   <img src="{{ mediaArt }}" alt="">
-                </sc-if>
-                <sc-if value="{{ mediaShowPlaceholder }}" hint-placeholder-val="{{ true }}">
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(79,214,232,.45)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="6.5" cy="17.5" r="2.5"></circle>
-                    <circle cx="17.5" cy="15.5" r="2.5"></circle>
-                    <path d="M9 17.5V6l11-2v11.5"></path>
-                  </svg>
                 </sc-if>
               </div>
               <div class="hv-media-source">{{ mediaAppLabel }}</div>
@@ -701,6 +1290,55 @@
               </div>
             </div>
           </sc-if>
+          <sc-if value="{{ wg.isModes }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-modes {{ wg.modeSizeClass }}">
+              <sc-if value="{{ wg.isModeWide }}" hint-placeholder-val="{{ false }}">
+                <div class="hv-modes-wide-kickers">
+                  <sc-for list="{{ wg.modeWideKickers }}" as="mk" hint-placeholder-count="0">
+                    <div class="hv-modes-wide-kicker {{ mk.spanClass }}">{{ mk.label }}</div>
+                  </sc-for>
+                </div>
+                <div class="hv-modes-wide-grid">
+                  <sc-for list="{{ wg.modeWideLines }}" as="ln" hint-placeholder-count="0">
+                    <div class="hv-modes-chips">
+                      <sc-for list="{{ ln.chips }}" as="ch" hint-placeholder-count="0">
+                        <button type="button" class="hv-modes-chip {{ ch.cls }}" onClick="{{ ch.onClick }}">{{ ch.label }}</button>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ wg.isModeStack }}" hint-placeholder-val="{{ true }}">
+                <sc-for list="{{ wg.modeRows }}" as="mr" hint-placeholder-count="0">
+                  <div class="hv-modes-row {{ mr.growClass }}">
+                    <div class="hv-modes-kicker">{{ mr.label }}</div>
+                    <sc-for list="{{ mr.lines }}" as="ln" hint-placeholder-count="0">
+                      <div class="hv-modes-chips">
+                        <sc-for list="{{ ln.chips }}" as="ch" hint-placeholder-count="0">
+                          <button type="button" class="hv-modes-chip {{ ch.cls }}" onClick="{{ ch.onClick }}">{{ ch.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-for>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-graphs {{ wg.graphSizeClass }}">
+              <div class="hv-graphs-head">
+                <div class="hv-graphs-kicker">POWER</div>
+                <div class="hv-graphs-readout">
+                  <span class="hv-graphs-mode">EV</span>
+                  <span class="hv-graphs-value">0.0</span>
+                  <span class="hv-graphs-unit">kW</span>
+                </div>
+              </div>
+              <div class="hv-graphs-plot">
+                <canvas class="hv-graphs-canvas"></canvas>
+              </div>
+            </div>
+          </sc-if>
           <sc-if value="{{ wg.isStub }}" hint-placeholder-val="{{ true }}">
             <div class="hv-widget-stub">
               <div class="hv-widget-stub-kicker">{{ wg.label }}</div>
@@ -724,7 +1362,7 @@
   <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
 
   <!-- config rail: top-right when collapsed; docks left of the details panel when open -->
-  <div class="hv-toolbar" style="position: absolute; top: {{ toolbarTop }}; right: {{ toolbarRight }}; left: auto; display: {{ dayNightDisplay }}; gap: 8px; z-index: 12;">
+  <div class="hv-toolbar" style="position: absolute; top: var(--hv-safe-top, 22px); right: calc(var(--hv-safe-right, 0px) + {{ toolbarRight }}); left: auto; display: {{ dayNightDisplay }}; gap: 8px; z-index: 12;">
     <div class="hv-toolbar-row">
       <button class="hv-tool-btn" onClick="{{ toggleConfigPanel }}" title="Configuration" style="background: {{ configBtnBg }}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ configBtnBorder }}; color: {{ configBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;">
         <span class="hv-tool-icon">
@@ -734,6 +1372,11 @@
           </svg>
         </span>
         <span class="hv-tool-label">CONFIG</span>
+      </button>
+
+      <button class="hv-tool-btn" onClick="{{ toggleCameraPanel }}" title="Camera" style="background: {{ cameraBtnBg }}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabCameraBorder }}; color: {{ tabCameraCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+        <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+        <span class="hv-tool-label">CAM</span>
       </button>
 
       <sc-if value="{{ configExpanded }}" hint-placeholder-val="{{ false }}">
@@ -763,10 +1406,6 @@
           </button>
           <sc-if value="{{ showOverrideSubmenu }}" hint-placeholder-val="{{ false }}">
             <div class="hv-tool-children">
-              <button class="hv-tool-btn" onClick="{{ setOverrideModel }}" title="Model" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovModelBorder }}; color: {{ ovModelCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-icon">{{ modelLabel }}</span>
-                <span class="hv-tool-label">MODEL</span>
-              </button>
               <button class="hv-tool-btn" onClick="{{ setOverrideMotion }}" title="Speed" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovMotionBorder }}; color: {{ ovMotionCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
                 <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4" /><path d="M3.34 19a10 10 0 1 1 17.32 0" /></svg></span>
                 <span class="hv-tool-label">SPEED</span>
@@ -787,9 +1426,9 @@
           <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span>
           <span class="hv-tool-label">ENV</span>
         </button>
-        <button class="hv-tool-btn" onClick="{{ openSectionCamera }}" title="Camera" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabCameraBorder }}; color: {{ tabCameraCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
-          <span class="hv-tool-label">CAM</span>
+        <button class="hv-tool-btn" onClick="{{ toggleModelVariant }}" title="{{ modelTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: rgba(255,255,255,.70); cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon">{{ modelLabel }}</span>
+          <span class="hv-tool-label">MODEL</span>
         </button>
         <button class="hv-tool-btn" onClick="{{ toggleFpsHud }}" title="{{ fpsTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ fpsBtnBorder }}; color: {{ fpsBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
           <span class="hv-tool-icon">FPS</span>
@@ -862,7 +1501,8 @@
           <button onClick="{{ cp.onClick }}" title="{{ cp.title }}" style="padding: 10px 6px; border-radius: 7px; border: 1px solid {{ cp.border }}; background: {{ cp.bg }}; color: {{ cp.col }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; font-weight: 600; line-height: 1.35; text-align: center;">{{ cp.label }}</button>
         </sc-for>
       </div>
-      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 4px;">Orbit drag still works after a preset settles.</div>
+      <button onClick="{{ saveLayoutCamera }}" title="{{ layoutCamSaveHint }}" style="width: 100%; padding: 10px 8px; border-radius: 7px; border: 1px solid {{ layoutCamSaveBorder }}; background: {{ layoutCamSaveBg }}; color: {{ layoutCamSaveCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600; opacity: {{ layoutCamSaveOpacity }};">{{ layoutCamSaveLabel }}</button>
+      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">{{ layoutCamSaveHint }}</div>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -931,14 +1571,6 @@
 
     <!-- ── CAR OVERRIDE ── -->
     <sc-if value="{{ sectionIsOverride }}" hint-placeholder-val="{{ false }}">
-      <sc-if value="{{ overrideIsModel }}" hint-placeholder-val="{{ true }}">
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">MODEL</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
-          <button onClick="{{ setModelHev }}" style="padding: 10px 4px; border-radius: 7px; border: 1px solid {{ modelHevBorder }}; background: {{ modelHevBg }}; color: {{ modelHevCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .1em; font-weight: 600;">HEV</button>
-          <button onClick="{{ setModelGt }}" style="padding: 10px 4px; border-radius: 7px; border: 1px solid {{ modelGtBorder }}; background: {{ modelGtBg }}; color: {{ modelGtCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .1em; font-weight: 600;">GT</button>
-        </div>
-      </sc-if>
-
       <sc-if value="{{ overrideIsLights }}" hint-placeholder-val="{{ false }}">
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 7px;">
         <sc-for list="{{ lightBtns }}" as="lb" hint-placeholder-count="8">
@@ -950,7 +1582,7 @@
       </div>
       </sc-if>
 
-      <sc-if value="{{ overrideIsMotion }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ overrideIsMotion }}" hint-placeholder-val="{{ true }}">
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL ANGLE</div>
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">LEFT ←  → RIGHT</span>
@@ -1180,19 +1812,88 @@ const CAR_SIGNALS = {
   sunroof: 'car.basic.sunroof_status',
   curtain: 'car.basic.sunshade_status',
   steering: 'car.basic.steering_wheel_angle',
+  ready: 'car.basic.driving_ready_state',
   // Viewer light group → car key. The car exposes low/high beam separately;
   // the viewer's "headlight" group is the low beam.
   lights: {
     headlight: 'car.basic.low_beam_light_status',
     highbeam:  'car.basic.high_beam_light_status',
-    position:  'car.basic.low_light_status',
+    // Position / clearance lamps. NOT car.basic.low_light_status — that was a
+    // wrong guess and never fires; observed on the car toggling 1 → 0 with the
+    // lamps. ("outside" in the constant name, "outline" in the value.)
+    position:  'car.drive.setting.outline_lamps_state',
     fogFront:  'car.basic.front_fog_light_status',
     fogRear:   'car.basic.rear_fog_light_status',
     hazard:    'car.basic.hazard_light_status',
     turnL:     'car.basic.left_turn_light_status',
     turnR:     'car.basic.right_turn_light_status',
   },
+  // GRAPHS widget — Impulse evPowerKw = V * I / 1000.
+  batteryVoltage: 'car.ev_info.power_battery_voltage',
+  batteryCurrent: 'car.ev_info.cur_charge_current',
 };
+
+// GRAPHS widget — same derivation Impulse uses for evPowerKw.
+const CAR_GRAPH_SPAN_MS = 20000;
+const CAR_GRAPH_AVG_MS = 30000;
+const CAR_GRAPH_MIN_KW = -40;
+const CAR_GRAPH_MAX_KW = 80;
+
+// MODES widget — same keys/values as Impulse SettingsMenuContent / Ajustes.
+// One chip per option so a tap writes the raw CAN value (no cycle).
+const CAR_MODE_ESP = {
+  stateKey: 'carEspEnable',
+  key: 'car.drive_setting.esp_enable',
+};
+const CAR_MODE_GROUPS = [
+  {
+    stateKey: 'carDriveMode',
+    key: 'car.drive_setting.drive_mode',
+    label: 'DRIVE',
+    options: [
+      { value: '2', label: 'Eco' },
+      { value: '0', label: 'Normal' },
+      { value: '1', label: 'Sport' },
+      { value: '3', label: 'Neve' },
+      { value: '4', label: 'Areia' },
+      { value: '5', label: 'Lama' },
+      { value: '11', label: 'AWD' },
+    ],
+  },
+  {
+    stateKey: 'carEvMode',
+    key: 'car.ev_setting.power_model_config',
+    label: 'EV',
+    options: [
+      { value: '0', label: 'HEV' },
+      { value: '1', label: 'EVP' },
+      { value: '3', label: 'EV' },
+    ],
+  },
+  {
+    stateKey: 'carSteerMode',
+    key: 'car.drive_setting.steering_wheel_assist_mode',
+    label: 'STEER',
+    options: [
+      { value: '2', label: 'Conforto' },
+      { value: '0', label: 'Normal' },
+      { value: '1', label: 'Sport' },
+    ],
+  },
+  {
+    stateKey: 'carRegenMode',
+    key: 'car.ev_setting.energy_recovery_level',
+    label: 'REGEN',
+    options: [
+      { value: '2', label: 'Baixo' },
+      { value: '0', label: 'Normal' },
+      { value: '1', label: 'Alto' },
+    ],
+  },
+];
+const CAR_MODE_STATE_BY_KEY = {};
+CAR_MODE_GROUPS.forEach((g) => { CAR_MODE_STATE_BY_KEY[g.key] = g.stateKey; });
+CAR_MODE_STATE_BY_KEY[CAR_MODE_ESP.key] = CAR_MODE_ESP.stateKey;
 
 // door_status is a brace-wrapped per-opening vector, not a bitmask. Captured off
 // the car (Its_IntelligentVehicleControlService):
@@ -1215,18 +1916,56 @@ const CAR_OPENING_UNKNOWN = -1;
 // value, and set this to peak/35.
 const CAR_STEERING_RATIO = 14.3;
 const CAR_ROAD_WHEEL_MAX_DEG = 35;
+// The car reports the opposite sign to the viewer's convention (where wheelAngle>0
+// steers right — see the streak-bow code). Observed on the car: turning right
+// drove the model's wheels left. Flip here rather than at the call site so the
+// ratio above stays a pure magnitude.
+const CAR_STEERING_SIGN = -1;
+
+// The two roof openings do NOT share a scale.
+//   sunshade → vehicle.getShadeScreensLevel(): 0-100 (havalshisuku sets 100 to
+//     open fully), so the value is already a percentage. CONFIRMED.
+//   sunroof  → vehicle.getSkylightLevel(): different range. 200 was observed on
+//     the car with the lid open, and clamping that to 100 is why the roof only
+//     ever showed fully-open. UNCALIBRATED — sweep the roof end to end and set
+//     this to the peak.
+const CAR_SUNSHADE_MAX = 100;
+
+// The sunroof is not a single linear axis. getSkylightLevel() reports 200 with
+// the lid merely TILTED (raised at the rear edge, not slid back) — confirmed on
+// the car — so scaling it linearly showed a vent as fully open.
+// _applySunroofTransform already models the two phases: below ratio 0.25 it only
+// lifts, above it slides. Tilt therefore maps to exactly that lift point.
+const CAR_SUNROOF_TILT_VALUE = 200;   // CONFIRMED: lid tilted/vented
+const CAR_SUNROOF_SLIDE_MAX = 100;    // ASSUMED: slide range, needs a full sweep
+const SUNROOF_TILT_PCT = 25;          // == transitionThreshold in the transform
+
+// Car-driven openings ease more slowly than the manual sliders. The bus reports
+// position in discrete jumps; at the manual rate the model finishes each jump in
+// a fraction of a second and then sits still, which reads as stepping. A slower
+// slew keeps it travelling between updates.
+// Daytime running lamps are not published, and readiness turned out NOT to be a
+// stand-in for them: the lamps were observed lit with driving_ready_state at
+// both 1 and 0, so the two are uncorrelated. Left in place (disabled) because
+// the wiring is harmless and the idea is worth retesting if a correlation ever
+// shows up. Do not re-enable without a lamps-OFF observation to test against.
+const CAR_DRL_FOLLOWS_READY = false;
+
+const CAR_OPENING_STEP = 0.006;
+const MANUAL_OPENING_STEP = 0.02;
 
 // ASSUMPTION: vehicle_speed is km/h. The viewer's motionSpeed unit is km/h/40
 // (see motionSpeedLabel, which renders Math.abs(motionSpeed) * 40 + ' km/h').
 const CAR_SPEED_KMH_PER_UNIT = 40;
 
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, saveFlash: false,
+  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, saveFlash: false,
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
-    overrideSubTab: 'model', // 'model' | 'motion' | 'doors' | 'lights'
+    overrideSubTab: 'motion', // 'motion' | 'doors' | 'lights'
     cameraPreset: null, // null | 'front' | 'side' | 'frontSide' | 'frontTopSide' | 'rearTopSide' | 'rearSide' | 'home'
+    layoutCamFlash: false,
     activeGroup: null, // 'tuning' | 'override' | 'env' | 'camera' | 'time' | null — which top-level section owns the submenu
     modelVariant: 'hev',
     motionSpeed: 0,
@@ -1286,7 +2025,12 @@ class Component extends DCLogic {
     widgetPlaceSide: null,
     widgetPlaceType: null,
     widgetPlaceW: 0,
-    widgetPlaceH: 0
+    widgetPlaceH: 0,
+    carDriveMode: '',
+    carEvMode: '',
+    carSteerMode: '',
+    carRegenMode: '',
+    carEspEnable: ''
   };
 
   constructor(props) {
@@ -1346,7 +2090,16 @@ class Component extends DCLogic {
     try { const sg = localStorage.getItem('h6_glassTweaks'); if (sg) this.state.glassTweaks = { ...this.state.glassTweaks, ...JSON.parse(sg) }; } catch(e) {}
     try { const sr = localStorage.getItem('h6_rearGlassTweaks'); if (sr) this.state.rearGlassTweaks = { ...this.state.rearGlassTweaks, ...JSON.parse(sr) }; } catch(e) {}
     this._loadSavedSettingsIntoState();
+    this._loadLayoutCameras();
     this._wireCarTelemetry();
+    this._graphV = 0;
+    this._graphI = 0;
+    this._graphKw = 0;
+    this._graphLive = false;
+    this._graphSamples = [];
+    this._graphDisplayKw = 0;
+    this._graphBars = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    this._graphRaf = 0;
     try {
       const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
       const qs = parse(location.search), hs = parse(location.hash);
@@ -1365,6 +2118,52 @@ class Component extends DCLogic {
   }
 
   _settingsStorageKey() { return 'h6_settings_v1'; }
+  _layoutCamStorageKey() { return 'h6_layout_cam_v1'; }
+
+  _layoutCamBuiltins() {
+    // Captured from the running APP + CAR layout on the car (2026-08-14).
+    // f/r/y are offsets from the car centre along forward / right / up,
+    // as multiples of the fit distance.
+    return {
+      appCar: { f: 0.5194, r: 0.5508, y: 0.2361, viewShift: 0.2971 },
+    };
+  }
+
+  _layoutCamLabel(mode) {
+    if (mode === 'appCar') return 'APP + CAR';
+    if (mode === 'triple') return 'APP + CAR + APP';
+    return null;
+  }
+
+  _currentLayoutCamKey() {
+    const mode = this._shellMode || (this.state && this.state.shellMode) || 'triple';
+    return (mode === 'triple' || mode === 'appCar') ? mode : null;
+  }
+
+  _loadLayoutCameras() {
+    this._layoutCameras = Object.assign({}, this._layoutCamBuiltins());
+    const apply = (src) => {
+      if (!src || typeof src !== 'object') return;
+      ['triple', 'appCar'].forEach((k) => {
+        const p = src[k];
+        if (p && typeof p.f === 'number' && typeof p.r === 'number' && typeof p.y === 'number') {
+          this._layoutCameras[k] = p;
+        }
+      });
+    };
+    try {
+      const raw = localStorage.getItem(this._layoutCamStorageKey());
+      if (raw) apply(JSON.parse(raw));
+    } catch (e) {}
+    if (this._savedSettings && this._savedSettings.layoutCameras) {
+      apply(this._savedSettings.layoutCameras);
+    }
+  }
+
+  _persistLayoutCameras() {
+    if (!this._layoutCameras) return;
+    try { localStorage.setItem(this._layoutCamStorageKey(), JSON.stringify(this._layoutCameras)); } catch (e) {}
+  }
 
   _loadSavedSettingsIntoState() {
     let saved = null;
@@ -1406,6 +2205,7 @@ class Component extends DCLogic {
     if (typeof saved.wheelDepthOffset === 'number') s.wheelDepthOffset = saved.wheelDepthOffset;
     if (typeof saved.wheelTintOverride === 'boolean') s.wheelTintOverride = saved.wheelTintOverride;
     if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
+    if (typeof saved.showFps === 'boolean') s.showFps = saved.showFps;
     this._pendingSceneSettings = true;
   }
 
@@ -1425,8 +2225,10 @@ class Component extends DCLogic {
   _carSignalKeys() {
     const lights = CAR_SIGNALS.lights;
     return [CAR_SIGNALS.doors, CAR_SIGNALS.speed, CAR_SIGNALS.night,
-            CAR_SIGNALS.sunroof, CAR_SIGNALS.curtain, CAR_SIGNALS.steering]
-      .concat(Object.keys(lights).map((k) => lights[k]));
+            CAR_SIGNALS.sunroof, CAR_SIGNALS.curtain, CAR_SIGNALS.steering,
+            CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent]
+      .concat(Object.keys(lights).map((k) => lights[k]))
+      .concat(Object.keys(CAR_MODE_STATE_BY_KEY));
   }
 
   /**
@@ -1455,13 +2257,369 @@ class Component extends DCLogic {
     }
     if (key === CAR_SIGNALS.doors)  { this._applyCarDoors(value); return; }
     if (key === CAR_SIGNALS.speed)  { this._applyCarSpeed(value); return; }
-    if (key === CAR_SIGNALS.sunroof) { this._applyCarOpening('_setSunroofOpen', value); return; }
-    if (key === CAR_SIGNALS.curtain) { this._applyCarOpening('_setCurtainOpen', value); return; }
+    if (key === CAR_SIGNALS.sunroof) { this._applyCarSunroof(value); return; }
+    if (key === CAR_SIGNALS.curtain) { this._applyCarOpening('_setCurtainOpen', value, CAR_SUNSHADE_MAX); return; }
     if (key === CAR_SIGNALS.steering) { this._applyCarSteering(value); return; }
+    if (key === CAR_SIGNALS.ready) {
+      this._carReady = this._carBool(value);
+      this._syncPositionLamps();
+      return;
+    }
+    if (key === CAR_SIGNALS.batteryVoltage || key === CAR_SIGNALS.batteryCurrent) {
+      this._applyGraphSignal(key, value);
+      return;
+    }
+    const modeStateKey = CAR_MODE_STATE_BY_KEY[key];
+    if (modeStateKey) {
+      this._applyCarMode(modeStateKey, value);
+      return;
+    }
     const lights = CAR_SIGNALS.lights;
     for (const group of Object.keys(lights)) {
-      if (lights[group] === key) { this._setLightFromCar(group, this._carBool(value)); return; }
+      if (lights[group] !== key) continue;
+      if (group === 'position') {
+        // Stalk selection only — the lamps themselves are derived below.
+        this._carPositionSelected = this._carBool(value);
+      } else {
+        this._setLightFromCar(group, this._carBool(value));
+      }
+      this._syncPositionLamps();
+      return;
     }
+  }
+
+  _applyCarMode(stateKey, value) {
+    const next = String(value == null ? '' : value);
+    if (this.state[stateKey] === next) return;
+    this.setState({ [stateKey]: next });
+  }
+
+  _setCarMode(stateKey, canKey, value) {
+    const next = String(value);
+    if (this.state[stateKey] !== next) this.setState({ [stateKey]: next });
+    try {
+      if (window.TelemetryBridge && typeof window.TelemetryBridge.setCarData === 'function') {
+        window.TelemetryBridge.setCarData(canKey, next);
+      }
+    } catch (e) {
+      console.warn('[modes] setCarData failed', canKey, next, e);
+    }
+  }
+
+  _modeChip(group, opt, current) {
+    return {
+      label: opt.label,
+      cls: current === opt.value ? 'on' : '',
+      onClick: () => this._setCarMode(group.stateKey, group.key, opt.value),
+    };
+  }
+
+  _modeEspChip() {
+    const espOn = this.state[CAR_MODE_ESP.stateKey] === '1';
+    return {
+      label: espOn ? 'ESP ON' : 'ESP OFF',
+      cls: espOn ? 'on' : '',
+      onClick: () => this._setCarMode(
+        CAR_MODE_ESP.stateKey,
+        CAR_MODE_ESP.key,
+        espOn ? '0' : '1'
+      ),
+    };
+  }
+
+  _modeGhostChip() {
+    return { label: '', cls: 'ghost', onClick: () => {} };
+  }
+
+  _modeGroupChips(group) {
+    return group.options.map((opt) => this._modeChip(group, opt, this.state[group.stateKey]));
+  }
+
+  _modeStackRows() {
+    const drive = CAR_MODE_GROUPS[0];
+    const driveChips = this._modeGroupChips(drive);
+    const rows = [{
+      label: drive.label,
+      growClass: 'drive',
+      lines: [
+        { chips: driveChips.slice(0, 3) },
+        { chips: driveChips.slice(3, 6) },
+        { chips: [driveChips[6], this._modeGhostChip(), this._modeEspChip()] },
+      ],
+    }];
+    for (let i = 1; i < CAR_MODE_GROUPS.length; i++) {
+      const g = CAR_MODE_GROUPS[i];
+      const chips = this._modeGroupChips(g);
+      const lines = [];
+      for (let n = 0; n < chips.length; n += 3) lines.push({ chips: chips.slice(n, n + 3) });
+      rows.push({ label: g.label, growClass: '', lines: lines });
+    }
+    return rows;
+  }
+
+  _modeWideLines() {
+    const driveChips = this._modeGroupChips(CAR_MODE_GROUPS[0]);
+    const cols = [
+      [driveChips[0], driveChips[1], driveChips[2]],
+      [driveChips[3], driveChips[4], driveChips[5]],
+      [driveChips[6], this._modeGhostChip(), this._modeEspChip()],
+      this._modeGroupChips(CAR_MODE_GROUPS[1]),
+      this._modeGroupChips(CAR_MODE_GROUPS[2]),
+      this._modeGroupChips(CAR_MODE_GROUPS[3]),
+    ];
+    return [0, 1, 2].map((r) => ({ chips: cols.map((col) => col[r]) }));
+  }
+
+  _modeWideKickers() {
+    return [
+      { label: 'DRIVE', spanClass: 'span3' },
+      { label: 'EV', spanClass: '' },
+      { label: 'STEER', spanClass: '' },
+      { label: 'REGEN', spanClass: '' },
+    ];
+  }
+
+  _modeWidgetView(item) {
+    const w = item.w || 2;
+    const h = item.h || 1;
+    const wide = h === 1;
+    return {
+      modeSizeClass: 'hv-modes-' + w + 'x' + h,
+      isModeWide: wide,
+      isModeStack: !wide,
+      modeRows: wide ? [] : this._modeStackRows(),
+      modeWideKickers: wide ? this._modeWideKickers() : [],
+      modeWideLines: wide ? this._modeWideLines() : [],
+    };
+  }
+
+  _applyGraphSignal(key, value) {
+    const n = parseFloat(String(value == null ? '' : value).trim());
+    if (!isFinite(n)) return;
+    if (key === CAR_SIGNALS.batteryVoltage) this._graphV = n;
+    else this._graphI = n;
+    this._graphLive = true;
+    this._graphKw = this._graphV * this._graphI / 1000;
+    this._pushGraphSample(typeof performance !== 'undefined' ? performance.now() : Date.now());
+  }
+
+  _pushGraphSample(now) {
+    const samples = this._graphSamples;
+    const last = samples.length ? samples[samples.length - 1] : null;
+    if (last && now - last.t < 80) {
+      last.kw = this._graphKw;
+      last.t = now;
+      return;
+    }
+    samples.push({ t: now, kw: this._graphKw });
+    const cutoff = now - CAR_GRAPH_AVG_MS - 500;
+    while (samples.length && samples[0].t < cutoff) samples.shift();
+  }
+
+  _graphWidgetView(item) {
+    const w = item.w || 2;
+    const h = item.h || 1;
+    return {
+      graphSizeClass: 'hv-graphs-' + w + 'x' + h,
+      graphShowBars: h > 1,
+    };
+  }
+
+  _syncGraphLoop(active) {
+    if (active) this._ensureGraphLoop();
+    else this._stopGraphLoop();
+  }
+
+  _ensureGraphLoop() {
+    if (this._graphRaf) return;
+    const tick = (now) => {
+      this._graphRaf = requestAnimationFrame(tick);
+      this._drawGraphs(now);
+    };
+    this._graphRaf = requestAnimationFrame(tick);
+  }
+
+  _stopGraphLoop() {
+    if (!this._graphRaf) return;
+    cancelAnimationFrame(this._graphRaf);
+    this._graphRaf = 0;
+  }
+
+  _graphKwAt(now) {
+    if (this._graphLive) return this._graphKw;
+    if (this._androidApp) return 0;
+    return Math.sin(now / 420) * 36 + Math.sin(now / 1180) * 16;
+  }
+
+  _drawGraphs(now) {
+    const canvases = document.querySelectorAll('.hv-graphs-canvas');
+    if (!canvases.length) return;
+    const kw = this._graphKwAt(now);
+    this._graphKw = this._graphLive ? this._graphKw : kw;
+    this._pushGraphSample(now);
+    this._graphDisplayKw += (kw - this._graphDisplayKw) * 0.18;
+    this._updateGraphReadout(this._graphDisplayKw);
+
+    const samples = this._graphSamples;
+    const spanStart = now - CAR_GRAPH_SPAN_MS;
+    const avgStart = now - CAR_GRAPH_AVG_MS;
+    let avgSum = 0;
+    let avgN = 0;
+    for (let i = 0; i < samples.length; i++) {
+      if (samples[i].t >= avgStart) {
+        avgSum += samples[i].kw;
+        avgN += 1;
+      }
+    }
+    const avgKw = avgN ? avgSum / avgN : 0;
+
+    for (let c = 0; c < canvases.length; c++) {
+      this._paintGraphCanvas(canvases[c], now, spanStart, avgKw);
+    }
+  }
+
+  _updateGraphReadout(kw) {
+    const regen = kw < -0.5;
+    const mag = Math.abs(kw);
+    const label = regen ? 'REGEN' : 'EV';
+    const text = mag.toFixed(1);
+    const modes = document.querySelectorAll('.hv-graphs-mode');
+    for (let i = 0; i < modes.length; i++) {
+      modes[i].textContent = label;
+      modes[i].className = 'hv-graphs-mode' + (regen ? ' regen' : '');
+    }
+    const vals = document.querySelectorAll('.hv-graphs-value');
+    for (let i = 0; i < vals.length; i++) vals[i].textContent = text;
+  }
+
+  _paintGraphCanvas(canvas, now, spanStart, avgKw) {
+    const wrap = canvas.parentNode;
+    if (!wrap) return;
+    const cssW = wrap.clientWidth;
+    const cssH = wrap.clientHeight;
+    if (cssW < 8 || cssH < 8) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const pixelW = Math.round(cssW * dpr);
+    const pixelH = Math.round(cssH * dpr);
+    if (canvas.width !== pixelW || canvas.height !== pixelH) {
+      canvas.width = pixelW;
+      canvas.height = pixelH;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const rootCls = wrap.parentNode && wrap.parentNode.className
+      ? String(wrap.parentNode.className) : '';
+    const tall = rootCls.indexOf('hv-graphs-2x2') >= 0 || rootCls.indexOf('hv-graphs-3x2') >= 0;
+    const barW = tall ? Math.max(36, cssW * 0.18) : 0;
+    const plotL = 2;
+    const plotR = cssW - barW - (barW ? 8 : 2);
+    const plotW = Math.max(8, plotR - plotL);
+    const kwToY = (kw) => {
+      const t = (kw - CAR_GRAPH_MIN_KW) / (CAR_GRAPH_MAX_KW - CAR_GRAPH_MIN_KW);
+      const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+      return (1 - clamped) * (cssH - 2) + 1;
+    };
+    const zeroY = kwToY(0);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(plotL, zeroY);
+    ctx.lineTo(plotR, zeroY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const samples = this._graphSamples;
+    const pts = [];
+    for (let i = 0; i < samples.length; i++) {
+      if (samples[i].t < spanStart) continue;
+      const x = plotL + ((samples[i].t - spanStart) / CAR_GRAPH_SPAN_MS) * plotW;
+      pts.push({ x: x, y: kwToY(samples[i].kw), kw: samples[i].kw });
+    }
+    if (pts.length) {
+      pts.push({ x: plotR, y: kwToY(this._graphDisplayKw), kw: this._graphDisplayKw });
+      this._fillGraphBand(ctx, pts, plotL, plotR, zeroY, true);
+      this._fillGraphBand(ctx, pts, plotL, plotR, zeroY, false);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.strokeStyle = 'rgba(242,245,248,.92)';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+    }
+
+    if (tall) {
+      const avgY = kwToY(avgKw);
+      ctx.beginPath();
+      ctx.moveTo(plotL, avgY);
+      ctx.lineTo(plotR, avgY);
+      ctx.strokeStyle = 'rgba(255,255,255,.35)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      this._paintGraphBars(ctx, cssW, cssH, barW, now);
+    }
+  }
+
+  _fillGraphBand(ctx, pts, plotL, plotR, zeroY, positive) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, zeroY);
+    for (let i = 0; i < pts.length; i++) {
+      const y = positive ? Math.min(pts[i].y, zeroY) : Math.max(pts[i].y, zeroY);
+      ctx.lineTo(pts[i].x, y);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, zeroY);
+    ctx.closePath();
+    ctx.fillStyle = positive ? 'rgba(242,245,248,.28)' : 'rgba(255,255,255,.08)';
+    ctx.fill();
+  }
+
+  _paintGraphBars(ctx, cssW, cssH, barW, now) {
+    const bars = this._graphBars;
+    const mag = Math.min(1, Math.abs(this._graphDisplayKw) / CAR_GRAPH_MAX_KW);
+    const n = bars.length;
+    const gap = 3;
+    const x0 = cssW - barW;
+    const bw = Math.max(2, (barW - gap * (n - 1)) / n);
+    for (let i = 0; i < n; i++) {
+      const pulse = 0.55 + 0.45 * Math.abs(Math.sin(now / 160 + i * 0.7));
+      const target = mag * Math.exp(-i * 0.11) * pulse;
+      bars[i] += (target - bars[i]) * (target > bars[i] ? 0.35 : 0.12);
+      bars[i] *= 0.96;
+      const bh = Math.max(1, bars[i] * (cssH - 4));
+      const x = x0 + i * (bw + gap);
+      ctx.fillStyle = 'rgba(242,245,248,' + (0.18 + bars[i] * 0.7).toFixed(3) + ')';
+      ctx.fillRect(x, cssH - bh, bw, bh);
+    }
+  }
+
+  /**
+   * Position lamps are not directly reported in AUTO mode.
+   *
+   * `outline_lamps_state` tracks the stalk *selection*, so it reads 0 whenever
+   * the switch is on AUTO even though the lamps are lit. No live position-lamp
+   * signal exists — a full-stalk capture moved only that key and low beam (see
+   * ANDROID.md) — so the state is derived from three things:
+   *
+   *   1. stalk selected to position
+   *   2. any beam on (position lamps are physically lit with a beam)
+   *   3. the car being ready, which is when the DRLs run
+   *
+   * CAVEAT on (3): nothing distinguishes stalk-OFF from stalk-AUTO — both report
+   * 0 for every light key — so this also lights the lamps with the stalk fully
+   * OFF. That is correct if the DRLs really do run whenever the car is ready,
+   * and wrong otherwise. Drop CAR_DRL_FOLLOWS_READY to disable.
+   */
+  _syncPositionLamps() {
+    const l = this.state.lights || {};
+    const drl = CAR_DRL_FOLLOWS_READY && !!this._carReady;
+    const on = !!(this._carPositionSelected || l.headlight || l.highbeam || drl);
+    if (l.position !== on) this._setLightFromCar('position', on);
   }
 
   /**
@@ -1512,23 +2670,56 @@ class Component extends DCLogic {
   }
 
   /**
-   * Sunroof / sunshade openness → the viewer's 0-100 percentage.
+   * Sunroof level → viewer percentage, honouring the tilt/slide split.
    *
-   * UNVERIFIED: neither key has been observed on the car (see below), so this
-   * accepts both plausible shapes — a 0-100 percentage, or an open/shut enum.
-   * Values of 0 and 1 are ambiguous between the two; 1 is read as fully open,
-   * because a 1% opening is not a state the car would report.
+   *   0    shut
+   *   200  tilted (lid raised, not slid) → the transform's lift-only phase
+   *   else treated as a slide position, mapped above the lift point because a
+   *        sliding roof is already lifted
    */
-  _applyCarOpening(setter, value) {
+  _applyCarSunroof(value) {
+    if (typeof this._setSunroofOpen !== 'function') return;
+    let raw = String(value).trim();
+    if (raw.charAt(0) === '{') raw = raw.replace(/^\{|\}$/g, '').split(',')[0].trim();
+    const n = parseFloat(raw);
+    if (!isFinite(n) || n < 0) {
+      if (this._carTrace) console.warn('[CarSignal] sunroof unparsed:', value);
+      return;
+    }
+    let pct;
+    if (n === 0) {
+      pct = 0;
+    } else if (n >= CAR_SUNROOF_TILT_VALUE || n > CAR_SUNROOF_SLIDE_MAX) {
+      pct = SUNROOF_TILT_PCT;
+    } else {
+      const slide = Math.min(1, n / CAR_SUNROOF_SLIDE_MAX);
+      pct = SUNROOF_TILT_PCT + slide * (100 - SUNROOF_TILT_PCT);
+    }
+    this._sunroofStep = CAR_OPENING_STEP;
+    this._setSunroofOpen(pct);
+  }
+
+  /**
+   * Roof opening → the viewer's 0-100 percentage.
+   *
+   * `max` is the signal's own full-open value: the sunshade reports 0-100, the
+   * sunroof a wider range. Scaling by it (rather than clamping at 100) is what
+   * lets a partly-open roof show as partly open.
+   */
+  _applyCarOpening(setter, value, max) {
     if (typeof this[setter] !== 'function') return;
     let raw = String(value).trim();
     if (raw.charAt(0) === '{') raw = raw.replace(/^\{|\}$/g, '').split(',')[0].trim();
     const n = parseFloat(raw);
-    if (!isFinite(n)) {
+    if (!isFinite(n) || n < 0) {
       if (this._carTrace) console.warn('[CarSignal] opening unparsed:', value);
       return;
     }
-    this[setter](n <= 1 ? (n > 0 ? 100 : 0) : Math.min(100, n));
+    const pct = Math.max(0, Math.min(100, (n / max) * 100));
+    // Ease at the car rate, not the manual-slider rate — see CAR_OPENING_STEP.
+    if (setter === '_setSunroofOpen') this._sunroofStep = CAR_OPENING_STEP;
+    else if (setter === '_setCurtainOpen') this._curtainStep = CAR_OPENING_STEP;
+    this[setter](pct);
   }
 
   /** Steering-wheel degrees → road-wheel degrees, clamped to the model's range. */
@@ -1541,7 +2732,7 @@ class Component extends DCLogic {
       if (this._carTrace) console.warn('[CarSignal] steering angle unparsed:', value);
       return;
     }
-    const road = wheelDeg / CAR_STEERING_RATIO;
+    const road = (wheelDeg * CAR_STEERING_SIGN) / CAR_STEERING_RATIO;
     const clamped = Math.max(-CAR_ROAD_WHEEL_MAX_DEG, Math.min(CAR_ROAD_WHEEL_MAX_DEG, road));
     // Sub-degree jitter would re-run the wheel transform every frame on a live bus.
     if (this._lastCarSteerDeg !== undefined && Math.abs(clamped - this._lastCarSteerDeg) < 0.5) return;
@@ -1614,7 +2805,8 @@ class Component extends DCLogic {
     } else if (section === 'env') {
       patch.activeGroup = 'env';
     } else if (section === 'camera') {
-      patch.activeGroup = 'camera';
+      this.toggleCameraRail(true);
+      return;
     } else if (section === 'override') {
       patch.activeGroup = 'override';
     }
@@ -1649,6 +2841,53 @@ class Component extends DCLogic {
       } catch (e) {}
       this._applyFitCamera();
     }
+  }
+
+  _dismissRightMediaForPanel() {
+    this.setState({ mediaColumnVisible: false });
+    try {
+      if (window.MediaBridge && typeof window.MediaBridge.dismissSlot === 'function') {
+        window.MediaBridge.dismissSlot();
+      }
+    } catch (e) {}
+  }
+
+  toggleCameraRail(forceOpen) {
+    const open = forceOpen === true || !(this.state.activeGroup === 'camera' && this.state.panelOpen && !this.state.configExpanded);
+    if (!open) {
+      const patch = { panelOpen: false, activeGroup: null };
+      if (this._androidApp && this.state.shellMode !== 'appsOnly') {
+        patch.mediaColumnVisible = true;
+        patch.mediaRight = this._shellRight || 'idle';
+      }
+      this.setState(patch);
+      return;
+    }
+    this.setState({
+      configExpanded: false,
+      panelOpen: true,
+      activeGroup: 'camera',
+      configSection: 'camera',
+      mediaColumnVisible: false,
+    });
+    this._dismissRightMediaForPanel();
+  }
+
+  saveLayoutCamera() {
+    const key = this._currentLayoutCamKey();
+    if (!key) return;
+    const rel = this._captureCurrentLayoutCam();
+    if (!rel) return;
+    if (!this._layoutCameras) this._layoutCameras = Object.assign({}, this._layoutCamBuiltins());
+    this._layoutCameras[key] = rel;
+    this._fitCamMode = key;
+    if (this._fitCam) this._fitCam.viewShift = rel.viewShift;
+    this._persistLayoutCameras();
+    this.setState({ layoutCamFlash: true, cameraPreset: null });
+    clearTimeout(this._layoutCamFlashTimer);
+    this._layoutCamFlashTimer = setTimeout(() => {
+      if (!this._unmounted) this.setState({ layoutCamFlash: false });
+    }, 1400);
   }
 
   cycleTimeMode() {
@@ -1691,9 +2930,12 @@ class Component extends DCLogic {
       wheelDepthOffset: s.wheelDepthOffset,
       wheelTintOverride: s.wheelTintOverride,
       wheelStyle: s.wheelStyle,
+      showFps: !!s.showFps,
+      layoutCameras: this._layoutCameras || {},
     };
     try {
       localStorage.setItem(this._settingsStorageKey(), JSON.stringify(payload));
+      this._persistLayoutCameras();
     } catch (e) {
       console.warn('[Settings] Failed to save', e);
       return;
@@ -1818,7 +3060,10 @@ class Component extends DCLogic {
         : (s.timeMode === 'night' ? 'Forced night' : 'Forced day'),
       labelColor: s.nightMode ? '#c8daea' : '#2b3037',
       hintColor: s.nightMode ? 'rgba(180,210,235,0.55)' : '#6a7077',
-      loaderDisplay: s.loading && !s.error ? 'flex' : 'none',
+      // Spinner + progress bar are the fallback, not the boot experience: while
+      // the splash clip is up it covers them anyway, and if the clip is skipped
+      // or fails early they take over for whatever is left of the load.
+      loaderDisplay: s.loading && !s.error && !s.splashActive ? 'flex' : 'none',
       errorDisplay: s.error ? 'flex' : 'none',
       errorMsg: s.error || '',
       progressText: s.processing ? 'PROCESSING…' : (Math.round(s.progress) + '%'),
@@ -1826,16 +3071,30 @@ class Component extends DCLogic {
       hintOpacity: (s.loading || this._androidApp) ? '0' : '0.85',
       panelDisplay: s.loading || s.error ? 'none' : 'block',
       panelOpen: s.panelOpen,
-      panelBodyDisplay: (!s.loading && !s.error && s.panelOpen && s.configExpanded) ? 'block' : 'none',
+      panelBodyDisplay: (!s.loading && !s.error && s.panelOpen) ? 'block' : 'none',
       panelWidth: '248px',
       panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
       dayNightDisplay: (!s.loading && !s.error) ? 'flex' : 'none',
-      // The MMI StatusBar is its own window and no longer overlaps ours, so the
-      // old 68px Android inset was dead space above the brand and the buttons.
-      safeTop: '22px',
+      // Native reports this: 22 when our window already starts below the MMI
+      // header, header-height + 22 when the header floats over our content.
+      safeTop: (this._safeTopPx == null ? 22 : this._safeTopPx) + 'px',
+      // Symmetric side band for chrome/widgets/icons; native reports it because
+      // the width depends on whether the MMI's nav rail is currently up.
+      safeLeft: (this._safeLeftPx || 0) + 'px',
+      safeRight: (this._safeRightPx || 0) + 'px',
+      safeBottom: (this._safeBottomPx || 0) + 'px',
+      launcherBottom: (this._launcherBottomPx == null ? 14 : this._launcherBottomPx) + 'px',
+      // The shell paints the FINAL background from the very first render.
+      // Previously this div carried a hardcoded light radial gradient and only
+      // became the real colour once _applyBackground ran after the model
+      // loaded, so a night-mode car flashed light grey for the whole load and
+      // then snapped dark. state.nightMode/dayBg/nightBg are restored from
+      // localStorage in the constructor, so they are already correct here.
+      shellBg: this._resolvedBg(),
       // CONFIG stays top-right; opening it hides the media column (no inset).
-      toolbarTop: '22px',
-      toolbarRight: ((s.panelOpen && s.configExpanded) ? 286 : 26) + 'px',
+      // Position comes from --hv-safe-* so it is right during load too, when the
+      // loading guard skips setState; this is only the panel-open offset.
+      toolbarRight: (s.panelOpen ? 286 : 26) + 'px',
       configPanelRight: '26px',
       mediaRailDisplay: 'none',
       shellHudDisplay: (!s.error && this._androidApp) ? 'flex' : 'none',
@@ -1853,18 +3112,10 @@ class Component extends DCLogic {
       shellGlyphAppCarDisplay: s.shellMode === 'appCar' ? 'flex' : 'none',
       shellGlyphAppsDisplay: s.shellMode === 'appsOnly' ? 'flex' : 'none',
       toggleShellMenu: () => {
-        const opening = !this.state.shellMenuOpen;
-        // Freeform windows sit above the WebView. Raise our own task while the
-        // menu is open rather than closing them (older builds dismissed them).
-        try {
-          const bridge = window.AppLauncherBridge;
-          if (bridge && typeof bridge.setChromeOnTop === 'function') {
-            bridge.setChromeOnTop(opening);
-          } else if (opening && bridge && typeof bridge.dismissOverlays === 'function') {
-            bridge.dismissOverlays();
-          }
-        } catch (e) {}
-        this.setState({ shellMenuOpen: opening });
+        // No z-order juggling needed: the menu opens inside the chrome band,
+        // which freeform windows never cover, so the open apps stay visible
+        // beside it. Older builds raised our task (hiding them) or closed them.
+        this.setState({ shellMenuOpen: !this.state.shellMenuOpen });
       },
       setShellTriple: () => this._setShellMode('triple'),
       setShellAppCar: () => this._setShellMode('appCar'),
@@ -1874,7 +3125,6 @@ class Component extends DCLogic {
       ...this._widgetRenderFields(s),
       mediaRailOpacity: s.mediaHasTrack ? '1' : '0.92',
       mediaHasArt: !!(s.mediaArt && s.mediaHasTrack),
-      mediaShowPlaceholder: !(s.mediaArt && s.mediaHasTrack),
       mediaTitle: s.mediaHasTrack
         ? (s.mediaTitle || 'Unknown')
         : (s.mediaNeedsListener ? 'Notification access required' : 'Nothing playing'),
@@ -1906,14 +3156,18 @@ class Component extends DCLogic {
       fpsTooltip:   s.showFps ? 'Hide FPS' : 'Show FPS',
       toggleFpsHud: () => this.setState((st) => {
         const showFps = !st.showFps;
-        if (this._fpsEl) this._fpsEl.style.display = showFps ? '' : 'none';
+        this._applyFpsVisibility(showFps);
         return { showFps };
       }),
       configBtnBorder: s.configExpanded ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       configBtnCol:    s.configExpanded ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       configBtnBg:     s.configExpanded ? 'rgba(79,214,232,.16)' : 'rgba(16,21,28,.82)',
       toggleConfigPanel: () => this.toggleConfigRail(),
-      closeConfigPanel: () => this.setState({ panelOpen: false }),
+      closeConfigPanel: () => this.setState((st) => {
+        const patch = { panelOpen: false };
+        if (st.activeGroup === 'camera' && !st.configExpanded) patch.activeGroup = null;
+        return patch;
+      }),
       openTimeSubmenu: () => {
         this.setState((st) => ({
           activeGroup: st.activeGroup === 'time' ? null : 'time',
@@ -1927,10 +3181,9 @@ class Component extends DCLogic {
         : s.configSection === 'env' ? 'ENVIRONMENT'
         : s.configSection === 'camera' ? 'CAMERA'
         : s.configSection === 'override' ? (
-            s.overrideSubTab === 'motion' ? 'SPEED'
-            : s.overrideSubTab === 'doors' ? 'DOORS'
+            s.overrideSubTab === 'doors' ? 'DOORS'
             : s.overrideSubTab === 'lights' ? 'LIGHTS'
-            : 'MODEL'
+            : 'SPEED'
           )
         : 'CONFIGURE',
       sectionIsPaint:    s.configSection === 'paint',
@@ -1948,6 +3201,7 @@ class Component extends DCLogic {
       tabEnvCol:         (s.activeGroup === 'env')      ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       tabCameraBorder:   (s.activeGroup === 'camera')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       tabCameraCol:      (s.activeGroup === 'camera')   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      cameraBtnBg:       (s.activeGroup === 'camera')   ? 'rgba(79,214,232,.16)' : 'rgba(16,21,28,.82)',
       openSectionTuning:   () => {
         this.setState({
           configExpanded: true, panelOpen: true, activeGroup: 'tuning',
@@ -1957,11 +3211,12 @@ class Component extends DCLogic {
       openSectionOverride: () => {
         this.setState({
           configExpanded: true, panelOpen: true, activeGroup: 'override',
-          configSection: 'override', overrideSubTab: 'model',
+          configSection: 'override', overrideSubTab: 'motion',
         });
       },
       openSectionEnv: () => this.openConfigSection('env'),
-      openSectionCamera: () => this.openConfigSection('camera'),
+      toggleCameraPanel: () => this.toggleCameraRail(),
+      openSectionCamera: () => this.toggleCameraRail(true),
       cameraPresets: (() => {
         const defs = [
           { key: 'front',        label: 'FRONT',         title: 'Front view' },
@@ -1982,6 +3237,19 @@ class Component extends DCLogic {
           };
         });
       })(),
+      saveLayoutCamera: () => this.saveLayoutCamera(),
+      layoutCamSaveLabel: (() => {
+        const name = this._layoutCamLabel(this._currentLayoutCamKey());
+        if (s.layoutCamFlash && name) return 'SAVED · ' + name;
+        return name ? ('SAVE · ' + name) : 'SAVE LAYOUT';
+      })(),
+      layoutCamSaveHint: this._currentLayoutCamKey()
+        ? 'Orbit the car, then save this view as the home for the current layout.'
+        : 'Switch to a car layout to save a home camera.',
+      layoutCamSaveBorder: s.layoutCamFlash ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      layoutCamSaveBg:     s.layoutCamFlash ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
+      layoutCamSaveCol:    s.layoutCamFlash ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      layoutCamSaveOpacity: this._currentLayoutCamKey() ? '1' : '0.4',
       onSaveSettings: () => this.saveSettings(),
       saveBtnBorder: s.saveFlash ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       saveBtnCol:    s.saveFlash ? '#4fd6e8' : 'rgba(255,255,255,.70)',
@@ -1998,23 +3266,18 @@ class Component extends DCLogic {
       tunWheelsBorder: s.configSection === 'wheels' ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       tunPaintCol:  s.configSection === 'paint'  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       tunWheelsCol: s.configSection === 'wheels' ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      overrideIsModel:  s.overrideSubTab === 'model',
       overrideIsMotion: s.overrideSubTab === 'motion',
       overrideIsDoors:  s.overrideSubTab === 'doors',
       overrideIsLights: s.overrideSubTab === 'lights',
-      setOverrideModel:  () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'model', panelOpen: true, configExpanded: true }),
       setOverrideMotion: () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'motion', panelOpen: true, configExpanded: true }),
       setOverrideDoors:  () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'doors', panelOpen: true, configExpanded: true }),
       setOverrideLights: () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'lights', panelOpen: true, configExpanded: true }),
-      ovModelBg:  s.overrideSubTab === 'model'  ? 'rgba(79,214,232,.18)' : 'transparent',
       ovMotionBg: s.overrideSubTab === 'motion' ? 'rgba(79,214,232,.18)' : 'transparent',
       ovDoorsBg:  s.overrideSubTab === 'doors'  ? 'rgba(79,214,232,.18)' : 'transparent',
       ovLightsBg: s.overrideSubTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
-      ovModelBorder:  (s.activeGroup === 'override' && s.overrideSubTab === 'model')  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       ovMotionBorder: (s.activeGroup === 'override' && s.overrideSubTab === 'motion') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       ovDoorsBorder:  (s.activeGroup === 'override' && s.overrideSubTab === 'doors')  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       ovLightsBorder: (s.activeGroup === 'override' && s.overrideSubTab === 'lights') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      ovModelCol:  (s.activeGroup === 'override' && s.overrideSubTab === 'model')  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       ovMotionCol: (s.activeGroup === 'override' && s.overrideSubTab === 'motion') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       ovDoorsCol:  (s.activeGroup === 'override' && s.overrideSubTab === 'doors')  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       ovLightsCol: (s.activeGroup === 'override' && s.overrideSubTab === 'lights') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
@@ -2030,6 +3293,8 @@ class Component extends DCLogic {
           border: s.doorRROpen > 0 ? '#4fd6e8' : 'rgba(79,214,232,.20)', bg: s.doorRROpen > 0 ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)', col: s.doorRROpen > 0 ? '#4fd6e8' : 'rgba(255,255,255,.70)' },
       ],
       modelLabel: s.modelVariant === 'gt' ? 'GT' : 'HEV',
+      modelTooltip: s.modelVariant === 'gt' ? 'Switch to HEV' : 'Switch to GT',
+      toggleModelVariant: () => this._setModelVariant(s.modelVariant === 'gt' ? 'hev' : 'gt'),
       currentCarPaintHex: activeKey,
       swatches,
       lightIntensity: s.lightIntensity,
@@ -2133,18 +3398,6 @@ class Component extends DCLogic {
       size22Col: s.wheelSizeInch === 22 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       wheelTintOverride: s.wheelTintOverride,
       onWheelTintOverride: (e) => this.onWheelTintOverride(e),
-      // Model variant toggle (HEV/PHEV ↔ GT)
-      modelVariant: s.modelVariant,
-      isHev: s.modelVariant === 'hev',
-      isGt:  s.modelVariant === 'gt',
-      setModelHev: () => this._setModelVariant('hev'),
-      setModelGt:  () => this._setModelVariant('gt'),
-      modelHevBg:  s.modelVariant === 'hev' ? 'rgba(79,214,232,.18)' : 'transparent',
-      modelGtBg:   s.modelVariant === 'gt'  ? 'rgba(79,214,232,.18)' : 'transparent',
-      modelHevCol: s.modelVariant === 'hev' ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      modelGtCol:  s.modelVariant === 'gt'  ? '#4fd6e8' : 'rgba(255,255,255,.45)',
-      modelHevBorder: s.modelVariant === 'hev' ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      modelGtBorder:  s.modelVariant === 'gt'  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       wheelAngle:      s.wheelAngle,
       wheelAngleLabel: s.wheelAngle + '°',
       motionSpeed:      s.motionSpeed,
@@ -2157,10 +3410,10 @@ class Component extends DCLogic {
       onCarHeight:    (e) => this._setCarHeight(parseFloat(e.target.value)),
       sunroofOpen:      s.sunroofOpen,
       sunroofLabel:     s.sunroofOpen + '%',
-      onSunroofOpen:    (e) => this._setSunroofOpen(parseFloat(e.target.value)),
+      onSunroofOpen:    (e) => { this._sunroofStep = MANUAL_OPENING_STEP; this._setSunroofOpen(parseFloat(e.target.value)); },
       curtainOpen:      s.curtainOpen,
       curtainLabel:     s.curtainOpen + '%',
-      onCurtainOpen:    (e) => this._setCurtainOpen(parseFloat(e.target.value)),
+      onCurtainOpen:    (e) => { this._curtainStep = MANUAL_OPENING_STEP; this._setCurtainOpen(parseFloat(e.target.value)); },
       toggleSunroofCurtain: () => this.toggleSunroofCurtain(),
       sunroofBtnLabel:  (s.sunroofOpen > 0 || s.curtainOpen > 0) ? 'CLOSE SUNROOF' : 'OPEN SUNROOF',
       sunroofBtnBorder: (s.sunroofOpen > 0 || s.curtainOpen > 0) ? '#4fd6e8' : 'rgba(79,214,232,.20)',
@@ -2283,6 +3536,19 @@ class Component extends DCLogic {
     };
   }
 
+  /**
+   * The background colour the shell should be showing right now.
+   *
+   * Single source of truth for every surface that paints it: the outer div's
+   * first render, the WebGL scene background set up before the model exists,
+   * and _applyBackground. Keeping them in agreement is what stops the load
+   * sequence from stepping through two or three different colours.
+   */
+  _resolvedBg(state) {
+    const s = state || this.state;
+    return s.nightMode ? s.nightBg : s.dayBg;
+  }
+
   _applyBackground(night, dayBg, nightBg, vig, grain) {
     const bg = night ? nightBg : dayBg;
     const vc = vig.color || '#000000';
@@ -2316,6 +3582,18 @@ class Component extends DCLogic {
       this.outerRef.current.style.background = bg;
       this.outerRef.current.classList.toggle('bg-grain', !!grain);
     }
+    // Paint the native shell for the NEXT cold start. The WebView's own colour
+    // is what fills the screen between Activity start and the page's first paint
+    // (~1.5s here). That used to mean handing over `bg`, the day/night car
+    // background, so a night-mode car didn't open on a flash of light grey — but
+    // the first thing on screen is now always the pure-black splash clip, not the
+    // car, so black is what the gap has to match regardless of day/night.
+    try {
+      const bridge = window.AppLauncherBridge;
+      if (bridge && typeof bridge.saveShellBackground === 'function') {
+        bridge.saveShellBackground('#000000');
+      }
+    } catch (e) {}
   }
 
   _setBg(mode, val) {
@@ -2444,7 +3722,13 @@ class Component extends DCLogic {
   // direction regardless of mirrored geometry. Converting to parent-local and
   // applying the FULL decompose (pos+quat+scale) preserves negative-scale
   // (mirror-modifier) wheels — dropping scale was what flipped them before.
-  _applyWheelTransforms() {
+  // fromLoop=true is passed ONLY by the render loop. It permits skipping the
+  // rotation math (not the visibility writes above it) when the car is parked
+  // and neither steer angle nor ride height has moved since the last apply —
+  // that work recomputes bit-identical matrices at ~60 Hz on an idle scene.
+  // Every other caller omits the flag and therefore always applies in full, so
+  // wheel swaps / height changes / steer updates can never be skipped.
+  _applyWheelTransforms(fromLoop) {
     if (!this.THREE || !this._allWheels) return;
     const THREE    = this.THREE;
     const steerRad = (this.state.wheelAngle || 0) * Math.PI / 180;
@@ -2519,6 +3803,13 @@ class Component extends DCLogic {
     // space so they stay grounded — applied on top of whatever P/_initWorld
     // already encode, so it never fights the caliper depth-offset logic below.
     const heightShiftY = (this._wheelsShareCarRoot !== false) ? -(this.state.carHeightOffset || 0) : 0;
+
+    // Rotation half. While the wheels are rolling every _rollAngle changed this
+    // frame, so it always has to run; parked, it only has to run when steer or
+    // ride height actually moved.
+    const rotSig = steerRad + '|' + heightShiftY;
+    if (fromLoop && speed === 0 && rotSig === this._lastWheelRotSig) return;
+    this._lastWheelRotSig = rotSig;
 
     const applyRot = (m, rollAngle, doSteer) => {
       if (!m._initWorld || !m._pivot) return;
@@ -3830,6 +5121,11 @@ class Component extends DCLogic {
 
   _applyNightMode(next, force) {
     if (!force && this.state.nightMode === next) return;
+    // Build the SpotLight rig on the way in, never on the way out — day mode
+    // then keeps NUM_SPOT_LIGHTS = 0 in every shader until the user actually
+    // asks for night. Once built it stays (tearing it down would force a second
+    // full shader recompile on every night toggle).
+    if (next) this._ensureNightRig();
     this.setState({ nightMode: next });
     // Body paint: re-apply metalness/roughness/envMapIntensity for the current
     // colour under the new day/night mode (see _bodyPaintParams — at night the
@@ -3975,6 +5271,12 @@ class Component extends DCLogic {
     return tex;
   }
 
+  // Builds the night floor and works out the rig geometry, but does NOT create
+  // the 13 SpotLights — see _ensureNightRig. three.js bakes the light counts into
+  // every lit material's shader (NUM_SPOT_LIGHTS), so creating them up front made
+  // day mode run a 13-iteration per-fragment spot loop over every pixel of the
+  // car for lights sitting at intensity 0. Deferring them until night mode is
+  // first entered lets day mode compile with NUM_SPOT_LIGHTS = 0.
   _setupNightSceneLights(center, size, baseY) {
     if (!this.THREE || !this.scene) return;
     const THREE = this.THREE;
@@ -4012,6 +5314,44 @@ class Component extends DCLogic {
     const hlH   = baseY + size.y * 0.30;
     const pd    = Math.max(carW, carL) * 1.6;
     const pa    = Math.PI / 1.4;   // wider cone since lights are higher up
+
+    // Everything the deferred spotlight rig needs, resolved once here while the
+    // car's bounding box and light groups are in hand.
+    this._nightRigGeom = { frontPos, rearPos, beamGnd, poolH, hlH, pd, pa, baseY, carW, carL, leftDir, forwardDir };
+
+    // Night floor — large enough to never clip beams or pools.
+    // white + AdditiveBlending = invisible where dark, shows pool colour where lit.
+    // receiveShadow = true so dirLight shadow catcher (car silhouette) composites on top.
+    const nfMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 1.0, metalness: 0, envMapIntensity: 0,
+    });
+    nfMat.blending = THREE.AdditiveBlending;
+    nfMat.transparent = true;
+    nfMat.depthWrite = false;
+    const dim = Math.max(carW, carL) * 12;   // large enough for full beam reach
+    const nightFloor = new THREE.Mesh(new THREE.PlaneGeometry(dim, dim), nfMat);
+    nightFloor.rotation.x = -Math.PI / 2;
+    nightFloor.position.set(center.x, baseY + 0.004, center.z);
+    nightFloor.renderOrder = 1;
+    nightFloor.receiveShadow = true;
+    nightFloor.visible = false;
+    this.scene.add(nightFloor);
+    this.nightFloor = nightFloor;
+
+    // If the viewer booted straight into night mode (restored setting), the rig
+    // is needed immediately — otherwise it waits for the first day→night toggle.
+    if (this.state && this.state.nightMode) this._ensureNightRig();
+  }
+
+  // Creates the 13 night SpotLights. Idempotent, and safe to call before the
+  // model has loaded (it no-ops until _setupNightSceneLights has run). Adding
+  // the lights triggers a one-off shader recompile of every lit material, which
+  // is why it happens on the night toggle rather than every frame.
+  _ensureNightRig() {
+    if (this._nightRigBuilt || !this._nightRigGeom || !this.THREE || !this.scene) return false;
+    const THREE = this.THREE;
+    const { frontPos, rearPos, beamGnd, poolH, hlH, pd, pa, baseY, carW, carL, leftDir, forwardDir } = this._nightRigGeom;
+    this._nightRigBuilt = true;
 
     const makePool = (hex, dist, angle) => {
       const sl = new THREE.SpotLight(hex, 0, dist, angle, 0.60, 2);
@@ -4095,24 +5435,9 @@ class Component extends DCLogic {
     this.nlTurnRB.position.copy(tRearR);
     this.nlTurnRB.target.position.set(tRearR.x, baseY - 3, tRearR.z);
 
-    // Night floor — large enough to never clip beams or pools.
-    // white + AdditiveBlending = invisible where dark, shows pool colour where lit.
-    // receiveShadow = true so dirLight shadow catcher (car silhouette) composites on top.
-    const nfMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, roughness: 1.0, metalness: 0, envMapIntensity: 0,
-    });
-    nfMat.blending = THREE.AdditiveBlending;
-    nfMat.transparent = true;
-    nfMat.depthWrite = false;
-    const dim = Math.max(carW, carL) * 12;   // large enough for full beam reach
-    const nightFloor = new THREE.Mesh(new THREE.PlaneGeometry(dim, dim), nfMat);
-    nightFloor.rotation.x = -Math.PI / 2;
-    nightFloor.position.set(center.x, baseY + 0.004, center.z);
-    nightFloor.renderOrder = 1;
-    nightFloor.receiveShadow = true;
-    nightFloor.visible = false;
-    this.scene.add(nightFloor);
-    this.nightFloor = nightFloor;
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(3);
+    return true;
   }
 
   _updateNightLight(key, on) {
@@ -4190,14 +5515,6 @@ class Component extends DCLogic {
     const targetVal = anyOpen ? 0 : 100;
     this._setSunroofOpen(targetVal);
     this._setCurtainOpen(targetVal);
-  }
-
-  // Darken a hex colour by factor (0.5 = 50% darker), except white which is kept.
-  darkenHex(hex, factor) {
-    if (!hex || hex.toUpperCase() === '#F4F5F7') return hex;
-    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-    const f = 1 - factor;
-    return '#' + [r,g,b].map(v=>Math.round(v*f).toString(16).padStart(2,'0')).join('');
   }
 
   // Darken a hex colour by factor (0–1), except white #F4F5F7 which is kept.
@@ -4648,6 +5965,57 @@ class Component extends DCLogic {
       }
     });
   }
+
+  // Streak-pass companion to _darkenNonBloom. Every streak mesh is also in
+  // _bloomMeshSet (the bloom add is unconditional, the streak add is gated on
+  // the group name), so once _darkenNonBloom has run the only meshes still
+  // showing a real material are the light emitters. Blacking out the ones that
+  // aren't streak lights turns a bloom-ready scene into a streak-ready one.
+  // That walks the light set - a few dozen emitters - instead of re-running a
+  // whole-graph scene.traverse(), and accumulates into the same _matStore so a
+  // single _restoreMaterials() still undoes both passes.
+  _darkenBloomOnlyLights() {
+    if (!this._bloomMeshSet) return;
+    if (!this._blackMat) this._blackMat = new this.THREE.MeshBasicMaterial({ color: 0x000000 });
+    if (!this._matStore) this._matStore = new Map();
+    if (!this._hiddenForBloom) this._hiddenForBloom = [];
+    const keep = this._streakMeshSet || new Set();
+    this._bloomMeshSet.forEach((o) => {
+      if (!o.isMesh || !o.visible || keep.has(o)) return;
+      const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+      if (mat && mat.transparent) {
+        o.visible = false;
+        this._hiddenForBloom.push(o);
+      } else {
+        this._matStore.set(o, o.material);
+        o.material = this._blackMat;
+      }
+    });
+  }
+  // ── Shadow updates during body tweens ────────────────────────────────────
+  // Every door/trunk/sunroof/curtain step used to set shadowMap.needsUpdate,
+  // forcing a full 2048² PCF-soft shadow re-render on EVERY frame of the tween
+  // — an extra whole-scene depth pass at the exact moment the frame budget is
+  // already tightest. The sun shadow is very soft (radius 15), so refreshing it
+  // every 3rd frame is imperceptible on a swinging door. _settleTweenShadow
+  // then guarantees one final update on the frame the tween stops, so the
+  // resting shadow always matches the resting geometry (shadowMap.autoUpdate is
+  // off — a missed final update would stick until something else dirties it).
+  _requestTweenShadow() {
+    this._tweenShadowPhase = (this._tweenShadowPhase || 0) + 1;
+    if (this._tweenShadowPhase % 3 === 1 && this.renderer) {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+  }
+
+  _settleTweenShadow(active) {
+    if (!active && this._tweenShadowWasActive && this.renderer) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this._tweenShadowPhase = 0;
+    }
+    this._tweenShadowWasActive = active;
+  }
+
   _restoreMaterials() {
     if (this._matStore) {
       this._matStore.forEach((mat, o) => { o.material = mat; });
@@ -5221,11 +6589,15 @@ class Component extends DCLogic {
         if (!m || !/rear.lights|glass.*rear/i.test(m.name || '')) return;
         m.opacity        = tweaks.opacity;
         m.roughness      = tweaks.roughness;
-        // Low tier: transmission>0 forces an extra full-scene render pass every
+        // Mobile: transmission>0 forces an extra full-scene render pass every
         // frame (expensive on the Adreno 640). Drop it and lean on opacity-based
         // translucency instead, so the rear glass still reads as tinted glass.
-        m.transmission   = this._perfLow ? 0 : tweaks.transmission;
-        if (this._perfLow) m.transparent = true;
+        // The cost is the same whether one small lamp lens uses transmission or
+        // the whole body does — three.js renders the scene into the transmission
+        // target regardless — so paying it for rear lamp glass is a bad trade on
+        // the head unit even at full quality.
+        m.transmission   = this._perfMobile ? 0 : tweaks.transmission;
+        if (this._perfMobile) m.transparent = true;
         m.envMapIntensity = tweaks.envMap;
         m.clearcoat      = tweaks.clearcoat;
         if (tweaks.color && m.color) {
@@ -6192,6 +7564,32 @@ class Component extends DCLogic {
   // for a single frame — _reapplyLights() at the end restores the true
   // requested state regardless, so the end result is always correct even if
   // a light was toggled mid-warmup.
+  /**
+   * Hold the light-shader pre-warm until the boot reveal has finished, so the
+   * ~16s of compile does not steal the frames the reveal needs. Falls back to a
+   * timer so a reveal that never runs (APP+APP, or an aborted intro) cannot
+   * strand the warmup forever.
+   */
+  _startWarmupAfterReveal() {
+    if (this._warmupScheduled) return;
+    this._warmupScheduled = true;
+    const go = () => {
+      if (this._unmounted || this._warmupInFlight) return;
+      clearTimeout(this._warmupFallbackTimer);
+      this._warmupFallbackTimer = null;
+      this._warmupLightsAsync();
+    };
+    // _endIntroAnimation clears _introActive; poll cheaply rather than thread a
+    // callback through every early-return path in the reveal.
+    const waitForIdle = () => {
+      if (this._unmounted) return;
+      if (!this._introActive && !this._camAnim) { go(); return; }
+      this._warmupIdleTimer = setTimeout(waitForIdle, 250);
+    };
+    this._warmupIdleTimer = setTimeout(waitForIdle, 250);
+    this._warmupFallbackTimer = setTimeout(go, 12000);
+  }
+
   _warmupLightsAsync() {
     if (!this.lightGroups || !this.renderer || !this.scene || !this.camera) return;
     if (this._warmupInFlight) return; // already running
@@ -6395,6 +7793,8 @@ class Component extends DCLogic {
     const draco = new THREE.DRACOLoader();
     draco.setDecoderPath('vendor/draco/');
     loader.setDRACOLoader(draco);
+    // Shared instance created during init — user-supplied GLBs may be KTX2 too.
+    if (this._ktx2Loader) loader.setKTX2Loader(this._ktx2Loader);
     if (window.MeshoptDecoder) {
       loader.setMeshoptDecoder(window.MeshoptDecoder);
     }
@@ -6516,6 +7916,7 @@ class Component extends DCLogic {
     const draco = new THREE.DRACOLoader();
     draco.setDecoderPath('vendor/draco/');
     loader.setDRACOLoader(draco);
+    if (this._ktx2Loader) loader.setKTX2Loader(this._ktx2Loader);
     if (window.MeshoptDecoder) {
       loader.setMeshoptDecoder(window.MeshoptDecoder);
     }
@@ -6602,6 +8003,7 @@ class Component extends DCLogic {
       const draco = new THREE.DRACOLoader();
       draco.setDecoderPath('vendor/draco/');
       loader.setDRACOLoader(draco);
+      if (this._ktx2Loader) loader.setKTX2Loader(this._ktx2Loader);
       if (window.MeshoptDecoder) {
         loader.setMeshoptDecoder(window.MeshoptDecoder);
       }
@@ -7113,12 +8515,40 @@ class Component extends DCLogic {
     const THREE = this.THREE;
     if (!THREE || !this._tireWheels) return;
 
+    // The four same-size tires SHARE one BufferGeometry (measured on the car:
+    // 8 tire meshes, 2 distinct geometries — 4x53942 verts and 4x1626). They
+    // therefore all write the same vertex buffer, so deforming per-mesh did the
+    // identical 54k-vertex pass four times over and only the last writer
+    // survived.
+    //
+    // Worse, it was silently wrong. The per-mesh `_origLocalPos` snapshot is
+    // taken lazily on first use, so the FIRST tire of a geometry captured
+    // pristine vertices while the other three captured a buffer the first tire
+    // had already deformed. Their derived bore radius came out ~6.5% small
+    // (0.271405 vs the pristine 0.290226), and each subsequent pass re-deformed
+    // an already-deformed snapshot — the compounding the "correction pass" in
+    // deformTireToTarget was quietly papering over.
+    //
+    // So: derive the pristine reference data ONCE PER GEOMETRY and run the
+    // vertex loop once per geometry. Every mesh sharing it still gets the same
+    // fields assigned (measureTire and the scale calibration read
+    // `_origLocalPos`/`_boreR` off the mesh), just now all pointing at the same
+    // pristine-derived values. Left/right tires carry opposite `_rollAxis`
+    // signs, which is harmless here: the radial component
+    // `rel - axis*(rel·axis)` is invariant under axis negation.
+    if (!this._tireGeoCache) this._tireGeoCache = new Map();
+    const geoCache = this._tireGeoCache;
+    const seenThisPass = new Set();
+
     this._tireWheels.forEach((tire) => {
       const geo = tire.geometry;
       if (!geo || !geo.attributes || !geo.attributes.position || !tire._pivot || !tire._rollAxis) return;
       const pos = geo.attributes.position;
 
-      if (!tire._origLocalPos) {
+      let shared = geoCache.get(geo.uuid);
+      if (!shared) {
+        shared = {};
+        geoCache.set(geo.uuid, shared);
         tire._origLocalPos = pos.array.slice();
 
         // Derive the axle pivot/direction in this mesh's LOCAL (object) space
@@ -7134,9 +8564,9 @@ class Component extends DCLogic {
         // that wrong axis would silently corrupt every future bore-deform
         // for the rest of the session, at any wheel angle. _initWorld is
         // always the steer=0 pose, so the round-trip is angle-independent.
-        tire._localPivot = tire._pivot.clone().applyMatrix4(tire._initWorld.clone().invert());
+        shared.localPivot = tire._pivot.clone().applyMatrix4(tire._initWorld.clone().invert());
         const localAxisPoint = tire._pivot.clone().add(tire._rollAxis).applyMatrix4(tire._initWorld.clone().invert());
-        tire._localAxis = localAxisPoint.sub(tire._localPivot).normalize();
+        shared.localAxis = localAxisPoint.sub(shared.localPivot).normalize();
 
         // Classify the bore (inner mounting hole) vs. tread (outer contact
         // patch) radius from the pristine geometry so the blend zone is
@@ -7144,26 +8574,40 @@ class Component extends DCLogic {
         const v = new THREE.Vector3();
         let minR = Infinity, maxR = -Infinity;
         for (let i = 0; i < pos.count; i++) {
-          v.fromBufferAttribute(pos, i).sub(tire._localPivot);
-          const axialComp = v.dot(tire._localAxis);
-          const r = v.addScaledVector(tire._localAxis, -axialComp).length();
+          v.fromBufferAttribute(pos, i).sub(shared.localPivot);
+          const axialComp = v.dot(shared.localAxis);
+          const r = v.addScaledVector(shared.localAxis, -axialComp).length();
           if (r < minR) minR = r;
           if (r > maxR) maxR = r;
         }
-        tire._boreR = minR;
-        tire._blendR = minR + (maxR - minR) * 0.35;
+        shared.origLocalPos = tire._origLocalPos;
+        shared.boreR = minR;
+        shared.blendR = minR + (maxR - minR) * 0.35;
       }
 
+      // Every mesh sharing this geometry reads the same pristine-derived
+      // values; downstream code (measureTire, the scale calibration) still
+      // reads these off the mesh.
+      tire._origLocalPos = shared.origLocalPos;
+      tire._localPivot = shared.localPivot;
+      tire._localAxis = shared.localAxis;
+      tire._boreR = shared.boreR;
+      tire._blendR = shared.blendR;
+
+      // One vertex pass per geometry, not per mesh.
+      if (seenThisPass.has(geo.uuid)) return;
+      seenThisPass.add(geo.uuid);
+
       const factor = absoluteRadius
-        ? (tire._boreR > 1e-9 ? (target / (scaleFactor || 1.0)) / tire._boreR : 1.0)
+        ? (shared.boreR > 1e-9 ? (target / (scaleFactor || 1.0)) / shared.boreR : 1.0)
         : target;
 
       if (factor === 1.0) {
-        pos.array.set(tire._origLocalPos);
+        pos.array.set(shared.origLocalPos);
       } else {
-        const orig = tire._origLocalPos;
-        const P = tire._localPivot, axis = tire._localAxis;
-        const boreR = tire._boreR, blendR = tire._blendR;
+        const orig = shared.origLocalPos;
+        const P = shared.localPivot, axis = shared.localAxis;
+        const boreR = shared.boreR, blendR = shared.blendR;
         const rel = new THREE.Vector3(), radial = new THREE.Vector3();
         for (let i = 0; i < pos.count; i++) {
           rel.set(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2]).sub(P);
@@ -7296,11 +8740,16 @@ class Component extends DCLogic {
             // rotation itself (which DOES use a shared, uncorrupted pivot) is correct.
             const src = m._origLocalPos || m.geometry.attributes.position.array;
             const count = src.length / 3;
+            // Hot loop: ~54k vertices per tire mesh. `_calV.clone()` here
+            // allocated a Vector3 per vertex, which on the MMI showed up as a
+            // large share of the GC time during the load's PROCESSING phase.
+            // _calV is already a scratch vector and is not read after this, so
+            // subtract in place instead of cloning.
             for (let i = 0; i < count; i++) {
               _calV.set(src[i * 3], src[i * 3 + 1], src[i * 3 + 2]).applyMatrix4(m._initWorld);
-              const rel = _calV.clone().sub(firstMesh._pivot);
-              const axialProj = rel.dot(firstMesh._rollAxis);
-              const radial = rel.addScaledVector(firstMesh._rollAxis, -axialProj).length();
+              _calV.sub(firstMesh._pivot);
+              const axialProj = _calV.dot(firstMesh._rollAxis);
+              const radial = _calV.addScaledVector(firstMesh._rollAxis, -axialProj).length();
               if (radial > stockTireOuterRadiusWorld) stockTireOuterRadiusWorld = radial;
             }
           }
@@ -7879,14 +9328,20 @@ class Component extends DCLogic {
   // means the scene may look different — request a redraw under on-demand mode.
   componentDidUpdate() {
     if (this.requestRender) this.requestRender(3);
+    this._syncBootHud();
     // Start the load intro only after the loading overlay has actually cleared.
+    //
+    // Two rAFs let the first post-load paint land before the camera moves. But
+    // rAF is NOT guaranteed to fire: Chromium stops servicing it whenever the
+    // WebView is not composited, which on this head unit happens routinely —
+    // the OEM scene manager pulls another app in front during boot. When that
+    // happened the reveal never ran at all and the splash sat frozen on its last
+    // frame indefinitely, which is exactly the "video never fades" hang. The
+    // timeout is the floor: whichever fires first wins, and _startIntroAnimation
+    // is idempotent via _introPlayed.
     if (this._introWaitingForLoader && !this.state.loading && !this.state.error) {
       this._introWaitingForLoader = false;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (!this._unmounted) this._startIntroAnimation();
-        });
-      });
+      this._kickIntroReveal();
     }
   }
 
@@ -7895,10 +9350,40 @@ class Component extends DCLogic {
   // not after the GPU finishes them, so synchronous JS timing is not a reliable
   // load signal. Non-overlapping 60-frame windows include the real GPU/vsync
   // delay; idle gaps reset the sample instead of looking like very slow frames.
+  // Frame-pacing tiers. Desktop chases 60 fps; the head unit chases 24 fps, so
+  // it needs its own numbers on all three axes:
+  //
+  //   gapMs   the "this was an idle gap, not a frame" reset. At 80ms a genuinely
+  //           slow device throws away precisely the windows that prove it is
+  //           slow — a 13 fps frame (77ms) is one hitch away from resetting the
+  //           sampler forever. Mobile uses 200ms, which no rendered frame hits.
+  //   window  samples per decision. 60 frames is 3.7s at 16 fps; halving it lets
+  //           the ladder react in about a second instead of ~8.
+  //   bad/good  the step-down / step-up frame times, either side of the target
+  //           with a gap between them so the ladder cannot oscillate.
+  _cadenceTuning() {
+    return this._perfMobile
+      // Measured on the car (Adreno 640, CDP orbit benchmark): the BEST cadence
+      // this hardware produces is 35.8ms (lights off, DPR 0.7). The old good
+      // threshold of 33.0ms (30fps) was therefore unreachable, so the ladder
+      // could only ever step DOWN - a one-way ratchet that parked the head unit
+      // at 0.7 permanently and never climbed back even when the scene went idle.
+      // good must sit above the hardware's real floor or adaptation is dead.
+      //
+      // bad is also relaxed 41.7 -> 50.0 deliberately. Resolution turned out to
+      // be nearly free here (DPR 0.7 -> 1.0 costs only ~20% of the frame rate:
+      // 25.3 -> 20.2 fps), because the frame is CPU/submit-bound, not fill-rate
+      // bound. Giving up native resolution to chase frames is a bad trade on
+      // this GPU, so only drop below 20fps sustained.
+      ? { gapMs: 200, window: 30, bad: 50.0, good: 44.0, slowBad: 60, slowGood: 52 }
+      : { gapMs: 80,  window: 60, bad: 22.0, good: 18.5, slowBad: 25, slowGood: 20 };
+  }
+
   _recordRenderCadence(now) {
     const c = this._frameCadence;
     if (!c) return;
-    if (!c.last || now - c.last > 80) {
+    const tune = this._cadenceTuning();
+    if (!c.last || now - c.last > tune.gapMs) {
       c.last = now;
       c.samples.length = 0;
       c.goodWindows = 0;
@@ -7910,19 +9395,20 @@ class Component extends DCLogic {
     const dt = now - c.last;
     c.last = now;
     c.samples.push(dt);
-    if (c.samples.length < 60) return;
+    if (c.samples.length < tune.window) return;
 
     const avg = c.samples.reduce((sum, value) => sum + value, 0) / c.samples.length;
-    const slow25 = c.samples.filter(value => value > 25).length / c.samples.length;
-    const slow20 = c.samples.filter(value => value > 20).length / c.samples.length;
+    const slowBad = c.samples.filter(value => value > tune.slowBad).length / c.samples.length;
+    const slowGood = c.samples.filter(value => value > tune.slowGood).length / c.samples.length;
+    const sampleCount = c.samples.length;
     c.samples.length = 0;
     c.avg = avg;
     c.windowReady = true;
 
-    if (avg > 22 || slow25 >= 0.20) {
+    if (avg > tune.bad || slowBad >= 0.20) {
       c.badWindows++;
       c.goodWindows = 0;
-    } else if (avg < 18.5 && slow20 <= 0.05) {
+    } else if (avg < tune.good && slowGood <= 0.05) {
       c.goodWindows++;
       c.badWindows = 0;
     } else {
@@ -7932,7 +9418,7 @@ class Component extends DCLogic {
 
     if (this._perf) {
       this._perf.cadenceMs = +avg.toFixed(2);
-      this._perf.cadenceSamples = 60;
+      this._perf.cadenceSamples = sampleCount;
     }
   }
 
@@ -7962,11 +9448,60 @@ class Component extends DCLogic {
     this.requestRender(3);
   }
 
+  // Resolution tied to motion.
+  //
+  // Measured on the head unit (reproducible A/B, two runs within 1%): native
+  // 1.0 renders at ~14fps while 0.7 holds ~22fps, and the cost scales almost
+  // linearly with pixel count - this frame is fill-rate bound. So native is
+  // not affordable WHILE THE CAMERA MOVES. But the render loop is on-demand:
+  // a settled scene draws nothing at all, so a crisp frame there costs nothing
+  // per second. Hence two tiers - the ladder's step while moving, the ladder's
+  // top step once motion stops.
+  //
+  // Switching tiers calls _onResize(), which reallocates every render target.
+  // That is expensive enough that it contaminated an earlier benchmark, so both
+  // directions are debounced in the render loop rather than switched per frame.
+  _setResTier(tier) {
+    if (this._resTier === tier || !this.renderer || !this._dprSteps) return;
+    const top = this._dprSteps[this._dprSteps.length - 1];
+    const dpr = tier === 'refine' ? top
+              : (this._dprSteps[this._dprIdx] || this._dprSteps[0]);
+    this._resTier = tier;
+    if (this.renderer.getPixelRatio() !== dpr) {
+      this.renderer.setPixelRatio(dpr);
+      if (this._onResize) this._onResize();
+      if (this._perf) this._perf.dpr = dpr;
+    }
+    // A cadence window straddling a resolution change describes neither
+    // resolution, and feeding it to the ladder would make it step on noise.
+    const c = this._frameCadence;
+    if (c) {
+      c.last = 0; c.samples.length = 0;
+      c.goodWindows = 0; c.badWindows = 0; c.windowReady = false;
+    }
+  }
+
   async componentDidMount() {
     // Ensure grain class is correctly off before model loads
     if (this.outerRef && this.outerRef.current) {
       this.outerRef.current.classList.remove('bg-grain');
     }
+    // Splash bookkeeping. The clip holds its last frame after `whenDone`;
+    // _startIntroAnimation is what actually fades the overlay, once the car
+    // has been drawn underneath. This handler is the backstop for when that
+    // reveal is NOT going to run — APP+APP has no car — so the overlay cannot
+    // stay up forever. Do NOT fade while the model is still loading; the
+    // splash HUD (and native boot chip) exist so a long hold is not a hang.
+    const splash = window.HavalSplash;
+    if (splash && splash.active) {
+      splash.whenDone(() => {
+        if (this._unmounted) return;
+        this._kickIntroReveal();
+      });
+    } else {
+      this._revealShellChrome();
+    }
+    this._syncBootHud();
     // If the stock-wheel / GLB pipeline never finishes on the MMI, still reveal chrome.
     this._loadSafetyTimer = setTimeout(() => {
       if (!this.state.loading) return;
@@ -7993,6 +9528,12 @@ class Component extends DCLogic {
         this.loadScript(B + 'examples/js/loaders/GLTFLoader.js'),
         this.loadScript(B + 'examples/js/loaders/DRACOLoader.js'),
         this.loadScript(B + 'examples/js/libs/meshopt_decoder.js'),
+        // KTX2Loader needs THREE.WorkerPool, which is a separate file in the
+        // legacy examples/js build and is NOT in three.min.js. Load order inside
+        // Promise.all does not matter (both only touch THREE at call time), but
+        // both must land before the first GLB parse.
+        this.loadScript(B + 'examples/js/utils/WorkerPool.js'),
+        this.loadScript(B + 'examples/js/loaders/KTX2Loader.js'),
         this._androidApp ? Promise.resolve() : this.loadScript(B + 'examples/js/exporters/GLTFExporter.js'),
         this.loadScript(B + 'examples/js/controls/OrbitControls.js'),
         this.loadScript(B + 'examples/js/objects/Sky.js'),
@@ -8018,7 +9559,9 @@ class Component extends DCLogic {
 
       const container = this.containerRef.current;
       if (!container) return;
-      const w = container.clientWidth, h = container.clientHeight;
+      this._forceViewerLayout();
+      const w = container.clientWidth || window.innerWidth || 1920;
+      const h = container.clientHeight || window.innerHeight || 720;
 
       // ── Performance tier ──────────────────────────────────────────────────
       // Opt-in via ?perf=low (the target Haval H6 MMI runs a Snapdragon 8155 /
@@ -8037,13 +9580,45 @@ class Component extends DCLogic {
           || qs.has('lite') || hs.has('lite');
         this._androidApp = qs.has('android') || hs.has('android');
       }
+      // Two tiers, because they buy different things:
+      //
+      //   _perfLow    opt-in via ?lite / ?perf=low. Trades VISIBLE quality for
+      //               frames: lower DPR, no MSAA, 1024² hard-PCF shadows, the
+      //               -lite GLBs. This is the "it's still too slow" hammer.
+      //
+      //   _perfMobile true on the head unit as well (?android). Only knobs whose
+      //               cost is invisible at viewing distance: blur-pass render
+      //               scale, streak tap count, the transmission render target,
+      //               framebuffer preservation. Nothing here changes what the
+      //               car looks like, so it is safe to enable unconditionally on
+      //               the MMI — which, note, launches with ?android and NEVER
+      //               ?lite, so before this split it ran the full desktop tier.
+      this._perfMobile = this._perfLow || this._androidApp;
       window.__perfLow = () => this._perfLow;
+      window.__perfMobile = () => this._perfMobile;
 
-      const renderer = new THREE.WebGLRenderer({ antialias: !this._perfLow, preserveDrawingBuffer: true });
+      // preserveDrawingBuffer forces the driver to keep the back buffer intact
+      // after compositing, which defeats the discard/rotate fast path that tiled
+      // mobile GPUs (Adreno) rely on. Nothing reads this canvas — the only
+      // toDataURL() call is on the separate thumbnail renderer — and GLTFExporter
+      // is already skipped on Android, so on mobile it is pure per-frame cost.
+      const renderer = new THREE.WebGLRenderer({
+        antialias: !this._perfLow,
+        preserveDrawingBuffer: !this._perfMobile,
+      });
       // Low tier starts at its lowest DPR step (0.75) — smooth-first; the
-      // adaptive loop ramps it up only if the GPU shows headroom. This matches
-      // _dprIdx=0 below so the renderer and the bookkeeping agree from frame 1.
-      renderer.setPixelRatio(this._perfLow ? 0.75 : Math.min(window.devicePixelRatio, 1.5));
+      // adaptive loop ramps it up only if the GPU shows headroom. Mobile starts
+      // at native 1.0 and adapts either way. These must match the _dprIdx chosen
+      // below so the renderer and the bookkeeping agree from frame 1.
+      renderer.setPixelRatio(
+        this._perfLow ? 0.75
+        // Mobile starts in the MOTION tier (0.7), not native. The intro
+        // animation is continuous motion, and native measured ~14fps here
+        // against ~22fps at 0.7. _setResTier lifts it to native once the
+        // scene settles - see the motion/idle block in the render loop.
+        : this._perfMobile ? 0.7
+        : Math.min(window.devicePixelRatio, 1.5),
+      );
       renderer.setSize(w, h);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = this.state.exposure;
@@ -8060,13 +9635,23 @@ class Component extends DCLogic {
       renderer.shadowMap.needsUpdate = true;
       container.appendChild(renderer.domElement);
       this.renderer = renderer;
+      renderer.domElement.addEventListener('webglcontextlost', (ev) => {
+        ev.preventDefault();
+        console.warn('[GL] context lost');
+      });
+      renderer.domElement.addEventListener('webglcontextrestored', () => {
+        console.warn('[GL] context restored — redrawing');
+        try {
+          if (this._onResize) this._onResize();
+          if (this.requestRender) this.requestRender(12);
+          if (this.renderOnce) this.renderOnce();
+        } catch (e) {}
+      });
 
-      // FPS HUD (bottom-left). Shows rendered frames/sec; "idle" under
-      // on-demand rendering when nothing is being drawn. Wrapped in a flex row
-      // so an optional LITE badge (perf=low/#lite) can sit to its right
-      // without needing to know the FPS pill's (text-dependent) width.
+      // FPS HUD shares the launcher strip's bottom gap (OEM climate dock
+      // clearance). Desktop has no strip, so it falls back to 14px.
       const hudEl = document.createElement('div');
-      hudEl.style.cssText = 'position:absolute;left:14px;bottom:14px;z-index:30;' +
+      hudEl.style.cssText = 'position:absolute;left:14px;bottom:var(--hv-launcher-bottom, 14px);z-index:30;' +
         'display:flex;align-items:center;gap:6px;pointer-events:none;user-select:none;';
       container.appendChild(hudEl);
       this._hudEl = hudEl;
@@ -8076,11 +9661,26 @@ class Component extends DCLogic {
         'font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;' +
         'color:#4fd6e8;background:rgba(10,14,18,.55);backdrop-filter:blur(6px);' +
         '-webkit-backdrop-filter:blur(6px);padding:4px 9px;border-radius:6px;' +
-        'border:1px solid rgba(79,214,232,.18);display:none;';
+        'border:1px solid rgba(79,214,232,.18);';
       fpsEl.textContent = '— FPS';
       hudEl.appendChild(fpsEl);
       this._fpsEl = fpsEl;
+      this._applyFpsVisibility(this.state.showFps);
       this._renderTimes = [];
+
+      // Ship frame metrics to logcat on the head unit (adb logcat -s H6Perf).
+      // Without this the only way to compare a before/after is to stand at the
+      // car reading the FPS pill. Skips idle samples so a parked, on-demand-idle
+      // viewer does not fill the log with meaningless zeroes.
+      if (window.TelemetryBridge && typeof window.TelemetryBridge.reportPerf === 'function') {
+        this._perfReportTimer = setInterval(() => {
+          try {
+            const p = window.__perf && window.__perf();
+            if (!p || p.idle) return;
+            window.TelemetryBridge.reportPerf(JSON.stringify(p));
+          } catch (e) { /* never let logging break the frame loop */ }
+        }, 2000);
+      }
 
       if (this._perfLow) {
         const liteEl = document.createElement('div');
@@ -8109,9 +9709,12 @@ class Component extends DCLogic {
         sun.setFromSphericalCoords(1, phi, theta);
       }
 
-      // Background is driven by _applyBackground after model loads;
-      // set a flat fallback during loading so the canvas isn't black.
-      scene.background = new THREE.Color(0xe7e7e7);
+      // _applyBackground takes over once the model is in (it swaps in the
+      // vignette/grain texture), but until then the canvas still has to paint
+      // something. Use the SAME colour it will settle on rather than a fixed
+      // light grey, so the canvas appearing over the shell is invisible instead
+      // of a flash of the wrong colour.
+      scene.background = new THREE.Color(this._resolvedBg());
 
       // Neutral sky-derived environment for reflections until the HDRI loads.
       const pmrem = new THREE.PMREMGenerator(renderer);
@@ -8165,7 +9768,6 @@ class Component extends DCLogic {
       // damping/async work settles. requestRender() is the single entry point;
       // componentDidUpdate (any setState), resize, and async loads all call it.
       this._renderFrames = 6;
-      this._wheelTransformsDirty = true;
       // Bloom/streak are screen-space results. Keep them until something that
       // can change the camera, light emitters or their occlusion requests a
       // redraw. Continuous wheel roll/reflection flow can then reuse the last
@@ -8183,18 +9785,47 @@ class Component extends DCLogic {
       // Steps never exceed the device cap (rendering above 1× the display is
       // pure waste). Desktop floors at 1.0; low tier may under-sample down to
       // 0.75 to hold framerate on the weak mobile GPU (a large screen hides it).
+      //
+      // The head unit previously floored at 1.0 too, which made the whole
+      // adaptive mechanism inert there: at ~16 fps every cadence window scores
+      // "bad", the ladder walks straight to its bottom step and then has nowhere
+      // left to go. Mobile keeps 0.7 as an emergency rung, but rests at 1.0.
+      //
+      // The intermediate rungs (0.8/0.85/0.9) were removed after measuring them:
+      // 0.85 renders at 20.4fps and 1.0 at 20.2fps - within noise of each other -
+      // so every middle step paid full price for visibly worse output. Only 0.7
+      // buys real frames (25.3fps), which makes this a two-state choice: native,
+      // or the emergency step. Nothing useful lives in between.
+      //
+      // Note there is NO FXAA pass (an earlier comment here claimed one). None is
+      // wanted: the main scene renders straight to the default framebuffer, where
+      // the context grants real 4x MSAA (SAMPLES=4, and MAX_SAMPLES=4 is the
+      // Adreno 640 ceiling). Routing through an RT to run FXAA would forfeit that
+      // MSAA for an edge-detect blur - strictly worse.
       this._dprSteps = this._perfLow
         ? [0.75, 0.85, 1.0]
-        : [...new Set([1.0, 1.25, 1.5].filter(v => v <= this._dprCap).concat(this._dprCap))].sort((a, b) => a - b);
+        : [...new Set(
+            (this._perfMobile ? [0.7, 1.0] : [1.0, 1.25, 1.5])
+              .filter(v => v <= this._dprCap).concat(this._dprCap),
+          )].sort((a, b) => a - b);
       // Low tier starts at its lowest step (smooth-first, ramp up if there's
-      // headroom); desktop starts crisp.
-      this._dprIdx   = this._perfLow ? 0 : this._dprSteps.length - 1;
+      // headroom); desktop starts crisp. Mobile starts at 1.0 — native
+      // resolution — and lets the cadence loop move it either way from there.
+      this._dprIdx   = this._perfLow ? 0
+                     : this._perfMobile ? 0
+                     : this._dprSteps.length - 1;
       this._frameCadence = {
         last: 0, samples: [], avg: 0,
         goodWindows: 0, badWindows: 0, windowReady: false,
       };
+      // Motion/idle resolution tiers - see _setResTier.
+      this._resTier      = 'motion';
+      this._motionStartMs = 0;
+      this._lastActiveMs  = 0;
+      this._refineFrames  = 0;
       this._perf = { fps: 0, lastMs: 0, renderedFrames: 0, dpr: this._dprSteps[this._dprIdx] };
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
+        resTier: this._resTier,
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
 
       // --- Load GLBs (glTF with PBR materials) ---
@@ -8221,8 +9852,30 @@ class Component extends DCLogic {
         draco.setWorkerLimit(1);
       }
       this._dracoLoader = draco;
+
+      // KTX2/UASTC textures (KHR_texture_basisu, see scripts/build-ktx2-textures.mjs).
+      // detectSupport() picks the transcode target from the live renderer — on the
+      // Adreno 640 that is ASTC 4x4, so a 2048² map occupies 4 MB of VRAM instead
+      // of the 16 MB an RGBA8 decode of the old JPEG needed. Like DRACOLoader this
+      // is lazy: vendor/basis/* is only fetched when a KTX2 texture is actually
+      // met, so a GLB that still carries JPEGs costs nothing. One worker keeps
+      // peak MMI memory predictable, matching the Draco decision above.
+      this._ktx2Loader = null;
+      if (THREE.KTX2Loader) {
+        try {
+          this._ktx2Loader = new THREE.KTX2Loader()
+            .setTranscoderPath('vendor/basis/')
+            .detectSupport(renderer);
+          if (this._androidApp) this._ktx2Loader.setWorkerLimit(1);
+        } catch (e) {
+          console.warn('KTX2Loader unavailable, falling back to uncompressed textures', e);
+          this._ktx2Loader = null;
+        }
+      }
+
       const loader = new THREE.GLTFLoader();
       loader.setDRACOLoader(draco);
+      if (this._ktx2Loader) loader.setKTX2Loader(this._ktx2Loader);
       if (window.MeshoptDecoder) {
         loader.setMeshoptDecoder(window.MeshoptDecoder);
       }
@@ -8325,9 +9978,17 @@ class Component extends DCLogic {
       // A 2/3 scale means the initial 0.75 DPR produces the same half-CSS-size
       // streak target as before, while bloom drops from full CSS resolution to
       // half. If DPR rises, the soft effects gain resolution with the main view.
-      // Normal mode stays at its existing 1 CSS pixel per target pixel.
+      //
+      // Bloom and the anamorphic streak are both BLURS — their output is soft by
+      // construction, so target resolution barely shows. Running them at 1 CSS
+      // pixel per target pixel (what the head unit did before _perfMobile
+      // existed) spends full-screen fill rate on detail the blur throws away.
+      // Mobile renders them at 0.7, which is ~2x the fill for both passes back.
+      // Desktop keeps 1.0.
       this._resizePostFX = (W, H) => {
-        const postFxScale = this._perfLow ? renderer.getPixelRatio() * (2 / 3) : 1;
+        const postFxScale = this._perfLow ? renderer.getPixelRatio() * (2 / 3)
+                          : this._perfMobile ? 0.7
+                          : 1;
         const targetW = Math.max(1, Math.round(W * postFxScale));
         const targetH = Math.max(1, Math.round(H * postFxScale));
         const resizeComposer = (composer) => {
@@ -8354,7 +10015,9 @@ class Component extends DCLogic {
 
       // --- Resize ---
       this._onResize = () => {
-        const W = container.clientWidth, H = container.clientHeight;
+        this._forceViewerLayout();
+        const W = (container.clientWidth || window.innerWidth || 1920);
+        const H = (container.clientHeight || window.innerHeight || 720);
         camera.aspect = W / H;
         camera.updateProjectionMatrix();
         renderer.setSize(W, H);
@@ -8371,8 +10034,13 @@ class Component extends DCLogic {
       // the per-tap step so the streak keeps ~the same on-screen length and
       // falloff (decay is held constant per-pixel-of-reach), then renders the
       // buffer at half-res (see streakRT) — together ~7× less streak-pass cost.
-      const STREAK_TAPS  = this._perfLow ? 20 : 56;
-      const STREAK_STEP  = this._perfLow ? 10.0 : 4.0;          // px of reach per tap
+      //
+      // Mobile sits between the two: 28 taps at 8 px keeps reach at exactly the
+      // desktop 224 px (56×4) with the same falloff, because STREAK_DECAY below
+      // is defined per pixel-of-reach rather than per tap. Half the texture
+      // fetches, visually identical streak.
+      const STREAK_TAPS  = this._perfLow ? 20   : this._perfMobile ? 28  : 56;
+      const STREAK_STEP  = this._perfLow ? 10.0 : this._perfMobile ? 8.0 : 4.0;  // px of reach per tap
       const STREAK_DECAY = (0.065 / 4.0) * STREAK_STEP;         // matches original falloff-vs-reach
       const AnamorphicShader = {
         uniforms: {
@@ -8561,6 +10229,10 @@ class Component extends DCLogic {
           if (this._updateWindLines(delta)) needRender = true;
         }
 
+        // Tracks whether any body tween moved this frame, so _settleTweenShadow
+        // can fire the final shadow refresh on the frame they all come to rest.
+        let tweenActive = false;
+
         // Smooth doors animation
         let doorsNeedRender = false;
         if (this._doorProgress && this._doorTargets) {
@@ -8579,7 +10251,8 @@ class Component extends DCLogic {
             this._applyDoorsTransform();
             needRender = true;
             this._postFxDirty = true;
-            if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+            tweenActive = true;
+            this._requestTweenShadow();
           }
         }
 
@@ -8594,12 +10267,13 @@ class Component extends DCLogic {
           this._applyTrunkTransform();
           needRender = true;
           this._postFxDirty = true;
-          if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+          tweenActive = true;
+          this._requestTweenShadow();
         }
 
         // Smooth sunroof animation
         if (this._sunroofProgress !== this._sunroofTarget) {
-          const step = 0.02;
+          const step = this._sunroofStep || MANUAL_OPENING_STEP;
           if (this._sunroofProgress < this._sunroofTarget) {
             this._sunroofProgress = Math.min(this._sunroofTarget, this._sunroofProgress + step);
           } else {
@@ -8608,12 +10282,13 @@ class Component extends DCLogic {
           this._applySunroofTransform(this._sunroofProgress * 100);
           needRender = true;
           this._postFxDirty = true;
-          if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+          tweenActive = true;
+          this._requestTweenShadow();
         }
 
         // Smooth curtain animation
         if (this._curtainProgress !== this._curtainTarget) {
-          const step = 0.02;
+          const step = this._curtainStep || MANUAL_OPENING_STEP;
           if (this._curtainProgress < this._curtainTarget) {
             this._curtainProgress = Math.min(this._curtainTarget, this._curtainProgress + step);
           } else {
@@ -8622,13 +10297,15 @@ class Component extends DCLogic {
           this._applyCurtainTransform(this._curtainProgress * 100);
           needRender = true;
           this._postFxDirty = true;
-          if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+          tweenActive = true;
+          this._requestTweenShadow();
         }
+        this._settleTweenShadow(tweenActive);
 
         // Keep steer + roll + high-speed sprite visibility synchronized. This
         // intentionally matches the committed implementation: visibility must
         // not depend on a dirty flag that can be cleared by another UI update.
-        this._applyWheelTransforms();
+        this._applyWheelTransforms(true);
 
         const _now = performance.now();
         const _dt = Math.min(0.05, Math.max(0.008, (this._fitCamLastMs ? (_now - this._fitCamLastMs) : 16) / 1000));
@@ -8655,6 +10332,35 @@ class Component extends DCLogic {
         }
         // Forced frames after UI changes / async loads (componentDidUpdate, etc.)
         if (this._renderFrames > 0) { this._renderFrames--; needRender = true; }
+
+        // Resolution tier (see _setResTier). Entering motion waits for
+        // SUSTAINED movement so a tap or a one-pixel nudge never pays for a
+        // render-target reallocation. Refining waits for the scene to go fully
+        // quiet - which includes the OrbitControls damping tail and any
+        // requestRender() frames still draining - then queues a couple of
+        // frames at full resolution for the next tick.
+        const _nowRes = performance.now();
+        if (needRender) {
+          this._lastActiveMs = _nowRes;
+          // The refinement's own frames must not read as motion, or the tier
+          // would immediately bounce back down and thrash the render targets.
+          if (this._refineFrames > 0) {
+            this._refineFrames--;
+          } else if (this._resTier === 'refine') {
+            if (!this._motionStartMs) this._motionStartMs = _nowRes;
+            if (_nowRes - this._motionStartMs >= 90) this._setResTier('motion');
+          }
+        } else {
+          this._motionStartMs = 0;
+          if (this._resTier !== 'refine' && this._lastActiveMs
+              && _nowRes - this._lastActiveMs >= 220) {
+            this._setResTier('refine');
+            this._postFxDirty = true;
+            this._renderFrames = Math.max(this._renderFrames || 0, 2);
+            this._refineFrames = 2;
+          }
+        }
+
         // Idle — nothing changed: skip ALL GPU work this frame
         if (!needRender) return;
         const _t0 = performance.now();
@@ -8675,9 +10381,8 @@ class Component extends DCLogic {
           dst.updateProjectionMatrix();
         };
 
-        const flashOn = !!(this._intro && this._intro.flashOn);
-        const anyLight = flashOn || (this.state.lights && Object.values(this.state.lights).some(Boolean));
-        const anyStreak = flashOn || (this.state.lights && (this.state.lights.headlight || this.state.lights.reverse || this.state.lights.fogFront));
+        const anyLight = !!(this.state.lights && Object.values(this.state.lights).some(Boolean));
+        const anyStreak = !!(this.state.lights && (this.state.lights.headlight || this.state.lights.reverse || this.state.lights.fogFront));
 
         // 1) Main scene
         renderer.autoClear = true;
@@ -8696,15 +10401,18 @@ class Component extends DCLogic {
             //    occludes hidden lights via real depth; emissive lights stay bright.
             this._darkenNonBloom(scene);
             this.bloomComposer.render();
-            this._restoreMaterials();
 
-            // 3) Streak pass (layer 2 — headlight + reverse only)
+            // 3) Streak pass (layer 2 — headlight + reverse only). The scene is
+            //    still blacked out from the bloom pass, so instead of restoring
+            //    every material and traversing the whole graph a second time,
+            //    just black out the bloom-only emitters. One traverse and one
+            //    restore per lit frame instead of two of each.
             if (anyStreak && this.streakComposer) {
               syncCam(this.streakCam);
-              this._darkenNonStreak(scene);
+              this._darkenBloomOnlyLights();
               this.streakComposer.render();
-              this._restoreMaterials();
             }
+            this._restoreMaterials();
 
             scene.background = savedBg;
             this._postFxDirty = false;
@@ -8754,8 +10462,13 @@ class Component extends DCLogic {
           this._perf.fps = Math.round(_fpsCount * 1000 / (now - _fpsT));
           _fpsCount = 0; _fpsT = now;
         }
-        this._recordRenderCadence(now);
-        this._maybeAdaptDPR();
+        // The ladder governs the MOTION tier only. Refinement frames are known
+        // to be slow (that is the trade) and must not be scored, or the ladder
+        // would read every settled scene as a stall and walk itself down.
+        if (this._resTier !== 'refine') {
+          this._recordRenderCadence(now);
+          this._maybeAdaptDPR();
+        }
       };
       loop();
     } catch (err) {
@@ -9068,12 +10781,12 @@ class Component extends DCLogic {
         }
 
         // Rear light glass: matte, transmission-based, less reflective.
-        // (Low tier drops transmission — see _applyRearGlassTweaks — to avoid
+        // (Mobile drops transmission — see _applyRearGlassTweaks — to avoid
         // the per-frame transmission render pass on the mobile GPU.)
         if (/rear.lights|glass.*rear/i.test(m.name || '')) {
           m.roughness = 0.15;
-          m.transmission = this._perfLow ? 0 : 0.6;
-          if (this._perfLow) m.transparent = true;
+          m.transmission = this._perfMobile ? 0 : 0.6;
+          if (this._perfMobile) m.transparent = true;
           m.envMapIntensity = 0.5;
           m.needsUpdate = true;
         }
@@ -9585,7 +11298,17 @@ class Component extends DCLogic {
       // GPU with shaders already cached — first-time compile adds more, and
       // more so on the target Adreno 640). Run it chunked/in the background
       // instead of blocking the overlay from clearing.
-      this._warmupLightsAsync();
+      //
+      // DEFERRED past the reveal. "Chunked" only means one light group per
+      // frame; on the head unit each group costs ~1s of shader compile, so the
+      // 17 groups own the main thread for ~16s (measured 07:39:47 → 07:40:03).
+      // Started here it competes with the boot reveal for the very same frames,
+      // and the splash sat frozen on its last frame for most of that — timers
+      // and rAF both starve, so even the reveal's own fallbacks could not run.
+      // The car is what the user is waiting for; a light toggled in the first
+      // few seconds can afford one compile hitch. _startWarmupAfterReveal runs
+      // it once the intro has settled, or immediately if there is no intro.
+      this._startWarmupAfterReveal();
     } else {
       // Unreachable: the !primary (GT) case already returned earlier in this
       // function (see the early-return block above, which runs its own
@@ -9657,8 +11380,89 @@ class Component extends DCLogic {
     this.camera.updateProjectionMatrix();
   }
 
+  _currentViewShift() {
+    const v = this.camera && this.camera.view;
+    if (v && v.enabled && v.fullWidth) return -v.offsetX / v.fullWidth;
+    return (this._fitCam && this._fitCam.viewShift) || 0;
+  }
+
+  _captureCurrentLayoutCam() {
+    if (!this.camera || !this.controls || !this._fitCenter || !this._fitDist) return null;
+    const { F, R } = this._carBasis();
+    const c = this._fitCenter;
+    const d = this._fitDist;
+    const off = this.camera.position.clone().sub(c);
+    const offT = this.controls.target.clone().sub(c);
+    const round = (n) => Math.round(n * 10000) / 10000;
+    return {
+      f: round(off.dot(F) / d),
+      r: round(off.dot(R) / d),
+      y: round(off.y / d),
+      tf: round(offT.dot(F) / d),
+      tr: round(offT.dot(R) / d),
+      ty: round(offT.y / d),
+      viewShift: round(this._currentViewShift()),
+    };
+  }
+
+  _relToPose(rel) {
+    if (!rel || !this._fitCenter || !this._fitDist) return null;
+    const THREE = window.THREE;
+    const { F, R } = this._carBasis();
+    const c = this._fitCenter.clone();
+    const d = this._fitDist;
+    const position = c.clone()
+      .addScaledVector(F, d * (rel.f || 0))
+      .addScaledVector(R, d * (rel.r || 0))
+      .add(new THREE.Vector3(0, d * (rel.y || 0), 0));
+    const target = c.clone()
+      .addScaledVector(F, d * (rel.tf || 0))
+      .addScaledVector(R, d * (rel.tr || 0))
+      .add(new THREE.Vector3(0, d * (rel.ty || 0), 0));
+    const auto = this._shellCameraTarget(!!window.__androidPopupActive);
+    return {
+      position,
+      target,
+      viewShift: rel.viewShift != null ? rel.viewShift : (auto.viewShift || 0),
+      distMul: auto.distMul,
+    };
+  }
+
+  _proceduralHomePose() {
+    if (!this._fitCenter || !this._fitDist) return null;
+    const THREE = window.THREE;
+    const pose = this._fitCam || this._shellCameraTarget(!!window.__androidPopupActive);
+    const distMul = pose.distMul != null ? pose.distMul : 1;
+    const dist = this._fitDist * distMul;
+    const c = this._fitCenter.clone();
+    const position = new THREE.Vector3(
+      c.x - dist * 0.66,
+      c.y + dist * 0.30,
+      c.z + dist * 0.70
+    );
+    return { position, target: c, viewShift: pose.viewShift || 0, distMul };
+  }
+
+  _layoutHomePose() {
+    const key = this._currentLayoutCamKey();
+    const saved = key && this._layoutCameras && this._layoutCameras[key];
+    if (saved && typeof saved.f === 'number') return this._relToPose(saved);
+    return this._proceduralHomePose();
+  }
+
   _snapFitCamera(pose) {
     if (!this.camera || !this.controls || !this._fitCenter || !this._fitDist) return;
+    const home = this._layoutHomePose();
+    if (home) {
+      this.camera.position.copy(home.position);
+      this.controls.target.copy(home.target);
+      const dist = this.camera.position.distanceTo(this.controls.target);
+      this.camera.near = Math.max(0.05, dist / 120);
+      this.camera.far = Math.max(100, dist * 120);
+      this._applyShellViewOffset(home.viewShift != null ? home.viewShift : ((pose && pose.viewShift) || 0));
+      this.controls.update();
+      return;
+    }
     const distMul = pose.distMul;
     const dist = this._fitDist * distMul;
     const c = this._fitCenter.clone();
@@ -9677,27 +11481,50 @@ class Component extends DCLogic {
   _applyFitCamera(popupActive) {
     if (!this.camera || !this.controls || !this._fitCenter || !this._fitDist) return;
     const target = this._shellCameraTarget(popupActive);
+    const key = this._currentLayoutCamKey();
+    const mode = key || this._shellMode || 'triple';
+    const saved = key && this._layoutCameras && this._layoutCameras[key];
+    const hasSaved = !!(saved && typeof saved.f === 'number');
+    const home = this._layoutHomePose();
+    const viewShift = (hasSaved && saved.viewShift != null)
+      ? saved.viewShift
+      : (target.viewShift || 0);
     // While the load intro (or a preset tween) owns the camera, only remember
     // the shell framing — don't snap or apply view-offset over the animation.
     // Applying view-offset here desyncs bloom/streak overlays from the car.
     if (this._introActive || this._camAnim) {
-      this._fitCam = { distMul: target.distMul, viewShift: target.viewShift || 0 };
+      this._fitCam = { distMul: target.distMul, viewShift };
+      this._fitCamMode = mode;
       return;
     }
     if (!this._fitCam) {
-      this._fitCam = { distMul: target.distMul, viewShift: target.viewShift || 0 };
+      this._fitCam = { distMul: target.distMul, viewShift };
+      this._fitCamMode = mode;
       this._snapFitCamera(this._fitCam);
       if (this.requestRender) this.requestRender(5);
       return;
     }
+    if (this._fitCamMode !== mode) {
+      this._fitCam = { distMul: target.distMul, viewShift };
+      this._fitCamMode = mode;
+      this._fitCamTo = null;
+      if (home) this._animateCameraTo(Object.assign({}, home, { viewShift }), 0.85);
+      return;
+    }
+    if (hasSaved) {
+      this._fitCam.distMul = target.distMul;
+      if (saved.viewShift == null) this._fitCam.viewShift = target.viewShift || 0;
+      this._applyShellViewOffset(this._fitCam.viewShift || 0);
+      return;
+    }
     const same = Math.abs(this._fitCam.distMul - target.distMul) < 0.002
-      && Math.abs((this._fitCam.viewShift || 0) - (target.viewShift || 0)) < 0.002;
+      && Math.abs((this._fitCam.viewShift || 0) - viewShift) < 0.002;
     if (same && !this._fitCamTo) {
-      this._snapFitCamera(this._fitCam);
+      this._applyShellViewOffset(this._fitCam.viewShift || 0);
       return;
     }
     this._fitCamFrom = { distMul: this._fitCam.distMul, viewShift: this._fitCam.viewShift || 0 };
-    this._fitCamTo = target;
+    this._fitCamTo = { distMul: target.distMul, viewShift };
     this._fitCamT = 0;
     if (this.requestRender) this.requestRender(30);
   }
@@ -9727,18 +11554,7 @@ class Component extends DCLogic {
   }
 
   _homeCameraPose() {
-    if (!this._fitCenter || !this._fitDist) return null;
-    const THREE = window.THREE;
-    const pose = this._fitCam || this._shellCameraTarget(!!window.__androidPopupActive);
-    const distMul = pose.distMul != null ? pose.distMul : 1;
-    const dist = this._fitDist * distMul;
-    const c = this._fitCenter.clone();
-    const position = new THREE.Vector3(
-      c.x - dist * 0.66,
-      c.y + dist * 0.30,
-      c.z + dist * 0.70
-    );
-    return { position, target: c };
+    return this._layoutHomePose();
   }
 
   _getCameraPresetPose(key) {
@@ -9762,22 +11578,12 @@ class Component extends DCLogic {
     };
     const position = map[key];
     if (!position) return null;
-    return { position, target: c.clone() };
-  }
-
-  _setHeadlightFlash(on) {
-    this._setGroupEmissive('headlight', !!on);
-    if (this.lightGroups && this.lightGroups.positionRear) {
-      const rearOn = !!on || !!(this.state.lights && (this.state.lights.headlight || this.state.lights.brake));
-      this._setGroupEmissive('positionRear', rearOn);
-    }
-    this._updateNightLight('headlight', !!on);
-    this._postFxDirty = true;
-  }
-
-  _restoreHeadlightsAfterFlash() {
-    const on = !!(this.state.lights && this.state.lights.headlight);
-    this._setHeadlightFlash(on);
+    const home = this._layoutHomePose();
+    return {
+      position,
+      target: c.clone(),
+      viewShift: home && home.viewShift != null ? home.viewShift : this._currentViewShift(),
+    };
   }
 
   _animateCameraTo(pose, durationSec) {
@@ -9787,6 +11593,8 @@ class Component extends DCLogic {
       fromTarget: this.controls.target.clone(),
       toPos: pose.position.clone(),
       toTarget: pose.target.clone(),
+      fromShift: this._currentViewShift(),
+      toShift: pose.viewShift != null ? pose.viewShift : this._currentViewShift(),
       t: 0,
       dur: Math.max(0.2, durationSec || 1.1),
     };
@@ -9806,9 +11614,13 @@ class Component extends DCLogic {
     this.camera.near = Math.max(0.05, dist / 120);
     this.camera.far = Math.max(100, dist * 120);
     this.camera.updateProjectionMatrix();
+    if (a.fromShift != null && a.toShift != null) {
+      this._applyShellViewOffset(a.fromShift + (a.toShift - a.fromShift) * e);
+    }
     this.controls.update();
     if (a.t >= 1) {
       this._camAnim = null;
+      if (this._fitCam && a.toShift != null) this._fitCam.viewShift = a.toShift;
       if (!this._introActive && this.controls) this.controls.enabled = true;
     }
     return true;
@@ -9820,6 +11632,78 @@ class Component extends DCLogic {
     if (!pose) return;
     this.setState({ cameraPreset: key });
     this._animateCameraTo(pose, 1.05);
+  }
+
+  /**
+   * Mirror load progress onto the splash HUD (HTML chip + native overlay).
+   * The fullscreen <video> punches through the in-page spinner, so without
+   * this the boot looks frozen once the clip holds its last frame.
+   */
+  _syncBootHud() {
+    const s = this.state || {};
+    const loading = !!(s.loading && !s.error);
+    const pct = Math.round(s.progress || 0);
+    const processing = !!s.processing;
+    const label = processing ? 'PROCESSING' : 'LOADING MODEL';
+    const text = processing ? 'PROCESSING…' : (pct + '%');
+    try {
+      const splash = window.HavalSplash;
+      const B = window.AppLauncherBridge;
+      const nativeHud = !!(B && typeof B.setBootProgress === 'function');
+      if (splash && typeof splash.setStatus === 'function') {
+        splash.setStatus(loading && !nativeHud, label, text, pct);
+      }
+      if (!B) return;
+      if (!loading) {
+        if (typeof B.hideBootProgress === 'function') B.hideBootProgress();
+        return;
+      }
+      if (typeof B.setBootProgress === 'function') B.setBootProgress(pct, text);
+    } catch (e) {}
+  }
+
+  _hideBootHud() {
+    try {
+      const splash = window.HavalSplash;
+      if (splash && typeof splash.setStatus === 'function') splash.setStatus(false);
+    } catch (e) {}
+    try {
+      const B = window.AppLauncherBridge;
+      if (B && typeof B.hideBootProgress === 'function') B.hideBootProgress();
+    } catch (e) {}
+  }
+
+  /**
+   * Stage the shell chrome back in after the boot splash, so the car gets the
+   * screen to itself for a beat before anything else lands on it:
+   *
+   *   +0.9s  launcher icons fly in from the left, 200ms apart (native — see
+   *          MainActivity.revealLauncherStrip). Held until the splash overlay
+   *          has actually finished fading, or they'd animate behind black.
+   *   +2.9s  widget boards fade up.
+   *
+   * Runs once per session, off the splash fade — not off the clip ending —
+   * so the icons don't fly in behind a still-up last frame.
+   */
+  _revealShellChrome() {
+    if (this._shellChromeRevealed) return;
+    this._shellChromeRevealed = true;
+    this._hideBootHud();
+    const splash = window.HavalSplash;
+    const afterFade = ((splash && splash.fadeMs) || 0) + 100;
+
+    this._launcherRevealTimer = setTimeout(() => {
+      try {
+        const bridge = window.AppLauncherBridge;
+        if (bridge && typeof bridge.revealLauncher === 'function') bridge.revealLauncher();
+      } catch (e) {
+        console.warn('[Shell] revealLauncher failed', e);
+      }
+    }, afterFade);
+
+    this._widgetRevealTimer = setTimeout(() => {
+      document.body.classList.remove('hv-boot');
+    }, afterFade + 2000);
   }
 
   _shouldShowCar() {
@@ -9889,9 +11773,23 @@ class Component extends DCLogic {
     }
   }
 
+  /**
+   * The two front-on camera poses the splash hand-off runs between.
+   *
+   * `front` is the car dead-centre, front-on, at the normal framing distance.
+   * Measured against the last frame of assets/app-splash.mp4 this puts the car
+   * within ~15% of the size it is in the clip (32% of viewport width at 16:9,
+   * ~21% at the MMI's ~2.7:1 — the letterboxed clip holds it at ~27% and ~18%),
+   * so the cross-fade reads as one continuous shot rather than a cut.
+   *
+   * `revealStart` is the same pose pulled back by REVEAL_PULLBACK. Easing that
+   * small gap out during the fade keeps the camera moving into the car the way
+   * the clip was, instead of snapping to a dead stop the instant it ends.
+   */
   _introFrontPoses() {
     if (!this._fitCenter || !this._fitDist) return null;
     const THREE = window.THREE;
+    const REVEAL_PULLBACK = 1.12;
     const { F } = this._carBasis();
     const c = this._fitCenter.clone();
     const distMul = (this._fitCam && this._fitCam.distMul != null) ? this._fitCam.distMul : 1;
@@ -9902,16 +11800,22 @@ class Component extends DCLogic {
     const elev = this._fitDist * 0.12;
     return {
       center: c,
-      near: c.clone().addScaledVector(F, defaultDist).add(new THREE.Vector3(0, elev, 0)),
-      far: c.clone().addScaledVector(F, defaultDist * 2.75).add(new THREE.Vector3(0, elev * 1.15, 0)),
+      front: c.clone().addScaledVector(F, defaultDist).add(new THREE.Vector3(0, elev, 0)),
+      revealStart: c.clone()
+        .addScaledVector(F, defaultDist * REVEAL_PULLBACK)
+        .add(new THREE.Vector3(0, elev * REVEAL_PULLBACK, 0)),
       defaultDist,
     };
   }
 
+  /**
+   * Put the camera on the reveal's opening pose while the splash is still up, so
+   * the very first frame the car is visible in is already the right one.
+   */
   _parkIntroCamera() {
     const poses = this._introFrontPoses();
     if (!poses || !this.camera || !this.controls) return;
-    this.camera.position.copy(poses.far);
+    this.camera.position.copy(poses.revealStart);
     this.controls.target.copy(poses.center);
     this.camera.near = Math.max(0.05, poses.defaultDist / 120);
     this.camera.far = Math.max(200, poses.defaultDist * 120);
@@ -9921,9 +11825,75 @@ class Component extends DCLogic {
     if (this.requestRender) this.requestRender(2);
   }
 
+  /**
+   * This WebView ignores CSS `inset`. A `position:fixed` root with no
+   * top/left/width/height then collapses to 0×0, so the WebGL canvas is
+   * 0×0 and the scene is black once the splash overlay is gone.
+   */
+  _forceViewerLayout() {
+    const w = window.innerWidth || 1920;
+    const h = window.innerHeight || 720;
+    const root = document.getElementById('hv-root');
+    if (root) {
+      root.style.position = 'fixed';
+      root.style.top = '0px';
+      root.style.left = '0px';
+      root.style.right = '0px';
+      root.style.bottom = '0px';
+      root.style.width = w + 'px';
+      root.style.height = h + 'px';
+    }
+    const box = this.containerRef && this.containerRef.current;
+    if (box) {
+      box.style.position = 'absolute';
+      box.style.top = '0px';
+      box.style.left = '0px';
+      box.style.width = '100%';
+      box.style.height = '100%';
+    }
+  }
+
+  _kickIntroReveal() {
+    if (this._unmounted || this._introPlayed) return;
+    if (this.state.loading || this.state.error) return;
+    this._introWaitingForLoader = false;
+    this._pendingIntro = false;
+    const splash = window.HavalSplash;
+    // Pull the hole-punched <video> off screen FIRST. Drawing the car while
+    // that overlay is up wastes frames into a discarded buffer (mobile
+    // preserveDrawingBuffer is off) and a later layer-type switch used to
+    // kill the GL context — both look like a black screen.
+    if (splash && splash.forceHold) splash.forceHold();
+    if (splash && splash.fadeOut) splash.fadeOut();
+    this.setState({ splashActive: false });
+    this._forceViewerLayout();
+    try {
+      this._setCarSceneVisible(true);
+      if (this._onResize) this._onResize();
+      if (this.renderOnce) this.renderOnce();
+      if (this.requestRender) this.requestRender(30);
+    } catch (e) { console.warn('[Splash] reveal draw failed', e); }
+    if (this.model && this.camera && this.controls && this._fitCenter && this._fitDist) {
+      this._startIntroAnimation();
+    }
+    this._revealShellChrome();
+    this._introPlayed = true;
+  }
+
+  /**
+   * Hand off from the boot splash to the live model.
+   *
+   * The old version of this played the whole opening in 3D: park far out in
+   * front, dolly in, flash the headlights twice, then orbit to home. All of
+   * that now lives in assets/app-splash.mp4, which is why only the orbit is
+   * left here. Two gates have to clear first — the model has to be loaded
+   * (`state.loading`) and the clip has to have finished (`HavalSplash`) — and
+   * either can win the race, so each one re-enters this method when it clears.
+   */
   _startIntroAnimation() {
     if (this._introPlayed || !this.model || !this.camera || !this.controls) return;
     if (!this._fitCenter || !this._fitDist) return;
+    const splash = window.HavalSplash;
     // Don't start under the loading overlay.
     if (this.state.loading) {
       this._introWaitingForLoader = true;
@@ -9932,28 +11902,44 @@ class Component extends DCLogic {
     // APP+APP has no car — skip intro until a car layout is selected.
     if (!this._shouldShowCar()) {
       this._setCarSceneVisible(false);
+      if (splash && splash.fadeOut) splash.fadeOut();
+      this.setState({ splashActive: false });
+      this._revealShellChrome();
+      this._introPlayed = true;
       return;
     }
+    if (splash && splash.forceHold) splash.forceHold();
+
     this._introPlayed = true;
     this._introActive = true;
+    if (this._introKickTimer) {
+      clearTimeout(this._introKickTimer);
+      this._introKickTimer = null;
+    }
+    // The reveal won the race against the bounded-hold cap in componentDidMount.
+    clearTimeout(this._splashHoldTimer);
     this._fitCamTo = null;
     this._camAnim = null;
     if (this.controls) this.controls.enabled = false;
 
-    // Reveal only now that loading is done and the intro is about to run.
-    this._setCarSceneVisible(true);
-
-    // Camera-only intro — never translate the model (wheels bake _initWorld).
-    // 1) Front-centered, far  →  dolly in to default framing distance
-    // 2) Headlight flash
-    // 3) Orbit to the normal top-side (home) pose
+    // Camera-only reveal — never translate the model (wheels bake _initWorld).
     if (this._modelHomePos) this.model.position.copy(this._modelHomePos);
     else this._modelHomePos = this.model.position.clone();
 
     if (!this._fitCam) this._fitCam = this._shellCameraTarget(!!window.__androidPopupActive);
     const poses = this._introFrontPoses();
-    if (!poses) return;
-    this.camera.position.copy(poses.far);
+    if (!poses) {
+      // Can't frame the reveal — don't leave the viewer mid-intro with the car
+      // hidden and the controls locked. Show it and hand control straight back.
+      this._introActive = false;
+      if (this.controls) this.controls.enabled = true;
+      this._setCarSceneVisible(true);
+      if (splash && splash.fadeOut) splash.fadeOut();
+      this.setState({ splashActive: false });
+      this._revealShellChrome();
+      return;
+    }
+    this.camera.position.copy(poses.revealStart);
     this.controls.target.copy(poses.center);
     this.camera.near = Math.max(0.05, poses.defaultDist / 120);
     this.camera.far = Math.max(200, poses.defaultDist * 120);
@@ -9961,12 +11947,23 @@ class Component extends DCLogic {
     this._applyShellViewOffset(0);
     this.controls.update();
 
+    // Show the car and draw it at the front pose BEFORE the splash starts
+    // fading, so the clip dissolves into a real frame rather than into whatever
+    // the canvas last held.
+    this._setCarSceneVisible(true);
+    if (this.renderOnce) { try { this.renderOnce(); } catch (e) {} }
+    if (splash && splash.fadeOut) splash.fadeOut();
+    this.setState({ splashActive: false });
+    this._revealShellChrome();
+
+    // 1) settle: ease the last of the clip's approach out under the cross-fade
+    // 2) orbit:  swing round to the normal top-side (home) framing
     this._intro = {
-      phase: 'approach',
+      phase: 'settle',
       t: 0,
-      camFrom: poses.far.clone(),
+      camFrom: poses.revealStart.clone(),
       camFromTarget: poses.center.clone(),
-      camTo: poses.near.clone(),
+      camTo: poses.front.clone(),
       camToTarget: poses.center.clone(),
     };
     if (this.requestRender) this.requestRender(240);
@@ -9974,7 +11971,6 @@ class Component extends DCLogic {
 
   _endIntroAnimation() {
     if (this.model && this._modelHomePos) this.model.position.copy(this._modelHomePos);
-    this._restoreHeadlightsAfterFlash();
     this._intro = null;
     this._introActive = false;
     this._camAnim = null;
@@ -10001,60 +11997,31 @@ class Component extends DCLogic {
       this.controls.update();
     };
 
-    if (intro.phase === 'approach') {
-      // Dolly zoom: front-centered far → front-centered at default distance.
-      const dur = 2.2;
+    if (intro.phase === 'settle') {
+      // Runs under the splash cross-fade (800ms), and slightly longer than it so
+      // the camera is still drifting in when the clip is fully gone.
+      const dur = 1.1;
       const u = Math.min(1, intro.t / dur);
       const e = 1 - Math.pow(1 - u, 3);
       applyCamLerp(intro.camFrom, intro.camTo, intro.camFromTarget, intro.camToTarget, e, 0);
       if (u >= 1) {
         this.camera.position.copy(intro.camTo);
         this.controls.target.copy(intro.camToTarget);
-        intro.phase = 'flash';
-        intro.t = 0;
-        intro.flashOn = false;
-        this._setHeadlightFlash(false);
-      }
-      return true;
-    }
-
-    if (intro.phase === 'flash') {
-      // Double flash: on → off → on → off, then orbit to top-side home.
-      const steps = [
-        { at: 0.00, on: true },
-        { at: 0.14, on: false },
-        { at: 0.28, on: true },
-        { at: 0.42, on: false },
-        { at: 0.62, done: true },
-      ];
-      let desired = false;
-      for (let i = 0; i < steps.length; i++) {
-        if (intro.t >= steps[i].at) {
-          if (steps[i].done) {
-            intro.flashOn = false;
-            this._restoreHeadlightsAfterFlash();
-            const home = this._homeCameraPose();
-            if (!home) {
-              this._endIntroAnimation();
-              return true;
-            }
-            // Same camera-only strategy as the dolly: lerp pose, don't move meshes.
-            intro.phase = 'orbit';
-            intro.t = 0;
-            intro.camFrom = this.camera.position.clone();
-            intro.camFromTarget = this.controls.target.clone();
-            intro.camTo = home.position.clone();
-            intro.camToTarget = home.target.clone();
-            intro.viewShiftFrom = 0;
-            intro.viewShiftTo = (this._fitCam && this._fitCam.viewShift) || 0;
-            return true;
-          }
-          desired = !!steps[i].on;
+        const home = this._homeCameraPose();
+        if (!home) {
+          this._endIntroAnimation();
+          return true;
         }
-      }
-      if (desired !== intro.flashOn) {
-        intro.flashOn = desired;
-        this._setHeadlightFlash(desired);
+        intro.phase = 'orbit';
+        intro.t = 0;
+        intro.camFrom = this.camera.position.clone();
+        intro.camFromTarget = this.controls.target.clone();
+        intro.camTo = home.position.clone();
+        intro.camToTarget = home.target.clone();
+        intro.viewShiftFrom = 0;
+        intro.viewShiftTo = (home.viewShift != null)
+          ? home.viewShift
+          : ((this._fitCam && this._fitCam.viewShift) || 0);
       }
       return true;
     }
@@ -10085,11 +12052,38 @@ class Component extends DCLogic {
     });
   }
 
+  _applyFpsVisibility(show) {
+    if (this._fpsEl) this._fpsEl.style.display = show ? '' : 'none';
+  }
+
+  _applySafeInsetVars() {
+    const el = this.outerRef && this.outerRef.current;
+    if (!el) return;
+    if (this._safeTopPx != null) el.style.setProperty('--hv-safe-top', this._safeTopPx + 'px');
+    if (this._safeLeftPx != null) el.style.setProperty('--hv-safe-left', this._safeLeftPx + 'px');
+    if (this._safeRightPx != null) el.style.setProperty('--hv-safe-right', this._safeRightPx + 'px');
+    if (this._safeBottomPx != null) el.style.setProperty('--hv-safe-bottom', this._safeBottomPx + 'px');
+    if (this._launcherBottomPx != null) el.style.setProperty('--hv-launcher-bottom', this._launcherBottomPx + 'px');
+  }
+
   applyShellLayout(layout) {
     const next = layout || {};
     this._shellLeft = !!next.left;
     if (next.leftBounds) this._shellLeftBounds = next.leftBounds;
     if (next.rightBounds) this._shellRightBounds = next.rightBounds;
+    // Side band kept clear for chrome/widgets/icons. The WebView stays full-bleed,
+    // so the 3D background still runs edge to edge behind it.
+    if (typeof next.safeLeft === 'number') this._safeLeftPx = next.safeLeft;
+    if (typeof next.safeRight === 'number') this._safeRightPx = next.safeRight;
+    // Native owns this: it is 22 when the window starts below the MMI header, and
+    // header-height + 22 when the header floats over our content instead.
+    if (typeof next.safeTop === 'number') this._safeTopPx = next.safeTop;
+    if (typeof next.safeBottom === 'number') this._safeBottomPx = next.safeBottom;
+    if (typeof next.launcherBottom === 'number') this._launcherBottomPx = next.launcherBottom;
+    // Push the insets straight onto the element as well. The loading guard below
+    // skips setState for the whole GLB pipeline, so a render-only path would keep
+    // the startup frame at the defaults — chrome under the header, no side band.
+    this._applySafeInsetVars();
     // Any shell notify from native implies the Android shell is active.
     if (next.right === 'idle' || next.right === 'app') {
       this._androidApp = true;
@@ -10106,6 +12100,10 @@ class Component extends DCLogic {
       this._pendingSlotSync = false;
       this._syncSlotUseToNative();
     }
+    // An occupying freeform app claims the slot; dismissing it leaves use as
+    // 'app' so the board returns and the strip can launch here again.
+    if (this._shellLeft) this._claimSlotUse('left', 'app', mode);
+    if (this._shellRight === 'app') this._claimSlotUse('right', 'app', mode);
     const patch = {
       mediaLeftOpen: this._shellLeft,
       mediaRight: this._shellRight,
@@ -10136,18 +12134,11 @@ class Component extends DCLogic {
 
   _setShellMode(mode) {
     this._shellMode = mode;
+    this._cancelWidgetPicker();
     this.setState({
       shellMode: mode,
       shellMenuOpen: false,
-      widgetPickerStep: null,
-      widgetPlaceSide: null,
     });
-    // Menu is gone — hand the z-order back to the freeform slots.
-    try {
-      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setChromeOnTop === 'function') {
-        window.AppLauncherBridge.setChromeOnTop(false);
-      }
-    } catch (e) {}
     this._applyFitCamera();
     this._syncCarSceneForShell();
     try {
@@ -10170,10 +12161,10 @@ class Component extends DCLogic {
 
   _widgetCatalog() {
     return {
-      media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2]] },
+      media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2]] },
       power: { label: 'POWER', title: 'Power', hint: 'Draft — coming next', sizes: [[1, 1], [2, 1], [3, 1], [2, 2]] },
-      modes: { label: 'MODES', title: 'Car modes', hint: 'Draft — coming next', sizes: [[2, 1], [3, 1], [1, 2]] },
-      graphs: { label: 'GRAPHS', title: 'Graphs', hint: 'Draft — coming next', sizes: [[2, 1], [3, 1], [2, 2], [3, 2]] },
+      modes: { label: 'MODES', title: 'Car modes', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2]] },
+      graphs: { label: 'GRAPHS', title: 'Power', hint: '', sizes: [[2, 1], [3, 1], [2, 2], [3, 2]] },
     };
   }
 
@@ -10260,16 +12251,30 @@ class Component extends DCLogic {
 
   _widgetItemView(item, side) {
     const cat = this._widgetCatalog()[item.type] || { label: (item.type || '').toUpperCase(), title: item.type, hint: '' };
-    return {
+    const view = {
       id: item.id,
       label: cat.label,
       stubTitle: cat.title,
       stubHint: cat.hint || 'Draft — coming next',
       isMedia: item.type === 'media',
-      isStub: item.type !== 'media',
+      isModes: item.type === 'modes',
+      isGraphs: item.type === 'graphs',
+      isStub: item.type !== 'media' && item.type !== 'modes' && item.type !== 'graphs',
+      mediaSizeClass: item.type === 'media' ? ('hv-media-' + (item.w || 2) + 'x' + (item.h || 1)) : '',
+      modeSizeClass: '',
+      graphSizeClass: '',
+      graphShowBars: false,
+      isModeWide: false,
+      isModeStack: false,
+      modeRows: [],
+      modeWideKickers: [],
+      modeWideLines: [],
       gridStyle: 'grid-column:' + (item.x + 1) + ' / span ' + item.w + ';grid-row:' + (item.y + 1) + ' / span ' + item.h,
       onRemove: () => this._removeWidget(side, item.id),
     };
+    if (item.type === 'modes') Object.assign(view, this._modeWidgetView(item));
+    if (item.type === 'graphs') Object.assign(view, this._graphWidgetView(item));
+    return view;
   }
 
   _fits(items, cols, x, y, w, h, ignoreId) {
@@ -10311,10 +12316,11 @@ class Component extends DCLogic {
     const rightApp = this._shellRight === 'app';
     const leftUse = (this._board('left', mode).use) || s.leftSlotUse || 'app';
     const rightUse = (this._board('right', mode).use) || s.rightSlotUse || 'app';
-    const showLeft = android && (mode === 'triple' || mode === 'appCar' || mode === 'appsOnly')
-      && !(leftApp && leftUse === 'app');
-    const showRight = android && mode !== 'appCar' && !s.configExpanded
-      && !(rightApp && rightUse === 'app');
+    // Boards are always on: an app launched into a slot is a freeform window that
+    // floats above them, so the widgets stay put underneath instead of being
+    // swapped out. (The old per-slot app/widgets switch is gone.)
+    const showLeft = android && (mode === 'triple' || mode === 'appCar' || mode === 'appsOnly');
+    const showRight = android && mode !== 'appCar' && !s.configExpanded;
     const leftRect = this._rectCss(this._shellLeftBounds, { l: 48, t: 100, r: 740, b: 530 });
     const rightRect = this._rectCss(this._shellRightBounds, { l: 1180, t: 100, r: 1872, b: 530 });
     const cols = this._gridColsForMode(mode);
@@ -10324,8 +12330,12 @@ class Component extends DCLogic {
     if (s.widgetPickerStep === 'type') {
       const cat = this._widgetCatalog();
       const usedMedia = this._hasWidgetType(mode, 'media');
+      const usedModes = this._hasWidgetType(mode, 'modes');
+      const usedGraphs = this._hasWidgetType(mode, 'graphs');
       pickerItems = Object.keys(cat).map((key) => {
-        const blocked = key === 'media' && usedMedia;
+        const blocked = (key === 'media' && usedMedia)
+          || (key === 'modes' && usedModes)
+          || (key === 'graphs' && usedGraphs);
         return {
           label: cat[key].label + (blocked ? '  ·  added' : ''),
           opacity: blocked ? '0.35' : '1',
@@ -10352,6 +12362,7 @@ class Component extends DCLogic {
           onClick: () => this._pickWidgetSize(sz[0], sz[1]),
         }));
     }
+    this._syncGraphLoop(this._hasWidgetType(mode, 'graphs'));
     return {
       leftBoardDisplay: showLeft ? 'flex' : 'none',
       rightBoardDisplay: showRight ? 'flex' : 'none',
@@ -10365,24 +12376,23 @@ class Component extends DCLogic {
       rightBoardHeight: rightRect.height,
       leftGridCols: 'repeat(' + cols + ', 1fr)',
       rightGridCols: 'repeat(' + cols + ', 1fr)',
-      leftUseAppClass: leftUse === 'app' ? 'on' : '',
-      leftUseWidClass: leftUse === 'widgets' ? 'on' : '',
-      rightUseAppClass: rightUse === 'app' ? 'on' : '',
-      rightUseWidClass: rightUse === 'widgets' ? 'on' : '',
+      leftAddClass: this._widgetAddingOn('left') ? 'on' : '',
+      rightAddClass: this._widgetAddingOn('right') ? 'on' : '',
       leftWidgetItems: (this._board('left', mode).items || []).map((it) => this._widgetItemView(it, 'left')),
       rightWidgetItems: (this._board('right', mode).items || []).map((it) => this._widgetItemView(it, 'right')),
       leftPlaceCells: this._placeCells('left'),
       rightPlaceCells: this._placeCells('right'),
-      setLeftSlotApp: () => this._setSlotUse('left', 'app'),
-      setLeftSlotWidgets: () => this._setSlotUse('left', 'widgets'),
-      setRightSlotApp: () => this._setSlotUse('right', 'app'),
-      setRightSlotWidgets: () => this._setSlotUse('right', 'widgets'),
       addWidgetLeft: () => this._openWidgetPicker('left'),
       addWidgetRight: () => this._openWidgetPicker('right'),
       widgetPickerDisplay: pickerOpen ? 'block' : 'none',
       widgetPickerTitle: pickerTitle,
       widgetPickerItems: pickerItems,
     };
+  }
+
+  _widgetAddingOn(side) {
+    const s = this.state;
+    return s.widgetPlaceSide === side && !!(s.widgetPickerStep || s.widgetPlaceType);
   }
 
   _hasWidgetType(mode, type) {
@@ -10392,6 +12402,17 @@ class Component extends DCLogic {
   }
 
   _openWidgetPicker(side) {
+    if (this._widgetAddingOn(side)) {
+      this._cancelWidgetPicker();
+      return;
+    }
+    if (this.state.widgetPlaceSide && this.state.widgetPlaceSide !== side) {
+      this._cancelWidgetPicker();
+    }
+    const board = this._board(side);
+    this._slotUseBeforePicker = board.use || 'app';
+    this._widgetPickerCommitted = false;
+    this._setSlotUse(side, 'widgets');
     this.setState({
       widgetPickerStep: 'type',
       widgetPlaceSide: side,
@@ -10399,6 +12420,24 @@ class Component extends DCLogic {
       widgetPlaceW: 0,
       widgetPlaceH: 0,
     });
+  }
+
+  _cancelWidgetPicker() {
+    const side = this.state.widgetPlaceSide;
+    const restore = this._slotUseBeforePicker;
+    const had = !!(this.state.widgetPickerStep || this.state.widgetPlaceType || side);
+    this._slotUseBeforePicker = null;
+    if (!had) return;
+    this.setState({
+      widgetPickerStep: null,
+      widgetPlaceSide: null,
+      widgetPlaceType: null,
+      widgetPlaceW: 0,
+      widgetPlaceH: 0,
+    });
+    if (side && !this._widgetPickerCommitted) {
+      this._setSlotUse(side, restore || 'app');
+    }
   }
 
   _pickWidgetType(type) {
@@ -10416,7 +12455,7 @@ class Component extends DCLogic {
         return false;
       });
     if (!sizes.length) {
-      this.setState({ widgetPickerStep: null });
+      this._cancelWidgetPicker();
       return;
     }
     if (sizes.length === 1) {
@@ -10440,11 +12479,14 @@ class Component extends DCLogic {
     const board = this._board(side, mode);
     const type = this.state.widgetPlaceType;
     if (!type) return;
+    this._widgetPickerCommitted = true;
+    this._slotUseBeforePicker = null;
     board.items = (board.items || []).concat([{
       id: 'w-' + type + '-' + Date.now().toString(36),
       type, x, y, w, h,
     }]);
     this._persistWidgets();
+    this._setSlotUse(side, 'widgets');
     this.setState({
       widgetRev: (this.state.widgetRev || 0) + 1,
       widgetPlaceSide: null,
@@ -10459,21 +12501,24 @@ class Component extends DCLogic {
     const board = this._board(side);
     board.items = (board.items || []).filter((it) => it.id !== id);
     this._persistWidgets();
-    this.setState({ widgetRev: (this.state.widgetRev || 0) + 1 });
+    if (!(board.items || []).length) this._setSlotUse(side, 'app');
+    else this.setState({ widgetRev: (this.state.widgetRev || 0) + 1 });
   }
 
   _setSlotUse(side, use) {
     const mode = this.state.shellMode || 'triple';
     const board = this._board(side, mode);
-    board.use = use === 'widgets' ? 'widgets' : 'app';
+    const next = use === 'widgets' ? 'widgets' : 'app';
+    const stateKey = side === 'right' ? 'rightSlotUse' : 'leftSlotUse';
+    if (board.use === next && this.state[stateKey] === next) return;
+    board.use = next;
     this._persistWidgets();
     const patch = { widgetRev: (this.state.widgetRev || 0) + 1 };
-    if (side === 'right') patch.rightSlotUse = board.use;
-    else patch.leftSlotUse = board.use;
+    patch[stateKey] = next;
     this.setState(patch);
     try {
       if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setSlotUse === 'function') {
-        window.AppLauncherBridge.setSlotUse(side, board.use);
+        window.AppLauncherBridge.setSlotUse(side, next);
       }
     } catch (e) {}
   }
@@ -10590,7 +12635,7 @@ class Component extends DCLogic {
       Object.assign(patch, this._pendingShellPatch);
       this._pendingShellPatch = null;
     }
-    this.setState(patch);
+    this.setState(patch, () => { this._kickIntroReveal(); });
     this._notifyViewerReady();
     const pendingMedia = this._pendingMediaPayload;
     this._pendingMediaPayload = null;
@@ -10778,6 +12823,13 @@ class Component extends DCLogic {
   componentWillUnmount() {
     this._unmounted = true;
     clearTimeout(this._saveFlashTimer);
+    clearTimeout(this._launcherRevealTimer);
+    clearTimeout(this._widgetRevealTimer);
+    clearTimeout(this._splashHoldTimer);
+    clearTimeout(this._introKickTimer);
+    clearTimeout(this._warmupIdleTimer);
+    clearTimeout(this._warmupFallbackTimer);
+    clearInterval(this._perfReportTimer);
     this._hdriRequestId = (this._hdriRequestId || 0) + 1;
     if (this._raf) cancelAnimationFrame(this._raf);
     if (this._warmupRaf) cancelAnimationFrame(this._warmupRaf);
@@ -10787,6 +12839,7 @@ class Component extends DCLogic {
 
     if (this.controls && this.controls.dispose) this.controls.dispose();
     if (this._dracoLoader && this._dracoLoader.dispose) this._dracoLoader.dispose();
+    if (this._ktx2Loader && this._ktx2Loader.dispose) this._ktx2Loader.dispose();
     this._disposeThumbRenderer();
     this._disposeCustomWheelResources();
 
