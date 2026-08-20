@@ -179,6 +179,15 @@ final class MediaNowPlaying {
         carPlay.stop();
     }
 
+    boolean hasAndroidAutoTrack() {
+        return mediaCenterTrack != null && mediaCenterTrack.hasTrack()
+                && "ANDROID AUTO".equals(mediaCenterTrack.appLabel);
+    }
+
+    boolean hasCarPlayTrack() {
+        return carPlayTrack != null && carPlayTrack.hasTrack();
+    }
+
     /** Force a full payload — the page reloaded and has nothing on screen yet. */
     void pushNow() {
         lastPayloadSignature = "";

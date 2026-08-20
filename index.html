@@ -12,7 +12,7 @@
      below, because the helmet's styles are only injected once the template
      mounts — by then the WebView has already painted a frame, and anything but
      black there is a visible flash before the clip appears. */
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; --hv-launcher-bottom: 60px; }
   /* support.js hides the source template with `x-dc{display:none}`. If a refetch
      accidentally nests that tag inside #dc-root, keep its children in layout. */
   #dc-root x-dc { display: contents !important; }
@@ -42,7 +42,7 @@
   #hv-splash.hv-splash-holding canvas { display: block; }
   #hv-splash-skip {
     position: absolute; z-index: 20; pointer-events: auto;
-    left: 24px; bottom: 20px;
+    left: 14px; bottom: var(--hv-launcher-bottom, 60px);
     padding: 8px 16px;
     border: 1px solid rgba(255,255,255,.28);
     border-radius: 4px;
@@ -503,19 +503,23 @@ window.HavalSplash = (function () {
     .hv-toolbar {
       scrollbar-width: none;
       -ms-overflow-style: none;
-      flex-direction: column !important;
-      align-items: flex-end;
+      position: relative !important;
+      top: auto !important;
+      right: auto !important;
+      left: auto !important;
+      flex-direction: row !important;
+      align-items: flex-start;
       overflow: visible !important;
-      max-width: min(72vw, 520px) !important;
-      transition: right 0.18s ease, top 0.18s ease;
+      max-width: none !important;
+      flex-shrink: 0;
     }
     .hv-toolbar-row {
       display: flex;
       flex-direction: row;
       align-items: flex-start;
-      justify-content: flex-end;
+      justify-content: flex-start;
       gap: 8px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
     .hv-tool-stack {
       display: flex;
@@ -545,6 +549,18 @@ window.HavalSplash = (function () {
       gap: 4px !important;
       box-sizing: border-box;
       text-align: center;
+      background: rgba(18,18,20,.40);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 4px 18px rgba(0,0,0,.22);
+    }
+    .hv-toolbar button.hv-tool-btn.hv-tool-btn-icon {
+      height: 58px !important;
+      padding: 0 !important;
+      gap: 0 !important;
+    }
+    .hv-toolbar button.hv-tool-btn.hv-tool-btn-icon .hv-tool-label {
+      display: none;
     }
     .hv-toolbar button.hv-tool-btn.hv-tool-btn-text {
       gap: 0 !important;
@@ -585,11 +601,145 @@ window.HavalSplash = (function () {
       text-align: center;
       pointer-events: none;
     }
+    .hv-wheel-catalog {
+      display: grid;
+      gap: 4px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 6px;
+      padding-right: 2px;
+      min-height: 0;
+    }
+    .hv-wheel-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 3px 2px 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .hv-wheel-card img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: contain;
+      border-radius: 4px;
+      background: rgba(255,255,255,.04);
+    }
+    .hv-wheel-card span {
+      font-family: 'Space Mono', monospace;
+      font-size: 7px;
+      letter-spacing: .02em;
+      text-align: center;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+    .hv-config-dock {
+      position: absolute;
+      z-index: 22;
+      pointer-events: auto;
+      min-width: 0;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+    .hv-config-dock .hv-config-panel {
+      position: relative !important;
+      top: auto !important;
+      right: auto !important;
+      width: 100% !important;
+      height: 100%;
+      max-height: none;
+      box-sizing: border-box;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
     .hv-config-panel {
       height: auto;
       max-height: calc(100vh - 182px);
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+    }
+    /* MMI WebView: a finger-drag on a range inside overflow-y:auto is treated
+       as a panel scroll, so the thumb never moves. pan-x + a larger thumb. */
+    .hv-config-panel input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 32px;
+      margin: 0;
+      background: transparent;
+      touch-action: pan-x;
+    }
+    .hv-config-panel input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      background: rgba(79, 214, 232, 0.22);
+      border-radius: 3px;
+    }
+    .hv-config-panel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 28px;
+      height: 28px;
+      margin-top: -11px;
+      border-radius: 50%;
+      background: #4fd6e8;
+      border: 0;
+    }
+    /* Custom SPEED control: Android 9 WebView never delivers drag on native
+       <input type="range"> inside overflow-y:auto. Track + ± buttons instead. */
+    .hv-range-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 14px;
+    }
+    .hv-range-nudge {
+      flex: 0 0 36px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid rgba(79,214,232,.35);
+      background: rgba(79,214,232,.10);
+      color: #4fd6e8;
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .hv-range {
+      position: relative;
+      flex: 1;
+      height: 36px;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .hv-range-track {
+      position: absolute;
+      left: 0; right: 0; top: 50%;
+      height: 6px;
+      margin-top: -3px;
+      border-radius: 3px;
+      background: rgba(79, 214, 232, 0.22);
+      pointer-events: none;
+    }
+    .hv-range-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 50%;
+      border-radius: 3px;
+      background: rgba(79, 214, 232, 0.55);
+    }
+    .hv-range-thumb {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 28px;
+      height: 28px;
+      margin: -14px 0 0 -14px;
+      border-radius: 50%;
+      background: #4fd6e8;
+      pointer-events: none;
     }
     /* Slightly larger panel type without rewriting every inline size. */
     .hv-config-panel { font-size: 13px; }
@@ -618,7 +768,6 @@ window.HavalSplash = (function () {
     }
     @media (max-width: 640px) {
       .hv-toolbar button.hv-tool-btn { width: 54px !important; min-width: 54px !important; }
-      .hv-config-panel { top: var(--hv-safe-top, 22px) !important; right: 14px !important; max-height: calc(100vh - 182px); height: auto; }
     }
     .hv-widget-board {
       position: absolute;
@@ -640,6 +789,7 @@ window.HavalSplash = (function () {
        going. pointer-events off too, so an invisible board can't swallow a tap
        in the meantime. */
     body.hv-boot .hv-widget-board { opacity: 0; pointer-events: none; }
+    body.hv-boot .hv-page-stub { opacity: 0; }
     .hv-widget-toolbar {
       display: flex;
       flex-direction: row;
@@ -651,9 +801,9 @@ window.HavalSplash = (function () {
       height: 26px;
       padding: 0 10px;
       border-radius: 8px;
-      border: 1px solid rgba(79,214,232,.35);
-      background: rgba(16,21,28,.72);
-      color: #4fd6e8;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(18,18,20,.40);
+      color: rgba(255,255,255,.82);
       font-family: 'Space Mono', monospace;
       font-size: 9px;
       letter-spacing: .1em;
@@ -662,7 +812,7 @@ window.HavalSplash = (function () {
       align-items: center;
       gap: 6px;
     }
-    .hv-widget-add.on { border-color: #4fd6e8; background: rgba(79,214,232,.16); }
+    .hv-widget-add.on { border-color: rgba(255,255,255,.48); background: rgba(255,255,255,.12); color: #fff; }
     .hv-widget-grid {
       position: relative;
       flex: 1;
@@ -681,6 +831,10 @@ window.HavalSplash = (function () {
       backdrop-filter: blur(22px) saturate(1.25);
       -webkit-backdrop-filter: blur(22px) saturate(1.25);
       box-shadow: 0 14px 40px rgba(0,0,0,.22);
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: manipulation;
     }
     .hv-widget-remove {
       position: absolute;
@@ -727,17 +881,26 @@ window.HavalSplash = (function () {
       padding: 8px 10px;
       box-sizing: border-box;
       display: grid;
-      gap: 6px;
+      gap: 8px;
       touch-action: pan-y;
+    }
+    .hv-modes-1x1 {
+      grid-template-rows: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      padding: 6px 8px;
     }
     .hv-modes-1x2,
     .hv-modes-2x2,
     .hv-modes-3x2 {
       grid-template-rows: 3fr 1fr 1fr 1fr;
     }
+    .hv-modes-2x2 { gap: 18px; }
     .hv-modes-2x1,
     .hv-modes-3x1 {
-      grid-template-rows: auto 1fr 1fr 1fr;
+      grid-template-columns: 3fr 1fr 1fr 1fr;
+      grid-template-rows: minmax(0, 1fr);
+      column-gap: 10px;
+      row-gap: 0;
     }
     .hv-modes-row {
       min-height: 0;
@@ -745,7 +908,7 @@ window.HavalSplash = (function () {
       display: grid;
       gap: 4px;
     }
-    .hv-modes-row.drive { grid-template-rows: auto 1fr 1fr 1fr; }
+    .hv-modes-row.drive { grid-template-rows: auto 1fr 1fr 1fr; gap: 6px; }
     .hv-modes-row:not(.drive) { grid-template-rows: auto 1fr; }
     .hv-modes-kicker {
       font-family: 'Space Mono', monospace;
@@ -794,23 +957,23 @@ window.HavalSplash = (function () {
       visibility: hidden;
       pointer-events: none;
     }
-    .hv-modes-wide-kickers {
+    .hv-modes-wide-col {
+      min-width: 0;
+      min-height: 0;
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-rows: auto 1fr;
       gap: 4px;
     }
-    .hv-modes-wide-kicker {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: .14em;
-      opacity: .5;
+    .hv-modes-wide-col .hv-modes-chips.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: repeat(3, minmax(0, 1fr));
     }
-    .hv-modes-wide-kicker.span3 { grid-column: span 3; }
-    .hv-modes-wide-grid { display: contents; }
-    .hv-modes-2x1 .hv-modes-chips,
-    .hv-modes-3x1 .hv-modes-chips {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+    .hv-modes-wide-col .hv-modes-chips.cols-1 {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: repeat(3, minmax(0, 1fr));
     }
+    .hv-modes-1x1 .hv-modes-kicker { font-size: 7px; }
+    .hv-modes-1x1 .hv-modes-chip { font-size: 10px; padding: 0 2px; }
     .hv-modes-1x2 .hv-modes-chip,
     .hv-modes-2x2 .hv-modes-chip,
     .hv-modes-3x2 .hv-modes-chip { font-size: 12px; }
@@ -819,11 +982,17 @@ window.HavalSplash = (function () {
       top: 0; right: 0; bottom: 0; left: 0;
       min-height: 0;
       overflow: hidden;
-      padding: 10px 12px 8px;
+      padding: 8px 10px 6px;
       box-sizing: border-box;
       display: grid;
-      grid-template-rows: auto 1fr;
       gap: 6px;
+    }
+    .hv-graphs-pane {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 3px;
     }
     .hv-graphs-head {
       display: flex;
@@ -837,6 +1006,9 @@ window.HavalSplash = (function () {
       font-size: 8px;
       letter-spacing: .14em;
       opacity: .5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .hv-graphs-readout {
       display: flex;
@@ -844,23 +1016,28 @@ window.HavalSplash = (function () {
       gap: 6px;
       min-width: 0;
       font-family: 'Space Mono', monospace;
+      flex-shrink: 0;
     }
     .hv-graphs-mode {
-      font-size: 9px;
+      font-size: 8px;
       letter-spacing: .12em;
       opacity: .45;
     }
-    .hv-graphs-mode.regen { opacity: .85; color: #f2f5f8; }
+    .hv-graphs-mode.regen { opacity: .9; color: #3ee08a; }
     .hv-graphs-value {
-      font-size: 18px;
+      font-size: 15px;
       font-weight: 700;
       letter-spacing: .02em;
       color: #f2f5f8;
     }
+    .hv-graphs-value.regen { color: #3ee08a; }
     .hv-graphs-2x1 .hv-graphs-value,
-    .hv-graphs-3x1 .hv-graphs-value { font-size: 16px; }
+    .hv-graphs-3x1 .hv-graphs-value { font-size: 14px; }
+    .hv-graphs-split .hv-graphs-value { font-size: 12px; }
+    .hv-graphs-split .hv-graphs-kicker { font-size: 7px; }
+    .hv-graphs-value.y2 { color: #4fd6e8; }
     .hv-graphs-unit {
-      font-size: 9px;
+      font-size: 8px;
       letter-spacing: .1em;
       opacity: .45;
     }
@@ -878,18 +1055,122 @@ window.HavalSplash = (function () {
       background: transparent;
       pointer-events: none;
     }
-    .hv-widget-cell {
+    .hv-widget-card-menu {
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      z-index: 6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(8,12,18,.58);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .hv-widget-card-menu button {
+      min-width: 72px;
+      padding: 10px 14px;
       border-radius: 10px;
-      border: 1px dashed rgba(79,214,232,.28);
-      background: rgba(16,21,28,.18);
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(16,21,28,.88);
+      color: #eaf2f8;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .12em;
       cursor: pointer;
     }
-    .hv-widget-cell.on { border-style: solid; border-color: #4fd6e8; background: rgba(79,214,232,.16); }
+    .hv-graph-editor {
+      position: absolute;
+      z-index: 52;
+      top: 96px;
+      left: 30px;
+      width: min(420px, calc(100vw - 60px));
+      max-height: calc(100vh - 160px);
+      overflow-y: auto;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(16,21,28,.96);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 14px 36px rgba(0,0,0,.45);
+      color: #eaf2f8;
+      pointer-events: auto;
+    }
+    .hv-graph-editor-title,
+    .hv-graph-editor-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .14em;
+    }
+    .hv-graph-editor-section,
+    .hv-graph-editor-kicker {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .14em;
+      opacity: .5;
+      margin: 10px 0 6px;
+    }
+    .hv-graph-editor-chips,
+    .hv-graph-editor-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .hv-graph-editor-chips button,
+    .hv-graph-editor-row button,
+    .hv-graph-editor-head button,
+    .hv-graph-editor-actions button {
+      padding: 7px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: transparent;
+      color: #eaf2f8;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .08em;
+      cursor: pointer;
+    }
+    .hv-graph-editor-chips button.on,
+    .hv-graph-editor-row button.on {
+      border-color: #fff;
+      background: #f2f5f8;
+      color: #0b1016;
+      font-weight: 700;
+    }
+    .hv-graph-pane-edit,
+    .hv-graph-editor-pane {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .hv-graph-pane-edit-head {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .12em;
+      opacity: .7;
+      margin-bottom: 8px;
+    }
+    .hv-graph-editor-actions {
+      margin-top: 12px;
+    }
+    .hv-graph-editor-actions button {
+      width: 100%;
+    }
+    .hv-widget-cell {
+      border-radius: 10px;
+      border: 1px dashed rgba(255,255,255,.28);
+      background: rgba(255,255,255,.06);
+      cursor: pointer;
+    }
+    .hv-widget-cell.on { border-style: solid; border-color: rgba(255,255,255,.55); background: rgba(255,255,255,.12); }
     .hv-widget-picker {
       position: absolute;
       z-index: 50;
-      top: 96px;
-      left: 30px;
+      top: calc(var(--hv-safe-top, 22px) + 70px);
+      left: var(--hv-chrome-main-left, 48px);
       min-width: 240px;
       padding: 10px;
       border-radius: 12px;
@@ -1087,51 +1368,156 @@ window.HavalSplash = (function () {
       width: 52px;
       height: 52px;
     }
-    .hv-brand {
+    .hv-chrome {
       position: absolute;
       top: var(--hv-safe-top, 22px);
-      left: calc(var(--hv-safe-left, 0px) + 30px);
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
+      left: 0;
+      right: var(--hv-safe-right, 0px);
+      display: block;
       z-index: 24;
       pointer-events: none;
       user-select: none;
+    }
+    .hv-brand {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: auto;
+      min-width: 0;
+      box-sizing: border-box;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      pointer-events: none;
+    }
+    .hv-brand-kicker {
+      font-size: 10px;
+      letter-spacing: .28em;
+      font-weight: 600;
+      opacity: .5;
+      line-height: 1;
+    }
+    .hv-brand-mark {
+      margin-top: 3px;
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      line-height: 1;
     }
     .hv-brand-row {
       display: flex;
       flex-direction: row;
       align-items: center;
       gap: 10px;
-      margin-top: 2px;
+    }
+    .hv-chrome-main {
+      pointer-events: auto;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      flex-wrap: nowrap;
+      gap: 0;
+      min-width: 0;
+      padding-left: var(--hv-chrome-main-left, 96px);
+    }
+    .hv-chrome-group {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 8px;
+      flex-wrap: nowrap;
+      flex-shrink: 0;
+    }
+    .hv-chrome-gap {
+      width: 16px;
+      flex-shrink: 0;
+    }
+    .hv-page-btn {
+      width: 58px;
+      min-width: 58px;
+      height: 58px;
+      flex-shrink: 0;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(18,18,20,.40);
+      color: rgba(255,255,255,.82);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      box-shadow: 0 4px 18px rgba(0,0,0,.22);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .hv-page-btn svg {
+      width: 22px;
+      height: 22px;
+      display: block;
+    }
+    .hv-page-btn.on {
+      border-color: rgba(255,255,255,.50);
+      background: rgba(255,255,255,.14);
+      color: #fff;
+    }
+    .hv-page-btn.hv-page-btn-tbd {
+      opacity: .92;
+    }
+    .hv-page-stub {
+      position: absolute;
+      left: var(--hv-chrome-main-left, 48px);
+      top: calc(var(--hv-safe-top, 22px) + 78px);
+      z-index: 21;
+      padding: 22px 26px;
+      border-radius: 14px;
+      background: rgba(16,21,28,.72);
+      border: 1px solid rgba(255,255,255,.16);
+      color: #eaf2f8;
+      box-shadow: 0 14px 36px rgba(0,0,0,.4);
+      pointer-events: none;
+    }
+    .hv-page-stub-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .18em;
+      color: rgba(255,255,255,.88);
+    }
+    .hv-page-stub-hint {
+      margin-top: 8px;
+      font-size: 13px;
+      letter-spacing: .04em;
+      opacity: .7;
     }
     .hv-shell-hud {
       pointer-events: auto;
-      position: absolute;
-      top: 0;
-      left: 168px;
+      position: relative;
+      top: auto;
+      left: auto;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
+      flex-shrink: 0;
     }
     .hv-shell-btns { display: flex; flex-direction: row; align-items: center; gap: 8px; }
     .hv-shell-btn {
       width: 58px; height: 58px;
       min-width: 58px;
       border-radius: 12px;
-      border: 1px solid rgba(79,214,232,.28);
-      background: rgba(16,21,28,.82);
-      color: #eaf2f8;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(18,18,20,.40);
+      color: rgba(255,255,255,.82);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       padding: 0;
-      box-shadow: 0 4px 18px rgba(0,0,0,.32);
+      box-shadow: 0 4px 18px rgba(0,0,0,.22);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
     }
-    .hv-shell-btn.on { border-color: #4fd6e8; background: rgba(79,214,232,.18); color: #4fd6e8; }
+    .hv-shell-btn.on { border-color: rgba(255,255,255,.50); background: rgba(255,255,255,.14); color: #fff; }
     .hv-shell-glyph { display: flex; align-items: center; gap: 3px; height: 22px; }
     .hv-shell-glyph i {
       display: block; height: 18px; border-radius: 2px;
@@ -1171,7 +1557,7 @@ window.HavalSplash = (function () {
       font-size: 10px;
       letter-spacing: .08em;
     }
-    .hv-shell-opt.on { border-color: #4fd6e8; background: rgba(79,214,232,.12); color: #4fd6e8; }
+    .hv-shell-opt.on { border-color: rgba(255,255,255,.50); background: rgba(255,255,255,.12); color: #fff; }
     .hv-side-btn {
       width: 58px;
       font-family: 'Space Mono', monospace;
@@ -1179,41 +1565,219 @@ window.HavalSplash = (function () {
       font-weight: 600;
       letter-spacing: .1em;
     }
+    .hv-toast {
+      position: absolute;
+      left: 50%;
+      bottom: calc(var(--hv-launcher-bottom, 60px) + 16px);
+      transform: translateX(-50%) translateY(8px);
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      max-width: min(520px, calc(100% - 48px));
+      padding: 10px 18px 12px;
+      border-radius: 12px;
+      background: rgba(16,21,28,.90);
+      border: 1px solid rgba(79,214,232,.28);
+      box-shadow: 0 14px 36px rgba(0,0,0,.45);
+      color: #eaf2f8;
+      text-align: center;
+      pointer-events: none;
+      user-select: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .22s ease, transform .22s ease, visibility .22s ease;
+    }
+    .hv-toast.on {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+    .hv-toast-mode {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .16em;
+      color: #4fd6e8;
+    }
+    .hv-toast-msg {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.35;
+      letter-spacing: .02em;
+      color: rgba(234,242,248,.88);
+    }
+    /* Same chip as the native boot HUD (top-left). Used after the first load
+       for wheel / model swaps on desktop; Android reuses the native view. */
+    .hv-load-hud {
+      position: absolute;
+      top: calc(var(--hv-safe-top, 22px) + 26px);
+      left: calc(var(--hv-safe-left, 0px) + 24px);
+      z-index: 45;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      pointer-events: none;
+      text-shadow: 0 1px 8px #000;
+    }
+    .hv-load-hud-title {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 11px;
+      letter-spacing: .18em;
+      color: #e8f1f8;
+    }
+    .hv-load-hud-pct {
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      color: #e8f1f8;
+    }
+    .hv-load-hud-bar {
+      width: 140px;
+      height: 2px;
+      margin-top: 4px;
+      background: rgba(255,255,255,.18);
+      overflow: hidden;
+    }
+    .hv-load-hud-fill {
+      height: 100%;
+      background: #4fd6e8;
+      transition: width .25s ease;
+    }
   </style>
 </helmet>
-<div id="hv-root" ref="{{ outerRef }}" style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; background: {{ shellBg }}; font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }}; --hv-safe-left: {{ safeLeft }}; --hv-safe-right: {{ safeRight }}; --hv-safe-bottom: {{ safeBottom }}; --hv-launcher-bottom: {{ launcherBottom }};">
+<div id="hv-root" ref="{{ outerRef }}" style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; background: {{ shellBg }}; font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }}; --hv-safe-left: {{ safeLeft }}; --hv-safe-right: {{ safeRight }}; --hv-safe-bottom: {{ safeBottom }}; --hv-launcher-bottom: {{ launcherBottom }}; --hv-chrome-main-left: {{ chromeMainLeft }};">
 
   <div ref="{{ containerRef }}" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%;"></div>
 
-  <!-- top-left model label + shell layout -->
-  <div class="hv-brand" style="color: {{ labelColor }}; transition: color 0.6s ease;">
-    <div style="font-size: 11px; letter-spacing: .42em; font-weight: 600; opacity: .55;">HAVAL</div>
-    <div class="hv-brand-row">
-      <div style="font-size: 30px; font-weight: 600; letter-spacing: .04em; line-height: 1.05;">H6</div>
+  <div class="hv-load-hud" style="display: {{ loadHudDisplay }};">
+    <div class="hv-load-hud-title">{{ loadHudTitle }}</div>
+    <div class="hv-load-hud-pct">{{ progressText }}</div>
+    <div class="hv-load-hud-bar"><div class="hv-load-hud-fill" style="width: {{ progressWidth }};"></div></div>
+  </div>
+
+  <!-- top chrome: logo in the corner, pages aligned to the left widget board -->
+  <div class="hv-chrome" style="color: {{ labelColor }}; transition: color 0.6s ease;">
+    <div class="hv-brand">
+      <div class="hv-brand-kicker">HAVAL</div>
+      <div class="hv-brand-mark">H6</div>
     </div>
-    <div class="hv-shell-hud" style="display: {{ shellHudDisplay }};">
-      <div class="hv-shell-btns">
-        <button type="button" class="hv-shell-btn {{ shellModeBtnClass }}" onClick="{{ toggleShellMenu }}" title="Layout">
-          <span class="hv-shell-glyph" style="color:#4fd6e8; display: {{ shellGlyphTripleDisplay }};"><i class="g-app"></i><i class="g-car"></i><i class="g-app"></i></span>
-          <span class="hv-shell-glyph" style="color:#4fd6e8; display: {{ shellGlyphAppCarDisplay }};"><i class="g-app"></i><i class="g-car"></i></span>
-          <span class="hv-shell-glyph" style="color:#4fd6e8; display: {{ shellGlyphAppsDisplay }};"><i class="g-app"></i><i class="g-app"></i></span>
+    <div class="hv-chrome-main">
+      <div class="hv-chrome-group" style="display: {{ pageBtnsDisplay }};">
+        <button type="button" class="hv-page-btn {{ pageMainClass }}" onClick="{{ setChromePageMain }}" title="Main">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
         </button>
-        <button type="button" class="hv-shell-btn hv-side-btn {{ shellLeftBtnClass }}" style="display: {{ shellSideBtnsDisplay }};" onClick="{{ setLaunchSideLeft }}" title="Open apps on the left">L</button>
-        <button type="button" class="hv-shell-btn hv-side-btn {{ shellRightBtnClass }}" style="display: {{ shellSideBtnsDisplay }};" onClick="{{ setLaunchSideRight }}" title="Open apps on the right">R</button>
+        <button type="button" class="hv-page-btn hv-page-btn-tbd {{ pageCarClass }}" onClick="{{ setChromePageCar }}" title="Car Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-5.1A2 2 0 0 1 6.9 6.5h10.2A2 2 0 0 1 19 7.9L21 13"/><path d="M3 13h18v3.5a1 1 0 0 1-1 1h-1.2"/><path d="M5.2 17.5H4a1 1 0 0 1-1-1V13"/><circle cx="7.5" cy="17.5" r="1.7"/><circle cx="16.5" cy="17.5" r="1.7"/></svg>
+        </button>
+        <button type="button" class="hv-page-btn hv-page-btn-tbd {{ pageAcClass }}" onClick="{{ setChromePageAc }}" title="AC settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5.6 6.5l12.8 11"/><path d="M5.6 17.5l12.8-11"/><path d="M9.6 4.4 12 3l2.4 1.4"/><path d="M9.6 19.6 12 21l2.4-1.4"/></svg>
+        </button>
       </div>
-      <div class="hv-shell-menu" style="display: {{ shellMenuDisplay }};">
-        <button type="button" class="hv-shell-opt {{ shellOptTripleClass }}" onClick="{{ setShellTriple }}">
-          <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-car"></i><i class="g-app"></i></span>
-          APP + CAR + APP
+      <div class="hv-chrome-gap" style="display: {{ pageBtnsDisplay }};"></div>
+      <div class="hv-toolbar" style="display: {{ dayNightDisplay }}; gap: 8px; z-index: 12;">
+        <div class="hv-toolbar-row">
+      <button class="hv-tool-btn hv-tool-btn-icon" onClick="{{ toggleConfigPanel }}" title="Configuration" style="background: {{ configBtnBg }}; border: 1px solid {{ configBtnBorder }}; color: {{ configBtnCol }}; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;">
+        <span class="hv-tool-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </span>
+      </button>
+
+      <sc-if value="{{ configExpanded }}" hint-placeholder-val="{{ false }}">
+        <div class="hv-shell-hud" style="display: {{ shellHudDisplay }};">
+          <div class="hv-shell-btns">
+            <button type="button" class="hv-shell-btn {{ shellModeBtnClass }}" onClick="{{ toggleShellMenu }}" title="Layout">
+              <span class="hv-shell-glyph" style="display: {{ shellGlyphTripleDisplay }};"><i class="g-app"></i><i class="g-car"></i><i class="g-app"></i></span>
+              <span class="hv-shell-glyph" style="display: {{ shellGlyphAppCarDisplay }};"><i class="g-app"></i><i class="g-car"></i></span>
+              <span class="hv-shell-glyph" style="display: {{ shellGlyphAppsDisplay }};"><i class="g-app"></i><i class="g-app"></i></span>
+            </button>
+            <button type="button" class="hv-shell-btn hv-side-btn {{ shellLeftBtnClass }}" style="display: {{ shellSideBtnsDisplay }};" onClick="{{ setLaunchSideLeft }}" title="Open apps on the left">L</button>
+            <button type="button" class="hv-shell-btn hv-side-btn {{ shellRightBtnClass }}" style="display: {{ shellSideBtnsDisplay }};" onClick="{{ setLaunchSideRight }}" title="Open apps on the right">R</button>
+          </div>
+          <div class="hv-shell-menu" style="display: {{ shellMenuDisplay }};">
+            <button type="button" class="hv-shell-opt {{ shellOptTripleClass }}" onClick="{{ setShellTriple }}">
+              <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-car"></i><i class="g-app"></i></span>
+              APP + CAR + APP
+            </button>
+            <button type="button" class="hv-shell-opt {{ shellOptAppCarClass }}" onClick="{{ setShellAppCar }}">
+              <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-car"></i></span>
+              APP + CAR
+            </button>
+            <button type="button" class="hv-shell-opt {{ shellOptAppsClass }}" onClick="{{ setShellApps }}">
+              <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-app"></i></span>
+              APP + APP
+            </button>
+          </div>
+        </div>
+
+        <button class="hv-tool-btn hv-tool-btn-icon" onClick="{{ addWidget }}" title="Add widget" style="display: {{ addWidgetBtnDisplay }}; background: {{ addWidgetBtnBg }}; border: 1px solid {{ addWidgetBtnBorder }}; color: {{ addWidgetBtnCol }}; cursor: pointer;">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
         </button>
-        <button type="button" class="hv-shell-opt {{ shellOptAppCarClass }}" onClick="{{ setShellAppCar }}">
-          <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-car"></i></span>
-          APP + CAR
+
+        <button class="hv-tool-btn hv-tool-btn-icon" onClick="{{ toggleCameraPanel }}" title="Camera" style="background: {{ cameraBtnBg }}; border: 1px solid {{ tabCameraBorder }}; color: {{ tabCameraCol }}; cursor: pointer;">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
         </button>
-        <button type="button" class="hv-shell-opt {{ shellOptAppsClass }}" onClick="{{ setShellApps }}">
-          <span class="hv-shell-glyph"><i class="g-app"></i><i class="g-app"></i></span>
-          APP + APP
+
+        <button class="hv-tool-btn" onClick="{{ setTuningPaint }}" title="Paint color" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tunPaintBorder }}; color: {{ tunPaintCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><div style="width: 18px; height: 18px; border-radius: 50%; background: {{ currentCarPaintHex }}; border: 1.5px solid rgba(255,255,255,.35);"></div></span>
+          <span class="hv-tool-label">COLOR</span>
         </button>
+        <button class="hv-tool-btn" onClick="{{ setTuningWheels }}" title="Wheels" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tunWheelsBorder }}; color: {{ tunWheelsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg></span>
+          <span class="hv-tool-label">WHEELS</span>
+        </button>
+        <button class="hv-tool-btn" onClick="{{ setOverrideMotion }}" title="Speed" style="background: rgba(18,18,20,.40); border: 1px solid {{ ovMotionBorder }}; color: {{ ovMotionCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4" /><path d="M3.34 19a10 10 0 1 1 17.32 0" /></svg></span>
+          <span class="hv-tool-label">SPEED</span>
+        </button>
+        <button class="hv-tool-btn" onClick="{{ setOverrideDoors }}" title="Doors" style="background: rgba(18,18,20,.40); border: 1px solid {{ ovDoorsBorder }}; color: {{ ovDoorsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M10 12h.01" /></svg></span>
+          <span class="hv-tool-label">DOORS</span>
+        </button>
+        <button class="hv-tool-btn" onClick="{{ setOverrideLights }}" title="Lights" style="background: rgba(18,18,20,.40); border: 1px solid {{ ovLightsBorder }}; color: {{ ovLightsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h6" /><path d="M2 12h7" /><path d="M2 16h6" /><path d="M13 5v14" /><path d="M13 5a7 7 0 0 1 0 14" /></svg></span>
+          <span class="hv-tool-label">LIGHTS</span>
+        </button>
+
+        <button class="hv-tool-btn" onClick="{{ openSectionEnv }}" title="Environment" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabEnvBorder }}; color: {{ tabEnvCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span>
+          <span class="hv-tool-label">ENV</span>
+        </button>
+        <button class="hv-tool-btn" onClick="{{ toggleModelVariant }}" title="{{ modelTooltip }}" style="background: {{ modelBtnBg }}; border: 1px solid {{ modelBtnBorder }}; color: {{ modelBtnCol }}; cursor: pointer;">
+          <span class="hv-tool-icon">{{ modelLabel }}</span>
+          <span class="hv-tool-label">MODEL</span>
+        </button>
+        <button class="hv-tool-btn" onClick="{{ cycleResScale }}" title="{{ resScaleTooltip }}" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ resScaleBorder }}; color: {{ resScaleCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon" style="font-size: 10px; letter-spacing: 0;">{{ resScaleIcon }}</span>
+          <span class="hv-tool-label">PERF</span>
+        </button>
+        <button class="hv-tool-btn" onClick="{{ toggleFpsHud }}" title="{{ fpsTooltip }}" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ fpsBtnBorder }}; color: {{ fpsBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon">FPS</span>
+          <span class="hv-tool-label">FPS</span>
+        </button>
+
+        <button class="hv-tool-btn" onClick="{{ setTimeDay }}" title="Day" style="background: rgba(18,18,20,.40); border: 1px solid {{ timeDayBorder }}; color: {{ timeDayCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
+          <span class="hv-tool-label">DAY</span>
+        </button>
+        <button class="hv-tool-btn" onClick="{{ setTimeNight }}" title="Night" style="background: rgba(18,18,20,.40); border: 1px solid {{ timeNightBorder }}; color: {{ timeNightCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
+          <span class="hv-tool-label">NIGHT</span>
+        </button>
+        <button class="hv-tool-btn hv-tool-btn-text" onClick="{{ setTimeAuto }}" title="Auto (follow car)" style="background: rgba(18,18,20,.40); border: 1px solid {{ timeAutoBorder }}; color: {{ timeAutoCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-label">AUTO</span>
+        </button>
+
+        <button class="hv-tool-btn" onClick="{{ onSaveSettings }}" title="Save settings" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ saveBtnBorder }}; color: {{ saveBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
+          <span class="hv-tool-label">SAVE</span>
+        </button>
+      </sc-if>
+        </div>
       </div>
     </div>
   </div>
@@ -1222,19 +1786,22 @@ window.HavalSplash = (function () {
   <div style="position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .14em; color: {{ hintColor }}; pointer-events: none; user-select: none; transition: opacity .6s ease, color 0.6s ease; opacity: {{ hintOpacity }};">
     DRAG TO ORBIT &nbsp;·&nbsp; SCROLL TO ZOOM &nbsp;·&nbsp; RIGHT-DRAG TO PAN
   </div>
+  <div class="hv-toast {{ perfToastClass }}">
+    <div class="hv-toast-mode">{{ perfToastTitle }}</div>
+    <div class="hv-toast-msg">{{ perfToastMsg }}</div>
+  </div>
 
   <!-- widget boards occupy the same rects as freeform app slots -->
   <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};">
-    <div class="hv-widget-toolbar">
-      <button type="button" class="hv-widget-add {{ leftAddClass }}" onClick="{{ addWidgetLeft }}" title="Add widget">+ ADD WIDGET</button>
-    </div>
     <div class="hv-widget-grid" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);">
       <sc-for list="{{ leftPlaceCells }}" as="pc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ pc.cls }}" style="{{ pc.gridStyle }}" onClick="{{ pc.onClick }}"></button>
       </sc-for>
       <sc-for list="{{ leftWidgetItems }}" as="wg" hint-placeholder-count="0">
-        <div class="hv-widget-card" style="{{ wg.gridStyle }}">
-          <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
+        <div class="hv-widget-card" style="{{ wg.gridStyle }}" onTouchStart="{{ wg.onHoldStart }}" onTouchEnd="{{ wg.onHoldEnd }}" onTouchCancel="{{ wg.onHoldEnd }}" onMouseDown="{{ wg.onHoldStart }}" onMouseUp="{{ wg.onHoldEnd }}" onMouseLeave="{{ wg.onHoldEnd }}" onContextMenu="{{ wg.onContextMenu }}">
+          <sc-if value="{{ wg.showRemove }}" hint-placeholder-val="{{ true }}">
+            <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
+          </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
             <div class="hv-media-rail {{ wg.mediaSizeClass }}" style="opacity: {{ mediaRailOpacity }};">
               <div class="hv-media-art-wrap">
@@ -1270,20 +1837,16 @@ window.HavalSplash = (function () {
           <sc-if value="{{ wg.isModes }}" hint-placeholder-val="{{ false }}">
             <div class="hv-modes {{ wg.modeSizeClass }}">
               <sc-if value="{{ wg.isModeWide }}" hint-placeholder-val="{{ false }}">
-                <div class="hv-modes-wide-kickers">
-                  <sc-for list="{{ wg.modeWideKickers }}" as="mk" hint-placeholder-count="0">
-                    <div class="hv-modes-wide-kicker {{ mk.spanClass }}">{{ mk.label }}</div>
-                  </sc-for>
-                </div>
-                <div class="hv-modes-wide-grid">
-                  <sc-for list="{{ wg.modeWideLines }}" as="ln" hint-placeholder-count="0">
-                    <div class="hv-modes-chips">
-                      <sc-for list="{{ ln.chips }}" as="ch" hint-placeholder-count="0">
+                <sc-for list="{{ wg.modeWideCols }}" as="col" hint-placeholder-count="0">
+                  <div class="hv-modes-wide-col">
+                    <div class="hv-modes-kicker">{{ col.label }}</div>
+                    <div class="hv-modes-chips {{ col.chipColsClass }}">
+                      <sc-for list="{{ col.chips }}" as="ch" hint-placeholder-count="0">
                         <button type="button" class="hv-modes-chip {{ ch.cls }}" onClick="{{ ch.onClick }}">{{ ch.label }}</button>
                       </sc-for>
                     </div>
-                  </sc-for>
-                </div>
+                  </div>
+                </sc-for>
               </sc-if>
               <sc-if value="{{ wg.isModeStack }}" hint-placeholder-val="{{ true }}">
                 <sc-for list="{{ wg.modeRows }}" as="mr" hint-placeholder-count="0">
@@ -1302,19 +1865,29 @@ window.HavalSplash = (function () {
             </div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-graphs {{ wg.graphSizeClass }}">
-              <div class="hv-graphs-head">
-                <div class="hv-graphs-kicker">POWER</div>
-                <div class="hv-graphs-readout">
-                  <span class="hv-graphs-mode">EV</span>
-                  <span class="hv-graphs-value">0.0</span>
-                  <span class="hv-graphs-unit">kW</span>
+            <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
+              <sc-for list="{{ wg.graphPanes }}" as="gp" hint-placeholder-count="1">
+                <div class="hv-graphs-pane">
+                  <div class="hv-graphs-head">
+                    <div class="hv-graphs-kicker">{{ gp.title }}</div>
+                    <div class="hv-graphs-readout">
+                      <span class="hv-graphs-mode">{{ gp.mode }}</span>
+                      <span class="hv-graphs-value">{{ gp.value }}</span>
+                      <span class="hv-graphs-unit">{{ gp.unit }}</span>
+                    </div>
+                  </div>
+                  <div class="hv-graphs-plot">
+                    <canvas class="hv-graphs-canvas" data-pane="{{ gp.index }}"></canvas>
+                  </div>
                 </div>
-              </div>
-              <div class="hv-graphs-plot">
-                <canvas class="hv-graphs-canvas"></canvas>
-              </div>
+              </sc-for>
             </div>
+            <sc-if value="{{ wg.graphMenuOpen }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-widget-card-menu">
+                <button type="button" onClick="{{ wg.onEdit }}">EDIT</button>
+                <button type="button" onClick="{{ wg.onRemove }}">CLOSE</button>
+              </div>
+            </sc-if>
           </sc-if>
           <sc-if value="{{ wg.isStub }}" hint-placeholder-val="{{ true }}">
             <div class="hv-widget-stub">
@@ -1329,16 +1902,15 @@ window.HavalSplash = (function () {
   </div>
 
   <div class="hv-widget-board" style="display: {{ rightBoardDisplay }}; left: {{ rightBoardLeft }}; top: {{ rightBoardTop }}; width: {{ rightBoardWidth }}; height: {{ rightBoardHeight }};">
-    <div class="hv-widget-toolbar">
-      <button type="button" class="hv-widget-add {{ rightAddClass }}" onClick="{{ addWidgetRight }}" title="Add widget">+ ADD WIDGET</button>
-    </div>
     <div class="hv-widget-grid" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);">
       <sc-for list="{{ rightPlaceCells }}" as="pc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ pc.cls }}" style="{{ pc.gridStyle }}" onClick="{{ pc.onClick }}"></button>
       </sc-for>
       <sc-for list="{{ rightWidgetItems }}" as="wg" hint-placeholder-count="0">
-        <div class="hv-widget-card" style="{{ wg.gridStyle }}">
-          <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
+        <div class="hv-widget-card" style="{{ wg.gridStyle }}" onTouchStart="{{ wg.onHoldStart }}" onTouchEnd="{{ wg.onHoldEnd }}" onTouchCancel="{{ wg.onHoldEnd }}" onMouseDown="{{ wg.onHoldStart }}" onMouseUp="{{ wg.onHoldEnd }}" onMouseLeave="{{ wg.onHoldEnd }}" onContextMenu="{{ wg.onContextMenu }}">
+          <sc-if value="{{ wg.showRemove }}" hint-placeholder-val="{{ true }}">
+            <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
+          </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
             <div class="hv-media-rail {{ wg.mediaSizeClass }}" style="opacity: {{ mediaRailOpacity }};">
               <div class="hv-media-art-wrap">
@@ -1374,20 +1946,16 @@ window.HavalSplash = (function () {
           <sc-if value="{{ wg.isModes }}" hint-placeholder-val="{{ false }}">
             <div class="hv-modes {{ wg.modeSizeClass }}">
               <sc-if value="{{ wg.isModeWide }}" hint-placeholder-val="{{ false }}">
-                <div class="hv-modes-wide-kickers">
-                  <sc-for list="{{ wg.modeWideKickers }}" as="mk" hint-placeholder-count="0">
-                    <div class="hv-modes-wide-kicker {{ mk.spanClass }}">{{ mk.label }}</div>
-                  </sc-for>
-                </div>
-                <div class="hv-modes-wide-grid">
-                  <sc-for list="{{ wg.modeWideLines }}" as="ln" hint-placeholder-count="0">
-                    <div class="hv-modes-chips">
-                      <sc-for list="{{ ln.chips }}" as="ch" hint-placeholder-count="0">
+                <sc-for list="{{ wg.modeWideCols }}" as="col" hint-placeholder-count="0">
+                  <div class="hv-modes-wide-col">
+                    <div class="hv-modes-kicker">{{ col.label }}</div>
+                    <div class="hv-modes-chips {{ col.chipColsClass }}">
+                      <sc-for list="{{ col.chips }}" as="ch" hint-placeholder-count="0">
                         <button type="button" class="hv-modes-chip {{ ch.cls }}" onClick="{{ ch.onClick }}">{{ ch.label }}</button>
                       </sc-for>
                     </div>
-                  </sc-for>
-                </div>
+                  </div>
+                </sc-for>
               </sc-if>
               <sc-if value="{{ wg.isModeStack }}" hint-placeholder-val="{{ true }}">
                 <sc-for list="{{ wg.modeRows }}" as="mr" hint-placeholder-count="0">
@@ -1406,19 +1974,29 @@ window.HavalSplash = (function () {
             </div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-graphs {{ wg.graphSizeClass }}">
-              <div class="hv-graphs-head">
-                <div class="hv-graphs-kicker">POWER</div>
-                <div class="hv-graphs-readout">
-                  <span class="hv-graphs-mode">EV</span>
-                  <span class="hv-graphs-value">0.0</span>
-                  <span class="hv-graphs-unit">kW</span>
+            <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
+              <sc-for list="{{ wg.graphPanes }}" as="gp" hint-placeholder-count="1">
+                <div class="hv-graphs-pane">
+                  <div class="hv-graphs-head">
+                    <div class="hv-graphs-kicker">{{ gp.title }}</div>
+                    <div class="hv-graphs-readout">
+                      <span class="hv-graphs-mode">{{ gp.mode }}</span>
+                      <span class="hv-graphs-value">{{ gp.value }}</span>
+                      <span class="hv-graphs-unit">{{ gp.unit }}</span>
+                    </div>
+                  </div>
+                  <div class="hv-graphs-plot">
+                    <canvas class="hv-graphs-canvas" data-pane="{{ gp.index }}"></canvas>
+                  </div>
                 </div>
-              </div>
-              <div class="hv-graphs-plot">
-                <canvas class="hv-graphs-canvas"></canvas>
-              </div>
+              </sc-for>
             </div>
+            <sc-if value="{{ wg.graphMenuOpen }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-widget-card-menu">
+                <button type="button" onClick="{{ wg.onEdit }}">EDIT</button>
+                <button type="button" onClick="{{ wg.onRemove }}">CLOSE</button>
+              </div>
+            </sc-if>
           </sc-if>
           <sc-if value="{{ wg.isStub }}" hint-placeholder-val="{{ true }}">
             <div class="hv-widget-stub">
@@ -1439,129 +2017,65 @@ window.HavalSplash = (function () {
     </sc-for>
   </div>
 
-  <!-- cyan accent corner ticks -->
-  <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
-
-  <!-- config rail: top-right when collapsed; docks left of the details panel when open -->
-  <div class="hv-toolbar" style="position: absolute; top: var(--hv-safe-top, 22px); right: calc(var(--hv-safe-right, 0px) + {{ toolbarRight }}); left: auto; display: {{ dayNightDisplay }}; gap: 8px; z-index: 12;">
-    <div class="hv-toolbar-row">
-      <button class="hv-tool-btn" onClick="{{ toggleConfigPanel }}" title="Configuration" style="background: {{ configBtnBg }}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ configBtnBorder }}; color: {{ configBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32); transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;">
-        <span class="hv-tool-icon">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </span>
-        <span class="hv-tool-label">CONFIG</span>
-      </button>
-
-      <button class="hv-tool-btn" onClick="{{ toggleCameraPanel }}" title="Camera" style="background: {{ cameraBtnBg }}; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabCameraBorder }}; color: {{ tabCameraCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-        <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
-        <span class="hv-tool-label">CAM</span>
-      </button>
-
-      <sc-if value="{{ configExpanded }}" hint-placeholder-val="{{ false }}">
-        <div class="hv-tool-stack">
-          <button class="hv-tool-btn" onClick="{{ openSectionTuning }}" title="Car Tuning" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabTuningBorder }}; color: {{ tabTuningCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-            <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="2" x2="12" y2="9"></line><line x1="12" y1="15" x2="12" y2="22"></line><line x1="2" y1="12" x2="9" y2="12"></line><line x1="15" y1="12" x2="22" y2="12"></line></svg></span>
-            <span class="hv-tool-label">TUNE</span>
-          </button>
-          <sc-if value="{{ showTuningSubmenu }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-tool-children">
-              <button class="hv-tool-btn" onClick="{{ setTuningPaint }}" title="Paint color" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tunPaintBorder }}; color: {{ tunPaintCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-icon"><div style="width: 18px; height: 18px; border-radius: 50%; background: {{ currentCarPaintHex }}; border: 1.5px solid rgba(255,255,255,.35);"></div></span>
-                <span class="hv-tool-label">COLOR</span>
-              </button>
-              <button class="hv-tool-btn" onClick="{{ setTuningWheels }}" title="Wheels" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tunWheelsBorder }}; color: {{ tunWheelsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg></span>
-                <span class="hv-tool-label">WHEELS</span>
-              </button>
-            </div>
-          </sc-if>
+  <div class="hv-graph-editor" style="display: {{ graphEditorDisplay }};">
+    <div class="hv-graph-editor-title">EDIT GRAPHS</div>
+    <div class="hv-graph-editor-section">LAYOUT</div>
+    <div class="hv-graph-editor-chips">
+      <sc-for list="{{ graphLayoutChips }}" as="lc" hint-placeholder-count="1">
+        <button type="button" class="{{ lc.className }}" onClick="{{ lc.onClick }}">{{ lc.label }}</button>
+      </sc-for>
+    </div>
+    <sc-for list="{{ graphPaneEditors }}" as="pe" hint-placeholder-count="1">
+      <div class="hv-graph-pane-edit">
+        <div class="hv-graph-pane-edit-head">PANE {{ pe.label }}</div>
+        <div class="hv-graph-editor-chips">
+          <button type="button" class="{{ pe.seriesClass }}" onClick="{{ pe.onSeries }}">GRAPH</button>
+          <button type="button" class="{{ pe.vizClass }}" onClick="{{ pe.onViz }}">VIZ</button>
         </div>
-
-        <div class="hv-tool-stack">
-          <button class="hv-tool-btn" onClick="{{ openSectionOverride }}" title="Car Override" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabOverrideBorder }}; color: {{ tabOverrideCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-            <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3" /><line x1="6" y1="8" x2="2" y2="6" /><line x1="18" y1="8" x2="22" y2="6" /><line x1="6" y1="16" x2="2" y2="14" /><line x1="18" y1="16" x2="22" y2="14" /></svg></span>
-            <span class="hv-tool-label">DRIVE</span>
-          </button>
-          <sc-if value="{{ showOverrideSubmenu }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-tool-children">
-              <button class="hv-tool-btn" onClick="{{ setOverrideMotion }}" title="Speed" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovMotionBorder }}; color: {{ ovMotionCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4" /><path d="M3.34 19a10 10 0 1 1 17.32 0" /></svg></span>
-                <span class="hv-tool-label">SPEED</span>
-              </button>
-              <button class="hv-tool-btn" onClick="{{ setOverrideDoors }}" title="Doors" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovDoorsBorder }}; color: {{ ovDoorsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M10 12h.01" /></svg></span>
-                <span class="hv-tool-label">DOORS</span>
-              </button>
-              <button class="hv-tool-btn" onClick="{{ setOverrideLights }}" title="Lights" style="background: rgba(16,21,28,.82); border: 1px solid {{ ovLightsBorder }}; color: {{ ovLightsCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h6" /><path d="M2 12h7" /><path d="M2 16h6" /><path d="M13 5v14" /><path d="M13 5a7 7 0 0 1 0 14" /></svg></span>
-                <span class="hv-tool-label">LIGHTS</span>
-              </button>
-            </div>
-          </sc-if>
-        </div>
-
-        <button class="hv-tool-btn" onClick="{{ openSectionEnv }}" title="Environment" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabEnvBorder }}; color: {{ tabEnvCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span>
-          <span class="hv-tool-label">ENV</span>
-        </button>
-        <button class="hv-tool-btn" onClick="{{ toggleModelVariant }}" title="{{ modelTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); color: rgba(255,255,255,.70); cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon">{{ modelLabel }}</span>
-          <span class="hv-tool-label">MODEL</span>
-        </button>
-        <button class="hv-tool-btn" onClick="{{ cycleResScale }}" title="{{ resScaleTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ resScaleBorder }}; color: {{ resScaleCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon">{{ resScaleIcon }}</span>
-          <span class="hv-tool-label">RES</span>
-        </button>
-        <button class="hv-tool-btn" onClick="{{ toggleFpsHud }}" title="{{ fpsTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ fpsBtnBorder }}; color: {{ fpsBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon">FPS</span>
-          <span class="hv-tool-label">FPS</span>
-        </button>
-
-        <div class="hv-tool-stack">
-          <button class="hv-tool-btn" onClick="{{ openTimeSubmenu }}" title="{{ timeModeHint }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tabTimeBorder }}; color: {{ tabTimeCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-            <span class="hv-tool-icon">
-              <sc-if value="{{ timeIconIsDay }}" hint-placeholder-val="{{ true }}">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-              </sc-if>
-              <sc-if value="{{ timeIconIsNight }}" hint-placeholder-val="{{ false }}">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-              </sc-if>
-              <sc-if value="{{ timeIconIsAuto }}" hint-placeholder-val="{{ false }}">
-                <span style="font-size: 9px; letter-spacing: 0.06em;">AUTO</span>
-              </sc-if>
-            </span>
-            <span class="hv-tool-label">TIME</span>
-          </button>
-          <sc-if value="{{ showTimeSubmenu }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-tool-children">
-              <button class="hv-tool-btn" onClick="{{ setTimeDay }}" title="Day" style="background: rgba(16,21,28,.82); border: 1px solid {{ timeDayBorder }}; color: {{ timeDayCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
-                <span class="hv-tool-label">DAY</span>
-              </button>
-              <button class="hv-tool-btn" onClick="{{ setTimeNight }}" title="Night" style="background: rgba(16,21,28,.82); border: 1px solid {{ timeNightBorder }}; color: {{ timeNightCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
-                <span class="hv-tool-label">NIGHT</span>
-              </button>
-              <button class="hv-tool-btn hv-tool-btn-text" onClick="{{ setTimeAuto }}" title="Auto (follow car)" style="background: rgba(16,21,28,.82); border: 1px solid {{ timeAutoBorder }}; color: {{ timeAutoCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-                <span class="hv-tool-label">AUTO</span>
-              </button>
-            </div>
-          </sc-if>
-        </div>
-
-        <button class="hv-tool-btn" onClick="{{ onSaveSettings }}" title="Save settings" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ saveBtnBorder }}; color: {{ saveBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
-          <span class="hv-tool-label">SAVE</span>
-        </button>
-      </sc-if>
+        <sc-if value="{{ pe.isSeries }}" hint-placeholder-val="{{ true }}">
+          <div class="hv-graph-editor-section">Y1</div>
+          <div class="hv-graph-editor-chips">
+            <sc-for list="{{ pe.y1Vars }}" as="v1" hint-placeholder-count="1">
+              <button type="button" class="{{ v1.className }}" onClick="{{ v1.onClick }}">{{ v1.label }}</button>
+            </sc-for>
+          </div>
+          <div class="hv-graph-editor-section">Y2</div>
+          <div class="hv-graph-editor-chips">
+            <sc-for list="{{ pe.y2Vars }}" as="v2" hint-placeholder-count="1">
+              <button type="button" class="{{ v2.className }}" onClick="{{ v2.onClick }}">{{ v2.label }}</button>
+            </sc-for>
+          </div>
+          <div class="hv-graph-editor-chips">
+            <button type="button" class="{{ pe.y1RulerClass }}" onClick="{{ pe.onY1Ruler }}">Y1 RULERS</button>
+            <button type="button" class="{{ pe.y2RulerClass }}" onClick="{{ pe.onY2Ruler }}">Y2 RULERS</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ pe.isViz }}" hint-placeholder-val="{{ false }}">
+          <div class="hv-graph-editor-section">STYLE</div>
+          <div class="hv-graph-editor-chips">
+            <sc-for list="{{ pe.vizStyles }}" as="vs" hint-placeholder-count="3">
+              <button type="button" class="{{ vs.className }}" onClick="{{ vs.onClick }}">{{ vs.label }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+    <div class="hv-graph-editor-actions">
+      <button type="button" onClick="{{ onGraphEditorClose }}">DONE</button>
     </div>
   </div>
 
-  <!-- configure panel on the right -->
-  <div class="hv-config-panel slim-scrollbar" style="position: absolute; top: {{ safeTop }}; right: {{ configPanelRight }}; width: {{ panelWidth }}; background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(79,214,232,.20); border-radius: 11px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32); display: {{ panelBodyDisplay }}; height: auto; max-height: calc(100vh - 182px); overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 11;">
+  <div class="hv-page-stub" style="display: {{ pageStubDisplay }};">
+    <div class="hv-page-stub-title">{{ pageStubTitle }}</div>
+    <div class="hv-page-stub-hint">Coming soon</div>
+  </div>
+
+  <!-- cyan accent corner ticks -->
+  <div style="position: absolute; top: 22px; left: 50%; width: 0; pointer-events: none;"></div>
+
+  <!-- configure panel over the left widget board -->
+  <div class="hv-config-dock" style="display: {{ configDockDisplay }}; left: {{ configDockLeft }}; top: {{ configDockTop }}; width: {{ configDockWidth }}; height: {{ configDockHeight }};">
+  <div class="hv-config-panel slim-scrollbar" style="background: rgba(16,21,28,.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.16); border-radius: 12px; padding: 14px 14px 16px; color: #eaf2f8; box-shadow: 0 14px 40px rgba(0,0,0,.32);">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
       <div style="font-size: 12px; letter-spacing: .3em; opacity: .55; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ configHeaderTitle }}</div>
@@ -1673,14 +2187,21 @@ window.HavalSplash = (function () {
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">LEFT ←  → RIGHT</span>
         <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelAngleLabel }}</span>
       </div>
-      <input type="range" min="-35" max="35" step="1" value="{{ wheelAngle }}" onChange="{{ onWheelAngle }}" onInput="{{ onWheelAngle }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
+      <input type="range" min="-35" max="35" step="0.1" value="{{ wheelAngle }}" onChange="{{ onWheelAngle }}" onInput="{{ onWheelAngle }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
 
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">SPEED</div>
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">REV ←  → FWD</span>
-        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ motionSpeedLabel }}</span>
+        <span data-speed-label="1" style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ motionSpeedLabel }}</span>
       </div>
-      <input type="range" min="-5" max="5" step="0.05" value="{{ motionSpeed }}" onChange="{{ onMotionSpeed }}" onInput="{{ onMotionSpeed }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 14px;" />
+      <div class="hv-range-row">
+        <button type="button" class="hv-range-nudge" onClick="{{ onMotionSlower }}">−</button>
+        <div class="hv-range" onPointerDown="{{ onMotionRangeDown }}" onTouchStart="{{ onMotionRangeDown }}" onMouseDown="{{ onMotionRangeDown }}">
+          <div class="hv-range-track"><div class="hv-range-fill" style="width: {{ motionSpeedPct }};"></div></div>
+          <div class="hv-range-thumb" style="left: {{ motionSpeedPct }};"></div>
+        </div>
+        <button type="button" class="hv-range-nudge" onClick="{{ onMotionFaster }}">+</button>
+      </div>
       <button onClick="{{ onMotionStop }}" style="width: 100%; padding: 7px; border-radius: 7px; border: 1px solid rgba(79,214,232,.3); background: rgba(79,214,232,.08); color: #4fd6e8; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em;">STOP</button>
       </sc-if>
 
@@ -1756,25 +2277,24 @@ window.HavalSplash = (function () {
     <!-- ── WHEELS ── -->
     <sc-if value="{{ sectionIsWheels }}" hint-placeholder-val="{{ false }}">
 
-      <!-- sub-tab pills: CATALOG / SETTINGS / CUSTOM -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 16px;">
+      <!-- sub-tab pills: CATALOG / WHEEL TUNE -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 16px;">
         <button onClick="{{ setWheelSubCatalog }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subCatalogBorder }}; background: {{ subCatalogBg }}; color: {{ subCatalogCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">CATALOG</button>
-        <button onClick="{{ setWheelSubSettings }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subSettingsBorder }}; background: {{ subSettingsBg }}; color: {{ subSettingsCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">SETTINGS</button>
-        <button onClick="{{ setWheelSubCustom }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subCustomBorder }}; background: {{ subCustomBg }}; color: {{ subCustomCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">CUSTOM</button>
+        <button onClick="{{ setWheelSubSettings }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subSettingsBorder }}; background: {{ subSettingsBg }}; color: {{ subSettingsCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">WHEEL TUNE</button>
       </div>
 
       <!-- ── 1. RIM CATALOG ── -->
       <sc-if value="{{ subIsCatalog }}" hint-placeholder-val="{{ true }}">
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM CATALOG</div>
-        <div class="slim-scrollbar" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: min(480px, calc(100vh - 210px)); overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: 6px; padding-right: 2px;">
-          <button onClick="{{ onSelectStockWheel }}" title="Stock" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ stockRing }}; background: {{ stockBg }}; cursor: pointer; transition: all 0.15s ease;">
-            <img src="{{ stockThumb }}" style="width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 7px; background: rgba(255,255,255,.04); opacity: {{ stockImgOpacity }}; animation: {{ stockImgAnim }};" />
-            <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .02em; color: {{ stockCol }}; text-align: center; line-height: 1.2; word-break: break-word;">STOCK</span>
+        <div class="slim-scrollbar hv-wheel-catalog" style="grid-template-columns: {{ wheelCatalogCols }};">
+          <button type="button" class="hv-wheel-card" onClick="{{ onSelectStockWheel }}" title="Stock" style="border: 1px solid {{ stockRing }}; background: {{ stockBg }};">
+            <img src="{{ stockThumb }}" style="opacity: {{ stockImgOpacity }}; animation: {{ stockImgAnim }};" />
+            <span style="color: {{ stockCol }};">STOCK</span>
           </button>
           <sc-for list="{{ catalogItems }}" as="cw" hint-placeholder-count="21">
-            <button onClick="{{ cw.onClick }}" title="{{ cw.label }}" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px; border-radius: 9px; border: 1px solid {{ cw.ring }}; background: {{ cw.bg }}; cursor: pointer; transition: all 0.15s ease;">
-              <img src="{{ cw.thumb }}" style="width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 7px; background: rgba(255,255,255,.04); opacity: {{ cw.imgOpacity }}; animation: {{ cw.imgAnim }};" />
-              <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .02em; color: {{ cw.textColor }}; text-align: center; line-height: 1.2; word-break: break-word;">{{ cw.label }}</span>
+            <button type="button" class="hv-wheel-card" onClick="{{ cw.onClick }}" title="{{ cw.label }}" style="border: 1px solid {{ cw.ring }}; background: {{ cw.bg }};">
+              <img src="{{ cw.thumb }}" style="opacity: {{ cw.imgOpacity }}; animation: {{ cw.imgAnim }};" />
+              <span style="color: {{ cw.textColor }};">{{ cw.label }}</span>
             </button>
           </sc-for>
         </div>
@@ -1853,6 +2373,7 @@ window.HavalSplash = (function () {
     </sc-if>
 
   </div>
+  </div>
 
   <!-- assign mode banner -->
   <div style="position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%); display: {{ assignBannerVis }}; align-items: center; gap: 14px; background: rgba(16,21,28,.88); backdrop-filter: blur(10px); border: 1px solid rgba(79,214,232,.35); border-radius: 9px; padding: 10px 18px; font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #4fd6e8; box-shadow: 0 6px 24px rgba(0,0,0,.4);">
@@ -1920,13 +2441,34 @@ const CAR_SIGNALS = {
   // GRAPHS widget — Impulse evPowerKw = V * I / 1000.
   batteryVoltage: 'car.ev_info.power_battery_voltage',
   batteryCurrent: 'car.ev_info.cur_charge_current',
+  engineRpm: 'car.basic.engine_speed',
+  fuelInst: 'car.basic.instant_fuel_consumption',
+  evConsume: 'car.ev_info.Instant_energy_consumption',
 };
 
 // GRAPHS widget — same derivation Impulse uses for evPowerKw.
 const CAR_GRAPH_SPAN_MS = 20000;
 const CAR_GRAPH_AVG_MS = 30000;
-const CAR_GRAPH_MIN_KW = -40;
-const CAR_GRAPH_MAX_KW = 80;
+const CAR_GRAPH_VARS = [
+  { key: 'evPowerKw', label: 'EV POWER', unit: 'kW', min: -40, max: 80, signed: true },
+  { key: 'speed', label: 'SPEED', unit: 'km/h', min: 0, max: 180 },
+  { key: 'rpm', label: 'ENGINE', unit: 'rpm', min: 0, max: 5500 },
+  { key: 'fuelInst', label: 'FUEL', unit: 'km/L', min: 0, max: 30 },
+  { key: 'evInst', label: 'EV USE', unit: 'kWh/100', min: 0, max: 40 },
+  { key: 'battV', label: 'BATT V', unit: 'V', min: 250, max: 450 },
+  { key: 'battI', label: 'BATT A', unit: 'A', min: -180, max: 180, signed: true },
+];
+const CAR_GRAPH_VAR_BY_KEY = {};
+CAR_GRAPH_VARS.forEach((v) => { CAR_GRAPH_VAR_BY_KEY[v.key] = v; });
+const CAR_GRAPH_VIZ = [
+  { key: 'bars', label: 'BARS' },
+  { key: 'radial', label: 'RADIAL' },
+  { key: 'mirror', label: 'MIRROR' },
+];
+const CAR_GRAPH_COLOR_Y1 = '#f2f5f8';
+const CAR_GRAPH_COLOR_Y2 = '#4fd6e8';
+const CAR_GRAPH_COLOR_REGEN = '#3ee08a';
+const CAR_GRAPH_HOLD_MS = 480;
 
 // MODES widget — same keys/values as Impulse SettingsMenuContent / Ajustes.
 // One chip per option so a tap writes the raw CAN value (no cycle).
@@ -2089,7 +2631,7 @@ const MANUAL_OPENING_STEP = 0.02;
 const CAR_SPEED_KMH_PER_UNIT = 40;
 
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false,
+  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
@@ -2148,6 +2690,7 @@ class Component extends DCLogic {
     nextLaunchSide: 'left',
     lastLaunchSide: null,
     shellMenuOpen: false,
+    chromePage: 'main', // 'main' | 'car' | 'ac'
     leftSlotUse: 'app',
     rightSlotUse: 'app',
     widgetRev: 0,
@@ -2156,6 +2699,10 @@ class Component extends DCLogic {
     widgetPlaceType: null,
     widgetPlaceW: 0,
     widgetPlaceH: 0,
+    graphMenuId: null,
+    graphMenuSide: null,
+    graphEditId: null,
+    graphEditSide: null,
     carDriveMode: '',
     carEvMode: '',
     carSteerMode: '',
@@ -2213,7 +2760,7 @@ class Component extends DCLogic {
     this.state.catalogThumbs = {};
     for (const item of this._wheelCatalog) {
       this.state.catalogThumbs[item.key] =
-        'assets/wheel-thumbnails/' + item.key + '.png?rev=1';
+        'assets/wheel-thumbnails/' + item.key + '.png?rev=2';
     }
     this._catalogPlaceholderThumb = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='none' stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'/%3E%3Cg stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'%3E%3Cline x1='32' y1='10' x2='32' y2='21'/%3E%3Cline x1='32' y1='43' x2='32' y2='54'/%3E%3Cline x1='10' y1='32' x2='21' y2='32'/%3E%3Cline x1='43' y1='32' x2='54' y2='32'/%3E%3C/g%3E%3C/svg%3E";
     // Restore saved glass tweaks (if user hit Save previously)
@@ -2224,12 +2771,16 @@ class Component extends DCLogic {
     this._wireCarTelemetry();
     this._graphV = 0;
     this._graphI = 0;
-    this._graphKw = 0;
-    this._graphLive = false;
-    this._graphSamples = [];
-    this._graphDisplayKw = 0;
-    this._graphBars = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    this._graphNow = 0;
+    this._graphAnyLive = false;
+    this._graphLiveKeys = {};
+    this._graphValues = {};
+    this._graphDisplay = {};
+    this._graphSeries = {};
+    this._graphVizState = {};
     this._graphRaf = 0;
+    this._graphHoldTimer = 0;
+    this._graphHoldFired = false;
     try {
       const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
       const qs = parse(location.search), hs = parse(location.hash);
@@ -2340,9 +2891,9 @@ class Component extends DCLogic {
     if (typeof saved.wheelTintOverride === 'boolean') s.wheelTintOverride = saved.wheelTintOverride;
     if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
     if (typeof saved.showFps === 'boolean') s.showFps = saved.showFps;
-    if (typeof saved.resScaleMode === 'string'
-        && ['off','strong','lite','on'].indexOf(saved.resScaleMode) !== -1) {
-      s.resScaleMode = saved.resScaleMode;
+    if (typeof saved.resScaleMode === 'string') {
+      if (saved.resScaleMode === 'strong' || saved.resScaleMode === 'lite') s.resScaleMode = 'lev1';
+      else if (['off','lev1','lev2','on'].indexOf(saved.resScaleMode) !== -1) s.resScaleMode = saved.resScaleMode;
     }
     this._pendingSceneSettings = true;
   }
@@ -2383,6 +2934,7 @@ class Component extends DCLogic {
     return [CAR_SIGNALS.doors, CAR_SIGNALS.speed, CAR_SIGNALS.night,
             CAR_SIGNALS.sunroof, CAR_SIGNALS.curtain, CAR_SIGNALS.steering,
             CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent,
+            CAR_SIGNALS.engineRpm, CAR_SIGNALS.fuelInst, CAR_SIGNALS.evConsume,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
       .concat(Object.keys(lights).map((k) => lights[k]))
@@ -2453,6 +3005,18 @@ class Component extends DCLogic {
       this._applyGraphSignal(key, value);
       return;
     }
+    if (key === CAR_SIGNALS.engineRpm) {
+      this._setGraphValue('rpm', this._carNumber(value));
+      return;
+    }
+    if (key === CAR_SIGNALS.fuelInst) {
+      this._setGraphValue('fuelInst', this._parseFuelInst(value));
+      return;
+    }
+    if (key === CAR_SIGNALS.evConsume) {
+      this._setGraphValue('evInst', this._carNumber(value));
+      return;
+    }
     const modeStateKey = CAR_MODE_STATE_BY_KEY[key];
     if (modeStateKey) {
       this._applyCarMode(modeStateKey, value);
@@ -2519,17 +3083,25 @@ class Component extends DCLogic {
     return group.options.map((opt) => this._modeChip(group, opt, this.state[group.stateKey]));
   }
 
-  _modeStackRows() {
+  _modeRoadDriveChips(driveChips) {
+    const drive = CAR_MODE_GROUPS[0];
+    const keep = { '2': true, '0': true, '1': true }; // Eco, Normal, Sport
+    return driveChips.filter((_, i) => keep[drive.options[i].value]);
+  }
+
+  _modeStackRows(compact) {
     const drive = CAR_MODE_GROUPS[0];
     const driveChips = this._modeGroupChips(drive);
     const rows = [{
       label: drive.label,
-      growClass: 'drive',
-      lines: [
-        { chips: driveChips.slice(0, 3) },
-        { chips: driveChips.slice(3, 6) },
-        { chips: [driveChips[6], this._modeGhostChip(), this._modeEspChip()] },
-      ],
+      growClass: compact ? '' : 'drive',
+      lines: compact
+        ? [{ chips: this._modeRoadDriveChips(driveChips) }]
+        : [
+            { chips: driveChips.slice(0, 3) },
+            { chips: driveChips.slice(3, 6) },
+            { chips: [driveChips[6], this._modeGhostChip(), this._modeEspChip()] },
+          ],
     }];
     for (let i = 1; i < CAR_MODE_GROUPS.length; i++) {
       const g = CAR_MODE_GROUPS[i];
@@ -2541,72 +3113,329 @@ class Component extends DCLogic {
     return rows;
   }
 
-  _modeWideLines() {
+  _modeWideCols() {
     const driveChips = this._modeGroupChips(CAR_MODE_GROUPS[0]);
-    const cols = [
-      [driveChips[0], driveChips[1], driveChips[2]],
-      [driveChips[3], driveChips[4], driveChips[5]],
-      [driveChips[6], this._modeGhostChip(), this._modeEspChip()],
-      this._modeGroupChips(CAR_MODE_GROUPS[1]),
-      this._modeGroupChips(CAR_MODE_GROUPS[2]),
-      this._modeGroupChips(CAR_MODE_GROUPS[3]),
-    ];
-    return [0, 1, 2].map((r) => ({ chips: cols.map((col) => col[r]) }));
-  }
-
-  _modeWideKickers() {
     return [
-      { label: 'DRIVE', spanClass: 'span3' },
-      { label: 'EV', spanClass: '' },
-      { label: 'STEER', spanClass: '' },
-      { label: 'REGEN', spanClass: '' },
+      {
+        label: 'DRIVE',
+        chipColsClass: 'cols-3',
+        chips: [
+          driveChips[0], driveChips[3], driveChips[6],
+          driveChips[1], driveChips[4], this._modeGhostChip(),
+          driveChips[2], driveChips[5], this._modeEspChip(),
+        ],
+      },
+      { label: 'EV', chipColsClass: 'cols-1', chips: this._modeGroupChips(CAR_MODE_GROUPS[1]) },
+      { label: 'STEER', chipColsClass: 'cols-1', chips: this._modeGroupChips(CAR_MODE_GROUPS[2]) },
+      { label: 'REGEN', chipColsClass: 'cols-1', chips: this._modeGroupChips(CAR_MODE_GROUPS[3]) },
     ];
   }
 
   _modeWidgetView(item) {
-    const w = item.w || 2;
-    const h = item.h || 1;
-    const wide = h === 1;
+    const w = Number(item.w) || 2;
+    const h = Number(item.h) || 1;
+    const compact = w === 1 && h === 1;
+    const wide = h === 1 && !compact;
     return {
       modeSizeClass: 'hv-modes-' + w + 'x' + h,
       isModeWide: wide,
       isModeStack: !wide,
-      modeRows: wide ? [] : this._modeStackRows(),
-      modeWideKickers: wide ? this._modeWideKickers() : [],
-      modeWideLines: wide ? this._modeWideLines() : [],
+      modeRows: wide ? [] : this._modeStackRows(compact),
+      modeWideCols: wide ? this._modeWideCols() : [],
     };
   }
 
   _applyGraphSignal(key, value) {
-    const n = parseFloat(String(value == null ? '' : value).trim());
+    const n = this._carNumber(value);
     if (!isFinite(n)) return;
     if (key === CAR_SIGNALS.batteryVoltage) this._graphV = n;
     else this._graphI = n;
-    this._graphLive = true;
-    this._graphKw = this._graphV * this._graphI / 1000;
-    this._pushGraphSample(typeof performance !== 'undefined' ? performance.now() : Date.now());
+    this._setGraphValue('battV', this._graphV);
+    this._setGraphValue('battI', this._graphI);
+    this._setGraphValue('evPowerKw', this._graphV * this._graphI / 1000);
   }
 
-  _pushGraphSample(now) {
-    const samples = this._graphSamples;
+  _setGraphValue(key, n) {
+    if (!isFinite(n)) return;
+    this._graphValues[key] = n;
+    this._graphLiveKeys[key] = true;
+    this._graphAnyLive = true;
+    const now = this._graphNow || (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    this._pushGraphSample(key, now, n);
+  }
+
+  _pushGraphSample(key, now, value) {
+    let samples = this._graphSeries[key];
+    if (!samples) {
+      samples = [];
+      this._graphSeries[key] = samples;
+    }
     const last = samples.length ? samples[samples.length - 1] : null;
     if (last && now - last.t < 80) {
-      last.kw = this._graphKw;
+      last.v = value;
       last.t = now;
       return;
     }
-    samples.push({ t: now, kw: this._graphKw });
+    samples.push({ t: now, v: value });
     const cutoff = now - CAR_GRAPH_AVG_MS - 500;
     while (samples.length && samples[0].t < cutoff) samples.shift();
   }
 
-  _graphWidgetView(item) {
+  _graphDefaultPane() {
+    return { kind: 'series', vars: ['evPowerKw'], y1Rulers: false, y2Rulers: false, vizStyle: 'bars' };
+  }
+
+  _graphNormalizePane(pane) {
+    const p = pane || {};
+    const kind = p.kind === 'viz' ? 'viz' : 'series';
+    const vars = [];
+    const raw = p.vars || [];
+    for (let i = 0; i < raw.length && vars.length < 2; i++) {
+      if (CAR_GRAPH_VAR_BY_KEY[raw[i]] && vars.indexOf(raw[i]) < 0) vars.push(raw[i]);
+    }
+    if (!vars.length) vars.push('evPowerKw');
+    let vizStyle = p.vizStyle || 'bars';
+    if (vizStyle !== 'bars' && vizStyle !== 'radial' && vizStyle !== 'mirror') vizStyle = 'bars';
+    return {
+      kind: kind,
+      vars: vars,
+      y1Rulers: !!p.y1Rulers,
+      y2Rulers: !!p.y2Rulers,
+      vizStyle: vizStyle,
+    };
+  }
+
+  _graphNormalizeCfg(item) {
     const w = item.w || 2;
     const h = item.h || 1;
+    const maxPanes = Math.max(1, w * h);
+    const cfg = item.graph || {};
+    let cols = parseInt(cfg.cols, 10) || 1;
+    let rows = parseInt(cfg.rows, 10) || 1;
+    if (cols < 1) cols = 1;
+    if (rows < 1) rows = 1;
+    if (cols > w) cols = w;
+    if (rows > h) rows = h;
+    if (cols > 2) cols = 2;
+    if (rows > 2) rows = 2;
+    if (cols * rows > maxPanes) {
+      cols = 1;
+      rows = 1;
+    }
+    const n = cols * rows;
+    const src = cfg.panes || [];
+    const panes = [];
+    for (let i = 0; i < n; i++) panes.push(this._graphNormalizePane(src[i]));
+    item.graph = { cols: cols, rows: rows, panes: panes };
+    return item.graph;
+  }
+
+  _graphLayoutsForItem(item) {
+    const w = item.w || 2;
+    const h = item.h || 1;
+    const out = [{ cols: 1, rows: 1, label: '1 × 1' }];
+    if (h >= 2) out.push({ cols: 1, rows: 2, label: '1 × 2' });
+    if (w >= 2) out.push({ cols: 2, rows: 1, label: '2 × 1' });
+    if (w >= 2 && h >= 2) out.push({ cols: 2, rows: 2, label: '2 × 2' });
+    return out;
+  }
+
+  _graphFindItem(side, id) {
+    const items = this._board(side).items || [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].id === id) return items[i];
+    }
+    return null;
+  }
+
+  _graphActiveItem() {
+    const mode = this.state.shellMode || 'triple';
+    const boards = [this._board('left', mode), this._board('right', mode)];
+    for (let b = 0; b < boards.length; b++) {
+      const items = (boards[b] && boards[b].items) || [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type === 'graphs') return items[i];
+      }
+    }
+    return null;
+  }
+
+  _graphPaneTitle(pane) {
+    if (!pane || pane.kind === 'viz') return 'VIZ';
+    const names = [];
+    const vars = pane.vars || [];
+    for (let i = 0; i < vars.length; i++) {
+      const spec = CAR_GRAPH_VAR_BY_KEY[vars[i]];
+      if (spec) names.push(spec.label);
+    }
+    return names.join(' · ') || 'GRAPH';
+  }
+
+  _graphFormat(key, n) {
+    const spec = CAR_GRAPH_VAR_BY_KEY[key];
+    if (!spec || !isFinite(n)) return '0';
+    if (spec.unit === 'rpm' || spec.unit === 'km/h') return String(Math.round(n));
+    return (Math.round(n * 10) / 10).toFixed(1);
+  }
+
+  _graphPaneReadout(pane) {
+    if (!pane || pane.kind === 'viz') {
+      const playing = !!this.state.mediaPlaying;
+      return { title: 'VIZ', mode: playing ? 'LIVE' : 'IDLE', value: playing ? 'ON' : 'OFF', unit: '', regen: false };
+    }
+    const key = (pane.vars && pane.vars[0]) || 'evPowerKw';
+    const spec = CAR_GRAPH_VAR_BY_KEY[key] || CAR_GRAPH_VAR_BY_KEY.evPowerKw;
+    const n = this._graphDisplay[key] != null ? this._graphDisplay[key] : (this._graphValues[key] || 0);
+    const regen = !!spec.signed && n < -0.05;
+    let mode = '';
+    if (key === 'evPowerKw') mode = regen ? 'REGEN' : 'EV';
+    else if (regen) mode = 'NEG';
     return {
-      graphSizeClass: 'hv-graphs-' + w + 'x' + h,
-      graphShowBars: h > 1,
+      title: this._graphPaneTitle(pane),
+      mode: mode,
+      value: this._graphFormat(key, n),
+      unit: spec.unit || '',
+      regen: regen,
     };
+  }
+
+  _graphWidgetView(item, side) {
+    const cfg = this._graphNormalizeCfg(item);
+    const w = item.w || 2;
+    const h = item.h || 1;
+    const panes = [];
+    for (let i = 0; i < cfg.panes.length; i++) {
+      const readout = this._graphPaneReadout(cfg.panes[i]);
+      panes.push({
+        index: String(i),
+        title: readout.title,
+        mode: readout.mode,
+        value: readout.value,
+        unit: readout.unit,
+      });
+    }
+    const split = cfg.cols * cfg.rows > 1;
+    return {
+      graphSizeClass: 'hv-graphs-' + w + 'x' + h + (split ? ' hv-graphs-split' : ''),
+      graphGridStyle: 'grid-template-columns:repeat(' + cfg.cols + ',minmax(0,1fr));grid-template-rows:repeat(' + cfg.rows + ',minmax(0,1fr))',
+      graphPanes: panes,
+      graphMenuOpen: this.state.graphMenuId === item.id,
+      onHoldStart: (ev) => this._onGraphHoldStart(side, item.id, ev),
+      onHoldEnd: (ev) => this._onGraphHoldEnd(side, item.id, ev),
+      onContextMenu: (ev) => { if (ev && ev.preventDefault) ev.preventDefault(); },
+      onEdit: () => this._openGraphEditor(side, item.id),
+    };
+  }
+
+  _clearGraphHold() {
+    if (this._graphHoldTimer) {
+      clearTimeout(this._graphHoldTimer);
+      this._graphHoldTimer = 0;
+    }
+    this._graphHold = null;
+  }
+
+  _onGraphHoldStart(side, id, ev) {
+    if (this.state.graphEditId) return;
+    const t = ev && ev.target;
+    if (t && t.closest && t.closest('button')) return;
+    this._clearGraphHold();
+    this._graphHoldFired = false;
+    this._graphHoldTimer = setTimeout(() => {
+      this._graphHoldTimer = 0;
+      this._graphHoldFired = true;
+      this.setState({ graphMenuId: id, graphMenuSide: side });
+    }, CAR_GRAPH_HOLD_MS);
+  }
+
+  _onGraphHoldEnd(side, id, ev) {
+    const t = ev && ev.target;
+    const onBtn = t && t.closest && t.closest('button');
+    const fired = this._graphHoldFired;
+    this._clearGraphHold();
+    if (onBtn) return;
+    if (fired) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      return;
+    }
+    if (this.state.graphMenuId === id) {
+      this.setState({ graphMenuId: null, graphMenuSide: null });
+    }
+  }
+
+  _openGraphEditor(side, id) {
+    this.setState({
+      graphEditId: id,
+      graphEditSide: side,
+      graphMenuId: null,
+      graphMenuSide: null,
+      widgetPickerStep: null,
+    });
+  }
+
+  _closeGraphEditor() {
+    this.setState({ graphEditId: null, graphEditSide: null });
+  }
+
+  _patchGraph(mutator) {
+    const item = this._graphFindItem(this.state.graphEditSide, this.state.graphEditId);
+    if (!item) return;
+    const cfg = this._graphNormalizeCfg(item);
+    mutator(cfg, item);
+    this._graphNormalizeCfg(item);
+    this._persistWidgets();
+    this._graphCanvasCacheAt = 0;
+    this.setState({ widgetRev: (this.state.widgetRev || 0) + 1 });
+  }
+
+  _setGraphLayout(cols, rows) {
+    this._patchGraph((cfg) => {
+      cfg.cols = cols;
+      cfg.rows = rows;
+    });
+  }
+
+  _setGraphPaneKind(paneIndex, kind) {
+    this._patchGraph((cfg) => {
+      const pane = cfg.panes[paneIndex];
+      if (!pane) return;
+      pane.kind = kind === 'viz' ? 'viz' : 'series';
+    });
+  }
+
+  _setGraphPaneVar(paneIndex, slot, key) {
+    this._patchGraph((cfg) => {
+      const pane = cfg.panes[paneIndex];
+      if (!pane || pane.kind !== 'series') return;
+      let y1 = pane.vars[0] || 'evPowerKw';
+      let y2 = pane.vars[1] || '';
+      if (slot === 0) {
+        if (!key) return;
+        if (key === y2) y2 = '';
+        y1 = key;
+      } else if (!key || key === y1) {
+        y2 = '';
+      } else {
+        y2 = key;
+      }
+      pane.vars = y2 ? [y1, y2] : [y1];
+    });
+  }
+
+  _toggleGraphRuler(paneIndex, field) {
+    this._patchGraph((cfg) => {
+      const pane = cfg.panes[paneIndex];
+      if (!pane) return;
+      pane[field] = !pane[field];
+    });
+  }
+
+  _setGraphVizStyle(paneIndex, style) {
+    this._patchGraph((cfg) => {
+      const pane = cfg.panes[paneIndex];
+      if (!pane) return;
+      pane.vizStyle = style;
+    });
   }
 
   _syncGraphLoop(active) {
@@ -2629,66 +3458,91 @@ class Component extends DCLogic {
     this._graphRaf = 0;
   }
 
-  _graphKwAt(now) {
-    if (this._graphLive) return this._graphKw;
-    if (this._androidApp) return 0;
-    return Math.sin(now / 420) * 36 + Math.sin(now / 1180) * 16;
+  _graphDemoValue(key, now) {
+    const s1 = Math.sin(now / 420);
+    const s2 = Math.sin(now / 1180);
+    if (key === 'evPowerKw') return s1 * 36 + s2 * 16;
+    if (key === 'speed') return 55 + s1 * 35;
+    if (key === 'rpm') return 1800 + s1 * 900;
+    if (key === 'fuelInst') return 14 + s2 * 5;
+    if (key === 'evInst') return 16 + s1 * 8;
+    if (key === 'battV') return 355 + s2 * 12;
+    if (key === 'battI') return s1 * 90;
+    return 0;
+  }
+
+  _graphRaw(key, now) {
+    if (this._graphLiveKeys[key]) return this._graphValues[key];
+    if (this._busCount > 0) {
+      const v = this._graphValues[key];
+      return v == null ? 0 : v;
+    }
+    return this._graphDemoValue(key, now);
+  }
+
+  _graphSmooth(key, now) {
+    const raw = this._graphRaw(key, now);
+    const prev = this._graphDisplay[key];
+    const next = prev == null ? raw : prev + (raw - prev) * 0.18;
+    this._graphDisplay[key] = next;
+    this._pushGraphSample(key, now, raw);
+    return next;
   }
 
   _drawGraphs(now) {
-    // This is a SECOND rAF loop running alongside the 3D render loop, so it is
-    // competing for the same frame budget. It used to run document.querySelector
-    // All on every frame; the widget set changes only when a widget is added or
-    // removed, so re-resolving it a few times a second is plenty.
+    // Second rAF loop alongside the 3D renderer — keep DOM queries rare.
     if (!this._graphCanvasCacheAt || now - this._graphCanvasCacheAt > 500) {
       this._graphCanvasCache = document.querySelectorAll('.hv-graphs-canvas');
       this._graphCanvasCacheAt = now;
     }
     const canvases = this._graphCanvasCache;
     if (!canvases || !canvases.length) return;
-    // The samples themselves are throttled to 80ms in _pushGraphSample, so
-    // redrawing at full rAF rate just burns budget on a line that has not moved.
     if (this._graphDrawAt && now - this._graphDrawAt < 33) return;
     this._graphDrawAt = now;
-    const kw = this._graphKwAt(now);
-    this._graphKw = this._graphLive ? this._graphKw : kw;
-    this._pushGraphSample(now);
-    this._graphDisplayKw += (kw - this._graphDisplayKw) * 0.18;
-    this._updateGraphReadout(this._graphDisplayKw);
+    this._graphNow = now;
 
-    const samples = this._graphSamples;
+    const item = this._graphActiveItem();
+    if (!item) return;
+    const cfg = this._graphNormalizeCfg(item);
+    const needed = { evPowerKw: true };
+    for (let i = 0; i < cfg.panes.length; i++) {
+      const vars = cfg.panes[i].vars || [];
+      for (let v = 0; v < vars.length; v++) needed[vars[v]] = true;
+    }
+    const keys = Object.keys(needed);
+    for (let k = 0; k < keys.length; k++) this._graphSmooth(keys[k], now);
+
     const spanStart = now - CAR_GRAPH_SPAN_MS;
-    const avgStart = now - CAR_GRAPH_AVG_MS;
-    let avgSum = 0;
-    let avgN = 0;
-    for (let i = 0; i < samples.length; i++) {
-      if (samples[i].t >= avgStart) {
-        avgSum += samples[i].kw;
-        avgN += 1;
-      }
-    }
-    const avgKw = avgN ? avgSum / avgN : 0;
-
     for (let c = 0; c < canvases.length; c++) {
-      this._paintGraphCanvas(canvases[c], now, spanStart, avgKw);
+      const idx = parseInt(canvases[c].getAttribute('data-pane'), 10);
+      const pane = cfg.panes[isFinite(idx) ? idx : c];
+      if (!pane) continue;
+      this._paintGraphCanvas(canvases[c], pane, now, spanStart);
     }
   }
 
-  _updateGraphReadout(kw) {
-    const regen = kw < -0.5;
-    const mag = Math.abs(kw);
-    const label = regen ? 'REGEN' : 'EV';
-    const text = mag.toFixed(1);
-    const modes = document.querySelectorAll('.hv-graphs-mode');
-    for (let i = 0; i < modes.length; i++) {
-      modes[i].textContent = label;
-      modes[i].className = 'hv-graphs-mode' + (regen ? ' regen' : '');
+  _updatePaneReadout(canvas, pane) {
+    const plot = canvas.parentNode;
+    const paneEl = plot && plot.parentNode;
+    if (!paneEl) return;
+    const readout = this._graphPaneReadout(pane);
+    const kicker = paneEl.querySelector('.hv-graphs-kicker');
+    const mode = paneEl.querySelector('.hv-graphs-mode');
+    const val = paneEl.querySelector('.hv-graphs-value');
+    const unit = paneEl.querySelector('.hv-graphs-unit');
+    if (kicker) kicker.textContent = readout.title;
+    if (mode) {
+      mode.textContent = readout.mode;
+      mode.className = 'hv-graphs-mode' + (readout.regen ? ' regen' : '');
     }
-    const vals = document.querySelectorAll('.hv-graphs-value');
-    for (let i = 0; i < vals.length; i++) vals[i].textContent = text;
+    if (val) {
+      val.textContent = readout.value;
+      val.className = 'hv-graphs-value' + (readout.regen ? ' regen' : '');
+    }
+    if (unit) unit.textContent = readout.unit;
   }
 
-  _paintGraphCanvas(canvas, now, spanStart, avgKw) {
+  _paintGraphCanvas(canvas, pane, now, spanStart) {
     const wrap = canvas.parentNode;
     if (!wrap) return;
     const cssW = wrap.clientWidth;
@@ -2705,64 +3559,95 @@ class Component extends DCLogic {
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
+    this._updatePaneReadout(canvas, pane);
+    if (pane.kind === 'viz') {
+      this._paintGraphViz(ctx, canvas, pane, cssW, cssH, now);
+      return;
+    }
+    this._paintGraphSeries(ctx, pane, cssW, cssH, now, spanStart);
+  }
 
-    const rootCls = wrap.parentNode && wrap.parentNode.className
-      ? String(wrap.parentNode.className) : '';
-    const tall = rootCls.indexOf('hv-graphs-2x2') >= 0 || rootCls.indexOf('hv-graphs-3x2') >= 0;
-    const barW = tall ? Math.max(36, cssW * 0.18) : 0;
-    const plotL = 2;
-    const plotR = cssW - barW - (barW ? 8 : 2);
+  _graphToY(value, spec, cssH) {
+    const t = (value - spec.min) / (spec.max - spec.min);
+    const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+    return (1 - clamped) * (cssH - 2) + 1;
+  }
+
+  _paintGraphSeries(ctx, pane, cssW, cssH, now, spanStart) {
+    const y1Key = (pane.vars && pane.vars[0]) || 'evPowerKw';
+    const y2Key = pane.vars && pane.vars[1] ? pane.vars[1] : '';
+    const y1 = CAR_GRAPH_VAR_BY_KEY[y1Key];
+    const y2 = y2Key ? CAR_GRAPH_VAR_BY_KEY[y2Key] : null;
+    const plotL = pane.y1Rulers ? 28 : 2;
+    const plotR = cssW - (pane.y2Rulers && y2 ? 28 : 2);
     const plotW = Math.max(8, plotR - plotL);
-    const kwToY = (kw) => {
-      const t = (kw - CAR_GRAPH_MIN_KW) / (CAR_GRAPH_MAX_KW - CAR_GRAPH_MIN_KW);
-      const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
-      return (1 - clamped) * (cssH - 2) + 1;
-    };
-    const zeroY = kwToY(0);
 
-    ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    if (pane.y1Rulers && y1) this._paintGraphRulers(ctx, y1, plotL - 4, 'right', cssH, 'rgba(242,245,248,.45)', plotL, plotR);
+    if (pane.y2Rulers && y2) this._paintGraphRulers(ctx, y2, plotR + 4, 'left', cssH, 'rgba(79,214,232,.55)', 0, 0);
+
+    this._strokeZero(ctx, y1, plotL, plotR, cssH, 'rgba(255,255,255,.14)');
+    if (y2) this._strokeZero(ctx, y2, plotL, plotR, cssH, 'rgba(79,214,232,.22)');
+
+    this._paintGraphVar(ctx, y1Key, y1, true, plotL, plotR, plotW, cssH, now, spanStart);
+    if (y2) this._paintGraphVar(ctx, y2Key, y2, false, plotL, plotR, plotW, cssH, now, spanStart);
+  }
+
+  _strokeZero(ctx, spec, plotL, plotR, cssH, color) {
+    if (!spec || spec.min >= 0 || spec.max <= 0) return;
+    const y = this._graphToY(0, spec, cssH);
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 4]);
     ctx.beginPath();
-    ctx.moveTo(plotL, zeroY);
-    ctx.lineTo(plotR, zeroY);
+    ctx.moveTo(plotL, y);
+    ctx.lineTo(plotR, y);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
 
-    const samples = this._graphSamples;
+  _paintGraphRulers(ctx, spec, x, align, cssH, color, gridL, gridR) {
+    const ticks = spec.signed ? [spec.min, 0, spec.max] : [spec.min, (spec.min + spec.max) / 2, spec.max];
+    ctx.font = '8px "Space Mono", monospace';
+    ctx.textAlign = align;
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < ticks.length; i++) {
+      const y = this._graphToY(ticks[i], spec, cssH);
+      if (gridR > gridL) {
+        ctx.strokeStyle = 'rgba(255,255,255,.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(gridL, y);
+        ctx.lineTo(gridR, y);
+        ctx.stroke();
+      }
+      ctx.fillStyle = color;
+      ctx.fillText(this._graphFormat(spec.key, ticks[i]), x, y);
+    }
+  }
+
+  _paintGraphVar(ctx, key, spec, isY1, plotL, plotR, plotW, cssH, now, spanStart) {
+    if (!spec) return;
+    const samples = this._graphSeries[key] || [];
+    const display = this._graphDisplay[key] != null ? this._graphDisplay[key] : 0;
     const pts = [];
     for (let i = 0; i < samples.length; i++) {
       if (samples[i].t < spanStart) continue;
       const x = plotL + ((samples[i].t - spanStart) / CAR_GRAPH_SPAN_MS) * plotW;
-      pts.push({ x: x, y: kwToY(samples[i].kw), kw: samples[i].kw });
+      pts.push({ x: x, y: this._graphToY(samples[i].v, spec, cssH), v: samples[i].v });
     }
-    if (pts.length) {
-      pts.push({ x: plotR, y: kwToY(this._graphDisplayKw), kw: this._graphDisplayKw });
-      this._fillGraphBand(ctx, pts, plotL, plotR, zeroY, true);
-      this._fillGraphBand(ctx, pts, plotL, plotR, zeroY, false);
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.strokeStyle = 'rgba(242,245,248,.92)';
-      ctx.lineWidth = 1.6;
-      ctx.stroke();
-    }
-
-    if (tall) {
-      const avgY = kwToY(avgKw);
-      ctx.beginPath();
-      ctx.moveTo(plotL, avgY);
-      ctx.lineTo(plotR, avgY);
-      ctx.strokeStyle = 'rgba(255,255,255,.35)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 5]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      this._paintGraphBars(ctx, cssW, cssH, barW, now);
-    }
+    if (!pts.length) return;
+    pts.push({ x: plotR, y: this._graphToY(display, spec, cssH), v: display });
+    const zeroY = spec.min < 0 && spec.max > 0 ? this._graphToY(0, spec, cssH) : cssH;
+    const posFill = isY1 ? 'rgba(242,245,248,.28)' : 'rgba(79,214,232,.22)';
+    const negFill = spec.signed ? 'rgba(62,224,138,.30)' : 'rgba(255,255,255,.08)';
+    const posStroke = isY1 ? CAR_GRAPH_COLOR_Y1 : CAR_GRAPH_COLOR_Y2;
+    const negStroke = spec.signed ? CAR_GRAPH_COLOR_REGEN : posStroke;
+    this._fillGraphBand(ctx, pts, zeroY, true, posFill);
+    this._fillGraphBand(ctx, pts, zeroY, false, negFill);
+    this._strokeGraphLine(ctx, pts, zeroY, posStroke, negStroke);
   }
 
-  _fillGraphBand(ctx, pts, plotL, plotR, zeroY, positive) {
+  _fillGraphBand(ctx, pts, zeroY, positive, fill) {
     ctx.beginPath();
     ctx.moveTo(pts[0].x, zeroY);
     for (let i = 0; i < pts.length; i++) {
@@ -2771,26 +3656,128 @@ class Component extends DCLogic {
     }
     ctx.lineTo(pts[pts.length - 1].x, zeroY);
     ctx.closePath();
-    ctx.fillStyle = positive ? 'rgba(242,245,248,.28)' : 'rgba(255,255,255,.08)';
+    ctx.fillStyle = fill;
     ctx.fill();
   }
 
-  _paintGraphBars(ctx, cssW, cssH, barW, now) {
-    const bars = this._graphBars;
-    const mag = Math.min(1, Math.abs(this._graphDisplayKw) / CAR_GRAPH_MAX_KW);
+  _strokeGraphLine(ctx, pts, zeroY, posColor, negColor) {
+    ctx.lineWidth = 1.6;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const aBelow = a.y > zeroY;
+      const bBelow = b.y > zeroY;
+      if (aBelow === bBelow) {
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = aBelow ? negColor : posColor;
+        ctx.stroke();
+      } else {
+        const dy = b.y - a.y;
+        const t = Math.abs(dy) < 0.001 ? 0.5 : (zeroY - a.y) / dy;
+        const mx = a.x + (b.x - a.x) * t;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(mx, zeroY);
+        ctx.strokeStyle = aBelow ? negColor : posColor;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(mx, zeroY);
+        ctx.lineTo(b.x, b.y);
+        ctx.strokeStyle = bBelow ? negColor : posColor;
+        ctx.stroke();
+      }
+    }
+  }
+
+  _graphVizLevel(now) {
+    const kw = this._graphDisplay.evPowerKw || 0;
+    const bass = Math.min(1, Math.abs(kw) / 80);
+    const playing = !!this.state.mediaPlaying;
+    const idle = 0.08 + 0.12 * bass;
+    const live = 0.38 + 0.62 * bass;
+    return playing ? live : idle;
+  }
+
+  _graphVizBars(id, n) {
+    let bars = this._graphVizState[id];
+    if (!bars || bars.length !== n) {
+      bars = [];
+      for (let i = 0; i < n; i++) bars.push(0);
+      this._graphVizState[id] = bars;
+    }
+    return bars;
+  }
+
+  _stepVizBars(bars, now, level, paneIndex) {
+    for (let i = 0; i < bars.length; i++) {
+      const pulse = 0.45 + 0.55 * Math.abs(Math.sin(now / 140 + i * 0.62 + paneIndex));
+      const falloff = Math.exp(-Math.abs(i - bars.length * 0.28) * 0.12);
+      const target = level * falloff * pulse;
+      bars[i] += (target - bars[i]) * (target > bars[i] ? 0.38 : 0.14);
+      bars[i] *= 0.97;
+    }
+  }
+
+  _paintGraphViz(ctx, canvas, pane, cssW, cssH, now) {
+    // No FFT of other apps' audio on the MMI. Drive the motion from now-playing
+    // plus battery power so a silent cabin still has a pulse when the car is
+    // pulling or regenerating.
+    const style = pane.vizStyle || 'bars';
+    const paneIndex = parseInt(canvas.getAttribute('data-pane'), 10) || 0;
+    const n = style === 'radial' ? 28 : 16;
+    const bars = this._graphVizBars(paneIndex + '-' + style, n);
+    const level = this._graphVizLevel(now);
+    this._stepVizBars(bars, now, level, paneIndex);
+    if (style === 'radial') this._paintVizRadial(ctx, cssW, cssH, bars);
+    else if (style === 'mirror') this._paintVizMirror(ctx, cssW, cssH, bars);
+    else this._paintVizBars(ctx, cssW, cssH, bars);
+  }
+
+  _paintVizBars(ctx, cssW, cssH, bars) {
     const n = bars.length;
     const gap = 3;
-    const x0 = cssW - barW;
-    const bw = Math.max(2, (barW - gap * (n - 1)) / n);
+    const bw = Math.max(2, (cssW - gap * (n - 1)) / n);
     for (let i = 0; i < n; i++) {
-      const pulse = 0.55 + 0.45 * Math.abs(Math.sin(now / 160 + i * 0.7));
-      const target = mag * Math.exp(-i * 0.11) * pulse;
-      bars[i] += (target - bars[i]) * (target > bars[i] ? 0.35 : 0.12);
-      bars[i] *= 0.96;
-      const bh = Math.max(1, bars[i] * (cssH - 4));
-      const x = x0 + i * (bw + gap);
-      ctx.fillStyle = 'rgba(242,245,248,' + (0.18 + bars[i] * 0.7).toFixed(3) + ')';
+      const bh = Math.max(2, bars[i] * (cssH - 4));
+      const x = i * (bw + gap);
+      ctx.fillStyle = 'rgba(242,245,248,' + (0.18 + bars[i] * 0.72).toFixed(3) + ')';
       ctx.fillRect(x, cssH - bh, bw, bh);
+    }
+  }
+
+  _paintVizRadial(ctx, cssW, cssH, bars) {
+    const n = bars.length;
+    const cx = cssW / 2;
+    const cy = cssH / 2;
+    const maxR = Math.min(cssW, cssH) * 0.46;
+    const inner = maxR * 0.28;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(2, (Math.PI * 2 * inner) / n * 0.55);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const outer = inner + bars[i] * (maxR - inner);
+      ctx.strokeStyle = 'rgba(242,245,248,' + (0.22 + bars[i] * 0.7).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
+      ctx.lineTo(cx + Math.cos(a) * outer, cy + Math.sin(a) * outer);
+      ctx.stroke();
+    }
+  }
+
+  _paintVizMirror(ctx, cssW, cssH, bars) {
+    const n = bars.length;
+    const gap = 3;
+    const bw = Math.max(2, (cssW - gap * (n - 1)) / n);
+    const mid = cssH / 2;
+    for (let i = 0; i < n; i++) {
+      const bh = Math.max(1, bars[i] * (cssH * 0.46));
+      const x = i * (bw + gap);
+      ctx.fillStyle = 'rgba(79,214,232,' + (0.2 + bars[i] * 0.65).toFixed(3) + ')';
+      ctx.fillRect(x, mid - bh, bw, bh * 2);
     }
   }
 
@@ -2828,6 +3815,37 @@ class Component extends DCLogic {
     let s = String(value).trim();
     if (s.charAt(0) === '{') s = s.replace(/^\{|\}$/g, '').split(',')[0].trim();
     return s === '1' || s === 'true';
+  }
+
+  _carNumber(value) {
+    let s = String(value == null ? '' : value).trim();
+    if (s.charAt(0) === '{') {
+      const parts = s.replace(/^\{|\}$/g, '').split(',');
+      s = (parts[parts.length > 1 ? 1 : 0] || '').trim();
+    }
+    const n = parseFloat(s);
+    return isFinite(n) ? n : NaN;
+  }
+
+  /**
+   * Impulse deriveGasConsumption: "{metric, value}" — metric 4.0 is idle L/h,
+   * otherwise running km/L via 100 / consumption. Idle plots as 0 so the
+   * km/L series is not mixed with L/h.
+   */
+  _parseFuelInst(value) {
+    let metric = 1;
+    let consumption = 0;
+    const str = String(value == null ? '' : value).trim();
+    if (str.charAt(0) === '{' && str.charAt(str.length - 1) === '}' && str.indexOf(',') >= 0) {
+      const parts = str.substring(1, str.length - 1).split(',');
+      metric = parseFloat((parts[0] || '').trim()) || 0;
+      consumption = parseFloat((parts[1] || '').trim()) || 0;
+    } else {
+      consumption = parseFloat(str) || 0;
+    }
+    if (metric === 4) return 0;
+    if (consumption <= 0) return 0;
+    return Math.floor(1000 / consumption) / 10;
   }
 
   /**
@@ -2931,7 +3949,19 @@ class Component extends DCLogic {
     const road = (wheelDeg * CAR_STEERING_SIGN) / CAR_STEERING_RATIO;
     const clamped = Math.max(-CAR_ROAD_WHEEL_MAX_DEG, Math.min(CAR_ROAD_WHEEL_MAX_DEG, road));
     // Sub-degree jitter would re-run the wheel transform every frame on a live bus.
-    if (this._lastCarSteerDeg !== undefined && Math.abs(clamped - this._lastCarSteerDeg) < 0.5) return;
+    if (this._wheelAngleHeldByUi) {
+      // Keep the preview until the car reports a value that is actually new
+      // vs the last bus sample we saw when the user took over (repeats of
+      // parked 0 / the same lock angle must not yank the slider back).
+      if (this._carSteerAtHold === undefined) {
+        this._carSteerAtHold = clamped;
+        return;
+      }
+      if (Math.abs(clamped - this._carSteerAtHold) < 0.5) return;
+      this._wheelAngleHeldByUi = false;
+    } else if (this._lastCarSteerDeg !== undefined && Math.abs(clamped - this._lastCarSteerDeg) < 0.5) {
+      return;
+    }
     this._lastCarSteerDeg = clamped;
     this._setWheelAngle(clamped);
   }
@@ -2943,6 +3973,18 @@ class Component extends DCLogic {
       return;
     }
     this._trackCarDeceleration(kmh);
+    this._setGraphValue('speed', kmh);
+    // The OVERRIDE → MOTION slider is a preview control. Ignore repeats of
+    // the speed we froze when the user took over (parked zeros, or the same
+    // cruise). A genuinely new vehicle_speed yields the wheel back to the car.
+    if (this._motionSpeedHeldByUi) {
+      if (this._carSpeedAtHold === undefined) {
+        this._carSpeedAtHold = kmh;
+        return;
+      }
+      if (Math.abs(kmh - this._carSpeedAtHold) < 0.5) return;
+      this._motionSpeedHeldByUi = false;
+    }
     this._setMotionSpeed(kmh / CAR_SPEED_KMH_PER_UNIT);
   }
 
@@ -3076,7 +4118,8 @@ class Component extends DCLogic {
   toggleConfigRail() {
     if (this.state.configExpanded) {
       // Closing config — restore the media rail on Android.
-      const patch = { configExpanded: false, panelOpen: false, activeGroup: null };
+      this._cancelWidgetPicker();
+      const patch = { configExpanded: false, panelOpen: false, activeGroup: null, shellMenuOpen: false };
       if (this._androidApp && this.state.shellMode !== 'appsOnly') {
         patch.mediaColumnVisible = true;
         patch.mediaRight = this._shellRight || 'idle';
@@ -3084,20 +4127,11 @@ class Component extends DCLogic {
       this.setState(patch);
       this._applyFitCamera();
     } else {
-      // Opening config — hide media widget and dismiss any right-slot music app.
       this.setState({
         configExpanded: true,
-        panelOpen: true,
-        activeGroup: 'tuning',
-        configSection: 'paint',
-        tuningSubTab: 'paint',
-        mediaColumnVisible: false,
+        panelOpen: false,
+        activeGroup: null,
       });
-      try {
-        if (window.MediaBridge && typeof window.MediaBridge.dismissSlot === 'function') {
-          window.MediaBridge.dismissSlot();
-        }
-      } catch (e) {}
       this._applyFitCamera();
     }
   }
@@ -3112,24 +4146,18 @@ class Component extends DCLogic {
   }
 
   toggleCameraRail(forceOpen) {
-    const open = forceOpen === true || !(this.state.activeGroup === 'camera' && this.state.panelOpen && !this.state.configExpanded);
+    const cameraOpen = this.state.activeGroup === 'camera' && this.state.panelOpen;
+    const open = forceOpen === true || !cameraOpen;
     if (!open) {
-      const patch = { panelOpen: false, activeGroup: null };
-      if (this._androidApp && this.state.shellMode !== 'appsOnly') {
-        patch.mediaColumnVisible = true;
-        patch.mediaRight = this._shellRight || 'idle';
-      }
-      this.setState(patch);
+      this.setState({ panelOpen: false, activeGroup: null });
       return;
     }
     this.setState({
-      configExpanded: false,
+      configExpanded: true,
       panelOpen: true,
       activeGroup: 'camera',
       configSection: 'camera',
-      mediaColumnVisible: false,
     });
-    this._dismissRightMediaForPanel();
   }
 
   saveLayoutCamera() {
@@ -3295,6 +4323,8 @@ class Component extends DCLogic {
       ring: p.key === activeKey ? '#4fd6e8' : 'rgba(255,255,255,.22)',
       onClick: () => this.setColor(p.key),
     }));
+    const hv = (on) => this._hvBtn(!!on);
+    const hvOff = hv(false);
     return {
       containerRef: this.containerRef,
       outerRef: this.outerRef,
@@ -3304,15 +4334,15 @@ class Component extends DCLogic {
       setTimeDay:   () => { this.setTimeMode('day'); this.setState({ activeGroup: 'time' }); },
       setTimeNight: () => { this.setTimeMode('night'); this.setState({ activeGroup: 'time' }); },
       setTimeAuto:  () => { this.setTimeMode('auto'); this.setState({ activeGroup: 'time' }); },
-      timeDayBg:    s.timeMode === 'day'   ? 'rgba(79,214,232,.18)' : 'transparent',
-      timeNightBg:  s.timeMode === 'night' ? 'rgba(79,214,232,.18)' : 'transparent',
-      timeAutoBg:   s.timeMode === 'auto'  ? 'rgba(79,214,232,.18)' : 'transparent',
-      timeDayBorder:   s.timeMode === 'day'   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      timeNightBorder: s.timeMode === 'night' ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      timeAutoBorder:  s.timeMode === 'auto'  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      timeDayCol:   s.timeMode === 'day'   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      timeNightCol: s.timeMode === 'night' ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      timeAutoCol:  s.timeMode === 'auto'  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      timeDayBg:    hv(s.timeMode === 'day').bg,
+      timeNightBg:  hv(s.timeMode === 'night').bg,
+      timeAutoBg:   hv(s.timeMode === 'auto').bg,
+      timeDayBorder:   hv(s.timeMode === 'day').border,
+      timeNightBorder: hv(s.timeMode === 'night').border,
+      timeAutoBorder:  hv(s.timeMode === 'auto').border,
+      timeDayCol:   hv(s.timeMode === 'day').col,
+      timeNightCol: hv(s.timeMode === 'night').col,
+      timeAutoCol:  hv(s.timeMode === 'auto').col,
       timeModeHint: s.timeMode === 'auto'
         ? (s.nightMode ? 'Auto · following car (night)' : 'Auto · following car (day)')
         : (s.timeMode === 'night' ? 'Forced night' : 'Forced day'),
@@ -3321,18 +4351,20 @@ class Component extends DCLogic {
       // Spinner + progress bar are the fallback, not the boot experience: while
       // the splash clip is up it covers them anyway, and if the clip is skipped
       // or fails early they take over for whatever is left of the load.
-      loaderDisplay: s.loading && !s.error && !s.splashActive && !this._androidApp ? 'flex' : 'none',
+      loaderDisplay: s.loading && !s.error && !s.splashActive && !this._androidApp && !this._viewerReady ? 'flex' : 'none',
+      loadHudDisplay: s.loading && !s.error && this._viewerReady && !this._androidApp ? 'flex' : 'none',
+      loadHudTitle: s.catalogLoadingKey ? 'LOADING WHEEL' : 'LOADING MODEL',
       errorDisplay: s.error ? 'flex' : 'none',
       errorMsg: s.error || '',
       progressText: s.processing ? 'PROCESSING…' : (Math.round(s.progress) + '%'),
       progressWidth: s.progress + '%',
-      hintOpacity: (s.loading || this._androidApp) ? '0' : '0.85',
-      panelDisplay: s.loading || s.error ? 'none' : 'block',
+      hintOpacity: (s.loading && !this._viewerReady) || this._androidApp ? '0' : '0.85',
+      panelDisplay: (s.loading && !this._viewerReady) || s.error ? 'none' : 'block',
       panelOpen: s.panelOpen,
-      panelBodyDisplay: (!s.loading && !s.error && s.panelOpen) ? 'block' : 'none',
+      panelBodyDisplay: (!s.error && s.panelOpen && !(s.loading && !this._viewerReady)) ? 'block' : 'none',
       panelWidth: '248px',
-      panelIconDisplay: (!s.loading && !s.error && !s.panelOpen) ? 'flex' : 'none',
-      dayNightDisplay: (!s.loading && !s.error) ? 'flex' : 'none',
+      panelIconDisplay: (!s.error && !s.panelOpen && !(s.loading && !this._viewerReady)) ? 'flex' : 'none',
+      dayNightDisplay: (!s.error && !(s.loading && !this._viewerReady)) ? 'flex' : 'none',
       // Native reports this: 22 when our window already starts below the MMI
       // header, header-height + 22 when the header floats over our content.
       safeTop: (this._safeTopPx == null ? 22 : this._safeTopPx) + 'px',
@@ -3341,7 +4373,7 @@ class Component extends DCLogic {
       safeLeft: (this._safeLeftPx || 0) + 'px',
       safeRight: (this._safeRightPx || 0) + 'px',
       safeBottom: (this._safeBottomPx || 0) + 'px',
-      launcherBottom: (this._launcherBottomPx == null ? 14 : this._launcherBottomPx) + 'px',
+      launcherBottom: (this._launcherBottomPx == null ? 60 : this._launcherBottomPx) + 'px',
       // The shell paints the FINAL background from the very first render.
       // Previously this div carried a hardcoded light radial gradient and only
       // became the real colour once _applyBackground ran after the model
@@ -3349,13 +4381,27 @@ class Component extends DCLogic {
       // then snapped dark. state.nightMode/dayBg/nightBg are restored from
       // localStorage in the constructor, so they are already correct here.
       shellBg: this._resolvedBg(),
-      // CONFIG stays top-right; opening it hides the media column (no inset).
-      // Position comes from --hv-safe-* so it is right during load too, when the
-      // loading guard skips setState; this is only the panel-open offset.
+      // Config panel docks over the left widget board (see configDock*).
       toolbarRight: (s.panelOpen ? 286 : 26) + 'px',
       configPanelRight: '26px',
       mediaRailDisplay: 'none',
       shellHudDisplay: (!s.error && this._androidApp) ? 'flex' : 'none',
+      pageBtnsDisplay: (!s.error && this._androidApp) ? 'flex' : 'none',
+      chromeMainLeft: '96px',
+      configDockDisplay: 'none',
+      configDockLeft: '0px',
+      configDockTop: '0px',
+      configDockWidth: '0px',
+      configDockHeight: '0px',
+      wheelCatalogCols: 'repeat(6, 1fr)',
+      pageMainClass: (s.chromePage || 'main') === 'main' ? 'on' : '',
+      pageCarClass: s.chromePage === 'car' ? 'on' : '',
+      pageAcClass: s.chromePage === 'ac' ? 'on' : '',
+      setChromePageMain: () => this.setState({ chromePage: 'main' }),
+      setChromePageCar: () => { this._cancelWidgetPicker(); this.setState({ chromePage: 'car' }); },
+      setChromePageAc: () => { this._cancelWidgetPicker(); this.setState({ chromePage: 'ac' }); },
+      pageStubDisplay: (this._androidApp && !s.error && !s.loading && s.chromePage && s.chromePage !== 'main') ? 'block' : 'none',
+      pageStubTitle: s.chromePage === 'ac' ? 'AC SETTINGS' : 'CAR SETTINGS',
       shellMenuDisplay: s.shellMenuOpen ? 'flex' : 'none',
       shellModeBtnClass: s.shellMenuOpen ? 'on' : '',
       shellSideBtnsDisplay: (s.shellMode === 'triple' || s.shellMode === 'appsOnly') ? 'inline-flex' : 'none',
@@ -3408,43 +4454,36 @@ class Component extends DCLogic {
       showTuningSubmenu: !!(s.configExpanded && s.activeGroup === 'tuning'),
       showOverrideSubmenu: !!(s.configExpanded && s.activeGroup === 'override'),
       showTimeSubmenu: !!(s.configExpanded && s.activeGroup === 'time'),
-      resScaleIcon: ({ off: 'OFF', strong: 'DYN+', lite: 'DYN', on: 'ON' })[s.resScaleMode || 'off'],
-      resScaleBorder: (s.resScaleMode && s.resScaleMode !== 'off') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      resScaleCol:    (s.resScaleMode && s.resScaleMode !== 'off') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      resScaleTooltip: ({
-        off:    'Resolution scaling: OFF - always native, sharpest but slowest while moving',
-        strong: 'Resolution scaling: DYNAMIC STRONG - reduce while moving once below ~20fps',
-        lite:   'Resolution scaling: DYNAMIC LITE - reduce only in emergencies, below ~10fps',
-        on:     'Resolution scaling: ALWAYS ON - always reduce while moving, sharpen when still',
-      })[s.resScaleMode || 'off'],
-      cycleResScale: () => this.setState((st) => {
-        const order = ['off', 'strong', 'lite', 'on'];
-        const next = order[(order.indexOf(st.resScaleMode || 'off') + 1) % order.length];
-        return { resScaleMode: next };
-      }),
+      resScaleIcon: this._perfModeInfo(s.resScaleMode).icon,
+      resScaleBorder: hv(s.resScaleMode && s.resScaleMode !== 'off').border,
+      resScaleCol:    hv(s.resScaleMode && s.resScaleMode !== 'off').col,
+      resScaleTooltip: this._perfModeInfo(s.resScaleMode).tooltip,
+      cycleResScale: () => this._cyclePerfMode(),
+      perfToastClass: s.perfToastOn ? 'on' : '',
+      perfToastTitle: s.perfToastTitle || '',
+      perfToastMsg: s.perfToastMsg || '',
       showFps: s.showFps,
-      fpsBtnBorder: s.showFps ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      fpsBtnCol:    s.showFps ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      fpsBtnBorder: hv(s.showFps).border,
+      fpsBtnCol:    hv(s.showFps).col,
       fpsTooltip:   s.showFps ? 'Hide FPS' : 'Show FPS',
       toggleFpsHud: () => this.setState((st) => {
         const showFps = !st.showFps;
         this._applyFpsVisibility(showFps);
         return { showFps };
       }),
-      configBtnBorder: s.configExpanded ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      configBtnCol:    s.configExpanded ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      configBtnBg:     s.configExpanded ? 'rgba(79,214,232,.16)' : 'rgba(16,21,28,.82)',
+      configBtnBorder: hv(s.configExpanded).border,
+      configBtnCol:    hv(s.configExpanded).col,
+      configBtnBg:     hv(s.configExpanded).bg,
       toggleConfigPanel: () => this.toggleConfigRail(),
-      closeConfigPanel: () => this.setState((st) => {
-        const patch = { panelOpen: false };
-        if (st.activeGroup === 'camera' && !st.configExpanded) patch.activeGroup = null;
-        return patch;
-      }),
-      openTimeSubmenu: () => {
-        this.setState((st) => ({
-          activeGroup: st.activeGroup === 'time' ? null : 'time',
-        }));
-      },
+      closeConfigPanel: () => this.setState({ panelOpen: false, activeGroup: null }),
+      openSectionEnv: () => this._toggleConfigSection('env', { activeGroup: 'env' }),
+      openSectionTuning: () => this._toggleConfigSection('paint', { activeGroup: 'tuning', tuningSubTab: 'paint' }),
+      openSectionOverride: () => this._toggleConfigSection('override', { activeGroup: 'override', overrideSubTab: 'motion' }),
+      tabEnvBorder:      hv(s.panelOpen && s.configSection === 'env').border,
+      tabEnvCol:         hv(s.panelOpen && s.configSection === 'env').col,
+      tabCameraBorder:   hv(s.panelOpen && s.configSection === 'camera').border,
+      tabCameraCol:      hv(s.panelOpen && s.configSection === 'camera').col,
+      cameraBtnBg:       hv(s.panelOpen && s.configSection === 'camera').bg,
       timeIconIsDay:   s.timeMode === 'day',
       timeIconIsNight: s.timeMode === 'night',
       timeIconIsAuto:  s.timeMode === 'auto',
@@ -3463,30 +4502,6 @@ class Component extends DCLogic {
       sectionIsOverride: s.configSection === 'override',
       sectionIsEnv:      s.configSection === 'env',
       sectionIsCamera:   s.configSection === 'camera',
-      tabTimeBorder:     (s.activeGroup === 'time') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabTimeCol:        (s.activeGroup === 'time') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabTuningBorder:   (s.activeGroup === 'tuning')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabTuningCol:      (s.activeGroup === 'tuning')   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabOverrideBorder: (s.activeGroup === 'override') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabOverrideCol:    (s.activeGroup === 'override') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabEnvBorder:      (s.activeGroup === 'env')      ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabEnvCol:         (s.activeGroup === 'env')      ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tabCameraBorder:   (s.activeGroup === 'camera')   ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tabCameraCol:      (s.activeGroup === 'camera')   ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      cameraBtnBg:       (s.activeGroup === 'camera')   ? 'rgba(79,214,232,.16)' : 'rgba(16,21,28,.82)',
-      openSectionTuning:   () => {
-        this.setState({
-          configExpanded: true, panelOpen: true, activeGroup: 'tuning',
-          configSection: 'paint', tuningSubTab: 'paint',
-        });
-      },
-      openSectionOverride: () => {
-        this.setState({
-          configExpanded: true, panelOpen: true, activeGroup: 'override',
-          configSection: 'override', overrideSubTab: 'motion',
-        });
-      },
-      openSectionEnv: () => this.openConfigSection('env'),
       toggleCameraPanel: () => this.toggleCameraRail(),
       openSectionCamera: () => this.toggleCameraRail(true),
       cameraPresets: (() => {
@@ -3523,36 +4538,29 @@ class Component extends DCLogic {
       layoutCamSaveCol:    s.layoutCamFlash ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       layoutCamSaveOpacity: this._currentLayoutCamKey() ? '1' : '0.4',
       onSaveSettings: () => this.saveSettings(),
-      saveBtnBorder: s.saveFlash ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      saveBtnCol:    s.saveFlash ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      setTuningPaint:  () => this.setState({
-        activeGroup: 'tuning', configSection: 'paint', tuningSubTab: 'paint', panelOpen: true, configExpanded: true,
-      }),
-      setTuningWheels: () => {
-        this.setState({
-          activeGroup: 'tuning', configSection: 'wheels', tuningSubTab: 'wheels', panelOpen: true, configExpanded: true,
-        });
-        this._generateCatalogThumbnails();
-      },
-      tunPaintBorder:  s.configSection === 'paint'  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tunWheelsBorder: s.configSection === 'wheels' ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      tunPaintCol:  s.configSection === 'paint'  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      tunWheelsCol: s.configSection === 'wheels' ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      saveBtnBorder: hv(s.saveFlash).border,
+      saveBtnCol:    hv(s.saveFlash).col,
+      setTuningPaint:  () => this._toggleConfigSection('paint', { activeGroup: 'tuning', tuningSubTab: 'paint' }),
+      setTuningWheels: () => this._toggleConfigSection('wheels', { activeGroup: 'tuning', tuningSubTab: 'wheels' }),
+      tunPaintBorder:  hv(s.panelOpen && s.configSection === 'paint').border,
+      tunWheelsBorder: hv(s.panelOpen && s.configSection === 'wheels').border,
+      tunPaintCol:  hv(s.panelOpen && s.configSection === 'paint').col,
+      tunWheelsCol: hv(s.panelOpen && s.configSection === 'wheels').col,
       overrideIsMotion: s.overrideSubTab === 'motion',
       overrideIsDoors:  s.overrideSubTab === 'doors',
       overrideIsLights: s.overrideSubTab === 'lights',
-      setOverrideMotion: () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'motion', panelOpen: true, configExpanded: true }),
-      setOverrideDoors:  () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'doors', panelOpen: true, configExpanded: true }),
-      setOverrideLights: () => this.setState({ activeGroup: 'override', configSection: 'override', overrideSubTab: 'lights', panelOpen: true, configExpanded: true }),
-      ovMotionBg: s.overrideSubTab === 'motion' ? 'rgba(79,214,232,.18)' : 'transparent',
-      ovDoorsBg:  s.overrideSubTab === 'doors'  ? 'rgba(79,214,232,.18)' : 'transparent',
-      ovLightsBg: s.overrideSubTab === 'lights' ? 'rgba(79,214,232,.18)' : 'transparent',
-      ovMotionBorder: (s.activeGroup === 'override' && s.overrideSubTab === 'motion') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      ovDoorsBorder:  (s.activeGroup === 'override' && s.overrideSubTab === 'doors')  ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      ovLightsBorder: (s.activeGroup === 'override' && s.overrideSubTab === 'lights') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
-      ovMotionCol: (s.activeGroup === 'override' && s.overrideSubTab === 'motion') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      ovDoorsCol:  (s.activeGroup === 'override' && s.overrideSubTab === 'doors')  ? '#4fd6e8' : 'rgba(255,255,255,.70)',
-      ovLightsCol: (s.activeGroup === 'override' && s.overrideSubTab === 'lights') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      setOverrideMotion: () => this._toggleConfigSection('override', { activeGroup: 'override', overrideSubTab: 'motion' }),
+      setOverrideDoors:  () => this._toggleConfigSection('override', { activeGroup: 'override', overrideSubTab: 'doors' }),
+      setOverrideLights: () => this._toggleConfigSection('override', { activeGroup: 'override', overrideSubTab: 'lights' }),
+      ovMotionBg: hv(s.panelOpen && s.overrideSubTab === 'motion').bg,
+      ovDoorsBg:  hv(s.panelOpen && s.overrideSubTab === 'doors').bg,
+      ovLightsBg: hv(s.panelOpen && s.overrideSubTab === 'lights').bg,
+      ovMotionBorder: hv(s.panelOpen && s.configSection === 'override' && s.overrideSubTab === 'motion').border,
+      ovDoorsBorder:  hv(s.panelOpen && s.configSection === 'override' && s.overrideSubTab === 'doors').border,
+      ovLightsBorder: hv(s.panelOpen && s.configSection === 'override' && s.overrideSubTab === 'lights').border,
+      ovMotionCol: hv(s.panelOpen && s.configSection === 'override' && s.overrideSubTab === 'motion').col,
+      ovDoorsCol:  hv(s.panelOpen && s.configSection === 'override' && s.overrideSubTab === 'doors').col,
+      ovLightsCol: hv(s.panelOpen && s.configSection === 'override' && s.overrideSubTab === 'lights').col,
       toggleDoors:    () => this.toggleDoors(),
       doorBtns: [
         { key: 'fl', label: 'FRONT LEFT',  title: 'Toggle front-left door',  onClick: () => this._setDoorOpen('fl', s.doorFLOpen > 0 ? 0 : 100),
@@ -3566,6 +4574,9 @@ class Component extends DCLogic {
       ],
       modelLabel: s.modelVariant === 'gt' ? 'GT' : 'HEV',
       modelTooltip: s.modelVariant === 'gt' ? 'Switch to HEV' : 'Switch to GT',
+      modelBtnBorder: hvOff.border,
+      modelBtnCol: hvOff.col,
+      modelBtnBg: hvOff.bg,
       toggleModelVariant: () => this._setModelVariant(s.modelVariant === 'gt' ? 'hev' : 'gt'),
       currentCarPaintHex: activeKey,
       swatches,
@@ -3600,22 +4611,21 @@ class Component extends DCLogic {
       onWheelColor: (e) => this.onWheelColor(e),
       onWheelRoughness: (e) => this.onWheelRoughness(e),
       onWheelMetalness: (e) => this.onWheelMetalness(e),
-      // Wheels sub-tabs: CATALOG / SETTINGS / CUSTOM
+      // Wheels sub-tabs: CATALOG / WHEEL TUNE (CUSTOM is hidden)
       wheelSubTab: s.wheelSubTab,
-      subIsCatalog:  s.wheelSubTab === 'catalog',
-      subIsCustom:   s.wheelSubTab === 'custom',
+      subIsCatalog:  s.wheelSubTab !== 'settings',
+      subIsCustom:   false,
       subIsSettings: s.wheelSubTab === 'settings',
       setWheelSubCatalog:  () => this.setWheelSubTab('catalog'),
-      setWheelSubCustom:   () => this.setWheelSubTab('custom'),
       setWheelSubSettings: () => this.setWheelSubTab('settings'),
-      subCatalogBg:  s.wheelSubTab === 'catalog'  ? 'rgba(79,214,232,.18)' : 'transparent',
-      subCustomBg:   s.wheelSubTab === 'custom'   ? 'rgba(79,214,232,.18)' : 'transparent',
+      subCatalogBg:  s.wheelSubTab !== 'settings' ? 'rgba(79,214,232,.18)' : 'transparent',
+      subCustomBg:   'transparent',
       subSettingsBg: s.wheelSubTab === 'settings' ? 'rgba(79,214,232,.18)' : 'transparent',
-      subCatalogCol:  s.wheelSubTab === 'catalog'  ? '#4fd6e8' : 'rgba(255,255,255,.6)',
-      subCustomCol:   s.wheelSubTab === 'custom'   ? '#4fd6e8' : 'rgba(255,255,255,.6)',
+      subCatalogCol:  s.wheelSubTab !== 'settings' ? '#4fd6e8' : 'rgba(255,255,255,.6)',
+      subCustomCol:   'rgba(255,255,255,.6)',
       subSettingsCol: s.wheelSubTab === 'settings' ? '#4fd6e8' : 'rgba(255,255,255,.6)',
-      subCatalogBorder:  s.wheelSubTab === 'catalog'  ? '#4fd6e8' : 'rgba(255,255,255,.12)',
-      subCustomBorder:   s.wheelSubTab === 'custom'   ? '#4fd6e8' : 'rgba(255,255,255,.12)',
+      subCatalogBorder:  s.wheelSubTab !== 'settings' ? '#4fd6e8' : 'rgba(255,255,255,.12)',
+      subCustomBorder:   'rgba(255,255,255,.12)',
       subSettingsBorder: s.wheelSubTab === 'settings' ? '#4fd6e8' : 'rgba(255,255,255,.12)',
       // Catalog grid — STOCK now shows (and resizes) via the same catalog
       // pipeline as every other wheel, backed by the current variant's own
@@ -3671,12 +4681,15 @@ class Component extends DCLogic {
       wheelTintOverride: s.wheelTintOverride,
       onWheelTintOverride: (e) => this.onWheelTintOverride(e),
       wheelAngle:      s.wheelAngle,
-      wheelAngleLabel: s.wheelAngle + '°',
+      wheelAngleLabel: (Number(s.wheelAngle) || 0).toFixed(1) + '°',
+      onWheelAngle:  (e) => { this._holdMotionFromUi('steer'); this._setWheelAngle(parseFloat(e.target.value)); },
       motionSpeed:      s.motionSpeed,
       motionSpeedLabel: Math.round(Math.abs(s.motionSpeed) * 40) + ' km/h' + (s.motionSpeed < 0 ? ' ↩' : ''),
-      onWheelAngle:  (e) => this._setWheelAngle(parseFloat(e.target.value)),
-      onMotionSpeed: (e) => this._setMotionSpeed(parseFloat(e.target.value)),
-      onMotionStop:  () => this._setMotionSpeed(0),
+      motionSpeedPct:   (Math.max(0, Math.min(1, ((s.motionSpeed || 0) + 5) / 10)) * 100).toFixed(2) + '%',
+      onMotionRangeDown: (e) => this._startMotionRange(e),
+      onMotionSlower: () => this._nudgeMotionSpeed(-0.25),
+      onMotionFaster: () => this._nudgeMotionSpeed(0.25),
+      onMotionStop:  () => { this._holdMotionFromUi('speed'); this._setMotionSpeed(0); },
       carHeightVal:   s.carHeightOffset * 100,
       carHeightLabel: (s.carHeightOffset * 100 > 0 ? '+' : '') + (s.carHeightOffset * 100).toFixed(1) + ' cm',
       onCarHeight:    (e) => this._setCarHeight(parseFloat(e.target.value)),
@@ -3981,9 +4994,28 @@ class Component extends DCLogic {
     this._trunkTarget = pct / 100;
   }
 
+  _holdMotionFromUi(which) {
+    if (which === 'speed' || which === 'both') {
+      if (!this._motionSpeedHeldByUi) this._carSpeedAtHold = this._carSpeedKmh;
+      this._motionSpeedHeldByUi = true;
+    }
+    if (which === 'steer' || which === 'both') {
+      if (!this._wheelAngleHeldByUi) this._carSteerAtHold = this._lastCarSteerDeg;
+      this._wheelAngleHeldByUi = true;
+    }
+  }
+
+  _releaseMotionUiHold() {
+    this._motionSpeedHeldByUi = false;
+    this._wheelAngleHeldByUi = false;
+    this._carSpeedAtHold = undefined;
+    this._carSteerAtHold = undefined;
+  }
+
   // ── Motion controls ─────────────────────────────────────────────────────
   _setWheelAngle(deg) {
-    this.setState({ wheelAngle: deg });
+    const v = Math.round((isFinite(deg) ? deg : 0) * 10) / 10;
+    this.setState({ wheelAngle: v });
     this._applyWheelTransforms();
   }
 
@@ -4033,7 +5065,7 @@ class Component extends DCLogic {
     const worldUp = scratch.worldUp;
     const _p = scratch.position, _q = scratch.quaternion, _s = scratch.scale;
 
-    const speed = this.state.motionSpeed || 0;
+    const speed = this._currentMotionSpeed();
     const speedKmh = Math.abs(speed) * 40;
     const isFast = speedKmh >= 60;
     const isBlending = speedKmh >= 30;
@@ -4059,21 +5091,6 @@ class Component extends DCLogic {
       this._blurredDiscs.forEach(m => { m.visible = isBlending; });
     }
 
-    // One-shot recapture the first time the sprites actually matter.
-    // Boot / stock-swap / HDRI all call _generateBlurredWheelTexture while
-    // the car root is still hidden for the intro — Three.js skips that
-    // whole subtree, so the baked texture was fully transparent and the
-    // discs (correct radius, correct opacity, visible=true) drew nothing.
-    // Recapturing here also heals a zero-radius disc (see _resizeBlurredDiscs).
-    if (isBlending && !this._blurDiscRecoveryTried
-        && this._blurredDiscs && this._blurredDiscs.length) {
-      this._blurDiscRecoveryTried = true;
-      try {
-        this._generateBlurredWheelTexture();
-      } catch (e) {
-        console.warn('[WheelBlur] recovery regeneration failed', e);
-      }
-    }
     if (this._backingDiscs) {
       this._backingDiscs.forEach(m => { m.visible = isBlending; });
     }
@@ -4193,11 +5210,83 @@ class Component extends DCLogic {
   // 0.005 units is 0.2 km/h (CAR_SPEED_KMH_PER_UNIT = 40) - far below anything
   // visible in wheel roll. A stop is always applied exactly, so the wheels
   // cannot be left spinning by the deadband.
+  _currentMotionSpeed() {
+    return (typeof this._liveMotionSpeed === 'number')
+      ? this._liveMotionSpeed
+      : (this.state.motionSpeed || 0);
+  }
+
+  _nudgeMotionSpeed(delta) {
+    this._holdMotionFromUi('speed');
+    const v = Math.max(-5, Math.min(5, this._currentMotionSpeed() + delta));
+    this._setMotionSpeed(v);
+  }
+
+  _startMotionRange(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    this._rangeDragging = true;
+    this._holdMotionFromUi('speed');
+    this._motionRangeEl = e.currentTarget;
+    this._applyMotionRange(e);
+    if (this._rangeMoveBound) return;
+    this._rangeMoveBound = (ev) => this._applyMotionRange(ev);
+    this._rangeUpBound = () => this._endMotionRange();
+    window.addEventListener('pointermove', this._rangeMoveBound);
+    window.addEventListener('pointerup', this._rangeUpBound);
+    window.addEventListener('mousemove', this._rangeMoveBound);
+    window.addEventListener('mouseup', this._rangeUpBound);
+    window.addEventListener('touchmove', this._rangeMoveBound, { passive: false });
+    window.addEventListener('touchend', this._rangeUpBound);
+  }
+
+  _applyMotionRange(e) {
+    const el = this._motionRangeEl;
+    if (!el) return;
+    const pt = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+    if (!pt || pt.clientX == null) return;
+    if (e.cancelable && e.preventDefault) e.preventDefault();
+    const rect = el.getBoundingClientRect();
+    let u = (pt.clientX - rect.left) / Math.max(rect.width, 1);
+    u = Math.max(0, Math.min(1, u));
+    const v = Math.round((-5 + u * 10) / 0.05) * 0.05;
+    this._liveMotionSpeed = v;
+    const pct = (u * 100) + '%';
+    const fill = el.querySelector('.hv-range-fill');
+    const thumb = el.querySelector('.hv-range-thumb');
+    if (fill) fill.style.width = pct;
+    if (thumb) thumb.style.left = pct;
+    const label = el.parentNode && el.parentNode.parentNode
+      && el.parentNode.parentNode.querySelector('[data-speed-label]');
+    if (label) {
+      label.textContent = Math.round(Math.abs(v) * 40) + ' km/h' + (v < 0 ? ' ↩' : '');
+    }
+  }
+
+  _endMotionRange() {
+    if (this._rangeMoveBound) {
+      window.removeEventListener('pointermove', this._rangeMoveBound);
+      window.removeEventListener('pointerup', this._rangeUpBound);
+      window.removeEventListener('mousemove', this._rangeMoveBound);
+      window.removeEventListener('mouseup', this._rangeUpBound);
+      window.removeEventListener('touchmove', this._rangeMoveBound);
+      window.removeEventListener('touchend', this._rangeUpBound);
+      this._rangeMoveBound = null;
+      this._rangeUpBound = null;
+    }
+    this._rangeDragging = false;
+    this._motionRangeEl = null;
+    this.setState({ motionSpeed: this._currentMotionSpeed() });
+  }
+
   _setMotionSpeed(speed) {
+    const v = isFinite(speed) ? speed : 0;
+    this._liveMotionSpeed = v;
     const prev = this.state.motionSpeed;
-    const stopping = speed === 0 && prev !== 0;
-    if (!stopping && typeof prev === 'number' && Math.abs(prev - speed) < 0.005) return;
-    this.setState({ motionSpeed: speed });
+    const stopping = v === 0 && prev !== 0;
+    if (!this._rangeDragging && !stopping && typeof prev === 'number' && Math.abs(prev - v) < 0.005) return;
+    if (this._rangeDragging) return;
+    this.setState({ motionSpeed: v });
   }
 
   // Raises/lowers the car body (glass, interior, lights, shared floor) while
@@ -4299,6 +5388,45 @@ class Component extends DCLogic {
     this._wheelBlurInitialized = true;
   }
 
+  // Temporarily put the given meshes back on their unsteered rest pose
+  // (_initWorld). Capture cameras look at the rest-pose pivot; shooting a
+  // rolled/steered rim from that camera baked an empty or smeared sprite and
+  // killed the spin animation. Returns a restore function.
+  _poseMeshesToInitWorld(meshes) {
+    const THREE = this.THREE;
+    if (!THREE) return () => {};
+    const saved = [];
+    const p = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3();
+    const local = new THREE.Matrix4();
+    const ident = new THREE.Matrix4();
+    (meshes || []).forEach((m) => {
+      if (!m || !m._initWorld) return;
+      saved.push({
+        m,
+        pos: m.position.clone(),
+        quat: m.quaternion.clone(),
+        scale: m.scale.clone(),
+      });
+      local.copy(m._initParentInv || ident).multiply(m._initWorld).decompose(p, q, s);
+      m.position.copy(p);
+      m.quaternion.copy(q);
+      m.scale.copy(s);
+      m.updateMatrix();
+      m.updateMatrixWorld(true);
+    });
+    return () => {
+      saved.forEach(({ m, pos, quat, scale }) => {
+        m.position.copy(pos);
+        m.quaternion.copy(quat);
+        m.scale.copy(scale);
+        m.updateMatrix();
+        m.updateMatrixWorld(true);
+      });
+    };
+  }
+
   _generateBlurredWheelTexture() {
     if (!this.THREE || !this.renderer || !this._frontLeftWheels || !this._spokesWheels) return;
     if (!this._wheelBlurInitialized) this._initWheelBlur();
@@ -4307,6 +5435,8 @@ class Component extends DCLogic {
     const renderer = this.renderer;
     const scene = this.scene;
 
+    const restorePose = this._poseMeshesToInitWorld(this._frontLeftWheels);
+    try {
     const flBox = new THREE.Box3();
     let hasRim = false;
     this._frontLeftWheels.forEach(m => {
@@ -4432,6 +5562,9 @@ class Component extends DCLogic {
     // the sprites onto the current rim's front face, or they render recessed
     // deep inside the tire barrel.
     this._placeBlurredDiscs();
+    } finally {
+      restorePose();
+    }
   }
 
   // Rescales the blurred-wheel + backing sprite discs so their world radius
@@ -6635,7 +7768,7 @@ class Component extends DCLogic {
   // needed). Returns true if a render is warranted this frame.
   _updateWindLines(delta) {
     if (!this._windGroup || !this._windStreaks) return false;
-    const speed = this.state.motionSpeed || 0;
+    const speed = this._currentMotionSpeed();
     const aspeed = Math.abs(speed);
     // Only kick in above ~40 km/h (speedKmh = |speed| * 40 → 1.0 == 40).
     const WIND_ON = 1.0;
@@ -9823,25 +10956,73 @@ class Component extends DCLogic {
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   }
 
+  _perfModeInfo(mode) {
+    const map = {
+      off:  {
+        icon: 'OFF', title: 'PERF OFF',
+        tooltip: 'Performance: OFF — always full resolution',
+        toast: 'Always full resolution. Sharpest picture.',
+      },
+      lev1: {
+        icon: 'LEV1', title: 'PERF LEV1',
+        tooltip: 'Performance: LEV1 — orbit, or below 14 FPS while driving',
+        toast: 'Softens while you orbit, or if FPS drops below 14 while driving.',
+      },
+      lev2: {
+        icon: 'LEV2', title: 'PERF LEV2',
+        tooltip: 'Performance: LEV2 — orbit or while the car is moving',
+        toast: 'Softens while you orbit or while the car is moving.',
+      },
+      on:   {
+        icon: 'ON', title: 'PERF ON',
+        tooltip: 'Performance: ON — always reduce while the view is busy',
+        toast: 'Always softens while the 3D view is busy, then sharpens when still.',
+      },
+    };
+    return map[mode] || map.off;
+  }
+
+  _cyclePerfMode() {
+    const order = ['off', 'lev1', 'lev2', 'on'];
+    const cur = this.state.resScaleMode || 'off';
+    const idx = order.indexOf(cur);
+    const next = order[((idx < 0 ? 0 : idx) + 1) % order.length];
+    const info = this._perfModeInfo(next);
+    clearTimeout(this._perfToastTimer);
+    this._perfToastTimer = setTimeout(() => {
+      if (!this._unmounted) this.setState({ perfToastOn: false });
+    }, 2800);
+    this.setState({
+      resScaleMode: next,
+      perfToastOn: true,
+      perfToastTitle: info.title,
+      perfToastMsg: info.toast,
+    });
+  }
+
   // Whether the motion tier may reduce resolution right now.
-  //   off    - never. Always native, whatever it costs. (default)
-  //   strong - engage early, as soon as the frame rate falls under ~20fps.
-  //   lite   - emergency only, under ~10fps.
-  //   on     - always reduce while the camera is moving.
+  //   off  - never. Always native.
+  //   lev1 - while the camera is moving, or if FPS drops below 14 while driving.
+  //   lev2 - while the camera is moving, or whenever the car is moving.
+  //   on   - always, whenever the 3D view is rendering. Sharpens once idle.
   //
-  // The dynamic modes LATCH once they fire and unlatch only when the scene
-  // settles back to refine. Without the latch, reducing resolution would raise
-  // the frame rate, which would immediately un-trigger the reduction, which
-  // would drop the frame rate again - a resolution oscillation roughly once a
-  // second, every flip paying a full render-target reallocation.
-  _resReductionAllowed() {
+  // LEV1 latches once the FPS trigger fires and unlatches only when the car
+  // stops (or the scene settles). Without the latch, reducing resolution would
+  // raise the frame rate, which would immediately un-trigger, which would drop
+  // the frame rate again - a resolution oscillation roughly once a second.
+  _resReductionAllowed(cameraBusy, carMoving) {
     const mode = (this.state && this.state.resScaleMode) || 'off';
     if (mode === 'off') return false;
     if (mode === 'on') return true;
+    if (cameraBusy) return true;
+    if (mode === 'lev2') return !!carMoving;
+    // lev1: FPS trigger only while the car is moving. Parked stays native
+    // unless the camera itself is busy (handled above).
+    if (!carMoving) return false;
     if (this._resReductionLatched) return true;
     const avg = this._recentAvgMs();
     if (!avg) return false;                        // no data yet - stay sharp
-    return avg > (mode === 'strong' ? 50 : 100);   // 20fps / 10fps
+    return avg > (1000 / 14);                      // below 14 fps
   }
 
   _setResTier(tier) {
@@ -10038,15 +11219,10 @@ class Component extends DCLogic {
         } catch (e) {}
       });
 
-      // FPS HUD must clear the OEM system UI, which on this head unit is much
-      // taller than the launcher strip: measured --hv-launcher-bottom 45px
-      // against --hv-safe-bottom 158px, which left the pill sitting inside the
-      // climate dock. safe-bottom is the offset that actually means "not covered
-      // by system UI"; max() keeps desktop (safe-bottom 0) on the launcher value
-      // rather than pinning the pill to the very bottom edge.
+      // FPS / SKIP sit 60px above the screen edge (above the climate dock).
       const hudEl = document.createElement('div');
       hudEl.style.cssText = 'position:absolute;left:14px;' +
-        'bottom:max(var(--hv-safe-bottom, 14px), var(--hv-launcher-bottom, 14px));z-index:30;' +
+        'bottom:var(--hv-launcher-bottom, 60px);z-index:30;' +
         'display:flex;align-items:center;gap:6px;pointer-events:none;user-select:none;';
       container.appendChild(hudEl);
       this._hudEl = hudEl;
@@ -10218,6 +11394,7 @@ class Component extends DCLogic {
       };
       // Motion/idle resolution tiers - see _setResTier.
       this._resTier      = 'refine';
+      this._resReductionLatched = false;
       this._motionStartMs = 0;
       this._lastActiveMs  = 0;
       this._refineFrames  = 0;
@@ -10623,7 +11800,7 @@ class Component extends DCLogic {
 
         // Motion: advance reflection flow offset + roll wheels
         let needRender = false;
-        const speed = this.state.motionSpeed || 0;
+        const speed = this._currentMotionSpeed();
         if (speed !== 0) {
           if (this._reflectionFlowUniforms) {
             this._reflectionFlowUniforms.uEnvOffset.value += delta * speed * 0.3;
@@ -10736,23 +11913,28 @@ class Component extends DCLogic {
         const _now = performance.now();
         const _dt = Math.min(0.05, Math.max(0.008, (this._fitCamLastMs ? (_now - this._fitCamLastMs) : 16) / 1000));
         this._fitCamLastMs = _now;
+        let cameraBusy = false;
         if (this._tickIntro(_dt)) {
+          cameraBusy = true;
           needRender = true;
           this._postFxDirty = true;
           this.requestRender(2);
         }
         if (this._tickCamAnim(_dt)) {
+          cameraBusy = true;
           needRender = true;
           this._postFxDirty = true;
           this.requestRender(2);
         }
         if (!this._introActive && !this._camAnim && this._tickFitCamera(_dt)) {
+          cameraBusy = true;
           needRender = true;
           this._postFxDirty = true;
           this.requestRender(2);
         }
         // controls.update() must run every frame for damping; true = camera moved
         if (controls.update()) {
+          cameraBusy = true;
           needRender = true;
           this._postFxDirty = true;
         }
@@ -10766,6 +11948,8 @@ class Component extends DCLogic {
         // requestRender() frames still draining - then queues a couple of
         // frames at full resolution for the next tick.
         const _nowRes = performance.now();
+        const carMoving = Math.abs((this.state && this.state.motionSpeed) || 0) > 0;
+        const allowReduce = this._resReductionAllowed(cameraBusy, carMoving);
         if (needRender) {
           this._lastActiveMs = _nowRes;
           // The refinement's own frames must not read as motion, or the tier
@@ -10774,22 +11958,24 @@ class Component extends DCLogic {
             this._refineFrames--;
             this._motionStartMs = 0;
           } else if (this._resTier === 'refine') {
-            if ((this._extRenderSeq || 0) === this._seqAtRefine) {
-              // Nothing external has asked for a redraw since we refined, so
-              // these are still the refine pass's own frames draining. Not motion.
+            if (!allowReduce) {
               this._motionStartMs = 0;
             } else {
               if (!this._motionStartMs) this._motionStartMs = _nowRes;
-              if (_nowRes - this._motionStartMs >= 90 && this._resReductionAllowed()) {
-                this._resReductionLatched = true;
+              if (_nowRes - this._motionStartMs >= 90) {
+                const mode = (this.state && this.state.resScaleMode) || 'off';
+                if (mode === 'lev1' && carMoving) this._resReductionLatched = true;
                 this._setResTier('motion');
               }
             }
-          } else if (!this._resReductionAllowed()) {
-            // Mode switched to OFF while the camera is still moving - restore
-            // native now rather than waiting for the scene to settle.
+          } else if (!allowReduce) {
+            // Mode switched off, car stopped, or camera settled - restore
+            // native now rather than waiting for the scene to go fully idle.
             this._resReductionLatched = false;
             this._setResTier('refine');
+          } else {
+            const mode = (this.state && this.state.resScaleMode) || 'off';
+            if (mode === 'lev1' && carMoving) this._resReductionLatched = true;
           }
         } else {
           this._motionStartMs = 0;
@@ -10918,8 +12104,8 @@ class Component extends DCLogic {
           this._busCount = 0; this._busSpeedCount = 0; this._setStateCount = 0;
           this._busRateT = now;
         }
-        // Rolling window for _resReductionAllowed. Fed on EVERY rendered frame,
-        // refine ones included, because the dynamic modes must see how slow
+        // Rolling window for LEV1's 14fps trigger. Fed on EVERY rendered frame,
+        // refine ones included, because the dynamic mode must see how slow
         // native actually is in order to decide to leave it.
         if (this._lastRecentMs) {
           const _d = now - this._lastRecentMs;
@@ -12121,21 +13307,21 @@ class Component extends DCLogic {
     const loading = !!(s.loading && !s.error);
     const pct = Math.round(s.progress || 0);
     const processing = !!s.processing;
-    const label = processing ? 'PROCESSING' : 'LOADING MODEL';
+    const title = s.catalogLoadingKey ? 'LOADING WHEEL' : 'LOADING MODEL';
     const text = processing ? 'PROCESSING…' : (pct + '%');
     try {
       const splash = window.HavalSplash;
       const B = window.AppLauncherBridge;
       const nativeHud = !!(B && typeof B.setBootProgress === 'function');
       if (splash && typeof splash.setStatus === 'function') {
-        splash.setStatus(loading && !nativeHud, label, text, pct);
+        splash.setStatus(loading && !nativeHud, title, text, pct);
       }
       if (!B) return;
       if (!loading) {
         if (typeof B.hideBootProgress === 'function') B.hideBootProgress();
         return;
       }
-      if (typeof B.setBootProgress === 'function') B.setBootProgress(pct, text);
+      if (typeof B.setBootProgress === 'function') B.setBootProgress(pct, text, title);
     } catch (e) {}
   }
 
@@ -12229,6 +13415,18 @@ class Component extends DCLogic {
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(4);
+
+    // Recapture the spin-blur sprite once the car root is actually visible.
+    // Boot classification often runs while the intro still hides the model;
+    // shooting then produced an empty texture. Do it here at rest, not on
+    // the first high-speed frame (which recaptured a rolling/steered rim).
+    if (show && !this._blurDiscBootRecaptured
+        && this._frontLeftWheels && this._rtBlurred) {
+      this._blurDiscBootRecaptured = true;
+      try { this._generateBlurredWheelTexture(); } catch (e) {
+        console.warn('[WheelBlur] visible-car recapture failed', e);
+      }
+    }
   }
 
   _syncCarSceneForShell() {
@@ -12561,7 +13759,12 @@ class Component extends DCLogic {
     if (this._safeLeftPx != null) el.style.setProperty('--hv-safe-left', this._safeLeftPx + 'px');
     if (this._safeRightPx != null) el.style.setProperty('--hv-safe-right', this._safeRightPx + 'px');
     if (this._safeBottomPx != null) el.style.setProperty('--hv-safe-bottom', this._safeBottomPx + 'px');
-    if (this._launcherBottomPx != null) el.style.setProperty('--hv-launcher-bottom', this._launcherBottomPx + 'px');
+    if (this._launcherBottomPx != null) {
+      const bottom = this._launcherBottomPx + 'px';
+      el.style.setProperty('--hv-launcher-bottom', bottom);
+      // Splash SKIP lives outside #hv-root, so it reads the var from <html>.
+      document.documentElement.style.setProperty('--hv-launcher-bottom', bottom);
+    }
   }
 
   applyShellLayout(layout) {
@@ -12611,13 +13814,8 @@ class Component extends DCLogic {
       lastLaunchSide: next.lastSide || this.state.lastLaunchSide || null,
       leftSlotUse: this._board('left', mode).use || 'app',
       rightSlotUse: this._board('right', mode).use || 'app',
-      mediaColumnVisible: !!this._androidApp && !this.state.configExpanded && !appsOnly,
+      mediaColumnVisible: !!this._androidApp && !appsOnly,
     };
-    if (this._shellRight === 'app' && (this.state.panelOpen || this.state.configExpanded)) {
-      patch.panelOpen = false;
-      patch.configExpanded = false;
-      patch.mediaColumnVisible = !!this._androidApp && !appsOnly;
-    }
     // Avoid React state churn while the GLB/wheel pipeline is still running.
     if (this.state.loading) {
       this._pendingShellPatch = patch;
@@ -12661,7 +13859,7 @@ class Component extends DCLogic {
     return {
       media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2]] },
       power: { label: 'POWER', title: 'Power', hint: 'Draft — coming next', sizes: [[1, 1], [2, 1], [3, 1], [2, 2]] },
-      modes: { label: 'MODES', title: 'Car modes', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2]] },
+      modes: { label: 'MODES', title: 'Car modes', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2], [1, 1]] },
       graphs: { label: 'GRAPHS', title: 'Power', hint: '', sizes: [[2, 1], [3, 1], [2, 2], [3, 2]] },
     };
   }
@@ -12737,6 +13935,97 @@ class Component extends DCLogic {
     return boards.left || { use: 'app', items: [] };
   }
 
+  _hvBtn(on) {
+    return {
+      border: on ? 'rgba(255,255,255,.50)' : 'rgba(255,255,255,.16)',
+      col:    on ? '#ffffff' : 'rgba(255,255,255,.78)',
+      bg:     on ? 'rgba(255,255,255,.12)' : 'rgba(18,18,20,.40)',
+    };
+  }
+
+  _configPanelSpan(s, cols) {
+    const section = s.configSection;
+    const sub = s.overrideSubTab;
+    if (section === 'wheels') return { w: cols, h: 2 };
+    if (section === 'env' || (section === 'override' && sub === 'doors')) {
+      return { w: Math.min(2, cols), h: 2 };
+    }
+    if (section === 'paint' || section === 'camera'
+      || (section === 'override' && (sub === 'motion' || sub === 'lights'))) {
+      return { w: 1, h: 2 };
+    }
+    return { w: Math.min(2, cols), h: 2 };
+  }
+
+  _configDockFields(s, leftRect) {
+    const open = !s.loading && !s.error && !!s.panelOpen && !!s.configSection;
+    const cols = this._gridColsForMode(s.shellMode);
+    const empty = {
+      configDockDisplay: 'none',
+      configDockLeft: leftRect.left,
+      configDockTop: leftRect.top,
+      configDockWidth: '0px',
+      configDockHeight: '0px',
+      wheelCatalogCols: 'repeat(' + (cols * 3) + ', 1fr)',
+    };
+    if (!open) return empty;
+    const boardW = parseFloat(leftRect.width) || 0;
+    const boardH = parseFloat(leftRect.height) || 0;
+    const spec = this._configPanelSpan(s, cols);
+    const gap = 8;
+    const cellW = cols > 0 ? (boardW - gap * (cols - 1)) / cols : boardW;
+    const cellH = (boardH - gap) / 2;
+    return {
+      configDockDisplay: 'block',
+      configDockLeft: leftRect.left,
+      configDockTop: leftRect.top,
+      configDockWidth: Math.max(0, spec.w * cellW + Math.max(0, spec.w - 1) * gap) + 'px',
+      configDockHeight: Math.max(0, spec.h * cellH + Math.max(0, spec.h - 1) * gap) + 'px',
+      wheelCatalogCols: 'repeat(' + (spec.w * 3) + ', 1fr)',
+    };
+  }
+
+  _toggleConfigSection(section, extra) {
+    extra = extra || {};
+    const s = this.state;
+    const sameSection = s.panelOpen && s.configSection === section;
+    const sameSub = extra.overrideSubTab == null || extra.overrideSubTab === s.overrideSubTab;
+    if (sameSection && sameSub) {
+      this.setState({ panelOpen: false, activeGroup: null });
+      return;
+    }
+    const patch = {
+      configExpanded: true,
+      panelOpen: true,
+      configSection: section,
+      activeGroup: extra.activeGroup || null,
+    };
+    if (extra.tuningSubTab) patch.tuningSubTab = extra.tuningSubTab;
+    if (extra.overrideSubTab) patch.overrideSubTab = extra.overrideSubTab;
+    this.setState(patch);
+    if (section === 'wheels') this._generateCatalogThumbnails();
+  }
+
+  _widgetPlaceSides(mode) {
+    const m = mode || this.state.shellMode || 'triple';
+    const sides = ['left'];
+    if (m !== 'appCar') sides.push('right');
+    return sides;
+  }
+
+  _sizeFitsAnySide(w, h, cols, mode) {
+    const sides = this._widgetPlaceSides(mode);
+    for (let i = 0; i < sides.length; i++) {
+      const items = this._board(sides[i], mode).items || [];
+      for (let y = 0; y < 2; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (this._fits(items, cols, x, y, w, h)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   _rectCss(bounds, fallback) {
     const b = bounds || fallback;
     return {
@@ -12762,16 +14051,23 @@ class Component extends DCLogic {
       modeSizeClass: '',
       graphSizeClass: '',
       graphShowBars: false,
+      graphGridStyle: '',
+      graphPanes: [],
+      graphMenuOpen: false,
+      showRemove: item.type !== 'graphs',
+      onHoldStart: () => {},
+      onHoldEnd: () => {},
+      onContextMenu: () => {},
+      onEdit: () => {},
       isModeWide: false,
       isModeStack: false,
       modeRows: [],
-      modeWideKickers: [],
-      modeWideLines: [],
+      modeWideCols: [],
       gridStyle: 'grid-column:' + (item.x + 1) + ' / span ' + item.w + ';grid-row:' + (item.y + 1) + ' / span ' + item.h,
       onRemove: () => this._removeWidget(side, item.id),
     };
     if (item.type === 'modes') Object.assign(view, this._modeWidgetView(item));
-    if (item.type === 'graphs') Object.assign(view, this._graphWidgetView(item));
+    if (item.type === 'graphs') Object.assign(view, this._graphWidgetView(item, side));
     return view;
   }
 
@@ -12787,7 +14083,9 @@ class Component extends DCLogic {
 
   _placeCells(side) {
     const s = this.state;
-    if (s.widgetPlaceSide !== side || !s.widgetPlaceType) return [];
+    if (!s.widgetPlaceType) return [];
+    if (s.widgetPlaceSide && s.widgetPlaceSide !== side) return [];
+    if (this._widgetPlaceSides().indexOf(side) < 0) return [];
     const cols = this._gridColsForMode(s.shellMode);
     const items = this._board(side).items || [];
     const w = s.widgetPlaceW;
@@ -12817,12 +14115,15 @@ class Component extends DCLogic {
     // Boards are always on: an app launched into a slot is a freeform window that
     // floats above them, so the widgets stay put underneath instead of being
     // swapped out. (The old per-slot app/widgets switch is gone.)
-    const showLeft = android && (mode === 'triple' || mode === 'appCar' || mode === 'appsOnly');
-    const showRight = android && mode !== 'appCar' && !s.configExpanded;
+    const onMain = (s.chromePage || 'main') === 'main';
+    const showLeft = android && onMain && (mode === 'triple' || mode === 'appCar' || mode === 'appsOnly');
+    const showRight = android && onMain && mode !== 'appCar';
     const leftRect = this._rectCss(this._shellLeftBounds, { l: 48, t: 100, r: 740, b: 530 });
     const rightRect = this._rectCss(this._shellRightBounds, { l: 1180, t: 100, r: 1872, b: 530 });
     const cols = this._gridColsForMode(mode);
     const pickerOpen = !!s.widgetPickerStep;
+    const addOn = this._widgetAddingOn();
+    const addBtn = this._hvBtn(addOn);
     let pickerItems = [];
     let pickerTitle = 'ADD WIDGET';
     if (s.widgetPickerStep === 'type') {
@@ -12843,17 +14144,9 @@ class Component extends DCLogic {
     } else if (s.widgetPickerStep === 'size') {
       pickerTitle = 'SIZE';
       const def = this._widgetCatalog()[s.widgetPlaceType] || { sizes: [[2, 1]] };
-      const items = this._board(s.widgetPlaceSide).items || [];
       pickerItems = def.sizes
         .filter((sz) => sz[0] <= cols)
-        .filter((sz) => {
-          for (let y = 0; y < 2; y++) {
-            for (let x = 0; x < cols; x++) {
-              if (this._fits(items, cols, x, y, sz[0], sz[1])) return true;
-            }
-          }
-          return false;
-        })
+        .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, mode))
         .map((sz) => ({
           label: sz[0] + ' × ' + sz[1],
           opacity: '1',
@@ -12861,7 +14154,12 @@ class Component extends DCLogic {
         }));
     }
     this._syncGraphLoop(this._hasWidgetType(mode, 'graphs'));
+    const editor = this._graphEditorFields();
+    const boardLeftPx = parseFloat(leftRect.left) || 0;
+    const dock = this._configDockFields(s, leftRect);
     return {
+      chromeMainLeft: this._androidApp ? (boardLeftPx + 'px') : '96px',
+      ...dock,
       leftBoardDisplay: showLeft ? 'flex' : 'none',
       rightBoardDisplay: showRight ? 'flex' : 'none',
       leftBoardLeft: leftRect.left,
@@ -12874,50 +14172,139 @@ class Component extends DCLogic {
       rightBoardHeight: rightRect.height,
       leftGridCols: 'repeat(' + cols + ', 1fr)',
       rightGridCols: 'repeat(' + cols + ', 1fr)',
-      leftAddClass: this._widgetAddingOn('left') ? 'on' : '',
-      rightAddClass: this._widgetAddingOn('right') ? 'on' : '',
       leftWidgetItems: (this._board('left', mode).items || []).map((it) => this._widgetItemView(it, 'left')),
       rightWidgetItems: (this._board('right', mode).items || []).map((it) => this._widgetItemView(it, 'right')),
       leftPlaceCells: this._placeCells('left'),
       rightPlaceCells: this._placeCells('right'),
-      addWidgetLeft: () => this._openWidgetPicker('left'),
-      addWidgetRight: () => this._openWidgetPicker('right'),
+      addWidget: () => this._openWidgetPicker(),
+      addWidgetBtnDisplay: (this._androidApp && !s.error && onMain) ? 'inline-flex' : 'none',
+      addWidgetBtnBorder: addBtn.border,
+      addWidgetBtnCol: addBtn.col,
+      addWidgetBtnBg: addBtn.bg,
       widgetPickerDisplay: pickerOpen ? 'block' : 'none',
       widgetPickerTitle: pickerTitle,
       widgetPickerItems: pickerItems,
+      graphEditorDisplay: editor.graphEditorDisplay,
+      graphLayoutChips: editor.graphLayoutChips,
+      graphPaneEditors: editor.graphPaneEditors,
+      onGraphEditorClose: editor.onGraphEditorClose,
     };
   }
 
-  _widgetAddingOn(side) {
+  _graphEditorFields() {
+    const id = this.state.graphEditId;
+    const side = this.state.graphEditSide;
+    const close = () => this._closeGraphEditor();
+    const empty = {
+      graphEditorDisplay: 'none',
+      graphLayoutChips: [],
+      graphPaneEditors: [],
+      onGraphEditorClose: close,
+    };
+    if (!id) return empty;
+    const item = this._graphFindItem(side, id);
+    if (!item || item.type !== 'graphs') return empty;
+    const cfg = this._graphNormalizeCfg(item);
+    const self = this;
+    const chips = this._graphLayoutsForItem(item);
+    const layoutChips = [];
+    for (let i = 0; i < chips.length; i++) {
+      const lay = chips[i];
+      layoutChips.push({
+        label: lay.label,
+        className: cfg.cols === lay.cols && cfg.rows === lay.rows ? 'on' : '',
+        onClick: (function(c, r) { return function() { self._setGraphLayout(c, r); }; })(lay.cols, lay.rows),
+      });
+    }
+    const paneEditors = [];
+    for (let p = 0; p < cfg.panes.length; p++) {
+      paneEditors.push(this._graphPaneEditorView(cfg.panes[p], p));
+    }
+    return {
+      graphEditorDisplay: 'block',
+      graphLayoutChips: layoutChips,
+      graphPaneEditors: paneEditors,
+      onGraphEditorClose: close,
+    };
+  }
+
+  _graphPaneEditorView(pane, index) {
+    const self = this;
+    const y1 = (pane.vars && pane.vars[0]) || 'evPowerKw';
+    const y2 = (pane.vars && pane.vars[1]) || '';
+    const y1Vars = [];
+    const y2Vars = [{
+      label: 'NONE',
+      className: y2 ? '' : 'on',
+      onClick: (function(i) { return function() { self._setGraphPaneVar(i, 1, ''); }; })(index),
+    }];
+    for (let i = 0; i < CAR_GRAPH_VARS.length; i++) {
+      const spec = CAR_GRAPH_VARS[i];
+      y1Vars.push({
+        label: spec.label,
+        className: y1 === spec.key ? 'on' : '',
+        onClick: (function(pi, key) { return function() { self._setGraphPaneVar(pi, 0, key); }; })(index, spec.key),
+      });
+      y2Vars.push({
+        label: spec.label,
+        className: y2 === spec.key ? 'on' : '',
+        onClick: (function(pi, key) { return function() { self._setGraphPaneVar(pi, 1, key); }; })(index, spec.key),
+      });
+    }
+    const vizStyles = [];
+    for (let i = 0; i < CAR_GRAPH_VIZ.length; i++) {
+      const vs = CAR_GRAPH_VIZ[i];
+      vizStyles.push({
+        label: vs.label,
+        className: pane.vizStyle === vs.key ? 'on' : '',
+        onClick: (function(pi, key) { return function() { self._setGraphVizStyle(pi, key); }; })(index, vs.key),
+      });
+    }
+    return {
+      label: String(index + 1),
+      isSeries: pane.kind !== 'viz',
+      isViz: pane.kind === 'viz',
+      seriesClass: pane.kind !== 'viz' ? 'on' : '',
+      vizClass: pane.kind === 'viz' ? 'on' : '',
+      onSeries: (function(i) { return function() { self._setGraphPaneKind(i, 'series'); }; })(index),
+      onViz: (function(i) { return function() { self._setGraphPaneKind(i, 'viz'); }; })(index),
+      y1Vars: y1Vars,
+      y2Vars: y2Vars,
+      y1RulerClass: pane.y1Rulers ? 'on' : '',
+      y2RulerClass: pane.y2Rulers ? 'on' : '',
+      onY1Ruler: (function(i) { return function() { self._toggleGraphRuler(i, 'y1Rulers'); }; })(index),
+      onY2Ruler: (function(i) { return function() { self._toggleGraphRuler(i, 'y2Rulers'); }; })(index),
+      vizStyles: vizStyles,
+    };
+  }
+
+  _widgetAddingOn() {
     const s = this.state;
-    return s.widgetPlaceSide === side && !!(s.widgetPickerStep || s.widgetPlaceType);
+    return !!(s.widgetPickerStep || s.widgetPlaceType);
+  }
+
+  _openWidgetPicker() {
+    if (this._widgetAddingOn()) {
+      this._cancelWidgetPicker();
+      return;
+    }
+    this._slotUseBeforePicker = null;
+    this._widgetPickerCommitted = false;
+    this.setState({
+      widgetPickerStep: 'type',
+      widgetPlaceSide: null,
+      widgetPlaceType: null,
+      widgetPlaceW: 0,
+      widgetPlaceH: 0,
+      panelOpen: false,
+      shellMenuOpen: false,
+    });
   }
 
   _hasWidgetType(mode, type) {
     const boards = this._currentBoards(mode);
     const sides = [boards.left, boards.right].filter(Boolean);
     return sides.some((b) => (b.items || []).some((it) => it.type === type));
-  }
-
-  _openWidgetPicker(side) {
-    if (this._widgetAddingOn(side)) {
-      this._cancelWidgetPicker();
-      return;
-    }
-    if (this.state.widgetPlaceSide && this.state.widgetPlaceSide !== side) {
-      this._cancelWidgetPicker();
-    }
-    const board = this._board(side);
-    this._slotUseBeforePicker = board.use || 'app';
-    this._widgetPickerCommitted = false;
-    this._setSlotUse(side, 'widgets');
-    this.setState({
-      widgetPickerStep: 'type',
-      widgetPlaceSide: side,
-      widgetPlaceType: null,
-      widgetPlaceW: 0,
-      widgetPlaceH: 0,
-    });
   }
 
   _cancelWidgetPicker() {
@@ -12942,16 +14329,8 @@ class Component extends DCLogic {
     const mode = this.state.shellMode || 'triple';
     const cols = this._gridColsForMode(mode);
     const def = this._widgetCatalog()[type];
-    const items = this._board(this.state.widgetPlaceSide).items || [];
     const sizes = (def.sizes || [[2, 1]]).filter((sz) => sz[0] <= cols)
-      .filter((sz) => {
-        for (let y = 0; y < 2; y++) {
-          for (let x = 0; x < cols; x++) {
-            if (this._fits(items, cols, x, y, sz[0], sz[1])) return true;
-          }
-        }
-        return false;
-      });
+      .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, mode));
     if (!sizes.length) {
       this._cancelWidgetPicker();
       return;
@@ -12979,10 +14358,12 @@ class Component extends DCLogic {
     if (!type) return;
     this._widgetPickerCommitted = true;
     this._slotUseBeforePicker = null;
-    board.items = (board.items || []).concat([{
+    const item = {
       id: 'w-' + type + '-' + Date.now().toString(36),
-      type, x, y, w, h,
-    }]);
+      type: type, x: x, y: y, w: w, h: h,
+    };
+    if (type === 'graphs') item.graph = this._graphNormalizeCfg(item);
+    board.items = (board.items || []).concat([item]);
     this._persistWidgets();
     this._setSlotUse(side, 'widgets');
     this.setState({
@@ -12999,8 +14380,17 @@ class Component extends DCLogic {
     const board = this._board(side);
     board.items = (board.items || []).filter((it) => it.id !== id);
     this._persistWidgets();
+    const patch = { widgetRev: (this.state.widgetRev || 0) + 1 };
+    if (this.state.graphMenuId === id) {
+      patch.graphMenuId = null;
+      patch.graphMenuSide = null;
+    }
+    if (this.state.graphEditId === id) {
+      patch.graphEditId = null;
+      patch.graphEditSide = null;
+    }
     if (!(board.items || []).length) this._setSlotUse(side, 'app');
-    else this.setState({ widgetRev: (this.state.widgetRev || 0) + 1 });
+    this.setState(patch);
   }
 
   _setSlotUse(side, use) {
@@ -13143,6 +14533,7 @@ class Component extends DCLogic {
   }
 
   _notifyViewerReady() {
+    this._viewerReady = true;
     window.__viewerReadyForMedia = true;
     try {
       if (window.MediaBridge && typeof window.MediaBridge.onViewerReady === 'function') {
@@ -13362,6 +14753,7 @@ class Component extends DCLogic {
       });
       return;
     }
+    this.setState({ loading: true, processing: true, progress: 40 });
     this._applyModelVariant(v);
   }
 
@@ -13388,12 +14780,14 @@ class Component extends DCLogic {
     } else {
       this.setState({ modelVariant: v });
       if (this._variants && this._variants[v]) this._activateVariant(v);
+      this._finishLoading();
     }
   }
 
   componentWillUnmount() {
     this._unmounted = true;
     clearTimeout(this._saveFlashTimer);
+    clearTimeout(this._perfToastTimer);
     clearTimeout(this._launcherRevealTimer);
     clearTimeout(this._widgetRevealTimer);
     clearTimeout(this._splashHoldTimer);
@@ -13459,6 +14853,13 @@ class Component extends DCLogic {
       ['__perf', '__perfLow', '__archCapRough', '__renderOnce', '__scene',
        '__camera', '__controls', '__renderer', '__app', '__lightGroups']
         .forEach((key) => { delete window[key]; });
+    } catch (_) {}
+  }
+}
+</script>
+</body>
+</html>
+dow[key]; });
     } catch (_) {}
   }
 }

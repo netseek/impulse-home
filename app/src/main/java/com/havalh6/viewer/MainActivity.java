@@ -311,7 +311,13 @@ public final class MainActivity extends Activity {
         "com.gwm.hvac",
         "com.gwm.vehicle",
         "com.gwm.car",
-        "com.android.vending"
+        "com.android.vending",
+        "com.ts.androidauto.app",
+        "com.ts.androidauto",
+        "com.ts.androidauto.projectionservice",
+        "com.ts.carplay.app",
+        "com.ts.carplay",
+        "com.google.android.projection.gearhead"
     ));
 
     public class AppLauncherBridge {
@@ -511,10 +517,11 @@ public final class MainActivity extends Activity {
          * 0–100; {@code text} is the short status ("42%", "PROCESSING…").
          */
         @JavascriptInterface
-        public void setBootProgress(int progress, String text) {
+        public void setBootProgress(int progress, String text, String title) {
             final int pct = Math.max(0, Math.min(100, progress));
             final String label = text != null ? text : (pct + "%");
-            runOnUiThread(() -> showBootHud(pct, label));
+            final String heading = (title != null && title.length() > 0) ? title : "LOADING MODEL";
+            runOnUiThread(() -> showBootHud(pct, label, heading));
         }
 
         @JavascriptInterface
@@ -585,6 +592,12 @@ public final class MainActivity extends Activity {
     private View stripContainer;
     /** Launcher icons, left to right — the order the boot reveal staggers them in. */
     private final List<MotionTrailLayout> launcherItems = new ArrayList<>();
+    private ProjectionPresence projectionPresence;
+    private MotionTrailLayout projectionItem;
+    private View projectionGap;
+    private final MotionTrailLayout[] recentItems = new MotionTrailLayout[3];
+    private View recentsGap;
+    private final List<String> recentPackages = new ArrayList<>();
     /** One-shot: the boot reveal must not replay on a later viewer reload. */
     private boolean launcherRevealed;
     /**
@@ -613,10 +626,10 @@ public final class MainActivity extends Activity {
     private Runnable pinMediaBoundsRunnable;
     private final MediaNowPlaying mediaNowPlaying = new MediaNowPlaying();
     private View bootHud;
+    private android.widget.TextView bootHudTitle;
     private android.widget.TextView bootHudPct;
     private View bootHudFill;
     private int bootHudBarWidthPx;
-    private boolean bootHudHidden;
     private View splashSkipBtn;
     private android.widget.ImageView splashFadeView;
     private Bitmap splashHoldFrame;
@@ -871,6 +884,12 @@ public final class MainActivity extends Activity {
         return Math.round(40 * density) + 5;
     }
 
+    /** Bottom offset for FPS / SKIP chrome (CSS 60px). */
+    private int chromeBottomGapPx() {
+        float density = getResources().getDisplayMetrics().density;
+        return Math.round(60f * density);
+    }
+
     private int dockReservePx() {
         float density = getResources().getDisplayMetrics().density;
         return Math.round((110f + 40f + 8f) * density);
@@ -1005,6 +1024,7 @@ public final class MainActivity extends Activity {
             return;
         }
         applySlotUse(side, "app");
+        rememberRecentApp(packageName);
         if ("right".equals(side)) launchAppInRightSlot(packageName);
         else launchAppInLeftSlot(packageName);
     }
@@ -1496,7 +1516,7 @@ public final class MainActivity extends Activity {
                 + ",safeRight:" + cssPx(pageSideInsetPx(true))
                 + ",safeTop:" + (cssPx(pageTopInsetPx()) + 22f)
                 + ",safeBottom:" + cssPx(dockReservePx())
-                + ",launcherBottom:" + cssPx(launcherBottomGapPx())
+                + ",launcherBottom:" + cssPx(chromeBottomGapPx())
                 + ",uiMode:\"" + uiMode + "\""
                 + "});}"
                 + "else if(window.onAndroidLauncherPopup){window.onAndroidLauncherPopup(" + left + ");}"
@@ -2796,6 +2816,7 @@ public final class MainActivity extends Activity {
         bootHudFill = fill;
 
         box.addView(label);
+        bootHudTitle = label;
         box.addView(pct);
         box.addView(bar);
 
@@ -2811,9 +2832,10 @@ public final class MainActivity extends Activity {
         bootHud = box;
     }
 
-    private void showBootHud(int pct, String text) {
-        if (bootHudHidden || bootHud == null) return;
+    private void showBootHud(int pct, String text, String title) {
+        if (bootHud == null) return;
         bootHud.setVisibility(View.VISIBLE);
+        if (bootHudTitle != null && title != null) bootHudTitle.setText(title);
         if (bootHudPct != null) bootHudPct.setText(text != null ? text : (pct + "%"));
         if (bootHudFill != null) {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) bootHudFill.getLayoutParams();
@@ -2823,7 +2845,6 @@ public final class MainActivity extends Activity {
     }
 
     private void hideBootHud() {
-        bootHudHidden = true;
         if (bootHud != null) bootHud.setVisibility(View.GONE);
     }
 
@@ -2857,8 +2878,8 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT);
         lp.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.START;
-        lp.leftMargin = Math.round(24 * d);
-        lp.bottomMargin = Math.round(20 * d);
+        lp.leftMargin = Math.round(14 * d);
+        lp.bottomMargin = chromeBottomGapPx();
         root.addView(skip, lp);
         splashSkipBtn = skip;
     }
@@ -2868,6 +2889,7 @@ public final class MainActivity extends Activity {
     }
 
     private void setupNativeLauncherUI(FrameLayout rootLayout) {
+        loadRecentApps();
         float density = getResources().getDisplayMetrics().density;
         int iconSizePx = Math.round(52 * density);
         int itemWidthPx = Math.round(78 * density);
@@ -2910,7 +2932,7 @@ public final class MainActivity extends Activity {
 
         android.widget.LinearLayout iconsLayout = new android.widget.LinearLayout(this);
         iconsLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        iconsLayout.setGravity(android.view.Gravity.CENTER);
+        iconsLayout.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
         iconsLayout.setPadding(Math.round(24 * density), 4, Math.round(24 * density), 4);
         // Let the reveal's motion smear draw past each item's own edges.
         iconsLayout.setClipChildren(false);
@@ -2921,56 +2943,47 @@ public final class MainActivity extends Activity {
         mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
 
+        int gapPx = Math.round(28 * density);
+        projectionItem = makeDockItem(itemWidthPx, iconSizePx, density);
+        projectionItem.setVisibility(View.GONE);
+        iconsLayout.addView(projectionItem);
+        launcherItems.add(projectionItem);
+
+        projectionGap = makeDockGap(gapPx);
+        projectionGap.setVisibility(View.GONE);
+        iconsLayout.addView(projectionGap);
+
+        for (int i = 0; i < recentItems.length; i++) {
+            recentItems[i] = makeDockItem(itemWidthPx, iconSizePx, density);
+            recentItems[i].setVisibility(View.GONE);
+            iconsLayout.addView(recentItems[i]);
+            launcherItems.add(recentItems[i]);
+        }
+
+        recentsGap = makeDockGap(gapPx);
+        recentsGap.setVisibility(View.GONE);
+        iconsLayout.addView(recentsGap);
+
+        seedRecentAppsFromSystem(apps);
+        bindRecentSlots(pm, apps);
+
         for (ResolveInfo info : apps) {
             String pkg = info.activityInfo.packageName;
-            if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)) continue;
+            if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
+                    || ProjectionPresence.isProjectionPackage(pkg)) continue;
 
             String labelStr = info.loadLabel(pm).toString();
             Drawable iconDrawable = info.loadIcon(pm);
-
-            MotionTrailLayout itemLayout = new MotionTrailLayout(this);
-            itemLayout.setOrientation(android.widget.LinearLayout.VERTICAL);
-            itemLayout.setGravity(android.view.Gravity.CENTER);
-            // Starts off-screen-left and transparent; revealLauncherStrip() flies
-            // it in. If that never runs, the strip stays INVISIBLE anyway, so no
-            // half-faded icons can be left on screen.
-            itemLayout.setAlpha(0f);
-            android.widget.LinearLayout.LayoutParams itemParams = new android.widget.LinearLayout.LayoutParams(
-                    itemWidthPx, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            itemParams.rightMargin = Math.round(12 * density);
-            itemLayout.setLayoutParams(itemParams);
-            itemLayout.setBackgroundColor(0x00000000);
-            itemLayout.setClickable(true);
-            itemLayout.setFocusable(true);
-
-            android.widget.ImageView iconView = new android.widget.ImageView(this);
-            iconView.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSizePx, iconSizePx));
-            iconView.setImageDrawable(iconDrawable);
-
-            android.widget.TextView labelView = new android.widget.TextView(this);
-            android.widget.LinearLayout.LayoutParams labelParams = new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            labelParams.topMargin = Math.round(4 * density);
-            labelView.setLayoutParams(labelParams);
-            labelView.setText(labelStr);
-            labelView.setTextSize(10f);
-            labelView.setTextColor(0xFFFFFFFF);
-            labelView.setGravity(android.view.Gravity.CENTER);
-            labelView.setSingleLine(true);
-            labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            labelView.setShadowLayer(4f, 0f, 2f, 0xFF000000);
-
-            itemLayout.addView(iconView);
-            itemLayout.addView(labelView);
-
-            final String targetPkg = pkg;
-            final String targetLabel = labelStr;
-            itemLayout.setOnClickListener(v -> launchAppForPackage(targetPkg, targetLabel));
-
+            MotionTrailLayout itemLayout = makeDockItem(itemWidthPx, iconSizePx, density);
+            bindDockItem(itemLayout, iconDrawable, labelStr,
+                    v -> launchAppForPackage(pkg, labelStr));
             iconsLayout.addView(itemLayout);
             launcherItems.add(itemLayout);
         }
+
+        projectionPresence = new ProjectionPresence(this, mainHandler, mediaNowPlaying);
+        projectionPresence.start(kind -> bindProjectionSlot(kind));
+        bindProjectionSlot(projectionPresence.current());
 
         scrollView.addView(iconsLayout, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -2981,7 +2994,7 @@ public final class MainActivity extends Activity {
             int avail = scrollView.getWidth();
             if (avail <= 0) return;
             iconsLayout.setMinimumWidth(avail);
-            iconsLayout.setGravity(android.view.Gravity.CENTER);
+            iconsLayout.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
         });
 
         strip.addView(scrollView, new FrameLayout.LayoutParams(
@@ -3024,6 +3037,189 @@ public final class MainActivity extends Activity {
         mediaAnchorLp.topMargin = RIGHT_APP_BOUNDS.top;
         rootLayout.addView(mediaAnchor, 0, mediaAnchorLp);
         mediaLaunchAnchor = mediaAnchor;
+    }
+
+    private MotionTrailLayout makeDockItem(int itemWidthPx, int iconSizePx, float density) {
+        MotionTrailLayout item = new MotionTrailLayout(this);
+        item.setOrientation(android.widget.LinearLayout.VERTICAL);
+        item.setGravity(android.view.Gravity.CENTER);
+        item.setAlpha(0f);
+        android.widget.LinearLayout.LayoutParams itemParams = new android.widget.LinearLayout.LayoutParams(
+                itemWidthPx, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        itemParams.rightMargin = Math.round(12 * density);
+        item.setLayoutParams(itemParams);
+        item.setBackgroundColor(0x00000000);
+        item.setClickable(true);
+        item.setFocusable(true);
+
+        android.widget.ImageView iconView = new android.widget.ImageView(this);
+        iconView.setTag("icon");
+        iconView.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSizePx, iconSizePx));
+
+        android.widget.TextView labelView = new android.widget.TextView(this);
+        android.widget.LinearLayout.LayoutParams labelParams = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        labelParams.topMargin = Math.round(4 * density);
+        labelView.setLayoutParams(labelParams);
+        labelView.setTag("label");
+        labelView.setTextSize(10f);
+        labelView.setTextColor(0xFFFFFFFF);
+        labelView.setGravity(android.view.Gravity.CENTER);
+        labelView.setSingleLine(true);
+        labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        labelView.setShadowLayer(4f, 0f, 2f, 0xFF000000);
+
+        item.addView(iconView);
+        item.addView(labelView);
+        return item;
+    }
+
+    private View makeDockGap(int widthPx) {
+        View gap = new View(this);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                widthPx, android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+        gap.setLayoutParams(lp);
+        gap.setClickable(false);
+        gap.setFocusable(false);
+        return gap;
+    }
+
+    private void bindDockItem(MotionTrailLayout item, Drawable icon, String label,
+            View.OnClickListener click) {
+        if (item == null) return;
+        android.widget.ImageView iv = (android.widget.ImageView) item.findViewWithTag("icon");
+        android.widget.TextView tv = (android.widget.TextView) item.findViewWithTag("label");
+        if (iv != null) iv.setImageDrawable(icon);
+        if (tv != null) tv.setText(label != null ? label : "");
+        item.setOnClickListener(click);
+        item.setClickable(click != null);
+        item.setVisibility(View.VISIBLE);
+        if (launcherRevealed) {
+            item.setAlpha(1f);
+            item.setTranslationX(0f);
+            item.setTrailPx(0f);
+        }
+    }
+
+    private void bindProjectionSlot(ProjectionPresence.Kind kind) {
+        if (projectionItem == null) return;
+        if (kind == null || kind == ProjectionPresence.Kind.NONE) {
+            projectionItem.setVisibility(View.GONE);
+            if (projectionGap != null) projectionGap.setVisibility(View.GONE);
+            return;
+        }
+        Drawable icon = projectionPresence != null ? projectionPresence.iconFor(kind) : null;
+        String label = projectionPresence != null ? projectionPresence.labelFor(kind) : "";
+        bindDockItem(projectionItem, icon, label, v -> {
+            if (projectionPresence != null) projectionPresence.launch(kind);
+        });
+        if (projectionGap != null) projectionGap.setVisibility(View.VISIBLE);
+    }
+
+    private void bindRecentSlots(PackageManager pm, List<ResolveInfo> apps) {
+        java.util.Map<String, ResolveInfo> byPkg = new java.util.HashMap<>();
+        if (apps != null) {
+            for (ResolveInfo info : apps) {
+                if (info == null || info.activityInfo == null) continue;
+                byPkg.put(info.activityInfo.packageName, info);
+            }
+        }
+        int shown = 0;
+        for (String pkg : recentPackages) {
+            if (shown >= recentItems.length) break;
+            if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
+                    || ProjectionPresence.isProjectionPackage(pkg)) continue;
+            ResolveInfo info = byPkg.get(pkg);
+            if (info == null) continue;
+            String label = info.loadLabel(pm).toString();
+            Drawable icon = info.loadIcon(pm);
+            final String targetPkg = pkg;
+            final String targetLabel = label;
+            bindDockItem(recentItems[shown], icon, label,
+                    v -> launchAppForPackage(targetPkg, targetLabel));
+            shown++;
+        }
+        for (int i = shown; i < recentItems.length; i++) {
+            if (recentItems[i] != null) recentItems[i].setVisibility(View.GONE);
+        }
+        if (recentsGap != null) recentsGap.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private void refreshRecentSlots() {
+        PackageManager pm = getPackageManager();
+        Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
+        mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        bindRecentSlots(pm, pm.queryIntentActivities(mainIntent, 0));
+    }
+
+    private void rememberRecentApp(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return;
+        if (packageName.equals(getPackageName()) || IGNORED_PACKAGES.contains(packageName)
+                || ProjectionPresence.isProjectionPackage(packageName)) return;
+        recentPackages.remove(packageName);
+        recentPackages.add(0, packageName);
+        while (recentPackages.size() > 12) {
+            recentPackages.remove(recentPackages.size() - 1);
+        }
+        saveRecentApps();
+        refreshRecentSlots();
+    }
+
+    private void loadRecentApps() {
+        recentPackages.clear();
+        String raw = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).getString("recent_apps", "");
+        if (raw == null || raw.isEmpty()) return;
+        for (String pkg : raw.split(",")) {
+            if (pkg == null) continue;
+            pkg = pkg.trim();
+            if (pkg.isEmpty() || recentPackages.contains(pkg)) continue;
+            recentPackages.add(pkg);
+        }
+    }
+
+    private void saveRecentApps() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < recentPackages.size(); i++) {
+            if (i > 0) sb.append(',');
+            sb.append(recentPackages.get(i));
+        }
+        getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                .edit()
+                .putString("recent_apps", sb.toString())
+                .apply();
+    }
+
+    private void seedRecentAppsFromSystem(List<ResolveInfo> launcherApps) {
+        if (!recentPackages.isEmpty()) return;
+        java.util.Set<String> launchable = new java.util.HashSet<>();
+        if (launcherApps != null) {
+            for (ResolveInfo info : launcherApps) {
+                if (info != null && info.activityInfo != null) {
+                    launchable.add(info.activityInfo.packageName);
+                }
+            }
+        }
+        try {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am == null) return;
+            @SuppressWarnings("deprecation")
+            List<android.app.ActivityManager.RecentTaskInfo> recent =
+                    am.getRecentTasks(16, android.app.ActivityManager.RECENT_WITH_EXCLUDED);
+            if (recent == null) return;
+            for (android.app.ActivityManager.RecentTaskInfo task : recent) {
+                android.content.ComponentName real = recentTaskRealActivity(task);
+                String pkg = real != null ? real.getPackageName() : null;
+                if (pkg == null || !launchable.contains(pkg)) continue;
+                if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
+                        || ProjectionPresence.isProjectionPackage(pkg)) continue;
+                if (recentPackages.contains(pkg)) continue;
+                recentPackages.add(pkg);
+                if (recentPackages.size() >= 3) break;
+            }
+            if (!recentPackages.isEmpty()) saveRecentApps();
+        } catch (Exception ignored) {}
     }
 
     /** minSdk 23 has no InputStream.readAllBytes(). */
@@ -3252,6 +3448,7 @@ public final class MainActivity extends Activity {
         stopOverlayWatchdog();
         unregisterOverlayTaskListener();
         mediaNowPlaying.stop();
+        if (projectionPresence != null) projectionPresence.stop();
         if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
         if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
         if (raiseOverlayRunnable != null) mainHandler.removeCallbacks(raiseOverlayRunnable);

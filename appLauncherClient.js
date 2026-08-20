@@ -36,12 +36,18 @@
   // MMI header. The root element exists as soon as the page paints.
   function applySafeInsets(layout) {
     var el = document.getElementById('hv-root');
-    if (!el) return;
-    if (typeof layout.safeTop === 'number') el.style.setProperty('--hv-safe-top', layout.safeTop + 'px');
-    if (typeof layout.safeLeft === 'number') el.style.setProperty('--hv-safe-left', layout.safeLeft + 'px');
-    if (typeof layout.safeRight === 'number') el.style.setProperty('--hv-safe-right', layout.safeRight + 'px');
-    if (typeof layout.safeBottom === 'number') el.style.setProperty('--hv-safe-bottom', layout.safeBottom + 'px');
-    if (typeof layout.launcherBottom === 'number') el.style.setProperty('--hv-launcher-bottom', layout.launcherBottom + 'px');
+    var html = document.documentElement;
+    function setVar(name, value) {
+      var px = value + 'px';
+      if (el) el.style.setProperty(name, px);
+      // Splash SKIP sits outside #hv-root and inherits from <html>.
+      if (html) html.style.setProperty(name, px);
+    }
+    if (typeof layout.safeTop === 'number') setVar('--hv-safe-top', layout.safeTop);
+    if (typeof layout.safeLeft === 'number') setVar('--hv-safe-left', layout.safeLeft);
+    if (typeof layout.safeRight === 'number') setVar('--hv-safe-right', layout.safeRight);
+    if (typeof layout.safeBottom === 'number') setVar('--hv-safe-bottom', layout.safeBottom);
+    if (typeof layout.launcherBottom === 'number') setVar('--hv-launcher-bottom', layout.launcherBottom);
   }
 
   function applyShell(layout) {
