@@ -445,6 +445,31 @@ public final class MainActivity extends Activity {
         }
 
         /**
+         * Viewer → shell: is anything already playing on the music stream?
+         *
+         * The boot clip carries a soundtrack, and an unmuted media element in
+         * the WebView takes audio focus — which pauses whatever the driver had
+         * running. There is no way to ask WebView for a ducking/transient focus
+         * instead, so the only way not to interrupt is to stay silent. The
+         * viewer calls this ONCE, before the clip's first play(), and keeps the
+         * clip muted when it returns true.
+         *
+         * isMusicActive() covers any app on STREAM_MUSIC, including ones that
+         * publish no MediaSession and so never reach MediaNowPlaying.
+         */
+        @JavascriptInterface
+        public boolean isMusicActive() {
+            try {
+                android.media.AudioManager am =
+                        (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                return am != null && am.isMusicActive();
+            } catch (Throwable t) {
+                Log.w(TAG, "isMusicActive failed", t);
+                return false;
+            }
+        }
+
+        /**
          * Viewer → shell: cross-fade the last splash frame over the 3D car.
          * Duration is milliseconds; matches HavalSplash.fadeMs.
          */

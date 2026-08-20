@@ -302,8 +302,27 @@ window.HavalSplash = (function () {
     });
   }
 
+  // Decided ONCE, here, before the clip has made a sound. It cannot be re-checked
+  // later: an unmuted clip is itself playing on the music stream, so isMusicActive()
+  // would answer "yes, music is playing" about us and we would mute ourselves.
+  var soundAllowed = (function () {
+    try {
+      var b = window.AppLauncherBridge;
+      if (b && typeof b.isMusicActive === 'function' && b.isMusicActive()) {
+        console.log('[Splash] music already playing — keeping the clip silent');
+        return false;
+      }
+    } catch (e) {
+      console.warn('[Splash] isMusicActive failed', e);
+    }
+    return true;
+  })();
+
   function unmute() {
     if (!video || holding || faded) return;
+    // Staying muted is what keeps the driver's music alive: an unmuted media
+    // element takes audio focus and pauses whatever was already playing.
+    if (!soundAllowed) return;
     try {
       video.muted = false;
       video.defaultMuted = false;
@@ -1492,6 +1511,10 @@ window.HavalSplash = (function () {
           <span class="hv-tool-icon">{{ modelLabel }}</span>
           <span class="hv-tool-label">MODEL</span>
         </button>
+        <button class="hv-tool-btn" onClick="{{ cycleResScale }}" title="{{ resScaleTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ resScaleBorder }}; color: {{ resScaleCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon">{{ resScaleIcon }}</span>
+          <span class="hv-tool-label">RES</span>
+        </button>
         <button class="hv-tool-btn" onClick="{{ toggleFpsHud }}" title="{{ fpsTooltip }}" style="background: rgba(16,21,28,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ fpsBtnBorder }}; color: {{ fpsBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
           <span class="hv-tool-icon">FPS</span>
           <span class="hv-tool-label">FPS</span>
@@ -1875,6 +1898,10 @@ const CAR_SIGNALS = {
   curtain: 'car.basic.sunshade_status',
   steering: 'car.basic.steering_wheel_angle',
   ready: 'car.basic.driving_ready_state',
+  autoHold: 'car.intelligent_driving_info.auto_hold_state',
+  gear: 'car.basic.gear_status',
+  epb: 'car.basic.epb_state',
+  handbrake: 'car.basic.hand_brake_status',
   // Viewer light group → car key. The car exposes low/high beam separately;
   // the viewer's "headlight" group is the low beam.
   lights: {
@@ -1974,8 +2001,11 @@ const CAR_OPENING_UNKNOWN = -1;
 
 // car.basic.steering_wheel_angle is the STEERING WHEEL angle (roughly +/-500 deg,
 // lock to lock); the viewer's wheelAngle is the ROAD WHEEL angle, capped at +/-35.
-// UNCALIBRATED: turn the wheel to full lock with ?cartrace on, read the peak
-// value, and set this to peak/35.
+// Checked against a real drive: peak |angle| 423.1 deg over 1041 samples, which
+// at this ratio maps to ~29.6 deg of road wheel — a plausible tight turn, and
+// short of the ~486 deg expected at full lock. Consistent with 14.3; deriving a
+// ratio from that 423 peak directly (12.1) would wrongly show full lock on an
+// ordinary corner. Revisit only with a true lock-to-lock sample.
 const CAR_STEERING_RATIO = 14.3;
 const CAR_ROAD_WHEEL_MAX_DEG = 35;
 // The car reports the opposite sign to the viewer's convention (where wheelAngle>0
@@ -1983,6 +2013,39 @@ const CAR_ROAD_WHEEL_MAX_DEG = 35;
 // drove the model's wheels left. Flip here rather than at the call site so the
 // ratio above stays a pure magnitude.
 const CAR_STEERING_SIGN = -1;
+
+// Brake lamps have no published source — CarConstants has no brake-pedal key.
+// Derived from the two signals that genuinely imply lit brake lamps:
+//   auto_hold_state — AutoHold holds brake pressure at a standstill and lights
+//     the lamps. epb_state / hand_brake_status are deliberately EXCLUDED: the
+//     parking brake lights the dash tell-tale, not the rear lamps, so using it
+//     would show brake lights on every parked car.
+//   deceleration    — measured from vehicle_speed, the ONLY viable source:
+//     motor_power produced a single stale sample (-1001) across an 11-minute
+//     drive and energy_recovery_info only ~43, so neither can drive a lamp.
+//
+// CALIBRATED against 3522 samples from an 11-minute urban drive (0-58.7 km/h):
+//   cadence 0.129 s median (~8 Hz), resolution 0.1 km/h
+//   deceleration  median 0.10   p90 0.84   p95 1.15   p99 1.89   max 2.86 m/s²
+// 1.3 (the ECE regen figure) fired on only 3.4% of the drive and missed ordinary
+// pedal braking, which lights real lamps at any pressure. 1.0 sits above the p90
+// of ordinary coasting yet catches moderate braking (6.6% of samples).
+const CAR_BRAKE_DECEL_MS2 = 1.0;
+const CAR_BRAKE_HOLD_MS = 600;
+// Deceleration is measured across a window, not between consecutive samples —
+// see _trackCarDeceleration. Samples older than the max are dropped, because a
+// gap in the feed says nothing about how the car was actually slowing.
+const CAR_BRAKE_WINDOW_MIN_MS = 400;
+const CAR_BRAKE_WINDOW_MAX_MS = 2000;
+
+// Held at a standstill. auto_hold_state is NOT usable — it read 0 on the car
+// while actually stopped on AutoHold, exactly as it does when parked, so it
+// never reports the hold. These four keys do separate the states cleanly:
+//   parked        gear 3, epb 1, handbrake 1, speed 0
+//   AutoHold stop gear 2, epb 0, handbrake 0, speed 0
+// Stationary, in a driving gear, with no parking brake means something is
+// holding the car — AutoHold or the driver's foot — and both light the lamps.
+const CAR_GEAR_PARK = 3;
 
 // The two roof openings do NOT share a scale.
 //   sunshade → vehicle.getShadeScreensLevel(): 0-100 (havalshisuku sets 100 to
@@ -2006,12 +2069,17 @@ const SUNROOF_TILT_PCT = 25;          // == transitionThreshold in the transform
 // position in discrete jumps; at the manual rate the model finishes each jump in
 // a fraction of a second and then sits still, which reads as stepping. A slower
 // slew keeps it travelling between updates.
-// Daytime running lamps are not published, and readiness turned out NOT to be a
-// stand-in for them: the lamps were observed lit with driving_ready_state at
-// both 1 and 0, so the two are uncorrelated. Left in place (disabled) because
-// the wiring is harmless and the idea is worth retesting if a correlation ever
-// shows up. Do not re-enable without a lamps-OFF observation to test against.
-const CAR_DRL_FOLLOWS_READY = false;
+// Daytime running lamps are not published. driving_ready_state is used as a
+// SUFFICIENT condition for them, which the captures support:
+//   ready=1 with lamps lit .... 4 of 4 captures  (no counter-example)
+//   ready=1 with lamps dark .... never observed  (no false positive)
+//   ready=0 with lamps lit ..... 1 capture, the car winding down
+// So ready=1 implies lamps on; ready=0 implies nothing either way. The single
+// ready=0 case is a MISS (lamps lit, model dark) during a transitional state —
+// preferable to the reverse, since lighting lamps that are actually dark would
+// be the visible error. Note no lamps-OFF state has ever been captured, so this
+// cannot yet be falsified; revisit if one ever is.
+const CAR_DRL_FOLLOWS_READY = true;
 
 const CAR_OPENING_STEP = 0.006;
 const MANUAL_OPENING_STEP = 0.02;
@@ -2021,7 +2089,7 @@ const MANUAL_OPENING_STEP = 0.02;
 const CAR_SPEED_KMH_PER_UNIT = 40;
 
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, saveFlash: false,
+  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false,
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
@@ -2272,6 +2340,10 @@ class Component extends DCLogic {
     if (typeof saved.wheelTintOverride === 'boolean') s.wheelTintOverride = saved.wheelTintOverride;
     if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
     if (typeof saved.showFps === 'boolean') s.showFps = saved.showFps;
+    if (typeof saved.resScaleMode === 'string'
+        && ['off','strong','lite','on'].indexOf(saved.resScaleMode) !== -1) {
+      s.resScaleMode = saved.resScaleMode;
+    }
     this._pendingSceneSettings = true;
   }
 
@@ -2310,7 +2382,9 @@ class Component extends DCLogic {
     const lights = CAR_SIGNALS.lights;
     return [CAR_SIGNALS.doors, CAR_SIGNALS.speed, CAR_SIGNALS.night,
             CAR_SIGNALS.sunroof, CAR_SIGNALS.curtain, CAR_SIGNALS.steering,
-            CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent]
+            CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent,
+            CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
+            CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
       .concat(Object.keys(lights).map((k) => lights[k]))
       .concat(Object.keys(CAR_MODE_STATE_BY_KEY));
   }
@@ -2335,6 +2409,12 @@ class Component extends DCLogic {
 
   _applyCarSignal(key, value) {
     if (this._carTrace) console.log('[CarSignal]', key, '=', value);
+    // Drive-time bus load, surfaced through window.__perf() -> TelemetryBridge
+    // .reportPerf -> logcat. The bus is almost silent parked, so this question
+    // can only be answered from a moving car; this makes that answer fall out
+    // of a plain "adb logcat -s H6Perf" with nobody attached to devtools.
+    this._busCount = (this._busCount || 0) + 1;
+    if (key === CAR_SIGNALS.speed) this._busSpeedCount = (this._busSpeedCount || 0) + 1;
     if (key === CAR_SIGNALS.night) {
       if (this.state.timeMode === 'auto') this._syncAutoNightMode();
       return;
@@ -2344,6 +2424,26 @@ class Component extends DCLogic {
     if (key === CAR_SIGNALS.sunroof) { this._applyCarSunroof(value); return; }
     if (key === CAR_SIGNALS.curtain) { this._applyCarOpening('_setCurtainOpen', value, CAR_SUNSHADE_MAX); return; }
     if (key === CAR_SIGNALS.steering) { this._applyCarSteering(value); return; }
+    if (key === CAR_SIGNALS.gear) {
+      this._carGear = parseInt(String(value).trim(), 10);
+      this._syncBrakeLamps();
+      return;
+    }
+    if (key === CAR_SIGNALS.epb) {
+      this._carEpb = this._carBool(value);
+      this._syncBrakeLamps();
+      return;
+    }
+    if (key === CAR_SIGNALS.handbrake) {
+      this._carHandbrake = this._carBool(value);
+      this._syncBrakeLamps();
+      return;
+    }
+    if (key === CAR_SIGNALS.autoHold) {
+      this._carAutoHold = this._carBool(value);
+      this._syncBrakeLamps();
+      return;
+    }
     if (key === CAR_SIGNALS.ready) {
       this._carReady = this._carBool(value);
       this._syncPositionLamps();
@@ -2536,8 +2636,20 @@ class Component extends DCLogic {
   }
 
   _drawGraphs(now) {
-    const canvases = document.querySelectorAll('.hv-graphs-canvas');
-    if (!canvases.length) return;
+    // This is a SECOND rAF loop running alongside the 3D render loop, so it is
+    // competing for the same frame budget. It used to run document.querySelector
+    // All on every frame; the widget set changes only when a widget is added or
+    // removed, so re-resolving it a few times a second is plenty.
+    if (!this._graphCanvasCacheAt || now - this._graphCanvasCacheAt > 500) {
+      this._graphCanvasCache = document.querySelectorAll('.hv-graphs-canvas');
+      this._graphCanvasCacheAt = now;
+    }
+    const canvases = this._graphCanvasCache;
+    if (!canvases || !canvases.length) return;
+    // The samples themselves are throttled to 80ms in _pushGraphSample, so
+    // redrawing at full rAF rate just burns budget on a line that has not moved.
+    if (this._graphDrawAt && now - this._graphDrawAt < 33) return;
+    this._graphDrawAt = now;
     const kw = this._graphKwAt(now);
     this._graphKw = this._graphLive ? this._graphKw : kw;
     this._pushGraphSample(now);
@@ -2830,7 +2942,70 @@ class Component extends DCLogic {
       if (this._carTrace) console.warn('[CarSignal] vehicle_speed not a number:', value);
       return;
     }
+    this._trackCarDeceleration(kmh);
     this._setMotionSpeed(kmh / CAR_SPEED_KMH_PER_UNIT);
+  }
+
+  /**
+   * Brake lamps while moving, inferred from how fast the car is slowing.
+   *
+   * Samples further apart than 5 s are ignored (the bus went quiet, so the delta
+   * says nothing), as are sub-50 ms ones where timing noise swamps the result.
+   */
+  _trackCarDeceleration(kmh) {
+    const now = Date.now();
+    this._carSpeedKmh = kmh;
+    const hist = this._carSpeedHist || (this._carSpeedHist = []);
+    hist.push({ t: now, kmh });
+    while (hist.length && now - hist[0].t > CAR_BRAKE_WINDOW_MAX_MS) hist.shift();
+
+    // Compare against the oldest sample at least CAR_BRAKE_WINDOW_MIN_MS back,
+    // never the immediately previous one. Consecutive samples make the result
+    // hostage to quantisation: if the bus reports whole km/h every 200 ms, a
+    // one-digit wobble reads as 1.4 m/s² and would false-trigger on its own.
+    // Measuring over >=400 ms caps that same wobble at ~0.7 m/s², safely under
+    // the threshold, without needing to know the cadence in advance.
+    let ref = null;
+    for (let i = 0; i < hist.length; i++) {
+      if (now - hist[i].t >= CAR_BRAKE_WINDOW_MIN_MS) ref = hist[i];
+      else break;
+    }
+    // Speed itself feeds the standstill hold, so the lamps must be re-evaluated
+    // on every sample — not only when a deceleration can be computed. Returning
+    // early here left them lit after pulling away from a stop.
+    if (!ref) { this._syncBrakeLamps(); return; }
+    const dt = (now - ref.t) / 1000;
+    if (dt <= 0) { this._syncBrakeLamps(); return; }
+    const decel = ((ref.kmh - kmh) / 3.6) / dt;   // m/s², positive = slowing
+    if (this._carTrace) {
+      console.log('[CarSignal] decel', decel.toFixed(2), 'm/s²',
+                  'from', ref.kmh, '->', kmh, 'over', dt.toFixed(2), 's');
+    }
+    if (decel >= CAR_BRAKE_DECEL_MS2) this._carBrakeUntil = now + CAR_BRAKE_HOLD_MS;
+    this._syncBrakeLamps();
+  }
+
+  /**
+   * brake = AutoHold engaged OR still inside the deceleration hold window.
+   *
+   * The hold needs its own timer: once the car stops, speed updates stop too, so
+   * nothing else would come along to switch the lamps back off.
+   */
+  _syncBrakeLamps() {
+    const now = Date.now();
+    const holding = !!(this._carBrakeUntil && now < this._carBrakeUntil);
+    // Stopped in gear with no parking brake => something is holding it.
+    const heldAtStop = this._carSpeedKmh === 0
+      && this._carGear !== undefined && this._carGear !== CAR_GEAR_PARK
+      && !this._carEpb && !this._carHandbrake;
+    const on = !!(this._carAutoHold || heldAtStop || holding);
+    const l = this.state.lights || {};
+    if (l.brake !== on) this._setLightFromCar('brake', on);
+    if (this._carBrakeTimer) { clearTimeout(this._carBrakeTimer); this._carBrakeTimer = null; }
+    if (holding) {
+      this._carBrakeTimer = setTimeout(() => this._syncBrakeLamps(),
+                                       this._carBrakeUntil - now + 20);
+    }
   }
 
   /**
@@ -3015,6 +3190,7 @@ class Component extends DCLogic {
       wheelTintOverride: s.wheelTintOverride,
       wheelStyle: s.wheelStyle,
       showFps: !!s.showFps,
+      resScaleMode: s.resScaleMode || 'off',
       layoutCameras: this._layoutCameras || {},
     };
     try {
@@ -3232,6 +3408,20 @@ class Component extends DCLogic {
       showTuningSubmenu: !!(s.configExpanded && s.activeGroup === 'tuning'),
       showOverrideSubmenu: !!(s.configExpanded && s.activeGroup === 'override'),
       showTimeSubmenu: !!(s.configExpanded && s.activeGroup === 'time'),
+      resScaleIcon: ({ off: 'OFF', strong: 'DYN+', lite: 'DYN', on: 'ON' })[s.resScaleMode || 'off'],
+      resScaleBorder: (s.resScaleMode && s.resScaleMode !== 'off') ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+      resScaleCol:    (s.resScaleMode && s.resScaleMode !== 'off') ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+      resScaleTooltip: ({
+        off:    'Resolution scaling: OFF - always native, sharpest but slowest while moving',
+        strong: 'Resolution scaling: DYNAMIC STRONG - reduce while moving once below ~20fps',
+        lite:   'Resolution scaling: DYNAMIC LITE - reduce only in emergencies, below ~10fps',
+        on:     'Resolution scaling: ALWAYS ON - always reduce while moving, sharpen when still',
+      })[s.resScaleMode || 'off'],
+      cycleResScale: () => this.setState((st) => {
+        const order = ['off', 'strong', 'lite', 'on'];
+        const next = order[(order.indexOf(st.resScaleMode || 'off') + 1) % order.length];
+        return { resScaleMode: next };
+      }),
       showFps: s.showFps,
       fpsBtnBorder: s.showFps ? '#4fd6e8' : 'rgba(79,214,232,.20)',
       fpsBtnCol:    s.showFps ? '#4fd6e8' : 'rgba(255,255,255,.70)',
@@ -3845,16 +4035,15 @@ class Component extends DCLogic {
 
     const speed = this.state.motionSpeed || 0;
     const speedKmh = Math.abs(speed) * 40;
-    const isFast = speedKmh >= 65;
-    const isBlending = speedKmh >= 45;
+    const isFast = speedKmh >= 60;
+    const isBlending = speedKmh >= 30;
 
-    // Calculate blend opacity for blurred discs (linear fade from 45 to 65 km/h).
-    // Capped below 1 so the spinning-blur sprite always reads as translucent
-    // rather than a flat opaque disc, even at full speed.
-    const MAX_BLUR_OPACITY = 0.85;
+    // Fade the sprite in; translucency itself comes from the captured
+    // spoke-gap alpha (see the blur shader), not from capping this below 1.
+    const MAX_BLUR_OPACITY = 1.0;
     let blend = 0;
-    if (speedKmh >= 45) {
-      blend = Math.min(1.0, (speedKmh - 45) / 20) * MAX_BLUR_OPACITY;
+    if (speedKmh >= 30) {
+      blend = Math.min(1.0, (speedKmh - 30) / 30) * MAX_BLUR_OPACITY;
     }
 
     if (this._blurredDiscs && this._blurredDiscs[0]) {
@@ -3868,6 +4057,22 @@ class Component extends DCLogic {
     }
     if (this._blurredDiscs) {
       this._blurredDiscs.forEach(m => { m.visible = isBlending; });
+    }
+
+    // One-shot recapture the first time the sprites actually matter.
+    // Boot / stock-swap / HDRI all call _generateBlurredWheelTexture while
+    // the car root is still hidden for the intro — Three.js skips that
+    // whole subtree, so the baked texture was fully transparent and the
+    // discs (correct radius, correct opacity, visible=true) drew nothing.
+    // Recapturing here also heals a zero-radius disc (see _resizeBlurredDiscs).
+    if (isBlending && !this._blurDiscRecoveryTried
+        && this._blurredDiscs && this._blurredDiscs.length) {
+      this._blurDiscRecoveryTried = true;
+      try {
+        this._generateBlurredWheelTexture();
+      } catch (e) {
+        console.warn('[WheelBlur] recovery regeneration failed', e);
+      }
     }
     if (this._backingDiscs) {
       this._backingDiscs.forEach(m => { m.visible = isBlending; });
@@ -3975,7 +4180,23 @@ class Component extends DCLogic {
 
   }
 
+  // Guarded the same way its neighbours already are: _applyCarMode bails when
+  // the value is unchanged, and _applyCarSteering carries an explicit 0.5-degree
+  // deadband whose comment warns that "sub-degree jitter would re-run the wheel
+  // transform every frame on a live bus". Speed had NO guard, yet vehicle_speed
+  // is the busiest signal there is while driving. Every frame off the bus meant
+  // a setState -> full component re-render -> componentDidUpdate ->
+  // requestRender() -> _postFxDirty, i.e. the whole React tree plus a forced
+  // post-FX rebuild at CAN rate. Parked, the bus is quiet (measured: 0.3
+  // signals/sec) which is exactly why this never showed up in bench testing.
+  //
+  // 0.005 units is 0.2 km/h (CAR_SPEED_KMH_PER_UNIT = 40) - far below anything
+  // visible in wheel roll. A stop is always applied exactly, so the wheels
+  // cannot be left spinning by the deadband.
   _setMotionSpeed(speed) {
+    const prev = this.state.motionSpeed;
+    const stopping = speed === 0 && prev !== 0;
+    if (!stopping && typeof prev === 'number' && Math.abs(prev - speed) < 0.005) return;
     this.setState({ motionSpeed: speed });
   }
 
@@ -4058,16 +4279,11 @@ class Component extends DCLogic {
             ) + center;
             color += texture2D(tSource, rotatedUv);
           }
-          vec4 avgColor = color / float(SAMPLES);
-          // avgColor.rgb is diluted by how much of the disc the spokes actually
-          // cover (transparent gaps contribute (0,0,0,0) to the sum), so a
-          // thin-spoked wheel comes out artificially dim regardless of its real
-          // material color. Un-premultiply by coverage (== avgColor.a here) to
-          // recover the true rim brightness/color before boosting alpha.
-          vec3 trueColor = avgColor.a > 0.001 ? avgColor.rgb / avgColor.a : avgColor.rgb;
-          // Boost alpha non-linearly to make the spinning rim feel solid and metallic
-          float boostedAlpha = min(1.0, pow(avgColor.a, 0.6) * 1.5);
-          gl_FragColor = vec4(trueColor, boostedAlpha);
+          // Keep the average as-is. Transparent spoke gaps contribute (0,0,0,0),
+          // so rgb is already premultiplied by coverage and alpha IS the mask —
+          // the holes in the captured rim. Un-premultiplying and boosting alpha
+          // (50dbd47) filled those holes and turned the sprite into a solid disc.
+          gl_FragColor = color / float(SAMPLES);
         }
       `
     });
@@ -4104,6 +4320,13 @@ class Component extends DCLogic {
     const sizeVec = new THREE.Vector3();
     flBox.getSize(sizeVec);
     const r = Math.max(sizeVec.x, sizeVec.y, sizeVec.z) * 0.5;
+    // A degenerate ortho frustum would clear _rtBlurred to empty and wipe a
+    // previously good sprite texture (the stock-swap path can measure 0 if
+    // the new clones have not had matrixWorld updated yet).
+    if (!(r > 1e-6)) {
+      console.warn('[WheelBlur] skip capture — rim radius is 0');
+      return;
+    }
 
     const flFirst = this._frontLeftWheels[0];
     const pivot = flFirst._pivot;
@@ -4117,7 +4340,6 @@ class Component extends DCLogic {
     tempCam.updateProjectionMatrix();
     tempCam.updateMatrixWorld(true);
 
-    console.log('[WheelBlur Camera] Pivot:', pivot.toArray(), 'Axle:', axle.toArray(), 'Radius:', r, 'CamPos:', tempCam.position.toArray());
 
     // Save shadowCatcher/nightFloor BEFORE the traverse so the restore gets the
     // original value — the traverse would overwrite the map entry with 'false'.
@@ -4125,11 +4347,27 @@ class Component extends DCLogic {
     const nfOrigVisible = this.nightFloor    ? this.nightFloor.visible    : undefined;
 
     const savedVisibilities = new Map();
+    const rememberVisible = (obj) => {
+      if (obj && !savedVisibilities.has(obj)) savedVisibilities.set(obj, obj.visible);
+    };
     scene.traverse(c => {
       if (c.isMesh) {
-        savedVisibilities.set(c, c.visible);
+        rememberVisible(c);
         const isFlSpokes = this._frontLeftWheels.includes(c) && this._spokesWheels.includes(c);
         c.visible = isFlSpokes;
+      }
+    });
+    // THREE does not render a mesh if ANY ancestor has visible=false. The boot
+    // path hides the car root until intro, and the stock-rim swap recaptures
+    // in that window — so forcing only the spoke meshes visible still produced
+    // an empty texture. Walk the parent chain and unhide it for the capture.
+    this._frontLeftWheels.forEach(m => {
+      if (!this._spokesWheels.includes(m)) return;
+      let p = m.parent;
+      while (p) {
+        rememberVisible(p);
+        p.visible = true;
+        p = p.parent;
       }
     });
 
@@ -4151,11 +4389,7 @@ class Component extends DCLogic {
 
     scene.background = oldBg;
 
-    scene.traverse(c => {
-      if (c.isMesh && savedVisibilities.has(c)) {
-        c.visible = savedVisibilities.get(c);
-      }
-    });
+    savedVisibilities.forEach((vis, obj) => { obj.visible = vis; });
     if (this.shadowCatcher && scOrigVisible !== undefined) this.shadowCatcher.visible = scOrigVisible;
     if (this.nightFloor    && nfOrigVisible !== undefined) this.nightFloor.visible    = nfOrigVisible;
 
@@ -4206,11 +4440,39 @@ class Component extends DCLogic {
   // Geometry is rebuilt rather than scaling the mesh, so the roll/steer
   // matrices (_initWorld/_initParentInv) stay untouched.
   _resizeBlurredDiscs(worldRadius) {
-    if (!this.THREE || !this._blurDiscInitWorldRadius || this._blurDiscInitWorldRadius < 1e-6) return;
-    const ratio = worldRadius / this._blurDiscInitWorldRadius;
-    if (!isFinite(ratio) || ratio <= 0) return;
+    if (!this.THREE || !isFinite(worldRadius) || worldRadius < 1e-6) return;
     const THREE = this.THREE;
     const discs = [...(this._blurredDiscs || []), ...(this._backingDiscs || [])];
+
+    // SELF-HEAL. The discs are sized from the FL rim's bounding box, which is
+    // EMPTY if they are built before those meshes have valid world matrices -
+    // exactly what happens with an uploaded custom rim, whose clones are
+    // attached to the suspension node after this runs. A zero measurement then
+    // produced CircleGeometry(0) for every disc: present in the scene, visible,
+    // 0.85 opacity, and drawing nothing at all. Worse, the old guard here
+    // early-returned whenever the stored baseline was zero, so the discs could
+    // never be repaired for the lifetime of the page - measured on the car as
+    // blurDiscInitWorldRadius 0 / _baseGeoRadius 0 / geometry radius 0.
+    //
+    // Adopt the first VALID measurement as the baseline instead, rebuilding
+    // each disc's local reference radius from its own parent world scale.
+    const baselineBad = !this._blurDiscInitWorldRadius
+                     || this._blurDiscInitWorldRadius < 1e-6
+                     || !discs.some(d => d._baseGeoRadius > 1e-6);
+    if (baselineBad) {
+      this._blurDiscInitWorldRadius = worldRadius;
+      const sv = new THREE.Vector3();
+      discs.forEach(d => {
+        let sf = 1;
+        if (d.parent) { d.parent.getWorldScale(sv); sf = sv.x || 1; }
+        d._baseGeoRadius = worldRadius / sf;
+        d._appliedGeoRadius = undefined;   // force the rebuild below
+      });
+      console.warn('[WheelBlur] disc baseline was invalid - healed to worldRadius', worldRadius);
+    }
+
+    const ratio = worldRadius / this._blurDiscInitWorldRadius;
+    if (!isFinite(ratio) || ratio <= 0) return;
     discs.forEach(d => {
       if (d._baseGeoRadius === undefined) return;
       const target = d._baseGeoRadius * ratio;
@@ -4982,9 +5244,13 @@ class Component extends DCLogic {
       const blurredMaterial = new THREE.MeshBasicMaterial({
         map: this._rtBlurred.texture,
         transparent: true,
+        // The blur shader writes premultiplied coverage (rgb * spoke-alpha).
+        // Without this, NormalBlending multiplies by alpha a second time and
+        // the mask reads as a muddy sheet instead of holes in the rim.
+        premultipliedAlpha: true,
         depthWrite: false,
         side: THREE.DoubleSide,
-        color: 0xffffff // No tint — the captured texture already carries the real rim's color/brightness
+        color: 0xffffff
       });
 
       const backingMaterial = new THREE.MeshBasicMaterial({
@@ -9410,6 +9676,7 @@ class Component extends DCLogic {
   // Any React state/prop change (paint, env, lights, vignette, night, steer …)
   // means the scene may look different — request a redraw under on-demand mode.
   componentDidUpdate() {
+    this._setStateCount = (this._setStateCount || 0) + 1;
     if (this.requestRender) this.requestRender(3);
     this._syncBootHud();
     // Start the load intro only after the loading overlay has actually cleared.
@@ -9543,11 +9810,53 @@ class Component extends DCLogic {
   // Switching tiers calls _onResize(), which reallocates every render target.
   // That is expensive enough that it contaminated an earlier benchmark, so both
   // directions are debounced in the render loop rather than switched per frame.
+  // Short rolling window of rendered-frame intervals, kept separate from
+  // _frameCadence: that one resets on every tier switch and needs 30 samples
+  // before it reports anything, which at ~14fps is over two seconds - far too
+  // slow to drive a "reduce resolution when it gets bad" decision.
+  _recentAvgMs() {
+    const a = this._recentMs;
+    if (!a || a.length < 4) return 0;
+    // MEDIAN, deliberately - see the note above about resize spikes.
+    const sorted = a.slice().sort((x, y) => x - y);
+    const mid = sorted.length >> 1;
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  // Whether the motion tier may reduce resolution right now.
+  //   off    - never. Always native, whatever it costs. (default)
+  //   strong - engage early, as soon as the frame rate falls under ~20fps.
+  //   lite   - emergency only, under ~10fps.
+  //   on     - always reduce while the camera is moving.
+  //
+  // The dynamic modes LATCH once they fire and unlatch only when the scene
+  // settles back to refine. Without the latch, reducing resolution would raise
+  // the frame rate, which would immediately un-trigger the reduction, which
+  // would drop the frame rate again - a resolution oscillation roughly once a
+  // second, every flip paying a full render-target reallocation.
+  _resReductionAllowed() {
+    const mode = (this.state && this.state.resScaleMode) || 'off';
+    if (mode === 'off') return false;
+    if (mode === 'on') return true;
+    if (this._resReductionLatched) return true;
+    const avg = this._recentAvgMs();
+    if (!avg) return false;                        // no data yet - stay sharp
+    return avg > (mode === 'strong' ? 50 : 100);   // 20fps / 10fps
+  }
+
   _setResTier(tier) {
     if (this._resTier === tier || !this.renderer || !this._dprSteps) return;
     const top = this._dprSteps[this._dprSteps.length - 1];
+    // REGRESSION GUARD: _maybeAdaptDPR can walk _dprIdx all the way to the top
+    // step whenever cadence looks good - and it does, e.g. while the window is
+    // collapsed and every frame is trivially cheap. If the motion tier were
+    // allowed to use that top step it would render motion at native, which is
+    // exactly what this tier exists to prevent (native measured ~14fps against
+    // ~22fps reduced). The top step belongs to the refine tier alone.
+    const motionIdx = Math.min(this._dprIdx,
+                               Math.max(0, this._dprSteps.length - 2));
     const dpr = tier === 'refine' ? top
-              : (this._dprSteps[this._dprIdx] || this._dprSteps[0]);
+              : (this._dprSteps[motionIdx] || this._dprSteps[0]);
     this._resTier = tier;
     if (this.renderer.getPixelRatio() !== dpr) {
       this.renderer.setPixelRatio(dpr);
@@ -9694,11 +10003,10 @@ class Component extends DCLogic {
       // below so the renderer and the bookkeeping agree from frame 1.
       renderer.setPixelRatio(
         this._perfLow ? 0.75
-        // Mobile starts in the MOTION tier (0.7), not native. The intro
-        // animation is continuous motion, and native measured ~14fps here
-        // against ~22fps at 0.7. _setResTier lifts it to native once the
-        // scene settles - see the motion/idle block in the render loop.
-        : this._perfMobile ? 0.7
+        // Boot native and let the resolution-mode logic decide from there. The
+        // default mode is OFF (never reduce), so booting at the motion step
+        // would contradict the saved setting before it has even been applied.
+        : this._perfMobile ? Math.min(window.devicePixelRatio || 1, 1.0)
         : Math.min(window.devicePixelRatio, 1.5),
       );
       renderer.setSize(w, h);
@@ -9730,10 +10038,15 @@ class Component extends DCLogic {
         } catch (e) {}
       });
 
-      // FPS HUD shares the launcher strip's bottom gap (OEM climate dock
-      // clearance). Desktop has no strip, so it falls back to 14px.
+      // FPS HUD must clear the OEM system UI, which on this head unit is much
+      // taller than the launcher strip: measured --hv-launcher-bottom 45px
+      // against --hv-safe-bottom 158px, which left the pill sitting inside the
+      // climate dock. safe-bottom is the offset that actually means "not covered
+      // by system UI"; max() keeps desktop (safe-bottom 0) on the launcher value
+      // rather than pinning the pill to the very bottom edge.
       const hudEl = document.createElement('div');
-      hudEl.style.cssText = 'position:absolute;left:14px;bottom:var(--hv-launcher-bottom, 14px);z-index:30;' +
+      hudEl.style.cssText = 'position:absolute;left:14px;' +
+        'bottom:max(var(--hv-safe-bottom, 14px), var(--hv-launcher-bottom, 14px));z-index:30;' +
         'display:flex;align-items:center;gap:6px;pointer-events:none;user-select:none;';
       container.appendChild(hudEl);
       this._hudEl = hudEl;
@@ -9858,6 +10171,9 @@ class Component extends DCLogic {
       this.requestRender = (n = 3) => {
         this._renderFrames = Math.max(this._renderFrames || 0, n);
         this._postFxDirty = true;
+        // Lets the resolution tier tell external redraw requests apart from
+        // the refine pass's own trailing frames - see _setResTier.
+        this._extRenderSeq = (this._extRenderSeq || 0) + 1;
       };
       controls.addEventListener('change', () => this.requestRender(2));
       // ── Adaptive pixel ratio ───────────────────────────────────────────────
@@ -9887,27 +10203,30 @@ class Component extends DCLogic {
       this._dprSteps = this._perfLow
         ? [0.75, 0.85, 1.0]
         : [...new Set(
-            (this._perfMobile ? [0.7, 1.0] : [1.0, 1.25, 1.5])
+            (this._perfMobile ? [0.75, 1.0] : [1.0, 1.25, 1.5])
               .filter(v => v <= this._dprCap).concat(this._dprCap),
           )].sort((a, b) => a - b);
       // Low tier starts at its lowest step (smooth-first, ramp up if there's
       // headroom); desktop starts crisp. Mobile starts at 1.0 — native
       // resolution — and lets the cadence loop move it either way from there.
       this._dprIdx   = this._perfLow ? 0
-                     : this._perfMobile ? 0
+                     : this._perfMobile ? Math.max(0, this._dprSteps.indexOf(1.0))
                      : this._dprSteps.length - 1;
       this._frameCadence = {
         last: 0, samples: [], avg: 0,
         goodWindows: 0, badWindows: 0, windowReady: false,
       };
       // Motion/idle resolution tiers - see _setResTier.
-      this._resTier      = 'motion';
+      this._resTier      = 'refine';
       this._motionStartMs = 0;
       this._lastActiveMs  = 0;
       this._refineFrames  = 0;
       this._perf = { fps: 0, lastMs: 0, renderedFrames: 0, dpr: this._dprSteps[this._dprIdx] };
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
         resTier: this._resTier,
+        busPerSec: this._busRate || 0,
+        speedPerSec: this._busSpeedRate || 0,
+        rendersPerSec: this._setStateRate || 0,
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
 
       // --- Load GLBs (glTF with PBR materials) ---
@@ -10453,18 +10772,37 @@ class Component extends DCLogic {
           // would immediately bounce back down and thrash the render targets.
           if (this._refineFrames > 0) {
             this._refineFrames--;
+            this._motionStartMs = 0;
           } else if (this._resTier === 'refine') {
-            if (!this._motionStartMs) this._motionStartMs = _nowRes;
-            if (_nowRes - this._motionStartMs >= 90) this._setResTier('motion');
+            if ((this._extRenderSeq || 0) === this._seqAtRefine) {
+              // Nothing external has asked for a redraw since we refined, so
+              // these are still the refine pass's own frames draining. Not motion.
+              this._motionStartMs = 0;
+            } else {
+              if (!this._motionStartMs) this._motionStartMs = _nowRes;
+              if (_nowRes - this._motionStartMs >= 90 && this._resReductionAllowed()) {
+                this._resReductionLatched = true;
+                this._setResTier('motion');
+              }
+            }
+          } else if (!this._resReductionAllowed()) {
+            // Mode switched to OFF while the camera is still moving - restore
+            // native now rather than waiting for the scene to settle.
+            this._resReductionLatched = false;
+            this._setResTier('refine');
           }
         } else {
           this._motionStartMs = 0;
           if (this._resTier !== 'refine' && this._lastActiveMs
               && _nowRes - this._lastActiveMs >= 220) {
             this._setResTier('refine');
+            this._resReductionLatched = false;
             this._postFxDirty = true;
             this._renderFrames = Math.max(this._renderFrames || 0, 2);
             this._refineFrames = 2;
+            // Snapshot AFTER _setResTier so any requestRender() its _onResize()
+            // triggers is counted as ours, not as user motion.
+            this._seqAtRefine = this._extRenderSeq || 0;
           }
         }
 
@@ -10571,6 +10909,27 @@ class Component extends DCLogic {
           this._perf.fps = Math.round(_fpsCount * 1000 / (now - _fpsT));
           _fpsCount = 0; _fpsT = now;
         }
+        if (!this._busRateT || now - this._busRateT >= 1000) {
+          const span = (now - (this._busRateT || now)) || 1000;
+          const k = 1000 / span;
+          this._busRate = Math.round((this._busCount || 0) * k);
+          this._busSpeedRate = Math.round((this._busSpeedCount || 0) * k);
+          this._setStateRate = Math.round((this._setStateCount || 0) * k);
+          this._busCount = 0; this._busSpeedCount = 0; this._setStateCount = 0;
+          this._busRateT = now;
+        }
+        // Rolling window for _resReductionAllowed. Fed on EVERY rendered frame,
+        // refine ones included, because the dynamic modes must see how slow
+        // native actually is in order to decide to leave it.
+        if (this._lastRecentMs) {
+          const _d = now - this._lastRecentMs;
+          if (_d > 0 && _d < 400) {
+            (this._recentMs || (this._recentMs = [])).push(_d);
+            if (this._recentMs.length > 10) this._recentMs.shift();
+          }
+        }
+        this._lastRecentMs = now;
+
         // The ladder governs the MOTION tier only. Refinement frames are known
         // to be slow (that is the trade) and must not be scored, or the ladder
         // would read every settled scene as a stall and walk itself down.

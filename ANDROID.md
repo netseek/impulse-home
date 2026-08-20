@@ -323,6 +323,56 @@ Injecting a signal by hand, to test without the car changing state:
 adb -s <device> shell "am broadcast -a com.haval.vehicle.EVENT_CHANGED --es key car.basic.door_status --es value '{1,0,0,0,0,0}'"
 ```
 
+### The position / DRL lamp has no published signal
+
+Verified exhaustively, not inferred. The front position lamp was observed
+**physically lit** in four different vehicle states:
+
+| State | `driving_ready` | `hvac.power_mode` | charging | stalk |
+| --- | --- | --- | --- | --- |
+| morning, AUTO | 1 | 1 | no | AUTO |
+| midday, settling | 0 | 0 | no | AUTO |
+| charging | 0 | 0 | yes | AUTO |
+| OFF mode | 0 | 0 | yes | OFF |
+
+In **all four**, every published light key read `0` — `low_beam`, `high_beam`,
+`front_fog`, `rear_fog`, `hazard`, both turn keys, and
+`car.drive.setting.outline_lamps_state`. `driving_ready_state` took both values
+with the lamp lit, so it is not a proxy (a rule based on it was tried and
+reverted — see `CAR_DRL_FOLLOWS_READY`). Charging is not a trigger either.
+
+`car.basic.low_light_status` and `car.basic.head_light_status` are subscribed but
+the vehicle returns **empty** for both, so `dispatchAllData` skips them — they are
+dead on this car despite looking like the obvious candidates.
+
+**Open lead:** `car.configure.comb_front_light_src` reads `3` (an enum, not a
+flag) while the lamps are lit — the only non-zero light-ish signal found. It
+needs a stalk cycle to confirm it tracks lamp output before anything is wired to
+it. Subscribed as of this change, along with `auto_headlight` (reads 1, just the
+feature toggle), `light_auto_switch_system` and `configure.parking_light` (both 0).
+
+What the viewer does today: `position = stalk-selected OR low beam OR high beam`.
+Correct in manual modes, misses AUTO/OFF where the lamps run with no signal.
+
+### There is no brake-pedal signal
+
+`CarConstants` has no brake-pedal key. The full candidate list:
+
+| Key | Meaning | Verdict |
+| --- | --- | --- |
+| `car.basic.hand_brake_status` | parking brake | does not light brake lamps |
+| `car.ipk_light.braking_system_indicator` | brake fault tell-tale | unrelated |
+| `car.ipk_light.brake_energe_recycle` | regen tell-tale | indirect |
+| `car.intelligent_driving_info.hazard_brake_state` | AEB | rare edge case |
+| `car.ev_info.energy_recovery_info` | regen level (float, e.g. `0.34`) | closest proxy, now subscribed |
+
+The viewer's `brake` light group therefore has no direct car source. The
+recommended approach is to **derive it from deceleration** of the already-reliable
+`car.basic.vehicle_speed`, with a short hold so it cannot strobe on sensor noise.
+That matches what a brake lamp physically signifies and also covers strong regen,
+which must legally light the lamps above ~1.3 m/s². Limitations: it cannot see
+the pedal pressed while stationary, and it can only be calibrated while driving.
+
 ### Cold start needs a snapshot
 
 The event stream is **change-only**. The viewer starts long after havalshisuku,
