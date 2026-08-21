@@ -1453,6 +1453,9 @@ window.HavalSplash = (function () {
       position: relative;
       min-width: 0;
       min-height: 0;
+      overflow: hidden;
+      border-radius: 8px;
+      background: rgba(8, 12, 18, 0.42);
     }
     .hv-graphs-head {
       position: absolute;
@@ -1784,6 +1787,35 @@ window.HavalSplash = (function () {
     button.on .hv-size-glyph {
       --on: #0b1016;
       --off: rgba(11,16,22,.16);
+    }
+    /* Graph LAYOUT chips: pane split inside the card, not widget occupancy. */
+    .hv-layout-glyph {
+      --on: #eaf2f8;
+      display: block;
+      width: 16px;
+      height: 7px;
+      border-radius: 2px;
+      background: var(--on);
+    }
+    .hv-layout-glyph.lg-2x1 {
+      width: 7px;
+      box-shadow: 9px 0 0 var(--on);
+      margin-right: 9px;
+    }
+    .hv-layout-glyph.lg-1x2 {
+      box-shadow: 0 9px 0 var(--on);
+      margin-bottom: 9px;
+    }
+    .hv-layout-glyph.lg-2x2 {
+      width: 7px;
+      box-shadow:
+        9px 0 0 var(--on),
+        0 9px 0 var(--on),
+        9px 9px 0 var(--on);
+      margin: 0 9px 9px 0;
+    }
+    button.on .hv-layout-glyph {
+      --on: #0b1016;
     }
     .hv-media-rail {
       position: absolute;
@@ -2769,7 +2801,7 @@ window.HavalSplash = (function () {
     <div class="hv-graph-editor-chips">
       <sc-for list="{{ graphLayoutChips }}" as="lc" hint-placeholder-count="1">
         <button type="button" class="{{ lc.className }}" onClick="{{ lc.onClick }}" title="{{ lc.label }}">
-          <span class="hv-size-glyph {{ lc.sizeClass }}"></span>
+          <span class="hv-layout-glyph {{ lc.sizeClass }}"></span>
         </button>
       </sc-for>
     </div>
@@ -16822,7 +16854,7 @@ class Component extends DCLogic {
       const lay = chips[i];
       layoutChips.push({
         label: lay.label,
-        sizeClass: 'board-2 size-' + lay.cols + 'x' + lay.rows,
+        sizeClass: 'lg-' + lay.cols + 'x' + lay.rows,
         className: (cfg.cols === lay.cols && cfg.rows === lay.rows ? 'on hv-size-chip' : 'hv-size-chip'),
         onClick: (function(c, r) { return function() { self._setGraphLayout(c, r); }; })(lay.cols, lay.rows),
       });
