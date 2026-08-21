@@ -124,6 +124,7 @@ window.HavalSplash = (function () {
       whenDone: function (cb) { cb(); },
       fadeOut: function () {},
       skip: function () {},
+      dropNow: function () {},
       wasSkipped: function () { return false; },
       isDone: function () { return true; },
       forceHold: function () {},
@@ -383,6 +384,25 @@ window.HavalSplash = (function () {
     lastTime = video.currentTime;
   }, 1200);
 
+  function dropNow() {
+    if (faded) return;
+    faded = true;
+    hideSkip();
+    clearTimeout(guard);
+    clearInterval(watchdog);
+    destroyVideo();
+    if (el) {
+      el.style.display = 'none';
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }
+    el = null;
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.endSplashOverlay === 'function') {
+        window.AppLauncherBridge.endSplashOverlay();
+      }
+    } catch (e) {}
+  }
+
   function skip() {
     if (faded || skipped) return;
     skipped = true;
@@ -409,6 +429,10 @@ window.HavalSplash = (function () {
     isDone: function () { return finished; },
     wasSkipped: function () { return skipped; },
     skip: skip,
+    /** Tear the overlay down immediately — no last-frame cross-fade.
+     *  Used when skip happens while the GLB is still loading so the shell
+     *  (launcher, chrome, widgets) can show on the empty background. */
+    dropNow: dropNow,
     /** Resolve once the clip has ended, been skipped, or failed. */
     whenDone: function (cb) {
       if (finished) { cb(); return; }
@@ -866,20 +890,28 @@ window.HavalSplash = (function () {
       -webkit-touch-callout: none;
       touch-action: manipulation;
     }
-    .hv-widget-remove {
+    .hv-widget-card.editing {
+      z-index: 8;
+      border-color: rgba(255,255,255,.42);
+    }
+    .hv-widget-remove,
+    .hv-widget-exit {
       position: absolute;
       top: 8px;
-      right: 8px;
       z-index: 8;
-      width: 22px; height: 22px;
+      width: 26px; height: 26px;
       border-radius: 50%;
       border: 1px solid rgba(255,255,255,.18);
-      background: rgba(8,12,18,.7);
+      background: rgba(8,12,18,.55);
       color: #eaf2f8;
       cursor: pointer;
-      font-size: 13px;
-      line-height: 1;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
+    .hv-widget-exit { left: 8px; }
+    .hv-widget-remove { right: 8px; }
     .hv-widget-stub {
       height: 100%;
       display: flex;
@@ -1026,11 +1058,12 @@ window.HavalSplash = (function () {
     }
     .hv-power-2x1,
     .hv-power-3x1 {
-      grid-template-columns: minmax(0, 1fr) 128px;
       grid-template-rows: auto minmax(0, 1fr);
       column-gap: 10px;
       row-gap: 4px;
     }
+    .hv-power-2x1 { grid-template-columns: minmax(0, 1fr) 148px; }
+    .hv-power-3x1 { grid-template-columns: minmax(0, 1fr) 176px; }
     .hv-power-2x2 {
       grid-template-columns: minmax(0, 1fr) 150px;
       grid-template-rows: auto minmax(0, 1fr) auto;
@@ -1091,6 +1124,12 @@ window.HavalSplash = (function () {
       grid-column: 2;
       grid-row: 1 / span 2;
     }
+    .hv-power-2x1 .hv-power-readout,
+    .hv-power-3x1 .hv-power-readout {
+      justify-content: flex-start;
+      align-items: stretch;
+      gap: 2px;
+    }
     .hv-power-value {
       font-family: 'Space Mono', monospace;
       font-size: 28px;
@@ -1132,18 +1171,21 @@ window.HavalSplash = (function () {
     .hv-power-car-frame {
       position: relative;
       height: 100%;
-      aspect-ratio: 550 / 240;
+      aspect-ratio: 550 / 260;
       max-width: 100%;
     }
     .hv-power-car-img {
       position: absolute;
-      inset: 0;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 86%;
       display: block;
       width: 100%;
-      height: 100%;
       object-fit: contain;
-      object-position: center;
+      object-position: center bottom;
       pointer-events: none;
+      z-index: 2;
     }
     .hv-power-ice,
     .hv-power-motor,
@@ -1152,37 +1194,57 @@ window.HavalSplash = (function () {
       pointer-events: none;
       opacity: .28;
       transition: opacity .2s ease, filter .2s ease;
+      z-index: 3;
     }
     .hv-power-ice {
       left: 11%;
-      top: 34%;
+      top: 28%;
       width: 11%;
     }
     .hv-power-motor.front {
-      left: 22%;
-      top: 62%;
+      left: 13%;
+      top: 54%;
       width: 9.5%;
     }
     .hv-power-motor.rear {
-      left: 69%;
-      top: 61%;
-      width: 12%;
+      left: 81%;
+      top: 54%;
+      width: 9.5%;
+      transform: scaleX(-1);
+      transform-origin: center center;
     }
     .hv-power-batt {
-      left: 42%;
-      top: 56%;
-      width: 15%;
+      left: 40%;
+      top: 48%;
+      width: 26%;
+      overflow: hidden;
+      transform: scaleY(1.85);
+      transform-origin: top center;
     }
     .hv-power-ice,
     .hv-power-motor {
       display: block;
       height: auto;
     }
-    .hv-power-batt-base,
-    .hv-power-batt-fill img {
+    .hv-power-batt-base {
       display: block;
       width: 100%;
       height: auto;
+    }
+    .hv-power-batt-fill {
+      position: absolute;
+      top: 12%;
+      left: 15%;
+      right: 9%;
+      bottom: 16%;
+      overflow: hidden;
+      clip-path: inset(0 calc(100% - var(--soc, 0%)) 0 0);
+    }
+    .hv-power-batt-fill img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
     }
     .hv-power-ice.on,
     .hv-power-motor.on,
@@ -1193,62 +1255,151 @@ window.HavalSplash = (function () {
     .hv-power-batt.on.ev { filter: drop-shadow(0 0 6px rgba(79,214,232,.45)); }
     .hv-power-batt.on.regen { filter: drop-shadow(0 0 6px rgba(62,224,138,.45)); }
     .hv-power-batt.on.charge { filter: drop-shadow(0 0 6px rgba(126,200,255,.5)); }
-    .hv-power-batt-fill {
+    .hv-power-floor {
       position: absolute;
-      inset: 0;
-      overflow: hidden;
-      clip-path: inset(0 calc(100% - var(--soc, 0%)) 0 0);
-    }
-    .hv-power-ring {
-      position: relative;
-      width: 44px;
-      height: 44px;
-      flex: 0 0 auto;
-      margin-top: -6px;
+      left: -3%;
+      width: 106%;
+      bottom: 2%;
+      height: 80%;
+      z-index: 0;
+      pointer-events: none;
+      color: #4fd6e8;
       --soc: 0;
+      transform: perspective(340px) rotateX(28deg);
+      transform-origin: 50% 88%;
     }
-    .hv-power-1x1 .hv-power-ring { width: 32px; height: 32px; margin-top: -4px; }
-    .hv-power-2x2 .hv-power-ring { width: 56px; height: 56px; margin-top: -4px; }
-    .hv-power-ring svg {
-      position: absolute;
-      inset: 0;
+    .hv-power.regen .hv-power-floor { color: #3ee08a; }
+    .hv-power.charge .hv-power-floor { color: #7ec8ff; }
+    .hv-power.ice .hv-power-floor { color: #f2f5f8; }
+    .hv-power-floor svg {
+      display: block;
       width: 100%;
       height: 100%;
+      overflow: visible;
     }
-    .hv-power-ring-track,
-    .hv-power-ring-fill {
+    .hv-power-floor-shadow {
+      fill: rgba(0, 0, 0, 0.14);
+      stroke: none;
+    }
+    .hv-power-floor-groove {
+      fill: rgba(8, 12, 18, 0.12);
+      stroke: rgba(255, 255, 255, 0.05);
+      stroke-width: 2;
+    }
+    .hv-power-floor-track,
+    .hv-power-floor-fill {
       fill: none;
-      stroke-width: 2.6;
-    }
-    .hv-power-ring-track { stroke: rgba(255,255,255,.12); }
-    .hv-power-ring-fill {
-      stroke: #4fd6e8;
       stroke-linecap: round;
-      transform-origin: 18px 18px;
-      transform: rotate(-90deg);
+    }
+    .hv-power-floor-track {
+      stroke: rgba(255, 255, 255, 0.26);
+      stroke-width: 7;
+    }
+    .hv-power-floor-fill {
+      stroke: currentColor;
+      stroke-width: 7;
       stroke-dasharray: 100;
       stroke-dashoffset: calc(100 - var(--soc, 0));
+      filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 10px currentColor);
     }
-    .hv-power.regen .hv-power-ring-fill { stroke: #3ee08a; }
-    .hv-power.charge .hv-power-ring-fill { stroke: #7ec8ff; }
-    .hv-power-ring-label {
+    .hv-power-floor-label {
       position: absolute;
-      inset: 0;
+      left: 53%;
+      bottom: 0;
+      transform: translateX(-50%);
+      z-index: 5;
       display: flex;
-      align-items: center;
+      align-items: baseline;
       justify-content: center;
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
       font-weight: 700;
       line-height: 1;
+      letter-spacing: .02em;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+      pointer-events: none;
     }
-    .hv-power-ring-num { font-size: 13px; letter-spacing: -0.04em; }
-    .hv-power-1x1 .hv-power-ring-num { font-size: 10px; }
-    .hv-power-2x2 .hv-power-ring-num { font-size: 16px; }
+    .hv-power-ring-num { font-size: 15px; letter-spacing: -0.03em; }
+    .hv-power-1x1 .hv-power-ring-num { font-size: 11px; }
+    .hv-power-2x2 .hv-power-ring-num { font-size: 20px; }
     .hv-power-ring-unit {
-      font-size: 7px;
-      letter-spacing: .08em;
-      opacity: .5;
-      margin-left: 1px;
+      font-size: 9px;
+      letter-spacing: .06em;
+      opacity: .55;
+      margin-left: 3px;
+      font-weight: 600;
+    }
+    .hv-power-1x1 .hv-power-ring-unit { font-size: 7px; margin-left: 2px; }
+    .hv-power-2x2 .hv-power-ring-unit { font-size: 11px; }
+    .hv-power-lane {
+      position: absolute;
+      height: 8px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 4;
+      overflow: hidden;
+      --flow: #4fd6e8;
+    }
+    .hv-power-lane::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 220%;
+      background-color: var(--flow);
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 1 L8 4 L2 7' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 1 L8 4 L2 7' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      -webkit-mask-repeat: repeat-x;
+      mask-repeat: repeat-x;
+      -webkit-mask-size: 12px 8px;
+      mask-size: 12px 8px;
+      filter: drop-shadow(0 0 3px var(--flow));
+    }
+    .hv-power-lane.front {
+      left: 22%;
+      top: 58%;
+      width: 18%;
+    }
+    .hv-power-lane.rear {
+      left: 66%;
+      top: 58%;
+      width: 15%;
+    }
+    .hv-power-lane.drive { opacity: .95; --flow: #4fd6e8; }
+    .hv-power-lane.regen { opacity: .95; --flow: #3ee08a; }
+    .hv-power-lane.front.drive,
+    .hv-power-lane.rear.regen {
+      transform: scaleX(-1);
+    }
+    .hv-power-lane.drive::after,
+    .hv-power-lane.regen::after {
+      animation: hv-power-flow 0.55s linear infinite;
+    }
+    @keyframes hv-power-flow {
+      from { transform: translateX(0); }
+      to { transform: translateX(12px); }
+    }
+    .hv-power-side-stats {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 0;
+      margin-top: auto;
+      min-height: 0;
+      padding-top: 8px;
+    }
+    .hv-power-side-stats .hv-power-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      padding-top: 5px;
+      margin-top: 3px;
+    }
+    .hv-power-side-stats .hv-power-stat-value {
+      margin-top: 0;
+      font-size: 12px;
+      text-align: right;
     }
     .hv-power-stats {
       display: none;
@@ -1326,6 +1477,31 @@ window.HavalSplash = (function () {
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    button.hv-graphs-viz-btn {
+      pointer-events: auto;
+      margin: 0;
+      padding: 4px 8px 4px 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      letter-spacing: inherit;
+      text-align: left;
+      cursor: pointer;
+      opacity: .72;
+      text-shadow: inherit;
+      max-width: 70%;
+    }
+    button.hv-graphs-viz-btn::after {
+      content: ' \203A';
+      opacity: .55;
+      letter-spacing: 0;
+      font-size: 11px;
+    }
+    button.hv-graphs-viz-btn:active {
+      opacity: 1;
+      color: #4fd6e8;
+    }
     .hv-graphs-readout {
       display: flex;
       align-items: baseline;
@@ -1379,17 +1555,19 @@ window.HavalSplash = (function () {
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-wrap: wrap;
       gap: 10px;
-      background: rgba(8,12,18,.58);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      padding: 36px 10px 10px;
+      background: rgba(8,12,18,.38);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
-    .hv-widget-card-menu button {
+    .hv-widget-card-menu > button:not(.hv-widget-exit):not(.hv-widget-remove) {
       min-width: 72px;
       padding: 10px 14px;
       border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.2);
-      background: rgba(16,21,28,.88);
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(16,21,28,.72);
       color: #eaf2f8;
       font-family: 'Space Mono', monospace;
       font-size: 10px;
@@ -1426,10 +1604,18 @@ window.HavalSplash = (function () {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
       letter-spacing: .14em;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+    .hv-graph-editor.dragging .hv-graph-editor-title {
+      cursor: grabbing;
     }
     .hv-graph-editor-title button {
       border-color: rgba(255,255,255,.28);
       background: rgba(255,255,255,.1);
+      cursor: pointer;
+      touch-action: auto;
     }
     .hv-graph-editor-section,
     .hv-graph-editor-kicker {
@@ -1465,6 +1651,14 @@ window.HavalSplash = (function () {
       background: #f2f5f8;
       color: #0b1016;
       font-weight: 700;
+    }
+    .hv-graph-editor-chips button.hv-size-chip {
+      min-width: 40px;
+      min-height: 40px;
+      padding: 8px 10px 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .hv-graph-editor-axes {
       display: grid;
@@ -1529,6 +1723,68 @@ window.HavalSplash = (function () {
       cursor: pointer;
     }
     .hv-widget-picker button:disabled { opacity: .35; cursor: default; }
+    .hv-widget-picker.is-sizes {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 6px;
+      min-width: 0;
+    }
+    .hv-widget-picker.is-sizes > div:first-child {
+      flex: 1 0 100%;
+      padding: 2px 4px 2px;
+    }
+    .hv-widget-picker.is-sizes button {
+      width: auto;
+      min-width: 52px;
+      min-height: 52px;
+      margin-top: 0;
+      justify-content: center;
+      padding: 12px 14px 14px;
+    }
+    .hv-size-glyph {
+      --on: #eaf2f8;
+      --off: rgba(255,255,255,.22);
+      --c00: var(--off);
+      --c10: var(--off);
+      --c20: var(--off);
+      --c01: var(--off);
+      --c11: var(--off);
+      --c21: var(--off);
+      display: none;
+      width: 7px;
+      height: 7px;
+      border-radius: 1.5px;
+      background: var(--c00);
+    }
+    .hv-size-glyph.board-2,
+    .hv-size-glyph.board-3 { display: block; }
+    .hv-size-glyph.board-2 {
+      box-shadow:
+        9px 0 0 var(--c10),
+        0 9px 0 var(--c01),
+        9px 9px 0 var(--c11);
+      margin: 0 9px 9px 0;
+    }
+    .hv-size-glyph.board-3 {
+      box-shadow:
+        9px 0 0 var(--c10),
+        18px 0 0 var(--c20),
+        0 9px 0 var(--c01),
+        9px 9px 0 var(--c11),
+        18px 9px 0 var(--c21);
+      margin: 0 18px 9px 0;
+    }
+    .hv-size-glyph.size-1x1 { --c00: var(--on); }
+    .hv-size-glyph.size-2x1 { --c00: var(--on); --c10: var(--on); }
+    .hv-size-glyph.size-3x1 { --c00: var(--on); --c10: var(--on); --c20: var(--on); }
+    .hv-size-glyph.size-1x2 { --c00: var(--on); --c01: var(--on); }
+    .hv-size-glyph.size-2x2 { --c00: var(--on); --c10: var(--on); --c01: var(--on); --c11: var(--on); }
+    .hv-size-glyph.size-3x2 { --c00: var(--on); --c10: var(--on); --c20: var(--on); --c01: var(--on); --c11: var(--on); --c21: var(--on); }
+    button.on .hv-size-glyph {
+      --on: #0b1016;
+      --off: rgba(11,16,22,.16);
+    }
     .hv-media-rail {
       position: absolute;
       inset: 0;
@@ -2134,9 +2390,6 @@ window.HavalSplash = (function () {
       </sc-for>
       <sc-for list="{{ leftWidgetItems }}" as="wg" hint-placeholder-count="0">
         <div class="hv-widget-card {{ wg.cardClass }}" style="{{ wg.gridStyle }}" onTouchStart="{{ wg.onHoldStart }}" onTouchEnd="{{ wg.onHoldEnd }}" onTouchCancel="{{ wg.onHoldCancel }}" onMouseDown="{{ wg.onHoldStart }}" onMouseUp="{{ wg.onHoldEnd }}" onMouseLeave="{{ wg.onHoldCancel }}" onContextMenu="{{ wg.onContextMenu }}">
-          <sc-if value="{{ wg.showRemove }}" hint-placeholder-val="{{ false }}">
-            <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
-          </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
             <div class="hv-media-rail {{ wg.mediaSizeClass }}" style="opacity: {{ mediaRailOpacity }};">
               <div class="hv-media-art-wrap">
@@ -2204,7 +2457,12 @@ window.HavalSplash = (function () {
               <sc-for list="{{ wg.graphPanes }}" as="gp" hint-placeholder-count="1">
                 <div class="hv-graphs-pane">
                   <div class="hv-graphs-head">
-                    <div class="hv-graphs-kicker">{{ gp.title }}</div>
+                    <sc-if value="{{ gp.isViz }}" hint-placeholder-val="{{ false }}">
+                      <button type="button" class="hv-graphs-kicker hv-graphs-viz-btn" onClick="{{ gp.onVizCycle }}" title="Next visualizer">{{ gp.title }}</button>
+                    </sc-if>
+                    <sc-if value="{{ gp.isSeries }}" hint-placeholder-val="{{ true }}">
+                      <div class="hv-graphs-kicker">{{ gp.title }}</div>
+                    </sc-if>
                     <div class="hv-graphs-readout">
                       <span class="hv-graphs-mode">{{ gp.mode }}</span>
                       <span class="hv-graphs-value">{{ gp.value }}</span>
@@ -2227,10 +2485,28 @@ window.HavalSplash = (function () {
               <div class="hv-power-readout">
                 <span class="hv-power-value {{ wg.powerKwClass }}">{{ wg.powerKw }}</span>
                 <span class="hv-power-unit">kW</span>
+                <sc-if value="{{ wg.showPowerSideStats }}" hint-placeholder-val="{{ false }}">
+                  <div class="hv-power-side-stats">
+                    <sc-for list="{{ wg.powerStats }}" as="st" hint-placeholder-count="4">
+                      <div class="hv-power-stat">
+                        <div class="hv-power-stat-kicker">{{ st.kicker }}</div>
+                        <div class="hv-power-stat-value">{{ st.value }}<span>{{ st.unit }}</span></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
               </div>
               <div class="hv-power-stage">
                 <div class="hv-power-car">
                   <div class="hv-power-car-frame">
+                  <div class="hv-power-floor" style="--soc: {{ wg.socPct }};">
+                    <svg viewBox="0 0 240 56" preserveAspectRatio="none" aria-hidden="true">
+                      <ellipse class="hv-power-floor-shadow" cx="120" cy="32" rx="112" ry="20"></ellipse>
+                      <ellipse class="hv-power-floor-groove" cx="120" cy="28" rx="112" ry="20"></ellipse>
+                      <ellipse class="hv-power-floor-track" cx="120" cy="28" rx="112" ry="20" pathLength="100"></ellipse>
+                      <ellipse class="hv-power-floor-fill" cx="120" cy="28" rx="112" ry="20" pathLength="100"></ellipse>
+                    </svg>
+                  </div>
                   <img class="hv-power-car-img" src="assets/power/car.webp" alt="">
                   <img class="hv-power-ice {{ wg.iceClass }}" src="{{ wg.iceSrc }}" alt="">
                   <img class="hv-power-motor front {{ wg.frontClass }}" src="{{ wg.frontSrc }}" alt="">
@@ -2239,16 +2515,12 @@ window.HavalSplash = (function () {
                     <img class="hv-power-batt-base" src="assets/power/battery.webp" alt="">
                     <div class="hv-power-batt-fill"><img src="assets/power/battery_fill.webp" alt=""></div>
                   </div>
-                  </div>
-                </div>
-                <div class="hv-power-ring" style="--soc: {{ wg.socPct }};">
-                  <svg viewBox="0 0 36 36" aria-hidden="true">
-                    <circle class="hv-power-ring-track" cx="18" cy="18" r="15.915"></circle>
-                    <circle class="hv-power-ring-fill" cx="18" cy="18" r="15.915"></circle>
-                  </svg>
-                  <div class="hv-power-ring-label">
+                  <div class="hv-power-lane front {{ wg.frontFlow }}"></div>
+                  <div class="hv-power-lane rear {{ wg.rearFlow }}"></div>
+                  <div class="hv-power-floor-label">
                     <span class="hv-power-ring-num">{{ wg.socNum }}</span>
                     <span class="hv-power-ring-unit">%</span>
+                  </div>
                   </div>
                 </div>
               </div>
@@ -2272,12 +2544,21 @@ window.HavalSplash = (function () {
             </div>
           </sc-if>
           <sc-if value="{{ wg.menuOpen }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-widget-card-menu" onClick="{{ wg.onMenuDismiss }}">
+            <div class="hv-widget-card-menu">
+              <button type="button" class="hv-widget-exit" onClick="{{ wg.onMenuDismiss }}" title="Voltar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+              </button>
+              <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remover">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>
+              </button>
               <sc-if value="{{ wg.showEdit }}" hint-placeholder-val="{{ false }}">
                 <button type="button" onClick="{{ wg.onEdit }}">EDIT</button>
               </sc-if>
               <sc-if value="{{ wg.showResize }}" hint-placeholder-val="{{ false }}">
                 <button type="button" onClick="{{ wg.onResize }}">RESIZE</button>
+              </sc-if>
+              <sc-if value="{{ wg.showMove }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ wg.onMove }}">MOVER</button>
               </sc-if>
             </div>
           </sc-if>
@@ -2293,9 +2574,6 @@ window.HavalSplash = (function () {
       </sc-for>
       <sc-for list="{{ rightWidgetItems }}" as="wg" hint-placeholder-count="0">
         <div class="hv-widget-card {{ wg.cardClass }}" style="{{ wg.gridStyle }}" onTouchStart="{{ wg.onHoldStart }}" onTouchEnd="{{ wg.onHoldEnd }}" onTouchCancel="{{ wg.onHoldCancel }}" onMouseDown="{{ wg.onHoldStart }}" onMouseUp="{{ wg.onHoldEnd }}" onMouseLeave="{{ wg.onHoldCancel }}" onContextMenu="{{ wg.onContextMenu }}">
-          <sc-if value="{{ wg.showRemove }}" hint-placeholder-val="{{ false }}">
-            <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
-          </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
             <div class="hv-media-rail {{ wg.mediaSizeClass }}" style="opacity: {{ mediaRailOpacity }};">
               <div class="hv-media-art-wrap">
@@ -2363,7 +2641,12 @@ window.HavalSplash = (function () {
               <sc-for list="{{ wg.graphPanes }}" as="gp" hint-placeholder-count="1">
                 <div class="hv-graphs-pane">
                   <div class="hv-graphs-head">
-                    <div class="hv-graphs-kicker">{{ gp.title }}</div>
+                    <sc-if value="{{ gp.isViz }}" hint-placeholder-val="{{ false }}">
+                      <button type="button" class="hv-graphs-kicker hv-graphs-viz-btn" onClick="{{ gp.onVizCycle }}" title="Next visualizer">{{ gp.title }}</button>
+                    </sc-if>
+                    <sc-if value="{{ gp.isSeries }}" hint-placeholder-val="{{ true }}">
+                      <div class="hv-graphs-kicker">{{ gp.title }}</div>
+                    </sc-if>
                     <div class="hv-graphs-readout">
                       <span class="hv-graphs-mode">{{ gp.mode }}</span>
                       <span class="hv-graphs-value">{{ gp.value }}</span>
@@ -2386,10 +2669,28 @@ window.HavalSplash = (function () {
               <div class="hv-power-readout">
                 <span class="hv-power-value {{ wg.powerKwClass }}">{{ wg.powerKw }}</span>
                 <span class="hv-power-unit">kW</span>
+                <sc-if value="{{ wg.showPowerSideStats }}" hint-placeholder-val="{{ false }}">
+                  <div class="hv-power-side-stats">
+                    <sc-for list="{{ wg.powerStats }}" as="st" hint-placeholder-count="4">
+                      <div class="hv-power-stat">
+                        <div class="hv-power-stat-kicker">{{ st.kicker }}</div>
+                        <div class="hv-power-stat-value">{{ st.value }}<span>{{ st.unit }}</span></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
               </div>
               <div class="hv-power-stage">
                 <div class="hv-power-car">
                   <div class="hv-power-car-frame">
+                  <div class="hv-power-floor" style="--soc: {{ wg.socPct }};">
+                    <svg viewBox="0 0 240 56" preserveAspectRatio="none" aria-hidden="true">
+                      <ellipse class="hv-power-floor-shadow" cx="120" cy="32" rx="112" ry="20"></ellipse>
+                      <ellipse class="hv-power-floor-groove" cx="120" cy="28" rx="112" ry="20"></ellipse>
+                      <ellipse class="hv-power-floor-track" cx="120" cy="28" rx="112" ry="20" pathLength="100"></ellipse>
+                      <ellipse class="hv-power-floor-fill" cx="120" cy="28" rx="112" ry="20" pathLength="100"></ellipse>
+                    </svg>
+                  </div>
                   <img class="hv-power-car-img" src="assets/power/car.webp" alt="">
                   <img class="hv-power-ice {{ wg.iceClass }}" src="{{ wg.iceSrc }}" alt="">
                   <img class="hv-power-motor front {{ wg.frontClass }}" src="{{ wg.frontSrc }}" alt="">
@@ -2398,16 +2699,12 @@ window.HavalSplash = (function () {
                     <img class="hv-power-batt-base" src="assets/power/battery.webp" alt="">
                     <div class="hv-power-batt-fill"><img src="assets/power/battery_fill.webp" alt=""></div>
                   </div>
-                  </div>
-                </div>
-                <div class="hv-power-ring" style="--soc: {{ wg.socPct }};">
-                  <svg viewBox="0 0 36 36" aria-hidden="true">
-                    <circle class="hv-power-ring-track" cx="18" cy="18" r="15.915"></circle>
-                    <circle class="hv-power-ring-fill" cx="18" cy="18" r="15.915"></circle>
-                  </svg>
-                  <div class="hv-power-ring-label">
+                  <div class="hv-power-lane front {{ wg.frontFlow }}"></div>
+                  <div class="hv-power-lane rear {{ wg.rearFlow }}"></div>
+                  <div class="hv-power-floor-label">
                     <span class="hv-power-ring-num">{{ wg.socNum }}</span>
                     <span class="hv-power-ring-unit">%</span>
+                  </div>
                   </div>
                 </div>
               </div>
@@ -2431,12 +2728,21 @@ window.HavalSplash = (function () {
             </div>
           </sc-if>
           <sc-if value="{{ wg.menuOpen }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-widget-card-menu" onClick="{{ wg.onMenuDismiss }}">
+            <div class="hv-widget-card-menu">
+              <button type="button" class="hv-widget-exit" onClick="{{ wg.onMenuDismiss }}" title="Voltar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+              </button>
+              <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remover">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>
+              </button>
               <sc-if value="{{ wg.showEdit }}" hint-placeholder-val="{{ false }}">
                 <button type="button" onClick="{{ wg.onEdit }}">EDIT</button>
               </sc-if>
               <sc-if value="{{ wg.showResize }}" hint-placeholder-val="{{ false }}">
                 <button type="button" onClick="{{ wg.onResize }}">RESIZE</button>
+              </sc-if>
+              <sc-if value="{{ wg.showMove }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ wg.onMove }}">MOVER</button>
               </sc-if>
             </div>
           </sc-if>
@@ -2445,22 +2751,26 @@ window.HavalSplash = (function () {
     </div>
   </div>
 
-  <div class="hv-widget-picker" style="display: {{ widgetPickerDisplay }};">
+  <div class="hv-widget-picker {{ widgetPickerListClass }}" style="display: {{ widgetPickerDisplay }};">
     <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.14em;opacity:.55;padding:2px 4px 6px;">{{ widgetPickerTitle }}</div>
     <sc-for list="{{ widgetPickerItems }}" as="pi" hint-placeholder-count="0">
-      <button type="button" onClick="{{ pi.onClick }}" style="opacity: {{ pi.opacity }};">{{ pi.label }}</button>
+      <button type="button" class="{{ pi.btnClass }}" onClick="{{ pi.onClick }}" title="{{ pi.title }}" style="opacity: {{ pi.opacity }};">
+        <span class="hv-size-glyph {{ pi.sizeClass }}"></span>{{ pi.label }}
+      </button>
     </sc-for>
   </div>
 
   <div class="hv-graph-editor" style="display: {{ graphEditorDisplay }}; {{ graphEditorStyle }}">
-    <div class="hv-graph-editor-title">
+    <div class="hv-graph-editor-title" onMouseDown="{{ onGraphEditorDragStart }}" onTouchStart="{{ onGraphEditorDragStart }}">
       <span>EDIT GRAPHS</span>
       <button type="button" onClick="{{ onGraphEditorClose }}">DONE</button>
     </div>
     <div class="hv-graph-editor-section">LAYOUT</div>
     <div class="hv-graph-editor-chips">
       <sc-for list="{{ graphLayoutChips }}" as="lc" hint-placeholder-count="1">
-        <button type="button" class="{{ lc.className }}" onClick="{{ lc.onClick }}">{{ lc.label }}</button>
+        <button type="button" class="{{ lc.className }}" onClick="{{ lc.onClick }}" title="{{ lc.label }}">
+          <span class="hv-size-glyph {{ lc.sizeClass }}"></span>
+        </button>
       </sc-for>
     </div>
     <sc-for list="{{ graphPaneEditors }}" as="pe" hint-placeholder-count="1">
@@ -2505,7 +2815,7 @@ window.HavalSplash = (function () {
         <sc-if value="{{ pe.isViz }}" hint-placeholder-val="{{ false }}">
           <div class="hv-graph-editor-section">STYLE</div>
           <div class="hv-graph-editor-chips">
-            <sc-for list="{{ pe.vizStyles }}" as="vs" hint-placeholder-count="4">
+            <sc-for list="{{ pe.vizStyles }}" as="vs" hint-placeholder-count="16">
               <button type="button" class="{{ vs.className }}" onClick="{{ vs.onClick }}">{{ vs.label }}</button>
             </sc-for>
           </div>
@@ -2936,10 +3246,25 @@ const CAR_GRAPH_STYLES = [
 ];
 const CAR_GRAPH_VIZ = [
   { key: 'spectrum', label: 'SPECTRUM' },
-  { key: 'scope', label: 'SCOPE' },
+  { key: 'bars', label: 'BARS' },
   { key: 'radial', label: 'RADIAL' },
+  { key: 'circular', label: 'CIRCULAR' },
+  { key: 'scope', label: 'SCOPE' },
   { key: 'dots', label: 'DOTS' },
+  { key: 'tunnel', label: 'TUNNEL' },
+  { key: 'neon', label: 'NEON' },
+  { key: 'aurora', label: 'AURORA' },
+  { key: 'particles', label: 'PARTICLES' },
+  { key: 'plasma', label: 'PLASMA' },
+  { key: 'matrix', label: 'MATRIX' },
+  { key: 'flame', label: 'FLAME' },
+  { key: 'hex', label: 'HEX' },
+  { key: 'vu', label: 'VU' },
+  { key: 'random', label: 'RANDOM' },
 ];
+const CAR_GRAPH_VIZ_POOL = CAR_GRAPH_VIZ.filter((v) => v.key !== 'random');
+const CAR_GRAPH_VIZ_BY_KEY = {};
+CAR_GRAPH_VIZ.forEach((v) => { CAR_GRAPH_VIZ_BY_KEY[v.key] = v; });
 const CAR_GRAPH_COLOR_Y1 = '#f2f5f8';
 const CAR_GRAPH_COLOR_Y2 = '#4fd6e8';
 const CAR_GRAPH_COLOR_REGEN = '#3ee08a';
@@ -2949,8 +3274,8 @@ const CAR_POWER_ASSETS = {
   iceOn: 'assets/power/engine_on.webp',
   frontOff: 'assets/power/motor.webp',
   frontOn: 'assets/power/motor_on.webp',
-  rearOff: 'assets/power/motor_p4.webp',
-  rearOn: 'assets/power/motor_p4_on.webp',
+  rearOff: 'assets/power/motor.webp',
+  rearOn: 'assets/power/motor_on.webp',
 };
 // energy_drive_state → flow. front/rear: 0 off, 1 drive, -1 regen (P2 / P4).
 const CAR_POWER_IDLE = { tone: 'idle', label: 'Parado', ice: false, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 };
@@ -2991,7 +3316,6 @@ const CAR_POWER_FLOW = {
 };
 const CAR_POWER_DEMO_STATES = [14, 42, 41, 40, 38, 39, 16, 6, 0];
 const CAR_WIDGET_HOLD_MS = 500;
-const CAR_WIDGET_MOVE_MS = 850;
 
 // MODES widget — same keys/values as Impulse SettingsMenuContent / Ajustes.
 // One chip per option so a tap writes the raw CAN value (no cycle).
@@ -3335,9 +3659,14 @@ class Component extends DCLogic {
     this._graphSeries = {};
     this._graphVizState = {};
     this._graphVizPeaks = {};
+    this._graphVizBuf = {};
+    this._graphVizPick = {};
+    this._graphVizHueDeg = 186;
+    this._graphVizTrackKey = '';
     this._graphRaf = 0;
+    this._graphEditorOffset = { x: 0, y: 0 };
+    this._graphEditorDrag = null;
     this._widgetHoldTimer = 0;
-    this._widgetMoveTimer = 0;
     this._widgetHoldFired = false;
     this._widgetHold = null;
     this._widgetTouchActive = false;
@@ -3737,6 +4066,12 @@ class Component extends DCLogic {
     return dir < 0 ? 'on regen' : 'on';
   }
 
+  _powerFlowClass(dir) {
+    if (dir > 0) return 'drive';
+    if (dir < 0) return 'regen';
+    return '';
+  }
+
   _powerMotorSrc(which, dir) {
     if (which === 'front') return dir ? CAR_POWER_ASSETS.frontOn : CAR_POWER_ASSETS.frontOff;
     if (which === 'rear') return dir ? CAR_POWER_ASSETS.rearOn : CAR_POWER_ASSETS.rearOff;
@@ -3794,6 +4129,8 @@ class Component extends DCLogic {
       rearClass: this._powerMotorClass(flow.rear),
       rearSrc: this._powerMotorSrc('rear', flow.rear),
       battClass: (flow.batt ? 'on ' : '') + battTone,
+      frontFlow: this._powerFlowClass(flow.front),
+      rearFlow: this._powerFlowClass(flow.rear),
       stats: [
         { kicker: 'EV', value: demo && live.evRange === '' ? '42' : this._powerFmtNum(live.evRange, 0), unit: 'km' },
         { kicker: 'COMB.', value: demo && live.fuelRange === '' ? '510' : this._powerFmtNum(live.fuelRange, 0), unit: 'km' },
@@ -3826,7 +4163,10 @@ class Component extends DCLogic {
       rearClass: model.rearClass,
       rearSrc: model.rearSrc,
       battClass: model.battClass,
+      frontFlow: model.frontFlow,
+      rearFlow: model.rearFlow,
       showPowerStats: h >= 2,
+      showPowerSideStats: w >= 2 && h === 1,
       powerStats: model.stats,
       onPowerTap: () => this._launchEnergyAssistant(),
     };
@@ -3886,10 +4226,14 @@ class Component extends DCLogic {
         batt.className = 'hv-power-batt' + (model.battClass ? (' ' + model.battClass) : '');
         batt.style.setProperty('--soc', model.socPct + '%');
       }
-      const ring = el.querySelector('.hv-power-ring');
-      if (ring) ring.style.setProperty('--soc', String(model.socPct));
+      const floor = el.querySelector('.hv-power-floor');
+      if (floor) floor.style.setProperty('--soc', String(model.socPct));
       const socNum = el.querySelector('.hv-power-ring-num');
       if (socNum) socNum.textContent = model.socNum;
+      const frontLane = el.querySelector('.hv-power-lane.front');
+      if (frontLane) frontLane.className = 'hv-power-lane front' + (model.frontFlow ? (' ' + model.frontFlow) : '');
+      const rearLane = el.querySelector('.hv-power-lane.rear');
+      if (rearLane) rearLane.className = 'hv-power-lane rear' + (model.rearFlow ? (' ' + model.rearFlow) : '');
       const stats = el.querySelectorAll('.hv-power-stat-value');
       for (let s = 0; s < stats.length && s < model.stats.length; s++) {
         const st = model.stats[s];
@@ -3948,7 +4292,6 @@ class Component extends DCLogic {
     }
     if (!vars.length) vars.push('evPowerKw');
     let vizStyle = p.vizStyle || 'spectrum';
-    if (vizStyle === 'bars') vizStyle = 'spectrum';
     if (vizStyle === 'mirror') vizStyle = 'scope';
     if (vizStyle === 'water') vizStyle = 'spectrum';
     let vizOk = false;
@@ -4027,13 +4370,15 @@ class Component extends DCLogic {
     return null;
   }
 
-  _graphPaneTitle(pane) {
+  _graphVizLabel(key) {
+    const spec = CAR_GRAPH_VIZ_BY_KEY[key];
+    return spec ? spec.label : 'VIZ';
+  }
+
+  _graphPaneTitle(pane, paneIndex) {
     if (!pane) return 'GRAPH';
     if (pane.kind === 'viz') {
-      for (let i = 0; i < CAR_GRAPH_VIZ.length; i++) {
-        if (CAR_GRAPH_VIZ[i].key === pane.vizStyle) return CAR_GRAPH_VIZ[i].label;
-      }
-      return 'VIZ';
+      return this._graphVizLabel(pane.vizStyle || 'spectrum');
     }
     const names = [];
     const vars = pane.vars || [];
@@ -4051,10 +4396,20 @@ class Component extends DCLogic {
     return (Math.round(n * 10) / 10).toFixed(1);
   }
 
-  _graphPaneReadout(pane) {
+  _graphPaneReadout(pane, paneIndex) {
     if (!pane || pane.kind === 'viz') {
       const playing = !!this.state.mediaPlaying;
-      return { title: this._graphPaneTitle(pane), mode: playing ? 'LIVE' : 'IDLE', value: '', unit: '', regen: false };
+      const idx = paneIndex == null ? 0 : paneIndex;
+      const random = !!(pane && pane.vizStyle === 'random');
+      let mode = playing ? 'LIVE' : 'IDLE';
+      if (random) mode = this._graphVizLabel(this._graphResolvedVizStyle(pane, idx));
+      return {
+        title: this._graphPaneTitle(pane, idx),
+        mode: mode,
+        value: '',
+        unit: '',
+        regen: false,
+      };
     }
     const key = (pane.vars && pane.vars[0]) || 'evPowerKw';
     const spec = CAR_GRAPH_VAR_BY_KEY[key] || CAR_GRAPH_VAR_BY_KEY.evPowerKw;
@@ -4064,7 +4419,7 @@ class Component extends DCLogic {
     if (key === 'evPowerKw') mode = regen ? 'REGEN' : 'EV';
     else if (regen) mode = 'NEG';
     return {
-      title: this._graphPaneTitle(pane),
+      title: this._graphPaneTitle(pane, paneIndex),
       mode: mode,
       value: this._graphFormat(key, n),
       unit: spec.unit || '',
@@ -4073,18 +4428,29 @@ class Component extends DCLogic {
   }
 
   _graphWidgetView(item, side) {
+    const self = this;
     const cfg = this._graphNormalizeCfg(item);
     const w = item.w || 2;
     const h = item.h || 1;
     const panes = [];
     for (let i = 0; i < cfg.panes.length; i++) {
-      const readout = this._graphPaneReadout(cfg.panes[i]);
+      const pane = cfg.panes[i];
+      const readout = this._graphPaneReadout(pane, i);
       panes.push({
         index: String(i),
         title: readout.title,
         mode: readout.mode,
         value: readout.value,
         unit: readout.unit,
+        isViz: pane.kind === 'viz',
+        isSeries: pane.kind !== 'viz',
+        onVizCycle: (function(s, id, pi) {
+          return function(ev) {
+            if (ev && ev.stopPropagation) ev.stopPropagation();
+            if (ev && ev.preventDefault) ev.preventDefault();
+            self._cycleGraphViz(s, id, pi);
+          };
+        })(side, item.id, i),
       });
     }
     const split = cfg.cols * cfg.rows > 1;
@@ -4100,6 +4466,8 @@ class Component extends DCLogic {
   }
 
   _openGraphEditor(side, id) {
+    this._stopGraphEditorDrag();
+    this._graphEditorOffset = { x: 0, y: 0 };
     this.setState({
       graphEditId: id,
       graphEditSide: side,
@@ -4114,10 +4482,6 @@ class Component extends DCLogic {
       clearTimeout(this._widgetHoldTimer);
       this._widgetHoldTimer = 0;
     }
-    if (this._widgetMoveTimer) {
-      clearTimeout(this._widgetMoveTimer);
-      this._widgetMoveTimer = 0;
-    }
     this._widgetHold = null;
   }
 
@@ -4125,22 +4489,36 @@ class Component extends DCLogic {
     const t = ev && ev.target;
     if (!t || !t.closest) return false;
     return !!(t.closest('.hv-widget-remove')
+      || t.closest('.hv-widget-exit')
       || t.closest('.hv-widget-card-menu')
       || t.closest('.hv-widget-cell')
       || t.closest('.hv-widget-picker')
-      || t.closest('.hv-graph-editor'));
+      || t.closest('.hv-graph-editor')
+      || t.closest('.hv-graphs-viz-btn'));
   }
 
   _onWidgetSuppressClick(e) {
-    if (!this._widgetSuppressClick) return;
-    const t = e && e.target;
-    if (t && t.closest && t.closest('.hv-widget-remove, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-graph-editor')) {
+    if (this._widgetSuppressClick) {
+      const t = e && e.target;
+      if (t && t.closest && t.closest('.hv-widget-remove, .hv-widget-exit, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-graph-editor')) {
+        this._widgetSuppressClick = false;
+        return;
+      }
+      if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
       this._widgetSuppressClick = false;
       return;
     }
-    if (e && e.preventDefault) e.preventDefault();
-    if (e && e.stopPropagation) e.stopPropagation();
-    this._widgetSuppressClick = false;
+    if (!this.state.widgetMenuId) return;
+    const t = e && e.target;
+    if (t && t.closest && (
+      t.closest('.hv-widget-card.editing')
+      || t.closest('.hv-widget-card-menu')
+      || t.closest('.hv-widget-cell')
+      || t.closest('.hv-widget-picker')
+      || t.closest('.hv-graph-editor')
+    )) return;
+    this._dismissWidgetMenu();
   }
 
   _suppressNextWidgetClick() {
@@ -4162,11 +4540,8 @@ class Component extends DCLogic {
     this._widgetHoldTimer = setTimeout(() => {
       this._widgetHoldTimer = 0;
       this._widgetHoldFired = true;
-      this._widgetMoveTimer = setTimeout(() => {
-        this._widgetMoveTimer = 0;
-        if (!this._widgetHold || !this._widgetHold.down) return;
-        this._beginWidgetMove(side, item);
-      }, CAR_WIDGET_MOVE_MS - CAR_WIDGET_HOLD_MS);
+      this._widgetSuppressClick = true;
+      this._openWidgetMenu(side, item);
     }, CAR_WIDGET_HOLD_MS);
   }
 
@@ -4186,7 +4561,7 @@ class Component extends DCLogic {
     if (fired) {
       this._suppressNextWidgetClick();
       if (ev && ev.preventDefault) ev.preventDefault();
-      this._openWidgetMenu(side, item);
+      if (!this.state.widgetMenuId) this._openWidgetMenu(side, item);
     }
   }
 
@@ -4330,18 +4705,24 @@ class Component extends DCLogic {
   }
 
   _closeGraphEditor() {
+    this._stopGraphEditorDrag();
+    this._graphEditorOffset = { x: 0, y: 0 };
     this.setState({ graphEditId: null, graphEditSide: null });
   }
 
-  _patchGraph(mutator) {
-    const item = this._graphFindItem(this.state.graphEditSide, this.state.graphEditId);
-    if (!item) return;
+  _patchGraphOn(item, mutator) {
+    if (!item || item.type !== 'graphs') return;
     const cfg = this._graphNormalizeCfg(item);
     mutator(cfg, item);
     this._graphNormalizeCfg(item);
     this._persistWidgets();
     this._graphCanvasCacheAt = 0;
     this.setState({ widgetRev: (this.state.widgetRev || 0) + 1 });
+  }
+
+  _patchGraph(mutator) {
+    const item = this._graphFindItem(this.state.graphEditSide, this.state.graphEditId);
+    this._patchGraphOn(item, mutator);
   }
 
   _setGraphLayout(cols, rows) {
@@ -4391,6 +4772,82 @@ class Component extends DCLogic {
       const pane = cfg.panes[paneIndex];
       if (!pane) return;
       pane.vizStyle = style;
+      if (style === 'random') this._reshuffleVizPick(paneIndex);
+    });
+  }
+
+  _hashHue(str) {
+    let h = 2166136261;
+    const s = String(str || '');
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) % 360;
+  }
+
+  _graphResolvedVizStyle(pane, paneIndex) {
+    const style = (pane && pane.vizStyle) || 'spectrum';
+    if (style !== 'random') return CAR_GRAPH_VIZ_BY_KEY[style] ? style : 'spectrum';
+    const idx = paneIndex == null ? 0 : paneIndex;
+    let pick = this._graphVizPick[idx];
+    if (!pick || !CAR_GRAPH_VIZ_BY_KEY[pick] || pick === 'random') {
+      pick = this._reshuffleVizPick(idx);
+    }
+    return pick;
+  }
+
+  _reshuffleVizPick(paneIndex) {
+    const idx = paneIndex == null ? 0 : paneIndex;
+    const pool = CAR_GRAPH_VIZ_POOL;
+    const prev = this._graphVizPick[idx];
+    if (!pool.length) {
+      this._graphVizPick[idx] = 'spectrum';
+      return 'spectrum';
+    }
+    let next = pool[Math.floor(Math.random() * pool.length)].key;
+    if (pool.length > 1 && next === prev) {
+      let start = 0;
+      for (let i = 0; i < pool.length; i++) {
+        if (pool[i].key === prev) { start = i; break; }
+      }
+      next = pool[(start + 1 + Math.floor(Math.random() * (pool.length - 1))) % pool.length].key;
+    }
+    this._graphVizPick[idx] = next;
+    return next;
+  }
+
+  _reshuffleRandomViz() {
+    try {
+      const mode = this.state.shellMode || 'triple';
+      const boards = [this._board('left', mode), this._board('right', mode)];
+      for (let b = 0; b < boards.length; b++) {
+        const items = (boards[b] && boards[b].items) || [];
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type !== 'graphs') continue;
+          const cfg = this._graphNormalizeCfg(items[i]);
+          for (let p = 0; p < cfg.panes.length; p++) {
+            if (cfg.panes[p].kind === 'viz' && cfg.panes[p].vizStyle === 'random') {
+              this._reshuffleVizPick(p);
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  _cycleGraphViz(side, id, paneIndex) {
+    const item = this._graphFindItem(side, id);
+    if (!item) return;
+    this._patchGraphOn(item, (cfg) => {
+      const pane = cfg.panes[paneIndex];
+      if (!pane || pane.kind !== 'viz') return;
+      let idx = 0;
+      for (let i = 0; i < CAR_GRAPH_VIZ.length; i++) {
+        if (CAR_GRAPH_VIZ[i].key === pane.vizStyle) { idx = i; break; }
+      }
+      pane.vizStyle = CAR_GRAPH_VIZ[(idx + 1) % CAR_GRAPH_VIZ.length].key;
+      if (pane.vizStyle === 'random') this._reshuffleVizPick(paneIndex);
     });
   }
 
@@ -4498,7 +4955,7 @@ class Component extends DCLogic {
     const plot = canvas.parentNode;
     const paneEl = plot && plot.parentNode;
     if (!paneEl) return;
-    const readout = this._graphPaneReadout(pane);
+    const readout = this._graphPaneReadout(pane, parseInt(canvas.getAttribute('data-pane'), 10) || 0);
     const kicker = paneEl.querySelector('.hv-graphs-kicker');
     const mode = paneEl.querySelector('.hv-graphs-mode');
     const val = paneEl.querySelector('.hv-graphs-value');
@@ -4782,6 +5239,15 @@ class Component extends DCLogic {
     return playing ? live : idle;
   }
 
+  _vizBands(now, level, paneIndex) {
+    const t = now * 0.001;
+    const kick = Math.pow(0.5 + 0.5 * Math.sin(t * 6.15 + paneIndex * 1.7), 10);
+    const bass = Math.min(1, level * (0.52 + 0.48 * Math.abs(Math.sin(t * 2.05 + paneIndex))) + kick * 0.42);
+    const mid = Math.min(1, level * (0.38 + 0.62 * Math.abs(Math.sin(t * 5.35 + 1.4))));
+    const treble = Math.min(1, level * (0.22 + 0.78 * Math.abs(Math.sin(t * 11.4 + 0.5)) * (0.45 + 0.55 * Math.abs(Math.sin(t * 3.6)))));
+    return { bass: bass, mid: mid, treble: treble, energy: level, kick: kick, t: t };
+  }
+
   _graphVizBars(id, n) {
     let bars = this._graphVizState[id];
     if (!bars || bars.length !== n) {
@@ -4794,41 +5260,131 @@ class Component extends DCLogic {
 
   _stepVizBars(bars, now, level, paneIndex) {
     const n = bars.length;
+    const t = now * 0.001;
+    const kick = Math.pow(0.5 + 0.5 * Math.sin(t * 6.15 + paneIndex), 10);
     for (let i = 0; i < n; i++) {
       const frac = n <= 1 ? 0 : i / (n - 1);
-      const bass = Math.exp(-frac * 2.4);
-      const mid = Math.exp(-Math.abs(frac - 0.32) * 6);
-      const treble = Math.exp(-Math.abs(frac - 0.78) * 9);
-      const wobble = Math.abs(Math.sin(now / 92 + i * 0.43 + paneIndex))
-        * (0.45 + 0.55 * Math.abs(Math.sin(now / 151 + i * 0.19)));
-      const beat = 0.55 + 0.45 * Math.abs(Math.sin(now / 210));
-      const target = level * (0.38 * bass * beat + 0.4 * mid * wobble + 0.28 * treble * wobble);
-      bars[i] += (target - bars[i]) * (target > bars[i] ? 0.42 : 0.16);
-      bars[i] *= 0.975;
-      if (bars[i] < 0.02) bars[i] = 0.02;
+      const bass = Math.exp(-frac * 2.6);
+      const mid = Math.exp(-Math.abs(frac - 0.34) * 5.4);
+      const treble = Math.exp(-Math.abs(frac - 0.78) * 8.2);
+      const wobble = 0.35 + 0.65 * Math.abs(Math.sin(t * 7.4 + i * 0.51 + paneIndex))
+        * Math.abs(Math.sin(t * 3.1 + i * 0.17));
+      const shimmer = 0.55 + 0.45 * Math.abs(Math.sin(t * 13.0 + i * 0.9));
+      const beat = 0.5 + 0.5 * Math.abs(Math.sin(t * 2.9)) + kick * 0.55;
+      const target = level * (0.42 * bass * beat + 0.36 * mid * wobble + 0.28 * treble * shimmer);
+      bars[i] += (target - bars[i]) * (target > bars[i] ? 0.48 : 0.14);
+      bars[i] *= 0.978;
+      if (bars[i] < 0.015) bars[i] = 0.015;
     }
+  }
+
+  _vizHue() {
+    return this._graphVizHueDeg == null ? 186 : this._graphVizHueDeg;
+  }
+
+  _vizHsla(h, s, l, a) {
+    return 'hsla(' + Math.round(h) + ',' + Math.round(s) + '%,' + Math.round(l) + '%,' + a + ')';
+  }
+
+  _vizLayer(id, w, h) {
+    let layer = this._graphVizBuf[id];
+    if (!layer || layer.w !== w || layer.h !== h) {
+      const make = function() {
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w));
+        c.height = Math.max(1, Math.round(h));
+        return { c: c, ctx: c.getContext('2d') };
+      };
+      layer = { a: make(), b: make(), flip: false, w: w, h: h };
+      this._graphVizBuf[id] = layer;
+    }
+    return layer;
+  }
+
+  _vizBegin(layer, fade, zoom, rot) {
+    const src = layer.flip ? layer.b : layer.a;
+    const dst = layer.flip ? layer.a : layer.b;
+    layer.flip = !layer.flip;
+    const d = dst.ctx;
+    const w = layer.w;
+    const h = layer.h;
+    d.setTransform(1, 0, 0, 1, 0, 0);
+    d.globalAlpha = 1;
+    d.globalCompositeOperation = 'source-over';
+    d.fillStyle = '#05080d';
+    d.fillRect(0, 0, w, h);
+    d.save();
+    d.globalAlpha = fade;
+    d.translate(w * 0.5, h * 0.5);
+    if (rot) d.rotate(rot);
+    d.scale(zoom, zoom);
+    d.drawImage(src.c, -w * 0.5, -h * 0.5);
+    d.restore();
+    d.globalAlpha = 1;
+    d.globalCompositeOperation = 'lighter';
+    return { ctx: d, canvas: dst.c };
+  }
+
+  _vizEnd(ctx, frame, cssW, cssH) {
+    frame.ctx.globalCompositeOperation = 'source-over';
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(frame.canvas, 0, 0, cssW, cssH);
+  }
+
+  _vizWaveY(x, now, level, ch, cssH, gentle) {
+    const phase = now / (gentle ? 280 : 160);
+    const nx = x * (gentle ? 0.028 : 0.052);
+    const a = Math.sin(nx * 1.15 + phase * (1.35 + ch * 0.22));
+    const b = Math.sin(nx * (gentle ? 1.55 : 2.6) + phase * (gentle ? 1.8 : 3.1) + ch) * (gentle ? 0.28 : 0.48);
+    const c = Math.sin(nx * 0.45 + phase * 0.7) * 0.22;
+    const d = Math.sin(nx * 4.2 + phase * 4.4 + ch * 2) * 0.12;
+    return cssH * 0.5 + (a + b + c + d) * level * cssH * (gentle ? 0.28 : 0.36);
   }
 
   _paintGraphViz(ctx, canvas, pane, cssW, cssH, now) {
-    // No FFT of other apps' audio on the MMI. Drive the motion from now-playing
-    // plus battery power so a silent cabin still has a pulse when the car is
-    // pulling or regenerating.
-    const style = pane.vizStyle || 'spectrum';
+    // No FFT of other apps' audio on the MMI. Drive motion from now-playing
+    // plus battery power. Dense VoltViz-inspired canvas (trails, tunnel, neon,
+    // milkdrop-style feedback) — not their WebGL app (offline APK, one GPU).
     const paneIndex = parseInt(canvas.getAttribute('data-pane'), 10) || 0;
+    const style = this._graphResolvedVizStyle(pane, paneIndex);
     const level = this._graphVizLevel(now);
+    const bands = this._vizBands(now, level, paneIndex);
+    const hue = this._vizHue();
     const id = paneIndex + '-' + style;
-    if (style === 'scope' || style === 'dots') {
-      this._paintVizScope(ctx, cssW, cssH, now, level, paneIndex, style === 'dots');
-      return;
-    }
-    const n = style === 'radial' ? 28 : 40;
+    const layer = this._vizLayer(id, cssW, cssH);
+    let fade = 0.78;
+    let zoom = 1;
+    let rot = 0;
+    if (style === 'plasma') { fade = 0.93; zoom = 1.045 + bands.bass * 0.02; rot = 0.012 + bands.mid * 0.01; }
+    else if (style === 'tunnel' || style === 'hex') { fade = 0.82; zoom = 1.03 + bands.bass * 0.02; }
+    else if (style === 'aurora' || style === 'neon') { fade = 0.84; zoom = 1.008; }
+    else if (style === 'particles' || style === 'flame') { fade = 0.8; }
+    else if (style === 'matrix') { fade = 0.72; }
+    else fade = 0.55;
+    const frame = this._vizBegin(layer, fade, zoom || 1, rot);
+    const bctx = frame.ctx;
+    const n = (style === 'radial' || style === 'circular' || style === 'hex') ? 48 : 72;
     const bars = this._graphVizBars(id, n);
     this._stepVizBars(bars, now, level, paneIndex);
-    if (style === 'radial') this._paintVizRadial(ctx, cssW, cssH, bars);
-    else this._paintVizSpectrum(ctx, cssW, cssH, bars, id);
+    if (style === 'scope') this._paintVizScope(bctx, cssW, cssH, now, level, paneIndex, false, hue, bands);
+    else if (style === 'dots') this._paintVizScope(bctx, cssW, cssH, now, level, paneIndex, true, hue, bands);
+    else if (style === 'neon') this._paintVizNeon(bctx, cssW, cssH, now, level, paneIndex, hue, bands, bars);
+    else if (style === 'aurora') this._paintVizAurora(bctx, cssW, cssH, now, level, paneIndex, hue, bands);
+    else if (style === 'particles') this._paintVizParticles(bctx, cssW, cssH, now, level, paneIndex, hue, bands);
+    else if (style === 'vu') this._paintVizVu(bctx, cssW, cssH, now, level, paneIndex, hue, bands);
+    else if (style === 'radial') this._paintVizRadial(bctx, cssW, cssH, bars, now, hue, bands);
+    else if (style === 'circular') this._paintVizCircular(bctx, cssW, cssH, bars, now, level, hue, bands);
+    else if (style === 'tunnel') this._paintVizTunnel(bctx, cssW, cssH, bars, now, level, hue, bands, paneIndex, 10);
+    else if (style === 'hex') this._paintVizTunnel(bctx, cssW, cssH, bars, now, level, hue, bands, paneIndex, 6);
+    else if (style === 'bars') this._paintVizMirrorBars(bctx, cssW, cssH, bars, hue);
+    else if (style === 'plasma') this._paintVizPlasma(bctx, cssW, cssH, bars, now, level, hue, bands);
+    else if (style === 'matrix') this._paintVizMatrix(bctx, cssW, cssH, now, level, paneIndex, hue, bands);
+    else if (style === 'flame') this._paintVizFlame(bctx, cssW, cssH, now, level, paneIndex, hue, bands);
+    else this._paintVizSpectrum(bctx, cssW, cssH, bars, id, hue);
+    this._vizEnd(ctx, frame, cssW, cssH);
   }
 
-  _paintVizSpectrum(ctx, cssW, cssH, bars, id) {
+  _paintVizSpectrum(ctx, cssW, cssH, bars, id, hue) {
     const n = bars.length;
     let peaks = this._graphVizPeaks[id];
     if (!peaks || peaks.length !== n) {
@@ -4836,58 +5392,51 @@ class Component extends DCLogic {
       for (let i = 0; i < n; i++) peaks.push(0);
       this._graphVizPeaks[id] = peaks;
     }
-    const gap = 1.5;
-    const bw = Math.max(2, (cssW - gap * (n - 1)) / n);
+    const gap = 0.8;
+    const bw = Math.max(1.4, (cssW - gap * (n - 1)) / n);
     const base = cssH - 2;
-    const maxH = cssH - 8;
+    const maxH = cssH - 6;
     for (let i = 0; i < n; i++) {
       if (bars[i] > peaks[i]) peaks[i] = bars[i];
-      else peaks[i] *= 0.985;
-      const bh = Math.max(2, bars[i] * maxH);
-      const x = i * (bw + gap);
+      else peaks[i] *= 0.972;
       const t = bars[i];
-      ctx.fillStyle = 'rgba(' + Math.round(180 + 62 * t) + ',' + Math.round(210 + 35 * t) + ',' + Math.round(232) + ',' + (0.22 + t * 0.7).toFixed(3) + ')';
+      const bh = Math.max(2, t * maxH);
+      const x = i * (bw + gap);
+      const h = hue + (n <= 1 ? 0 : (i / (n - 1)) * 70);
+      ctx.fillStyle = this._vizHsla(h, 90, 58, 0.18 + t * 0.55);
       ctx.fillRect(x, base - bh, bw, bh);
-      const py = base - peaks[i] * maxH;
-      ctx.fillStyle = 'rgba(242,245,248,' + (0.35 + peaks[i] * 0.55).toFixed(3) + ')';
-      ctx.fillRect(x, py - 1.5, bw, 1.5);
+      ctx.fillStyle = this._vizHsla(h, 95, 78, 0.55 + t * 0.45);
+      ctx.fillRect(x, base - bh, Math.max(1, bw * 0.35), bh);
+      ctx.fillStyle = this._vizHsla(h, 40, 92, 0.35 + peaks[i] * 0.55);
+      ctx.fillRect(x, base - peaks[i] * maxH - 1.5, bw, 1.5);
     }
   }
 
-  _vizWaveY(x, now, level, ch, cssH, gentle) {
-    const phase = now / (gentle ? 280 : 180);
-    const nx = x * (gentle ? 0.028 : 0.045);
-    const a = Math.sin(nx * 1.15 + phase * (1.35 + ch * 0.22));
-    const b = Math.sin(nx * (gentle ? 1.55 : 2.4) + phase * (gentle ? 1.8 : 2.8) + ch) * (gentle ? 0.28 : 0.42);
-    const c = Math.sin(nx * 0.45 + phase * 0.7) * 0.22;
-    return cssH * 0.5 + (a + b + c) * level * cssH * (gentle ? 0.28 : 0.32);
-  }
-
-  _paintVizScope(ctx, cssW, cssH, now, level, paneIndex, asDots) {
-    const step = asDots ? 5 : 3;
+  _paintVizScope(ctx, cssW, cssH, now, level, paneIndex, asDots, hue, bands) {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    for (let ch = 0; ch < 2; ch++) {
+    const layers = asDots ? 3 : 5;
+    for (let ch = 0; ch < layers; ch++) {
+      const step = asDots ? 4 : 2;
+      const amp = level * (1 - ch * 0.12) * (ch % 2 ? bands.mid : bands.bass);
       const pts = [];
       for (let x = 0; x <= cssW; x += step) {
-        pts.push({ x: x, y: this._vizWaveY(x, now, level * (ch ? 0.72 : 1), paneIndex + ch, cssH, asDots) });
+        pts.push({ x: x, y: this._vizWaveY(x, now * (1 + ch * 0.08), amp, paneIndex + ch, cssH, asDots) });
       }
+      const h = hue + ch * 38;
       if (!asDots) {
         ctx.beginPath();
         ctx.moveTo(pts[0].x, pts[0].y);
         for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.strokeStyle = ch ? 'rgba(79,214,232,.22)' : 'rgba(79,214,232,.2)';
-        ctx.lineWidth = 5;
+        ctx.strokeStyle = this._vizHsla(h, 90, 55, 0.12);
+        ctx.lineWidth = 8 - ch;
         ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.strokeStyle = ch ? 'rgba(79,214,232,.85)' : 'rgba(242,245,248,.92)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = this._vizHsla(h, 95, 72, 0.55 + bands.energy * 0.4);
+        ctx.lineWidth = 1.4;
         ctx.stroke();
       } else {
-        const r = 1.7 + level * 0.8;
-        ctx.fillStyle = ch ? 'rgba(79,214,232,.7)' : 'rgba(242,245,248,.88)';
+        const r = 1.2 + bands.treble * 1.6;
+        ctx.fillStyle = this._vizHsla(h, 90, 70, 0.35 + bands.energy * 0.4);
         for (let i = 0; i < pts.length; i++) {
           ctx.beginPath();
           ctx.arc(pts[i].x, pts[i].y, r, 0, Math.PI * 2);
@@ -4897,22 +5446,514 @@ class Component extends DCLogic {
     }
   }
 
-  _paintVizRadial(ctx, cssW, cssH, bars) {
+  _paintVizRadial(ctx, cssW, cssH, bars, now, hue, bands) {
     const n = bars.length;
     const cx = cssW / 2;
     const cy = cssH / 2;
-    const maxR = Math.min(cssW, cssH) * 0.5 - 3;
-    const inner = Math.max(6, maxR * 0.12);
+    const maxR = Math.min(cssW, cssH) * 0.48;
+    const inner = Math.max(8, maxR * (0.16 + bands.bass * 0.08));
+    const spin = now / 4200;
     ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(2.5, (Math.PI * 2 * inner) / n * 0.7);
+    for (let ring = 0; ring < 3; ring++) {
+      const r0 = inner * (0.45 + ring * 0.28);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r0, 0, Math.PI * 2);
+      ctx.strokeStyle = this._vizHsla(hue + ring * 24, 70, 70, 0.12 + bands.energy * 0.12);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.lineWidth = Math.max(2, (Math.PI * 2 * inner) / n * 0.55);
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-      const outer = inner + bars[i] * (maxR - inner);
-      ctx.strokeStyle = 'rgba(242,245,248,' + (0.22 + bars[i] * 0.7).toFixed(3) + ')';
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2 + spin;
+      const t = bars[i];
+      const outer = inner + t * (maxR - inner);
       ctx.beginPath();
       ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
       ctx.lineTo(cx + Math.cos(a) * outer, cy + Math.sin(a) * outer);
+      ctx.strokeStyle = this._vizHsla(hue + (i / n) * 80, 90, 62 + t * 20, 0.2 + t * 0.75);
       ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, inner * 0.55 * (0.8 + bands.kick), 0, Math.PI * 2);
+    ctx.fillStyle = this._vizHsla(hue, 90, 70, 0.12 + bands.bass * 0.28);
+    ctx.fill();
+  }
+
+  _paintVizMirrorBars(ctx, cssW, cssH, bars, hue) {
+    const n = bars.length;
+    const gap = 0.7;
+    const bw = Math.max(1.2, (cssW - gap * (n - 1)) / n);
+    const mid = cssH * 0.5;
+    const maxH = cssH * 0.48;
+    for (let i = 0; i < n; i++) {
+      const t = bars[i];
+      const bh = Math.max(2, t * maxH);
+      const x = i * (bw + gap);
+      const h = hue + (i / n) * 90;
+      ctx.fillStyle = this._vizHsla(h, 92, 62, 0.22 + t * 0.7);
+      ctx.fillRect(x, mid - bh, bw, bh);
+      ctx.fillStyle = this._vizHsla(h, 85, 55, 0.12 + t * 0.38);
+      ctx.fillRect(x, mid, bw, bh * 0.78);
+      ctx.fillStyle = this._vizHsla(h, 40, 92, 0.7);
+      ctx.fillRect(x, mid - bh, bw, 1.2);
+    }
+  }
+
+  _paintVizCircular(ctx, cssW, cssH, bars, now, level, hue, bands) {
+    const n = bars.length;
+    const cx = cssW / 2;
+    const cy = cssH / 2;
+    const maxR = Math.min(cssW, cssH) * 0.48;
+    const spin = now / 3800;
+    const rings = [0.22, 0.34, 0.48];
+    for (let r = 0; r < rings.length; r++) {
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const t = bars[i % n];
+        const a = (i / n) * Math.PI * 2 - Math.PI / 2 + spin * (r % 2 ? -1 : 1);
+        const rad = maxR * rings[r] + t * maxR * (0.1 + r * 0.08) * (0.7 + bands.energy);
+        const x = cx + Math.cos(a) * rad;
+        const y = cy + Math.sin(a) * rad;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = this._vizHsla(hue + r * 42, 90, 68, 0.35 + bands.energy * 0.45);
+      ctx.lineWidth = r === 1 ? 2.4 : 1.3;
+      ctx.stroke();
+      if (r === 1) {
+        ctx.fillStyle = this._vizHsla(hue, 80, 55, 0.06 + bands.bass * 0.1);
+        ctx.fill();
+      }
+    }
+    const spokes = 12;
+    for (let s = 0; s < spokes; s++) {
+      const a = (s / spokes) * Math.PI * 2 + spin * 2;
+      const t = bars[Math.floor((s / spokes) * n) % n];
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * maxR * 0.08, cy + Math.sin(a) * maxR * 0.08);
+      ctx.lineTo(cx + Math.cos(a) * maxR * (0.18 + t * 0.28), cy + Math.sin(a) * maxR * (0.18 + t * 0.28));
+      ctx.strokeStyle = this._vizHsla(hue + 80, 90, 70, 0.15 + t * 0.45);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, maxR * 0.07 * (1 + bands.kick * 1.4), 0, Math.PI * 2);
+    ctx.fillStyle = this._vizHsla(hue, 95, 75, 0.25 + bands.bass * 0.45);
+    ctx.fill();
+  }
+
+  _paintVizTunnel(ctx, cssW, cssH, bars, now, level, hue, bands, paneIndex, sides) {
+    const w = cssW;
+    const h = cssH;
+    const fov = 280;
+    const maxZ = 2400;
+    const numRings = 22;
+    const baseR = Math.min(w, h) * 1.15;
+    const id = 'tn-' + paneIndex + '-' + sides;
+    let st = this._graphVizState[id];
+    if (!st) {
+      const rings = [];
+      for (let i = 0; i < numRings; i++) rings.push({ z: (i / numRings) * maxZ });
+      const pts = [];
+      for (let i = 0; i < 90; i++) {
+        pts.push({
+          a: Math.random() * Math.PI * 2,
+          r: baseR * (0.15 + Math.random() * 2.4),
+          z: Math.random() * maxZ,
+          s: 12 + Math.random() * 28,
+          sz: 0.8 + Math.random() * 1.8,
+        });
+      }
+      st = { rings: rings, pts: pts };
+      this._graphVizState[id] = st;
+    }
+    const t = bands.t;
+    const speed = 14 + bands.bass * 38 + bands.kick * 22;
+    const camA = t * 0.7;
+    const camX = Math.sin(t * 1.15) * 40 * (0.6 + bands.mid);
+    const camY = Math.cos(t * 0.85) * 32 * (0.6 + bands.mid);
+    const project = function(x, y, z) {
+      if (z < 12) return null;
+      const sc = fov / z;
+      return { x: x * sc + w * 0.5, y: y * sc + h * 0.5, sc: sc };
+    };
+    ctx.fillStyle = this._vizHsla(hue, 40, 8, 0.12);
+    for (let i = 0; i < st.pts.length; i++) {
+      const p = st.pts[i];
+      p.z -= p.s * (0.35 + bands.energy);
+      if (p.z < 12) { p.z = maxZ; p.a = Math.random() * Math.PI * 2; }
+      const px = Math.cos(p.a + camA) * p.r - camX;
+      const py = Math.sin(p.a + camA) * p.r - camY;
+      const pr = project(px, py, p.z);
+      if (!pr) continue;
+      ctx.globalAlpha = Math.max(0, 1 - p.z / maxZ) * (0.25 + bands.treble * 0.7);
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, p.sz * pr.sc, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    st.rings.sort(function(a, b) { return b.z - a.z; });
+    const nSides = sides || 10;
+    for (let i = 0; i < st.rings.length; i++) {
+      const ring = st.rings[i];
+      ring.z -= speed;
+      if (ring.z < 12) ring.z = maxZ;
+      const u = 1 - ring.z / maxZ;
+      const tBar = bars[Math.min(bars.length - 1, Math.floor(u * bars.length))] || 0.2;
+      const rad = baseR * (0.85 + tBar * 0.35 + bands.bass * 0.2);
+      const fade = Math.max(0, Math.min(1, u));
+      const twist = ring.z * 0.0018 * Math.sin(t * 0.5);
+      const pts = [];
+      for (let s = 0; s < nSides; s++) {
+        const a = (s / nSides) * Math.PI * 2 + camA + twist;
+        const pr = project(Math.cos(a) * rad - camX, Math.sin(a) * rad - camY, ring.z);
+        if (pr) pts.push(pr);
+      }
+      if (pts.length !== nSides) continue;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let s = 1; s < nSides; s++) ctx.lineTo(pts[s].x, pts[s].y);
+      ctx.closePath();
+      ctx.strokeStyle = this._vizHsla(hue + u * 90 + t * 18, 95, 58 + tBar * 18, fade * (0.18 + tBar * 0.7));
+      ctx.lineWidth = Math.max(0.8, (1.4 + tBar * 5) * (fov / ring.z));
+      ctx.stroke();
+      if (i > 0) {
+        const prev = st.rings[i - 1];
+        if (prev.z > ring.z && prev.z - ring.z < (maxZ / numRings) * 2.4) {
+          const prevU = 1 - prev.z / maxZ;
+          const prevT = bars[Math.min(bars.length - 1, Math.floor(prevU * bars.length))] || 0.2;
+          const prevR = baseR * (0.85 + prevT * 0.35 + bands.bass * 0.2);
+          const prevTwist = prev.z * 0.0018 * Math.sin(t * 0.5);
+          ctx.beginPath();
+          for (let s = 0; s < nSides; s++) {
+            const a2 = (s / nSides) * Math.PI * 2 + camA + prevTwist;
+            const p2 = project(Math.cos(a2) * prevR - camX, Math.sin(a2) * prevR - camY, prev.z);
+            if (!p2) continue;
+            ctx.moveTo(pts[s].x, pts[s].y);
+            ctx.lineTo(p2.x, p2.y);
+          }
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  _paintVizNeon(ctx, cssW, cssH, now, level, paneIndex, hue, bands, bars) {
+    const id = 'nw-' + paneIndex;
+    let shapes = this._graphVizState[id];
+    if (!shapes) {
+      shapes = [];
+      const types = ['circle', 'tri', 'sq', 'cross', 'squig'];
+      for (let i = 0; i < 36; i++) {
+        shapes.push({
+          type: types[i % types.length],
+          x: Math.random(),
+          y: Math.random(),
+          size: 8 + Math.random() * 28,
+          rot: Math.random() * Math.PI * 2,
+          rs: (Math.random() - 0.5) * 0.025,
+          fill: Math.random() > 0.72,
+          pulse: 0.4 + Math.random() * 0.8,
+          dh: (Math.random() - 0.5) * 50,
+        });
+      }
+      this._graphVizState[id] = shapes;
+    }
+    for (let i = 0; i < shapes.length; i++) {
+      const sh = shapes[i];
+      sh.rot += sh.rs * (0.8 + bands.energy);
+      const x = sh.x * cssW;
+      const y = sh.y * cssH;
+      const sz = (sh.size + bands.bass * 18 * sh.pulse) * (0.85 + level * 0.3);
+      const col = this._vizHsla(hue + sh.dh, 95, 60, 0.22 + bands.energy * 0.25);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(sh.rot);
+      ctx.beginPath();
+      if (sh.type === 'circle') ctx.arc(0, 0, sz, 0, Math.PI * 2);
+      else if (sh.type === 'tri') {
+        ctx.moveTo(0, -sz); ctx.lineTo(sz * 0.86, sz * 0.5); ctx.lineTo(-sz * 0.86, sz * 0.5); ctx.closePath();
+      } else if (sh.type === 'sq') ctx.rect(-sz * 0.5, -sz * 0.5, sz, sz);
+      else if (sh.type === 'cross') {
+        ctx.moveTo(-sz, 0); ctx.lineTo(sz, 0); ctx.moveTo(0, -sz); ctx.lineTo(0, sz);
+      } else {
+        ctx.moveTo(-sz, 0);
+        ctx.quadraticCurveTo(-sz * 0.5, -sz, 0, 0);
+        ctx.quadraticCurveTo(sz * 0.5, sz, sz, 0);
+      }
+      if (sh.fill && sh.type !== 'cross' && sh.type !== 'squig') {
+        ctx.fillStyle = col;
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const midY = cssH * 0.42;
+    ctx.beginPath();
+    ctx.moveTo(0, midY);
+    ctx.lineTo(cssW, midY);
+    ctx.strokeStyle = this._vizHsla(hue, 90, 60, 0.25);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    for (let ch = 0; ch < 3; ch++) {
+      ctx.beginPath();
+      for (let x = 0; x <= cssW; x += 3) {
+        const y = this._vizWaveY(x, now * (1 + ch * 0.1), level * (1 - ch * 0.16), paneIndex + ch, cssH, false);
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      const hh = hue + (ch === 0 ? 120 : ch === 1 ? 0 : -80);
+      ctx.strokeStyle = this._vizHsla(hh, 95, 58, 0.16);
+      ctx.lineWidth = 7 - ch * 1.5;
+      ctx.stroke();
+      ctx.strokeStyle = this._vizHsla(hh, 100, 70, 0.75);
+      ctx.lineWidth = 1.7;
+      ctx.stroke();
+    }
+    const bn = Math.min(bars.length, 64);
+    const bw = cssW / bn;
+    for (let i = 0; i < bn; i++) {
+      const t = bars[i];
+      const bh = t * cssH * 0.28;
+      ctx.fillStyle = this._vizHsla(hue + (i / bn) * 50, 95, 60, 0.35 + t * 0.55);
+      ctx.fillRect(i * bw + 0.4, cssH - 8 - bh, Math.max(1, bw * 0.62), bh);
+      ctx.fillStyle = this._vizHsla(hue + (i / bn) * 50, 80, 55, 0.12);
+      ctx.fillRect(i * bw + 0.4, cssH - 8, Math.max(1, bw * 0.62), bh * 0.28);
+    }
+  }
+
+  _paintVizAurora(ctx, cssW, cssH, now, level, paneIndex, hue, bands) {
+    const bandsN = 9;
+    for (let b = 0; b < bandsN; b++) {
+      ctx.beginPath();
+      ctx.moveTo(0, cssH);
+      for (let x = 0; x <= cssW; x += 5) {
+        const n1 = Math.sin(x * 0.016 + now / (480 + b * 70) + paneIndex);
+        const n2 = Math.sin(x * 0.039 + now / 290 + b * 0.7);
+        const n3 = Math.sin(x * 0.07 + now / 160 + b);
+        const y = cssH * (0.12 + b * 0.08) + (n1 * 0.5 + n2 * 0.32 + n3 * 0.18) * (0.35 + bands.energy) * cssH * 0.38;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(cssW, cssH);
+      ctx.closePath();
+      ctx.fillStyle = this._vizHsla(hue + b * 18 + bands.t * 8, 80, 52 + b * 2, 0.07 + bands.energy * 0.08);
+      ctx.fill();
+    }
+  }
+
+  _paintVizParticles(ctx, cssW, cssH, now, level, paneIndex, hue, bands) {
+    const id = 'pt-' + paneIndex;
+    let pts = this._graphVizState[id];
+    const want = 70 + Math.round(bands.energy * 50);
+    if (!pts) { pts = []; this._graphVizState[id] = pts; }
+    while (pts.length < want) {
+      pts.push({
+        x: Math.random() * cssW,
+        y: Math.random() * cssH,
+        vx: (Math.random() - 0.5) * 1.1,
+        vy: -0.15 - Math.random() * 1.1,
+        r: 0.8 + Math.random() * 2.8,
+        a: 0.25 + Math.random() * 0.6,
+        dh: Math.random() * 40,
+      });
+    }
+    if (pts.length > want + 12) pts.length = want;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      p.x += p.vx * (0.5 + bands.energy * 2.2);
+      p.y += p.vy * (0.5 + bands.energy * 2.2);
+      p.vx += Math.sin(now / 380 + i) * 0.02 * bands.mid;
+      if (p.y < -8) { p.y = cssH + 6; p.x = Math.random() * cssW; }
+      if (p.x < -8) p.x = cssW + 6;
+      if (p.x > cssW + 8) p.x = -6;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (0.7 + bands.bass * 1.1), 0, Math.PI * 2);
+      ctx.fillStyle = this._vizHsla(hue + p.dh, 90, 70, p.a);
+      ctx.fill();
+    }
+    ctx.lineWidth = 0.6;
+    const linkN = Math.min(pts.length, 80);
+    for (let i = 0; i < linkN; i++) {
+      const a = pts[i];
+      const jMax = Math.min(linkN, i + 6);
+      for (let j = i + 1; j < jMax; j++) {
+        const b = pts[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > 55 * 55) continue;
+        ctx.strokeStyle = this._vizHsla(hue, 80, 70, 0.08 * (1 - Math.sqrt(d2) / 55));
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  _paintVizPlasma(ctx, cssW, cssH, bars, now, level, hue, bands) {
+    const cx = cssW / 2;
+    const cy = cssH / 2;
+    const n = bars.length;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const t = bars[i % n];
+      const a = (i / n) * Math.PI * 2 + now / 900;
+      const r = (0.16 + t * 0.14 + bands.kick * 0.08) * Math.min(cssW, cssH);
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = this._vizHsla(hue + now / 40, 95, 65, 0.55 + bands.energy * 0.4);
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const t = bars[(i * 3) % n];
+      const a = (i / n) * Math.PI * 2 - now / 1200;
+      const r = (0.28 + t * 0.1) * Math.min(cssW, cssH);
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = this._vizHsla(hue + 140, 90, 60, 0.35 + bands.mid * 0.4);
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    const spokes = 8;
+    for (let s = 0; s < spokes; s++) {
+      const a = (s / spokes) * Math.PI * 2 + now / 2000;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * Math.min(cssW, cssH) * 0.42, cy + Math.sin(a) * Math.min(cssW, cssH) * 0.42);
+      ctx.strokeStyle = this._vizHsla(hue + 50, 90, 70, 0.08 + bands.treble * 0.2);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6 + bands.bass * 18, 0, Math.PI * 2);
+    ctx.fillStyle = this._vizHsla(hue, 95, 72, 0.2 + bands.bass * 0.5);
+    ctx.fill();
+  }
+
+  _paintVizMatrix(ctx, cssW, cssH, now, level, paneIndex, hue, bands) {
+    const id = 'mx-' + paneIndex;
+    const colW = 9;
+    const cols = Math.max(8, Math.floor(cssW / colW));
+    let st = this._graphVizState[id];
+    if (!st || st.cols !== cols) {
+      const drops = [];
+      for (let i = 0; i < cols; i++) {
+        drops.push({ y: Math.random() * cssH, sp: 1.2 + Math.random() * 3.4, len: 8 + Math.floor(Math.random() * 16) });
+      }
+      st = { cols: cols, drops: drops };
+      this._graphVizState[id] = st;
+    }
+    const glyphs = '01ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒﾗｷﾑｴ';
+    ctx.font = '10px "Space Mono", monospace';
+    ctx.textBaseline = 'top';
+    for (let i = 0; i < cols; i++) {
+      const d = st.drops[i];
+      d.y += d.sp * (0.7 + bands.energy * 2.4 + bands.kick * 1.5);
+      if (d.y > cssH + d.len * 11) {
+        d.y = -d.len * 11;
+        d.sp = 1.2 + Math.random() * 3.4;
+      }
+      for (let k = 0; k < d.len; k++) {
+        const gy = d.y - k * 11;
+        if (gy < -12 || gy > cssH) continue;
+        const g = glyphs.charAt((i * 13 + k * 7 + Math.floor(now / 80)) % glyphs.length);
+        const a = k === 0 ? 0.95 : Math.max(0.08, 0.55 - k / d.len);
+        ctx.fillStyle = this._vizHsla(hue + (k === 0 ? -20 : 0), 95, k === 0 ? 88 : 55, a * (0.45 + bands.energy * 0.55));
+        ctx.fillText(g, i * colW, gy);
+      }
+    }
+  }
+
+  _paintVizFlame(ctx, cssW, cssH, now, level, paneIndex, hue, bands) {
+    const id = 'fl-' + paneIndex;
+    let pts = this._graphVizState[id];
+    const want = 90 + Math.round(bands.bass * 40);
+    if (!pts) { pts = []; this._graphVizState[id] = pts; }
+    while (pts.length < want) {
+      pts.push({
+        x: cssW * 0.5 + (Math.random() - 0.5) * cssW * 0.7,
+        y: cssH + Math.random() * 20,
+        vx: (Math.random() - 0.5) * 0.8,
+        vy: -1.2 - Math.random() * 2.4,
+        life: Math.random(),
+        r: 2 + Math.random() * 6,
+      });
+    }
+    if (pts.length > want + 10) pts.length = want;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      p.x += p.vx + Math.sin(now / 200 + i) * 0.4 * bands.mid;
+      p.y += p.vy * (0.8 + bands.energy * 1.6);
+      p.life -= 0.012 + bands.treble * 0.01;
+      if (p.life <= 0 || p.y < -10) {
+        p.x = cssW * 0.5 + (Math.random() - 0.5) * cssW * (0.35 + bands.bass * 0.4);
+        p.y = cssH + 4;
+        p.vy = -1.4 - Math.random() * 2.8;
+        p.life = 0.6 + Math.random() * 0.4;
+      }
+      const t = p.life;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * t * (0.8 + bands.kick), 0, Math.PI * 2);
+      ctx.fillStyle = this._vizHsla(hue - 40 + (1 - t) * 50, 95, 55 + t * 25, 0.18 + t * 0.5);
+      ctx.fill();
+    }
+  }
+
+  _paintVizVu(ctx, cssW, cssH, now, level, paneIndex, hue, bands) {
+    const id = 'vu-' + paneIndex;
+    let peaks = this._graphVizPeaks[id];
+    if (!peaks || peaks.length !== 2) {
+      peaks = [0, 0];
+      this._graphVizPeaks[id] = peaks;
+    }
+    const vals = [
+      Math.min(1, bands.bass * 0.85 + bands.kick * 0.35),
+      Math.min(1, bands.mid * 0.7 + bands.treble * 0.45),
+    ];
+    const labels = ['L', 'R'];
+    const gap = 8;
+    const bw = Math.max(16, (cssW - gap) / 2);
+    const bot = cssH - 10;
+    const top = 12;
+    const maxH = bot - top;
+    const segs = 18;
+    const segH = (maxH - (segs - 1) * 2) / segs;
+    for (let ch = 0; ch < 2; ch++) {
+      if (vals[ch] > peaks[ch]) peaks[ch] = vals[ch];
+      else peaks[ch] *= 0.96;
+      const x = ch * (bw + gap);
+      const lit = Math.round(vals[ch] * segs);
+      for (let s = 0; s < segs; s++) {
+        const on = s < lit;
+        const y = bot - (s + 1) * (segH + 2);
+        const frac = s / segs;
+        const hh = frac > 0.8 ? 8 : hue;
+        ctx.fillStyle = on
+          ? this._vizHsla(hh, 90, frac > 0.8 ? 58 : 62, 0.55 + bands.energy * 0.4)
+          : 'rgba(255,255,255,.05)';
+        ctx.fillRect(x, y, bw, segH);
+      }
+      const py = bot - peaks[ch] * maxH;
+      ctx.fillStyle = 'rgba(242,245,248,.85)';
+      ctx.fillRect(x, py - 2, bw, 2);
+      ctx.fillStyle = 'rgba(242,245,248,.4)';
+      ctx.font = '8px "Space Mono", monospace';
+      ctx.fillText(labels[ch], x + 4, cssH - 2);
     }
   }
 
@@ -5535,7 +6576,7 @@ class Component extends DCLogic {
       mediaRailDisplay: 'none',
       shellHudDisplay: (!s.error && this._androidApp) ? 'flex' : 'none',
       pageBtnsDisplay: (!s.error && this._androidApp) ? 'flex' : 'none',
-      chromeMainLeft: '96px',
+      chromeMainLeft: this._chromeMainLeftPx(null) + 'px',
       configDockDisplay: 'none',
       configDockLeft: '0px',
       configDockTop: '0px',
@@ -14824,15 +15865,28 @@ class Component extends DCLogic {
    *          has actually finished fading, or they'd animate behind black.
    *   +2.9s  widget boards fade up.
    *
+   * Skip-while-loading is the exception: `opts.immediate` brings launcher,
+   * widgets and menus in at once, and `opts.keepHud` leaves the loading chip
+   * up until the GLB arrives.
+   *
    * Runs once per session, off the splash fade — not off the clip ending —
    * so the icons don't fly in behind a still-up last frame.
    */
-  _revealShellChrome() {
+  _revealShellChrome(opts) {
     if (this._shellChromeRevealed) return;
     this._shellChromeRevealed = true;
-    this._hideBootHud();
+    const immediate = !!(opts && opts.immediate);
+    const keepHud = !!(opts && opts.keepHud);
+    if (!keepHud) {
+      this._hideBootHud();
+    } else {
+      try {
+        const B = window.AppLauncherBridge;
+        if (B && typeof B.placeBootProgress === 'function') B.placeBootProgress('center');
+      } catch (e) {}
+    }
     const splash = window.HavalSplash;
-    const afterFade = ((splash && splash.fadeMs) || 0) + 100;
+    const afterFade = immediate ? 0 : (((splash && splash.fadeMs) || 0) + 100);
 
     this._launcherRevealTimer = setTimeout(() => {
       try {
@@ -14845,7 +15899,7 @@ class Component extends DCLogic {
 
     this._widgetRevealTimer = setTimeout(() => {
       document.body.classList.remove('hv-boot');
-    }, afterFade + 2000);
+    }, immediate ? 0 : afterFade + 2000);
   }
 
   _shouldShowCar() {
@@ -15020,11 +16074,14 @@ class Component extends DCLogic {
 
     if (this.state.loading && !this.state.error) {
       if (skipped || !splash || !splash.active) {
-        if (splash && splash.fadeOut) splash.fadeOut();
+        // Skip (or a failed clip) while the model is still arriving: drop the
+        // overlay immediately so the shell can paint, keep the loading chip.
+        this._applyChromeMainLeftVar();
+        if (splash && typeof splash.dropNow === 'function') splash.dropNow();
+        else if (splash && splash.fadeOut) splash.fadeOut();
         this.setState({ splashActive: false });
-        // Keep the boot HUD up — chrome reveal would hide it while the GLB
-        // is still arriving.
         this._introWaitingForLoader = true;
+        this._revealShellChrome({ immediate: true, keepHud: true });
       }
       return;
     }
@@ -15248,6 +16305,27 @@ class Component extends DCLogic {
       // Splash SKIP lives outside #hv-root, so it reads the var from <html>.
       document.documentElement.style.setProperty('--hv-launcher-bottom', bottom);
     }
+    this._applyChromeMainLeftVar();
+  }
+
+  /**
+   * Page chrome (Main / layout / L / R) must start at the left widget board,
+   * but never under the HAVAL H6 brand. The board fallback is 48px, which is
+   * inside the mark — floor at 96px so skip-before-layout doesn't overlap.
+   */
+  _chromeMainLeftPx(boardLeftPx) {
+    const left = (typeof boardLeftPx === 'number' && isFinite(boardLeftPx))
+      ? boardLeftPx : 0;
+    return Math.max(left, 96);
+  }
+
+  _applyChromeMainLeftVar() {
+    const el = (this.outerRef && this.outerRef.current)
+      || document.getElementById('hv-root');
+    const boardLeft = (this._shellLeftBounds && typeof this._shellLeftBounds.l === 'number')
+      ? this._shellLeftBounds.l : 0;
+    const px = this._chromeMainLeftPx(boardLeft) + 'px';
+    if (el) el.style.setProperty('--hv-chrome-main-left', px);
   }
 
   applyShellLayout(layout) {
@@ -15268,6 +16346,7 @@ class Component extends DCLogic {
     // skips setState for the whole GLB pipeline, so a render-only path would keep
     // the startup frame at the defaults — chrome under the header, no side band.
     this._applySafeInsetVars();
+    this._applyChromeMainLeftVar();
     // Any shell notify from native implies the Android shell is active.
     if (next.right === 'idle' || next.right === 'app') {
       this._androidApp = true;
@@ -15299,8 +16378,11 @@ class Component extends DCLogic {
       rightSlotUse: this._board('right', mode).use || 'app',
       mediaColumnVisible: !!this._androidApp && !appsOnly,
     };
-    // Avoid React state churn while the GLB/wheel pipeline is still running.
-    if (this.state.loading) {
+    // Avoid React state churn while the GLB pipeline is still running AND the
+    // shell is still hidden behind the splash. Once skip has brought chrome
+    // and widgets up, layout notifies have to paint — otherwise the boards
+    // sit on the 48px fallback until the car arrives.
+    if (this.state.loading && !this._shellChromeRevealed) {
       this._pendingShellPatch = patch;
       this._applyFitCamera();
       return;
@@ -15543,6 +16625,7 @@ class Component extends DCLogic {
       menuOpen: menuOpen,
       showEdit: item.type === 'graphs',
       showResize: this._widgetResizeSizes(item).length > 0,
+      showMove: this._widgetCanMove(item, side),
       cardClass: moving ? 'moving' : (menuOpen ? 'editing' : ''),
       onHoldStart: (ev) => this._onWidgetHoldStart(side, item, ev),
       onHoldEnd: (ev) => this._onWidgetHoldEnd(side, item, ev),
@@ -15553,13 +16636,23 @@ class Component extends DCLogic {
         if (ev && ev.stopPropagation) ev.stopPropagation();
         this._startWidgetResize(side, item);
       },
-      onMenuDismiss: () => this._dismissWidgetMenu(),
+      onMove: (ev) => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        this._beginWidgetMove(side, item);
+      },
+      onMenuDismiss: (ev) => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        this._dismissWidgetMenu();
+      },
       isModeWide: false,
       isModeStack: false,
       modeRows: [],
       modeWideCols: [],
       gridStyle: 'grid-column:' + (item.x + 1) + ' / span ' + item.w + ';grid-row:' + (item.y + 1) + ' / span ' + item.h,
-      onRemove: () => this._removeWidget(side, item.id),
+      onRemove: (ev) => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        this._removeWidget(side, item.id);
+      },
     };
     if (item.type === 'modes') Object.assign(view, this._modeWidgetView(item));
     if (item.type === 'graphs') Object.assign(view, this._graphWidgetView(item, side));
@@ -15605,7 +16698,7 @@ class Component extends DCLogic {
   _widgetRenderFields(s) {
     this._ensureWidgetsLoaded();
     const mode = s.shellMode || 'triple';
-    const android = !!this._androidApp && !s.error && !s.loading;
+    const android = !!this._androidApp && !s.error;
     const leftApp = !!this._shellLeft;
     const rightApp = this._shellRight === 'app';
     const leftUse = (this._board('left', mode).use) || s.leftSlotUse || 'app';
@@ -15637,6 +16730,9 @@ class Component extends DCLogic {
           || (key === 'power' && usedPower);
         return {
           label: cat[key].label + (blocked ? '  ·  added' : ''),
+          title: cat[key].label,
+          btnClass: '',
+          sizeClass: '',
           opacity: blocked ? '0.35' : '1',
           onClick: blocked ? () => {} : () => this._pickWidgetType(key),
         };
@@ -15652,7 +16748,10 @@ class Component extends DCLogic {
         .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, mode, ignoreId))
         .filter((sz) => !cur || sz[0] !== cur.w || sz[1] !== cur.h)
         .map((sz) => ({
-          label: sz[0] + ' × ' + sz[1],
+          label: '',
+          title: sz[0] + ' × ' + sz[1],
+          btnClass: 'hv-picker-size',
+          sizeClass: 'board-3 size-' + sz[0] + 'x' + sz[1],
           opacity: '1',
           onClick: () => this._pickWidgetSize(sz[0], sz[1]),
         }));
@@ -15662,7 +16761,7 @@ class Component extends DCLogic {
     const boardLeftPx = parseFloat(leftRect.left) || 0;
     const dock = this._configDockFields(s, leftRect);
     return {
-      chromeMainLeft: this._androidApp ? (boardLeftPx + 'px') : '96px',
+      chromeMainLeft: this._androidApp ? (this._chromeMainLeftPx(boardLeftPx) + 'px') : '96px',
       ...dock,
       leftBoardDisplay: showLeft ? 'flex' : 'none',
       rightBoardDisplay: showRight ? 'flex' : 'none',
@@ -15688,6 +16787,7 @@ class Component extends DCLogic {
       addWidgetBtnCol: addBtn.col,
       addWidgetBtnBg: addBtn.bg,
       widgetPickerDisplay: pickerOpen ? 'block' : 'none',
+      widgetPickerListClass: s.widgetPickerStep === 'size' ? 'is-sizes' : '',
       widgetPickerTitle: pickerTitle,
       widgetPickerItems: pickerItems,
       graphEditorDisplay: editor.graphEditorDisplay,
@@ -15695,6 +16795,7 @@ class Component extends DCLogic {
       graphLayoutChips: editor.graphLayoutChips,
       graphPaneEditors: editor.graphPaneEditors,
       onGraphEditorClose: editor.onGraphEditorClose,
+      onGraphEditorDragStart: editor.onGraphEditorDragStart,
     };
   }
 
@@ -15708,6 +16809,7 @@ class Component extends DCLogic {
       graphLayoutChips: [],
       graphPaneEditors: [],
       onGraphEditorClose: close,
+      onGraphEditorDragStart: () => {},
     };
     if (!id) return empty;
     const item = this._graphFindItem(side, id);
@@ -15720,7 +16822,8 @@ class Component extends DCLogic {
       const lay = chips[i];
       layoutChips.push({
         label: lay.label,
-        className: cfg.cols === lay.cols && cfg.rows === lay.rows ? 'on' : '',
+        sizeClass: 'board-2 size-' + lay.cols + 'x' + lay.rows,
+        className: (cfg.cols === lay.cols && cfg.rows === lay.rows ? 'on hv-size-chip' : 'hv-size-chip'),
         onClick: (function(c, r) { return function() { self._setGraphLayout(c, r); }; })(lay.cols, lay.rows),
       });
     }
@@ -15734,6 +16837,7 @@ class Component extends DCLogic {
       graphLayoutChips: layoutChips,
       graphPaneEditors: paneEditors,
       onGraphEditorClose: close,
+      onGraphEditorDragStart: (ev) => this._onGraphEditorDragStart(ev),
     };
   }
 
@@ -15762,27 +16866,143 @@ class Component extends DCLogic {
     };
   }
 
-  _graphEditorBox(side, item) {
-    const r = this._widgetCardRect(side, item);
+  _graphEditorBoardRect(side) {
+    const fallback = side === 'right'
+      ? { l: 1180, t: 100, r: 1872, b: 530 }
+      : { l: 48, t: 100, r: 740, b: 530 };
+    const b = (side === 'right' ? this._shellRightBounds : this._shellLeftBounds) || fallback;
+    return {
+      left: b.l || 0,
+      top: b.t || 0,
+      width: Math.max(0, (b.r || 0) - (b.l || 0)),
+      height: Math.max(0, (b.b || 0) - (b.t || 0)),
+    };
+  }
+
+  _graphEditorDefaultRect(side) {
+    const board = this._graphEditorBoardRect(side);
+    const vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
+    const pad = 8;
+    const gap = 10;
+    const width = 300;
+    let left = side === 'right' ? (board.left - gap - width) : (board.left + board.width + gap);
+    if (left < pad) left = board.left + board.width + gap;
+    if (left + width > vw - pad) left = board.left - gap - width;
+    if (left < pad) left = pad;
+    if (left + width > vw - pad) left = Math.max(pad, vw - pad - width);
+    return { left: left, top: board.top, width: width, height: board.height };
+  }
+
+  _graphEditorClamp(left, top, width, height) {
     const launcher = this._launcherBottomPx == null ? 60 : this._launcherBottomPx;
     const vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
     const vh = (typeof window !== 'undefined' && window.innerHeight) ? window.innerHeight : 720;
     const pad = 8;
     const maxBottom = vh - launcher - pad;
-    let left = r.left;
-    let top = r.top;
-    let width = r.width;
-    if (width < 200) width = Math.min(320, vw - pad * 2);
-    if (left + width > vw - pad) left = Math.max(pad, vw - pad - width);
-    if (left < pad) left = pad;
-    let maxH = Math.min(r.height, maxBottom - top);
-    if (maxH < 140 && top + r.height > maxBottom) {
-      top = Math.max(pad, maxBottom - Math.min(r.height, maxBottom - pad));
-      maxH = Math.min(r.height, maxBottom - top);
+    let h = height;
+    if (h > maxBottom - pad) h = Math.max(160, maxBottom - pad);
+    const maxLeft = Math.max(pad, vw - pad - width);
+    const maxTop = Math.max(pad, maxBottom - h);
+    let x = left;
+    let y = top;
+    if (x < pad) x = pad;
+    if (x > maxLeft) x = maxLeft;
+    if (y < pad) y = pad;
+    if (y > maxTop) y = maxTop;
+    return { left: x, top: y, width: width, height: h };
+  }
+
+  _graphEditorBox(side, item) {
+    const def = this._graphEditorDefaultRect(side);
+    const off = this._graphEditorOffset || { x: 0, y: 0 };
+    const box = this._graphEditorClamp(
+      def.left + (off.x || 0),
+      def.top + (off.y || 0),
+      def.width,
+      def.height
+    );
+    return 'left:' + Math.round(box.left) + 'px;top:' + Math.round(box.top) + 'px;width:'
+      + Math.round(box.width) + 'px;height:' + Math.round(box.height) + 'px;';
+  }
+
+  _eventClientPoint(ev) {
+    if (!ev) return null;
+    if (ev.touches && ev.touches[0]) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+    if (ev.changedTouches && ev.changedTouches[0]) {
+      return { x: ev.changedTouches[0].clientX, y: ev.changedTouches[0].clientY };
     }
-    if (maxH < 120) maxH = Math.max(120, maxBottom - pad);
-    return 'left:' + Math.round(left) + 'px;top:' + Math.round(top) + 'px;width:'
-      + Math.round(width) + 'px;max-height:' + Math.round(maxH) + 'px;';
+    if (typeof ev.clientX === 'number') return { x: ev.clientX, y: ev.clientY };
+    return null;
+  }
+
+  _onGraphEditorDragStart(ev) {
+    const t = ev && ev.target;
+    if (t && t.closest && t.closest('button')) return;
+    if (ev && typeof ev.button === 'number' && ev.button !== 0) return;
+    const el = (t && t.closest) ? t.closest('.hv-graph-editor') : document.querySelector('.hv-graph-editor');
+    const point = this._eventClientPoint(ev);
+    if (!el || !point) return;
+    if (ev.preventDefault) ev.preventDefault();
+    if (ev.stopPropagation) ev.stopPropagation();
+    this._stopGraphEditorDrag();
+    const move = (e) => this._onGraphEditorDragMove(e);
+    const end = (e) => this._onGraphEditorDragEnd(e);
+    this._graphEditorDrag = {
+      el: el,
+      startX: point.x,
+      startY: point.y,
+      origX: el.offsetLeft,
+      origY: el.offsetTop,
+      width: el.offsetWidth,
+      height: el.offsetHeight,
+      move: move,
+      end: end,
+    };
+    el.classList.add('dragging');
+    document.addEventListener('mousemove', move, true);
+    document.addEventListener('mouseup', end, true);
+    document.addEventListener('touchmove', move, { capture: true, passive: false });
+    document.addEventListener('touchend', end, true);
+    document.addEventListener('touchcancel', end, true);
+  }
+
+  _onGraphEditorDragMove(ev) {
+    const drag = this._graphEditorDrag;
+    if (!drag) return;
+    const point = this._eventClientPoint(ev);
+    if (!point) return;
+    if (ev.preventDefault) ev.preventDefault();
+    const box = this._graphEditorClamp(
+      drag.origX + (point.x - drag.startX),
+      drag.origY + (point.y - drag.startY),
+      drag.width,
+      drag.height
+    );
+    drag.el.style.left = Math.round(box.left) + 'px';
+    drag.el.style.top = Math.round(box.top) + 'px';
+  }
+
+  _onGraphEditorDragEnd() {
+    const drag = this._graphEditorDrag;
+    if (!drag) return;
+    const def = this._graphEditorDefaultRect(this.state.graphEditSide);
+    this._graphEditorOffset = {
+      x: drag.el.offsetLeft - def.left,
+      y: drag.el.offsetTop - def.top,
+    };
+    this._stopGraphEditorDrag();
+  }
+
+  _stopGraphEditorDrag() {
+    const drag = this._graphEditorDrag;
+    if (!drag) return;
+    document.removeEventListener('mousemove', drag.move, true);
+    document.removeEventListener('mouseup', drag.end, true);
+    document.removeEventListener('touchmove', drag.move, true);
+    document.removeEventListener('touchend', drag.end, true);
+    document.removeEventListener('touchcancel', drag.end, true);
+    if (drag.el && drag.el.classList) drag.el.classList.remove('dragging');
+    this._graphEditorDrag = null;
   }
 
   _graphPaneEditorView(pane, index) {
@@ -16057,6 +17277,12 @@ class Component extends DCLogic {
     const p = payload || {};
     const hasTrack = !!p.hasTrack || !!(p.title || p.artist);
     const art = p.artDataUrl || '';
+    const trackKey = hasTrack ? ((p.title || '') + '\u0001' + (p.artist || '')) : '';
+    if (trackKey && trackKey !== this._graphVizTrackKey) {
+      this._graphVizTrackKey = trackKey;
+      this._graphVizHueDeg = this._hashHue(trackKey);
+      this._reshuffleRandomViz();
+    }
     this.setState({
       mediaTitle: p.title || '',
       mediaArtist: p.artist || '',

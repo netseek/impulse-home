@@ -48,6 +48,12 @@
     if (typeof layout.safeRight === 'number') setVar('--hv-safe-right', layout.safeRight);
     if (typeof layout.safeBottom === 'number') setVar('--hv-safe-bottom', layout.safeBottom);
     if (typeof layout.launcherBottom === 'number') setVar('--hv-launcher-bottom', layout.launcherBottom);
+    // Align page chrome with the left widget board, but never under the brand.
+    // Native may send this while React is still loading the GLB, so the CSS var
+    // has to land here — applyShellLayout skips setState during that window.
+    if (layout.leftBounds && typeof layout.leftBounds.l === 'number') {
+      setVar('--hv-chrome-main-left', Math.max(layout.leftBounds.l, 96));
+    }
   }
 
   function applyShell(layout) {

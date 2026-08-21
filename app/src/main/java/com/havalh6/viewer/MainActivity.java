@@ -544,6 +544,17 @@ public final class MainActivity extends Activity {
         public void hideBootProgress() {
             runOnUiThread(() -> hideBootHud());
         }
+
+        /**
+         * Viewer → shell: move the boot progress chip. {@code "center"} parks it
+         * in the car gap after skip (chrome occupies the clip's left pillar);
+         * anything else restores the splash-pillar placement.
+         */
+        @JavascriptInterface
+        public void placeBootProgress(String where) {
+            final String place = where;
+            runOnUiThread(() -> layoutBootHud(place));
+        }
     }
 
     /**
@@ -2769,6 +2780,9 @@ public final class MainActivity extends Activity {
             });
             anim.start();
         }
+        if (bootHud != null && bootHud.getVisibility() == View.VISIBLE) {
+            bootHud.bringToFront();
+        }
     }
 
     /**
@@ -2781,7 +2795,6 @@ public final class MainActivity extends Activity {
     private void endSplashOverlay() {
         if (splashOverlayEnded) return;
         splashOverlayEnded = true;
-        hideBootHud();
         hideSplashSkip();
         if (webView != null) {
             final int shellBg = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
@@ -2971,6 +2984,7 @@ public final class MainActivity extends Activity {
     private void showBootHud(int pct, String text, String title) {
         if (bootHud == null) return;
         bootHud.setVisibility(View.VISIBLE);
+        bootHud.bringToFront();
         if (bootHudTitle != null && title != null) bootHudTitle.setText(title);
         if (bootHudPct != null) bootHudPct.setText(text != null ? text : (pct + "%"));
         if (bootHudFill != null) {
@@ -2982,6 +2996,27 @@ public final class MainActivity extends Activity {
 
     private void hideBootHud() {
         if (bootHud != null) bootHud.setVisibility(View.GONE);
+    }
+
+    /**
+     * {@code "center"} sits in the car gap once chrome is up (skip-while-load).
+     * Any other value restores the splash-clip left pillar.
+     */
+    private void layoutBootHud(String where) {
+        if (bootHud == null) return;
+        float d = getResources().getDisplayMetrics().density;
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) bootHud.getLayoutParams();
+        if ("center".equals(where)) {
+            lp.gravity = android.view.Gravity.CENTER;
+            lp.topMargin = 0;
+            lp.leftMargin = 0;
+        } else {
+            lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+            lp.topMargin = Math.round(48 * d);
+            lp.leftMargin = Math.round(132 * d);
+        }
+        bootHud.setLayoutParams(lp);
+        if (bootHud.getVisibility() == View.VISIBLE) bootHud.bringToFront();
     }
 
     /**
@@ -3005,6 +3040,7 @@ public final class MainActivity extends Activity {
         skip.setClickable(true);
         skip.setFocusable(true);
         skip.setOnClickListener(v -> {
+            hideSplashSkip();
             if (webView == null) return;
             webView.evaluateJavascript(
                     "(function(){try{if(window.HavalSplash&&window.HavalSplash.skip)window.HavalSplash.skip();}catch(e){}})()",
