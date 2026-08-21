@@ -660,6 +660,35 @@ window.HavalSplash = (function () {
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
+    .hv-cam-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .hv-cam-tile {
+      aspect-ratio: 1;
+      padding: 7px !important;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .hv-cam-ico {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: currentColor;
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      -webkit-mask-size: contain;
+      mask-repeat: no-repeat;
+      mask-position: center;
+      mask-size: contain;
+    }
+    .hv-cam-ico-flip { transform: scaleX(-1); }
     /* MMI WebView: a finger-drag on a range inside overflow-y:auto is treated
        as a panel scroll, so the thumb never moves. pan-x + a larger thumb. */
     .hv-config-panel input[type="range"] {
@@ -820,6 +849,7 @@ window.HavalSplash = (function () {
       display: grid;
       gap: 8px;
     }
+    .hv-widget-card.moving { opacity: .48; }
     .hv-widget-card {
       position: relative;
       min-width: 0;
@@ -840,7 +870,7 @@ window.HavalSplash = (function () {
       position: absolute;
       top: 8px;
       right: 8px;
-      z-index: 4;
+      z-index: 8;
       width: 22px; height: 22px;
       border-radius: 50%;
       border: 1px solid rgba(255,255,255,.18);
@@ -977,6 +1007,287 @@ window.HavalSplash = (function () {
     .hv-modes-1x2 .hv-modes-chip,
     .hv-modes-2x2 .hv-modes-chip,
     .hv-modes-3x2 .hv-modes-chip { font-size: 12px; }
+    .hv-power {
+      position: absolute;
+      inset: 0;
+      min-height: 0;
+      overflow: hidden;
+      padding: 10px 12px;
+      box-sizing: border-box;
+      display: grid;
+      gap: 8px;
+      color: #eaf2f8;
+    }
+    .hv-power-1x1 {
+      padding: 8px 10px;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 4px;
+    }
+    .hv-power-2x1,
+    .hv-power-3x1 {
+      grid-template-columns: minmax(0, 1fr) 128px;
+      grid-template-rows: auto minmax(0, 1fr);
+      column-gap: 10px;
+      row-gap: 4px;
+    }
+    .hv-power-2x2 {
+      grid-template-columns: minmax(0, 1fr) 150px;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      column-gap: 12px;
+      row-gap: 8px;
+      padding: 12px 14px;
+    }
+    .hv-power-head {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .hv-power-2x1 .hv-power-head,
+    .hv-power-3x1 .hv-power-head { grid-column: 1; grid-row: 1; }
+    .hv-power-2x2 .hv-power-head { grid-column: 1; grid-row: 1; }
+    .hv-power-kicker {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .14em;
+      opacity: .5;
+    }
+    .hv-power-1x1 .hv-power-kicker { font-size: 7px; }
+    .hv-power-1x1 .hv-power-head { grid-column: 1; grid-row: 1; }
+    .hv-power-1x1 .hv-power-stage { grid-column: 1; grid-row: 2; }
+    .hv-power-1x1 .hv-power-readout { grid-column: 1; grid-row: 3; }
+    .hv-power-state {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hv-power-1x1 .hv-power-state { font-size: 12px; }
+    .hv-power.ev .hv-power-state { color: #4fd6e8; }
+    .hv-power.regen .hv-power-state { color: #3ee08a; }
+    .hv-power.ice .hv-power-state { color: #f2f5f8; }
+    .hv-power.hybrid .hv-power-state { color: #f2f5f8; }
+    .hv-power.charge .hv-power-state { color: #7ec8ff; }
+    .hv-power-readout {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-end;
+      text-align: right;
+    }
+    .hv-power-1x1 .hv-power-readout {
+      align-items: flex-start;
+      text-align: left;
+      justify-content: flex-end;
+    }
+    .hv-power-2x1 .hv-power-readout,
+    .hv-power-3x1 .hv-power-readout,
+    .hv-power-2x2 .hv-power-readout {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+    }
+    .hv-power-value {
+      font-family: 'Space Mono', monospace;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      line-height: .95;
+      color: #f2f5f8;
+    }
+    .hv-power-1x1 .hv-power-value { font-size: 26px; }
+    .hv-power-2x2 .hv-power-value { font-size: 34px; }
+    .hv-power-value.ev { color: #4fd6e8; }
+    .hv-power-value.regen { color: #3ee08a; }
+    .hv-power-unit {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .12em;
+      opacity: .45;
+      margin-top: 2px;
+    }
+    .hv-power-stage {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .hv-power-2x1 .hv-power-stage,
+    .hv-power-3x1 .hv-power-stage { grid-column: 1; grid-row: 2; }
+    .hv-power-2x2 .hv-power-stage { grid-column: 1; grid-row: 2; }
+    .hv-power-car {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .hv-power-car-frame {
+      position: relative;
+      height: 100%;
+      aspect-ratio: 550 / 240;
+      max-width: 100%;
+    }
+    .hv-power-car-img {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      pointer-events: none;
+    }
+    .hv-power-ice,
+    .hv-power-motor,
+    .hv-power-batt {
+      position: absolute;
+      pointer-events: none;
+      opacity: .28;
+      transition: opacity .2s ease, filter .2s ease;
+    }
+    .hv-power-ice {
+      left: 11%;
+      top: 34%;
+      width: 11%;
+    }
+    .hv-power-motor.front {
+      left: 22%;
+      top: 62%;
+      width: 9.5%;
+    }
+    .hv-power-motor.rear {
+      left: 69%;
+      top: 61%;
+      width: 12%;
+    }
+    .hv-power-batt {
+      left: 42%;
+      top: 56%;
+      width: 15%;
+    }
+    .hv-power-ice,
+    .hv-power-motor {
+      display: block;
+      height: auto;
+    }
+    .hv-power-batt-base,
+    .hv-power-batt-fill img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .hv-power-ice.on,
+    .hv-power-motor.on,
+    .hv-power-batt.on { opacity: 1; }
+    .hv-power-ice.on { filter: drop-shadow(0 0 6px rgba(242,245,248,.55)); }
+    .hv-power-motor.on { filter: drop-shadow(0 0 7px rgba(79,214,232,.75)); }
+    .hv-power-motor.on.regen { filter: hue-rotate(78deg) drop-shadow(0 0 7px rgba(62,224,138,.8)); }
+    .hv-power-batt.on.ev { filter: drop-shadow(0 0 6px rgba(79,214,232,.45)); }
+    .hv-power-batt.on.regen { filter: drop-shadow(0 0 6px rgba(62,224,138,.45)); }
+    .hv-power-batt.on.charge { filter: drop-shadow(0 0 6px rgba(126,200,255,.5)); }
+    .hv-power-batt-fill {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      clip-path: inset(0 calc(100% - var(--soc, 0%)) 0 0);
+    }
+    .hv-power-ring {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      flex: 0 0 auto;
+      margin-top: -6px;
+      --soc: 0;
+    }
+    .hv-power-1x1 .hv-power-ring { width: 32px; height: 32px; margin-top: -4px; }
+    .hv-power-2x2 .hv-power-ring { width: 56px; height: 56px; margin-top: -4px; }
+    .hv-power-ring svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .hv-power-ring-track,
+    .hv-power-ring-fill {
+      fill: none;
+      stroke-width: 2.6;
+    }
+    .hv-power-ring-track { stroke: rgba(255,255,255,.12); }
+    .hv-power-ring-fill {
+      stroke: #4fd6e8;
+      stroke-linecap: round;
+      transform-origin: 18px 18px;
+      transform: rotate(-90deg);
+      stroke-dasharray: 100;
+      stroke-dashoffset: calc(100 - var(--soc, 0));
+    }
+    .hv-power.regen .hv-power-ring-fill { stroke: #3ee08a; }
+    .hv-power.charge .hv-power-ring-fill { stroke: #7ec8ff; }
+    .hv-power-ring-label {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .hv-power-ring-num { font-size: 13px; letter-spacing: -0.04em; }
+    .hv-power-1x1 .hv-power-ring-num { font-size: 10px; }
+    .hv-power-2x2 .hv-power-ring-num { font-size: 16px; }
+    .hv-power-ring-unit {
+      font-size: 7px;
+      letter-spacing: .08em;
+      opacity: .5;
+      margin-left: 1px;
+    }
+    .hv-power-stats {
+      display: none;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      min-width: 0;
+    }
+    .hv-power-2x2 .hv-power-stats {
+      display: grid;
+      grid-column: 1 / span 2;
+      grid-row: 3;
+    }
+    .hv-power-stat {
+      min-width: 0;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+    .hv-power-stat-kicker {
+      font-family: 'Space Mono', monospace;
+      font-size: 7px;
+      letter-spacing: .12em;
+      opacity: .45;
+    }
+    .hv-power-stat-value {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hv-power-stat-value span {
+      font-size: 8px;
+      font-weight: 400;
+      letter-spacing: .08em;
+      opacity: .45;
+      margin-left: 4px;
+    }
     .hv-graphs {
       position: absolute;
       top: 0; right: 0; bottom: 0; left: 0;
@@ -988,18 +1299,23 @@ window.HavalSplash = (function () {
       gap: 6px;
     }
     .hv-graphs-pane {
+      position: relative;
       min-width: 0;
       min-height: 0;
-      display: grid;
-      grid-template-rows: auto 1fr;
-      gap: 3px;
     }
     .hv-graphs-head {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 2;
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       gap: 8px;
       min-width: 0;
+      padding: 1px 2px 12px;
+      pointer-events: none;
+      background: linear-gradient(to bottom, rgba(8,12,18,.45), rgba(8,12,18,0));
+      text-shadow: 0 1px 6px rgba(8,12,18,.85);
     }
     .hv-graphs-kicker {
       font-family: 'Space Mono', monospace;
@@ -1042,7 +1358,8 @@ window.HavalSplash = (function () {
       opacity: .45;
     }
     .hv-graphs-plot {
-      position: relative;
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
       min-height: 0;
       min-width: 0;
     }
@@ -1082,12 +1399,11 @@ window.HavalSplash = (function () {
     .hv-graph-editor {
       position: absolute;
       z-index: 52;
-      top: 96px;
-      left: 30px;
-      width: min(420px, calc(100vw - 60px));
-      max-height: calc(100vh - 160px);
+      box-sizing: border-box;
+      padding: 8px 8px 6px;
+      overflow-x: hidden;
       overflow-y: auto;
-      padding: 12px;
+      -webkit-overflow-scrolling: touch;
       border-radius: 12px;
       background: rgba(16,21,28,.96);
       border: 1px solid rgba(255,255,255,.14);
@@ -1097,13 +1413,23 @@ window.HavalSplash = (function () {
     }
     .hv-graph-editor-title,
     .hv-graph-editor-head {
+      position: sticky;
+      top: 0;
+      z-index: 1;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 10px;
+      gap: 8px;
+      margin: -8px -8px 6px;
+      padding: 8px 8px 6px;
+      background: rgba(16,21,28,.96);
       font-family: 'Space Mono', monospace;
-      font-size: 10px;
+      font-size: 9px;
       letter-spacing: .14em;
+    }
+    .hv-graph-editor-title button {
+      border-color: rgba(255,255,255,.28);
+      background: rgba(255,255,255,.1);
     }
     .hv-graph-editor-section,
     .hv-graph-editor-kicker {
@@ -1111,25 +1437,25 @@ window.HavalSplash = (function () {
       font-size: 8px;
       letter-spacing: .14em;
       opacity: .5;
-      margin: 10px 0 6px;
+      margin: 6px 0 4px;
     }
     .hv-graph-editor-chips,
     .hv-graph-editor-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 4px;
     }
     .hv-graph-editor-chips button,
     .hv-graph-editor-row button,
     .hv-graph-editor-head button,
-    .hv-graph-editor-actions button {
-      padding: 7px 10px;
-      border-radius: 8px;
+    .hv-graph-editor-title button {
+      padding: 5px 8px;
+      border-radius: 7px;
       border: 1px solid rgba(255,255,255,.12);
       background: transparent;
       color: #eaf2f8;
       font-family: 'Space Mono', monospace;
-      font-size: 10px;
+      font-size: 9px;
       letter-spacing: .08em;
       cursor: pointer;
     }
@@ -1140,30 +1466,38 @@ window.HavalSplash = (function () {
       color: #0b1016;
       font-weight: 700;
     }
+    .hv-graph-editor-axes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+    }
     .hv-graph-pane-edit,
     .hv-graph-editor-pane {
-      margin-top: 8px;
-      padding-top: 6px;
+      margin-top: 6px;
+      padding-top: 4px;
       border-top: 1px solid rgba(255,255,255,.08);
     }
     .hv-graph-pane-edit-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
       font-family: 'Space Mono', monospace;
       font-size: 9px;
       letter-spacing: .12em;
       opacity: .7;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
-    .hv-graph-editor-actions {
-      margin-top: 12px;
-    }
-    .hv-graph-editor-actions button {
-      width: 100%;
-    }
+    .hv-graph-pane-edit-head .hv-graph-editor-chips { opacity: 1; }
     .hv-widget-cell {
       border-radius: 10px;
       border: 1px dashed rgba(255,255,255,.28);
       background: rgba(255,255,255,.06);
       cursor: pointer;
+    }
+    .hv-widget-grid.placing .hv-widget-cell {
+      position: relative;
+      z-index: 8;
     }
     .hv-widget-cell.on { border-style: solid; border-color: rgba(255,255,255,.55); background: rgba(255,255,255,.12); }
     .hv-widget-picker {
@@ -1676,19 +2010,8 @@ window.HavalSplash = (function () {
         </button>
       </div>
       <div class="hv-chrome-gap" style="display: {{ pageBtnsDisplay }};"></div>
-      <div class="hv-toolbar" style="display: {{ dayNightDisplay }}; gap: 8px; z-index: 12;">
-        <div class="hv-toolbar-row">
-      <button class="hv-tool-btn hv-tool-btn-icon" onClick="{{ toggleConfigPanel }}" title="Configuration" style="background: {{ configBtnBg }}; border: 1px solid {{ configBtnBorder }}; color: {{ configBtnCol }}; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;">
-        <span class="hv-tool-icon">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </span>
-      </button>
-
-      <sc-if value="{{ configExpanded }}" hint-placeholder-val="{{ false }}">
-        <div class="hv-shell-hud" style="display: {{ shellHudDisplay }};">
+      <div class="hv-chrome-group" style="display: {{ shellHudDisplay }};">
+        <div class="hv-shell-hud">
           <div class="hv-shell-btns">
             <button type="button" class="hv-shell-btn {{ shellModeBtnClass }}" onClick="{{ toggleShellMenu }}" title="Layout">
               <span class="hv-shell-glyph" style="display: {{ shellGlyphTripleDisplay }};"><i class="g-app"></i><i class="g-car"></i><i class="g-app"></i></span>
@@ -1713,11 +2036,23 @@ window.HavalSplash = (function () {
             </button>
           </div>
         </div>
-
-        <button class="hv-tool-btn hv-tool-btn-icon" onClick="{{ addWidget }}" title="Add widget" style="display: {{ addWidgetBtnDisplay }}; background: {{ addWidgetBtnBg }}; border: 1px solid {{ addWidgetBtnBorder }}; color: {{ addWidgetBtnCol }}; cursor: pointer;">
-          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
+        <button type="button" class="hv-shell-btn {{ addWidgetBtnClass }}" style="display: {{ addWidgetBtnDisplay }};" onClick="{{ addWidget }}" title="Add widget">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
+      </div>
+      <div class="hv-chrome-gap" style="display: {{ pageBtnsDisplay }};"></div>
+      <div class="hv-toolbar" style="display: {{ dayNightDisplay }}; gap: 8px; z-index: 12;">
+        <div class="hv-toolbar-row">
+      <button class="hv-tool-btn hv-tool-btn-icon" onClick="{{ toggleConfigPanel }}" title="Configuration" style="background: {{ configBtnBg }}; border: 1px solid {{ configBtnBorder }}; color: {{ configBtnCol }}; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;">
+        <span class="hv-tool-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </span>
+      </button>
 
+      <sc-if value="{{ configExpanded }}" hint-placeholder-val="{{ false }}">
         <button class="hv-tool-btn hv-tool-btn-icon" onClick="{{ toggleCameraPanel }}" title="Camera" style="background: {{ cameraBtnBg }}; border: 1px solid {{ tabCameraBorder }}; color: {{ tabCameraCol }}; cursor: pointer;">
           <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
         </button>
@@ -1793,13 +2128,13 @@ window.HavalSplash = (function () {
 
   <!-- widget boards occupy the same rects as freeform app slots -->
   <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};">
-    <div class="hv-widget-grid" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);">
+    <div class="hv-widget-grid {{ widgetPlaceGridClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);">
       <sc-for list="{{ leftPlaceCells }}" as="pc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ pc.cls }}" style="{{ pc.gridStyle }}" onClick="{{ pc.onClick }}"></button>
       </sc-for>
       <sc-for list="{{ leftWidgetItems }}" as="wg" hint-placeholder-count="0">
-        <div class="hv-widget-card" style="{{ wg.gridStyle }}" onTouchStart="{{ wg.onHoldStart }}" onTouchEnd="{{ wg.onHoldEnd }}" onTouchCancel="{{ wg.onHoldEnd }}" onMouseDown="{{ wg.onHoldStart }}" onMouseUp="{{ wg.onHoldEnd }}" onMouseLeave="{{ wg.onHoldEnd }}" onContextMenu="{{ wg.onContextMenu }}">
-          <sc-if value="{{ wg.showRemove }}" hint-placeholder-val="{{ true }}">
+        <div class="hv-widget-card {{ wg.cardClass }}" style="{{ wg.gridStyle }}" onTouchStart="{{ wg.onHoldStart }}" onTouchEnd="{{ wg.onHoldEnd }}" onTouchCancel="{{ wg.onHoldCancel }}" onMouseDown="{{ wg.onHoldStart }}" onMouseUp="{{ wg.onHoldEnd }}" onMouseLeave="{{ wg.onHoldCancel }}" onContextMenu="{{ wg.onContextMenu }}">
+          <sc-if value="{{ wg.showRemove }}" hint-placeholder-val="{{ false }}">
             <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
@@ -1882,12 +2217,52 @@ window.HavalSplash = (function () {
                 </div>
               </sc-for>
             </div>
-            <sc-if value="{{ wg.graphMenuOpen }}" hint-placeholder-val="{{ false }}">
-              <div class="hv-widget-card-menu">
-                <button type="button" onClick="{{ wg.onEdit }}">EDIT</button>
-                <button type="button" onClick="{{ wg.onRemove }}">CLOSE</button>
+          </sc-if>
+          <sc-if value="{{ wg.isPower }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-power {{ wg.powerSizeClass }} {{ wg.powerTone }}" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}">
+              <div class="hv-power-head">
+                <div class="hv-power-kicker">FLUXO</div>
+                <div class="hv-power-state">{{ wg.powerState }}</div>
               </div>
-            </sc-if>
+              <div class="hv-power-readout">
+                <span class="hv-power-value {{ wg.powerKwClass }}">{{ wg.powerKw }}</span>
+                <span class="hv-power-unit">kW</span>
+              </div>
+              <div class="hv-power-stage">
+                <div class="hv-power-car">
+                  <div class="hv-power-car-frame">
+                  <img class="hv-power-car-img" src="assets/power/car.webp" alt="">
+                  <img class="hv-power-ice {{ wg.iceClass }}" src="{{ wg.iceSrc }}" alt="">
+                  <img class="hv-power-motor front {{ wg.frontClass }}" src="{{ wg.frontSrc }}" alt="">
+                  <img class="hv-power-motor rear {{ wg.rearClass }}" src="{{ wg.rearSrc }}" alt="">
+                  <div class="hv-power-batt {{ wg.battClass }}" style="--soc: {{ wg.socPct }}%;">
+                    <img class="hv-power-batt-base" src="assets/power/battery.webp" alt="">
+                    <div class="hv-power-batt-fill"><img src="assets/power/battery_fill.webp" alt=""></div>
+                  </div>
+                  </div>
+                </div>
+                <div class="hv-power-ring" style="--soc: {{ wg.socPct }};">
+                  <svg viewBox="0 0 36 36" aria-hidden="true">
+                    <circle class="hv-power-ring-track" cx="18" cy="18" r="15.915"></circle>
+                    <circle class="hv-power-ring-fill" cx="18" cy="18" r="15.915"></circle>
+                  </svg>
+                  <div class="hv-power-ring-label">
+                    <span class="hv-power-ring-num">{{ wg.socNum }}</span>
+                    <span class="hv-power-ring-unit">%</span>
+                  </div>
+                </div>
+              </div>
+              <sc-if value="{{ wg.showPowerStats }}" hint-placeholder-val="{{ false }}">
+                <div class="hv-power-stats">
+                  <sc-for list="{{ wg.powerStats }}" as="st" hint-placeholder-count="4">
+                    <div class="hv-power-stat">
+                      <div class="hv-power-stat-kicker">{{ st.kicker }}</div>
+                      <div class="hv-power-stat-value">{{ st.value }}<span>{{ st.unit }}</span></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
           </sc-if>
           <sc-if value="{{ wg.isStub }}" hint-placeholder-val="{{ true }}">
             <div class="hv-widget-stub">
@@ -1896,19 +2271,29 @@ window.HavalSplash = (function () {
               <div class="hv-widget-stub-hint">{{ wg.stubHint }}</div>
             </div>
           </sc-if>
+          <sc-if value="{{ wg.menuOpen }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-widget-card-menu" onClick="{{ wg.onMenuDismiss }}">
+              <sc-if value="{{ wg.showEdit }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ wg.onEdit }}">EDIT</button>
+              </sc-if>
+              <sc-if value="{{ wg.showResize }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ wg.onResize }}">RESIZE</button>
+              </sc-if>
+            </div>
+          </sc-if>
         </div>
       </sc-for>
     </div>
   </div>
 
   <div class="hv-widget-board" style="display: {{ rightBoardDisplay }}; left: {{ rightBoardLeft }}; top: {{ rightBoardTop }}; width: {{ rightBoardWidth }}; height: {{ rightBoardHeight }};">
-    <div class="hv-widget-grid" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);">
+    <div class="hv-widget-grid {{ widgetPlaceGridClass }}" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);">
       <sc-for list="{{ rightPlaceCells }}" as="pc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ pc.cls }}" style="{{ pc.gridStyle }}" onClick="{{ pc.onClick }}"></button>
       </sc-for>
       <sc-for list="{{ rightWidgetItems }}" as="wg" hint-placeholder-count="0">
-        <div class="hv-widget-card" style="{{ wg.gridStyle }}" onTouchStart="{{ wg.onHoldStart }}" onTouchEnd="{{ wg.onHoldEnd }}" onTouchCancel="{{ wg.onHoldEnd }}" onMouseDown="{{ wg.onHoldStart }}" onMouseUp="{{ wg.onHoldEnd }}" onMouseLeave="{{ wg.onHoldEnd }}" onContextMenu="{{ wg.onContextMenu }}">
-          <sc-if value="{{ wg.showRemove }}" hint-placeholder-val="{{ true }}">
+        <div class="hv-widget-card {{ wg.cardClass }}" style="{{ wg.gridStyle }}" onTouchStart="{{ wg.onHoldStart }}" onTouchEnd="{{ wg.onHoldEnd }}" onTouchCancel="{{ wg.onHoldCancel }}" onMouseDown="{{ wg.onHoldStart }}" onMouseUp="{{ wg.onHoldEnd }}" onMouseLeave="{{ wg.onHoldCancel }}" onContextMenu="{{ wg.onContextMenu }}">
+          <sc-if value="{{ wg.showRemove }}" hint-placeholder-val="{{ false }}">
             <button type="button" class="hv-widget-remove" onClick="{{ wg.onRemove }}" title="Remove">×</button>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
@@ -1991,18 +2376,68 @@ window.HavalSplash = (function () {
                 </div>
               </sc-for>
             </div>
-            <sc-if value="{{ wg.graphMenuOpen }}" hint-placeholder-val="{{ false }}">
-              <div class="hv-widget-card-menu">
-                <button type="button" onClick="{{ wg.onEdit }}">EDIT</button>
-                <button type="button" onClick="{{ wg.onRemove }}">CLOSE</button>
+          </sc-if>
+          <sc-if value="{{ wg.isPower }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-power {{ wg.powerSizeClass }} {{ wg.powerTone }}" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}">
+              <div class="hv-power-head">
+                <div class="hv-power-kicker">FLUXO</div>
+                <div class="hv-power-state">{{ wg.powerState }}</div>
               </div>
-            </sc-if>
+              <div class="hv-power-readout">
+                <span class="hv-power-value {{ wg.powerKwClass }}">{{ wg.powerKw }}</span>
+                <span class="hv-power-unit">kW</span>
+              </div>
+              <div class="hv-power-stage">
+                <div class="hv-power-car">
+                  <div class="hv-power-car-frame">
+                  <img class="hv-power-car-img" src="assets/power/car.webp" alt="">
+                  <img class="hv-power-ice {{ wg.iceClass }}" src="{{ wg.iceSrc }}" alt="">
+                  <img class="hv-power-motor front {{ wg.frontClass }}" src="{{ wg.frontSrc }}" alt="">
+                  <img class="hv-power-motor rear {{ wg.rearClass }}" src="{{ wg.rearSrc }}" alt="">
+                  <div class="hv-power-batt {{ wg.battClass }}" style="--soc: {{ wg.socPct }}%;">
+                    <img class="hv-power-batt-base" src="assets/power/battery.webp" alt="">
+                    <div class="hv-power-batt-fill"><img src="assets/power/battery_fill.webp" alt=""></div>
+                  </div>
+                  </div>
+                </div>
+                <div class="hv-power-ring" style="--soc: {{ wg.socPct }};">
+                  <svg viewBox="0 0 36 36" aria-hidden="true">
+                    <circle class="hv-power-ring-track" cx="18" cy="18" r="15.915"></circle>
+                    <circle class="hv-power-ring-fill" cx="18" cy="18" r="15.915"></circle>
+                  </svg>
+                  <div class="hv-power-ring-label">
+                    <span class="hv-power-ring-num">{{ wg.socNum }}</span>
+                    <span class="hv-power-ring-unit">%</span>
+                  </div>
+                </div>
+              </div>
+              <sc-if value="{{ wg.showPowerStats }}" hint-placeholder-val="{{ false }}">
+                <div class="hv-power-stats">
+                  <sc-for list="{{ wg.powerStats }}" as="st" hint-placeholder-count="4">
+                    <div class="hv-power-stat">
+                      <div class="hv-power-stat-kicker">{{ st.kicker }}</div>
+                      <div class="hv-power-stat-value">{{ st.value }}<span>{{ st.unit }}</span></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
           </sc-if>
           <sc-if value="{{ wg.isStub }}" hint-placeholder-val="{{ true }}">
             <div class="hv-widget-stub">
               <div class="hv-widget-stub-kicker">{{ wg.label }}</div>
               <div class="hv-widget-stub-title">{{ wg.stubTitle }}</div>
               <div class="hv-widget-stub-hint">{{ wg.stubHint }}</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ wg.menuOpen }}" hint-placeholder-val="{{ false }}">
+            <div class="hv-widget-card-menu" onClick="{{ wg.onMenuDismiss }}">
+              <sc-if value="{{ wg.showEdit }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ wg.onEdit }}">EDIT</button>
+              </sc-if>
+              <sc-if value="{{ wg.showResize }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ wg.onResize }}">RESIZE</button>
+              </sc-if>
             </div>
           </sc-if>
         </div>
@@ -2017,8 +2452,11 @@ window.HavalSplash = (function () {
     </sc-for>
   </div>
 
-  <div class="hv-graph-editor" style="display: {{ graphEditorDisplay }};">
-    <div class="hv-graph-editor-title">EDIT GRAPHS</div>
+  <div class="hv-graph-editor" style="display: {{ graphEditorDisplay }}; {{ graphEditorStyle }}">
+    <div class="hv-graph-editor-title">
+      <span>EDIT GRAPHS</span>
+      <button type="button" onClick="{{ onGraphEditorClose }}">DONE</button>
+    </div>
     <div class="hv-graph-editor-section">LAYOUT</div>
     <div class="hv-graph-editor-chips">
       <sc-for list="{{ graphLayoutChips }}" as="lc" hint-placeholder-count="1">
@@ -2027,42 +2465,53 @@ window.HavalSplash = (function () {
     </div>
     <sc-for list="{{ graphPaneEditors }}" as="pe" hint-placeholder-count="1">
       <div class="hv-graph-pane-edit">
-        <div class="hv-graph-pane-edit-head">PANE {{ pe.label }}</div>
-        <div class="hv-graph-editor-chips">
-          <button type="button" class="{{ pe.seriesClass }}" onClick="{{ pe.onSeries }}">GRAPH</button>
-          <button type="button" class="{{ pe.vizClass }}" onClick="{{ pe.onViz }}">VIZ</button>
+        <div class="hv-graph-pane-edit-head">
+          <span>PANE {{ pe.label }}</span>
+          <div class="hv-graph-editor-chips">
+            <button type="button" class="{{ pe.seriesClass }}" onClick="{{ pe.onSeries }}">GRAPH</button>
+            <button type="button" class="{{ pe.vizClass }}" onClick="{{ pe.onViz }}">VIZ</button>
+          </div>
         </div>
         <sc-if value="{{ pe.isSeries }}" hint-placeholder-val="{{ true }}">
-          <div class="hv-graph-editor-section">Y1</div>
-          <div class="hv-graph-editor-chips">
-            <sc-for list="{{ pe.y1Vars }}" as="v1" hint-placeholder-count="1">
-              <button type="button" class="{{ v1.className }}" onClick="{{ v1.onClick }}">{{ v1.label }}</button>
-            </sc-for>
-          </div>
-          <div class="hv-graph-editor-section">Y2</div>
-          <div class="hv-graph-editor-chips">
-            <sc-for list="{{ pe.y2Vars }}" as="v2" hint-placeholder-count="1">
-              <button type="button" class="{{ v2.className }}" onClick="{{ v2.onClick }}">{{ v2.label }}</button>
-            </sc-for>
+          <div class="hv-graph-editor-axes">
+            <div>
+              <div class="hv-graph-editor-section">Y1</div>
+              <div class="hv-graph-editor-chips">
+                <sc-for list="{{ pe.y1Vars }}" as="v1" hint-placeholder-count="1">
+                  <button type="button" class="{{ v1.className }}" onClick="{{ v1.onClick }}">{{ v1.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div>
+              <div class="hv-graph-editor-section">Y2</div>
+              <div class="hv-graph-editor-chips">
+                <sc-for list="{{ pe.y2Vars }}" as="v2" hint-placeholder-count="1">
+                  <button type="button" class="{{ v2.className }}" onClick="{{ v2.onClick }}">{{ v2.label }}</button>
+                </sc-for>
+              </div>
+            </div>
           </div>
           <div class="hv-graph-editor-chips">
             <button type="button" class="{{ pe.y1RulerClass }}" onClick="{{ pe.onY1Ruler }}">Y1 RULERS</button>
             <button type="button" class="{{ pe.y2RulerClass }}" onClick="{{ pe.onY2Ruler }}">Y2 RULERS</button>
           </div>
+          <div class="hv-graph-editor-section">STYLE</div>
+          <div class="hv-graph-editor-chips">
+            <sc-for list="{{ pe.graphStyles }}" as="gs" hint-placeholder-count="4">
+              <button type="button" class="{{ gs.className }}" onClick="{{ gs.onClick }}">{{ gs.label }}</button>
+            </sc-for>
+          </div>
         </sc-if>
         <sc-if value="{{ pe.isViz }}" hint-placeholder-val="{{ false }}">
           <div class="hv-graph-editor-section">STYLE</div>
           <div class="hv-graph-editor-chips">
-            <sc-for list="{{ pe.vizStyles }}" as="vs" hint-placeholder-count="3">
+            <sc-for list="{{ pe.vizStyles }}" as="vs" hint-placeholder-count="4">
               <button type="button" class="{{ vs.className }}" onClick="{{ vs.onClick }}">{{ vs.label }}</button>
             </sc-for>
           </div>
         </sc-if>
       </div>
     </sc-for>
-    <div class="hv-graph-editor-actions">
-      <button type="button" onClick="{{ onGraphEditorClose }}">DONE</button>
-    </div>
   </div>
 
   <div class="hv-page-stub" style="display: {{ pageStubDisplay }};">
@@ -2095,13 +2544,23 @@ window.HavalSplash = (function () {
     <!-- ── CAMERA TAB ── -->
     <sc-if value="{{ sectionIsCamera }}" hint-placeholder-val="{{ false }}">
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CAMERA</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
-        <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="6">
-          <button onClick="{{ cp.onClick }}" title="{{ cp.title }}" style="padding: 10px 6px; border-radius: 7px; border: 1px solid {{ cp.border }}; background: {{ cp.bg }}; color: {{ cp.col }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; font-weight: 600; line-height: 1.35; text-align: center;">{{ cp.label }}</button>
+      <div class="hv-cam-grid">
+        <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="12">
+          <button class="hv-cam-tile" onClick="{{ cp.onClick }}" title="{{ cp.title }}" style="border-radius: 7px; border: 1px solid {{ cp.border }}; background: {{ cp.bg }}; color: {{ cp.col }}; cursor: pointer;">
+            <span class="hv-cam-ico {{ cp.flipClass }}" style="-webkit-mask-image:url('{{ cp.maskUrl }}');mask-image:url('{{ cp.maskUrl }}');"></span>
+          </button>
         </sc-for>
       </div>
       <button onClick="{{ saveLayoutCamera }}" title="{{ layoutCamSaveHint }}" style="width: 100%; padding: 10px 8px; border-radius: 7px; border: 1px solid {{ layoutCamSaveBorder }}; background: {{ layoutCamSaveBg }}; color: {{ layoutCamSaveCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600; opacity: {{ layoutCamSaveOpacity }};">{{ layoutCamSaveLabel }}</button>
       <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">{{ layoutCamSaveHint }}</div>
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin: 16px 0 9px;">OPTIONS</div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <sc-for list="{{ cameraOptions }}" as="co" hint-placeholder-count="3">
+          <button onClick="{{ co.onClick }}" title="{{ co.title }}" style="width: 100%; padding: 9px 8px; border-radius: 7px; border: 1px solid {{ co.border }}; background: {{ co.bg }}; color: {{ co.col }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600; text-align: left; line-height: 1.35;">{{ co.label }}</button>
+        </sc-for>
+      </div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">Event follows doors, trunk and roof, then restores when you drive. Cycle steps views every 60s while moving. Orbit is a slow spin.</div>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -2441,9 +2900,19 @@ const CAR_SIGNALS = {
   // GRAPHS widget — Impulse evPowerKw = V * I / 1000.
   batteryVoltage: 'car.ev_info.power_battery_voltage',
   batteryCurrent: 'car.ev_info.cur_charge_current',
-  engineRpm: 'car.basic.engine_speed',
   fuelInst: 'car.basic.instant_fuel_consumption',
   evConsume: 'car.ev_info.Instant_energy_consumption',
+  fuelTrip: 'car.basic.cur_journey_avg_fuel_consume',
+  fuelAvg: 'car.basic.avg_fuel_consumption',
+  evTrip: 'car.ev_info.avg_energy_consume_info_since_startup',
+  // POWER widget — BeanEnergyAssistant Fluxo de energia (RE300 HEV).
+  driveState: 'car.ev_info.energy_drive_state',
+  batterySoc: 'car.ev_info.cur_battery_power_percentage',
+  evRange: 'car.ev_info.electric_mode_remain_odometer',
+  fuelRange: 'car.ev_info.fuel_mode_remain_odometer',
+  cycleEv: 'car.ev_info.cycle_energy_consume_info',
+  chargingState: 'car.ev_info.charging_state',
+  architecture: 'car.configure.ev_drive_architecture',
 };
 
 // GRAPHS widget — same derivation Impulse uses for evPowerKw.
@@ -2451,24 +2920,78 @@ const CAR_GRAPH_SPAN_MS = 20000;
 const CAR_GRAPH_AVG_MS = 30000;
 const CAR_GRAPH_VARS = [
   { key: 'evPowerKw', label: 'EV POWER', unit: 'kW', min: -40, max: 80, signed: true },
-  { key: 'speed', label: 'SPEED', unit: 'km/h', min: 0, max: 180 },
-  { key: 'rpm', label: 'ENGINE', unit: 'rpm', min: 0, max: 5500 },
-  { key: 'fuelInst', label: 'FUEL', unit: 'km/L', min: 0, max: 30 },
-  { key: 'evInst', label: 'EV USE', unit: 'kWh/100', min: 0, max: 40 },
-  { key: 'battV', label: 'BATT V', unit: 'V', min: 250, max: 450 },
-  { key: 'battI', label: 'BATT A', unit: 'A', min: -180, max: 180, signed: true },
+  { key: 'evInst', label: 'EV INST', unit: 'kWh/100', min: -8, max: 40, signed: true },
+  { key: 'fuelInst', label: 'GAS INST', unit: 'km/L', min: 0, max: 30 },
+  { key: 'evTrip', label: 'EV TRIP', unit: 'kWh/100', min: 0, max: 40 },
+  { key: 'fuelTrip', label: 'GAS TRIP', unit: 'km/L', min: 0, max: 30 },
+  { key: 'fuelAvg', label: 'GAS AVG', unit: 'km/L', min: 0, max: 30 },
 ];
 const CAR_GRAPH_VAR_BY_KEY = {};
 CAR_GRAPH_VARS.forEach((v) => { CAR_GRAPH_VAR_BY_KEY[v.key] = v; });
-const CAR_GRAPH_VIZ = [
+const CAR_GRAPH_STYLES = [
+  { key: 'line', label: 'LINE' },
+  { key: 'area', label: 'AREA' },
   { key: 'bars', label: 'BARS' },
+  { key: 'dots', label: 'DOTS' },
+];
+const CAR_GRAPH_VIZ = [
+  { key: 'spectrum', label: 'SPECTRUM' },
+  { key: 'scope', label: 'SCOPE' },
   { key: 'radial', label: 'RADIAL' },
-  { key: 'mirror', label: 'MIRROR' },
+  { key: 'dots', label: 'DOTS' },
 ];
 const CAR_GRAPH_COLOR_Y1 = '#f2f5f8';
 const CAR_GRAPH_COLOR_Y2 = '#4fd6e8';
 const CAR_GRAPH_COLOR_REGEN = '#3ee08a';
-const CAR_GRAPH_HOLD_MS = 480;
+const CAR_POWER_PACKAGE = 'com.beantechs.energyassistant';
+const CAR_POWER_ASSETS = {
+  iceOff: 'assets/power/engine.webp',
+  iceOn: 'assets/power/engine_on.webp',
+  frontOff: 'assets/power/motor.webp',
+  frontOn: 'assets/power/motor_on.webp',
+  rearOff: 'assets/power/motor_p4.webp',
+  rearOn: 'assets/power/motor_p4_on.webp',
+};
+// energy_drive_state → flow. front/rear: 0 off, 1 drive, -1 regen (P2 / P4).
+const CAR_POWER_IDLE = { tone: 'idle', label: 'Parado', ice: false, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 };
+const CAR_POWER_FLOW = {
+  0: CAR_POWER_IDLE,
+  10: CAR_POWER_IDLE,
+  11: { tone: 'idle', label: 'Parado', ice: true, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  21: { tone: 'idle', label: 'Marcha lenta', ice: true, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  14: { tone: 'ev', label: 'Elétrico', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
+  22: { tone: 'ev', label: 'Elétrico', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
+  6:  { tone: 'regen', label: 'Regen', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: -1, iceWheel: 0, front: -1, rear: 0 },
+  13: { tone: 'regen', label: 'Regen', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: -1, iceWheel: 0, front: -1, rear: 0 },
+  15: { tone: 'hybrid', label: 'Híbrido', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
+  16: { tone: 'hybrid', label: 'Híbrido', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
+  17: { tone: 'hybrid', label: 'Híbrido', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
+  3:  { tone: 'ice', label: 'Paralelo', ice: true, batt: false, wheel: true, iceBatt: 0, battWheel: 0, iceWheel: 1, front: 0, rear: 0 },
+  20: { tone: 'hybrid', label: 'Combinado', ice: true, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 1, front: 1, rear: 0 },
+  1:  { tone: 'charge', label: 'Carga', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 0, iceWheel: 1, front: 1, rear: 0 },
+  12: { tone: 'charge', label: 'Carga lenta', ice: true, batt: true, wheel: false, iceBatt: 1, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  18: { tone: 'charge', label: 'Aquecendo', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  23: { tone: 'charge', label: 'Externa', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  45: { tone: 'charge', label: 'Externa', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  46: { tone: 'charge', label: 'Externa', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  // P2 (front) / P4 (rear) — layout_car_p2p4 + P2P4FlowView.drawView packed 30–42.
+  30: { tone: 'charge', label: 'Carga P2+P4', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 1 },
+  31: { tone: 'hybrid', label: 'P4 + carga P2', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 1, front: 1, rear: 1 },
+  32: { tone: 'charge', label: 'Carga P2', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 0, iceWheel: 1, front: 1, rear: 0 },
+  33: { tone: 'charge', label: 'Carga P4', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 0, iceWheel: 1, front: 0, rear: 1 },
+  34: { tone: 'hybrid', label: 'Motor + P4', ice: true, batt: false, wheel: true, iceBatt: 0, battWheel: 0, iceWheel: 1, front: 0, rear: 1 },
+  35: { tone: 'hybrid', label: 'Motor + P2+P4', ice: true, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 1, front: 1, rear: 1 },
+  36: { tone: 'hybrid', label: 'Motor + P2', ice: true, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 1, front: 1, rear: 0 },
+  37: { tone: 'hybrid', label: 'P4, carga P2', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 1 },
+  38: { tone: 'regen', label: 'Regen dianteiro', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: -1, iceWheel: 0, front: -1, rear: 0 },
+  39: { tone: 'regen', label: 'Regen traseiro', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: -1, iceWheel: 0, front: 0, rear: -1 },
+  40: { tone: 'ev', label: 'P2 + P4', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 1 },
+  41: { tone: 'ev', label: 'P4', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 0, rear: 1 },
+  42: { tone: 'ev', label: 'P2', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
+};
+const CAR_POWER_DEMO_STATES = [14, 42, 41, 40, 38, 39, 16, 6, 0];
+const CAR_WIDGET_HOLD_MS = 500;
+const CAR_WIDGET_MOVE_MS = 850;
 
 // MODES widget — same keys/values as Impulse SettingsMenuContent / Ajustes.
 // One chip per option so a tap writes the raw CAN value (no cycle).
@@ -2589,6 +3112,11 @@ const CAR_BRAKE_WINDOW_MAX_MS = 2000;
 // holding the car — AutoHold or the driver's foot — and both light the lamps.
 const CAR_GEAR_PARK = 3;
 
+// Render layers: 1 = bloom, 2 = streak, 3 = ground-only pool lighting.
+// Lights assigned to POOL_LAYER illuminate ONLY objects that opt in, which is
+// how the downward pool spots light the floor without raking the bodywork.
+const POOL_LAYER = 3;
+
 // The two roof openings do NOT share a scale.
 //   sunshade → vehicle.getShadeScreensLevel(): 0-100 (havalshisuku sets 100 to
 //     open fully), so the value is already a percentage. CONFIRMED.
@@ -2630,13 +3158,22 @@ const MANUAL_OPENING_STEP = 0.02;
 // (see motionSpeedLabel, which renders Math.abs(motionSpeed) * 40 + ' km/h').
 const CAR_SPEED_KMH_PER_UNIT = 40;
 
+// Event / cycle / orbit camera behaviour (CAMERA → OPTIONS).
+const CAM_EVENT_OPEN_THRESH = 0.04; // 4% open counts as an event
+const CAM_MOVE_THRESH = 0.05;       // ~2 km/h — cycle + restore-on-drive
+const CAM_CYCLE_SEC = 60;
+const CAM_ORBIT_SPEED = 0.22;       // OrbitControls: 2.0 = 30s/rev; this is ~5.5 min
+
 class Component extends DCLogic {
   state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
     overrideSubTab: 'motion', // 'motion' | 'doors' | 'lights'
-    cameraPreset: null, // null | 'front' | 'side' | 'frontSide' | 'frontTopSide' | 'rearTopSide' | 'rearSide' | 'home'
+    cameraPreset: null, // named view key or 'home'
+    camEventEnabled: false,
+    camCycleEnabled: false,
+    camOrbitEnabled: false,
     layoutCamFlash: false,
     activeGroup: null, // 'tuning' | 'override' | 'env' | 'camera' | 'time' | null — which top-level section owns the submenu
     modelVariant: 'hev',
@@ -2699,8 +3236,11 @@ class Component extends DCLogic {
     widgetPlaceType: null,
     widgetPlaceW: 0,
     widgetPlaceH: 0,
-    graphMenuId: null,
-    graphMenuSide: null,
+    widgetPlaceMode: null,
+    widgetPlaceId: null,
+    widgetPlaceFromSide: null,
+    widgetMenuId: null,
+    widgetMenuSide: null,
     graphEditId: null,
     graphEditSide: null,
     carDriveMode: '',
@@ -2768,6 +3308,22 @@ class Component extends DCLogic {
     try { const sr = localStorage.getItem('h6_rearGlassTweaks'); if (sr) this.state.rearGlassTweaks = { ...this.state.rearGlassTweaks, ...JSON.parse(sr) }; } catch(e) {}
     this._loadSavedSettingsIntoState();
     this._loadLayoutCameras();
+    this._camEventKind = null;
+    this._camEventPrevRel = null;
+    this._camEventPrevPreset = null;
+    this._camEventUserOverride = false;
+    this._camEventDismissedKind = null;
+    this._camRestorePending = false;
+    this._camEventSettledKind = null;
+    this._camLastOpenKind = null;
+    this._camCycleElapsed = 0;
+    this._camCycleKeys = [
+      'frontSide', 'frontTopSide', 'side', 'rearTopSide',
+      'rearSide', 'rear', 'sideLeft', 'frontSideLeft',
+    ];
+    this._powerLive = { drive: '', soc: '', evRange: '', fuelRange: '', cycleEv: '', charging: '', evInst: '', arch: '' };
+    this._powerCardCache = null;
+    this._powerCardCacheAt = 0;
     this._wireCarTelemetry();
     this._graphV = 0;
     this._graphI = 0;
@@ -2778,9 +3334,17 @@ class Component extends DCLogic {
     this._graphDisplay = {};
     this._graphSeries = {};
     this._graphVizState = {};
+    this._graphVizPeaks = {};
     this._graphRaf = 0;
-    this._graphHoldTimer = 0;
-    this._graphHoldFired = false;
+    this._widgetHoldTimer = 0;
+    this._widgetMoveTimer = 0;
+    this._widgetHoldFired = false;
+    this._widgetHold = null;
+    this._widgetTouchActive = false;
+    this._widgetSuppressClick = false;
+    if (typeof document !== 'undefined') {
+      document.addEventListener('click', (e) => this._onWidgetSuppressClick(e), true);
+    }
     try {
       const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
       const qs = parse(location.search), hs = parse(location.hash);
@@ -2890,6 +3454,9 @@ class Component extends DCLogic {
     if (typeof saved.wheelDepthOffset === 'number') s.wheelDepthOffset = saved.wheelDepthOffset;
     if (typeof saved.wheelTintOverride === 'boolean') s.wheelTintOverride = saved.wheelTintOverride;
     if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
+    if (typeof saved.camEventEnabled === 'boolean') s.camEventEnabled = saved.camEventEnabled;
+    if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
+    if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
     if (typeof saved.showFps === 'boolean') s.showFps = saved.showFps;
     if (typeof saved.resScaleMode === 'string') {
       if (saved.resScaleMode === 'strong' || saved.resScaleMode === 'lite') s.resScaleMode = 'lev1';
@@ -2934,7 +3501,11 @@ class Component extends DCLogic {
     return [CAR_SIGNALS.doors, CAR_SIGNALS.speed, CAR_SIGNALS.night,
             CAR_SIGNALS.sunroof, CAR_SIGNALS.curtain, CAR_SIGNALS.steering,
             CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent,
-            CAR_SIGNALS.engineRpm, CAR_SIGNALS.fuelInst, CAR_SIGNALS.evConsume,
+            CAR_SIGNALS.fuelInst, CAR_SIGNALS.evConsume,
+            CAR_SIGNALS.fuelTrip, CAR_SIGNALS.fuelAvg, CAR_SIGNALS.evTrip,
+            CAR_SIGNALS.driveState, CAR_SIGNALS.batterySoc,
+            CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange, CAR_SIGNALS.cycleEv,
+            CAR_SIGNALS.chargingState, CAR_SIGNALS.architecture,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
       .concat(Object.keys(lights).map((k) => lights[k]))
@@ -3005,16 +3576,32 @@ class Component extends DCLogic {
       this._applyGraphSignal(key, value);
       return;
     }
-    if (key === CAR_SIGNALS.engineRpm) {
-      this._setGraphValue('rpm', this._carNumber(value));
-      return;
-    }
     if (key === CAR_SIGNALS.fuelInst) {
       this._setGraphValue('fuelInst', this._parseFuelInst(value));
       return;
     }
     if (key === CAR_SIGNALS.evConsume) {
       this._setGraphValue('evInst', this._carNumber(value));
+      this._powerLive.evInst = String(value);
+      return;
+    }
+    if (key === CAR_SIGNALS.driveState) { this._powerLive.drive = String(value); return; }
+    if (key === CAR_SIGNALS.batterySoc) { this._powerLive.soc = String(value); return; }
+    if (key === CAR_SIGNALS.evRange) { this._powerLive.evRange = String(value); return; }
+    if (key === CAR_SIGNALS.fuelRange) { this._powerLive.fuelRange = String(value); return; }
+    if (key === CAR_SIGNALS.cycleEv) { this._powerLive.cycleEv = String(value); return; }
+    if (key === CAR_SIGNALS.chargingState) { this._powerLive.charging = String(value); return; }
+    if (key === CAR_SIGNALS.architecture) { this._powerLive.arch = String(value); return; }
+    if (key === CAR_SIGNALS.fuelTrip) {
+      this._setGraphValue('fuelTrip', this._parseFuelAvg(value));
+      return;
+    }
+    if (key === CAR_SIGNALS.fuelAvg) {
+      this._setGraphValue('fuelAvg', this._parseFuelAvg(value));
+      return;
+    }
+    if (key === CAR_SIGNALS.evTrip) {
+      this._setGraphValue('evTrip', this._carNumber(value));
       return;
     }
     const modeStateKey = CAR_MODE_STATE_BY_KEY[key];
@@ -3145,13 +3732,180 @@ class Component extends DCLogic {
     };
   }
 
+  _powerMotorClass(dir) {
+    if (!dir) return '';
+    return dir < 0 ? 'on regen' : 'on';
+  }
+
+  _powerMotorSrc(which, dir) {
+    if (which === 'front') return dir ? CAR_POWER_ASSETS.frontOn : CAR_POWER_ASSETS.frontOff;
+    if (which === 'rear') return dir ? CAR_POWER_ASSETS.rearOn : CAR_POWER_ASSETS.rearOff;
+    return dir ? CAR_POWER_ASSETS.iceOn : CAR_POWER_ASSETS.iceOff;
+  }
+
+  _powerResolveFlow(raw) {
+    const n = parseInt(String(raw == null ? '' : raw).trim(), 10);
+    const flow = CAR_POWER_FLOW[n];
+    return flow || CAR_POWER_IDLE;
+  }
+
+  _powerDemoDrive(now) {
+    const i = Math.floor((now || 0) / 4200) % CAR_POWER_DEMO_STATES.length;
+    return String(CAR_POWER_DEMO_STATES[i]);
+  }
+
+  _powerFmtNum(raw, digits) {
+    const n = this._carNumber(raw);
+    if (!isFinite(n)) return '—';
+    if (digits === 0) return String(Math.round(n));
+    const d = digits == null ? 1 : digits;
+    return (Math.round(n * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d);
+  }
+
+  _powerModel(now) {
+    const live = this._powerLive || {};
+    const demo = !this._graphAnyLive && !(this._busCount > 0);
+    const drive = live.drive !== '' && live.drive != null ? live.drive : (demo ? this._powerDemoDrive(now) : '0');
+    const charging = String(live.charging || '').trim() === '1';
+    let flow = this._powerResolveFlow(drive);
+    if (charging && flow.tone === 'idle') flow = CAR_POWER_FLOW[23];
+    const kwRaw = this._graphDisplay.evPowerKw != null
+      ? this._graphDisplay.evPowerKw
+      : (this._graphValues.evPowerKw || (demo ? this._graphDemoValue('evPowerKw', now) : 0));
+    const regenKw = kwRaw < -0.4;
+    let kwClass = '';
+    if (regenKw || flow.tone === 'regen') kwClass = 'regen';
+    else if (kwRaw > 0.4 || flow.tone === 'ev') kwClass = 'ev';
+    const socRaw = this._carNumber(live.soc);
+    const socPct = isFinite(socRaw) ? Math.max(0, Math.min(100, Math.round(socRaw))) : (demo ? 64 : 0);
+    const socNum = isFinite(socRaw) || demo ? String(socPct) : '—';
+    const battTone = flow.tone === 'regen' ? 'regen' : (flow.tone === 'charge' ? 'charge' : (flow.batt ? 'ev' : ''));
+    return {
+      tone: flow.tone,
+      state: flow.label,
+      kw: this._graphFormat('evPowerKw', kwRaw),
+      kwClass: kwClass,
+      socPct: socPct,
+      socNum: socNum,
+      iceClass: flow.ice ? 'on' : '',
+      iceSrc: this._powerMotorSrc('ice', flow.ice),
+      frontClass: this._powerMotorClass(flow.front),
+      frontSrc: this._powerMotorSrc('front', flow.front),
+      rearClass: this._powerMotorClass(flow.rear),
+      rearSrc: this._powerMotorSrc('rear', flow.rear),
+      battClass: (flow.batt ? 'on ' : '') + battTone,
+      stats: [
+        { kicker: 'EV', value: demo && live.evRange === '' ? '42' : this._powerFmtNum(live.evRange, 0), unit: 'km' },
+        { kicker: 'COMB.', value: demo && live.fuelRange === '' ? '510' : this._powerFmtNum(live.fuelRange, 0), unit: 'km' },
+        { kicker: 'CICLO', value: demo && live.cycleEv === '' ? '3.9' : this._powerFmtNum(live.cycleEv, 1), unit: 'kWh/100' },
+        { kicker: 'INST', value: demo && live.evInst === '' ? '12.4' : this._powerFmtNum(live.evInst, 1), unit: 'kWh/100' },
+      ],
+    };
+  }
+
+  _powerWidgetView(item) {
+    const w = Number(item.w) || 2;
+    const h = Number(item.h) || 1;
+    const model = this._powerModel(this._graphNow || 0);
+    const size = w + 'x' + h;
+    return {
+      isPower: true,
+      isStub: false,
+      powerSize: size,
+      powerSizeClass: 'hv-power-' + size,
+      powerTone: model.tone,
+      powerState: model.state,
+      powerKw: model.kw,
+      powerKwClass: model.kwClass,
+      socPct: model.socPct,
+      socNum: model.socNum,
+      iceClass: model.iceClass,
+      iceSrc: model.iceSrc,
+      frontClass: model.frontClass,
+      frontSrc: model.frontSrc,
+      rearClass: model.rearClass,
+      rearSrc: model.rearSrc,
+      battClass: model.battClass,
+      showPowerStats: h >= 2,
+      powerStats: model.stats,
+      onPowerTap: () => this._launchEnergyAssistant(),
+    };
+  }
+
+  _launchEnergyAssistant() {
+    if (this._widgetSuppressClick) return;
+    if (this.state.widgetMenuId || this.state.widgetPlaceType) return;
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
+        window.AppLauncherBridge.launchAppInPopup(CAR_POWER_PACKAGE);
+      }
+    } catch (e) {}
+  }
+
+  _setPowerElClass(el, base, extra) {
+    if (!el) return;
+    el.className = base + (extra ? (' ' + extra) : '');
+  }
+
+  _updatePowerCards(now) {
+    if (!this._powerCardCacheAt || now - this._powerCardCacheAt > 500) {
+      this._powerCardCache = document.querySelectorAll('.hv-power');
+      this._powerCardCacheAt = now;
+    }
+    const cards = this._powerCardCache;
+    if (!cards || !cards.length) return;
+    const model = this._powerModel(now);
+    for (let i = 0; i < cards.length; i++) {
+      const el = cards[i];
+      const size = el.getAttribute('data-power-size') || '2x1';
+      el.className = 'hv-power hv-power-' + size + ' ' + model.tone;
+      const state = el.querySelector('.hv-power-state');
+      const val = el.querySelector('.hv-power-value');
+      if (state) state.textContent = model.state;
+      if (val) {
+        val.textContent = model.kw;
+        val.className = 'hv-power-value' + (model.kwClass ? (' ' + model.kwClass) : '');
+      }
+      const ice = el.querySelector('.hv-power-ice');
+      if (ice) {
+        ice.className = 'hv-power-ice' + (model.iceClass ? (' ' + model.iceClass) : '');
+        if (ice.getAttribute('src') !== model.iceSrc) ice.setAttribute('src', model.iceSrc);
+      }
+      const front = el.querySelector('.hv-power-motor.front');
+      if (front) {
+        front.className = 'hv-power-motor front' + (model.frontClass ? (' ' + model.frontClass) : '');
+        if (front.getAttribute('src') !== model.frontSrc) front.setAttribute('src', model.frontSrc);
+      }
+      const rear = el.querySelector('.hv-power-motor.rear');
+      if (rear) {
+        rear.className = 'hv-power-motor rear' + (model.rearClass ? (' ' + model.rearClass) : '');
+        if (rear.getAttribute('src') !== model.rearSrc) rear.setAttribute('src', model.rearSrc);
+      }
+      const batt = el.querySelector('.hv-power-batt');
+      if (batt) {
+        batt.className = 'hv-power-batt' + (model.battClass ? (' ' + model.battClass) : '');
+        batt.style.setProperty('--soc', model.socPct + '%');
+      }
+      const ring = el.querySelector('.hv-power-ring');
+      if (ring) ring.style.setProperty('--soc', String(model.socPct));
+      const socNum = el.querySelector('.hv-power-ring-num');
+      if (socNum) socNum.textContent = model.socNum;
+      const stats = el.querySelectorAll('.hv-power-stat-value');
+      for (let s = 0; s < stats.length && s < model.stats.length; s++) {
+        const st = model.stats[s];
+        const unit = document.createElement('span');
+        unit.textContent = st.unit;
+        stats[s].textContent = st.value;
+        stats[s].appendChild(unit);
+      }
+    }
+  }
+
   _applyGraphSignal(key, value) {
     const n = this._carNumber(value);
     if (!isFinite(n)) return;
     if (key === CAR_SIGNALS.batteryVoltage) this._graphV = n;
     else this._graphI = n;
-    this._setGraphValue('battV', this._graphV);
-    this._setGraphValue('battI', this._graphI);
     this._setGraphValue('evPowerKw', this._graphV * this._graphI / 1000);
   }
 
@@ -3160,8 +3914,6 @@ class Component extends DCLogic {
     this._graphValues[key] = n;
     this._graphLiveKeys[key] = true;
     this._graphAnyLive = true;
-    const now = this._graphNow || (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    this._pushGraphSample(key, now, n);
   }
 
   _pushGraphSample(key, now, value) {
@@ -3171,9 +3923,10 @@ class Component extends DCLogic {
       this._graphSeries[key] = samples;
     }
     const last = samples.length ? samples[samples.length - 1] : null;
-    if (last && now - last.t < 80) {
+    // Keep last.t fixed so this is a real throttle. Bumping t every frame
+    // never reached 80ms on a 30fps loop, so history collapsed to one point.
+    if (last && now - last.t < 40) {
       last.v = value;
-      last.t = now;
       return;
     }
     samples.push({ t: now, v: value });
@@ -3182,7 +3935,7 @@ class Component extends DCLogic {
   }
 
   _graphDefaultPane() {
-    return { kind: 'series', vars: ['evPowerKw'], y1Rulers: false, y2Rulers: false, vizStyle: 'bars' };
+    return { kind: 'series', vars: ['evPowerKw'], y1Rulers: false, y2Rulers: false, vizStyle: 'spectrum', graphStyle: 'line' };
   }
 
   _graphNormalizePane(pane) {
@@ -3194,14 +3947,28 @@ class Component extends DCLogic {
       if (CAR_GRAPH_VAR_BY_KEY[raw[i]] && vars.indexOf(raw[i]) < 0) vars.push(raw[i]);
     }
     if (!vars.length) vars.push('evPowerKw');
-    let vizStyle = p.vizStyle || 'bars';
-    if (vizStyle !== 'bars' && vizStyle !== 'radial' && vizStyle !== 'mirror') vizStyle = 'bars';
+    let vizStyle = p.vizStyle || 'spectrum';
+    if (vizStyle === 'bars') vizStyle = 'spectrum';
+    if (vizStyle === 'mirror') vizStyle = 'scope';
+    if (vizStyle === 'water') vizStyle = 'spectrum';
+    let vizOk = false;
+    for (let i = 0; i < CAR_GRAPH_VIZ.length; i++) {
+      if (CAR_GRAPH_VIZ[i].key === vizStyle) vizOk = true;
+    }
+    if (!vizOk) vizStyle = 'spectrum';
+    let graphStyle = p.graphStyle || 'line';
+    let styleOk = false;
+    for (let i = 0; i < CAR_GRAPH_STYLES.length; i++) {
+      if (CAR_GRAPH_STYLES[i].key === graphStyle) styleOk = true;
+    }
+    if (!styleOk) graphStyle = 'line';
     return {
       kind: kind,
       vars: vars,
       y1Rulers: !!p.y1Rulers,
       y2Rulers: !!p.y2Rulers,
       vizStyle: vizStyle,
+      graphStyle: graphStyle,
     };
   }
 
@@ -3261,7 +4028,13 @@ class Component extends DCLogic {
   }
 
   _graphPaneTitle(pane) {
-    if (!pane || pane.kind === 'viz') return 'VIZ';
+    if (!pane) return 'GRAPH';
+    if (pane.kind === 'viz') {
+      for (let i = 0; i < CAR_GRAPH_VIZ.length; i++) {
+        if (CAR_GRAPH_VIZ[i].key === pane.vizStyle) return CAR_GRAPH_VIZ[i].label;
+      }
+      return 'VIZ';
+    }
     const names = [];
     const vars = pane.vars || [];
     for (let i = 0; i < vars.length; i++) {
@@ -3281,7 +4054,7 @@ class Component extends DCLogic {
   _graphPaneReadout(pane) {
     if (!pane || pane.kind === 'viz') {
       const playing = !!this.state.mediaPlaying;
-      return { title: 'VIZ', mode: playing ? 'LIVE' : 'IDLE', value: playing ? 'ON' : 'OFF', unit: '', regen: false };
+      return { title: this._graphPaneTitle(pane), mode: playing ? 'LIVE' : 'IDLE', value: '', unit: '', regen: false };
     }
     const key = (pane.vars && pane.vars[0]) || 'evPowerKw';
     const spec = CAR_GRAPH_VAR_BY_KEY[key] || CAR_GRAPH_VAR_BY_KEY.evPowerKw;
@@ -3319,57 +4092,240 @@ class Component extends DCLogic {
       graphSizeClass: 'hv-graphs-' + w + 'x' + h + (split ? ' hv-graphs-split' : ''),
       graphGridStyle: 'grid-template-columns:repeat(' + cfg.cols + ',minmax(0,1fr));grid-template-rows:repeat(' + cfg.rows + ',minmax(0,1fr))',
       graphPanes: panes,
-      graphMenuOpen: this.state.graphMenuId === item.id,
-      onHoldStart: (ev) => this._onGraphHoldStart(side, item.id, ev),
-      onHoldEnd: (ev) => this._onGraphHoldEnd(side, item.id, ev),
-      onContextMenu: (ev) => { if (ev && ev.preventDefault) ev.preventDefault(); },
-      onEdit: () => this._openGraphEditor(side, item.id),
+      onEdit: (ev) => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        this._openGraphEditor(side, item.id);
+      },
     };
-  }
-
-  _clearGraphHold() {
-    if (this._graphHoldTimer) {
-      clearTimeout(this._graphHoldTimer);
-      this._graphHoldTimer = 0;
-    }
-    this._graphHold = null;
-  }
-
-  _onGraphHoldStart(side, id, ev) {
-    if (this.state.graphEditId) return;
-    const t = ev && ev.target;
-    if (t && t.closest && t.closest('button')) return;
-    this._clearGraphHold();
-    this._graphHoldFired = false;
-    this._graphHoldTimer = setTimeout(() => {
-      this._graphHoldTimer = 0;
-      this._graphHoldFired = true;
-      this.setState({ graphMenuId: id, graphMenuSide: side });
-    }, CAR_GRAPH_HOLD_MS);
-  }
-
-  _onGraphHoldEnd(side, id, ev) {
-    const t = ev && ev.target;
-    const onBtn = t && t.closest && t.closest('button');
-    const fired = this._graphHoldFired;
-    this._clearGraphHold();
-    if (onBtn) return;
-    if (fired) {
-      if (ev && ev.preventDefault) ev.preventDefault();
-      return;
-    }
-    if (this.state.graphMenuId === id) {
-      this.setState({ graphMenuId: null, graphMenuSide: null });
-    }
   }
 
   _openGraphEditor(side, id) {
     this.setState({
       graphEditId: id,
       graphEditSide: side,
-      graphMenuId: null,
-      graphMenuSide: null,
+      widgetMenuId: null,
+      widgetMenuSide: null,
       widgetPickerStep: null,
+    });
+  }
+
+  _clearWidgetHold() {
+    if (this._widgetHoldTimer) {
+      clearTimeout(this._widgetHoldTimer);
+      this._widgetHoldTimer = 0;
+    }
+    if (this._widgetMoveTimer) {
+      clearTimeout(this._widgetMoveTimer);
+      this._widgetMoveTimer = 0;
+    }
+    this._widgetHold = null;
+  }
+
+  _isWidgetChromeTarget(ev) {
+    const t = ev && ev.target;
+    if (!t || !t.closest) return false;
+    return !!(t.closest('.hv-widget-remove')
+      || t.closest('.hv-widget-card-menu')
+      || t.closest('.hv-widget-cell')
+      || t.closest('.hv-widget-picker')
+      || t.closest('.hv-graph-editor'));
+  }
+
+  _onWidgetSuppressClick(e) {
+    if (!this._widgetSuppressClick) return;
+    const t = e && e.target;
+    if (t && t.closest && t.closest('.hv-widget-remove, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-graph-editor')) {
+      this._widgetSuppressClick = false;
+      return;
+    }
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    this._widgetSuppressClick = false;
+  }
+
+  _suppressNextWidgetClick() {
+    this._widgetSuppressClick = true;
+    const self = this;
+    setTimeout(() => { self._widgetSuppressClick = false; }, 400);
+  }
+
+  _onWidgetHoldStart(side, item, ev) {
+    if (ev && ev.type === 'mousedown' && this._widgetTouchActive) return;
+    if (ev && ev.type === 'touchstart') this._widgetTouchActive = true;
+    if (this.state.graphEditId) return;
+    if (this._isWidgetChromeTarget(ev)) return;
+    if (this.state.widgetMenuId && this.state.widgetMenuId !== item.id) this._dismissWidgetMenu();
+    this._clearWidgetHold();
+    this._widgetHoldFired = false;
+    this._widgetHold = { side: side, id: item.id, item: item, down: true };
+    if (this.state.widgetPlaceMode === 'move' && this.state.widgetPlaceId === item.id) return;
+    this._widgetHoldTimer = setTimeout(() => {
+      this._widgetHoldTimer = 0;
+      this._widgetHoldFired = true;
+      this._widgetMoveTimer = setTimeout(() => {
+        this._widgetMoveTimer = 0;
+        if (!this._widgetHold || !this._widgetHold.down) return;
+        this._beginWidgetMove(side, item);
+      }, CAR_WIDGET_MOVE_MS - CAR_WIDGET_HOLD_MS);
+    }, CAR_WIDGET_HOLD_MS);
+  }
+
+  _onWidgetHoldEnd(side, item, ev) {
+    if (ev && ev.type === 'mouseup' && this._widgetTouchActive) return;
+    if (ev && (ev.type === 'touchend' || ev.type === 'touchcancel')) this._widgetTouchActive = false;
+    if (this._widgetHold) this._widgetHold.down = false;
+    const fired = this._widgetHoldFired;
+    const moving = this.state.widgetPlaceMode === 'move' && this.state.widgetPlaceId === item.id;
+    this._clearWidgetHold();
+    if (this._isWidgetChromeTarget(ev)) return;
+    if (moving) {
+      this._suppressNextWidgetClick();
+      if (!fired) this._cancelWidgetPicker();
+      return;
+    }
+    if (fired) {
+      this._suppressNextWidgetClick();
+      if (ev && ev.preventDefault) ev.preventDefault();
+      this._openWidgetMenu(side, item);
+    }
+  }
+
+  _onWidgetHoldCancel(side, item, ev) {
+    if (ev && ev.type === 'mouseleave' && this._widgetTouchActive) return;
+    if (ev && ev.type === 'touchcancel') this._widgetTouchActive = false;
+    if (!this._widgetHoldFired) {
+      this._clearWidgetHold();
+      return;
+    }
+    this._onWidgetHoldEnd(side, item, ev);
+  }
+
+  _openWidgetMenu(side, item) {
+    this.setState({
+      widgetMenuId: item.id,
+      widgetMenuSide: side,
+      widgetPickerStep: null,
+      widgetPlaceSide: null,
+      widgetPlaceType: null,
+      widgetPlaceW: 0,
+      widgetPlaceH: 0,
+      widgetPlaceMode: null,
+      widgetPlaceId: null,
+      widgetPlaceFromSide: null,
+    });
+  }
+
+  _dismissWidgetMenu() {
+    if (!this.state.widgetMenuId) return;
+    this.setState({ widgetMenuId: null, widgetMenuSide: null });
+  }
+
+  _widgetResizeSizes(item, mode) {
+    const m = mode || this.state.shellMode || 'triple';
+    const cols = this._gridColsForMode(m);
+    const cat = this._widgetCatalog()[item.type] || { sizes: [] };
+    const cw = Number(item.w) || 2;
+    const ch = Number(item.h) || 1;
+    return (cat.sizes || [])
+      .filter((sz) => sz[0] <= cols)
+      .filter((sz) => sz[0] !== cw || sz[1] !== ch)
+      .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, m, item.id));
+  }
+
+  _widgetCanMove(item, fromSide, mode) {
+    const m = mode || this.state.shellMode || 'triple';
+    const cols = this._gridColsForMode(m);
+    const sides = this._widgetPlaceSides(m);
+    const w = Number(item.w) || 2;
+    const h = Number(item.h) || 1;
+    for (let i = 0; i < sides.length; i++) {
+      const side = sides[i];
+      const items = this._board(side, m).items || [];
+      for (let y = 0; y < 2; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (side === fromSide && x === item.x && y === item.y) continue;
+          if (this._fits(items, cols, x, y, w, h, item.id)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  _beginWidgetMove(side, item) {
+    if (!this._widgetCanMove(item, side)) return;
+    this._suppressNextWidgetClick();
+    this.setState({
+      widgetMenuId: null,
+      widgetMenuSide: null,
+      widgetPickerStep: null,
+      widgetPlaceMode: 'move',
+      widgetPlaceType: item.type,
+      widgetPlaceId: item.id,
+      widgetPlaceFromSide: side,
+      widgetPlaceW: Number(item.w) || 2,
+      widgetPlaceH: Number(item.h) || 1,
+      widgetPlaceSide: null,
+    });
+  }
+
+  _startWidgetResize(side, item) {
+    const sizes = this._widgetResizeSizes(item);
+    if (!sizes.length) return;
+    const one = sizes.length === 1;
+    this.setState({
+      widgetMenuId: null,
+      widgetMenuSide: null,
+      widgetPickerStep: one ? null : 'size',
+      widgetPlaceMode: 'resize',
+      widgetPlaceType: item.type,
+      widgetPlaceId: item.id,
+      widgetPlaceFromSide: side,
+      widgetPlaceW: one ? sizes[0][0] : 0,
+      widgetPlaceH: one ? sizes[0][1] : 0,
+      widgetPlaceSide: null,
+    });
+  }
+
+  _findWidget(id, mode) {
+    const sides = this._widgetPlaceSides(mode);
+    for (let i = 0; i < sides.length; i++) {
+      const side = sides[i];
+      const items = this._board(side, mode).items || [];
+      for (let j = 0; j < items.length; j++) {
+        if (items[j].id === id) return { side: side, item: items[j] };
+      }
+    }
+    return null;
+  }
+
+  _relocateWidget(id, fromSide, toSide, x, y, w, h) {
+    const fromBoard = this._board(fromSide);
+    const item = (fromBoard.items || []).find((it) => it.id === id);
+    if (!item) return;
+    if (fromSide !== toSide) {
+      fromBoard.items = (fromBoard.items || []).filter((it) => it.id !== id);
+      const toBoard = this._board(toSide);
+      toBoard.items = (toBoard.items || []).concat([item]);
+      if (!(fromBoard.items || []).length) this._setSlotUse(fromSide, 'app');
+      this._setSlotUse(toSide, 'widgets');
+    }
+    item.x = x;
+    item.y = y;
+    item.w = w;
+    item.h = h;
+    this._persistWidgets();
+    this.setState({
+      widgetRev: (this.state.widgetRev || 0) + 1,
+      widgetPickerStep: null,
+      widgetPlaceSide: null,
+      widgetPlaceType: null,
+      widgetPlaceW: 0,
+      widgetPlaceH: 0,
+      widgetPlaceMode: null,
+      widgetPlaceId: null,
+      widgetPlaceFromSide: null,
+      widgetMenuId: null,
+      widgetMenuSide: null,
     });
   }
 
@@ -3438,6 +4394,14 @@ class Component extends DCLogic {
     });
   }
 
+  _setGraphDrawStyle(paneIndex, style) {
+    this._patchGraph((cfg) => {
+      const pane = cfg.panes[paneIndex];
+      if (!pane) return;
+      pane.graphStyle = style;
+    });
+  }
+
   _syncGraphLoop(active) {
     if (active) this._ensureGraphLoop();
     else this._stopGraphLoop();
@@ -3462,12 +4426,11 @@ class Component extends DCLogic {
     const s1 = Math.sin(now / 420);
     const s2 = Math.sin(now / 1180);
     if (key === 'evPowerKw') return s1 * 36 + s2 * 16;
-    if (key === 'speed') return 55 + s1 * 35;
-    if (key === 'rpm') return 1800 + s1 * 900;
-    if (key === 'fuelInst') return 14 + s2 * 5;
     if (key === 'evInst') return 16 + s1 * 8;
-    if (key === 'battV') return 355 + s2 * 12;
-    if (key === 'battI') return s1 * 90;
+    if (key === 'fuelInst') return 14 + s2 * 5;
+    if (key === 'evTrip') return 18 + s2 * 3;
+    if (key === 'fuelTrip') return 12.4 + s1 * 1.6;
+    if (key === 'fuelAvg') return 11.8 + s2 * 0.8;
     return 0;
   }
 
@@ -3485,32 +4448,42 @@ class Component extends DCLogic {
     const prev = this._graphDisplay[key];
     const next = prev == null ? raw : prev + (raw - prev) * 0.18;
     this._graphDisplay[key] = next;
-    this._pushGraphSample(key, now, raw);
+    this._pushGraphSample(key, now, next);
     return next;
   }
 
   _drawGraphs(now) {
-    // Second rAF loop alongside the 3D renderer — keep DOM queries rare.
+    // Sample every frame so the series keeps moving; paint can stay cheaper.
+    this._graphNow = now;
+    this._graphSmooth('evPowerKw', now);
+    this._updatePowerCards(now);
+
     if (!this._graphCanvasCacheAt || now - this._graphCanvasCacheAt > 500) {
       this._graphCanvasCache = document.querySelectorAll('.hv-graphs-canvas');
       this._graphCanvasCacheAt = now;
     }
     const canvases = this._graphCanvasCache;
     if (!canvases || !canvases.length) return;
-    if (this._graphDrawAt && now - this._graphDrawAt < 33) return;
-    this._graphDrawAt = now;
-    this._graphNow = now;
 
     const item = this._graphActiveItem();
     if (!item) return;
     const cfg = this._graphNormalizeCfg(item);
     const needed = { evPowerKw: true };
+    let fastPaint = false;
     for (let i = 0; i < cfg.panes.length; i++) {
-      const vars = cfg.panes[i].vars || [];
+      const pane = cfg.panes[i];
+      const vars = pane.vars || [];
       for (let v = 0; v < vars.length; v++) needed[vars[v]] = true;
+      if (pane.kind === 'viz' || pane.graphStyle === 'dots') fastPaint = true;
     }
     const keys = Object.keys(needed);
-    for (let k = 0; k < keys.length; k++) this._graphSmooth(keys[k], now);
+    for (let k = 0; k < keys.length; k++) {
+      if (keys[k] !== 'evPowerKw') this._graphSmooth(keys[k], now);
+    }
+
+    const minDt = fastPaint ? 16 : 33;
+    if (this._graphDrawAt && now - this._graphDrawAt < minDt) return;
+    this._graphDrawAt = now;
 
     const spanStart = now - CAR_GRAPH_SPAN_MS;
     for (let c = 0; c < canvases.length; c++) {
@@ -3567,10 +4540,41 @@ class Component extends DCLogic {
     this._paintGraphSeries(ctx, pane, cssW, cssH, now, spanStart);
   }
 
-  _graphToY(value, spec, cssH) {
+  _graphToY(value, spec, top, bot) {
     const t = (value - spec.min) / (spec.max - spec.min);
     const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
-    return (1 - clamped) * (cssH - 2) + 1;
+    return top + (1 - clamped) * (bot - top);
+  }
+
+  _catmull(p0, p1, p2, p3, t) {
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+  }
+
+  _smoothGraphPts(pts) {
+    if (pts.length < 3) return pts;
+    const out = [];
+    const steps = 8;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i === 0 ? 0 : i - 1];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] ? pts[i + 2] : p2;
+      const yMin = Math.min(p1.y, p2.y);
+      const yMax = Math.max(p1.y, p2.y);
+      out.push(p1);
+      for (let s = 1; s < steps; s++) {
+        const t = s / steps;
+        const x = this._catmull(p0.x, p1.x, p2.x, p3.x, t);
+        let y = this._catmull(p0.y, p1.y, p2.y, p3.y, t);
+        if (y < yMin) y = yMin;
+        else if (y > yMax) y = yMax;
+        out.push({ x: x, y: y, v: p1.v + (p2.v - p1.v) * t });
+      }
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
   }
 
   _paintGraphSeries(ctx, pane, cssW, cssH, now, spanStart) {
@@ -3580,21 +4584,24 @@ class Component extends DCLogic {
     const y2 = y2Key ? CAR_GRAPH_VAR_BY_KEY[y2Key] : null;
     const plotL = pane.y1Rulers ? 28 : 2;
     const plotR = cssW - (pane.y2Rulers && y2 ? 28 : 2);
+    const plotT = 20;
+    const plotB = cssH - 2;
     const plotW = Math.max(8, plotR - plotL);
+    const style = pane.graphStyle || 'line';
 
-    if (pane.y1Rulers && y1) this._paintGraphRulers(ctx, y1, plotL - 4, 'right', cssH, 'rgba(242,245,248,.45)', plotL, plotR);
-    if (pane.y2Rulers && y2) this._paintGraphRulers(ctx, y2, plotR + 4, 'left', cssH, 'rgba(79,214,232,.55)', 0, 0);
+    if (pane.y1Rulers && y1) this._paintGraphRulers(ctx, y1, plotL - 4, 'right', plotT, plotB, 'rgba(242,245,248,.45)', plotL, plotR);
+    if (pane.y2Rulers && y2) this._paintGraphRulers(ctx, y2, plotR + 4, 'left', plotT, plotB, 'rgba(79,214,232,.55)', 0, 0);
 
-    this._strokeZero(ctx, y1, plotL, plotR, cssH, 'rgba(255,255,255,.14)');
-    if (y2) this._strokeZero(ctx, y2, plotL, plotR, cssH, 'rgba(79,214,232,.22)');
+    this._strokeZero(ctx, y1, plotL, plotR, plotT, plotB, 'rgba(255,255,255,.14)');
+    if (y2) this._strokeZero(ctx, y2, plotL, plotR, plotT, plotB, 'rgba(79,214,232,.22)');
 
-    this._paintGraphVar(ctx, y1Key, y1, true, plotL, plotR, plotW, cssH, now, spanStart);
-    if (y2) this._paintGraphVar(ctx, y2Key, y2, false, plotL, plotR, plotW, cssH, now, spanStart);
+    this._paintGraphVar(ctx, y1Key, y1, true, style, plotL, plotR, plotW, plotT, plotB, now, spanStart);
+    if (y2) this._paintGraphVar(ctx, y2Key, y2, false, style, plotL, plotR, plotW, plotT, plotB, now, spanStart);
   }
 
-  _strokeZero(ctx, spec, plotL, plotR, cssH, color) {
+  _strokeZero(ctx, spec, plotL, plotR, plotT, plotB, color) {
     if (!spec || spec.min >= 0 || spec.max <= 0) return;
-    const y = this._graphToY(0, spec, cssH);
+    const y = this._graphToY(0, spec, plotT, plotB);
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 4]);
@@ -3605,13 +4612,13 @@ class Component extends DCLogic {
     ctx.setLineDash([]);
   }
 
-  _paintGraphRulers(ctx, spec, x, align, cssH, color, gridL, gridR) {
+  _paintGraphRulers(ctx, spec, x, align, plotT, plotB, color, gridL, gridR) {
     const ticks = spec.signed ? [spec.min, 0, spec.max] : [spec.min, (spec.min + spec.max) / 2, spec.max];
     ctx.font = '8px "Space Mono", monospace';
     ctx.textAlign = align;
     ctx.textBaseline = 'middle';
     for (let i = 0; i < ticks.length; i++) {
-      const y = this._graphToY(ticks[i], spec, cssH);
+      const y = this._graphToY(ticks[i], spec, plotT, plotB);
       if (gridR > gridL) {
         ctx.strokeStyle = 'rgba(255,255,255,.08)';
         ctx.lineWidth = 1;
@@ -3625,29 +4632,100 @@ class Component extends DCLogic {
     }
   }
 
-  _paintGraphVar(ctx, key, spec, isY1, plotL, plotR, plotW, cssH, now, spanStart) {
+  _paintGraphVar(ctx, key, spec, isY1, style, plotL, plotR, plotW, plotT, plotB, now, spanStart) {
     if (!spec) return;
+    if (style === 'bars') {
+      this._paintGraphHist(ctx, key, spec, isY1, plotL, plotR, plotW, plotT, plotB, spanStart);
+      return;
+    }
     const samples = this._graphSeries[key] || [];
     const display = this._graphDisplay[key] != null ? this._graphDisplay[key] : 0;
-    const pts = [];
+    const rawPts = [];
     for (let i = 0; i < samples.length; i++) {
       if (samples[i].t < spanStart) continue;
       const x = plotL + ((samples[i].t - spanStart) / CAR_GRAPH_SPAN_MS) * plotW;
-      pts.push({ x: x, y: this._graphToY(samples[i].v, spec, cssH), v: samples[i].v });
+      rawPts.push({ x: x, y: this._graphToY(samples[i].v, spec, plotT, plotB), v: samples[i].v });
     }
-    if (!pts.length) return;
-    pts.push({ x: plotR, y: this._graphToY(display, spec, cssH), v: display });
-    const zeroY = spec.min < 0 && spec.max > 0 ? this._graphToY(0, spec, cssH) : cssH;
-    const posFill = isY1 ? 'rgba(242,245,248,.28)' : 'rgba(79,214,232,.22)';
-    const negFill = spec.signed ? 'rgba(62,224,138,.30)' : 'rgba(255,255,255,.08)';
+    if (!rawPts.length) return;
+    rawPts.push({ x: plotR, y: this._graphToY(display, spec, plotT, plotB), v: display });
+    const pts = this._smoothGraphPts(rawPts);
+    const zeroY = spec.min < 0 && spec.max > 0 ? this._graphToY(0, spec, plotT, plotB) : plotB;
+    const posFill = isY1 ? 'rgba(242,245,248,.22)' : 'rgba(79,214,232,.18)';
+    const negFill = spec.signed ? 'rgba(62,224,138,.26)' : 'rgba(255,255,255,.06)';
     const posStroke = isY1 ? CAR_GRAPH_COLOR_Y1 : CAR_GRAPH_COLOR_Y2;
     const negStroke = spec.signed ? CAR_GRAPH_COLOR_REGEN : posStroke;
-    this._fillGraphBand(ctx, pts, zeroY, true, posFill);
-    this._fillGraphBand(ctx, pts, zeroY, false, negFill);
-    this._strokeGraphLine(ctx, pts, zeroY, posStroke, negStroke);
+    if (style !== 'dots') {
+      const fillAmt = style === 'area' ? 1 : 0.55;
+      this._fillGraphBand(ctx, pts, zeroY, true, posFill, fillAmt);
+      this._fillGraphBand(ctx, pts, zeroY, false, negFill, fillAmt);
+    }
+    if (style === 'dots') {
+      this._paintGraphDots(ctx, pts, zeroY, posStroke, negStroke);
+    } else {
+      this._strokeGraphLine(ctx, pts, zeroY, posStroke, negStroke, style === 'area' ? 1.4 : 2);
+    }
   }
 
-  _fillGraphBand(ctx, pts, zeroY, positive, fill) {
+  _paintGraphDots(ctx, pts, zeroY, posColor, negColor) {
+    if (!pts.length) return;
+    const gap = 5;
+    const x1 = pts[pts.length - 1].x;
+    const xStart = Math.ceil(pts[0].x / gap) * gap;
+    const dots = [];
+    let i = 0;
+    for (let x = xStart; x <= x1 + 0.01; x += gap) {
+      while (i < pts.length - 1 && pts[i + 1].x < x) i += 1;
+      const a = pts[i];
+      const b = pts[i + 1] || a;
+      const dx = b.x - a.x;
+      const t = Math.abs(dx) < 0.001 ? 0 : (x - a.x) / dx;
+      dots.push({ x: x, y: a.y + (b.y - a.y) * t });
+    }
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.beginPath();
+      for (let d = 0; d < dots.length; d++) {
+        const below = dots[d].y > zeroY;
+        if ((pass === 1) !== below) continue;
+        ctx.moveTo(dots[d].x + 2, dots[d].y);
+        ctx.arc(dots[d].x, dots[d].y, 2, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = pass ? negColor : posColor;
+      ctx.fill();
+    }
+  }
+
+  _paintGraphHist(ctx, key, spec, isY1, plotL, plotR, plotW, plotT, plotB, spanStart) {
+    const samples = this._graphSeries[key] || [];
+    const n = Math.max(16, Math.floor(plotW / 8));
+    const bins = [];
+    for (let i = 0; i < n; i++) bins.push({ s: 0, c: 0 });
+    for (let i = 0; i < samples.length; i++) {
+      if (samples[i].t < spanStart) continue;
+      const t = (samples[i].t - spanStart) / CAR_GRAPH_SPAN_MS;
+      let bi = Math.floor(t * n);
+      if (bi < 0) bi = 0;
+      if (bi >= n) bi = n - 1;
+      bins[bi].s += samples[i].v;
+      bins[bi].c += 1;
+    }
+    const zeroY = spec.min < 0 && spec.max > 0 ? this._graphToY(0, spec, plotT, plotB) : plotB;
+    const gap = 1.5;
+    const bw = Math.max(1, plotW / n - gap);
+    const pos = isY1 ? 'rgba(242,245,248,.78)' : 'rgba(79,214,232,.75)';
+    const neg = spec.signed ? 'rgba(62,224,138,.8)' : pos;
+    for (let i = 0; i < n; i++) {
+      if (!bins[i].c) continue;
+      const avg = bins[i].s / bins[i].c;
+      const y = this._graphToY(avg, spec, plotT, plotB);
+      const x = plotL + i * (plotW / n);
+      ctx.fillStyle = y > zeroY ? neg : pos;
+      const top = Math.min(y, zeroY);
+      const h = Math.max(1, Math.abs(zeroY - y));
+      ctx.fillRect(x, top, bw, h);
+    }
+  }
+
+  _fillGraphBand(ctx, pts, zeroY, positive, fill, amt) {
     ctx.beginPath();
     ctx.moveTo(pts[0].x, zeroY);
     for (let i = 0; i < pts.length; i++) {
@@ -3656,12 +4734,14 @@ class Component extends DCLogic {
     }
     ctx.lineTo(pts[pts.length - 1].x, zeroY);
     ctx.closePath();
+    ctx.globalAlpha = amt == null ? 1 : amt;
     ctx.fillStyle = fill;
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
-  _strokeGraphLine(ctx, pts, zeroY, posColor, negColor) {
-    ctx.lineWidth = 1.6;
+  _strokeGraphLine(ctx, pts, zeroY, posColor, negColor, width) {
+    ctx.lineWidth = width || 2;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     for (let i = 0; i < pts.length - 1; i++) {
@@ -3697,8 +4777,8 @@ class Component extends DCLogic {
     const kw = this._graphDisplay.evPowerKw || 0;
     const bass = Math.min(1, Math.abs(kw) / 80);
     const playing = !!this.state.mediaPlaying;
-    const idle = 0.08 + 0.12 * bass;
-    const live = 0.38 + 0.62 * bass;
+    const idle = 0.1 + 0.14 * bass;
+    const live = 0.42 + 0.58 * bass;
     return playing ? live : idle;
   }
 
@@ -3713,12 +4793,19 @@ class Component extends DCLogic {
   }
 
   _stepVizBars(bars, now, level, paneIndex) {
-    for (let i = 0; i < bars.length; i++) {
-      const pulse = 0.45 + 0.55 * Math.abs(Math.sin(now / 140 + i * 0.62 + paneIndex));
-      const falloff = Math.exp(-Math.abs(i - bars.length * 0.28) * 0.12);
-      const target = level * falloff * pulse;
-      bars[i] += (target - bars[i]) * (target > bars[i] ? 0.38 : 0.14);
-      bars[i] *= 0.97;
+    const n = bars.length;
+    for (let i = 0; i < n; i++) {
+      const frac = n <= 1 ? 0 : i / (n - 1);
+      const bass = Math.exp(-frac * 2.4);
+      const mid = Math.exp(-Math.abs(frac - 0.32) * 6);
+      const treble = Math.exp(-Math.abs(frac - 0.78) * 9);
+      const wobble = Math.abs(Math.sin(now / 92 + i * 0.43 + paneIndex))
+        * (0.45 + 0.55 * Math.abs(Math.sin(now / 151 + i * 0.19)));
+      const beat = 0.55 + 0.45 * Math.abs(Math.sin(now / 210));
+      const target = level * (0.38 * bass * beat + 0.4 * mid * wobble + 0.28 * treble * wobble);
+      bars[i] += (target - bars[i]) * (target > bars[i] ? 0.42 : 0.16);
+      bars[i] *= 0.975;
+      if (bars[i] < 0.02) bars[i] = 0.02;
     }
   }
 
@@ -3726,26 +4813,87 @@ class Component extends DCLogic {
     // No FFT of other apps' audio on the MMI. Drive the motion from now-playing
     // plus battery power so a silent cabin still has a pulse when the car is
     // pulling or regenerating.
-    const style = pane.vizStyle || 'bars';
+    const style = pane.vizStyle || 'spectrum';
     const paneIndex = parseInt(canvas.getAttribute('data-pane'), 10) || 0;
-    const n = style === 'radial' ? 28 : 16;
-    const bars = this._graphVizBars(paneIndex + '-' + style, n);
     const level = this._graphVizLevel(now);
+    const id = paneIndex + '-' + style;
+    if (style === 'scope' || style === 'dots') {
+      this._paintVizScope(ctx, cssW, cssH, now, level, paneIndex, style === 'dots');
+      return;
+    }
+    const n = style === 'radial' ? 28 : 40;
+    const bars = this._graphVizBars(id, n);
     this._stepVizBars(bars, now, level, paneIndex);
     if (style === 'radial') this._paintVizRadial(ctx, cssW, cssH, bars);
-    else if (style === 'mirror') this._paintVizMirror(ctx, cssW, cssH, bars);
-    else this._paintVizBars(ctx, cssW, cssH, bars);
+    else this._paintVizSpectrum(ctx, cssW, cssH, bars, id);
   }
 
-  _paintVizBars(ctx, cssW, cssH, bars) {
+  _paintVizSpectrum(ctx, cssW, cssH, bars, id) {
     const n = bars.length;
-    const gap = 3;
+    let peaks = this._graphVizPeaks[id];
+    if (!peaks || peaks.length !== n) {
+      peaks = [];
+      for (let i = 0; i < n; i++) peaks.push(0);
+      this._graphVizPeaks[id] = peaks;
+    }
+    const gap = 1.5;
     const bw = Math.max(2, (cssW - gap * (n - 1)) / n);
+    const base = cssH - 2;
+    const maxH = cssH - 8;
     for (let i = 0; i < n; i++) {
-      const bh = Math.max(2, bars[i] * (cssH - 4));
+      if (bars[i] > peaks[i]) peaks[i] = bars[i];
+      else peaks[i] *= 0.985;
+      const bh = Math.max(2, bars[i] * maxH);
       const x = i * (bw + gap);
-      ctx.fillStyle = 'rgba(242,245,248,' + (0.18 + bars[i] * 0.72).toFixed(3) + ')';
-      ctx.fillRect(x, cssH - bh, bw, bh);
+      const t = bars[i];
+      ctx.fillStyle = 'rgba(' + Math.round(180 + 62 * t) + ',' + Math.round(210 + 35 * t) + ',' + Math.round(232) + ',' + (0.22 + t * 0.7).toFixed(3) + ')';
+      ctx.fillRect(x, base - bh, bw, bh);
+      const py = base - peaks[i] * maxH;
+      ctx.fillStyle = 'rgba(242,245,248,' + (0.35 + peaks[i] * 0.55).toFixed(3) + ')';
+      ctx.fillRect(x, py - 1.5, bw, 1.5);
+    }
+  }
+
+  _vizWaveY(x, now, level, ch, cssH, gentle) {
+    const phase = now / (gentle ? 280 : 180);
+    const nx = x * (gentle ? 0.028 : 0.045);
+    const a = Math.sin(nx * 1.15 + phase * (1.35 + ch * 0.22));
+    const b = Math.sin(nx * (gentle ? 1.55 : 2.4) + phase * (gentle ? 1.8 : 2.8) + ch) * (gentle ? 0.28 : 0.42);
+    const c = Math.sin(nx * 0.45 + phase * 0.7) * 0.22;
+    return cssH * 0.5 + (a + b + c) * level * cssH * (gentle ? 0.28 : 0.32);
+  }
+
+  _paintVizScope(ctx, cssW, cssH, now, level, paneIndex, asDots) {
+    const step = asDots ? 5 : 3;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (let ch = 0; ch < 2; ch++) {
+      const pts = [];
+      for (let x = 0; x <= cssW; x += step) {
+        pts.push({ x: x, y: this._vizWaveY(x, now, level * (ch ? 0.72 : 1), paneIndex + ch, cssH, asDots) });
+      }
+      if (!asDots) {
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.strokeStyle = ch ? 'rgba(79,214,232,.22)' : 'rgba(79,214,232,.2)';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.strokeStyle = ch ? 'rgba(79,214,232,.85)' : 'rgba(242,245,248,.92)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else {
+        const r = 1.7 + level * 0.8;
+        ctx.fillStyle = ch ? 'rgba(79,214,232,.7)' : 'rgba(242,245,248,.88)';
+        for (let i = 0; i < pts.length; i++) {
+          ctx.beginPath();
+          ctx.arc(pts[i].x, pts[i].y, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
   }
 
@@ -3753,10 +4901,10 @@ class Component extends DCLogic {
     const n = bars.length;
     const cx = cssW / 2;
     const cy = cssH / 2;
-    const maxR = Math.min(cssW, cssH) * 0.46;
-    const inner = maxR * 0.28;
+    const maxR = Math.min(cssW, cssH) * 0.5 - 3;
+    const inner = Math.max(6, maxR * 0.12);
     ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(2, (Math.PI * 2 * inner) / n * 0.55);
+    ctx.lineWidth = Math.max(2.5, (Math.PI * 2 * inner) / n * 0.7);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 - Math.PI / 2;
       const outer = inner + bars[i] * (maxR - inner);
@@ -3765,19 +4913,6 @@ class Component extends DCLogic {
       ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
       ctx.lineTo(cx + Math.cos(a) * outer, cy + Math.sin(a) * outer);
       ctx.stroke();
-    }
-  }
-
-  _paintVizMirror(ctx, cssW, cssH, bars) {
-    const n = bars.length;
-    const gap = 3;
-    const bw = Math.max(2, (cssW - gap * (n - 1)) / n);
-    const mid = cssH / 2;
-    for (let i = 0; i < n; i++) {
-      const bh = Math.max(1, bars[i] * (cssH * 0.46));
-      const x = i * (bw + gap);
-      ctx.fillStyle = 'rgba(79,214,232,' + (0.2 + bars[i] * 0.65).toFixed(3) + ')';
-      ctx.fillRect(x, mid - bh, bw, bh * 2);
     }
   }
 
@@ -3848,6 +4983,14 @@ class Component extends DCLogic {
     return Math.floor(1000 / consumption) / 10;
   }
 
+  /** Trip/avg fuel is shown raw on the cluster; only the brace vector needs the instant conversion. */
+  _parseFuelAvg(value) {
+    const str = String(value == null ? '' : value).trim();
+    if (str.charAt(0) === '{') return this._parseFuelInst(value);
+    const n = this._carNumber(value);
+    return isFinite(n) ? n : 0;
+  }
+
   /**
    * Accepts the vector the car actually sends ("{1,0,0,0,0,0}") and, as a
    * fallback, a plain integer bitmask — the shape the other publisher build
@@ -3881,6 +5024,7 @@ class Component extends DCLogic {
     if (typeof this._setTrunkOpen === 'function') {
       applySlot(slots[CAR_DOOR_SLOTS.trunk], (pct) => this._setTrunkOpen(pct));
     }
+    this._syncEventCamera();
   }
 
   /**
@@ -3911,6 +5055,7 @@ class Component extends DCLogic {
     }
     this._sunroofStep = CAR_OPENING_STEP;
     this._setSunroofOpen(pct);
+    this._syncEventCamera();
   }
 
   /**
@@ -3934,6 +5079,7 @@ class Component extends DCLogic {
     if (setter === '_setSunroofOpen') this._sunroofStep = CAR_OPENING_STEP;
     else if (setter === '_setCurtainOpen') this._curtainStep = CAR_OPENING_STEP;
     this[setter](pct);
+    this._syncEventCamera();
   }
 
   /** Steering-wheel degrees → road-wheel degrees, clamped to the model's range. */
@@ -3973,7 +5119,6 @@ class Component extends DCLogic {
       return;
     }
     this._trackCarDeceleration(kmh);
-    this._setGraphValue('speed', kmh);
     // The OVERRIDE → MOTION slider is a preview control. Ignore repeats of
     // the speed we froze when the user took over (parked zeros, or the same
     // cruise). A genuinely new vehicle_speed yields the wheel back to the car.
@@ -3986,6 +5131,7 @@ class Component extends DCLogic {
       this._motionSpeedHeldByUi = false;
     }
     this._setMotionSpeed(kmh / CAR_SPEED_KMH_PER_UNIT);
+    this._syncEventCamera();
   }
 
   /**
@@ -4118,8 +5264,7 @@ class Component extends DCLogic {
   toggleConfigRail() {
     if (this.state.configExpanded) {
       // Closing config — restore the media rail on Android.
-      this._cancelWidgetPicker();
-      const patch = { configExpanded: false, panelOpen: false, activeGroup: null, shellMenuOpen: false };
+      const patch = { configExpanded: false, panelOpen: false, activeGroup: null };
       if (this._androidApp && this.state.shellMode !== 'appsOnly') {
         patch.mediaColumnVisible = true;
         patch.mediaRight = this._shellRight || 'idle';
@@ -4219,6 +5364,9 @@ class Component extends DCLogic {
       wheelStyle: s.wheelStyle,
       showFps: !!s.showFps,
       resScaleMode: s.resScaleMode || 'off',
+      camEventEnabled: !!s.camEventEnabled,
+      camCycleEnabled: !!s.camCycleEnabled,
+      camOrbitEnabled: !!s.camOrbitEnabled,
       layoutCameras: this._layoutCameras || {},
     };
     try {
@@ -4505,18 +5653,12 @@ class Component extends DCLogic {
       toggleCameraPanel: () => this.toggleCameraRail(),
       openSectionCamera: () => this.toggleCameraRail(true),
       cameraPresets: (() => {
-        const defs = [
-          { key: 'front',        label: 'FRONT',         title: 'Front view' },
-          { key: 'side',         label: 'SIDE',          title: 'Side view' },
-          { key: 'frontSide',    label: 'FRONT SIDE',    title: 'Front three-quarter' },
-          { key: 'frontTopSide', label: 'FRONT TOP SIDE', title: 'Elevated front three-quarter' },
-          { key: 'rearTopSide',  label: 'REAR TOP SIDE',  title: 'Elevated rear three-quarter' },
-          { key: 'rearSide',     label: 'REAR SIDE',     title: 'Rear three-quarter' },
-        ];
-        return defs.map((d) => {
+        return this._cameraPresetDefs().map((d) => {
           const on = s.cameraPreset === d.key;
           return {
             ...d,
+            flipClass: d.flip ? 'hv-cam-ico-flip' : '',
+            maskUrl: this._cameraPresetMaskUrl(d.icon),
             border: on ? '#4fd6e8' : 'rgba(79,214,232,.20)',
             bg: on ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
             col: on ? '#4fd6e8' : 'rgba(255,255,255,.70)',
@@ -4525,11 +5667,7 @@ class Component extends DCLogic {
         });
       })(),
       saveLayoutCamera: () => this.saveLayoutCamera(),
-      layoutCamSaveLabel: (() => {
-        const name = this._layoutCamLabel(this._currentLayoutCamKey());
-        if (s.layoutCamFlash && name) return 'SAVED · ' + name;
-        return name ? ('SAVE · ' + name) : 'SAVE LAYOUT';
-      })(),
+      layoutCamSaveLabel: s.layoutCamFlash ? 'SAVED TO CURRENT LAYOUT' : 'SAVE TO CURRENT LAYOUT',
       layoutCamSaveHint: this._currentLayoutCamKey()
         ? 'Orbit the car, then save this view as the home for the current layout.'
         : 'Switch to a car layout to save a home camera.',
@@ -4537,6 +5675,23 @@ class Component extends DCLogic {
       layoutCamSaveBg:     s.layoutCamFlash ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
       layoutCamSaveCol:    s.layoutCamFlash ? '#4fd6e8' : 'rgba(255,255,255,.70)',
       layoutCamSaveOpacity: this._currentLayoutCamKey() ? '1' : '0.4',
+      cameraOptions: (() => {
+        const defs = [
+          { key: 'camEventEnabled', label: 'ON EVENT', title: 'Doors, trunk, and roof move the camera. Restores the previous view when you start driving.' },
+          { key: 'camCycleEnabled', label: 'CYCLE 60s', title: 'Cycle camera views every 60 seconds while the car is moving.' },
+          { key: 'camOrbitEnabled', label: 'ORBIT', title: 'Very slow continuous orbit around the car.' },
+        ];
+        return defs.map((d) => {
+          const on = !!s[d.key];
+          return {
+            ...d,
+            border: on ? '#4fd6e8' : 'rgba(79,214,232,.20)',
+            bg: on ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
+            col: on ? '#4fd6e8' : 'rgba(255,255,255,.70)',
+            onClick: () => this._setCamOption(d.key, !s[d.key]),
+          };
+        });
+      })(),
       onSaveSettings: () => this.saveSettings(),
       saveBtnBorder: hv(s.saveFlash).border,
       saveBtnCol:    hv(s.saveFlash).col,
@@ -4905,6 +6060,7 @@ class Component extends DCLogic {
   _setSunroofOpen(pct) {
     this.setState({ sunroofOpen: pct });
     this._sunroofTarget = pct / 100;
+    this._syncEventCamera();
   }
 
   _applySunroofTransform(pct) {
@@ -4967,6 +6123,7 @@ class Component extends DCLogic {
   _setCurtainOpen(pct) {
     this.setState({ curtainOpen: pct });
     this._curtainTarget = pct / 100;
+    this._syncEventCamera();
   }
 
   _applyCurtainTransform(pct) {
@@ -4987,11 +6144,13 @@ class Component extends DCLogic {
     this.setState({ [`door${doorKey.toUpperCase()}Open`]: pct });
     if (!this._doorTargets) this._doorTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
     this._doorTargets[doorKey] = pct / 100;
+    this._syncEventCamera();
   }
 
   _setTrunkOpen(pct) {
     this.setState({ trunkOpen: pct });
     this._trunkTarget = pct / 100;
+    this._syncEventCamera();
   }
 
   _holdMotionFromUi(which) {
@@ -5287,6 +6446,7 @@ class Component extends DCLogic {
     if (!this._rangeDragging && !stopping && typeof prev === 'number' && Math.abs(prev - v) < 0.005) return;
     if (this._rangeDragging) return;
     this.setState({ motionSpeed: v });
+    this._syncEventCamera();
   }
 
   // Raises/lowers the car body (glass, interior, lights, shared floor) while
@@ -5358,8 +6518,11 @@ class Component extends DCLogic {
           vec2 uv = vUv - center;
           vec4 color = vec4(0.0);
           const int SAMPLES = 32;
+          // Partial arc, centred on the source orientation - see note above.
+          // A full 6.2831853 sweep is axisymmetric and cannot read as turning.
+          const float BLUR_ARC_RAD = 1.0472;   // 60 degrees
           for (int i = 0; i < SAMPLES; i++) {
-            float angle = float(i) * 6.2831853 / float(SAMPLES);
+            float angle = (float(i) / float(SAMPLES) - 0.5) * BLUR_ARC_RAD;
             float cosA = cos(angle);
             float sinA = sin(angle);
             vec2 rotatedUv = vec2(
@@ -6816,6 +7979,7 @@ class Component extends DCLogic {
     nightFloor.renderOrder = 1;
     nightFloor.receiveShadow = true;
     nightFloor.visible = false;
+    nightFloor.layers.enable(POOL_LAYER);   // receives the light pools
     this.scene.add(nightFloor);
     this.nightFloor = nightFloor;
 
@@ -6834,8 +7998,14 @@ class Component extends DCLogic {
     const { frontPos, rearPos, beamGnd, poolH, hlH, pd, pa, baseY, carW, carL, leftDir, forwardDir } = this._nightRigGeom;
     this._nightRigBuilt = true;
 
+    // Pool lights hang ABOVE the car aimed straight down, so on the way to the
+    // floor they rake the roof and bodywork — a red brake pool showed up as a
+    // specular smear on the roof from the front. Confining them to POOL_LAYER
+    // means they light the ground planes and nothing else: a light only
+    // illuminates objects whose layers it shares.
     const makePool = (hex, dist, angle) => {
       const sl = new THREE.SpotLight(hex, 0, dist, angle, 0.60, 2);
+      sl.layers.set(POOL_LAYER);
       sl.target = new THREE.Object3D();
       this.scene.add(sl.target);
       this.scene.add(sl);
@@ -6988,6 +8158,7 @@ class Component extends DCLogic {
     this._setTrunkOpen(targetVal);
     this._setSunroofOpen(targetVal);
     this._setCurtainOpen(targetVal);
+    this._syncEventCamera();
   }
 
   toggleSunroofCurtain() {
@@ -7124,6 +8295,7 @@ class Component extends DCLogic {
     plane.position.set(center.x, baseY + 0.008, center.z);
     plane.receiveShadow = true;
     plane.renderOrder = 2;
+    plane.layers.enable(POOL_LAYER);        // receives the light pools
     this.scene.add(plane);
     this.shadowCatcher = plane;
   }
@@ -8621,7 +9793,7 @@ class Component extends DCLogic {
       positionFrontAmber:  { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
       positionFrontLAmber: { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
       positionFrontRAmber: { color: [1.00, 0.48, 0.00], intensity: 0.36, toneMapped: false },
-      positionRear:        { color: [0.85, 0.04, 0.00], intensity: 2.0, toneMapped: false }, // red running light. toneMapped:false + higher intensity so the thin LED strip stays visibly lit at distance — at 0.5/toneMapped the sub-pixel-averaged strip washed out as the camera pulled back. Still well below brake (4.0).
+      positionRear:        { color: [1.00, 0.00, 0.00], intensity: 2.0, toneMapped: false }, // same pure red as brake (4.0) — hue matches, intensity carries the difference. Was [0.85,0.04,0] which read orange next to the brake lamp. toneMapped:false + higher intensity so the thin LED strip stays visibly lit at distance — at 0.5/toneMapped the sub-pixel-averaged strip washed out as the camera pulled back. Still well below brake (4.0).
       position:            { color: [1.00, 0.91, 0.75], intensity: 0.8  }, // fallback
       headlight:           { color: [0.87, 0.93, 1.00], intensity: 28.0, toneMapped: false }, // strong beam
       highbeam:            { color: [0.90, 0.95, 1.00], intensity: 32.0, toneMapped: false }, // inner projector, brighter
@@ -11222,7 +12394,7 @@ class Component extends DCLogic {
       // FPS / SKIP sit 60px above the screen edge (above the climate dock).
       const hudEl = document.createElement('div');
       hudEl.style.cssText = 'position:absolute;left:14px;' +
-        'bottom:var(--hv-launcher-bottom, 60px);z-index:30;' +
+        'bottom:max(var(--hv-safe-bottom, 60px), var(--hv-launcher-bottom, 60px));z-index:30;' +
         'display:flex;align-items:center;gap:6px;pointer-events:none;user-select:none;';
       container.appendChild(hudEl);
       this._hudEl = hudEl;
@@ -11352,6 +12524,13 @@ class Component extends DCLogic {
         this._extRenderSeq = (this._extRenderSeq || 0) + 1;
       };
       controls.addEventListener('change', () => this.requestRender(2));
+      controls.addEventListener('start', () => {
+        this._camCycleElapsed = 0;
+        if (this._camEventKind && this._camEventKind !== 'user') {
+          this._camEventDismissedKind = this._camEventKind;
+          this._camEventUserOverride = true;
+        }
+      });
       // ── Adaptive pixel ratio ───────────────────────────────────────────────
       // Step DPR within [1.0 .. cap] from sustained render cost (rendered frames
       // only), so weak GPUs stay smooth and strong ones stay crisp.
@@ -11932,6 +13111,14 @@ class Component extends DCLogic {
           this._postFxDirty = true;
           this.requestRender(2);
         }
+        if (this._tickCamCycle(_dt)) {
+          cameraBusy = true;
+          needRender = true;
+          this._postFxDirty = true;
+          this.requestRender(2);
+        }
+        if (this._camRestorePending) this._syncEventCamera();
+        this._syncCamOrbit();
         // controls.update() must run every frame for damping; true = camera moved
         if (controls.update()) {
           cameraBusy = true;
@@ -13155,7 +14342,7 @@ class Component extends DCLogic {
     // While the load intro (or a preset tween) owns the camera, only remember
     // the shell framing — don't snap or apply view-offset over the animation.
     // Applying view-offset here desyncs bloom/streak overlays from the car.
-    if (this._introActive || this._camAnim) {
+    if (this._introActive || this._camAnim || this._camEventKind) {
       this._fitCam = { distMul: target.distMul, viewShift };
       this._fitCamMode = mode;
       return;
@@ -13220,6 +14407,86 @@ class Component extends DCLogic {
     return this._layoutHomePose();
   }
 
+  _cameraPresetDefs() {
+    // icon: drawing used as a "what you'll see" silhouette. flip mirrors L/R.
+    return [
+      { key: 'front',         icon: 'front',     title: 'Front' },
+      { key: 'frontSide',     icon: 'frontSide', title: 'Front three-quarter' },
+      { key: 'side',          icon: 'side',      title: 'Right side' },
+      { key: 'rearSide',      icon: 'rearSide',  title: 'Rear three-quarter' },
+      { key: 'rear',          icon: 'rear',      title: 'Rear' },
+      { key: 'rearSideLeft',  icon: 'rearSide',  title: 'Rear three-quarter, left',  flip: true },
+      { key: 'sideLeft',      icon: 'side',      title: 'Left side',                 flip: true },
+      { key: 'frontSideLeft', icon: 'frontSide', title: 'Front three-quarter, left', flip: true },
+      { key: 'frontTopSide',  icon: 'frontTop',  title: 'Elevated front three-quarter' },
+      { key: 'top',           icon: 'top',       title: 'Top' },
+      { key: 'rearTopSide',   icon: 'rearTop',   title: 'Elevated rear three-quarter' },
+      { key: 'topSide',       icon: 'topSide',   title: 'High side / doors' },
+    ];
+  }
+
+  _cameraPresetMaskUrl(icon) {
+    if (!this._camMaskUrls) this._camMaskUrls = {};
+    if (this._camMaskUrls[icon]) return this._camMaskUrls[icon];
+    const svg = this._cameraViewSvg(icon);
+    if (!svg) return '';
+    return this._camMaskUrls[icon] = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  // Filled SUV glyphs drawn as the car appears FROM that camera.
+  // Glass is an even-odd hole so the silhouette still reads at ~40px.
+  _cameraViewSvg(icon) {
+    const ns = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='black'>";
+    const map = {
+      front:
+        "<path fill-rule='evenodd' d='M8 13.1 11.1 7.4h9.8L24 13.1V21H8V13.1Zm3.5-3.9h8.8l1.7 3.1H9.8l1.7-3.1Z'/>" +
+        "<path d='M7.2 21h17.6v1.5H7.2z'/>" +
+        "<circle cx='11' cy='23.5' r='2.45'/><circle cx='21' cy='23.5' r='2.45'/>" +
+        "<rect x='9.1' y='16.2' width='4.3' height='1.65' rx='.45'/>" +
+        "<rect x='18.6' y='16.2' width='4.3' height='1.65' rx='.45'/>",
+      rear:
+        "<path fill-rule='evenodd' d='M8 12.6 10.6 7.8h10.8L24 12.6V21H8V12.6Zm4.1-2.8h7.8l1.3 2.7H10.8l1.3-2.7Z'/>" +
+        "<path d='M7.2 21h17.6v1.5H7.2z'/>" +
+        "<circle cx='11' cy='23.5' r='2.45'/><circle cx='21' cy='23.5' r='2.45'/>" +
+        "<rect x='8.7' y='15.5' width='5.1' height='2.05' rx='.5'/>" +
+        "<rect x='18.2' y='15.5' width='5.1' height='2.05' rx='.5'/>",
+      side:
+        "<path fill-rule='evenodd' d='M3.8 18.4 6.6 13.8 11 10.6h8.8l3.2 2.4 4.4.9v5.3H3.8v-.8Zm7.4-6.1h8l2 1.65H10l1.2-1.65Z'/>" +
+        "<path d='M3.8 19.6h22.2v1.35H3.8z'/>" +
+        "<circle cx='10.2' cy='22.8' r='2.65'/><circle cx='22.3' cy='22.8' r='2.65'/>",
+      frontSide:
+        "<path fill-rule='evenodd' d='M6.4 14.7 10.4 8.8l7.2-1 1.3 4.4 7.1 1.3v7.1l-8.2 1.3L6.4 20.4V14.7Zm4.6-4.1 5.6-.7 1 3.1-5.9.8-1-3.2Z'/>" +
+        "<circle cx='11.2' cy='22.3' r='2.35'/><circle cx='20.6' cy='22.9' r='2.35'/>" +
+        "<ellipse cx='24.1' cy='21.5' rx='1.45' ry='1.75'/>" +
+        "<rect x='7.4' y='16.4' width='3.4' height='1.45' rx='.4'/>",
+      rearSide:
+        "<path fill-rule='evenodd' d='M6.6 13.9 9.2 8.9l7.1-.7 1.4 4.3 7.2 1.4v7.1l-8.4 1.3L6.6 20.2V13.9Zm3.8-3.4 5.4-.5.95 3.05-5.6.7-.75-3.25Z'/>" +
+        "<circle cx='11' cy='22.2' r='2.35'/><circle cx='20.8' cy='22.9' r='2.35'/>" +
+        "<ellipse cx='24.2' cy='21.5' rx='1.45' ry='1.75'/>" +
+        "<rect x='7.2' y='15.6' width='4.1' height='1.7' rx='.4'/>",
+      top:
+        "<path fill-rule='evenodd' d='M10.2 3.6h11.6l2.6 4.1v16.6l-2.6 4.1H10.2l-2.6-4.1V7.7l2.6-4.1Zm2.1 2.6h7.4l-1.5 4.1h-4.4l-1.5-4.1Z'/>" +
+        "<rect x='8.2' y='8.8' width='2.1' height='3.4' rx='.7'/>" +
+        "<rect x='21.7' y='8.8' width='2.1' height='3.4' rx='.7'/>" +
+        "<rect x='8.2' y='19.6' width='2.1' height='3.4' rx='.7'/>" +
+        "<rect x='21.7' y='19.6' width='2.1' height='3.4' rx='.7'/>",
+      frontTop:
+        "<path fill-rule='evenodd' d='M7.2 15.2 11.6 8.2l8.4-1.4 1.6 5.6 5.2 1.6v6.6l-9.6 1.8L7.2 20.6V15.2Zm4.6-5 6.6-1 1.2 3.8-7 1.1-1-3.9Z'/>" +
+        "<circle cx='12' cy='22.6' r='2.15'/><circle cx='21.4' cy='23.1' r='2.15'/>" +
+        "<path d='M9.2 13.4h8.8l1.4 2.2H9.8z' opacity='.35'/>",
+      rearTop:
+        "<path fill-rule='evenodd' d='M7.4 14.6 10.4 8.4l8.2-1.2 1.6 5.4 5.4 1.6v6.8l-9.8 1.7L7.4 20.2V14.6Zm3.6-4.4 6.2-.8 1.1 3.6-6.6 1-1-3.8Z'/>" +
+        "<circle cx='11.8' cy='22.5' r='2.15'/><circle cx='21.6' cy='23.1' r='2.15'/>" +
+        "<rect x='8' y='16.2' width='4.4' height='1.6' rx='.4'/>",
+      topSide:
+        "<path fill-rule='evenodd' d='M8.4 14.8 12.6 7.2h8.2l4.2 4.4v9.2l-6.8 2.2H8.8l-.4-8.2Zm4.4-5.6h6.6l2.4 3.2H11.2l1.6-3.2Z'/>" +
+        "<circle cx='12.2' cy='22.8' r='2.2'/><circle cx='21.8' cy='23.2' r='2.2'/>",
+    };
+    const body = map[icon];
+    if (!body) return '';
+    return ns + body + "</svg>";
+  }
+
   _getCameraPresetPose(key) {
     if (!this._fitCenter || !this._fitDist) return null;
     if (key === 'home') return this._homeCameraPose();
@@ -13232,19 +14499,27 @@ class Component extends DCLogic {
       .addScaledVector(R, d * r)
       .add(new THREE.Vector3(0, d * y, 0));
     const map = {
-      front:        pos(1.12,  0.00, 0.14),
-      side:         pos(0.05,  1.18, 0.20),
-      frontSide:    pos(0.78,  0.78, 0.22),
-      frontTopSide: pos(0.66,  0.70, 0.38),
-      rearTopSide:  pos(-0.66, 0.70, 0.38),
-      rearSide:     pos(-0.78, 0.78, 0.22),
+      front:         pos(1.12,   0.00, 0.14),
+      frontSide:     pos(0.78,   0.78, 0.22),
+      side:          pos(0.05,   1.18, 0.20),
+      rearSide:      pos(-0.78,  0.78, 0.22),
+      rear:          pos(-1.12,  0.00, 0.16),
+      rearSideLeft:  pos(-0.78, -0.78, 0.22),
+      sideLeft:      pos(0.05,  -1.18, 0.20),
+      frontSideLeft: pos(0.78,  -0.78, 0.22),
+      frontTopSide:  pos(0.66,   0.70, 0.38),
+      top:           pos(0.08,   0.12, 1.08),
+      rearTopSide:   pos(-0.66,  0.70, 0.38),
+      topSide:       pos(0.20,   0.55, 0.90),
     };
     const position = map[key];
     if (!position) return null;
     const home = this._layoutHomePose();
+    const target = c.clone();
+    if (key === 'top') target.y += d * 0.10;
     return {
       position,
-      target: c.clone(),
+      target,
       viewShift: home && home.viewShift != null ? home.viewShift : this._currentViewShift(),
     };
   }
@@ -13262,7 +14537,10 @@ class Component extends DCLogic {
       dur: Math.max(0.2, durationSec || 1.1),
     };
     this._fitCamTo = null;
-    if (this.controls) this.controls.enabled = false;
+    if (this.controls) {
+      this.controls.enabled = false;
+      this.controls.autoRotate = false;
+    }
     if (this.requestRender) this.requestRender(90);
   }
 
@@ -13285,6 +14563,7 @@ class Component extends DCLogic {
       this._camAnim = null;
       if (this._fitCam && a.toShift != null) this._fitCam.viewShift = a.toShift;
       if (!this._introActive && this.controls) this.controls.enabled = true;
+      this._syncCamOrbit();
     }
     return true;
   }
@@ -13293,8 +14572,208 @@ class Component extends DCLogic {
     if (this._introActive) return;
     const pose = this._getCameraPresetPose(key);
     if (!pose) return;
+    this._camCycleElapsed = 0;
+    if (this._camEventKind) {
+      this._camEventDismissedKind = this._camEventKind;
+      this._camEventUserOverride = true;
+      this._camEventKind = null;
+    }
     this.setState({ cameraPreset: key });
     this._animateCameraTo(pose, 1.05);
+  }
+
+  _carIsMoving() {
+    return Math.abs(this._currentMotionSpeed()) > CAM_MOVE_THRESH;
+  }
+
+  _roofEventBusy() {
+    return this._sunroofProgress !== this._sunroofTarget
+      || this._curtainProgress !== this._curtainTarget;
+  }
+
+  _desiredEventCamKind() {
+    const t = this._doorTargets || {};
+    const p = this._doorProgress || {};
+    const doorAmt = Math.max(t.fl || 0, t.fr || 0, t.rl || 0, t.rr || 0,
+      p.fl || 0, p.fr || 0, p.rl || 0, p.rr || 0);
+    if (doorAmt > CAM_EVENT_OPEN_THRESH) return 'doors';
+    if (Math.max(this._trunkTarget || 0, this._trunkProgress || 0) > CAM_EVENT_OPEN_THRESH) return 'trunk';
+    if (Math.max(this._sunroofTarget || 0, this._sunroofProgress || 0) > CAM_EVENT_OPEN_THRESH
+      || Math.max(this._curtainTarget || 0, this._curtainProgress || 0) > CAM_EVENT_OPEN_THRESH) {
+      return 'roof';
+    }
+    return null;
+  }
+
+  _eventCamPose(kind) {
+    if (!this._fitCenter || !this._fitDist) return null;
+    const THREE = window.THREE;
+    const c = this._fitCenter.clone();
+    const d = this._fitDist;
+    const { F, R } = this._carBasis();
+    const pos = (f, r, y) => c.clone()
+      .addScaledVector(F, d * f)
+      .addScaledVector(R, d * r)
+      .add(new THREE.Vector3(0, d * y, 0));
+    const tgt = (f, r, y) => c.clone()
+      .addScaledVector(F, d * (f || 0))
+      .addScaledVector(R, d * (r || 0))
+      .add(new THREE.Vector3(0, d * (y || 0), 0));
+    const home = this._layoutHomePose();
+    const viewShift = home && home.viewShift != null ? home.viewShift : this._currentViewShift();
+    if (kind === 'doors') {
+      return { position: pos(0.16, 0.50, 0.96), target: tgt(0.00, 0, 0.05), viewShift };
+    }
+    if (kind === 'trunk') {
+      return { position: pos(-0.96, 0.36, 0.30), target: tgt(-0.28, 0, 0.08), viewShift };
+    }
+    if (kind === 'roof') {
+      return { position: pos(0.14, 0.10, 0.98), target: tgt(0.04, 0, 0.14), viewShift };
+    }
+    return null;
+  }
+
+  _clearEventCam() {
+    this._camEventKind = null;
+    this._camEventPrevRel = null;
+    this._camEventPrevPreset = null;
+    this._camEventUserOverride = false;
+    this._camEventDismissedKind = null;
+    this._camRestorePending = false;
+  }
+
+  _enterEventCam(kind) {
+    if (!kind || this._camEventKind === kind) return;
+    if (this._camEventDismissedKind === kind) return;
+    if (this._camEventDismissedKind && this._camEventDismissedKind !== kind) {
+      this._camEventDismissedKind = null;
+      this._camEventUserOverride = false;
+    }
+    const pose = this._eventCamPose(kind);
+    if (!pose) return;
+    if (!this._camEventPrevRel) {
+      this._camEventPrevRel = this._captureCurrentLayoutCam();
+      this._camEventPrevPreset = this.state.cameraPreset;
+    }
+    this._camEventKind = kind;
+    this._camEventUserOverride = false;
+    this.setState({ cameraPreset: null });
+    this._animateCameraTo(pose, 1.2);
+  }
+
+  _restoreEventCam() {
+    if (!this._camEventKind && !this._camEventPrevRel && !this._camRestorePending) return;
+    if (this._introActive) {
+      this._clearEventCam();
+      return;
+    }
+    const skip = this._camEventUserOverride;
+    const rel = this._camEventPrevRel;
+    const preset = this._camEventPrevPreset;
+    this._clearEventCam();
+    this._camCycleElapsed = 0;
+    if (skip) return;
+    if (preset) {
+      this.setCameraPreset(preset);
+      return;
+    }
+    if (!rel) return;
+    const pose = this._relToPose(rel);
+    if (pose) this._animateCameraTo(pose, 1.15);
+  }
+
+  _syncEventCamera() {
+    if (!this.state || !this.state.camEventEnabled) return;
+    if (this._introActive || !this._introPlayed) return;
+    if (!this.camera || !this.controls || !this._fitCenter) return;
+
+    const kind = this._desiredEventCamKind();
+    const moving = this._carIsMoving();
+    const roofBusy = this._roofEventBusy();
+
+    if (kind && !moving) {
+      this._camRestorePending = false;
+      this._enterEventCam(kind);
+      return;
+    }
+
+    if (kind && moving) {
+      if (kind === 'roof' && roofBusy) {
+        this._enterEventCam('roof');
+        this._camRestorePending = true;
+        return;
+      }
+      if (this._camEventKind || this._camRestorePending) {
+        if (roofBusy) {
+          this._camRestorePending = true;
+          return;
+        }
+        this._restoreEventCam();
+      }
+      return;
+    }
+
+    if (this._camEventKind || this._camRestorePending) {
+      if (roofBusy) {
+        this._camRestorePending = true;
+        return;
+      }
+      this._restoreEventCam();
+    }
+  }
+
+  _tickCamCycle(dt) {
+    if (!this.state || !this.state.camCycleEnabled) return false;
+    if (this._introActive || this._camAnim || this._camEventKind) return false;
+    if (!this._carIsMoving()) {
+      this._camCycleElapsed = 0;
+      return false;
+    }
+    this._camCycleElapsed = (this._camCycleElapsed || 0) + dt;
+    if (this._camCycleElapsed < CAM_CYCLE_SEC) return false;
+    this._camCycleElapsed = 0;
+    const keys = this._camCycleKeys || [];
+    if (!keys.length) return false;
+    const cur = this.state.cameraPreset;
+    const idx = keys.indexOf(cur);
+    const next = keys[(idx + 1) % keys.length];
+    this.setCameraPreset(next);
+    return true;
+  }
+
+  _syncCamOrbit() {
+    if (!this.controls) return;
+    const on = !!(this.state && this.state.camOrbitEnabled)
+      && !this._introActive && !this._camAnim;
+    this.controls.autoRotate = on;
+    if (on) this.controls.autoRotateSpeed = CAM_ORBIT_SPEED;
+  }
+
+  _setCamOption(key, enabled) {
+    const on = !!enabled;
+    this.setState({ [key]: on });
+    try {
+      const raw = localStorage.getItem(this._settingsStorageKey());
+      const saved = (raw ? JSON.parse(raw) : {}) || {};
+      if (saved && typeof saved === 'object') {
+        saved.camEventEnabled = key === 'camEventEnabled' ? on : !!this.state.camEventEnabled;
+        saved.camCycleEnabled = key === 'camCycleEnabled' ? on : !!this.state.camCycleEnabled;
+        saved.camOrbitEnabled = key === 'camOrbitEnabled' ? on : !!this.state.camOrbitEnabled;
+        localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
+        if (this._savedSettings) {
+          this._savedSettings.camEventEnabled = saved.camEventEnabled;
+          this._savedSettings.camCycleEnabled = saved.camCycleEnabled;
+          this._savedSettings.camOrbitEnabled = saved.camOrbitEnabled;
+        }
+      }
+    } catch (e) {}
+    this._syncCamOrbit();
+    if (key === 'camEventEnabled') {
+      if (on) this._syncEventCamera();
+      else this._restoreEventCam();
+    }
+    if (key === 'camCycleEnabled') this._camCycleElapsed = 0;
+    if (this.requestRender) this.requestRender(12);
   }
 
   /**
@@ -13637,6 +15116,8 @@ class Component extends DCLogic {
       if (splash && splash.fadeOut) splash.fadeOut();
       this.setState({ splashActive: false });
       this._revealShellChrome();
+      this._syncCamOrbit();
+      this._syncEventCamera();
       return;
     }
     this.camera.position.copy(poses.front);
@@ -13681,6 +15162,8 @@ class Component extends DCLogic {
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     // Settle on the shell-aware top-side home framing (incl. view-offset).
     this._applyFitCamera(!!window.__androidPopupActive);
+    this._syncCamOrbit();
+    this._syncEventCamera();
     if (this.requestRender) this.requestRender(8);
   }
 
@@ -13858,7 +15341,7 @@ class Component extends DCLogic {
   _widgetCatalog() {
     return {
       media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2]] },
-      power: { label: 'POWER', title: 'Power', hint: 'Draft — coming next', sizes: [[1, 1], [2, 1], [3, 1], [2, 2]] },
+      power: { label: 'POWER', title: 'Fluxo', hint: '', sizes: [[1, 1], [2, 1], [3, 1], [2, 2]] },
       modes: { label: 'MODES', title: 'Car modes', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2], [1, 1]] },
       graphs: { label: 'GRAPHS', title: 'Power', hint: '', sizes: [[2, 1], [3, 1], [2, 2], [3, 2]] },
     };
@@ -14013,13 +15496,13 @@ class Component extends DCLogic {
     return sides;
   }
 
-  _sizeFitsAnySide(w, h, cols, mode) {
+  _sizeFitsAnySide(w, h, cols, mode, ignoreId) {
     const sides = this._widgetPlaceSides(mode);
     for (let i = 0; i < sides.length; i++) {
       const items = this._board(sides[i], mode).items || [];
       for (let y = 0; y < 2; y++) {
         for (let x = 0; x < cols; x++) {
-          if (this._fits(items, cols, x, y, w, h)) return true;
+          if (this._fits(items, cols, x, y, w, h, ignoreId)) return true;
         }
       }
     }
@@ -14038,6 +15521,8 @@ class Component extends DCLogic {
 
   _widgetItemView(item, side) {
     const cat = this._widgetCatalog()[item.type] || { label: (item.type || '').toUpperCase(), title: item.type, hint: '' };
+    const menuOpen = this.state.widgetMenuId === item.id;
+    const moving = this.state.widgetPlaceMode === 'move' && this.state.widgetPlaceId === item.id;
     const view = {
       id: item.id,
       label: cat.label,
@@ -14046,19 +15531,29 @@ class Component extends DCLogic {
       isMedia: item.type === 'media',
       isModes: item.type === 'modes',
       isGraphs: item.type === 'graphs',
-      isStub: item.type !== 'media' && item.type !== 'modes' && item.type !== 'graphs',
+      isPower: item.type === 'power',
+      isStub: item.type !== 'media' && item.type !== 'modes' && item.type !== 'graphs' && item.type !== 'power',
       mediaSizeClass: item.type === 'media' ? ('hv-media-' + (item.w || 2) + 'x' + (item.h || 1)) : '',
       modeSizeClass: '',
       graphSizeClass: '',
       graphShowBars: false,
       graphGridStyle: '',
       graphPanes: [],
-      graphMenuOpen: false,
-      showRemove: item.type !== 'graphs',
-      onHoldStart: () => {},
-      onHoldEnd: () => {},
-      onContextMenu: () => {},
+      showRemove: menuOpen,
+      menuOpen: menuOpen,
+      showEdit: item.type === 'graphs',
+      showResize: this._widgetResizeSizes(item).length > 0,
+      cardClass: moving ? 'moving' : (menuOpen ? 'editing' : ''),
+      onHoldStart: (ev) => this._onWidgetHoldStart(side, item, ev),
+      onHoldEnd: (ev) => this._onWidgetHoldEnd(side, item, ev),
+      onHoldCancel: (ev) => this._onWidgetHoldCancel(side, item, ev),
+      onContextMenu: (ev) => { if (ev && ev.preventDefault) ev.preventDefault(); },
       onEdit: () => {},
+      onResize: (ev) => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        this._startWidgetResize(side, item);
+      },
+      onMenuDismiss: () => this._dismissWidgetMenu(),
       isModeWide: false,
       isModeStack: false,
       modeRows: [],
@@ -14068,6 +15563,7 @@ class Component extends DCLogic {
     };
     if (item.type === 'modes') Object.assign(view, this._modeWidgetView(item));
     if (item.type === 'graphs') Object.assign(view, this._graphWidgetView(item, side));
+    if (item.type === 'power') Object.assign(view, this._powerWidgetView(item));
     return view;
   }
 
@@ -14083,17 +15579,19 @@ class Component extends DCLogic {
 
   _placeCells(side) {
     const s = this.state;
-    if (!s.widgetPlaceType) return [];
+    if (!s.widgetPlaceType || s.widgetPickerStep) return [];
+    const w = s.widgetPlaceW;
+    const h = s.widgetPlaceH;
+    if (!w || !h) return [];
     if (s.widgetPlaceSide && s.widgetPlaceSide !== side) return [];
     if (this._widgetPlaceSides().indexOf(side) < 0) return [];
     const cols = this._gridColsForMode(s.shellMode);
     const items = this._board(side).items || [];
-    const w = s.widgetPlaceW;
-    const h = s.widgetPlaceH;
+    const ignoreId = (s.widgetPlaceMode === 'move' || s.widgetPlaceMode === 'resize') ? s.widgetPlaceId : null;
     const cells = [];
     for (let y = 0; y < 2; y++) {
       for (let x = 0; x < cols; x++) {
-        if (!this._fits(items, cols, x, y, w, h)) continue;
+        if (!this._fits(items, cols, x, y, w, h, ignoreId)) continue;
         cells.push({
           cls: 'on',
           gridStyle: 'grid-column:' + (x + 1) + ' / span 1;grid-row:' + (y + 1) + ' / span 1',
@@ -14131,10 +15629,12 @@ class Component extends DCLogic {
       const usedMedia = this._hasWidgetType(mode, 'media');
       const usedModes = this._hasWidgetType(mode, 'modes');
       const usedGraphs = this._hasWidgetType(mode, 'graphs');
+      const usedPower = this._hasWidgetType(mode, 'power');
       pickerItems = Object.keys(cat).map((key) => {
         const blocked = (key === 'media' && usedMedia)
           || (key === 'modes' && usedModes)
-          || (key === 'graphs' && usedGraphs);
+          || (key === 'graphs' && usedGraphs)
+          || (key === 'power' && usedPower);
         return {
           label: cat[key].label + (blocked ? '  ·  added' : ''),
           opacity: blocked ? '0.35' : '1',
@@ -14144,16 +15644,20 @@ class Component extends DCLogic {
     } else if (s.widgetPickerStep === 'size') {
       pickerTitle = 'SIZE';
       const def = this._widgetCatalog()[s.widgetPlaceType] || { sizes: [[2, 1]] };
+      const ignoreId = s.widgetPlaceId;
+      const found = ignoreId ? this._findWidget(ignoreId, mode) : null;
+      const cur = found && found.item;
       pickerItems = def.sizes
         .filter((sz) => sz[0] <= cols)
-        .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, mode))
+        .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, mode, ignoreId))
+        .filter((sz) => !cur || sz[0] !== cur.w || sz[1] !== cur.h)
         .map((sz) => ({
           label: sz[0] + ' × ' + sz[1],
           opacity: '1',
           onClick: () => this._pickWidgetSize(sz[0], sz[1]),
         }));
     }
-    this._syncGraphLoop(this._hasWidgetType(mode, 'graphs'));
+    this._syncGraphLoop(this._hasWidgetType(mode, 'graphs') || this._hasWidgetType(mode, 'power'));
     const editor = this._graphEditorFields();
     const boardLeftPx = parseFloat(leftRect.left) || 0;
     const dock = this._configDockFields(s, leftRect);
@@ -14172,12 +15676,14 @@ class Component extends DCLogic {
       rightBoardHeight: rightRect.height,
       leftGridCols: 'repeat(' + cols + ', 1fr)',
       rightGridCols: 'repeat(' + cols + ', 1fr)',
+      widgetPlaceGridClass: (s.widgetPlaceType && !s.widgetPickerStep && s.widgetPlaceW && s.widgetPlaceH) ? 'placing' : '',
       leftWidgetItems: (this._board('left', mode).items || []).map((it) => this._widgetItemView(it, 'left')),
       rightWidgetItems: (this._board('right', mode).items || []).map((it) => this._widgetItemView(it, 'right')),
       leftPlaceCells: this._placeCells('left'),
       rightPlaceCells: this._placeCells('right'),
       addWidget: () => this._openWidgetPicker(),
       addWidgetBtnDisplay: (this._androidApp && !s.error && onMain) ? 'inline-flex' : 'none',
+      addWidgetBtnClass: addOn ? 'on' : '',
       addWidgetBtnBorder: addBtn.border,
       addWidgetBtnCol: addBtn.col,
       addWidgetBtnBg: addBtn.bg,
@@ -14185,6 +15691,7 @@ class Component extends DCLogic {
       widgetPickerTitle: pickerTitle,
       widgetPickerItems: pickerItems,
       graphEditorDisplay: editor.graphEditorDisplay,
+      graphEditorStyle: editor.graphEditorStyle,
       graphLayoutChips: editor.graphLayoutChips,
       graphPaneEditors: editor.graphPaneEditors,
       onGraphEditorClose: editor.onGraphEditorClose,
@@ -14197,6 +15704,7 @@ class Component extends DCLogic {
     const close = () => this._closeGraphEditor();
     const empty = {
       graphEditorDisplay: 'none',
+      graphEditorStyle: '',
       graphLayoutChips: [],
       graphPaneEditors: [],
       onGraphEditorClose: close,
@@ -14222,10 +15730,59 @@ class Component extends DCLogic {
     }
     return {
       graphEditorDisplay: 'block',
+      graphEditorStyle: this._graphEditorBox(side, item),
       graphLayoutChips: layoutChips,
       graphPaneEditors: paneEditors,
       onGraphEditorClose: close,
     };
+  }
+
+  _widgetCardRect(side, item) {
+    const fallback = side === 'right'
+      ? { l: 1180, t: 100, r: 1872, b: 530 }
+      : { l: 48, t: 100, r: 740, b: 530 };
+    const b = (side === 'right' ? this._shellRightBounds : this._shellLeftBounds) || fallback;
+    const left = b.l || 0;
+    const top = b.t || 0;
+    const width = Math.max(0, (b.r || 0) - (b.l || 0));
+    const height = Math.max(0, (b.b || 0) - (b.t || 0));
+    const cols = this._gridColsForMode(this.state.shellMode || 'triple');
+    const gap = 8;
+    const cellW = cols > 0 ? (width - gap * (cols - 1)) / cols : width;
+    const cellH = (height - gap) / 2;
+    const x = item.x || 0;
+    const y = item.y || 0;
+    const w = item.w || 1;
+    const h = item.h || 1;
+    return {
+      left: left + x * (cellW + gap),
+      top: top + y * (cellH + gap),
+      width: w * cellW + Math.max(0, w - 1) * gap,
+      height: h * cellH + Math.max(0, h - 1) * gap,
+    };
+  }
+
+  _graphEditorBox(side, item) {
+    const r = this._widgetCardRect(side, item);
+    const launcher = this._launcherBottomPx == null ? 60 : this._launcherBottomPx;
+    const vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
+    const vh = (typeof window !== 'undefined' && window.innerHeight) ? window.innerHeight : 720;
+    const pad = 8;
+    const maxBottom = vh - launcher - pad;
+    let left = r.left;
+    let top = r.top;
+    let width = r.width;
+    if (width < 200) width = Math.min(320, vw - pad * 2);
+    if (left + width > vw - pad) left = Math.max(pad, vw - pad - width);
+    if (left < pad) left = pad;
+    let maxH = Math.min(r.height, maxBottom - top);
+    if (maxH < 140 && top + r.height > maxBottom) {
+      top = Math.max(pad, maxBottom - Math.min(r.height, maxBottom - pad));
+      maxH = Math.min(r.height, maxBottom - top);
+    }
+    if (maxH < 120) maxH = Math.max(120, maxBottom - pad);
+    return 'left:' + Math.round(left) + 'px;top:' + Math.round(top) + 'px;width:'
+      + Math.round(width) + 'px;max-height:' + Math.round(maxH) + 'px;';
   }
 
   _graphPaneEditorView(pane, index) {
@@ -14260,6 +15817,15 @@ class Component extends DCLogic {
         onClick: (function(pi, key) { return function() { self._setGraphVizStyle(pi, key); }; })(index, vs.key),
       });
     }
+    const graphStyles = [];
+    for (let i = 0; i < CAR_GRAPH_STYLES.length; i++) {
+      const gs = CAR_GRAPH_STYLES[i];
+      graphStyles.push({
+        label: gs.label,
+        className: pane.graphStyle === gs.key ? 'on' : '',
+        onClick: (function(pi, key) { return function() { self._setGraphDrawStyle(pi, key); }; })(index, gs.key),
+      });
+    }
     return {
       label: String(index + 1),
       isSeries: pane.kind !== 'viz',
@@ -14275,6 +15841,7 @@ class Component extends DCLogic {
       onY1Ruler: (function(i) { return function() { self._toggleGraphRuler(i, 'y1Rulers'); }; })(index),
       onY2Ruler: (function(i) { return function() { self._toggleGraphRuler(i, 'y2Rulers'); }; })(index),
       vizStyles: vizStyles,
+      graphStyles: graphStyles,
     };
   }
 
@@ -14296,6 +15863,11 @@ class Component extends DCLogic {
       widgetPlaceType: null,
       widgetPlaceW: 0,
       widgetPlaceH: 0,
+      widgetPlaceMode: 'add',
+      widgetPlaceId: null,
+      widgetPlaceFromSide: null,
+      widgetMenuId: null,
+      widgetMenuSide: null,
       panelOpen: false,
       shellMenuOpen: false,
     });
@@ -14310,8 +15882,9 @@ class Component extends DCLogic {
   _cancelWidgetPicker() {
     const side = this.state.widgetPlaceSide;
     const restore = this._slotUseBeforePicker;
-    const had = !!(this.state.widgetPickerStep || this.state.widgetPlaceType || side);
+    const had = !!(this.state.widgetPickerStep || this.state.widgetPlaceType || this.state.widgetPlaceMode || side);
     this._slotUseBeforePicker = null;
+    this._clearWidgetHold();
     if (!had) return;
     this.setState({
       widgetPickerStep: null,
@@ -14319,6 +15892,9 @@ class Component extends DCLogic {
       widgetPlaceType: null,
       widgetPlaceW: 0,
       widgetPlaceH: 0,
+      widgetPlaceMode: null,
+      widgetPlaceId: null,
+      widgetPlaceFromSide: null,
     });
     if (side && !this._widgetPickerCommitted) {
       this._setSlotUse(side, restore || 'app');
@@ -14339,21 +15915,31 @@ class Component extends DCLogic {
       this._pickWidgetSize(sizes[0][0], sizes[0][1], type);
       return;
     }
-    this.setState({ widgetPickerStep: 'size', widgetPlaceType: type });
+    this.setState({ widgetPickerStep: 'size', widgetPlaceType: type, widgetPlaceMode: 'add' });
   }
 
   _pickWidgetSize(w, h, type) {
     this.setState({
       widgetPickerStep: null,
       widgetPlaceType: type || this.state.widgetPlaceType,
+      widgetPlaceMode: this.state.widgetPlaceMode || 'add',
       widgetPlaceW: w,
       widgetPlaceH: h,
     });
   }
 
   _commitWidget(side, x, y, w, h) {
-    const mode = this.state.shellMode || 'triple';
-    const board = this._board(side, mode);
+    const mode = this.state.widgetPlaceMode;
+    if (mode === 'move' || mode === 'resize') {
+      const fromSide = this.state.widgetPlaceFromSide || side;
+      const id = this.state.widgetPlaceId;
+      if (!id) return;
+      this._widgetPickerCommitted = true;
+      this._slotUseBeforePicker = null;
+      this._relocateWidget(id, fromSide, side, x, y, w, h);
+      return;
+    }
+    const board = this._board(side);
     const type = this.state.widgetPlaceType;
     if (!type) return;
     this._widgetPickerCommitted = true;
@@ -14373,6 +15959,9 @@ class Component extends DCLogic {
       widgetPlaceW: 0,
       widgetPlaceH: 0,
       widgetPickerStep: null,
+      widgetPlaceMode: null,
+      widgetPlaceId: null,
+      widgetPlaceFromSide: null,
     });
   }
 
@@ -14381,13 +15970,22 @@ class Component extends DCLogic {
     board.items = (board.items || []).filter((it) => it.id !== id);
     this._persistWidgets();
     const patch = { widgetRev: (this.state.widgetRev || 0) + 1 };
-    if (this.state.graphMenuId === id) {
-      patch.graphMenuId = null;
-      patch.graphMenuSide = null;
+    if (this.state.widgetMenuId === id) {
+      patch.widgetMenuId = null;
+      patch.widgetMenuSide = null;
     }
     if (this.state.graphEditId === id) {
       patch.graphEditId = null;
       patch.graphEditSide = null;
+    }
+    if (this.state.widgetPlaceId === id) {
+      patch.widgetPlaceType = null;
+      patch.widgetPlaceW = 0;
+      patch.widgetPlaceH = 0;
+      patch.widgetPlaceMode = null;
+      patch.widgetPlaceId = null;
+      patch.widgetPlaceFromSide = null;
+      patch.widgetPickerStep = null;
     }
     if (!(board.items || []).length) this._setSlotUse(side, 'app');
     this.setState(patch);

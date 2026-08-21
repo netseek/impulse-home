@@ -281,9 +281,19 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /** Always-left GWM shortcuts, same order as the OEM AppList. */
+    private static final String[] PINNED_PACKAGES = {
+        "com.beantechs.vehiclecenter",
+        "com.beantechs.settings",
+        "com.beantechs.energyassistant",
+        "com.beantechs.launcher"
+    };
+    private static final String CAR_SETTINGS_PACKAGE = "com.android.car.settings";
+    private static final String ANDROID_SETTINGS_PACKAGE = "com.android.settings";
+    private static final String ANDROID_SETTINGS_ACTIVITY = "com.android.settings.Settings";
+
     private static final java.util.Set<String> IGNORED_PACKAGES = new java.util.HashSet<>(java.util.Arrays.asList(
         "com.beantechs.hvac",
-        "com.beantechs.vehiclecenter",
         "com.beantechs.btphone",
         "com.beantechs.drivinganalysisservice",
         "com.beantechs.personalcenter",
@@ -296,6 +306,8 @@ public final class MainActivity extends Activity {
         "com.beantechs.adaptertool.client",
         "com.beantechs.sshost.client",
         "com.android.car.media",
+        "com.android.car.radio",
+        "com.beantechs.mediacenter",
         "com.beantechs.mediacenter.h5.ui",
         "com.beantechs.mediacenter.h5.core",
         "com.android.support.car.lenspicker",
@@ -312,6 +324,9 @@ public final class MainActivity extends Activity {
         "com.gwm.vehicle",
         "com.gwm.car",
         "com.android.vending",
+        "app.revanced.android.gms",
+        "com.google.android.gms",
+        "moe.shizuku.privileged.api",
         "com.ts.androidauto.app",
         "com.ts.androidauto",
         "com.ts.androidauto.projectionservice",
@@ -332,7 +347,8 @@ public final class MainActivity extends Activity {
 
                 for (ResolveInfo info : apps) {
                     String pkg = info.activityInfo.packageName;
-                    if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)) continue;
+                    if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
+                            || hiddenPackages.contains(pkg)) continue;
 
                     String label = info.loadLabel(pm).toString();
                     JSONObject appObj = new JSONObject();
@@ -595,9 +611,26 @@ public final class MainActivity extends Activity {
     private ProjectionPresence projectionPresence;
     private MotionTrailLayout projectionItem;
     private View projectionGap;
+    private final MotionTrailLayout[] pinnedItems = new MotionTrailLayout[PINNED_PACKAGES.length];
+    private View pinnedGap;
     private final MotionTrailLayout[] recentItems = new MotionTrailLayout[3];
     private View recentsGap;
     private final List<String> recentPackages = new ArrayList<>();
+    /** User-hidden packages (long-press → Hide). Survives restarts. */
+    private final java.util.Set<String> hiddenPackages = new java.util.HashSet<>();
+    /** Main-strip icons keyed by package so recents can hide the duplicate. */
+    private final java.util.Map<String, MotionTrailLayout> dockItemsByPackage =
+            new java.util.LinkedHashMap<>();
+    private android.widget.PopupWindow dockEditMenu;
+    private final BroadcastReceiver packageRemovedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || intent.getData() == null) return;
+            String pkg = intent.getData().getSchemeSpecificPart();
+            if (pkg == null || pkg.isEmpty()) return;
+            mainHandler.post(() -> removeDockPackage(pkg, false));
+        }
+    };
     /** One-shot: the boot reveal must not replay on a later viewer reload. */
     private boolean launcherRevealed;
     /**
@@ -929,44 +962,46 @@ public final class MainActivity extends Activity {
      * inside a band matching the nav rail — the WebView itself stays full-bleed, so
      * the 3D background still runs edge to edge behind it.
      * <p>
-     * While the rail is up our window is already inset by it, so that part of the
-     * margin is subtracted and the content does not shift when the rail toggles.
+     * {@code origin.left + safeLeft} always equals the rail width on the display,
+     * whether the OEM has inset our window (freeform stole focus and brought the
+     * rail back) or we are still full-bleed. Using the UI mode instead of the
+     * measured origin double-counted the band and shoved everything to the right.
      */
     private int pageSideInsetPx(boolean rightSide) {
         android.graphics.Point real = new android.graphics.Point();
         try {
             getWindowManager().getDefaultDisplay().getRealSize(real);
         } catch (Exception ignored) {}
-        // Full-bleed: nothing is reserved for us, so the page keeps the whole band.
-        if (laidOutFullBleed()) return navRailReservePx();
-        // Inset: the system reserves the rail when it is up; we top up the rest.
-        Rect usable = usableDisplayRect();
+        int rail = navRailReservePx();
+        Rect origin = pageOriginRect();
         int windowInset = rightSide
-                ? Math.max(0, real.x - usable.right)
-                : Math.max(0, usable.left);
-        return Math.max(0, navRailReservePx() - windowInset);
+                ? Math.max(0, real.x - origin.right)
+                : Math.max(0, origin.left);
+        return Math.max(0, rail - windowInset);
     }
 
     /**
-     * Where our window actually sits on the display. LAYOUT_STABLE insets keep
-     * reporting bars we have hidden, which made the side band collapse on one edge
-     * in the full-bleed modes; the decor view's real position does not lie.
-     */
-    /**
      * Display-space rect the page's (0,0) maps to, measured from the content view.
      * <p>
-     * Neither of the obvious sources works: the decor view always spans the whole
-     * display, and LAYOUT_STABLE insets keep reporting bars as inset even in the
-     * full-bleed modes where they are not. The content view is where the system
-     * actually put us, so it answers "are we inset right now" for both axes.
+     * Do not infer this from {@link #laidOutFullBleed()}: a focused freeform
+     * window forces the OEM rail back and the window manager re-frames us even
+     * in floating/full modes. LAYOUT_STABLE insets also keep reporting bars we
+     * have hidden. {@link View#getLocationOnScreen} is the only source that
+     * answers "where did the system actually put us".
      */
     private Rect pageOriginRect() {
-        if (!laidOutFullBleed()) return usableDisplayRect();
         android.graphics.Point real = new android.graphics.Point();
         try {
             getWindowManager().getDefaultDisplay().getRealSize(real);
         } catch (Exception ignored) {}
         if (real.x <= 0 || real.y <= 0) return usableDisplayRect();
+        if (rootLayout != null && rootLayout.getWidth() > 0 && rootLayout.getHeight() > 0) {
+            int[] loc = new int[2];
+            rootLayout.getLocationOnScreen(loc);
+            return new Rect(loc[0], loc[1],
+                    loc[0] + rootLayout.getWidth(), loc[1] + rootLayout.getHeight());
+        }
+        if (!laidOutFullBleed()) return usableDisplayRect();
         return new Rect(0, 0, real.x, real.y);
     }
 
@@ -977,17 +1012,13 @@ public final class MainActivity extends Activity {
 
     /**
      * Top margin the page must keep clear. Zero when the window already starts
-     * below the header; the header's height when it floats over us.
-     */
-    /**
-     * Mode-driven, not measured: measuring the content view raced the relayout that
-     * follows a mode switch, so the page briefly used the wrong offset and the
-     * chrome landed under the header.
+     * below the header; the leftover header height when it floats over us.
+     * Measured the same way as {@link #pageSideInsetPx} so a freeform-driven
+     * re-frame cannot double-count the header.
      */
     private int pageTopInsetPx() {
-        if (!statusBarShown()) return 0;      // full: no header at all
-        if (!laidOutFullBleed()) return 0;    // inset: the system already cleared it
-        return statusBarHeightPx();           // floating: header floats over us
+        if (!statusBarShown()) return 0;
+        return Math.max(0, statusBarHeightPx() - Math.max(0, pageOriginRect().top));
     }
 
     private String boundsToCssJson(Rect bounds) {
@@ -1006,6 +1037,15 @@ public final class MainActivity extends Activity {
 
     private void launchAppForPackage(String packageName, String label) {
         if (packageName == null || packageName.isEmpty()) return;
+        rememberRecentApp(packageName);
+        if (CAR_SETTINGS_PACKAGE.equals(packageName)) {
+            launchAndroidSettingsRoot();
+            return;
+        }
+        if (isGwmApp(packageName) || isPinnedPackage(packageName)) {
+            launchAppFullscreen(packageName);
+            return;
+        }
         if (packageName.equals(activePopupPackage)) {
             dismissPopup(packageName);
             return;
@@ -1024,7 +1064,6 @@ public final class MainActivity extends Activity {
             return;
         }
         applySlotUse(side, "app");
-        rememberRecentApp(packageName);
         if ("right".equals(side)) launchAppInRightSlot(packageName);
         else launchAppInLeftSlot(packageName);
     }
@@ -1560,9 +1599,21 @@ public final class MainActivity extends Activity {
         } else {
             flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         }
+        // A focused freeform window cannot hide the OEM rail (Android 9). The
+        // rail coming back normally re-insets us and shoves the layout right.
+        // LAYOUT_NO_LIMITS keeps this window at the full display under the rail
+        // — only while a slot is open; with focus it would hide the rail/header.
+        if (hasOverlayWindow()) {
+            flags |= WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+        } else {
+            flags &= ~(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+        }
         if (flags == lp.flags) return;
         lp.flags = flags;
         getWindow().setAttributes(lp);
+        if (!hasOverlayWindow()) enterImmersiveMode();
         Log.w(TAG, hasOverlayWindow()
                 ? "Launcher NOT_FOCUSABLE while freeform overlay is open"
                 : "Launcher focusable");
@@ -2313,11 +2364,83 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * OEM GWM / BeanTechs / Autolink apps: always Display 0 fullscreen, never a
+     * freeform slot. Same windowing path as {@link #maximizePopupApp}.
+     */
+    private void launchAppFullscreen(String packageName) {
+        try {
+            if (packageName == null || packageName.isEmpty()) return;
+            PackageManager pm = getPackageManager();
+            Intent resolve = pm.getLaunchIntentForPackage(packageName);
+            if (resolve == null || resolve.getComponent() == null) return;
+
+            if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+            if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
+
+            if (packageName.equals(activePopupPackage)) {
+                activePopupPackage = "";
+                activePopupTaskId = -1;
+                activePopupComponent = null;
+            }
+            if (packageName.equals(activeMediaPackage)) {
+                activeMediaPackage = "";
+                activeMediaTaskId = -1;
+                activeMediaComponent = null;
+            }
+
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setComponent(resolve.getComponent());
+            intent.setPackage(packageName);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+
+            Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
+            Log.w(TAG, "Fullscreen launch " + resolve.getComponent());
+            startActivity(intent, opts);
+            requestTaskBounds(packageName, FULLSCREEN_BOUNDS);
+            notifyViewerShellLayout();
+        } catch (Exception e) {
+            Log.e(TAG, "Error launching fullscreen " + packageName, e);
+        }
+    }
+
+    /**
+     * {@code com.android.car.settings} trampolines into the connectivity page on
+     * this ROM. Open the stock Settings root activity instead, fullscreen.
+     */
+    private void launchAndroidSettingsRoot() {
+        try {
+            if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+            if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setComponent(new ComponentName(
+                    ANDROID_SETTINGS_PACKAGE, ANDROID_SETTINGS_ACTIVITY));
+            intent.setPackage(ANDROID_SETTINGS_PACKAGE);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
+            Log.w(TAG, "Fullscreen Android Settings root");
+            startActivity(intent, opts);
+            requestTaskBounds(ANDROID_SETTINGS_PACKAGE, FULLSCREEN_BOUNDS);
+            notifyViewerShellLayout();
+        } catch (Exception e) {
+            Log.e(TAG, "Error launching Android Settings root", e);
+            launchAppFullscreen(ANDROID_SETTINGS_PACKAGE);
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // No LAYOUT_NO_LIMITS / LAYOUT_IN_SCREEN: those let the window extend under
-        // the MMI's own bars, which is what hid the left nav rail and top header.
+        // LAYOUT_NO_LIMITS / LAYOUT_IN_SCREEN are applied only while a freeform
+        // slot is open — see applyLauncherFocusPolicy. With focus they would hide
+        // the MMI rail and header, which is why they stay off here.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         // Before enterImmersiveMode below: the stored mode decides its flags.
         uiMode = readUiModePref();
@@ -2498,6 +2621,14 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             Log.w(TAG, "Task id receiver not registered", e);
         }
+        try {
+            IntentFilter pkgFilter = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
+            pkgFilter.addAction(Intent.ACTION_PACKAGE_FULLY_REMOVED);
+            pkgFilter.addDataScheme("package");
+            registerReceiver(packageRemovedReceiver, pkgFilter);
+        } catch (Exception e) {
+            Log.w(TAG, "Package removed receiver not registered", e);
+        }
 
         setContentView(rootLayout);
         navRailReservePx();  // logs the reserve once, for slot-geometry debugging
@@ -2608,9 +2739,14 @@ public final class MainActivity extends Activity {
         // Rightmost icon leads and the sequence walks back toward the left edge.
         // Every icon still travels left-to-right into its slot — it is the ORDER
         // that is reversed, so the icon with furthest to go sets off first.
-        final int count = launcherItems.size();
+        // Skip GONE duplicates (recents already occupy a slot on the left).
+        final List<MotionTrailLayout> visible = new ArrayList<>();
+        for (MotionTrailLayout item : launcherItems) {
+            if (item != null && item.getVisibility() == View.VISIBLE) visible.add(item);
+        }
+        final int count = visible.size();
         for (int i = 0; i < count; i++) {
-            final MotionTrailLayout item = launcherItems.get(i);
+            final MotionTrailLayout item = visible.get(i);
             android.animation.ValueAnimator anim = android.animation.ValueAnimator.ofFloat(0f, 1f);
             anim.setDuration(520);
             anim.setStartDelay((count - 1 - i) * 200L);
@@ -2890,12 +3026,14 @@ public final class MainActivity extends Activity {
 
     private void setupNativeLauncherUI(FrameLayout rootLayout) {
         loadRecentApps();
+        loadHiddenApps();
         float density = getResources().getDisplayMetrics().density;
         int iconSizePx = Math.round(52 * density);
         int itemWidthPx = Math.round(78 * density);
         int marginBottomPx = launcherBottomGapPx();
         int fadeLengthPx = Math.round(72 * density);
         int stripHeightPx = Math.round(110 * density);
+        int iconBottomGapPx = Math.round(10 * density);
 
         // Bottom icon strip — full width (media column sits above the dock band).
         FrameLayout strip = new FrameLayout(this);
@@ -2932,8 +3070,8 @@ public final class MainActivity extends Activity {
 
         android.widget.LinearLayout iconsLayout = new android.widget.LinearLayout(this);
         iconsLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        iconsLayout.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
-        iconsLayout.setPadding(Math.round(24 * density), 4, Math.round(24 * density), 4);
+        iconsLayout.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        iconsLayout.setPadding(Math.round(24 * density), 0, Math.round(24 * density), iconBottomGapPx);
         // Let the reveal's motion smear draw past each item's own edges.
         iconsLayout.setClipChildren(false);
         scrollView.setClipChildren(false);
@@ -2942,6 +3080,13 @@ public final class MainActivity extends Activity {
         Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
         mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
         List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
+        java.util.Map<String, ResolveInfo> byPkg = new java.util.HashMap<>();
+        if (apps != null) {
+            for (ResolveInfo info : apps) {
+                if (info == null || info.activityInfo == null) continue;
+                byPkg.put(info.activityInfo.packageName, info);
+            }
+        }
 
         int gapPx = Math.round(28 * density);
         projectionItem = makeDockItem(itemWidthPx, iconSizePx, density);
@@ -2952,6 +3097,27 @@ public final class MainActivity extends Activity {
         projectionGap = makeDockGap(gapPx);
         projectionGap.setVisibility(View.GONE);
         iconsLayout.addView(projectionGap);
+
+        int pinnedShown = 0;
+        for (int i = 0; i < PINNED_PACKAGES.length; i++) {
+            String pkg = PINNED_PACKAGES[i];
+            pinnedItems[i] = makeDockItem(itemWidthPx, iconSizePx, density);
+            pinnedItems[i].setVisibility(View.GONE);
+            iconsLayout.addView(pinnedItems[i]);
+            launcherItems.add(pinnedItems[i]);
+            if (isUserHidden(pkg)) continue;
+            ResolveInfo info = byPkg.get(pkg);
+            if (info == null) continue;
+            String labelStr = pinnedLabel(pkg, pm, info);
+            bindDockItem(pinnedItems[i], iconForLauncherApp(pm, info), labelStr,
+                    v -> launchAppForPackage(pkg, labelStr), pkg);
+            pinnedShown++;
+            Log.w(TAG, "Launcher pinned " + pkg + " | " + labelStr);
+        }
+
+        pinnedGap = makeDockGap(gapPx);
+        pinnedGap.setVisibility(pinnedShown > 0 ? View.VISIBLE : View.GONE);
+        iconsLayout.addView(pinnedGap);
 
         for (int i = 0; i < recentItems.length; i++) {
             recentItems[i] = makeDockItem(itemWidthPx, iconSizePx, density);
@@ -2965,21 +3131,26 @@ public final class MainActivity extends Activity {
         iconsLayout.addView(recentsGap);
 
         seedRecentAppsFromSystem(apps);
-        bindRecentSlots(pm, apps);
+        dockItemsByPackage.clear();
 
         for (ResolveInfo info : apps) {
             String pkg = info.activityInfo.packageName;
-            if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
-                    || ProjectionPresence.isProjectionPackage(pkg)) continue;
+            if (skipInAppRow(pkg)) continue;
 
-            String labelStr = info.loadLabel(pm).toString();
-            Drawable iconDrawable = info.loadIcon(pm);
+            String labelStr = launcherLabel(pm, info);
+            Drawable iconDrawable = iconForLauncherApp(pm, info);
             MotionTrailLayout itemLayout = makeDockItem(itemWidthPx, iconSizePx, density);
             bindDockItem(itemLayout, iconDrawable, labelStr,
-                    v -> launchAppForPackage(pkg, labelStr));
+                    v -> launchAppForPackage(pkg, labelStr), pkg);
             iconsLayout.addView(itemLayout);
             launcherItems.add(itemLayout);
+            dockItemsByPackage.put(pkg, itemLayout);
+            Log.w(TAG, "Launcher shown " + pkg + " | " + labelStr
+                    + (isGwmApp(pkg) ? " | gwm" : "")
+                    + (CAR_SETTINGS_PACKAGE.equals(pkg) ? " | settings-root" : ""));
         }
+
+        bindRecentSlots(pm, apps);
 
         projectionPresence = new ProjectionPresence(this, mainHandler, mediaNowPlaying);
         projectionPresence.start(kind -> bindProjectionSlot(kind));
@@ -2994,7 +3165,7 @@ public final class MainActivity extends Activity {
             int avail = scrollView.getWidth();
             if (avail <= 0) return;
             iconsLayout.setMinimumWidth(avail);
-            iconsLayout.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
+            iconsLayout.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         });
 
         strip.addView(scrollView, new FrameLayout.LayoutParams(
@@ -3085,8 +3256,84 @@ public final class MainActivity extends Activity {
         return gap;
     }
 
+    private boolean isPinnedPackage(String packageName) {
+        if (packageName == null) return false;
+        for (String pinned : PINNED_PACKAGES) {
+            if (pinned.equals(packageName)) return true;
+        }
+        return false;
+    }
+
+    private boolean isUserHidden(String packageName) {
+        return packageName != null && hiddenPackages.contains(packageName);
+    }
+
+    /** Hidden from the scrolling app row (pinned apps live in their own slots). */
+    private boolean skipInAppRow(String pkg) {
+        return pkg.equals(getPackageName())
+                || IGNORED_PACKAGES.contains(pkg)
+                || isUserHidden(pkg)
+                || isPinnedPackage(pkg)
+                || ProjectionPresence.isProjectionPackage(pkg);
+    }
+
+    private boolean skipInRecents(String pkg) {
+        return skipInAppRow(pkg);
+    }
+
+    private String pinnedLabel(String pkg, PackageManager pm, ResolveInfo info) {
+        if ("com.beantechs.vehiclecenter".equals(pkg)) return "VehicleCenter";
+        if ("com.beantechs.settings".equals(pkg)) return "Settings";
+        if ("com.beantechs.energyassistant".equals(pkg)) return "Energy Assistant";
+        if ("com.beantechs.launcher".equals(pkg)) return "Launcher";
+        return launcherLabel(pm, info);
+    }
+
+    private boolean isGwmApp(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return false;
+        if (packageName.equals(getPackageName())) return false;
+        if (packageName.equals(HAVALSHISUKU_PACKAGE)) return false;
+        if (ProjectionPresence.isProjectionPackage(packageName)) return false;
+        String p = packageName.toLowerCase();
+        return p.contains("beantech")
+                || p.contains("autolink")
+                || p.startsWith("com.gwm")
+                || p.contains(".gwm.");
+    }
+
+    private String launcherLabel(PackageManager pm, ResolveInfo info) {
+        if (info == null || info.activityInfo == null) return "";
+        if ("com.beantechs.energyassistant".equalsIgnoreCase(info.activityInfo.packageName)) {
+            return "Energy Assistant";
+        }
+        CharSequence label = info.loadLabel(pm);
+        return label != null ? label.toString() : "";
+    }
+
+    private Drawable iconForLauncherApp(PackageManager pm, ResolveInfo info) {
+        if (info == null || info.activityInfo == null) return null;
+        String pkg = info.activityInfo.packageName;
+        if ("com.beantechs.energyassistant".equalsIgnoreCase(pkg)) {
+            try {
+                Drawable energy = getDrawable(R.drawable.ic_energy_assistant);
+                if (energy != null) return energy;
+            } catch (Exception ignored) {}
+        } else if (isGwmApp(pkg)) {
+            try {
+                Drawable gwm = getDrawable(R.drawable.ic_gwm);
+                if (gwm != null) return gwm;
+            } catch (Exception ignored) {}
+        }
+        return info.loadIcon(pm);
+    }
+
     private void bindDockItem(MotionTrailLayout item, Drawable icon, String label,
             View.OnClickListener click) {
+        bindDockItem(item, icon, label, click, null);
+    }
+
+    private void bindDockItem(MotionTrailLayout item, Drawable icon, String label,
+            View.OnClickListener click, String editPackage) {
         if (item == null) return;
         android.widget.ImageView iv = (android.widget.ImageView) item.findViewWithTag("icon");
         android.widget.TextView tv = (android.widget.TextView) item.findViewWithTag("label");
@@ -3094,6 +3341,14 @@ public final class MainActivity extends Activity {
         if (tv != null) tv.setText(label != null ? label : "");
         item.setOnClickListener(click);
         item.setClickable(click != null);
+        if (editPackage != null && !editPackage.isEmpty()) {
+            item.setOnLongClickListener(v -> {
+                showDockEditMenu(v, editPackage);
+                return true;
+            });
+        } else {
+            item.setOnLongClickListener(null);
+        }
         item.setVisibility(View.VISIBLE);
         if (launcherRevealed) {
             item.setAlpha(1f);
@@ -3125,25 +3380,176 @@ public final class MainActivity extends Activity {
                 byPkg.put(info.activityInfo.packageName, info);
             }
         }
+        java.util.Set<String> shownRecents = new java.util.HashSet<>();
         int shown = 0;
         for (String pkg : recentPackages) {
             if (shown >= recentItems.length) break;
-            if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
-                    || ProjectionPresence.isProjectionPackage(pkg)) continue;
+            if (skipInRecents(pkg)) continue;
             ResolveInfo info = byPkg.get(pkg);
             if (info == null) continue;
-            String label = info.loadLabel(pm).toString();
-            Drawable icon = info.loadIcon(pm);
+            String label = launcherLabel(pm, info);
+            Drawable icon = iconForLauncherApp(pm, info);
             final String targetPkg = pkg;
             final String targetLabel = label;
             bindDockItem(recentItems[shown], icon, label,
-                    v -> launchAppForPackage(targetPkg, targetLabel));
+                    v -> launchAppForPackage(targetPkg, targetLabel), targetPkg);
+            shownRecents.add(pkg);
             shown++;
         }
         for (int i = shown; i < recentItems.length; i++) {
             if (recentItems[i] != null) recentItems[i].setVisibility(View.GONE);
         }
         if (recentsGap != null) recentsGap.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
+        hideRecentDuplicatesFromStrip(shownRecents);
+    }
+
+    private void loadHiddenApps() {
+        hiddenPackages.clear();
+        String raw = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).getString("hidden_apps", "");
+        if (raw == null || raw.isEmpty()) return;
+        for (String pkg : raw.split(",")) {
+            if (pkg == null) continue;
+            pkg = pkg.trim();
+            if (pkg.isEmpty()) continue;
+            hiddenPackages.add(pkg);
+        }
+    }
+
+    private void saveHiddenApps() {
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (String pkg : hiddenPackages) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append(pkg);
+        }
+        getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                .edit()
+                .putString("hidden_apps", sb.toString())
+                .apply();
+    }
+
+    private boolean canUninstallPackage(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return false;
+        if (pkg.equals(getPackageName()) || isPinnedPackage(pkg) || isGwmApp(pkg)) return false;
+        try {
+            android.content.pm.ApplicationInfo info = getPackageManager().getApplicationInfo(pkg, 0);
+            return (info.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void dismissDockEditMenu() {
+        if (dockEditMenu == null) return;
+        try {
+            dockEditMenu.dismiss();
+        } catch (Exception ignored) {}
+        dockEditMenu = null;
+    }
+
+    private void showDockEditMenu(View anchor, String pkg) {
+        if (anchor == null || pkg == null || pkg.isEmpty()) return;
+        dismissDockEditMenu();
+        float d = getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setBackgroundColor(0xF2141820);
+        box.setElevation(12f * d);
+        int padH = Math.round(14 * d);
+        int padV = Math.round(8 * d);
+        box.setPadding(padH, padV, padH, padV);
+
+        box.addView(makeDockMenuRow("Hide", () -> {
+            dismissDockEditMenu();
+            removeDockPackage(pkg, true);
+        }));
+        if (canUninstallPackage(pkg)) {
+            box.addView(makeDockMenuRow("Uninstall", () -> {
+                dismissDockEditMenu();
+                try {
+                    Intent intent = new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + pkg));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.w(TAG, "Uninstall failed for " + pkg, e);
+                }
+            }));
+        }
+
+        android.widget.PopupWindow popup = new android.widget.PopupWindow(
+                box,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                true);
+        popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
+        popup.setOnDismissListener(() -> {
+            if (dockEditMenu == popup) dockEditMenu = null;
+        });
+        dockEditMenu = popup;
+        box.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int xOff = (anchor.getWidth() - box.getMeasuredWidth()) / 2;
+        int yOff = -(box.getMeasuredHeight() + anchor.getHeight() + Math.round(8 * d));
+        popup.showAsDropDown(anchor, xOff, yOff);
+    }
+
+    private android.widget.TextView makeDockMenuRow(String title, Runnable action) {
+        float d = getResources().getDisplayMetrics().density;
+        android.widget.TextView row = new android.widget.TextView(this);
+        row.setText(title);
+        row.setTextColor(0xFFFFFFFF);
+        row.setTextSize(13f);
+        row.setPadding(Math.round(6 * d), Math.round(8 * d), Math.round(6 * d), Math.round(8 * d));
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(v -> action.run());
+        return row;
+    }
+
+    private void removeDockPackage(String pkg, boolean persistHide) {
+        if (pkg == null || pkg.isEmpty()) return;
+        if (persistHide) {
+            hiddenPackages.add(pkg);
+            saveHiddenApps();
+        }
+        recentPackages.remove(pkg);
+        saveRecentApps();
+        MotionTrailLayout row = dockItemsByPackage.get(pkg);
+        if (row != null) row.setVisibility(View.GONE);
+        int pinnedVisible = 0;
+        for (int i = 0; i < PINNED_PACKAGES.length; i++) {
+            if (pinnedItems[i] == null) continue;
+            if (PINNED_PACKAGES[i].equals(pkg) || isUserHidden(PINNED_PACKAGES[i])) {
+                pinnedItems[i].setVisibility(View.GONE);
+            } else if (pinnedItems[i].getVisibility() == View.VISIBLE) {
+                pinnedVisible++;
+            }
+        }
+        if (pinnedGap != null) {
+            pinnedGap.setVisibility(pinnedVisible > 0 ? View.VISIBLE : View.GONE);
+        }
+        refreshRecentSlots();
+    }
+
+    /** Recents already occupy the left slots — drop the same package from the main row. */
+    private void hideRecentDuplicatesFromStrip(java.util.Set<String> shownRecents) {
+        for (java.util.Map.Entry<String, MotionTrailLayout> e : dockItemsByPackage.entrySet()) {
+            MotionTrailLayout item = e.getValue();
+            if (item == null) continue;
+            boolean hide = isUserHidden(e.getKey())
+                    || (shownRecents != null && shownRecents.contains(e.getKey()));
+            if (hide) {
+                item.setVisibility(View.GONE);
+                continue;
+            }
+            item.setVisibility(View.VISIBLE);
+            if (launcherRevealed) {
+                item.setAlpha(1f);
+                item.setTranslationX(0f);
+                item.setTrailPx(0f);
+            }
+        }
     }
 
     private void refreshRecentSlots() {
@@ -3155,8 +3561,7 @@ public final class MainActivity extends Activity {
 
     private void rememberRecentApp(String packageName) {
         if (packageName == null || packageName.isEmpty()) return;
-        if (packageName.equals(getPackageName()) || IGNORED_PACKAGES.contains(packageName)
-                || ProjectionPresence.isProjectionPackage(packageName)) return;
+        if (skipInRecents(packageName)) return;
         recentPackages.remove(packageName);
         recentPackages.add(0, packageName);
         while (recentPackages.size() > 12) {
@@ -3212,8 +3617,7 @@ public final class MainActivity extends Activity {
                 android.content.ComponentName real = recentTaskRealActivity(task);
                 String pkg = real != null ? real.getPackageName() : null;
                 if (pkg == null || !launchable.contains(pkg)) continue;
-                if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
-                        || ProjectionPresence.isProjectionPackage(pkg)) continue;
+                if (skipInRecents(pkg)) continue;
                 if (recentPackages.contains(pkg)) continue;
                 recentPackages.add(pkg);
                 if (recentPackages.size() >= 3) break;
@@ -3411,6 +3815,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        dismissDockEditMenu();
         // Telemetry stays registered across pause: opening a freeform app pauses
         // this activity, and the car keeps sending door/light/speed events that
         // the still-visible 3D scene behind it has to follow. Unregistered in
@@ -3448,6 +3853,7 @@ public final class MainActivity extends Activity {
         stopOverlayWatchdog();
         unregisterOverlayTaskListener();
         mediaNowPlaying.stop();
+        dismissDockEditMenu();
         if (projectionPresence != null) projectionPresence.stop();
         if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
         if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
@@ -3457,6 +3863,9 @@ public final class MainActivity extends Activity {
         } catch (Exception ignored) {}
         try {
             unregisterReceiver(taskResolvedReceiver);
+        } catch (Exception ignored) {}
+        try {
+            unregisterReceiver(packageRemovedReceiver);
         } catch (Exception ignored) {}
         if (pendingFiles != null) pendingFiles.onReceiveValue(null);
         webView.stopLoading();
