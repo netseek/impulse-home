@@ -152,7 +152,7 @@ window.HavalSplash = (function () {
     video.style.height = H + 'px';
     video.style.left = '0px';
     video.style.top = '0px';
-    video.style.objectFit = 'contain';
+    video.style.objectFit = 'cover';
     video.style.zIndex = '2';
   }
 
@@ -692,7 +692,7 @@ window.HavalSplash = (function () {
     }
     .hv-cam-tile {
       aspect-ratio: 1;
-      padding: 7px !important;
+      padding: 6px !important;
       display: flex !important;
       align-items: center;
       justify-content: center;
@@ -704,14 +704,11 @@ window.HavalSplash = (function () {
       display: block;
       width: 100%;
       height: 100%;
-      background: currentColor;
-      -webkit-mask-repeat: no-repeat;
-      -webkit-mask-position: center;
-      -webkit-mask-size: contain;
-      mask-repeat: no-repeat;
-      mask-position: center;
-      mask-size: contain;
+      object-fit: contain;
+      pointer-events: none;
+      opacity: 0.78;
     }
+    .hv-cam-tile.is-on .hv-cam-ico { opacity: 1; }
     .hv-cam-ico-flip { transform: scaleX(-1); }
     /* MMI WebView: a finger-drag on a range inside overflow-y:auto is treated
        as a panel scroll, so the thumb never moves. pan-x + a larger thumb. */
@@ -1100,10 +1097,12 @@ window.HavalSplash = (function () {
       text-overflow: ellipsis;
     }
     .hv-power-1x1 .hv-power-state { font-size: 12px; }
-    .hv-power.ev .hv-power-state { color: #4fd6e8; }
-    .hv-power.regen .hv-power-state { color: #3ee08a; }
-    .hv-power.ice .hv-power-state { color: #f2f5f8; }
-    .hv-power.hybrid .hv-power-state { color: #f2f5f8; }
+    /* Green = idle / running. Blue = charge / regen. */
+    .hv-power.idle .hv-power-state,
+    .hv-power.ev .hv-power-state,
+    .hv-power.ice .hv-power-state,
+    .hv-power.hybrid .hv-power-state { color: #3ee08a; }
+    .hv-power.regen .hv-power-state,
     .hv-power.charge .hv-power-state { color: #7ec8ff; }
     .hv-power-readout {
       min-width: 0;
@@ -1140,8 +1139,8 @@ window.HavalSplash = (function () {
     }
     .hv-power-1x1 .hv-power-value { font-size: 26px; }
     .hv-power-2x2 .hv-power-value { font-size: 34px; }
-    .hv-power-value.ev { color: #4fd6e8; }
-    .hv-power-value.regen { color: #3ee08a; }
+    .hv-power-value.ev { color: #3ee08a; }
+    .hv-power-value.regen { color: #7ec8ff; }
     .hv-power-unit {
       font-family: 'Space Mono', monospace;
       font-size: 8px;
@@ -1188,11 +1187,17 @@ window.HavalSplash = (function () {
       z-index: 2;
     }
     .hv-power-ice,
-    .hv-power-motor,
+    .hv-power-motor {
+      position: absolute;
+      pointer-events: none;
+      opacity: .55;
+      transition: opacity .2s ease, filter .2s ease;
+      z-index: 3;
+    }
     .hv-power-batt {
       position: absolute;
       pointer-events: none;
-      opacity: .28;
+      opacity: 1;
       transition: opacity .2s ease, filter .2s ease;
       z-index: 3;
     }
@@ -1239,22 +1244,29 @@ window.HavalSplash = (function () {
       bottom: 16%;
       overflow: hidden;
       clip-path: inset(0 calc(100% - var(--soc, 0%)) 0 0);
+      background: rgba(62, 224, 138, 0.72);
+    }
+    .hv-power-batt.on.regen .hv-power-batt-fill,
+    .hv-power-batt.on.charge .hv-power-batt-fill {
+      background: rgba(126, 200, 255, 0.72);
     }
     .hv-power-batt-fill img {
       display: block;
       width: 100%;
       height: 100%;
       object-fit: fill;
+      opacity: 1;
     }
     .hv-power-ice.on,
     .hv-power-motor.on,
     .hv-power-batt.on { opacity: 1; }
-    .hv-power-ice.on { filter: drop-shadow(0 0 6px rgba(242,245,248,.55)); }
-    .hv-power-motor.on { filter: drop-shadow(0 0 7px rgba(79,214,232,.75)); }
-    .hv-power-motor.on.regen { filter: hue-rotate(78deg) drop-shadow(0 0 7px rgba(62,224,138,.8)); }
-    .hv-power-batt.on.ev { filter: drop-shadow(0 0 6px rgba(79,214,232,.45)); }
-    .hv-power-batt.on.regen { filter: drop-shadow(0 0 6px rgba(62,224,138,.45)); }
-    .hv-power-batt.on.charge { filter: drop-shadow(0 0 6px rgba(126,200,255,.5)); }
+    .hv-power-ice.on { filter: drop-shadow(0 0 5px rgba(62,224,138,.4)); }
+    .hv-power-motor.on { filter: drop-shadow(0 0 6px rgba(62,224,138,.55)); }
+    .hv-power-motor.on.regen { filter: drop-shadow(0 0 6px rgba(126,200,255,.6)); }
+    .hv-power-batt.on.ev,
+    .hv-power-batt.on { filter: drop-shadow(0 0 4px rgba(62,224,138,.28)); }
+    .hv-power-batt.on.regen,
+    .hv-power-batt.on.charge { filter: drop-shadow(0 0 4px rgba(126,200,255,.35)); }
     .hv-power-floor {
       position: absolute;
       left: -3%;
@@ -1263,14 +1275,17 @@ window.HavalSplash = (function () {
       height: 80%;
       z-index: 0;
       pointer-events: none;
-      color: #4fd6e8;
+      color: #3ee08a;
       --soc: 0;
       transform: perspective(340px) rotateX(28deg);
       transform-origin: 50% 88%;
     }
-    .hv-power.regen .hv-power-floor { color: #3ee08a; }
+    .hv-power.idle .hv-power-floor,
+    .hv-power.ev .hv-power-floor,
+    .hv-power.ice .hv-power-floor,
+    .hv-power.hybrid .hv-power-floor { color: #3ee08a; }
+    .hv-power.regen .hv-power-floor,
     .hv-power.charge .hv-power-floor { color: #7ec8ff; }
-    .hv-power.ice .hv-power-floor { color: #f2f5f8; }
     .hv-power-floor svg {
       display: block;
       width: 100%;
@@ -1300,7 +1315,7 @@ window.HavalSplash = (function () {
       stroke-width: 7;
       stroke-dasharray: 100;
       stroke-dashoffset: calc(100 - var(--soc, 0));
-      filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 10px currentColor);
+      filter: drop-shadow(0 0 2px currentColor);
     }
     .hv-power-floor-label {
       position: absolute;
@@ -1318,8 +1333,18 @@ window.HavalSplash = (function () {
       text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
       pointer-events: none;
     }
+    .hv-power-1x1 .hv-power-floor-label,
+    .hv-power-2x1 .hv-power-floor-label,
+    .hv-power-3x1 .hv-power-floor-label {
+      left: auto;
+      right: 1%;
+      bottom: 2%;
+      transform: none;
+    }
     .hv-power-ring-num { font-size: 15px; letter-spacing: -0.03em; }
-    .hv-power-1x1 .hv-power-ring-num { font-size: 11px; }
+    .hv-power-1x1 .hv-power-ring-num { font-size: 22px; }
+    .hv-power-2x1 .hv-power-ring-num,
+    .hv-power-3x1 .hv-power-ring-num { font-size: 18px; }
     .hv-power-2x2 .hv-power-ring-num { font-size: 20px; }
     .hv-power-ring-unit {
       font-size: 9px;
@@ -1328,7 +1353,9 @@ window.HavalSplash = (function () {
       margin-left: 3px;
       font-weight: 600;
     }
-    .hv-power-1x1 .hv-power-ring-unit { font-size: 7px; margin-left: 2px; }
+    .hv-power-1x1 .hv-power-ring-unit { font-size: 11px; margin-left: 2px; }
+    .hv-power-2x1 .hv-power-ring-unit,
+    .hv-power-3x1 .hv-power-ring-unit { font-size: 10px; }
     .hv-power-2x2 .hv-power-ring-unit { font-size: 11px; }
     .hv-power-lane {
       position: absolute;
@@ -1337,7 +1364,7 @@ window.HavalSplash = (function () {
       pointer-events: none;
       z-index: 4;
       overflow: hidden;
-      --flow: #4fd6e8;
+      --flow: #3ee08a;
     }
     .hv-power-lane::after {
       content: '';
@@ -1353,7 +1380,7 @@ window.HavalSplash = (function () {
       mask-repeat: repeat-x;
       -webkit-mask-size: 12px 8px;
       mask-size: 12px 8px;
-      filter: drop-shadow(0 0 3px var(--flow));
+      filter: drop-shadow(0 0 1.5px var(--flow));
     }
     .hv-power-lane.front {
       left: 22%;
@@ -1365,8 +1392,8 @@ window.HavalSplash = (function () {
       top: 58%;
       width: 15%;
     }
-    .hv-power-lane.drive { opacity: .95; --flow: #4fd6e8; }
-    .hv-power-lane.regen { opacity: .95; --flow: #3ee08a; }
+    .hv-power-lane.drive { opacity: .95; --flow: #3ee08a; }
+    .hv-power-lane.regen { opacity: .95; --flow: #7ec8ff; }
     .hv-power-lane.front.drive,
     .hv-power-lane.rear.regen {
       transform: scaleX(-1);
@@ -1396,10 +1423,18 @@ window.HavalSplash = (function () {
       padding-top: 5px;
       margin-top: 3px;
     }
+    .hv-power-side-stats .hv-power-stat-kicker {
+      font-size: 9px;
+      letter-spacing: .1em;
+      opacity: .55;
+    }
     .hv-power-side-stats .hv-power-stat-value {
       margin-top: 0;
-      font-size: 12px;
+      font-size: 16px;
       text-align: right;
+    }
+    .hv-power-side-stats .hv-power-stat-value span {
+      font-size: 10px;
     }
     .hv-power-stats {
       display: none;
@@ -2888,8 +2923,8 @@ window.HavalSplash = (function () {
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CAMERA</div>
       <div class="hv-cam-grid">
         <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="12">
-          <button class="hv-cam-tile" onClick="{{ cp.onClick }}" title="{{ cp.title }}" style="border-radius: 7px; border: 1px solid {{ cp.border }}; background: {{ cp.bg }}; color: {{ cp.col }}; cursor: pointer;">
-            <span class="hv-cam-ico {{ cp.flipClass }}" style="-webkit-mask-image:url('{{ cp.maskUrl }}');mask-image:url('{{ cp.maskUrl }}');"></span>
+          <button class="hv-cam-tile {{ cp.onClass }}" onClick="{{ cp.onClick }}" title="{{ cp.title }}" style="border-radius: 7px; border: 1px solid {{ cp.border }}; background: {{ cp.bg }}; color: {{ cp.col }}; cursor: pointer;">
+            <img class="hv-cam-ico {{ cp.flipClass }}" src="{{ cp.maskUrl }}" alt="" draggable="false" />
           </button>
         </sc-for>
       </div>
@@ -2902,7 +2937,7 @@ window.HavalSplash = (function () {
           <button onClick="{{ co.onClick }}" title="{{ co.title }}" style="width: 100%; padding: 9px 8px; border-radius: 7px; border: 1px solid {{ co.border }}; background: {{ co.bg }}; color: {{ co.col }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600; text-align: left; line-height: 1.35;">{{ co.label }}</button>
         </sc-for>
       </div>
-      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">Event follows doors, trunk and roof, then restores when you drive. Cycle steps views every 60s while moving. Orbit is a slow spin.</div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">Event: doors → top-left, roof → top facing left; returns to the previous view a couple of seconds after the opening settles. Cycle steps every preset every 60s while moving. Orbit is a slow spin.</div>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -3253,13 +3288,16 @@ const CAR_SIGNALS = {
   evRange: 'car.ev_info.electric_mode_remain_odometer',
   fuelRange: 'car.ev_info.fuel_mode_remain_odometer',
   cycleEv: 'car.ev_info.cycle_energy_consume_info',
+  cycleFuel: 'car.ev_info.cycle_fuel_consume_info',
   chargingState: 'car.ev_info.charging_state',
   architecture: 'car.configure.ev_drive_architecture',
+  engineState: 'car.basic.engine_state',
 };
 
 // GRAPHS widget — same derivation Impulse uses for evPowerKw.
 const CAR_GRAPH_SPAN_MS = 20000;
-const CAR_GRAPH_AVG_MS = 30000;
+const CAR_GRAPH_KPI_SPAN_MS = 180000;
+const CAR_GRAPH_AVG_MS = 180000;
 const CAR_GRAPH_VARS = [
   { key: 'evPowerKw', label: 'EV POWER', unit: 'kW', min: -40, max: 80, signed: true },
   { key: 'evInst', label: 'EV INST', unit: 'kWh/100', min: -8, max: 40, signed: true },
@@ -3267,6 +3305,8 @@ const CAR_GRAPH_VARS = [
   { key: 'evTrip', label: 'EV TRIP', unit: 'kWh/100', min: 0, max: 40 },
   { key: 'fuelTrip', label: 'GAS TRIP', unit: 'km/L', min: 0, max: 30 },
   { key: 'fuelAvg', label: 'GAS AVG', unit: 'km/L', min: 0, max: 30 },
+  { key: 'evCycle', label: 'EV CYCLE', unit: 'kWh/100', min: 0, max: 40 },
+  { key: 'fuelCycle', label: 'GAS CYCLE', unit: 'km/L', min: 0, max: 30 },
 ];
 const CAR_GRAPH_VAR_BY_KEY = {};
 CAR_GRAPH_VARS.forEach((v) => { CAR_GRAPH_VAR_BY_KEY[v.key] = v; });
@@ -3518,10 +3558,13 @@ const CAR_SPEED_KMH_PER_UNIT = 40;
 const CAM_EVENT_OPEN_THRESH = 0.04; // 4% open counts as an event
 const CAM_MOVE_THRESH = 0.05;       // ~2 km/h — cycle + restore-on-drive
 const CAM_CYCLE_SEC = 60;
+const CAM_EVENT_RESTORE_SEC = 2.0;  // hold event view after openings settle, then restore
 const CAM_ORBIT_SPEED = 0.22;       // OrbitControls: 2.0 = 30s/rev; this is ~5.5 min
+// On-event presets: doors → camera #10 (top), roof/curtain → #12 (topSide).
+const CAM_EVENT_PRESET = { doors: 'top', trunk: 'rear', roof: 'topSide' };
 
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'st_peters', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
+  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'studio', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
@@ -3670,14 +3713,18 @@ class Component extends DCLogic {
     this._camEventUserOverride = false;
     this._camEventDismissedKind = null;
     this._camRestorePending = false;
+    this._camRestoreWait = 0;
     this._camEventSettledKind = null;
     this._camLastOpenKind = null;
     this._camCycleElapsed = 0;
-    this._camCycleKeys = [
-      'frontSide', 'frontTopSide', 'side', 'rearTopSide',
-      'rearSide', 'rear', 'sideLeft', 'frontSideLeft',
-    ];
+    // Filled from _cameraPresetDefs() once the class methods exist; constructor
+    // runs before those, so _tickCamCycle resolves the list lazily.
+    this._camCycleKeys = null;
     this._powerLive = { drive: '', soc: '', evRange: '', fuelRange: '', cycleEv: '', charging: '', evInst: '', arch: '' };
+    this._engineOn = false;
+    this._graphEvInstEma = null;
+    this._graphBusEvTrip = false;
+    this._graphBusFuelTrip = false;
     this._powerCardCache = null;
     this._powerCardCacheAt = 0;
     this._wireCarTelemetry();
@@ -3866,7 +3913,8 @@ class Component extends DCLogic {
             CAR_SIGNALS.fuelTrip, CAR_SIGNALS.fuelAvg, CAR_SIGNALS.evTrip,
             CAR_SIGNALS.driveState, CAR_SIGNALS.batterySoc,
             CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange, CAR_SIGNALS.cycleEv,
-            CAR_SIGNALS.chargingState, CAR_SIGNALS.architecture,
+            CAR_SIGNALS.cycleFuel, CAR_SIGNALS.chargingState,
+            CAR_SIGNALS.architecture, CAR_SIGNALS.engineState,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
       .concat(Object.keys(lights).map((k) => lights[k]))
@@ -3938,31 +3986,54 @@ class Component extends DCLogic {
       return;
     }
     if (key === CAR_SIGNALS.fuelInst) {
-      this._setGraphValue('fuelInst', this._parseFuelInst(value));
+      const n = this._parseFuelInst(value);
+      if (this._graphAcceptKpi(n, 0, 40)) this._setGraphValue('fuelInst', n);
       return;
     }
     if (key === CAR_SIGNALS.evConsume) {
-      this._setGraphValue('evInst', this._carNumber(value));
-      this._powerLive.evInst = String(value);
+      // Impulse cluster ignores this key and derives kWh/100 from pack kW × speed.
       return;
     }
     if (key === CAR_SIGNALS.driveState) { this._powerLive.drive = String(value); return; }
     if (key === CAR_SIGNALS.batterySoc) { this._powerLive.soc = String(value); return; }
     if (key === CAR_SIGNALS.evRange) { this._powerLive.evRange = String(value); return; }
     if (key === CAR_SIGNALS.fuelRange) { this._powerLive.fuelRange = String(value); return; }
-    if (key === CAR_SIGNALS.cycleEv) { this._powerLive.cycleEv = String(value); return; }
+    if (key === CAR_SIGNALS.cycleEv) {
+      this._powerLive.cycleEv = String(value);
+      const n = this._carNumber(value);
+      if (this._graphAcceptKpi(n, 0, 80)) this._setGraphValue('evCycle', n);
+      return;
+    }
+    if (key === CAR_SIGNALS.cycleFuel) {
+      const n = this._parseFuelAvg(value);
+      if (this._graphAcceptKpi(n, 0, 40)) this._setGraphValue('fuelCycle', n);
+      return;
+    }
     if (key === CAR_SIGNALS.chargingState) { this._powerLive.charging = String(value); return; }
     if (key === CAR_SIGNALS.architecture) { this._powerLive.arch = String(value); return; }
+    if (key === CAR_SIGNALS.engineState) {
+      this._engineOn = this._carEngineOn(value);
+      return;
+    }
     if (key === CAR_SIGNALS.fuelTrip) {
-      this._setGraphValue('fuelTrip', this._parseFuelAvg(value));
+      const n = this._parseFuelAvg(value);
+      if (this._graphAcceptKpi(n, 0, 40)) {
+        this._setGraphValue('fuelTrip', n);
+        if (n > 0.05) this._graphBusFuelTrip = true;
+      }
       return;
     }
     if (key === CAR_SIGNALS.fuelAvg) {
-      this._setGraphValue('fuelAvg', this._parseFuelAvg(value));
+      const n = this._parseFuelAvg(value);
+      if (this._graphAcceptKpi(n, 0, 40)) this._setGraphValue('fuelAvg', n);
       return;
     }
     if (key === CAR_SIGNALS.evTrip) {
-      this._setGraphValue('evTrip', this._carNumber(value));
+      const n = this._carNumber(value);
+      if (this._graphAcceptKpi(n, 0, 80)) {
+        this._setGraphValue('evTrip', n);
+        if (n > 0.05) this._graphBusEvTrip = true;
+      }
       return;
     }
     const modeStateKey = CAR_MODE_STATE_BY_KEY[key];
@@ -4116,6 +4187,25 @@ class Component extends DCLogic {
     return flow || CAR_POWER_IDLE;
   }
 
+  // Dual-motor AWD often lands on an unmapped/idle enum while both axles
+  // are live. If we're moving with pack power, don't sit on Parado.
+  _powerInferAwd(flow, kwRaw) {
+    const iceOn = !!this._engineOn;
+    if (kwRaw < -0.15) {
+      return { tone: 'regen', label: iceOn ? 'Regen' : 'Regen', ice: iceOn, batt: true, wheel: true, iceBatt: iceOn ? 1 : 0, battWheel: -1, iceWheel: 0, front: -1, rear: -1 };
+    }
+    if (kwRaw > 0.15 && iceOn) {
+      return { tone: 'hybrid', label: 'Híbrido', ice: true, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 1, front: 1, rear: 1 };
+    }
+    if (kwRaw > 0.15) {
+      return { tone: 'ev', label: 'P2 + P4', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 1 };
+    }
+    if (iceOn) {
+      return { tone: 'idle', label: 'Marcha lenta', ice: true, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 };
+    }
+    return flow;
+  }
+
   _powerDemoDrive(now) {
     const i = Math.floor((now || 0) / 4200) % CAR_POWER_DEMO_STATES.length;
     return String(CAR_POWER_DEMO_STATES[i]);
@@ -4136,17 +4226,27 @@ class Component extends DCLogic {
     const charging = String(live.charging || '').trim() === '1';
     let flow = this._powerResolveFlow(drive);
     if (charging && flow.tone === 'idle') flow = CAR_POWER_FLOW[23];
-    const kwRaw = this._graphDisplay.evPowerKw != null
+    let kwRaw = this._graphDisplay.evPowerKw != null
       ? this._graphDisplay.evPowerKw
       : (this._graphValues.evPowerKw || (demo ? this._graphDemoValue('evPowerKw', now) : 0));
+    // Parked / stopped: force a clean 0 kW readout (pack V×I noise otherwise).
+    // Prefer vehicle speed — don't use flow.tone alone (drive-state may be missing).
+    const speedKmh = this._carSpeedKmh;
+    const stopped = !demo && !charging && isFinite(speedKmh) && speedKmh < 0.5;
+    if (stopped) kwRaw = 0;
+    if (!demo && !charging && !stopped && flow.tone === 'idle') {
+      flow = this._powerInferAwd(flow, kwRaw);
+    }
     const regenKw = kwRaw < -0.4;
     let kwClass = '';
-    if (regenKw || flow.tone === 'regen') kwClass = 'regen';
-    else if (kwRaw > 0.4 || flow.tone === 'ev') kwClass = 'ev';
+    if (regenKw || flow.tone === 'regen' || flow.tone === 'charge') kwClass = 'regen';
+    else if (kwRaw > 0.4 || flow.tone === 'ev' || flow.tone === 'ice' || flow.tone === 'hybrid' || flow.tone === 'idle') kwClass = 'ev';
     const socRaw = this._carNumber(live.soc);
     const socPct = isFinite(socRaw) ? Math.max(0, Math.min(100, Math.round(socRaw))) : (demo ? 64 : 0);
     const socNum = isFinite(socRaw) || demo ? String(socPct) : '—';
-    const battTone = flow.tone === 'regen' ? 'regen' : (flow.tone === 'charge' ? 'charge' : (flow.batt ? 'ev' : ''));
+    const battTone = (flow.tone === 'regen' || flow.tone === 'charge')
+      ? (flow.tone === 'charge' ? 'charge' : 'regen')
+      : (flow.batt ? 'ev' : '');
     return {
       tone: flow.tone,
       state: flow.label,
@@ -4306,7 +4406,7 @@ class Component extends DCLogic {
       return;
     }
     samples.push({ t: now, v: value });
-    const cutoff = now - CAR_GRAPH_AVG_MS - 500;
+    const cutoff = now - Math.max(CAR_GRAPH_AVG_MS, CAR_GRAPH_KPI_SPAN_MS) - 500;
     while (samples.length && samples[0].t < cutoff) samples.shift();
   }
 
@@ -4920,16 +5020,73 @@ class Component extends DCLogic {
     if (key === 'evTrip') return 18 + s2 * 3;
     if (key === 'fuelTrip') return 12.4 + s1 * 1.6;
     if (key === 'fuelAvg') return 11.8 + s2 * 0.8;
+    if (key === 'evCycle') return 17 + s1 * 2;
+    if (key === 'fuelCycle') return 13.1 + s2 * 1.1;
     return 0;
   }
 
   _graphRaw(key, now) {
     if (this._graphLiveKeys[key]) return this._graphValues[key];
-    if (this._busCount > 0) {
+    if (this._graphAnyLive) {
       const v = this._graphValues[key];
       return v == null ? 0 : v;
     }
     return this._graphDemoValue(key, now);
+  }
+
+  _graphAcceptKpi(n, min, max) {
+    if (!isFinite(n)) return false;
+    if (n === 65535 || n === 6553.5 || n === 1023 || n === 2047) return false;
+    if (n < min || n > max) return false;
+    return true;
+  }
+
+  _graphRollingMean(key, now, windowMs) {
+    const samples = this._graphSeries[key];
+    if (!samples || samples.length < 4) return null;
+    const from = now - windowMs;
+    let sum = 0, n = 0;
+    for (let i = 0; i < samples.length; i++) {
+      if (samples[i].t < from) continue;
+      sum += samples[i].v;
+      n += 1;
+    }
+    return n ? sum / n : null;
+  }
+
+  // Impulse cluster: kWh/100km = (pack kW × 100) / km/h, EMA, fade under 10 km/h.
+  _graphDeriveConsumption(now) {
+    if (!this._graphLiveKeys.evPowerKw) return;
+    const kw = this._graphValues.evPowerKw;
+    const speed = this._carSpeedKmh;
+    let inst = 0;
+    if (isFinite(kw) && isFinite(speed) && speed > 0.5) {
+      let phys = (kw * 100) / speed;
+      if (speed < 10) {
+        const x = speed / 10;
+        phys *= x * x * x * (4 - 3 * x);
+      }
+      inst = phys;
+    }
+    const prev = this._graphEvInstEma;
+    const ema = prev == null ? inst : prev * 0.7 + inst * 0.3;
+    this._graphEvInstEma = ema;
+    this._setGraphValue('evInst', ema);
+    this._powerLive.evInst = String(ema);
+    if (!this._graphBusEvTrip) {
+      const mean = this._graphRollingMean('evInst', now, CAR_GRAPH_KPI_SPAN_MS);
+      if (mean != null) this._setGraphValue('evTrip', mean);
+    }
+    if (!this._graphBusFuelTrip) {
+      const mean = this._graphRollingMean('fuelInst', now, CAR_GRAPH_KPI_SPAN_MS);
+      if (mean != null) this._setGraphValue('fuelTrip', mean);
+    }
+  }
+
+  _graphPaneSpanMs(pane) {
+    if (!pane || pane.kind === 'viz') return CAR_GRAPH_SPAN_MS;
+    const key = (pane.vars && pane.vars[0]) || 'evPowerKw';
+    return key === 'evPowerKw' ? CAR_GRAPH_SPAN_MS : CAR_GRAPH_KPI_SPAN_MS;
   }
 
   _graphSmooth(key, now) {
@@ -4944,7 +5101,10 @@ class Component extends DCLogic {
   _drawGraphs(now) {
     // Sample every frame so the series keeps moving; paint can stay cheaper.
     this._graphNow = now;
+    this._graphDeriveConsumption(now);
     this._graphSmooth('evPowerKw', now);
+    this._graphSmooth('evInst', now);
+    if (this._graphLiveKeys.fuelInst) this._graphSmooth('fuelInst', now);
     this._updatePowerCards(now);
 
     if (!this._graphCanvasCacheAt || now - this._graphCanvasCacheAt > 500) {
@@ -4974,12 +5134,11 @@ class Component extends DCLogic {
     if (this._graphDrawAt && now - this._graphDrawAt < minDt) return;
     this._graphDrawAt = now;
 
-    const spanStart = now - CAR_GRAPH_SPAN_MS;
     for (let c = 0; c < canvases.length; c++) {
       const idx = parseInt(canvases[c].getAttribute('data-pane'), 10);
       const pane = cfg.panes[isFinite(idx) ? idx : c];
       if (!pane) continue;
-      this._paintGraphCanvas(canvases[c], pane, now, spanStart);
+      this._paintGraphCanvas(canvases[c], pane, now, now - this._graphPaneSpanMs(pane));
     }
   }
 
@@ -5124,7 +5283,7 @@ class Component extends DCLogic {
   _paintGraphVar(ctx, key, spec, isY1, style, plotL, plotR, plotW, plotT, plotB, now, spanStart) {
     if (!spec) return;
     if (style === 'bars') {
-      this._paintGraphHist(ctx, key, spec, isY1, plotL, plotR, plotW, plotT, plotB, spanStart);
+      this._paintGraphHist(ctx, key, spec, isY1, plotL, plotR, plotW, plotT, plotB, now, spanStart);
       return;
     }
     const samples = this._graphSeries[key] || [];
@@ -5132,7 +5291,8 @@ class Component extends DCLogic {
     const rawPts = [];
     for (let i = 0; i < samples.length; i++) {
       if (samples[i].t < spanStart) continue;
-      const x = plotL + ((samples[i].t - spanStart) / CAR_GRAPH_SPAN_MS) * plotW;
+      const spanMs = Math.max(1, now - spanStart);
+      const x = plotL + ((samples[i].t - spanStart) / spanMs) * plotW;
       rawPts.push({ x: x, y: this._graphToY(samples[i].v, spec, plotT, plotB), v: samples[i].v });
     }
     if (!rawPts.length) return;
@@ -5183,14 +5343,15 @@ class Component extends DCLogic {
     }
   }
 
-  _paintGraphHist(ctx, key, spec, isY1, plotL, plotR, plotW, plotT, plotB, spanStart) {
+  _paintGraphHist(ctx, key, spec, isY1, plotL, plotR, plotW, plotT, plotB, now, spanStart) {
     const samples = this._graphSeries[key] || [];
     const n = Math.max(16, Math.floor(plotW / 8));
+    const spanMs = Math.max(1, now - spanStart);
     const bins = [];
     for (let i = 0; i < n; i++) bins.push({ s: 0, c: 0 });
     for (let i = 0; i < samples.length; i++) {
       if (samples[i].t < spanStart) continue;
-      const t = (samples[i].t - spanStart) / CAR_GRAPH_SPAN_MS;
+      const t = (samples[i].t - spanStart) / spanMs;
       let bi = Math.floor(t * n);
       if (bi < 0) bi = 0;
       if (bi >= n) bi = n - 1;
@@ -6025,6 +6186,12 @@ class Component extends DCLogic {
     return s === '1' || s === 'true';
   }
 
+  _carEngineOn(value) {
+    const s = String(value == null ? '' : value).trim();
+    if (!s || s === '0' || s === '-1' || s === '10' || s === '14' || s === '15') return false;
+    return true;
+  }
+
   _carNumber(value) {
     let s = String(value == null ? '' : value).trim();
     if (s.charAt(0) === '{') {
@@ -6053,7 +6220,8 @@ class Component extends DCLogic {
     }
     if (metric === 4) return 0;
     if (consumption <= 0) return 0;
-    return Math.floor(1000 / consumption) / 10;
+    if (metric === 1) return Math.floor(1000 / consumption) / 10;
+    return consumption;
   }
 
   /** Trip/avg fuel is shown raw on the cluster; only the brace vector needs the instant conversion. */
@@ -6731,6 +6899,7 @@ class Component extends DCLogic {
           return {
             ...d,
             flipClass: d.flip ? 'hv-cam-ico-flip' : '',
+            onClass: on ? 'is-on' : '',
             maskUrl: this._cameraPresetMaskUrl(d.icon),
             border: on ? '#4fd6e8' : 'rgba(79,214,232,.20)',
             bg: on ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
@@ -6750,8 +6919,8 @@ class Component extends DCLogic {
       layoutCamSaveOpacity: this._currentLayoutCamKey() ? '1' : '0.4',
       cameraOptions: (() => {
         const defs = [
-          { key: 'camEventEnabled', label: 'ON EVENT', title: 'Doors, trunk, and roof move the camera. Restores the previous view when you start driving.' },
-          { key: 'camCycleEnabled', label: 'CYCLE 60s', title: 'Cycle camera views every 60 seconds while the car is moving.' },
+          { key: 'camEventEnabled', label: 'ON EVENT', title: 'Doors → top (20° left). Roof/curtain → top facing left. Returns to the previous view ~2s after the opening settles.' },
+          { key: 'camCycleEnabled', label: 'CYCLE 60s', title: 'Cycle every predefined camera view every 60 seconds while the car is moving.' },
           { key: 'camOrbitEnabled', label: 'ORBIT', title: 'Very slow continuous orbit around the car.' },
         ];
         return defs.map((d) => {
@@ -7595,7 +7764,7 @@ class Component extends DCLogic {
           // A full 6.2831853 sweep is axisymmetric and cannot read as turning.
           const float BLUR_ARC_RAD = 1.0472;   // 60 degrees
           for (int i = 0; i < SAMPLES; i++) {
-            float angle = (float(i) / float(SAMPLES) - 0.5) * BLUR_ARC_RAD;
+            float angle = (float(i) / float(SAMPLES - 1) - 0.5) * BLUR_ARC_RAD;
             float cosA = cos(angle);
             float sinA = sin(angle);
             vec2 rotatedUv = vec2(
@@ -13303,6 +13472,21 @@ class Component extends DCLogic {
     if (this.outerRef && this.outerRef.current) {
       this.outerRef.current.classList.remove('bg-grain');
     }
+    // Register the bridge target NOW, not after the GLB is fit. Native pushes
+    // the shell layout (board bounds, shell mode, safe insets) from
+    // onPageFinished — minutes of model load earlier on the MMI — and
+    // appLauncherClient can only forward it if window.__app already exists.
+    // Without this the whole pre-car shell ran on the built-in fallbacks: the
+    // boards sat on the 1920-panel constants instead of the clamped, rail-aware
+    // rects (visibly shifted left and over-wide), and the page stayed in its
+    // default 'triple' no matter which layout was last used — both snapping
+    // into place only when the car arrived and __app was finally set.
+    // Everything applyShellLayout touches is model-optional: _applyFitCamera
+    // and _setCarSceneVisible both no-op until the scene exists.
+    window.__app = this;
+    if (typeof window.__flushAndroidShell === 'function') {
+      try { window.__flushAndroidShell(); } catch (e) { console.warn('[AndroidShell]', e); }
+    }
     // Splash bookkeeping. The clip holds its last frame after `whenDone`;
     // _startIntroAnimation is what actually fades the overlay, once the car
     // has been drawn underneath. This handler is the backstop for when that
@@ -13722,8 +13906,8 @@ class Component extends DCLogic {
       // Content-Length, so the progress bar divides by these. The HEV pair is
       // shipped uncompressed by scripts/build-fast-models.mjs (hence the jump
       // from ~5.7MB); the GT pair is still Draco.
-      const HEV_BYTES = this._perfLow ? 8473284 : 11321360;
-      const GT_BYTES = this._perfLow ? 3009120 : 4871268;
+      const HEV_BYTES = this._perfLow ? 14098412 : 34647700;
+      const GT_BYTES = this._perfLow ? 6966928 : 17776560;
       const profiles = this._modelProfiles();
       // Boot whichever body was last selected (default HEV). The other GLB is
       // lazy — fetched on the first MODEL toggle (see _setModelVariant) so a
@@ -14191,6 +14375,12 @@ class Component extends DCLogic {
           this.requestRender(2);
         }
         if (this._camRestorePending) this._syncEventCamera();
+        if (this._tickEventCamRestore(_dt)) {
+          cameraBusy = true;
+          needRender = true;
+          this._postFxDirty = true;
+          this.requestRender(2);
+        }
         this._syncCamOrbit();
         // controls.update() must run every frame for damping; true = camera moved
         if (controls.update()) {
@@ -15492,9 +15682,9 @@ class Component extends DCLogic {
       { key: 'sideLeft',      icon: 'side',      title: 'Left side',                 flip: true },
       { key: 'frontSideLeft', icon: 'frontSide', title: 'Front three-quarter, left', flip: true },
       { key: 'frontTopSide',  icon: 'frontTop',  title: 'Elevated front three-quarter' },
-      { key: 'top',           icon: 'top',       title: 'Top' },
+      { key: 'top',           icon: 'top',       title: 'Top, 20° left' },
       { key: 'rearTopSide',   icon: 'rearTop',   title: 'Elevated rear three-quarter' },
-      { key: 'topSide',       icon: 'topSide',   title: 'High side / doors' },
+      { key: 'topSide',       icon: 'topSide',   title: 'Top, facing left' },
     ];
   }
 
@@ -15503,13 +15693,24 @@ class Component extends DCLogic {
     if (this._camMaskUrls[icon]) return this._camMaskUrls[icon];
     const svg = this._cameraViewSvg(icon);
     if (!svg) return '';
-    return this._camMaskUrls[icon] = 'data:image/svg+xml,' + encodeURIComponent(svg);
+    return this._camMaskUrls[icon] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  _cameraTopPlanInner() {
+    // Plan view, nose toward -Y (up) before rotation. Windshield + sunroof are holes.
+    return ""
+      + "<path fill-rule='evenodd' d='M11.1 5h9.8l2.3 3.1v15.6L20.9 27h-9.8l-2.3-3.3V8.1L11.1 5Zm1.6 2.3h6.6L18 10.6h-4L12.7 7.3Zm1.5 6.4h4.6v6.6h-4.6z'/>"
+      + "<rect x='8' y='9.1' width='2.35' height='4.1' rx='1.05'/>"
+      + "<rect x='21.65' y='9.1' width='2.35' height='4.1' rx='1.05'/>"
+      + "<rect x='8' y='18.6' width='2.35' height='4.1' rx='1.05'/>"
+      + "<rect x='21.65' y='18.6' width='2.35' height='4.1' rx='1.05'/>"
+      + "<rect x='7.15' y='14.35' width='1.7' height='3.1' rx='.55'/>"
+      + "<rect x='23.15' y='14.35' width='1.7' height='3.1' rx='.55'/>";
   }
 
   // Filled SUV glyphs drawn as the car appears FROM that camera.
-  // Glass is an even-odd hole so the silhouette still reads at ~40px.
   _cameraViewSvg(icon) {
-    const ns = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='black'>";
+    const ns = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='#4fd6e8'>";
     const map = {
       front:
         "<path fill-rule='evenodd' d='M8 13.1 11.1 7.4h9.8L24 13.1V21H8V13.1Zm3.5-3.9h8.8l1.7 3.1H9.8l1.7-3.1Z'/>" +
@@ -15537,23 +15738,15 @@ class Component extends DCLogic {
         "<circle cx='11' cy='22.2' r='2.35'/><circle cx='20.8' cy='22.9' r='2.35'/>" +
         "<ellipse cx='24.2' cy='21.5' rx='1.45' ry='1.75'/>" +
         "<rect x='7.2' y='15.6' width='4.1' height='1.7' rx='.4'/>",
-      top:
-        "<path fill-rule='evenodd' d='M10.2 3.6h11.6l2.6 4.1v16.6l-2.6 4.1H10.2l-2.6-4.1V7.7l2.6-4.1Zm2.1 2.6h7.4l-1.5 4.1h-4.4l-1.5-4.1Z'/>" +
-        "<rect x='8.2' y='8.8' width='2.1' height='3.4' rx='.7'/>" +
-        "<rect x='21.7' y='8.8' width='2.1' height='3.4' rx='.7'/>" +
-        "<rect x='8.2' y='19.6' width='2.1' height='3.4' rx='.7'/>" +
-        "<rect x='21.7' y='19.6' width='2.1' height='3.4' rx='.7'/>",
+      top: "<g transform='rotate(-20 16 16)'>" + this._cameraTopPlanInner() + "</g>",
       frontTop:
         "<path fill-rule='evenodd' d='M7.2 15.2 11.6 8.2l8.4-1.4 1.6 5.6 5.2 1.6v6.6l-9.6 1.8L7.2 20.6V15.2Zm4.6-5 6.6-1 1.2 3.8-7 1.1-1-3.9Z'/>" +
-        "<circle cx='12' cy='22.6' r='2.15'/><circle cx='21.4' cy='23.1' r='2.15'/>" +
-        "<path d='M9.2 13.4h8.8l1.4 2.2H9.8z' opacity='.35'/>",
+        "<circle cx='12' cy='22.6' r='2.15'/><circle cx='21.4' cy='23.1' r='2.15'/>",
       rearTop:
         "<path fill-rule='evenodd' d='M7.4 14.6 10.4 8.4l8.2-1.2 1.6 5.4 5.4 1.6v6.8l-9.8 1.7L7.4 20.2V14.6Zm3.6-4.4 6.2-.8 1.1 3.6-6.6 1-1-3.8Z'/>" +
         "<circle cx='11.8' cy='22.5' r='2.15'/><circle cx='21.6' cy='23.1' r='2.15'/>" +
         "<rect x='8' y='16.2' width='4.4' height='1.6' rx='.4'/>",
-      topSide:
-        "<path fill-rule='evenodd' d='M8.4 14.8 12.6 7.2h8.2l4.2 4.4v9.2l-6.8 2.2H8.8l-.4-8.2Zm4.4-5.6h6.6l2.4 3.2H11.2l1.6-3.2Z'/>" +
-        "<circle cx='12.2' cy='22.8' r='2.2'/><circle cx='21.8' cy='23.2' r='2.2'/>",
+      topSide: "<g transform='rotate(-90 16 16)'>" + this._cameraTopPlanInner() + "</g>",
     };
     const body = map[icon];
     if (!body) return '';
@@ -15581,15 +15774,15 @@ class Component extends DCLogic {
       sideLeft:      pos(0.05,  -1.18, 0.20),
       frontSideLeft: pos(0.78,  -0.78, 0.22),
       frontTopSide:  pos(0.66,   0.70, 0.38),
-      top:           pos(0.08,   0.12, 1.08),
+      top:           pos(-0.30,  0.11, 1.06),
       rearTopSide:   pos(-0.66,  0.70, 0.38),
-      topSide:       pos(0.20,   0.55, 0.90),
+      topSide:       pos(0.04,   0.36, 1.06),
     };
     const position = map[key];
     if (!position) return null;
     const home = this._layoutHomePose();
     const target = c.clone();
-    if (key === 'top') target.y += d * 0.10;
+    if (key === 'top' || key === 'topSide') target.y += d * 0.08;
     return {
       position,
       target,
@@ -15664,6 +15857,16 @@ class Component extends DCLogic {
       || this._curtainProgress !== this._curtainTarget;
   }
 
+  _eventOpeningsBusy() {
+    const t = this._doorTargets || {};
+    const p = this._doorProgress || {};
+    for (const k of ['fl', 'fr', 'rl', 'rr']) {
+      if ((p[k] || 0) !== (t[k] || 0)) return true;
+    }
+    if ((this._trunkProgress || 0) !== (this._trunkTarget || 0)) return true;
+    return this._roofEventBusy();
+  }
+
   _desiredEventCamKind() {
     const t = this._doorTargets || {};
     const p = this._doorProgress || {};
@@ -15678,32 +15881,8 @@ class Component extends DCLogic {
     return null;
   }
 
-  _eventCamPose(kind) {
-    if (!this._fitCenter || !this._fitDist) return null;
-    const THREE = window.THREE;
-    const c = this._fitCenter.clone();
-    const d = this._fitDist;
-    const { F, R } = this._carBasis();
-    const pos = (f, r, y) => c.clone()
-      .addScaledVector(F, d * f)
-      .addScaledVector(R, d * r)
-      .add(new THREE.Vector3(0, d * y, 0));
-    const tgt = (f, r, y) => c.clone()
-      .addScaledVector(F, d * (f || 0))
-      .addScaledVector(R, d * (r || 0))
-      .add(new THREE.Vector3(0, d * (y || 0), 0));
-    const home = this._layoutHomePose();
-    const viewShift = home && home.viewShift != null ? home.viewShift : this._currentViewShift();
-    if (kind === 'doors') {
-      return { position: pos(0.16, 0.50, 0.96), target: tgt(0.00, 0, 0.05), viewShift };
-    }
-    if (kind === 'trunk') {
-      return { position: pos(-0.96, 0.36, 0.30), target: tgt(-0.28, 0, 0.08), viewShift };
-    }
-    if (kind === 'roof') {
-      return { position: pos(0.14, 0.10, 0.98), target: tgt(0.04, 0, 0.14), viewShift };
-    }
-    return null;
+  _eventCamPresetKey(kind) {
+    return (CAM_EVENT_PRESET && CAM_EVENT_PRESET[kind]) || null;
   }
 
   _clearEventCam() {
@@ -15713,6 +15892,7 @@ class Component extends DCLogic {
     this._camEventUserOverride = false;
     this._camEventDismissedKind = null;
     this._camRestorePending = false;
+    this._camRestoreWait = 0;
   }
 
   _enterEventCam(kind) {
@@ -15722,7 +15902,10 @@ class Component extends DCLogic {
       this._camEventDismissedKind = null;
       this._camEventUserOverride = false;
     }
-    const pose = this._eventCamPose(kind);
+    const presetKey = this._eventCamPresetKey(kind);
+    const pose = presetKey
+      ? this._getCameraPresetPose(presetKey)
+      : null;
     if (!pose) return;
     if (!this._camEventPrevRel) {
       this._camEventPrevRel = this._captureCurrentLayoutCam();
@@ -15730,7 +15913,9 @@ class Component extends DCLogic {
     }
     this._camEventKind = kind;
     this._camEventUserOverride = false;
-    this.setState({ cameraPreset: null });
+    this._camRestorePending = false;
+    this._camRestoreWait = 0;
+    this.setState({ cameraPreset: presetKey });
     this._animateCameraTo(pose, 1.2);
   }
 
@@ -15755,6 +15940,10 @@ class Component extends DCLogic {
     if (pose) this._animateCameraTo(pose, 1.15);
   }
 
+  _scheduleEventCamRestore() {
+    this._camRestorePending = true;
+  }
+
   _syncEventCamera() {
     if (!this.state || !this.state.camEventEnabled) return;
     if (this._introActive || !this._introPlayed) return;
@@ -15764,40 +15953,71 @@ class Component extends DCLogic {
     const moving = this._carIsMoving();
     const roofBusy = this._roofEventBusy();
 
+    // Parked with an opening: hold / switch to the matching preset.
     if (kind && !moving) {
       this._camRestorePending = false;
+      this._camRestoreWait = 0;
       this._enterEventCam(kind);
       return;
     }
 
-    if (kind && moving) {
-      if (kind === 'roof' && roofBusy) {
-        this._enterEventCam('roof');
-        this._camRestorePending = true;
-        return;
-      }
-      if (this._camEventKind || this._camRestorePending) {
-        if (roofBusy) {
-          this._camRestorePending = true;
-          return;
-        }
-        this._restoreEventCam();
-      }
+    // Driving while the roof is still travelling: stay on roof until it settles.
+    if (kind === 'roof' && moving && roofBusy) {
+      this._enterEventCam('roof');
+      this._scheduleEventCamRestore();
+      this._camRestoreWait = 0;
       return;
     }
 
-    if (this._camEventKind || this._camRestorePending) {
-      if (roofBusy) {
-        this._camRestorePending = true;
-        return;
-      }
-      this._restoreEventCam();
+    // Event is over (closed), or driving away: restore after settle + hold.
+    if (this._camEventKind || this._camRestorePending || this._camEventPrevRel) {
+      this._scheduleEventCamRestore();
     }
+  }
+
+  _tickEventCamRestore(dt) {
+    if (!this.state || !this.state.camEventEnabled) return false;
+    if (!this._camRestorePending) return false;
+    if (this._introActive || this._camAnim) return false;
+
+    const kind = this._desiredEventCamKind();
+    const moving = this._carIsMoving();
+
+    // Still parked with something open — cancel the countdown.
+    if (kind && !moving) {
+      this._camRestorePending = false;
+      this._camRestoreWait = 0;
+      return false;
+    }
+
+    // Count only after openings have finished travelling.
+    if (!moving && this._eventOpeningsBusy()) {
+      this._camRestoreWait = 0;
+      return false;
+    }
+    if (moving && this._roofEventBusy()) {
+      this._camRestoreWait = 0;
+      return false;
+    }
+
+    this._camRestoreWait = (this._camRestoreWait || 0) + dt;
+    if (this._camRestoreWait < CAM_EVENT_RESTORE_SEC) {
+      if (this.requestRender) this.requestRender(2);
+      return true;
+    }
+    this._restoreEventCam();
+    return true;
+  }
+
+  _camCyclePresetKeys() {
+    if (this._camCycleKeys && this._camCycleKeys.length) return this._camCycleKeys;
+    this._camCycleKeys = this._cameraPresetDefs().map((d) => d.key);
+    return this._camCycleKeys;
   }
 
   _tickCamCycle(dt) {
     if (!this.state || !this.state.camCycleEnabled) return false;
-    if (this._introActive || this._camAnim || this._camEventKind) return false;
+    if (this._introActive || this._camAnim || this._camEventKind || this._camRestorePending) return false;
     if (!this._carIsMoving()) {
       this._camCycleElapsed = 0;
       return false;
@@ -15805,7 +16025,7 @@ class Component extends DCLogic {
     this._camCycleElapsed = (this._camCycleElapsed || 0) + dt;
     if (this._camCycleElapsed < CAM_CYCLE_SEC) return false;
     this._camCycleElapsed = 0;
-    const keys = this._camCycleKeys || [];
+    const keys = this._camCyclePresetKeys();
     if (!keys.length) return false;
     const cur = this.state.cameraPreset;
     const idx = keys.indexOf(cur);
@@ -15907,6 +16127,15 @@ class Component extends DCLogic {
   _revealShellChrome(opts) {
     if (this._shellChromeRevealed) return;
     this._shellChromeRevealed = true;
+    // Chrome is going up while the GLB may still be arriving (skip). Any layout
+    // notify that landed during the load parked its patch instead of painting
+    // (see applyShellLayout); paint it now, or the shell opens in the default
+    // layout and only switches to the real one when the car loads.
+    if (this._pendingShellPatch) {
+      const parked = this._pendingShellPatch;
+      this._pendingShellPatch = null;
+      this.setState(parked);
+    }
     const immediate = !!(opts && opts.immediate);
     const keepHud = !!(opts && opts.keepHud);
     if (!keepHud) {

@@ -307,6 +307,9 @@ public final class MainActivity extends Activity {
         "com.beantechs.sshost.client",
         "com.android.car.media",
         "com.android.car.radio",
+        // Duplicate "Configurações" row — the pinned com.beantechs.settings
+        // ("Configurações do Sistema") is the entry point we keep.
+        "com.android.car.settings",
         "com.beantechs.mediacenter",
         "com.beantechs.mediacenter.h5.ui",
         "com.beantechs.mediacenter.h5.core",
@@ -623,6 +626,8 @@ public final class MainActivity extends Activity {
     private MotionTrailLayout projectionItem;
     private View projectionGap;
     private final MotionTrailLayout[] pinnedItems = new MotionTrailLayout[PINNED_PACKAGES.length];
+    /** Pinned slots with an installed app behind them — the rest stay GONE forever. */
+    private final boolean[] pinnedBound = new boolean[PINNED_PACKAGES.length];
     private View pinnedGap;
     private final MotionTrailLayout[] recentItems = new MotionTrailLayout[3];
     private View recentsGap;
@@ -633,6 +638,8 @@ public final class MainActivity extends Activity {
     private final java.util.Map<String, MotionTrailLayout> dockItemsByPackage =
             new java.util.LinkedHashMap<>();
     private android.widget.PopupWindow dockEditMenu;
+    /** Long-press → "Unhide selected…" list. */
+    private android.widget.PopupWindow unhidePicker;
     private final BroadcastReceiver packageRemovedReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -2419,6 +2426,47 @@ public final class MainActivity extends Activity {
     }
 
     /**
+     * Projection (Android Auto / CarPlay) opens fullscreen, like the OEM apps.
+     *
+     * <p>The old path started the display activity from ProjectionPresence's
+     * application context with default window options. With no explicit
+     * windowing mode the task inherits whatever the caller is in, so on this ROM
+     * the tap produced nothing visible. Go through the same fullscreen options
+     * every other full-screen launch uses, and walk the candidate components so
+     * a non-exported display activity falls back to the package's own launcher
+     * entry instead of failing silently.
+     */
+    private void launchProjection(ProjectionPresence.Kind kind) {
+        if (kind == null || kind == ProjectionPresence.Kind.NONE) return;
+        if (projectionPresence == null) return;
+        if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
+        if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
+
+        List<Intent> candidates = projectionPresence.launchIntents(kind);
+        if (candidates.isEmpty()) {
+            Log.w(TAG, "Projection " + kind + ": nothing launchable installed");
+            return;
+        }
+        for (Intent intent : candidates) {
+            ComponentName cn = intent.getComponent();
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            try {
+                Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
+                Log.w(TAG, "Projection launch " + kind + " -> " + cn);
+                startActivity(intent, opts);
+                if (cn != null) requestTaskBounds(cn.getPackageName(), FULLSCREEN_BOUNDS);
+                notifyViewerShellLayout();
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "Projection launch failed for " + cn, e);
+            }
+        }
+        Log.e(TAG, "Projection " + kind + ": every launch candidate failed");
+    }
+
+    /**
      * {@code com.android.car.settings} trampolines into the connectivity page on
      * this ROM. Open the stock Settings root activity instead, fullscreen.
      */
@@ -3064,12 +3112,14 @@ public final class MainActivity extends Activity {
         loadRecentApps();
         loadHiddenApps();
         float density = getResources().getDisplayMetrics().density;
-        int iconSizePx = Math.round(52 * density);
-        int itemWidthPx = Math.round(78 * density);
+        // Bigger than the old 52/78: dropping the captions freed vertical room in
+        // the 110dp band, and the GWM emblems need the width for the name drawn
+        // across their lower third. This is a 160dpi unit, so 1dp is 1px.
+        int iconSizePx = Math.round(60 * density);
+        int itemWidthPx = Math.round(84 * density);
         int marginBottomPx = launcherBottomGapPx();
         int fadeLengthPx = Math.round(72 * density);
         int stripHeightPx = Math.round(110 * density);
-        int iconBottomGapPx = Math.round(10 * density);
 
         // Bottom icon strip — full width (media column sits above the dock band).
         FrameLayout strip = new FrameLayout(this);
@@ -3106,8 +3156,10 @@ public final class MainActivity extends Activity {
 
         android.widget.LinearLayout iconsLayout = new android.widget.LinearLayout(this);
         iconsLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        iconsLayout.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
-        iconsLayout.setPadding(Math.round(24 * density), 0, Math.round(24 * density), iconBottomGapPx);
+        // Captions are gone, so the items are all one icon tall: centre them in
+        // the strip band instead of hanging them off its top edge.
+        iconsLayout.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
+        iconsLayout.setPadding(Math.round(24 * density), 0, Math.round(24 * density), 0);
         // Let the reveal's motion smear draw past each item's own edges.
         iconsLayout.setClipChildren(false);
         scrollView.setClipChildren(false);
@@ -3141,12 +3193,17 @@ public final class MainActivity extends Activity {
             pinnedItems[i].setVisibility(View.GONE);
             iconsLayout.addView(pinnedItems[i]);
             launcherItems.add(pinnedItems[i]);
-            if (isUserHidden(pkg)) continue;
             ResolveInfo info = byPkg.get(pkg);
             if (info == null) continue;
             String labelStr = pinnedLabel(pkg, pm, info);
+            // Bind even when hidden — the slot stays GONE until "Unhide" flips it.
             bindDockItem(pinnedItems[i], iconForLauncherApp(pm, info), labelStr,
                     v -> launchAppForPackage(pkg, labelStr), pkg);
+            pinnedBound[i] = true;
+            if (isUserHidden(pkg)) {
+                pinnedItems[i].setVisibility(View.GONE);
+                continue;
+            }
             pinnedShown++;
             Log.w(TAG, "Launcher pinned " + pkg + " | " + labelStr);
         }
@@ -3171,7 +3228,7 @@ public final class MainActivity extends Activity {
 
         for (ResolveInfo info : apps) {
             String pkg = info.activityInfo.packageName;
-            if (skipInAppRow(pkg)) continue;
+            if (excludedFromAppRow(pkg)) continue;
 
             String labelStr = launcherLabel(pm, info);
             Drawable iconDrawable = iconForLauncherApp(pm, info);
@@ -3181,9 +3238,11 @@ public final class MainActivity extends Activity {
             iconsLayout.addView(itemLayout);
             launcherItems.add(itemLayout);
             dockItemsByPackage.put(pkg, itemLayout);
-            Log.w(TAG, "Launcher shown " + pkg + " | " + labelStr
-                    + (isGwmApp(pkg) ? " | gwm" : "")
-                    + (CAR_SETTINGS_PACKAGE.equals(pkg) ? " | settings-root" : ""));
+            // hideRecentDuplicatesFromStrip (via bindRecentSlots below) settles the
+            // final visibility, including the user's hide list.
+            if (isUserHidden(pkg)) itemLayout.setVisibility(View.GONE);
+            Log.w(TAG, "Launcher " + (isUserHidden(pkg) ? "hidden " : "shown ") + pkg + " | " + labelStr
+                    + (isGwmApp(pkg) ? " | gwm" : ""));
         }
 
         bindRecentSlots(pm, apps);
@@ -3201,7 +3260,7 @@ public final class MainActivity extends Activity {
             int avail = scrollView.getWidth();
             if (avail <= 0) return;
             iconsLayout.setMinimumWidth(avail);
-            iconsLayout.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+            iconsLayout.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
         });
 
         strip.addView(scrollView, new FrameLayout.LayoutParams(
@@ -3259,26 +3318,43 @@ public final class MainActivity extends Activity {
         item.setClickable(true);
         item.setFocusable(true);
 
+        // One fixed-size box per item, so every icon in the row sits on the same
+        // baseline no matter whether it carries a badge. The badge is drawn
+        // inside the box (over the emblem's empty lower third), never below it
+        // — an extra row of text under some items would push those icons up.
+        android.widget.FrameLayout iconBox = new android.widget.FrameLayout(this);
+        iconBox.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, iconSizePx));
+        iconBox.setClipChildren(false);
+
         android.widget.ImageView iconView = new android.widget.ImageView(this);
         iconView.setTag("icon");
-        iconView.setLayoutParams(new android.widget.LinearLayout.LayoutParams(iconSizePx, iconSizePx));
+        android.widget.FrameLayout.LayoutParams iconParams =
+                new android.widget.FrameLayout.LayoutParams(iconSizePx, iconSizePx);
+        iconParams.gravity = android.view.Gravity.CENTER;
+        iconView.setLayoutParams(iconParams);
+        iconBox.addView(iconView);
 
+        // Only GWM-emblem apps get text; see bindDockItem.
         android.widget.TextView labelView = new android.widget.TextView(this);
-        android.widget.LinearLayout.LayoutParams labelParams = new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        labelParams.topMargin = Math.round(4 * density);
+        android.widget.FrameLayout.LayoutParams labelParams =
+                new android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.WRAP_CONTENT);
+        labelParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL;
         labelView.setLayoutParams(labelParams);
         labelView.setTag("label");
-        labelView.setTextSize(10f);
+        labelView.setTextSize(9f);
         labelView.setTextColor(0xFFFFFFFF);
         labelView.setGravity(android.view.Gravity.CENTER);
-        labelView.setSingleLine(true);
+        labelView.setMaxLines(2);
+        labelView.setLineSpacing(0f, 0.9f);
         labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        labelView.setShadowLayer(4f, 0f, 2f, 0xFF000000);
+        labelView.setShadowLayer(4f, 0f, 1f, 0xFF000000);
+        labelView.setVisibility(View.GONE);
+        iconBox.addView(labelView);
 
-        item.addView(iconView);
-        item.addView(labelView);
+        item.addView(iconBox);
         return item;
     }
 
@@ -3304,24 +3380,39 @@ public final class MainActivity extends Activity {
         return packageName != null && hiddenPackages.contains(packageName);
     }
 
-    /** Hidden from the scrolling app row (pinned apps live in their own slots). */
-    private boolean skipInAppRow(String pkg) {
+    /**
+     * Structurally absent from the scrolling app row — pinned apps live in their
+     * own slots, the rest are never launcher material. Unlike
+     * {@link #skipInAppRow} this ignores the user's hide list: hidden apps still
+     * get a (GONE) item built at setup so "Unhide" can just flip visibility
+     * instead of splicing a new view into the row.
+     */
+    private boolean excludedFromAppRow(String pkg) {
         return pkg.equals(getPackageName())
                 || IGNORED_PACKAGES.contains(pkg)
-                || isUserHidden(pkg)
                 || isPinnedPackage(pkg)
                 || ProjectionPresence.isProjectionPackage(pkg);
+    }
+
+    /** Hidden from the scrolling app row (pinned apps live in their own slots). */
+    private boolean skipInAppRow(String pkg) {
+        return excludedFromAppRow(pkg) || isUserHidden(pkg);
     }
 
     private boolean skipInRecents(String pkg) {
         return skipInAppRow(pkg);
     }
 
+    /**
+     * The pinned GWM shortcuts all share one emblem, and the OEM labels
+     * ("VehicleCenter", "Settings") say nothing about which is which on a car
+     * screen. These are the names drawn on the icons.
+     */
     private String pinnedLabel(String pkg, PackageManager pm, ResolveInfo info) {
-        if ("com.beantechs.vehiclecenter".equals(pkg)) return "VehicleCenter";
-        if ("com.beantechs.settings".equals(pkg)) return "Settings";
+        if ("com.beantechs.vehiclecenter".equals(pkg)) return "Configurações do Veículo";
+        if ("com.beantechs.settings".equals(pkg)) return "Configurações do Sistema";
         if ("com.beantechs.energyassistant".equals(pkg)) return "Energy Assistant";
-        if ("com.beantechs.launcher".equals(pkg)) return "Launcher";
+        if ("com.beantechs.launcher".equals(pkg)) return "GWM Home";
         return launcherLabel(pm, info);
     }
 
@@ -3354,13 +3445,24 @@ public final class MainActivity extends Activity {
                 Drawable energy = getDrawable(R.drawable.ic_energy_assistant);
                 if (energy != null) return energy;
             } catch (Exception ignored) {}
-        } else if (isGwmApp(pkg)) {
+        } else if (usesGwmEmblem(pkg)) {
             try {
-                Drawable gwm = getDrawable(R.drawable.ic_gwm);
+                Drawable gwm = getDrawable(R.drawable.ic_gwm_emblem);
                 if (gwm != null) return gwm;
             } catch (Exception ignored) {}
         }
         return info.loadIcon(pm);
+    }
+
+    /**
+     * Every GWM / BeanTechs / Autolink app resolves to the same emblem, so the
+     * icon alone cannot tell them apart once the row drops its captions — those
+     * are the ones that get their name drawn on the icon, in place of the "GWM"
+     * wordmark {@code ic_gwm_emblem} leaves out. Energy Assistant ships its own
+     * artwork and needs no badge.
+     */
+    private boolean usesGwmEmblem(String pkg) {
+        return isGwmApp(pkg) && !"com.beantechs.energyassistant".equalsIgnoreCase(pkg);
     }
 
     private void bindDockItem(MotionTrailLayout item, Drawable icon, String label,
@@ -3374,7 +3476,13 @@ public final class MainActivity extends Activity {
         android.widget.ImageView iv = (android.widget.ImageView) item.findViewWithTag("icon");
         android.widget.TextView tv = (android.widget.TextView) item.findViewWithTag("label");
         if (iv != null) iv.setImageDrawable(icon);
-        if (tv != null) tv.setText(label != null ? label : "");
+        if (tv != null) {
+            // Captions are off across the row; only the interchangeable GWM
+            // emblems carry a name, drawn on the icon itself.
+            boolean badge = usesGwmEmblem(editPackage) && label != null && !label.isEmpty();
+            tv.setText(badge ? label : "");
+            tv.setVisibility(badge ? View.VISIBLE : View.GONE);
+        }
         item.setOnClickListener(click);
         item.setClickable(click != null);
         if (editPackage != null && !editPackage.isEmpty()) {
@@ -3402,9 +3510,7 @@ public final class MainActivity extends Activity {
         }
         Drawable icon = projectionPresence != null ? projectionPresence.iconFor(kind) : null;
         String label = projectionPresence != null ? projectionPresence.labelFor(kind) : "";
-        bindDockItem(projectionItem, icon, label, v -> {
-            if (projectionPresence != null) projectionPresence.launch(kind);
-        });
+        bindDockItem(projectionItem, icon, label, v -> launchProjection(kind));
         if (projectionGap != null) projectionGap.setVisibility(View.VISIBLE);
     }
 
@@ -3477,6 +3583,7 @@ public final class MainActivity extends Activity {
     }
 
     private void dismissDockEditMenu() {
+        dismissUnhidePicker();
         if (dockEditMenu == null) return;
         try {
             dockEditMenu.dismiss();
@@ -3500,6 +3607,12 @@ public final class MainActivity extends Activity {
             dismissDockEditMenu();
             removeDockPackage(pkg, true);
         }));
+        if (!hiddenPackages.isEmpty()) {
+            box.addView(makeDockMenuRow("Unhide selected…", () -> {
+                dismissDockEditMenu();
+                showUnhidePicker();
+            }));
+        }
         if (canUninstallPackage(pkg)) {
             box.addView(makeDockMenuRow("Uninstall", () -> {
                 dismissDockEditMenu();
@@ -3530,6 +3643,151 @@ public final class MainActivity extends Activity {
         popup.showAsDropDown(anchor, xOff, yOff);
     }
 
+    /**
+     * "Unhide selected" — every package the user has hidden, icon + label, tap
+     * to bring it back. Hidden apps keep a GONE item in the strip (see
+     * {@link #excludedFromAppRow}), so restoring one is a visibility flip.
+     */
+    private void showUnhidePicker() {
+        if (hiddenPackages.isEmpty()) return;
+        dismissUnhidePicker();
+        float d = getResources().getDisplayMetrics().density;
+        PackageManager pm = getPackageManager();
+        Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
+        mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        java.util.Map<String, ResolveInfo> byPkg = new java.util.HashMap<>();
+        List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
+        if (apps != null) {
+            for (ResolveInfo info : apps) {
+                if (info == null || info.activityInfo == null) continue;
+                byPkg.put(info.activityInfo.packageName, info);
+            }
+        }
+
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setBackgroundColor(0xF2141820);
+        box.setElevation(12f * d);
+        int pad = Math.round(14 * d);
+        box.setPadding(pad, Math.round(10 * d), pad, Math.round(10 * d));
+
+        android.widget.TextView title = new android.widget.TextView(this);
+        title.setText("Hidden apps");
+        title.setTextColor(0x99FFFFFF);
+        title.setTextSize(11f);
+        title.setPadding(Math.round(6 * d), 0, Math.round(6 * d), Math.round(6 * d));
+        box.addView(title);
+
+        // Sorted so the list does not reshuffle between openings (hiddenPackages
+        // is a HashSet).
+        List<String> pkgs = new ArrayList<>(hiddenPackages);
+        java.util.Collections.sort(pkgs);
+        int iconPx = Math.round(28 * d);
+        for (String hidden : pkgs) {
+            final String target = hidden;
+            ResolveInfo info = byPkg.get(hidden);
+            String label = info != null ? pinnedLabel(hidden, pm, info) : hidden;
+            Drawable icon = info != null ? iconForLauncherApp(pm, info) : null;
+
+            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(Math.round(6 * d), Math.round(8 * d), Math.round(6 * d), Math.round(8 * d));
+            row.setClickable(true);
+            row.setFocusable(true);
+
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            android.widget.LinearLayout.LayoutParams ivLp =
+                    new android.widget.LinearLayout.LayoutParams(iconPx, iconPx);
+            ivLp.rightMargin = Math.round(10 * d);
+            iv.setLayoutParams(ivLp);
+            iv.setImageDrawable(icon);
+            row.addView(iv);
+
+            android.widget.TextView tv = new android.widget.TextView(this);
+            tv.setText(label);
+            tv.setTextColor(0xFFFFFFFF);
+            tv.setTextSize(13f);
+            tv.setSingleLine(true);
+            tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            tv.setMaxWidth(Math.round(240 * d));
+            row.addView(tv);
+
+            row.setOnClickListener(v -> {
+                dismissUnhidePicker();
+                restoreDockPackage(target);
+            });
+            box.addView(row);
+        }
+
+        android.widget.ScrollView scroller = new android.widget.ScrollView(this);
+        scroller.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroller.addView(box);
+
+        android.widget.PopupWindow popup = new android.widget.PopupWindow(
+                scroller,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                true);
+        popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
+        popup.setOnDismissListener(() -> {
+            if (unhidePicker == popup) unhidePicker = null;
+        });
+        unhidePicker = popup;
+        View anchor = stripContainer != null ? stripContainer : webView;
+        if (anchor == null) {
+            unhidePicker = null;
+            return;
+        }
+        // Centred over the shell: the list can outgrow any single icon's anchor,
+        // and the ScrollView caps it at the screen rather than the strip band.
+        popup.showAtLocation(anchor, android.view.Gravity.CENTER, 0, 0);
+    }
+
+    private void dismissUnhidePicker() {
+        if (unhidePicker == null) return;
+        try {
+            unhidePicker.dismiss();
+        } catch (Exception ignored) {}
+        unhidePicker = null;
+    }
+
+    /** Reverse of {@link #removeDockPackage}: drop the hide flag and re-show. */
+    private void restoreDockPackage(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return;
+        if (!hiddenPackages.remove(pkg)) return;
+        saveHiddenApps();
+        updatePinnedVisibility();
+        // Rebinds recents and settles app-row visibility from the hide list.
+        refreshRecentSlots();
+        Log.w(TAG, "Launcher unhidden " + pkg);
+    }
+
+    /** Pinned slots follow the hide list; the trailing gap follows the slots. */
+    private void updatePinnedVisibility() {
+        int pinnedVisible = 0;
+        for (int i = 0; i < PINNED_PACKAGES.length; i++) {
+            if (pinnedItems[i] == null) continue;
+            if (isUserHidden(PINNED_PACKAGES[i])) {
+                pinnedItems[i].setVisibility(View.GONE);
+                continue;
+            }
+            // Never revive a slot with no app behind it.
+            if (!pinnedBound[i]) continue;
+            pinnedItems[i].setVisibility(View.VISIBLE);
+            if (launcherRevealed) {
+                pinnedItems[i].setAlpha(1f);
+                pinnedItems[i].setTranslationX(0f);
+                pinnedItems[i].setTrailPx(0f);
+            }
+            pinnedVisible++;
+        }
+        if (pinnedGap != null) {
+            pinnedGap.setVisibility(pinnedVisible > 0 ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private android.widget.TextView makeDockMenuRow(String title, Runnable action) {
         float d = getResources().getDisplayMetrics().density;
         android.widget.TextView row = new android.widget.TextView(this);
@@ -3553,18 +3811,29 @@ public final class MainActivity extends Activity {
         saveRecentApps();
         MotionTrailLayout row = dockItemsByPackage.get(pkg);
         if (row != null) row.setVisibility(View.GONE);
-        int pinnedVisible = 0;
-        for (int i = 0; i < PINNED_PACKAGES.length; i++) {
-            if (pinnedItems[i] == null) continue;
-            if (PINNED_PACKAGES[i].equals(pkg) || isUserHidden(PINNED_PACKAGES[i])) {
-                pinnedItems[i].setVisibility(View.GONE);
-            } else if (pinnedItems[i].getVisibility() == View.VISIBLE) {
-                pinnedVisible++;
+        if (!persistHide) {
+            // Uninstalled, not merely hidden: drop the views outright, or
+            // hideRecentDuplicatesFromStrip / updatePinnedVisibility would keep
+            // reviving a shortcut with nothing behind it.
+            if (row != null) {
+                dockItemsByPackage.remove(pkg);
+                launcherItems.remove(row);
+                if (row.getParent() instanceof android.view.ViewGroup) {
+                    ((android.view.ViewGroup) row.getParent()).removeView(row);
+                }
             }
+            for (int i = 0; i < PINNED_PACKAGES.length; i++) {
+                if (!PINNED_PACKAGES[i].equals(pkg) || pinnedItems[i] == null) continue;
+                pinnedBound[i] = false;
+                pinnedItems[i].setOnClickListener(null);
+                pinnedItems[i].setClickable(false);
+                pinnedItems[i].setOnLongClickListener(null);
+                pinnedItems[i].setVisibility(View.GONE);
+            }
+            // Also drop it from the hide list so it stops haunting the unhide picker.
+            if (hiddenPackages.remove(pkg)) saveHiddenApps();
         }
-        if (pinnedGap != null) {
-            pinnedGap.setVisibility(pinnedVisible > 0 ? View.VISIBLE : View.GONE);
-        }
+        updatePinnedVisibility();
         refreshRecentSlots();
     }
 

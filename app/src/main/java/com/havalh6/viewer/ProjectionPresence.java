@@ -127,6 +127,52 @@ final class ProjectionPresence {
         return null;
     }
 
+    private static String[] packagesFor(Kind kind) {
+        if (kind == Kind.ANDROID_AUTO) {
+            return new String[]{AA_APP, "com.ts.androidauto", AA_SERVICE_PACKAGE};
+        }
+        if (kind == Kind.CARPLAY) return new String[]{CP_APP, CP_HOST};
+        return new String[0];
+    }
+
+    /**
+     * Ordered launch candidates, best first: the display activity by explicit
+     * component, then whatever each projection package exports as its launcher
+     * entry.
+     *
+     * <p>The display activity is the one that actually shows the phone, but it
+     * is not exported on every ROM build — starting it then throws and the icon
+     * does nothing. Handing back a list lets the caller walk down to the
+     * package's own entry instead of dying on the first candidate.
+     */
+    java.util.List<Intent> launchIntents(Kind kind) {
+        java.util.List<Intent> out = new java.util.ArrayList<>();
+        if (kind == null || kind == Kind.NONE) return out;
+        PackageManager pm = app.getPackageManager();
+        ComponentName cn = componentFor(kind);
+        if (cn != null && activityExists(pm, cn)) out.add(new Intent().setComponent(cn));
+        for (String pkg : packagesFor(kind)) {
+            Intent launch;
+            try {
+                launch = pm.getLaunchIntentForPackage(pkg);
+            } catch (Throwable t) {
+                continue;
+            }
+            if (launch == null || launch.getComponent() == null) continue;
+            if (cn != null && cn.equals(launch.getComponent())) continue;
+            out.add(launch);
+        }
+        return out;
+    }
+
+    private static boolean activityExists(PackageManager pm, ComponentName cn) {
+        try {
+            return pm.getActivityInfo(cn, 0) != null;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     Drawable iconFor(Kind kind) {
         if (kind == Kind.NONE) return null;
         // Display apps ship a car glyph; the projection services have no launcher
@@ -151,21 +197,6 @@ final class ProjectionPresence {
         if (kind == Kind.ANDROID_AUTO) return "Android Auto";
         if (kind == Kind.CARPLAY) return "CarPlay";
         return "";
-    }
-
-    void launch(Kind kind) {
-        ComponentName cn = componentFor(kind);
-        if (cn == null) return;
-        try {
-            Intent intent = new Intent();
-            intent.setComponent(cn);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-            app.startActivity(intent);
-        } catch (Exception e) {
-            Log.w(TAG, "Projection launch failed for " + kind, e);
-        }
     }
 
     private Kind detect() {
