@@ -710,6 +710,35 @@ window.HavalSplash = (function () {
     }
     .hv-cam-tile.is-on .hv-cam-ico { opacity: 1; }
     .hv-cam-ico-flip { transform: scaleX(-1); }
+    /* Renders arrive on transparent, and a midnight-blue car on a dark panel
+       is nearly invisible without something behind it — an exposure lift does
+       not fix that, the paint is dark in every light. So the tile lights the
+       car from behind instead, and the selected tile tints that light cyan. */
+    .hv-cam-ico-shot {
+      opacity: 0.88;
+      border-radius: 5px;
+      background: radial-gradient(circle at 50% 45%,
+        rgba(255,255,255,.20) 0%, rgba(255,255,255,.02) 70%);
+    }
+    .hv-cam-tile.is-on .hv-cam-ico-shot {
+      opacity: 1;
+      background: radial-gradient(circle at 50% 45%,
+        rgba(79,214,232,.26) 0%, rgba(79,214,232,.04) 70%);
+    }
+    /* While a tile's render is still queued it shows what the view IS, in
+       words. A stand-in drawing would only be read as the finished icon. */
+    .hv-cam-ico-off, .hv-cam-cap-off { display: none; }
+    .hv-cam-cap {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      line-height: 1.35;
+      letter-spacing: .04em;
+      text-align: center;
+      color: rgba(255,255,255,.45);
+      padding: 0 2px;
+      pointer-events: none;
+    }
+    .hv-cam-tile.is-on .hv-cam-cap { color: rgba(79,214,232,.8); }
     /* MMI WebView: a finger-drag on a range inside overflow-y:auto is treated
        as a panel scroll, so the thumb never moves. pan-x + a larger thumb. */
     .hv-config-panel input[type="range"] {
@@ -2924,7 +2953,8 @@ window.HavalSplash = (function () {
       <div class="hv-cam-grid">
         <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="12">
           <button class="hv-cam-tile {{ cp.onClass }}" onClick="{{ cp.onClick }}" title="{{ cp.title }}" style="border-radius: 7px; border: 1px solid {{ cp.border }}; background: {{ cp.bg }}; color: {{ cp.col }}; cursor: pointer;">
-            <img class="hv-cam-ico {{ cp.flipClass }}" src="{{ cp.maskUrl }}" alt="" draggable="false" />
+            <img class="hv-cam-ico {{ cp.icoClass }}" src="{{ cp.maskUrl }}" alt="" draggable="false" />
+            <span class="hv-cam-cap {{ cp.capClass }}">{{ cp.caption }}</span>
           </button>
         </sc-for>
       </div>
@@ -3562,6 +3592,27 @@ const CAM_EVENT_RESTORE_SEC = 2.0;  // hold event view after openings settle, th
 const CAM_ORBIT_SPEED = 0.22;       // OrbitControls: 2.0 = 30s/rev; this is ~5.5 min
 // On-event presets: doors → camera #10 (top), roof/curtain → #12 (topSide).
 const CAM_EVENT_PRESET = { doors: 'top', trunk: 'rear', roof: 'topSide' };
+// The two roof views ('top', 'topSide') are specified as a tilt off vertical
+// plus the direction the nose should point ON SCREEN, because that is what
+// they are actually for — see _getCameraPresetPose's roofPose().
+const CAM_ROOF_TILT_RAD = 20 * Math.PI / 180;
+const CAM_ROOF_NOSE_DEG = { top: 135, topSide: 180 };
+// Reach in fit-distances. A car laid out horizontally only spans its own
+// WIDTH vertically, so 'topSide' has to come closer to carry the same weight
+// on the 1920x720 panel as the diagonal 'top' does.
+const CAM_ROOF_REACH = { top: 1.10, topSide: 0.79 };
+// Camera tiles are rendered from the live scene, one per timer tick.
+const CAM_ICON_PX = 128;        // tiles are ~56 css px; 128 survives a 2x panel
+const CAM_ICON_FILL = 0.88;     // fraction of the tile the car spans
+const CAM_ICON_START_MS = 260;  // let the panel finish opening first
+// A tile costs one full scene pass plus a readback stall, and that is hardware
+// the numbers in CLAUDE.md say not to guess at: measured 15ms + 37ms on a
+// desktop, unknown on the Adreno. So the gap between tiles is derived from how
+// long the last one actually took (CAM_ICON_DUTY) rather than fixed, which
+// leaves the UI the same share of the frame budget on any unit.
+const CAM_ICON_DUTY = 2.5;      // idle this many times the last render's cost
+const CAM_ICON_GAP_MIN_MS = 60;
+const CAM_ICON_GAP_MAX_MS = 500;
 
 class Component extends DCLogic {
   state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'studio', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
@@ -4992,8 +5043,28 @@ class Component extends DCLogic {
   }
 
   _syncGraphLoop(active) {
-    if (active) this._ensureGraphLoop();
-    else this._stopGraphLoop();
+    this._graphLoopWanted = !!active;
+    this._applyGraphLoopGate();
+  }
+
+  // Reconciles "do the widgets want the loop" against "is the camera moving".
+  _applyGraphLoopGate() {
+    const now = performance.now();
+    const settled = !this._camBusyMs || (now - this._camBusyMs) > 250;
+    if (this._graphLoopWanted && settled) {
+      this._ensureGraphLoop();
+      return;
+    }
+    this._stopGraphLoop();
+    // The 3D loop is ON-DEMAND: as soon as the camera settles it stops ticking,
+    // so nothing in the render path would ever re-evaluate this and the graphs
+    // would stay frozen for good. Re-check on a short timer instead.
+    if (this._graphLoopWanted && !this._graphGateTimer) {
+      this._graphGateTimer = setTimeout(() => {
+        this._graphGateTimer = 0;
+        this._applyGraphLoopGate();
+      }, 300);
+    }
   }
 
   _ensureGraphLoop() {
@@ -6538,6 +6609,9 @@ class Component extends DCLogic {
       this.setState({ panelOpen: false, activeGroup: null });
       return;
     }
+    // Arm first: setState paints the tiles, and they need to know a render
+    // is coming or the first frame flashes the fallback glyphs.
+    this._ensureCamIcons();
     this.setState({
       configExpanded: true,
       panelOpen: true,
@@ -6894,13 +6968,28 @@ class Component extends DCLogic {
       toggleCameraPanel: () => this.toggleCameraRail(),
       openSectionCamera: () => this.toggleCameraRail(true),
       cameraPresets: (() => {
+        const shots = this._camIcons || {};
+        const busy = this._camIconsBusy();
         return this._cameraPresetDefs().map((d) => {
           const on = s.cameraPreset === d.key;
+          // Three states. A render, or — while its render is still queued —
+          // the view's name, because a placeholder drawing would be read as
+          // the finished icon rather than as "not ready yet". The glyphs are
+          // only left for the case where the render was tried and produced
+          // nothing, so a failed readback still leaves a usable grid.
+          const shot = shots[d.key];
+          const pending = !shot && busy;
           return {
             ...d,
-            flipClass: d.flip ? 'hv-cam-ico-flip' : '',
+            // A render already faces the right way; only the drawn glyph is
+            // shared between a left and a right preset and needs mirroring.
+            icoClass: shot ? 'hv-cam-ico-shot'
+              : pending ? 'hv-cam-ico-off'
+              : (d.flip ? 'hv-cam-ico-flip' : ''),
+            capClass: pending ? '' : 'hv-cam-cap-off',
+            caption: pending ? d.title : '',
             onClass: on ? 'is-on' : '',
-            maskUrl: this._cameraPresetMaskUrl(d.icon),
+            maskUrl: shot || this._cameraPresetMaskUrl(d.icon),
             border: on ? '#4fd6e8' : 'rgba(79,214,232,.20)',
             bg: on ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)',
             col: on ? '#4fd6e8' : 'rgba(255,255,255,.70)',
@@ -9378,6 +9467,7 @@ class Component extends DCLogic {
   setColor(key) {
     if (key === 'stock') { this.setState({ carColor: null }); this.applyCarColor(null); }
     else { this.setState({ carColor: key }); this.applyCarColor(key); }
+    this._invalidateCamIcons();
   }
 
   toggleDoors() {
@@ -9756,8 +9846,12 @@ class Component extends DCLogic {
     setPO(/ReverseLight/i,      -2, -4);  // pull toward camera → wins over brake
     setPO(/BrakeLight/i,         0,  0);  // neutral
     setPO(/PositionLight_Rear/i, 2,  4);  // push back → behind brake/reverse
-    // Merge front+rear for the toggle key
-    groups.position = [...groups.positionFront, ...groups.positionRear];
+    // Alias for the front-only toggle key. Do NOT fold positionRear in here —
+    // `_lightCfg().position` is the warm-white DRL colour. Warmup (and any
+    // caller) that lights `position` would paint the rear bar white; cycling
+    // HEAD then cleared it only because that path re-drives positionRear with
+    // the red cfg / off. Rear follows headlight|brake separately.
+    groups.position = groups.positionFront.slice();
     const BL = this.BLOOM_LAYER || 1;
     // Start with ALL light meshes OFF layer 1 — they join only when turned on
     Object.values(groups).forEach(arr => arr.forEach(mesh => mesh.layers.disable(BL)));
@@ -10682,6 +10776,20 @@ class Component extends DCLogic {
         mesh.layers.disable(this.BLOOM_LAYER || 1);
       });
     });
+    // Position emitters: zero any baked/stale emissive (GT's PositionLight_Front
+    // ships with emissive [1,1,1]; rear must not inherit the warm-white DRL look).
+    ['positionFront', 'positionFrontL', 'positionFrontR', 'positionRear', 'position'].forEach(key => {
+      (this.lightGroups[key] || []).forEach(mesh => {
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach(m => {
+          if (!m) return;
+          if (m.emissive) m.emissive.setRGB(0, 0, 0);
+          m.emissiveIntensity = 0;
+          m.needsUpdate = true;
+        });
+        mesh.layers.disable(this.BLOOM_LAYER || 1);
+      });
+    });
   }
 
   _saveFogAssignments() {
@@ -11288,7 +11396,11 @@ class Component extends DCLogic {
     this.setState({ lights });
     const rearOn = lights.headlight || lights.brake;
     if (key === 'position') {
+      // Front DRL / clearance only. Always re-assert rear from head|brake so a
+      // prior warm-white paint on PositionLight_Rear (e.g. old combined
+      // `position` group) cannot linger while lights.position stays true.
       this._setGroupEmissive('positionFront', lights.position);
+      this._setGroupEmissive('positionRear', rearOn);
     } else if (key === 'headlight') {
       this._setGroupEmissive('headlight',    lights.headlight);
       this._setGroupEmissive('positionRear', rearOn);
@@ -11336,12 +11448,14 @@ class Component extends DCLogic {
   }
 
   _warmupKeys() {
+    // No combined `position` key — that cfg is warm-white DRL and must never
+    // touch positionRear (see collectLightMeshes). Front + rear are warmed apart.
     return [
       'headlight', 'highbeam', 'fogFront', 'fogRear', 'brake', 'reverse',
       'turnL', 'turnR', 'hazard',
       'positionFront', 'positionFrontL', 'positionFrontR',
       'positionFrontAmber', 'positionFrontLAmber', 'positionFrontRAmber',
-      'positionRear', 'position'
+      'positionRear'
     ];
   }
 
@@ -11434,6 +11548,9 @@ class Component extends DCLogic {
     console.log('[Lights Warmup] Starting sequential shader pre-warm...');
     this._warmupKeys().forEach(k => this._warmupLightKey(k));
     this._warmupOverlayOnce();
+    // Same restore the async path does — without it, the last on→off can leave
+    // emitters out of sync with state.lights (especially position vs rear).
+    this._reapplyLights();
     console.log('[Lights Warmup] Sequential pre-warm completed.');
   }
 
@@ -13031,6 +13148,9 @@ class Component extends DCLogic {
   applyWheelMaterialProperties() {
     const THREE = this.THREE;
     if (!THREE) return;
+    // Every wheel swap, tint and finish change funnels through here, and all of
+    // them are visible in the camera tiles.
+    this._invalidateCamIcons();
 
     const useOverride = this.state.wheelTintOverride !== undefined ? this.state.wheelTintOverride : false;
     const color = new THREE.Color(this.state.wheelColor);
@@ -14398,6 +14518,12 @@ class Component extends DCLogic {
         // requestRender() frames still draining - then queues a couple of
         // frames at full resolution for the next tick.
         const _nowRes = performance.now();
+        // Widget panes are a second rAF loop and cost ~37ms/frame - park them
+        // while the camera moves. See _applyGraphLoopGate.
+        if (cameraBusy) {
+          this._camBusyMs = _nowRes;
+          if (this._graphRaf) this._applyGraphLoopGate();
+        }
         const carMoving = Math.abs((this.state && this.state.motionSpeed) || 0) > 0;
         const allowReduce = this._resReductionAllowed(cameraBusy, carMoving);
         if (needRender) {
@@ -15682,9 +15808,9 @@ class Component extends DCLogic {
       { key: 'sideLeft',      icon: 'side',      title: 'Left side',                 flip: true },
       { key: 'frontSideLeft', icon: 'frontSide', title: 'Front three-quarter, left', flip: true },
       { key: 'frontTopSide',  icon: 'frontTop',  title: 'Elevated front three-quarter' },
-      { key: 'top',           icon: 'top',       title: 'Top, 20° left' },
+      { key: 'top',           icon: 'top',       title: 'Roof, nose top-left' },
       { key: 'rearTopSide',   icon: 'rearTop',   title: 'Elevated rear three-quarter' },
-      { key: 'topSide',       icon: 'topSide',   title: 'Top, facing left' },
+      { key: 'topSide',       icon: 'topSide',   title: 'Roof, nose left' },
     ];
   }
 
@@ -15694,6 +15820,203 @@ class Component extends DCLogic {
     const svg = this._cameraViewSvg(icon);
     if (!svg) return '';
     return this._camMaskUrls[icon] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  // ── Camera tile renders ───────────────────────────────────────────────
+  // The tiles show a real render of THIS car — current paint, wheels, ride
+  // height — from the exact pose the tile selects, so "what you'll see" is
+  // literal instead of a drawing that approximates it. Drawn with the MAIN
+  // renderer: a second WebGL context is not affordable on this unit (the same
+  // reason _generateCatalogThumbnails ships pre-rendered PNGs instead), but
+  // the scene is already resident here, so one extra pass costs only its own
+  // draw calls. The SVG glyphs below stay as the placeholder until each render
+  // lands, and as the permanent fallback if WebGL readback ever fails.
+
+  // Car-only bounds. The ground plane is ~310 m across, so a plain
+  // Box3().setFromObject(this.model) frames the floor, not the car.
+  _camIconBox() {
+    if (this._camIconBoxCache) return this._camIconBoxCache;
+    const THREE = this.THREE;
+    if (!THREE || !this.model) return null;
+    const skip = new Set([this.floorMesh, this.nightFloor, this.shadowCatcher, this.contactShadow]
+      .filter(Boolean));
+    const box = new THREE.Box3();
+    this.model.traverse((o) => {
+      if (o.isMesh && o.visible && !skip.has(o)) box.expandByObject(o);
+    });
+    if (box.isEmpty()) return null;
+    return this._camIconBoxCache = box;
+  }
+
+  // Same direction as the preset, but re-fitted for a square tile: the framing
+  // that suits a 1920x720 strip leaves a horizontal view swimming in empty
+  // space at 1:1. Scale the offset until the car fills CAM_ICON_FILL, then pan
+  // the target to centre what is left. Both converge in a couple of passes
+  // because projected size is very nearly linear in 1/distance.
+  _camIconCamera(key) {
+    const THREE = this.THREE;
+    const pose = this._getCameraPresetPose(key);
+    const box = this._camIconBox();
+    if (!pose || !box) return null;
+    const cam = new THREE.PerspectiveCamera(this.camera.fov, 1, 0.05, 500);
+    const target = box.getCenter(new THREE.Vector3());
+    const offset = pose.position.clone().sub(pose.target);
+    const corners = [];
+    for (let i = 0; i < 8; i++) {
+      corners.push(new THREE.Vector3(
+        (i & 1) ? box.max.x : box.min.x,
+        (i & 2) ? box.max.y : box.min.y,
+        (i & 4) ? box.max.z : box.min.z));
+    }
+    const p = new THREE.Vector3();
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3();
+    for (let pass = 0; pass < 4; pass++) {
+      cam.position.copy(target).add(offset);
+      cam.up.set(0, 1, 0);
+      cam.lookAt(target);
+      cam.updateProjectionMatrix();
+      cam.updateMatrixWorld(true);
+      if (pass === 3) break;
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const c of corners) {
+        p.copy(c).project(cam);
+        x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x);
+        y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+      }
+      const halfSpan = Math.max(x1 - x0, y1 - y0) / 2;
+      if (!(halfSpan > 0)) break;
+      // Pan first, using the distance the measurement was actually taken from.
+      const reach = Math.tan(cam.fov * Math.PI / 360) * offset.length();
+      right.setFromMatrixColumn(cam.matrixWorld, 0);
+      up.setFromMatrixColumn(cam.matrixWorld, 1);
+      target.addScaledVector(right, (x1 + x0) / 2 * reach)
+        .addScaledVector(up, (y1 + y0) / 2 * reach);
+      offset.multiplyScalar(halfSpan / CAM_ICON_FILL);
+    }
+    return cam;
+  }
+
+  _renderCamIcon(key) {
+    const THREE = this.THREE;
+    const renderer = this.renderer;
+    const scene = this.scene;
+    if (!THREE || !renderer || !scene) return null;
+    const cam = this._camIconCamera(key);
+    if (!cam) return null;
+    const px = CAM_ICON_PX;
+    if (!this._camIconRt) {
+      this._camIconRt = new THREE.WebGLRenderTarget(px, px, { format: THREE.RGBAFormat });
+      this._camIconRt.texture.generateMipmaps = false;
+    }
+    // Seen from overhead each of these fills the tile with a slab of floor;
+    // the tile wants the car alone on transparent.
+    const hidden = [];
+    [this.floorMesh, this.nightFloor, this.shadowCatcher, this.contactShadow].forEach((o) => {
+      if (o) { hidden.push([o, o.visible]); o.visible = false; }
+    });
+    const prevRt = renderer.getRenderTarget();
+    const prevAlpha = renderer.getClearAlpha();
+    const prevColor = new THREE.Color();
+    renderer.getClearColor(prevColor);
+    const prevBg = scene.background;
+    scene.background = null;
+    let buf = null;
+    try {
+      renderer.setRenderTarget(this._camIconRt);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(scene, cam);
+      buf = this._camIconBuf || (this._camIconBuf = new Uint8Array(px * px * 4));
+      renderer.readRenderTargetPixels(this._camIconRt, 0, 0, px, px, buf);
+    } finally {
+      renderer.setRenderTarget(prevRt);
+      renderer.setClearColor(prevColor, prevAlpha);
+      scene.background = prevBg;
+      hidden.forEach(([o, v]) => { o.visible = v; });
+    }
+    if (!buf) return null;
+    // The car root is hidden for part of the boot sequence, and a pose whose
+    // fit ran against a half-built model can miss it entirely. Either way the
+    // readback comes back fully transparent, so check the result rather than
+    // trying to enumerate the states that produce it — returning null leaves
+    // the glyph up and the key in `missing`, so it retries on the next open.
+    let opaque = false;
+    for (let i = 3; i < buf.length; i += 16) {
+      if (buf[i] > 8) { opaque = true; break; }
+    }
+    if (!opaque) return null;
+    const cv = this._camIconCanvas || (this._camIconCanvas = document.createElement('canvas'));
+    cv.width = cv.height = px;
+    const ctx = cv.getContext('2d');
+    const img = ctx.createImageData(px, px);
+    // readRenderTargetPixels hands back bottom-up rows; putImageData won't flip.
+    for (let y = 0; y < px; y++) {
+      img.data.set(buf.subarray((px - 1 - y) * px * 4, (px - y) * px * 4), y * px * 4);
+    }
+    ctx.putImageData(img, 0, 0);
+    return cv.toDataURL('image/png');
+  }
+
+  // One tile per timer tick rather than a loop: twelve full scene passes back
+  // to back is a visible freeze on the MMI right as the panel opens.
+  _ensureCamIcons(delayMs) {
+    if (!this._camIcons) this._camIcons = {};
+    if (this._camIconTimer || this._introActive) return;
+    if (!this.renderer || !this.model || !this._fitCenter || !this._fitDist) return;
+    const missing = this._cameraPresetDefs()
+      .map((d) => d.key)
+      .filter((k) => !this._camIcons[k]);
+    if (!missing.length) return;
+    this._camIconQueue = missing;
+    this._camIconTimer = setTimeout(() => this._stepCamIcons(),
+      delayMs == null ? CAM_ICON_START_MS : delayMs);
+  }
+
+  _camIconsBusy() {
+    return !!(this._camIconTimer || (this._camIconQueue && this._camIconQueue.length));
+  }
+
+  _stepCamIcons() {
+    this._camIconTimer = null;
+    const queue = this._camIconQueue;
+    if (!queue || !queue.length || this.state.activeGroup !== 'camera') {
+      this._camIconQueue = null;
+      return;
+    }
+    // A preset tween owns the frame first — a readback mid-tween stutters the
+    // very move the user is watching. Skip the slot and retry next tick.
+    let cost = CAM_ICON_GAP_MIN_MS;
+    if (!this._camAnim) {
+      const key = queue.shift();
+      const t0 = performance.now();
+      let url = null;
+      try {
+        url = this._renderCamIcon(key);
+      } catch (err) {
+        console.warn('[cam icons] render failed, keeping glyphs', key, err);
+        this._camIconQueue = null;
+        return;
+      }
+      cost = performance.now() - t0;
+      if (url) {
+        this._camIcons[key] = url;
+        this.setState({ camIconTick: (this.state.camIconTick || 0) + 1 });
+      }
+    }
+    if (!queue.length) { this._camIconQueue = null; return; }
+    const gap = Math.min(CAM_ICON_GAP_MAX_MS,
+      Math.max(CAM_ICON_GAP_MIN_MS, cost * CAM_ICON_DUTY));
+    this._camIconTimer = setTimeout(() => this._stepCamIcons(), gap);
+  }
+
+  // Paint, wheels and model swaps all change what the tiles should be showing.
+  _invalidateCamIcons() {
+    this._camIcons = null;
+    this._camIconBoxCache = null;
+    this._camIconQueue = null;
+    if (this._camIconTimer) { clearTimeout(this._camIconTimer); this._camIconTimer = null; }
+    if (this.state && this.state.activeGroup === 'camera') this._ensureCamIcons();
   }
 
   _cameraTopPlanInner() {
@@ -15764,6 +16087,20 @@ class Component extends DCLogic {
       .addScaledVector(F, d * f)
       .addScaledVector(R, d * r)
       .add(new THREE.Vector3(0, d * y, 0));
+    // Roof views. Near-vertical cameras keep camera.up at +Y, so screen-up
+    // ends up being the OPPOSITE of the horizontal offset direction: a camera
+    // parked behind the car looks down its nose. Inverting that gives the
+    // offset for a wanted on-screen nose angle `a` (CCW from screen-right):
+    // f = -sin(a), r = -cos(a), scaled by the tilt off vertical. Specifying
+    // these two by (nose angle, tilt) instead of raw f/r/y is the whole point
+    // — the tilt is what keeps the roof reading as a surface rather than a
+    // flat plan, and it is invisible in a bare offset triplet.
+    const roofPose = (k) => {
+      const a = CAM_ROOF_NOSE_DEG[k] * Math.PI / 180;
+      const reach = CAM_ROOF_REACH[k];
+      const m = reach * Math.sin(CAM_ROOF_TILT_RAD);
+      return pos(-Math.sin(a) * m, -Math.cos(a) * m, reach * Math.cos(CAM_ROOF_TILT_RAD));
+    };
     const map = {
       front:         pos(1.12,   0.00, 0.14),
       frontSide:     pos(0.78,   0.78, 0.22),
@@ -15774,15 +16111,14 @@ class Component extends DCLogic {
       sideLeft:      pos(0.05,  -1.18, 0.20),
       frontSideLeft: pos(0.78,  -0.78, 0.22),
       frontTopSide:  pos(0.66,   0.70, 0.38),
-      top:           pos(-0.30,  0.11, 1.06),
+      top:           roofPose('top'),
       rearTopSide:   pos(-0.66,  0.70, 0.38),
-      topSide:       pos(0.04,   0.36, 1.06),
+      topSide:       roofPose('topSide'),
     };
     const position = map[key];
     if (!position) return null;
     const home = this._layoutHomePose();
     const target = c.clone();
-    if (key === 'top' || key === 'topSide') target.y += d * 0.08;
     return {
       position,
       target,
@@ -17017,7 +17353,10 @@ class Component extends DCLogic {
           onClick: () => this._pickWidgetSize(sz[0], sz[1]),
         }));
     }
-    this._syncGraphLoop(this._hasWidgetType(mode, 'graphs') || this._hasWidgetType(mode, 'power'));
+    this._syncGraphLoop(
+      !this.state.loading
+      && (this._hasWidgetType(mode, 'graphs') || this._hasWidgetType(mode, 'power')),
+    );
     const editor = this._graphEditorFields();
     const boardLeftPx = parseFloat(leftRect.left) || 0;
     const dock = this._configDockFields(s, leftRect);
@@ -17754,6 +18093,7 @@ class Component extends DCLogic {
     // Re-apply the current UI state to the now-active model.
     this._setupReflectionFlow();
     this.applyCarColor(this.state.carColor);
+    this._invalidateCamIcons();
     this._applyCarHeightOffset();
     this._applyWheelTransforms();
     this.applyWheelMaterialProperties();
