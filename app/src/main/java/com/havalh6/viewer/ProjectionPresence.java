@@ -127,11 +127,25 @@ final class ProjectionPresence {
         return null;
     }
 
+    /** Display-app packages to search when raising an existing projection task. */
+    static String[] displayPackagesFor(Kind kind) {
+        if (kind == Kind.ANDROID_AUTO) {
+            return new String[]{AA_APP, "com.autolink.androidauto.app"};
+        }
+        if (kind == Kind.CARPLAY) {
+            return new String[]{CP_APP, "com.autolink.carplay.app"};
+        }
+        return new String[0];
+    }
+
     private static String[] packagesFor(Kind kind) {
         if (kind == Kind.ANDROID_AUTO) {
-            return new String[]{AA_APP, "com.ts.androidauto", AA_SERVICE_PACKAGE};
+            return new String[]{
+                    AA_APP, "com.autolink.androidauto.app", "com.ts.androidauto", AA_SERVICE_PACKAGE};
         }
-        if (kind == Kind.CARPLAY) return new String[]{CP_APP, CP_HOST};
+        if (kind == Kind.CARPLAY) {
+            return new String[]{CP_APP, "com.autolink.carplay.app", CP_HOST};
+        }
         return new String[0];
     }
 
@@ -150,7 +164,7 @@ final class ProjectionPresence {
         if (kind == null || kind == Kind.NONE) return out;
         PackageManager pm = app.getPackageManager();
         ComponentName cn = componentFor(kind);
-        if (cn != null && activityExists(pm, cn)) out.add(new Intent().setComponent(cn));
+        if (cn != null && activityLaunchable(pm, cn)) out.add(new Intent().setComponent(cn));
         for (String pkg : packagesFor(kind)) {
             Intent launch;
             try {
@@ -165,9 +179,10 @@ final class ProjectionPresence {
         return out;
     }
 
-    private static boolean activityExists(PackageManager pm, ComponentName cn) {
+    private static boolean activityLaunchable(PackageManager pm, ComponentName cn) {
         try {
-            return pm.getActivityInfo(cn, 0) != null;
+            android.content.pm.ActivityInfo info = pm.getActivityInfo(cn, 0);
+            return info != null && info.exported;
         } catch (Throwable t) {
             return false;
         }
@@ -197,6 +212,53 @@ final class ProjectionPresence {
         if (kind == Kind.ANDROID_AUTO) return "Android Auto";
         if (kind == Kind.CARPLAY) return "CarPlay";
         return "";
+    }
+
+    /**
+     * Best-effort nudge when we cannot discover the display task ourselves.
+     * The projection service normally owns launching {@code AapActivity}; these
+     * are the hooks visible from package manifests on the MMI.
+     */
+    void requestShow(Kind kind) {
+        if (kind == Kind.ANDROID_AUTO) {
+            try {
+                Intent viewState = new Intent("ts.car.androidauto.view_state");
+                viewState.putExtra("state", 1);
+                app.sendBroadcast(viewState);
+            } catch (Throwable ignored) {}
+            sendAaTransact(0x16);
+            sendAaTransact(0x17);
+            sendAaTransact(0x18);
+        } else if (kind == Kind.CARPLAY) {
+            sendCpTransact(30);
+            sendCpTransact(31);
+        }
+    }
+
+    private void sendAaTransact(int code) {
+        IBinder binder = ensureAaBinder();
+        if (binder == null || !binder.isBinderAlive()) return;
+        Parcel data = Parcel.obtain();
+        try {
+            data.writeInterfaceToken(AA_DESCRIPTOR);
+            binder.transact(code, data, null, IBinder.FLAG_ONEWAY);
+        } catch (Throwable ignored) {
+        } finally {
+            data.recycle();
+        }
+    }
+
+    private void sendCpTransact(int code) {
+        IBinder binder = ensureCpBinder();
+        if (binder == null || !binder.isBinderAlive()) return;
+        Parcel data = Parcel.obtain();
+        try {
+            data.writeInterfaceToken(CP_DESCRIPTOR);
+            binder.transact(code, data, null, IBinder.FLAG_ONEWAY);
+        } catch (Throwable ignored) {
+        } finally {
+            data.recycle();
+        }
     }
 
     private Kind detect() {

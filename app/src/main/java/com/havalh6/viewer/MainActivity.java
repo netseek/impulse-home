@@ -114,6 +114,11 @@ public final class MainActivity extends Activity {
             String pkg = intent.getStringExtra("package");
             int taskId = intent.getIntExtra("taskId", -1);
             if (pkg == null || pkg.isEmpty() || taskId < 0) return;
+            if (pendingProjectionKind != null && pendingProjectionPackages.contains(pkg)) {
+                Log.w(TAG, "Impulse resolved projection " + pkg + " -> task " + taskId);
+                mainHandler.post(() -> completeProjectionRaise(taskId, pkg));
+                return;
+            }
             // Only adopt an id for a slot we actually have open.
             if (pkg.equals(activePopupPackage)) activePopupTaskId = taskId;
             else if (pkg.equals(activeMediaPackage)) activeMediaTaskId = taskId;
@@ -625,6 +630,10 @@ public final class MainActivity extends Activity {
     private ProjectionPresence projectionPresence;
     private MotionTrailLayout projectionItem;
     private View projectionGap;
+    /** Waiting for Impulse to resolve a projection display task id. */
+    private ProjectionPresence.Kind pendingProjectionKind;
+    private final java.util.Set<String> pendingProjectionPackages = new java.util.HashSet<>();
+    private Runnable pendingProjectionTimeout;
     private final MotionTrailLayout[] pinnedItems = new MotionTrailLayout[PINNED_PACKAGES.length];
     /** Pinned slots with an installed app behind them — the rest stay GONE forever. */
     private final boolean[] pinnedBound = new boolean[PINNED_PACKAGES.length];
@@ -1823,6 +1832,81 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /** Impulse/Shizuku can see foreign tasks; we cannot on Android 9. */
+    private void requestProjectionTaskResolve(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return;
+        try {
+            Intent request = new Intent(ACTION_RESOLVE_TASK);
+            request.setPackage(IMPULSE_PACKAGE);
+            request.putExtra(ImpulseApi.EXTRA_CALLER, apiCallerToken());
+            request.putExtra("package", packageName);
+            request.putExtra("slot", "projection");
+            sendBroadcast(request);
+            Log.w(TAG, "Projection task resolve requested for " + packageName);
+        } catch (Exception e) {
+            Log.w(TAG, "Projection task resolve failed for " + packageName + " ("
+                    + e.getClass().getSimpleName() + ")");
+        }
+    }
+
+    private void clearPendingProjection() {
+        pendingProjectionKind = null;
+        pendingProjectionPackages.clear();
+        if (pendingProjectionTimeout != null) {
+            mainHandler.removeCallbacks(pendingProjectionTimeout);
+            pendingProjectionTimeout = null;
+        }
+    }
+
+    private void completeProjectionRaise(int taskId, String packageName) {
+        clearPendingProjection();
+        if (taskId < 0) return;
+        Log.w(TAG, "Projection raise task=" + taskId + " pkg=" + packageName);
+        if (moveTaskToFrontNoAnim(taskId)) {
+            requestTaskBounds(packageName, FULLSCREEN_BOUNDS);
+            notifyViewerShellLayout();
+        }
+    }
+
+    private void beginProjectionResolve(ProjectionPresence.Kind kind) {
+        clearPendingProjection();
+        pendingProjectionKind = kind;
+        for (String pkg : ProjectionPresence.displayPackagesFor(kind)) {
+            pendingProjectionPackages.add(pkg);
+            requestProjectionTaskResolve(pkg);
+        }
+        if (projectionPresence != null) projectionPresence.requestShow(kind);
+        final ProjectionPresence.Kind watch = kind;
+        pendingProjectionTimeout = () -> {
+            if (pendingProjectionKind != watch) return;
+            Log.w(TAG, "Projection resolve timed out for " + watch + "; trying launch intents");
+            clearPendingProjection();
+            List<Intent> candidates = projectionPresence != null
+                    ? projectionPresence.launchIntents(watch) : null;
+            if (candidates == null || candidates.isEmpty()) {
+                Log.w(TAG, "Projection " + watch + ": no launch fallback available");
+                return;
+            }
+            for (Intent intent : candidates) {
+                ComponentName cn = intent.getComponent();
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                try {
+                    Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
+                    Log.w(TAG, "Projection launch " + watch + " -> " + cn);
+                    startActivity(intent, opts);
+                    if (cn != null) requestTaskBounds(cn.getPackageName(), FULLSCREEN_BOUNDS);
+                    notifyViewerShellLayout();
+                    return;
+                } catch (Exception e) {
+                    Log.w(TAG, "Projection launch failed for " + cn, e);
+                }
+            }
+        };
+        mainHandler.postDelayed(pendingProjectionTimeout, 1500);
+    }
+
     /**
      * Bring a freeform task back above this launcher without replaying its enter
      * animation. Needs REORDER_TASKS (declared) and a visible caller.
@@ -2241,6 +2325,15 @@ public final class MainActivity extends Activity {
             }
         }
         maybeRaiseTaskFromIntent(intent);
+        String projection = intent.getStringExtra("launch_projection");
+        if (projection != null && !projection.isEmpty()) {
+            intent.removeExtra("launch_projection");
+            if ("AA".equalsIgnoreCase(projection) || "ANDROID_AUTO".equalsIgnoreCase(projection)) {
+                launchProjection(ProjectionPresence.Kind.ANDROID_AUTO);
+            } else if ("CP".equalsIgnoreCase(projection) || "CARPLAY".equalsIgnoreCase(projection)) {
+                launchProjection(ProjectionPresence.Kind.CARPLAY);
+            }
+        }
         String pkg = intent.getStringExtra(EXTRA_LAUNCH_FREEFORM);
         if (pkg != null && !pkg.isEmpty()) {
             intent.removeExtra(EXTRA_LAUNCH_FREEFORM);
@@ -2428,13 +2521,11 @@ public final class MainActivity extends Activity {
     /**
      * Projection (Android Auto / CarPlay) opens fullscreen, like the OEM apps.
      *
-     * <p>The old path started the display activity from ProjectionPresence's
-     * application context with default window options. With no explicit
-     * windowing mode the task inherits whatever the caller is in, so on this ROM
-     * the tap produced nothing visible. Go through the same fullscreen options
-     * every other full-screen launch uses, and walk the candidate components so
-     * a non-exported display activity falls back to the package's own launcher
-     * entry instead of failing silently.
+     * <p>The display activities ({@code AapActivity}, {@code CarPlayDisplayActivity})
+     * are started by the projection service when a phone links and are not exported
+     * to third-party apps — {@code startActivity} on them throws and the icon
+     * appears dead. Raise the existing task instead (same path as freeform popups),
+     * then fall back to any exported launcher entry the stack happens to ship.
      */
     private void launchProjection(ProjectionPresence.Kind kind) {
         if (kind == null || kind == ProjectionPresence.Kind.NONE) return;
@@ -2442,28 +2533,19 @@ public final class MainActivity extends Activity {
         if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
         if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
 
-        List<Intent> candidates = projectionPresence.launchIntents(kind);
-        if (candidates.isEmpty()) {
-            Log.w(TAG, "Projection " + kind + ": nothing launchable installed");
-            return;
-        }
-        for (Intent intent : candidates) {
-            ComponentName cn = intent.getComponent();
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-            try {
-                Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
-                Log.w(TAG, "Projection launch " + kind + " -> " + cn);
-                startActivity(intent, opts);
-                if (cn != null) requestTaskBounds(cn.getPackageName(), FULLSCREEN_BOUNDS);
+        for (String pkg : ProjectionPresence.displayPackagesFor(kind)) {
+            int taskId = findTaskIdForPackage(pkg);
+            Log.w(TAG, "Projection lookup " + kind + " pkg=" + pkg + " task=" + taskId);
+            if (taskId < 0) continue;
+            Log.w(TAG, "Projection raise " + kind + " task=" + taskId + " pkg=" + pkg);
+            if (moveTaskToFrontNoAnim(taskId)) {
+                requestTaskBounds(pkg, FULLSCREEN_BOUNDS);
                 notifyViewerShellLayout();
                 return;
-            } catch (Exception e) {
-                Log.w(TAG, "Projection launch failed for " + cn, e);
             }
         }
-        Log.e(TAG, "Projection " + kind + ": every launch candidate failed");
+
+        beginProjectionResolve(kind);
     }
 
     /**
