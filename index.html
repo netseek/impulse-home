@@ -1126,13 +1126,14 @@ window.HavalSplash = (function () {
       text-overflow: ellipsis;
     }
     .hv-power-1x1 .hv-power-state { font-size: 12px; }
-    /* Green = idle / running. Blue = charge / regen. */
-    .hv-power.idle .hv-power-state,
+    /* White = in use. Green = regen / stopped / charge. */
+    /* Blue = consuming. Green = regen / parked / charge. */
     .hv-power.ev .hv-power-state,
     .hv-power.ice .hv-power-state,
-    .hv-power.hybrid .hv-power-state { color: #3ee08a; }
+    .hv-power.hybrid .hv-power-state { color: #4fd6e8; }
+    .hv-power.idle .hv-power-state,
     .hv-power.regen .hv-power-state,
-    .hv-power.charge .hv-power-state { color: #7ec8ff; }
+    .hv-power.charge .hv-power-state { color: #3ee08a; }
     .hv-power-readout {
       min-width: 0;
       display: flex;
@@ -1168,8 +1169,8 @@ window.HavalSplash = (function () {
     }
     .hv-power-1x1 .hv-power-value { font-size: 26px; }
     .hv-power-2x2 .hv-power-value { font-size: 34px; }
-    .hv-power-value.ev { color: #3ee08a; }
-    .hv-power-value.regen { color: #7ec8ff; }
+    .hv-power-value.ev { color: #4fd6e8; }
+    .hv-power-value.regen { color: #3ee08a; }
     .hv-power-unit {
       font-family: 'Space Mono', monospace;
       font-size: 8px;
@@ -1201,6 +1202,7 @@ window.HavalSplash = (function () {
       height: 100%;
       aspect-ratio: 550 / 260;
       max-width: 100%;
+      isolation: isolate;
     }
     .hv-power-car-img {
       position: absolute;
@@ -1219,16 +1221,17 @@ window.HavalSplash = (function () {
     .hv-power-motor {
       position: absolute;
       pointer-events: none;
-      opacity: .55;
+      /* Keep opacity at 1 — opacity < 1 breaks z-order vs pipes (same Chromium issue as filter). */
+      opacity: 1;
       transition: opacity .2s ease, filter .2s ease;
-      z-index: 3;
+      z-index: 4;
     }
     .hv-power-batt {
       position: absolute;
       pointer-events: none;
       opacity: 1;
       transition: opacity .2s ease, filter .2s ease;
-      z-index: 3;
+      z-index: 4;
     }
     .hv-power-ice {
       left: 11%;
@@ -1248,12 +1251,12 @@ window.HavalSplash = (function () {
       transform-origin: center center;
     }
     .hv-power-batt {
-      left: 40%;
-      top: 48%;
-      width: 26%;
+      left: 34%;
+      top: 54%;
+      width: 38%;
       overflow: hidden;
-      transform: scaleY(1.85);
-      transform-origin: top center;
+      transform: scaleY(0.72);
+      transform-origin: center center;
     }
     .hv-power-ice,
     .hv-power-motor {
@@ -1267,55 +1270,69 @@ window.HavalSplash = (function () {
     }
     .hv-power-batt-fill {
       position: absolute;
-      top: 12%;
-      left: 15%;
-      right: 9%;
-      bottom: 16%;
+      inset: 0;
       overflow: hidden;
-      clip-path: inset(0 calc(100% - var(--soc, 0%)) 0 0);
-      background: rgba(62, 224, 138, 0.72);
+      /* clip-path set inline — WebView 91 ignores var() inside polygon(). */
+      background: transparent;
     }
-    .hv-power-batt.on.regen .hv-power-batt-fill,
-    .hv-power-batt.on.charge .hv-power-batt-fill {
-      background: rgba(126, 200, 255, 0.72);
-    }
-    .hv-power-batt-fill img {
+    .hv-power-batt-fill svg {
       display: block;
       width: 100%;
       height: 100%;
-      object-fit: fill;
-      opacity: 1;
+    }
+    .hv-power-batt-para {
+      fill: #3ee08a;
+    }
+    .hv-power-batt-para.low {
+      fill: #ff4d5e;
     }
     .hv-power-ice.on,
     .hv-power-motor.on,
     .hv-power-batt.on { opacity: 1; }
-    .hv-power-ice.on { filter: drop-shadow(0 0 5px rgba(62,224,138,.4)); }
-    .hv-power-motor.on { filter: drop-shadow(0 0 6px rgba(62,224,138,.55)); }
-    .hv-power-motor.on.regen { filter: drop-shadow(0 0 6px rgba(126,200,255,.6)); }
+    /* No CSS filter on motors/batt — filter creates a compositing layer that
+       paints UNDER unfiltered pipes regardless of z-index (Chromium). */
+    .hv-power-ice.on { filter: none; }
+    .hv-power-motor.on { filter: none; }
+    .hv-power-motor.on.regen { filter: none; }
     .hv-power-batt.on.ev,
-    .hv-power-batt.on { filter: drop-shadow(0 0 4px rgba(62,224,138,.28)); }
+    .hv-power-batt.on,
     .hv-power-batt.on.regen,
-    .hv-power-batt.on.charge { filter: drop-shadow(0 0 4px rgba(126,200,255,.35)); }
+    .hv-power-batt.on.charge { filter: none; }
     .hv-power-floor {
       position: absolute;
-      left: -3%;
-      width: 106%;
-      bottom: 2%;
-      height: 80%;
+      left: -8%;
+      width: 116%;
+      bottom: -4%;
+      height: 92%;
       z-index: 0;
       pointer-events: none;
       color: #3ee08a;
       --soc: 0;
-      transform: perspective(340px) rotateX(28deg);
-      transform-origin: 50% 88%;
+      transform: perspective(260px) rotateX(36deg) scaleY(0.94);
+      transform-origin: 50% 92%;
     }
-    .hv-power.idle .hv-power-floor,
     .hv-power.ev .hv-power-floor,
     .hv-power.ice .hv-power-floor,
-    .hv-power.hybrid .hv-power-floor { color: #3ee08a; }
+    .hv-power.hybrid .hv-power-floor { color: #4fd6e8; }
+    .hv-power.idle .hv-power-floor,
     .hv-power.regen .hv-power-floor,
-    .hv-power.charge .hv-power-floor { color: #7ec8ff; }
+    .hv-power.charge .hv-power-floor { color: #3ee08a; }
+    .hv-power-floor-ring {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center bottom;
+      opacity: 0;
+      pointer-events: none;
+      display: none;
+    }
     .hv-power-floor svg {
+      position: absolute;
+      inset: 0;
       display: block;
       width: 100%;
       height: 100%;
@@ -1336,15 +1353,79 @@ window.HavalSplash = (function () {
       stroke-linecap: round;
     }
     .hv-power-floor-track {
-      stroke: rgba(255, 255, 255, 0.26);
-      stroke-width: 7;
+      stroke: rgba(255, 255, 255, 0.16);
+      stroke-width: 4.2;
     }
     .hv-power-floor-fill {
       stroke: currentColor;
-      stroke-width: 7;
-      stroke-dasharray: 100;
-      stroke-dashoffset: calc(100 - var(--soc, 0));
-      filter: drop-shadow(0 0 2px currentColor);
+      stroke-width: 4.2;
+      /* pathLength=100 → dash = SoC directly; grows left→right. */
+      stroke-dasharray: var(--soc) 100;
+      stroke-dashoffset: 0;
+      filter: drop-shadow(0 0 1px currentColor) drop-shadow(0 0 3px currentColor);
+    }
+    .hv-power.charge .hv-power-floor-fill {
+      animation: hv-power-charge-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes hv-power-charge-pulse {
+      0%, 100% { filter: drop-shadow(0 0 2px currentColor) drop-shadow(0 0 5px currentColor); opacity: 1; }
+      50% { filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 9px currentColor); opacity: .88; }
+    }
+    .hv-power-charge-cable {
+      position: absolute;
+      right: -6%;
+      top: 46%;
+      width: 30%;
+      height: 32%;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .25s ease;
+    }
+    .hv-power.charge .hv-power-charge-cable { opacity: 1; }
+    .hv-power-charge-cable svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+    .hv-power-charge-cable .cable-glow {
+      fill: none;
+      stroke: rgba(235, 242, 255, 0.45);
+      stroke-width: 3.2;
+      stroke-linecap: round;
+      filter: blur(1.6px);
+    }
+    .hv-power-charge-cable .cable-core {
+      fill: none;
+      stroke: #f4f7fb;
+      stroke-width: 1.05;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 1.8px rgba(235, 245, 255, 1)) drop-shadow(0 0 5px rgba(200, 220, 255, .5));
+    }
+    .hv-power-charge-cable .cable-flow {
+      fill: none;
+      stroke: #3ee08a;
+      stroke-width: 2.35;
+      stroke-linecap: round;
+      stroke-dasharray: 1.8 5.2;
+      filter: drop-shadow(0 0 2px #3ee08a) drop-shadow(0 0 7px rgba(62, 224, 138, .85));
+      animation: hv-power-cable-flow 0.95s linear infinite;
+    }
+    .hv-power-charge-cable .cable-plug {
+      fill: none;
+      stroke: #f4f7fb;
+      stroke-width: 1.15;
+      filter: drop-shadow(0 0 2px rgba(235, 245, 255, 1)) drop-shadow(0 0 6px rgba(180, 210, 255, .55));
+      animation: hv-power-cable-plug 1.4s ease-in-out infinite;
+    }
+    @keyframes hv-power-cable-flow {
+      from { stroke-dashoffset: 0; }
+      to { stroke-dashoffset: -14; }
+    }
+    @keyframes hv-power-cable-plug {
+      0%, 100% { stroke: #f4f7fb; filter: drop-shadow(0 0 2px rgba(235, 245, 255, 1)) drop-shadow(0 0 6px rgba(180, 210, 255, .55)); }
+      50% { stroke: #b8f5d2; filter: drop-shadow(0 0 3px #3ee08a) drop-shadow(0 0 8px rgba(62, 224, 138, .75)); }
     }
     .hv-power-floor-label {
       position: absolute;
@@ -1386,21 +1467,76 @@ window.HavalSplash = (function () {
     .hv-power-2x1 .hv-power-ring-unit,
     .hv-power-3x1 .hv-power-ring-unit { font-size: 10px; }
     .hv-power-2x2 .hv-power-ring-unit { font-size: 11px; }
+    .hv-power-conduits {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+      overflow: visible;
+      display: none;
+    }
+    .hv-power-conduits .rail-under {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.22);
+      stroke-width: 11px;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+    }
+    .hv-power-conduits .rail {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.5);
+      stroke-width: 4.5px;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+    }
+    .hv-power-flow-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .hv-power-pipe {
+      position: absolute;
+      height: 14px;
+      border-radius: 0;
+      z-index: auto;
+      pointer-events: none;
+      box-sizing: border-box;
+      /* OEM frosted ribbon: bright glass body + crisp edge rails */
+      background:
+        linear-gradient(180deg,
+          rgba(220, 230, 240, 0.48) 0%,
+          rgba(175, 190, 205, 0.26) 20%,
+          rgba(140, 155, 170, 0.14) 50%,
+          rgba(170, 185, 200, 0.22) 80%,
+          rgba(215, 225, 235, 0.40) 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.72);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.52);
+      box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+      opacity: 0.9;
+    }
+    /* Extend under motor/battery opaque cores so square ends are covered. */
+    /* Align pipe with chevron lane (lane centered in pipe). */
+    .hv-power-pipe.front { left: 17%; top: 64.7%; width: 20%; }
+    .hv-power-pipe.rear { left: 66%; top: 64.7%; width: 18%; }
     .hv-power-lane {
       position: absolute;
-      height: 8px;
+      /* Match pipe height/top so chevrons sit exactly mid-pipe */
+      height: 14px;
       opacity: 0;
       pointer-events: none;
-      z-index: 4;
+      z-index: auto;
       overflow: hidden;
-      --flow: #3ee08a;
+      --flow: #4fd6e8;
     }
     .hv-power-lane::after {
       content: '';
       position: absolute;
-      top: 0;
+      top: 2px; /* optical mid — chevron stroke sits slightly high in mask */
       left: 0;
-      height: 100%;
+      height: 8px;
       width: 220%;
       background-color: var(--flow);
       -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 1 L8 4 L2 7' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -1409,20 +1545,40 @@ window.HavalSplash = (function () {
       mask-repeat: repeat-x;
       -webkit-mask-size: 12px 8px;
       mask-size: 12px 8px;
-      filter: drop-shadow(0 0 1.5px var(--flow));
+      filter: drop-shadow(0 0 2px var(--flow)) drop-shadow(0 0 5px var(--flow));
     }
     .hv-power-lane.front {
-      left: 22%;
-      top: 58%;
-      width: 18%;
+      left: 17%;
+      top: 64.7%;
+      width: 20%;
     }
     .hv-power-lane.rear {
       left: 66%;
-      top: 58%;
-      width: 15%;
+      top: 64.7%;
+      width: 18%;
     }
-    .hv-power-lane.drive { opacity: .95; --flow: #3ee08a; }
-    .hv-power-lane.regen { opacity: .95; --flow: #7ec8ff; }
+    .hv-power-lane.drive {
+      opacity: .95;
+      --flow: #4fd6e8;
+      background:
+        linear-gradient(180deg,
+          rgba(79, 214, 232, 0.04) 0%,
+          rgba(79, 214, 232, 0.22) 28%,
+          rgba(79, 214, 232, 0.38) 50%,
+          rgba(79, 214, 232, 0.22) 72%,
+          rgba(79, 214, 232, 0.04) 100%);
+    }
+    .hv-power-lane.regen {
+      opacity: .95;
+      --flow: #3ee08a;
+      background:
+        linear-gradient(180deg,
+          rgba(62, 224, 138, 0.04) 0%,
+          rgba(62, 224, 138, 0.22) 28%,
+          rgba(62, 224, 138, 0.38) 50%,
+          rgba(62, 224, 138, 0.22) 72%,
+          rgba(62, 224, 138, 0.04) 100%);
+    }
     .hv-power-lane.front.drive,
     .hv-power-lane.rear.regen {
       transform: scaleX(-1);
@@ -2446,6 +2602,10 @@ window.HavalSplash = (function () {
           <span class="hv-tool-icon">FPS</span>
           <span class="hv-tool-label">FPS</span>
         </button>
+        <button class="hv-tool-btn" onClick="{{ togglePowertrain }}" title="{{ powertrainTooltip }}" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ powertrainBorder }}; color: {{ powertrainCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="9.5" width="10" height="5" rx="1"></rect><circle cx="5" cy="17" r="2.2"></circle><circle cx="19" cy="17" r="2.2"></circle><path d="M3 12h2M19 12h2"></path></svg></span>
+          <span class="hv-tool-label">CHASSI</span>
+        </button>
 
         <button class="hv-tool-btn" onClick="{{ setTimeDay }}" title="Day" style="background: rgba(18,18,20,.40); border: 1px solid {{ timeDayBorder }}; color: {{ timeDayCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
           <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
@@ -2596,23 +2756,40 @@ window.HavalSplash = (function () {
                 <div class="hv-power-car">
                   <div class="hv-power-car-frame">
                   <div class="hv-power-floor" style="--soc: {{ wg.socPct }};">
+                    <img class="hv-power-floor-ring" src="assets/power/floor_ring.png?v=4" alt="">
                     <svg viewBox="0 0 240 56" preserveAspectRatio="none" aria-hidden="true">
-                      <ellipse class="hv-power-floor-shadow" cx="120" cy="32" rx="112" ry="20"></ellipse>
-                      <ellipse class="hv-power-floor-groove" cx="120" cy="28" rx="112" ry="20"></ellipse>
-                      <ellipse class="hv-power-floor-track" cx="120" cy="28" rx="112" ry="20" pathLength="100"></ellipse>
-                      <ellipse class="hv-power-floor-fill" cx="120" cy="28" rx="112" ry="20" pathLength="100"></ellipse>
+                      <!-- 220° floor arc: 180° front→rear +20° each end (tucks behind car). -->
+                      <path class="hv-power-floor-track" pathLength="100" d="M 5.4 18.1 A 122 23 0 1 0 234.6 18.1"></path>
+                      <path class="hv-power-floor-fill" pathLength="100" d="M 5.4 18.1 A 122 23 0 1 0 234.6 18.1"></path>
                     </svg>
                   </div>
                   <img class="hv-power-car-img" src="assets/power/car.webp" alt="">
+                  <div class="hv-power-flow-layer" aria-hidden="true">
+                    <div class="hv-power-pipe front"></div>
+                    <div class="hv-power-pipe rear"></div>
+                    <div class="hv-power-lane front {{ wg.frontFlow }}"></div>
+                    <div class="hv-power-lane rear {{ wg.rearFlow }}"></div>
+                  </div>
                   <img class="hv-power-ice {{ wg.iceClass }}" src="{{ wg.iceSrc }}" alt="">
                   <img class="hv-power-motor front {{ wg.frontClass }}" src="{{ wg.frontSrc }}" alt="">
                   <img class="hv-power-motor rear {{ wg.rearClass }}" src="{{ wg.rearSrc }}" alt="">
                   <div class="hv-power-batt {{ wg.battClass }}" style="--soc: {{ wg.socPct }}%;">
-                    <img class="hv-power-batt-base" src="assets/power/battery.webp" alt="">
-                    <div class="hv-power-batt-fill"><img src="assets/power/battery_fill.webp" alt=""></div>
+                    <img class="hv-power-batt-base" src="assets/power/battery.webp?v=6" alt="">
+                    <div class="hv-power-batt-fill" style="clip-path: {{ wg.battFillClip }};">
+                      <svg viewBox="0 0 140 60" preserveAspectRatio="none" aria-hidden="true">
+                        <!-- Soft-corner parallelogram inset in the silver tray cavity -->
+                        <path class="{{ wg.battParaClass }}" d="M 28.5 12.2 L 105.5 11.3 Q 107.5 11.1 108 13 L 111 30.5 Q 111.5 32.3 109.5 32.5 L 25 32.5 Q 23 32.4 23.3 30.5 L 26.5 14 Q 26.6 12.4 28.5 12.2 Z"></path>
+                      </svg>
+                    </div>
                   </div>
-                  <div class="hv-power-lane front {{ wg.frontFlow }}"></div>
-                  <div class="hv-power-lane rear {{ wg.rearFlow }}"></div>
+                  <div class="hv-power-charge-cable" aria-hidden="true">
+                    <svg viewBox="0 0 100 48" preserveAspectRatio="none">
+                      <path class="cable-glow" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
+                      <path class="cable-core" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
+                      <path class="cable-flow" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
+                      <circle class="cable-plug" cx="18.5" cy="18.5" r="4.2"></circle>
+                    </svg>
+                  </div>
                   <div class="hv-power-floor-label">
                     <span class="hv-power-ring-num">{{ wg.socNum }}</span>
                     <span class="hv-power-ring-unit">%</span>
@@ -2780,23 +2957,40 @@ window.HavalSplash = (function () {
                 <div class="hv-power-car">
                   <div class="hv-power-car-frame">
                   <div class="hv-power-floor" style="--soc: {{ wg.socPct }};">
+                    <img class="hv-power-floor-ring" src="assets/power/floor_ring.png?v=4" alt="">
                     <svg viewBox="0 0 240 56" preserveAspectRatio="none" aria-hidden="true">
-                      <ellipse class="hv-power-floor-shadow" cx="120" cy="32" rx="112" ry="20"></ellipse>
-                      <ellipse class="hv-power-floor-groove" cx="120" cy="28" rx="112" ry="20"></ellipse>
-                      <ellipse class="hv-power-floor-track" cx="120" cy="28" rx="112" ry="20" pathLength="100"></ellipse>
-                      <ellipse class="hv-power-floor-fill" cx="120" cy="28" rx="112" ry="20" pathLength="100"></ellipse>
+                      <!-- 220° floor arc: 180° front→rear +20° each end (tucks behind car). -->
+                      <path class="hv-power-floor-track" pathLength="100" d="M 5.4 18.1 A 122 23 0 1 0 234.6 18.1"></path>
+                      <path class="hv-power-floor-fill" pathLength="100" d="M 5.4 18.1 A 122 23 0 1 0 234.6 18.1"></path>
                     </svg>
                   </div>
                   <img class="hv-power-car-img" src="assets/power/car.webp" alt="">
+                  <div class="hv-power-flow-layer" aria-hidden="true">
+                    <div class="hv-power-pipe front"></div>
+                    <div class="hv-power-pipe rear"></div>
+                    <div class="hv-power-lane front {{ wg.frontFlow }}"></div>
+                    <div class="hv-power-lane rear {{ wg.rearFlow }}"></div>
+                  </div>
                   <img class="hv-power-ice {{ wg.iceClass }}" src="{{ wg.iceSrc }}" alt="">
                   <img class="hv-power-motor front {{ wg.frontClass }}" src="{{ wg.frontSrc }}" alt="">
                   <img class="hv-power-motor rear {{ wg.rearClass }}" src="{{ wg.rearSrc }}" alt="">
                   <div class="hv-power-batt {{ wg.battClass }}" style="--soc: {{ wg.socPct }}%;">
-                    <img class="hv-power-batt-base" src="assets/power/battery.webp" alt="">
-                    <div class="hv-power-batt-fill"><img src="assets/power/battery_fill.webp" alt=""></div>
+                    <img class="hv-power-batt-base" src="assets/power/battery.webp?v=6" alt="">
+                    <div class="hv-power-batt-fill" style="clip-path: {{ wg.battFillClip }};">
+                      <svg viewBox="0 0 140 60" preserveAspectRatio="none" aria-hidden="true">
+                        <!-- Soft-corner parallelogram inset in the silver tray cavity -->
+                        <path class="{{ wg.battParaClass }}" d="M 28.5 12.2 L 105.5 11.3 Q 107.5 11.1 108 13 L 111 30.5 Q 111.5 32.3 109.5 32.5 L 25 32.5 Q 23 32.4 23.3 30.5 L 26.5 14 Q 26.6 12.4 28.5 12.2 Z"></path>
+                      </svg>
+                    </div>
                   </div>
-                  <div class="hv-power-lane front {{ wg.frontFlow }}"></div>
-                  <div class="hv-power-lane rear {{ wg.rearFlow }}"></div>
+                  <div class="hv-power-charge-cable" aria-hidden="true">
+                    <svg viewBox="0 0 100 48" preserveAspectRatio="none">
+                      <path class="cable-glow" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
+                      <path class="cable-core" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
+                      <path class="cable-flow" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
+                      <circle class="cable-plug" cx="18.5" cy="18.5" r="4.2"></circle>
+                    </svg>
+                  </div>
                   <div class="hv-power-floor-label">
                     <span class="hv-power-ring-num">{{ wg.socNum }}</span>
                     <span class="hv-power-ring-unit">%</span>
@@ -2986,6 +3180,7 @@ window.HavalSplash = (function () {
 
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">ENVIRONMENT</div>
       <select value="{{ hdriKey }}" onChange="{{ onHdri }}" style="width: 100%; background: rgba(255,255,255,.06); color: #eaf2f8; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; padding: 7px 9px; font-family: 'Space Grotesk', sans-serif; font-size: 12px; outline: none; cursor: pointer; margin-bottom: 8px;">
+        <option value="dyad" style="color:#111;">Dyad showroom cube</option>
         <option value="st_peters" style="color:#111;">St. Peter's Square Night</option>
         <option value="studio" style="color:#111;">Studio (neutral)</option>
         <option value="venice" style="color:#111;">Venice Sunset</option>
@@ -3375,9 +3570,11 @@ const CAR_POWER_ASSETS = {
   iceOff: 'assets/power/engine.webp',
   iceOn: 'assets/power/engine_on.webp',
   frontOff: 'assets/power/motor.webp',
-  frontOn: 'assets/power/motor_on.webp',
+  frontOn: 'assets/power/motor_on_blue.webp',
+  frontOnRegen: 'assets/power/motor_on.webp',
   rearOff: 'assets/power/motor.webp',
-  rearOn: 'assets/power/motor_on.webp',
+  rearOn: 'assets/power/motor_on_blue.webp',
+  rearOnRegen: 'assets/power/motor_on.webp',
 };
 // energy_drive_state → flow. front/rear: 0 off, 1 drive, -1 regen (P2 / P4).
 const CAR_POWER_IDLE = { tone: 'idle', label: 'Parado', ice: false, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 };
@@ -3398,9 +3595,9 @@ const CAR_POWER_FLOW = {
   1:  { tone: 'charge', label: 'Carga', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 0, iceWheel: 1, front: 1, rear: 0 },
   12: { tone: 'charge', label: 'Carga lenta', ice: true, batt: true, wheel: false, iceBatt: 1, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
   18: { tone: 'charge', label: 'Aquecendo', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  23: { tone: 'charge', label: 'Externa', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  45: { tone: 'charge', label: 'Externa', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  46: { tone: 'charge', label: 'Externa', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  23: { tone: 'charge', label: 'Carregando', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  45: { tone: 'charge', label: 'Carregando', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
+  46: { tone: 'charge', label: 'Carregando', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
   // P2 (front) / P4 (rear) — layout_car_p2p4 + P2P4FlowView.drawView packed 30–42.
   30: { tone: 'charge', label: 'Carga P2+P4', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 1 },
   31: { tone: 'hybrid', label: 'P4 + carga P2', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 1, front: 1, rear: 1 },
@@ -3580,6 +3777,13 @@ const CAR_DRL_FOLLOWS_READY = true;
 const CAR_OPENING_STEP = 0.006;
 const MANUAL_OPENING_STEP = 0.02;
 
+// Angular rate the wheels are rolled at, per km/h. The loop advances
+// delta * motionSpeed * 15.2 rad and motionSpeed is km/h / 40 (see
+// CAR_SPEED_KMH_PER_UNIT), so one km/h is 0.38 rad/s. Deliberately about half
+// the true rate for a 0.35 m wheel — kept as-is, it reads better on a small
+// panel; the anti-alias clamp below is what stops it freezing.
+const WHEEL_RAD_PER_S_PER_KMH = 15.2 / 40;
+
 // ASSUMPTION: vehicle_speed is km/h. The viewer's motionSpeed unit is km/h/40
 // (see motionSpeedLabel, which renders Math.abs(motionSpeed) * 40 + ' km/h').
 const CAR_SPEED_KMH_PER_UNIT = 40;
@@ -3615,7 +3819,7 @@ const CAM_ICON_GAP_MIN_MS = 60;
 const CAM_ICON_GAP_MAX_MS = 500;
 
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'studio', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
+  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'dyad', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, powertrainOn: false, nightMode: false, timeMode: 'auto', showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
@@ -3713,6 +3917,32 @@ class Component extends DCLogic {
     this._curtainProgress = 0;
     this._curtainTarget = 0;
     this._wheelsShareCarRoot = true;
+    // The finest rotation that leaves the current rim looking identical.
+    // Re-measured from the real geometry on every rim install
+    // (_measureRimRepeatRad); this default is a plain 5-spoke rim.
+    this._rimRepeatRad = Math.PI * 2 / 5;   // 72 degrees
+    // Wheel-spin look, all live-tunable from devtools via window.__wheelSpin()
+    // so it can be dialled in ON THE CAR at the frame rates it actually gets.
+    this._wheelSpinTune = {
+      // How far the sharp rim may advance in ONE rendered frame, as a
+      // fraction of its repeat period. Under 0.5 the wheel always reads as
+      // turning forward; at or over it the render is under-sampled and the
+      // spin freezes or runs backwards — the wagon-wheel effect, and the
+      // reason a rim can look motionless at 20 km/h on a 14-22 fps panel.
+      stepFrac: 0.45,
+      // The blur sprite fades in from the speed where the sharp rim starts to
+      // alias, and is fully in by fadeSpan x that speed.
+      fadeSpan: 1.7,
+      minBlurKmh: 8,          // never blur at parking speeds
+      maxBlurStartKmh: 30,    // however coarse the rim, blur by here
+      // Blur arc as a fraction of the repeat period. CLAUDE.md: the arc has
+      // to stay UNDER the spoke pitch or the smear is axisymmetric and the
+      // sprite reads as standing still. Capped at the 60 degrees that suits a
+      // 5-spoke rim, floored so a 30-spoke mesh rim still smears to a disc.
+      arcFrac: 0.8,
+      arcMaxRad: Math.PI / 3,
+      arcMinRad: 0.35,
+    };
     this._wheelCatalog = [
       // haval_gt and haval_phev are each variant's own extracted stock rim —
       // besides being regular catalog entries (so either can be put on the
@@ -3720,8 +3950,15 @@ class Component extends DCLogic {
       // currently active variant (see _stockCatalogKeyFor), which is what
       // gives STOCK a real thumbnail and lets it resize like every other
       // wheel instead of being a separate fixed, non-resizable mesh.
-      { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT' },
-      { key: 'haval_phev',         file: 'HavalPHEV-wheel.glb', liteFile: 'HavalPHEV-wheel-lite.glb?rev=2', label: 'Haval PHEV' },
+      { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT', defaultInch: 19, proudMm: 8 },
+      // Only the decimated build ships; the full rim is a build source under
+      // assets/_source/wheels/. The other catalog entries have no lite variant
+      // yet — see scripts/build-lite-wheel.mjs, which still only knows this one.
+      { key: 'haval_phev',         file: 'HavalPHEV34-wheel.glb?rev=5', liteFile: 'HavalPHEV-wheel-lite.glb?rev=9', label: 'PHEV34', defaultInch: 19 },
+      // Optional 19" PHEV rim — catalog-only (not stock); loads on demand when picked.
+      { key: 'haval_phev19',       file: 'HavalPHEV19-wheel.glb?rev=3',    label: 'PHEV19', defaultInch: 19 },
+      // Extracted HEV rim — catalog-only; PHEV34 is stock on the HEV/PHEV body.
+      { key: 'haval_hev',          file: 'HavalHEV-wheel.glb',             label: 'Haval HEV', defaultInch: 19 },
       { key: 'vossen_lc104t',      file: '3d_vossen_lc104t.glb',           label: 'Vossen LC104T' },
       { key: 'audi_rs5',           file: 'Audi-RS5.glb',                   label: 'Audi RS5' },
       { key: 'bmw_19',             file: 'bmw_wheel_19inch_model_859.glb', label: 'BMW 19"' },
@@ -3750,13 +3987,15 @@ class Component extends DCLogic {
     this.state.catalogThumbs = {};
     for (const item of this._wheelCatalog) {
       this.state.catalogThumbs[item.key] =
-        'assets/wheel-thumbnails/' + item.key + '.png?rev=2';
+        'assets/wheel-thumbnails/' + item.key + '.png?rev=8';
     }
     this._catalogPlaceholderThumb = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='none' stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'/%3E%3Ccircle cx='32' cy='32' r='7' fill='none' stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'/%3E%3Cg stroke='%234fd6e8' stroke-opacity='.35' stroke-width='2.5'%3E%3Cline x1='32' y1='10' x2='32' y2='21'/%3E%3Cline x1='32' y1='43' x2='32' y2='54'/%3E%3Cline x1='10' y1='32' x2='21' y2='32'/%3E%3Cline x1='43' y1='32' x2='54' y2='32'/%3E%3C/g%3E%3C/svg%3E";
     // Restore saved glass tweaks (if user hit Save previously)
     try { const sg = localStorage.getItem('h6_glassTweaks'); if (sg) this.state.glassTweaks = { ...this.state.glassTweaks, ...JSON.parse(sg) }; } catch(e) {}
     try { const sr = localStorage.getItem('h6_rearGlassTweaks'); if (sr) this.state.rearGlassTweaks = { ...this.state.rearGlassTweaks, ...JSON.parse(sr) }; } catch(e) {}
     this._loadSavedSettingsIntoState();
+    // ?model= / #model= wins over saved body+wheel for this boot only.
+    this._applyUrlModelPreset();
     this._loadLayoutCameras();
     this._camEventKind = null;
     this._camEventPrevRel = null;
@@ -3906,6 +4145,9 @@ class Component extends DCLogic {
     if (typeof saved.sunroofOpen === 'number') s.sunroofOpen = saved.sunroofOpen;
     if (typeof saved.curtainOpen === 'number') s.curtainOpen = saved.curtainOpen;
     if (typeof saved.selectedCatalogKey === 'string' || saved.selectedCatalogKey === null) s.selectedCatalogKey = saved.selectedCatalogKey;
+    if (s.selectedCatalogKey && this._isStockPlaceholderKey(s.selectedCatalogKey)) {
+      s.selectedCatalogKey = this._stockCatalogKeyFor(s.modelVariant);
+    }
     if (typeof saved.wheelSizeInch === 'number') s.wheelSizeInch = saved.wheelSizeInch;
     if (typeof saved.wheelColor === 'string') s.wheelColor = saved.wheelColor;
     if (typeof saved.wheelRoughness === 'number') s.wheelRoughness = saved.wheelRoughness;
@@ -3917,6 +4159,7 @@ class Component extends DCLogic {
     if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
     if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
     if (typeof saved.showFps === 'boolean') s.showFps = saved.showFps;
+    if (typeof saved.powertrainOn === 'boolean') s.powertrainOn = saved.powertrainOn;
     if (typeof saved.resScaleMode === 'string') {
       if (saved.resScaleMode === 'strong' || saved.resScaleMode === 'lite') s.resScaleMode = 'lev1';
       else if (['off','lev1','lev2','on'].indexOf(saved.resScaleMode) !== -1) s.resScaleMode = saved.resScaleMode;
@@ -3924,7 +4167,40 @@ class Component extends DCLogic {
     this._pendingSceneSettings = true;
   }
 
+  // Boot presets: body GLB + initial catalog rim. Omit ?model= → today's
+  // default (PHEV body + PHEV34 stock), still honouring a saved GT session.
+  //   ?model=phev34  PHEV body + PHEV34 wheels
+  //   ?model=phev19  PHEV body + PHEV19 wheels
+  //   ?model=hev     PHEV body + HEV wheels
+  //   ?model=gt      GT body + GT wheels
+  _parseUrlModelPreset() {
+    try {
+      const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
+      const qs = parse(location.search), hs = parse(location.hash);
+      const raw = String(qs.get('model') || hs.get('model') || '').toLowerCase().trim();
+      if (!raw) return null;
+      const PRESETS = {
+        phev34: { body: 'hev', wheel: 'haval_phev' },
+        phev19: { body: 'hev', wheel: 'haval_phev19' },
+        hev:    { body: 'hev', wheel: 'haval_hev' },
+        gt:     { body: 'gt',  wheel: 'haval_gt' },
+      };
+      return PRESETS[raw] || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  _applyUrlModelPreset() {
+    const p = this._parseUrlModelPreset();
+    this._urlModelPreset = p;
+    if (!p || !this.state) return;
+    this.state.modelVariant = p.body;
+    this.state.selectedCatalogKey = p.wheel;
+  }
+
   _resolvedBootVariant() {
+    if (this._urlModelPreset && this._urlModelPreset.body) return this._urlModelPreset.body;
     if (this.state && this.state.modelVariant === 'gt') return 'gt';
     if (this._savedSettings && this._savedSettings.modelVariant === 'gt') return 'gt';
     return 'hev';
@@ -4227,9 +4503,10 @@ class Component extends DCLogic {
   }
 
   _powerMotorSrc(which, dir) {
-    if (which === 'front') return dir ? CAR_POWER_ASSETS.frontOn : CAR_POWER_ASSETS.frontOff;
-    if (which === 'rear') return dir ? CAR_POWER_ASSETS.rearOn : CAR_POWER_ASSETS.rearOff;
-    return dir ? CAR_POWER_ASSETS.iceOn : CAR_POWER_ASSETS.iceOff;
+    if (which === 'ice') return dir ? CAR_POWER_ASSETS.iceOn : CAR_POWER_ASSETS.iceOff;
+    if (!dir) return which === 'rear' ? CAR_POWER_ASSETS.rearOff : CAR_POWER_ASSETS.frontOff;
+    if (dir < 0) return which === 'rear' ? CAR_POWER_ASSETS.rearOnRegen : CAR_POWER_ASSETS.frontOnRegen;
+    return which === 'rear' ? CAR_POWER_ASSETS.rearOn : CAR_POWER_ASSETS.frontOn;
   }
 
   _powerResolveFlow(raw) {
@@ -4276,7 +4553,17 @@ class Component extends DCLogic {
     const drive = live.drive !== '' && live.drive != null ? live.drive : (demo ? this._powerDemoDrive(now) : '0');
     const charging = String(live.charging || '').trim() === '1';
     let flow = this._powerResolveFlow(drive);
-    if (charging && flow.tone === 'idle') flow = CAR_POWER_FLOW[23];
+    if (charging) {
+      // Plugged in: always show charging, regardless of drive-state idle/noise.
+      flow = Object.assign({}, CAR_POWER_FLOW[23] || CAR_POWER_IDLE, {
+        tone: 'charge',
+        label: 'Carregando',
+        batt: true,
+        front: 0,
+        rear: 0,
+        ice: false,
+      });
+    }
     let kwRaw = this._graphDisplay.evPowerKw != null
       ? this._graphDisplay.evPowerKw
       : (this._graphValues.evPowerKw || (demo ? this._graphDemoValue('evPowerKw', now) : 0));
@@ -4346,6 +4633,8 @@ class Component extends DCLogic {
       rearClass: model.rearClass,
       rearSrc: model.rearSrc,
       battClass: model.battClass,
+      battFillClip: this._powerBattClipPath(model.socPct),
+      battParaClass: 'hv-power-batt-para' + (model.socPct <= 10 ? ' low' : ''),
       frontFlow: model.frontFlow,
       rearFlow: model.rearFlow,
       showPowerStats: h >= 2,
@@ -4368,6 +4657,24 @@ class Component extends DCLogic {
   _setPowerElClass(el, base, extra) {
     if (!el) return;
     el.className = base + (extra ? (' ' + extra) : '');
+  }
+
+  _powerBattClipPath(socPct) {
+    const LT = 20.4, LB = 17.9, RT = 75.4, RB = 79.3;
+    const t = socPct / 100;
+    const rTop = LT + (RT - LT) * t;
+    const slant = (LB - LT) * (1 - t) + (RB - RT) * t;
+    const rBot = rTop + slant;
+    return 'polygon(' + LT + '% 0%, ' + rTop + '% 0%, ' + rBot + '% 100%, ' + LB + '% 100%)';
+  }
+
+  _applyPowerBattSoc(batt, socPct) {
+    if (!batt) return;
+    const fill = batt.querySelector('.hv-power-batt-fill');
+    if (fill) fill.style.clipPath = this._powerBattClipPath(socPct);
+    batt.style.setProperty('--soc', socPct + '%');
+    const para = batt.querySelector('.hv-power-batt-para');
+    if (para) para.classList.toggle('low', socPct <= 10);
   }
 
   _updatePowerCards(now) {
@@ -4407,10 +4714,17 @@ class Component extends DCLogic {
       const batt = el.querySelector('.hv-power-batt');
       if (batt) {
         batt.className = 'hv-power-batt' + (model.battClass ? (' ' + model.battClass) : '');
-        batt.style.setProperty('--soc', model.socPct + '%');
+        this._applyPowerBattSoc(batt, model.socPct);
       }
       const floor = el.querySelector('.hv-power-floor');
-      if (floor) floor.style.setProperty('--soc', String(model.socPct));
+      if (floor) {
+        floor.style.setProperty('--soc', String(model.socPct));
+        const fill = floor.querySelector('.hv-power-floor-fill');
+        if (fill) {
+          fill.style.strokeDasharray = model.socPct + ' 100';
+          fill.style.strokeDashoffset = '0';
+        }
+      }
       const socNum = el.querySelector('.hv-power-ring-num');
       if (socNum) socNum.textContent = model.socNum;
       const frontLane = el.querySelector('.hv-power-lane.front');
@@ -6678,6 +6992,7 @@ class Component extends DCLogic {
       wheelTintOverride: s.wheelTintOverride,
       wheelStyle: s.wheelStyle,
       showFps: !!s.showFps,
+      powertrainOn: !!s.powertrainOn,
       resScaleMode: s.resScaleMode || 'off',
       camEventEnabled: !!s.camEventEnabled,
       camCycleEnabled: !!s.camCycleEnabled,
@@ -6737,7 +7052,11 @@ class Component extends DCLogic {
     if (typeof saved.curtainOpen === 'number') this._setCurtainOpen(saved.curtainOpen);
     this._restoreLightsFromState();
     if (typeof saved.wheelSizeInch === 'number' && typeof this.onWheelSizeInch === 'function') {
-      this.onWheelSizeInch(saved.wheelSizeInch);
+      // Cold-start STOCK already fitted with state.wheelSizeInch; re-running
+      // here only churns bore/fit and can disagree with the first pass.
+      if (!(this._customWheelsInstalled && this.state.wheelSizeInch === saved.wheelSizeInch)) {
+        this.onWheelSizeInch(saved.wheelSizeInch);
+      }
     }
     if (saved.wheelTintOverride && typeof this._generateBlurredWheelTexture === 'function') {
       try { this._generateBlurredWheelTexture(); } catch (e) {}
@@ -6933,6 +7252,15 @@ class Component extends DCLogic {
         const showFps = !st.showFps;
         this._applyFpsVisibility(showFps);
         return { showFps };
+      }),
+      powertrainOn: s.powertrainOn,
+      powertrainBorder: hv(s.powertrainOn).border,
+      powertrainCol:    hv(s.powertrainOn).col,
+      powertrainTooltip: s.powertrainOn ? 'Ocultar chassi' : 'Mostrar chassi',
+      togglePowertrain: () => this.setState((st) => {
+        const powertrainOn = !st.powertrainOn;
+        this._applyPowertrainVisibility(powertrainOn);
+        return { powertrainOn };
       }),
       configBtnBorder: hv(s.configExpanded).border,
       configBtnCol:    hv(s.configExpanded).col,
@@ -7557,15 +7885,24 @@ class Component extends DCLogic {
 
     const speed = this._currentMotionSpeed();
     const speedKmh = Math.abs(speed) * 40;
-    const isFast = speedKmh >= 60;
-    const isBlending = speedKmh >= 30;
+    // The handover speed is no longer a fixed 30 -> 60 km/h. It now tracks the
+    // speed at which THIS rim, at the frame rate we are actually getting,
+    // starts to alias — see _blurSpeedWindow. For the stock 5-spoke rim at
+    // ~18 fps that lands near 27 -> 46 km/h (was 30 -> 60, i.e. it used to
+    // stay sharp for a whole 30 km/h band in which it was already frozen, and
+    // then took another 30 km/h to hand over). For a fine-patterned rim like
+    // the Concept L it opens much earlier, because that rim aliases from ~7.
+    const blurWin = this._blurSpeedWindow();
+    const isFast = speedKmh >= blurWin.full;
+    const isBlending = speedKmh >= blurWin.start;
 
     // Fade the sprite in; translucency itself comes from the captured
     // spoke-gap alpha (see the blur shader), not from capping this below 1.
     const MAX_BLUR_OPACITY = 1.0;
     let blend = 0;
-    if (speedKmh >= 30) {
-      blend = Math.min(1.0, (speedKmh - 30) / 30) * MAX_BLUR_OPACITY;
+    if (isBlending) {
+      const span = Math.max(1e-3, blurWin.full - blurWin.start);
+      blend = Math.min(1.0, (speedKmh - blurWin.start) / span) * MAX_BLUR_OPACITY;
     }
 
     if (this._blurredDiscs && this._blurredDiscs[0]) {
@@ -7799,9 +8136,9 @@ class Component extends DCLogic {
     if (this.model._rideBaseY === undefined) this.model._rideBaseY = this.model.position.y;
     this.model.position.y = this.model._rideBaseY + offsetMeters;
 
-    // The shared ground-plane mesh lives inside the primary (HEV) root, so it
-    // only needs counter-shifting when that's the active/moved root — the
-    // same condition that gates the wheel compensation.
+    // Floor stays with the boot-primary root and must not jump when switching
+    // HEV↔GT. Only counter-shift it for ride height when wheels share that root
+    // (otherwise the floor would rise with a GT body while donor tires stay put).
     if (this._wheelsShareCarRoot !== false && this.floorMesh) {
       if (this.floorMesh._rideBaseY === undefined) this.floorMesh._rideBaseY = this.floorMesh.position.y;
       this.floorMesh.position.y = this.floorMesh._rideBaseY - offsetMeters;
@@ -7810,6 +8147,145 @@ class Component extends DCLogic {
     this._applyWheelTransforms();
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (this.requestRender) this.requestRender(4);
+  }
+
+  // ── Wheel-spin anti-aliasing ────────────────────────────────────────────
+  //
+  // A rendered wheel is a strobe: the eye only ever sees it at the frame rate,
+  // so if the rim advances by close to one whole repeat of its own pattern
+  // between frames it looks frozen, and past half a repeat it looks like it is
+  // turning BACKWARDS. That is the entire "the wheel doesn't spin / seems to
+  // struggle" symptom, and it is a sampling problem — it cannot be fixed by
+  // making the frame cheaper, only by keeping the per-frame step under the
+  // rim's own pitch (and by handing over to the blur sprite once it can't be).
+  //
+  // Measured offline over the whole catalogue by scripts/analyze-rim-symmetry.mjs:
+  // the stock Haval rims repeat every 72 deg and start aliasing near 27 km/h at
+  // 18 fps — just under the 30 km/h the blur used to start at, which is why the
+  // stock wheels were only marginally affected. The fine-patterned rims are far
+  // worse: Concept L repeats every 20 deg (aliases from ~7 km/h) and Forgiato
+  // Multato every 12 deg (~4.5 km/h), so those spent most of their speed range
+  // visibly stuck. Hence: measure the period per rim rather than assume one.
+
+  // The finest rotation (radians) that leaves this rim looking identical.
+  // Builds an angular mass profile of the spoke annulus and takes the LARGEST
+  // symmetry order whose circular autocorrelation still matches — largest,
+  // because N-fold symmetry implies symmetry at every divisor of N as well (a
+  // 30-spoke rim is trivially 2-fold), and it is the FINEST pitch that decides
+  // when the spin aliases. Returns null when there is nothing to measure.
+  _measureRimRepeatRad(meshes, pivot, axis) {
+    const THREE = this.THREE;
+    if (!THREE || !meshes || !meshes.length || !pivot || !axis) return null;
+
+    // Orthonormal basis in the wheel's plane.
+    const u = new THREE.Vector3(1, 0, 0);
+    if (Math.abs(u.dot(axis)) > 0.9) u.set(0, 1, 0);
+    u.addScaledVector(axis, -u.dot(axis)).normalize();
+    const w = new THREE.Vector3().crossVectors(axis, u).normalize();
+
+    // Pass 1: collect (angle, radius) for a bounded sample of vertices.
+    const MAX_SAMPLES = 24000;
+    const angles = new Float32Array(MAX_SAMPLES);
+    const radii  = new Float32Array(MAX_SAMPLES);
+    let n = 0, maxR = 0;
+    const v = new THREE.Vector3();
+    const perMesh = Math.max(1, Math.floor(MAX_SAMPLES / meshes.length));
+    for (const m of meshes) {
+      const pos = m && m.geometry && m.geometry.attributes && m.geometry.attributes.position;
+      if (!pos || !pos.count) continue;
+      m.updateWorldMatrix(true, false);
+      const stride = Math.max(1, Math.ceil(pos.count / perMesh));
+      for (let i = 0; i < pos.count && n < MAX_SAMPLES; i += stride) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld).sub(pivot);
+        v.addScaledVector(axis, -v.dot(axis));      // project into the wheel plane
+        const x = v.dot(u), y = v.dot(w);
+        const r = Math.hypot(x, y);
+        if (r > maxR) maxR = r;
+        angles[n] = Math.atan2(y, x);
+        radii[n]  = r;
+        n++;
+      }
+    }
+    if (n < 200 || maxR < 1e-6) return null;
+
+    // Pass 2: angular mass profile over the spoke annulus. Vertex count per
+    // bin stands in for "how much rim material sits at this angle"; the sqrt
+    // stops one densely-tessellated detail (a logo, a lug boss) from drowning
+    // out the pattern the spokes make. A plain occupancy mask was tried and is
+    // worse: at these radii many rims have SOMETHING at every angle, so the
+    // mask saturates to a constant and the spokes disappear from it entirely.
+    const BINS = 1440;
+    const raw = new Float64Array(BINS);
+    const TWO_PI = Math.PI * 2;
+    for (let i = 0; i < n; i++) {
+      const r = radii[i];
+      if (r < maxR * 0.30 || r > maxR * 0.95) continue;
+      let a = angles[i];
+      if (a < 0) a += TWO_PI;
+      raw[Math.min(BINS - 1, (a / TWO_PI * BINS) | 0)] += 1;
+    }
+    const prof = new Float64Array(BINS);
+    const K = 3;   // +-0.75 deg boxcar, so a one-bin tessellation gap is not a spoke gap
+    let mean = 0;
+    for (let i = 0; i < BINS; i++) {
+      let acc = 0;
+      for (let k = -K; k <= K; k++) acc += Math.sqrt(raw[(i + k + BINS) % BINS]);
+      prof[i] = acc / (2 * K + 1);
+      mean += prof[i];
+    }
+    mean /= BINS;
+    let r0 = 0;
+    for (let i = 0; i < BINS; i++) { prof[i] -= mean; r0 += prof[i] * prof[i]; }
+    if (r0 <= 1e-12) return null;
+
+    // Circular autocorrelation at shift 2*PI/N, linearly interpolated so N
+    // need not divide BINS (a 7-spoke rim is real — Forgiato Spettro M).
+    const corrAt = (N) => {
+      const shift = BINS / N;
+      const i0 = Math.floor(shift), fr = shift - i0;
+      let acc = 0;
+      for (let i = 0; i < BINS; i++) {
+        const a1 = prof[(i + i0) % BINS], a2 = prof[(i + i0 + 1) % BINS];
+        acc += prof[i] * (a1 + (a2 - a1) * fr);
+      }
+      return acc / r0;
+    };
+    const BAR = 0.75;
+    let bestCorr = -2, bestN = 1;
+    for (let N = 40; N >= 2; N--) {
+      const c = corrAt(N);
+      if (c >= BAR) return { rad: TWO_PI / N, order: N, corr: c, weak: false };
+      if (c > bestCorr) { bestCorr = c; bestN = N; }
+    }
+    // Nothing matched the bar, so we genuinely do not know this rim's pitch —
+    // the peak order is as likely to be mesh noise as a real spoke count (the
+    // Vorsteiner V-FF109 peaks at 40 with a correlation of 0.39). Don't act on
+    // either extreme: clamp the guess into 5..12, i.e. never coarser than a
+    // plain 5-spoke rim and never finer than a 12-spoke one, and flag it weak
+    // so __wheelSpin() shows the number is a guess.
+    const guess = Math.min(12, Math.max(5, bestN));
+    return { rad: TWO_PI / guess, order: guess, corr: bestCorr, weak: true };
+  }
+
+  // Speed window (km/h) over which the blur sprite takes over from the sharp
+  // rim. Anchored to the speed at which THIS rim starts aliasing at the frame
+  // rate we are ACTUALLY getting — a 5-spoke rim at 20 fps can stay crisp to
+  // ~30 km/h, a 30-spoke rim at 14 fps cannot past ~4.
+  _blurSpeedWindow() {
+    const t = this._wheelSpinTune;
+    const period = this._rimRepeatRad || (Math.PI * 2 / 5);
+    // Smoothed inter-frame interval while moving (see the render loop); falls
+    // back to a pessimistic 18 fps, the measured median on the MMI.
+    const dt = this._motionDt || (1 / 18);
+    const aliasKmh = (t.stepFrac * period) / (dt * WHEEL_RAD_PER_S_PER_KMH);
+    const start = Math.min(t.maxBlurStartKmh, Math.max(t.minBlurKmh, aliasKmh));
+    // Written into a reusable object: _applyWheelTransforms calls this on every
+    // rAF tick, parked included, and a fresh literal there is avoidable garbage
+    // on a memory-constrained head unit.
+    const out = this._blurWinScratch || (this._blurWinScratch = { start: 0, full: 0 });
+    out.start = start;
+    out.full = start * t.fadeSpan;
+    return out;
   }
 
   _initWheelBlur() {
@@ -7832,7 +8308,9 @@ class Component extends DCLogic {
 
     this._blurShaderMat = new THREE.ShaderMaterial({
       uniforms: {
-        tSource: { value: null }
+        tSource: { value: null },
+        // Per-rim: set from the measured repeat period before every capture.
+        uArcRad: { value: Math.PI / 3 }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -7843,6 +8321,7 @@ class Component extends DCLogic {
       `,
       fragmentShader: `
         uniform sampler2D tSource;
+        uniform float uArcRad;
         varying vec2 vUv;
         void main() {
           vec2 center = vec2(0.5, 0.5);
@@ -7850,10 +8329,11 @@ class Component extends DCLogic {
           vec4 color = vec4(0.0);
           const int SAMPLES = 32;
           // Partial arc, centred on the source orientation - see note above.
-          // A full 6.2831853 sweep is axisymmetric and cannot read as turning.
-          const float BLUR_ARC_RAD = 1.0472;   // 60 degrees
+          // A full 6.2831853 sweep is axisymmetric and cannot read as turning,
+          // and neither can any arc at or beyond the rim's own spoke pitch —
+          // which is why this is a per-rim uniform and not a constant 60 deg.
           for (int i = 0; i < SAMPLES; i++) {
-            float angle = (float(i) / float(SAMPLES - 1) - 0.5) * BLUR_ARC_RAD;
+            float angle = (float(i) / float(SAMPLES - 1) - 0.5) * uArcRad;
             float cosA = cos(angle);
             float sinA = sin(angle);
             vec2 rotatedUv = vec2(
@@ -7956,6 +8436,39 @@ class Component extends DCLogic {
     const pivot = flFirst._pivot;
     const axle = flFirst._rollAxis;
     if (!pivot || !axle) return;
+
+    // Re-measure this rim's rotational repeat while the wheels are posed at
+    // their unsteered rest pose (see _poseMeshesToInitWorld above) — it drives
+    // both the anti-alias clamp on the roll and the blur crossover speed, and
+    // it changes with every rim swap.
+    // Keyed on mesh identity, because this method is also called on every
+    // wheel-colour / roughness / metalness slider event and on HDRI switches —
+    // none of which change the geometry. Without the guard a slider drag would
+    // re-run a 24k-vertex scan per input event on the MMI.
+    const spokeMeshes = this._frontLeftWheels.filter(m => this._spokesWheels.includes(m));
+    const repSig = spokeMeshes.map(m => m.uuid).join('|');
+    const rep = (repSig && repSig === this._rimRepeatSig)
+      ? null
+      : this._measureRimRepeatRad(spokeMeshes, pivot, axle);
+    if (rep) {
+      this._rimRepeatSig = repSig;
+      this._rimRepeatRad = rep.rad;
+      this._rimRepeatInfo = rep;
+      console.log('[WheelSpin] rim repeats every',
+        (rep.rad * 180 / Math.PI).toFixed(1) + ' deg',
+        '(order ' + rep.order + ', corr ' + rep.corr.toFixed(2) + (rep.weak ? ', weak' : '') + ')');
+    }
+    // The smear must stay under the spoke pitch or the sprite comes out
+    // axisymmetric and reads as standing still (CLAUDE.md). 60 deg only ever
+    // suited a 5-8 spoke rim; a 30-spoke rim needs 12 deg by that rule, which
+    // is no blur at all, so floor it and accept that a rim that fine honestly
+    // does smear to a plain disc.
+    {
+      const t = this._wheelSpinTune;
+      const arc = Math.min(t.arcMaxRad, Math.max(t.arcMinRad, this._rimRepeatRad * t.arcFrac));
+      this._blurShaderMat.uniforms.uArcRad.value = arc;
+      this._blurArcRad = arc;
+    }
 
     const tempCam = new THREE.OrthographicCamera(-r, r, r, -r, 0.01, 10);
     tempCam.position.copy(pivot).addScaledVector(axle, -2.0);
@@ -8977,6 +9490,7 @@ class Component extends DCLogic {
         this._backingDiscs.push(backingDisc);
       });
     }
+    this._snapshotOriginalWheelsState();
   }
 
   // Injects "Hemisphere Teleportation Flow" directly into the PMREM reflectVec of
@@ -9073,6 +9587,30 @@ class Component extends DCLogic {
       m.needsUpdate = true;
     });
     console.log('[ReflectionFlow] injected into', this._animEnvMaterials.length, 'materials');
+  }
+
+  // Speed-driven hemisphere warp is for equirect HDRIs (streaks that read as
+  // motion). The Dyad cube and the generated studio PMREM stay static.
+  _setReflectionFlowEnabled(on) {
+    this._reflectionFlowEnabled = !!on;
+    if (!on && this._reflectionFlowUniforms) {
+      this._reflectionFlowUniforms.uEnvOffset.value = 0;
+    }
+  }
+
+  _finishHdriSwitch() {
+    this._generateBlurredWheelTexture();
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(4);
+  }
+
+  // Dyad cube is owned separately from one-shot generated HDRIs so switching
+  // away and back does not re-PMREM the six faces.
+  _applyDyadEnvironment() {
+    this._setGeneratedEnvironment(null);
+    if (this.scene && this._dyadEnvTexture) this.scene.environment = this._dyadEnvTexture;
+    this._setReflectionFlowEnabled(false);
+    this._finishHdriSwitch();
   }
 
   selectTab(tab) {
@@ -10652,7 +11190,7 @@ class Component extends DCLogic {
     const DEFAULTS = (profile && profile.fogDefaults) || {
       fogFront: ['BuildingMesh-00026|HeadlightMain'],
       // f144: BuildingMesh-00027's 171 faces span 11 disconnected islands (verified
-      // via flood-fill against assets/haval-h6-hev.glb) — most are the left/right
+      // via flood-fill against assets/_source/haval-h6-hev.glb) — most are the left/right
       // taillight lens shells (world Z ≈ ±0.79-0.99, overlapping BrakeLight/
       // PositionLight_Rear/Light Turn bboxes). Only the island seeded at face 144
       // (10 faces, world bbox Z: -0.156..0.155, centered on the car's midline) is
@@ -11009,6 +11547,16 @@ class Component extends DCLogic {
     // window.__archCapRough(true) / (false).
     window.__archCapRough = (rough = true) => this._setArchCapRough(rough);
 
+    // How far the rim's outermost surface stands proud of the tyre's outer
+    // face, in millimetres (default 3). Negative recesses it. Reinstalls the
+    // wheels so the change is visible immediately — handy for eyeballing the
+    // fit on the car itself, where editing a constant means a redeploy.
+    window.__rimProud = (mm = 3) => {
+      this._rimProudBiasM = mm / 1000;
+      this.onWheelStyle(this.state.wheelStyle);
+      return `rim proud bias = ${mm}mm`;
+    };
+
     const params = new URLSearchParams(location.search);
     this._pickerEnabled = params.get('debug') === '1';
     if (!this._pickerEnabled) return;
@@ -11051,16 +11599,24 @@ class Component extends DCLogic {
         showResult(fallbackCopy(lastText));
       }
     });
-    overlay.appendChild(textEl);
-    overlay.appendChild(copyBtn);
-    document.body.appendChild(overlay);
-    this._pickerOverlay = overlay;
-
-    const canvas = this.renderer.domElement;
-    this._onPickerClick = (e) => {
-      if (!this._pickerEnabled) return;
-      const hit = this._raycastMesh(e, null);
-      if (!hit) return;
+    // --- Live material tweaks for the picked mesh ---------------------------
+    // Sliders for the PBR knobs we most often need to eyeball, plus a colour
+    // swatch. Debug-only and deliberately temporary: nothing is persisted, and
+    // any app code that re-applies its own material params (body paint, wheel
+    // tint, fog/highlight/arch-cap toggles) overwrites these the next time it
+    // runs. Edits hit the material instance, so every mesh sharing it changes.
+    const editEl = document.createElement('div');
+    editEl.style.cssText = 'margin:8px 0 9px;padding-top:8px;display:none;' +
+      'border-top:1px solid rgba(79,214,232,.22);';
+    const SLIDERS = [
+      { key: 'roughness',       label: 'ROUGH', min: 0, max: 1, step: 0.01 },
+      { key: 'metalness',       label: 'METAL', min: 0, max: 1, step: 0.01 },
+      { key: 'envMapIntensity', label: 'ENV',   min: 0, max: 4, step: 0.02 },
+      { key: 'opacity',         label: 'OPAC',  min: 0, max: 1, step: 0.01 },
+    ];
+    let pickedMats = [];
+    let pickedHit = null;
+    const describeHit = (hit) => {
       const mats = Array.isArray(hit.material) ? hit.material : [hit.material];
       const chain = [];
       let p = hit.parent;
@@ -11071,11 +11627,122 @@ class Component extends DCLogic {
         return `  [${i}] "${m.name || '(unnamed)'}" color=${c} rough=${m.roughness} metal=${m.metalness} env=${m.envMapIntensity} opacity=${m.opacity}${m.transparent ? ' transparent' : ''}`;
       }).join('\n');
       const variant = this.state && this.state.modelVariant;
-      const text = `variant: ${variant}\nmesh: "${hit.name || '(unnamed)'}"\nparents: ${chain.join(' > ') || '(none)'}\nmaterials:\n${info}`;
-      console.log('[picker]', text, hit);
-      lastText = text;
-      textEl.textContent = text;
+      return `variant: ${variant}\nmesh: "${hit.name || '(unnamed)'}"\nparents: ${chain.join(' > ') || '(none)'}\nmaterials:\n${info}`;
+    };
+    // Snapshot the untouched values once per material, so RESET always returns
+    // to what the app produced rather than to the last slider position.
+    const snapshotMat = (m) => {
+      if (m._pickerOrig) return;
+      const o = { color: m.color ? m.color.clone() : null, transparent: m.transparent };
+      SLIDERS.forEach(s => { o[s.key] = m[s.key]; });
+      m._pickerOrig = o;
+    };
+    const editMats = (fn) => {
+      pickedMats.forEach(m => { if (m) { fn(m); m.needsUpdate = true; } });
+      if (this.requestRender) this.requestRender(3);
+      syncEditor();
+    };
+    const sliderRows = SLIDERS.map((spec) => {
+      const row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:7px;margin:3px 0;';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      name.style.cssText = 'width:40px;font-size:9px;letter-spacing:.08em;opacity:.75;';
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = spec.min; input.max = spec.max; input.step = spec.step;
+      input.style.cssText = 'flex:1;accent-color:#4fd6e8;height:13px;';
+      const val = document.createElement('span');
+      val.style.cssText = 'width:34px;text-align:right;font-size:10px;';
+      input.addEventListener('input', () => {
+        const v = parseFloat(input.value);
+        editMats((m) => {
+          if (m[spec.key] === undefined) return;
+          m[spec.key] = v;
+          // Opacity is inert on an opaque material — flip the flag so the
+          // slider actually shows something (RESET puts it back).
+          if (spec.key === 'opacity') m.transparent = v < 1 ? true : m._pickerOrig.transparent;
+        });
+      });
+      row.appendChild(name); row.appendChild(input); row.appendChild(val);
+      editEl.appendChild(row);
+      return { spec, input, val };
+    });
+    const colorRow = document.createElement('label');
+    colorRow.style.cssText = 'display:flex;align-items:center;gap:7px;margin:5px 0 8px;';
+    const colorName = document.createElement('span');
+    colorName.textContent = 'COLOR';
+    colorName.style.cssText = 'width:40px;font-size:9px;letter-spacing:.08em;opacity:.75;';
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.style.cssText = 'flex:1;height:20px;padding:0;border:1px solid rgba(79,214,232,.35);' +
+      'border-radius:4px;background:transparent;cursor:pointer;';
+    colorInput.addEventListener('input', () => {
+      editMats((m) => { if (m.color) m.color.set(colorInput.value); });
+    });
+    colorRow.appendChild(colorName); colorRow.appendChild(colorInput);
+    editEl.appendChild(colorRow);
+
+    // Reads the first picked material back into the widgets — keeps the
+    // sliders honest when a material has no such property (undefined) and
+    // after RESET. Also refreshes the readout above, so the printed (and
+    // copied) numbers track whatever the sliders are currently showing.
+    const syncEditor = () => {
+      if (pickedHit) { lastText = describeHit(pickedHit); textEl.textContent = lastText; }
+      const m = pickedMats[0];
+      if (!m) return;
+      sliderRows.forEach(({ spec, input, val }) => {
+        const v = m[spec.key];
+        const has = v !== undefined && v !== null;
+        input.disabled = !has;
+        input.style.opacity = has ? '1' : '.3';
+        if (has) input.value = v;
+        val.textContent = has ? (+v).toFixed(2) : '--';
+      });
+      if (m.color) colorInput.value = '#' + m.color.getHexString();
+    };
+
+    const btnCss = 'font-family:"Space Mono",monospace;font-size:9px;letter-spacing:.08em;' +
+      'padding:4px 10px;border-radius:5px;border:1px solid rgba(79,214,232,.4);' +
+      'background:rgba(79,214,232,.12);color:#4fd6e8;cursor:pointer;';
+    copyBtn.style.cssText = btnCss;
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = 'RESET';
+    resetBtn.style.cssText = btnCss + 'margin-left:6px;';
+    resetBtn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      editMats((m) => {
+        const o = m._pickerOrig;
+        if (!o) return;
+        SLIDERS.forEach(s => { if (o[s.key] !== undefined) m[s.key] = o[s.key]; });
+        m.transparent = o.transparent;
+        if (o.color && m.color) m.color.copy(o.color);
+      });
+    });
+
+    overlay.appendChild(textEl);
+    overlay.appendChild(editEl);
+    overlay.appendChild(copyBtn);
+    overlay.appendChild(resetBtn);
+    document.body.appendChild(overlay);
+    this._pickerOverlay = overlay;
+
+    const canvas = this.renderer.domElement;
+    this._onPickerClick = (e) => {
+      if (!this._pickerEnabled) return;
+      const hit = this._raycastMesh(e, null);
+      if (!hit) return;
+      const mats = Array.isArray(hit.material) ? hit.material : [hit.material];
+      console.log('[picker]', describeHit(hit), hit);
       copyBtn.textContent = 'COPY';
+      // Hand the picked mesh's materials to the tweak sliders. All of them,
+      // so a multi-material mesh moves as one; the widgets read back [0].
+      pickedHit = hit;
+      pickedMats = mats.filter(Boolean);
+      pickedMats.forEach(snapshotMat);
+      editEl.style.display = pickedMats.length ? 'block' : 'none';
+      syncEditor();
       overlay.style.display = 'block';
     };
     canvas.addEventListener('click', this._onPickerClick);
@@ -11771,16 +12438,11 @@ class Component extends DCLogic {
         const rt = this._maskHDRBelowHorizon(hdr);
         const envTarget = this.pmrem.fromEquirectangular(rt.texture);
         this._setGeneratedEnvironment(envTarget);
+        this._setupReflectionFlow();
+        this._setReflectionFlowEnabled(true);
         hdr.dispose(); rt.dispose();
         URL.revokeObjectURL(url);
-        // _generateBlurredWheelTexture hides every mesh except one wheel rim
-        // for its capture pass — it must run BEFORE the needsUpdate flag is
-        // set, or that internal render consumes the flag against a scene
-        // where the body (and its shadow) is invisible, baking in an empty
-        // shadow map that then sticks (shadowMap.autoUpdate is off).
-        this._generateBlurredWheelTexture();
-        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
-        if (this.requestRender) this.requestRender(4);
+        this._finishHdriSwitch();
       },
       undefined,
       (err) => { URL.revokeObjectURL(url); console.warn('[Haval H6] custom HDRI failed', err); }
@@ -11845,7 +12507,22 @@ class Component extends DCLogic {
 
   // Which catalog wheel represents a given variant's own stock rim.
   _stockCatalogKeyFor(variant) {
-    return variant === 'gt' ? 'haval_gt' : 'haval_phev';
+    if (variant === 'gt') return 'haval_gt';
+    // HEV/PHEV body (modelVariant 'hev') ships with the PHEV34 rim.
+    return 'haval_phev';
+  }
+
+  // Saved keys that mean "variant stock", not a deliberate aftermarket pick.
+  _isStockPlaceholderKey(key) {
+    return key === 'haval_gt' || key === 'haval_phev' || key === 'haval_hev';
+  }
+
+  _resolveBootWheelKey() {
+    if (this._urlModelPreset && this._urlModelPreset.wheel) return this._urlModelPreset.wheel;
+    const stockKey = this._stockCatalogKeyFor(this.state.modelVariant);
+    const saved = this.state.selectedCatalogKey;
+    if (!saved || saved === stockKey || this._isStockPlaceholderKey(saved)) return stockKey;
+    return saved;
   }
 
   _wheelAssetFile(item) {
@@ -11854,8 +12531,13 @@ class Component extends DCLogic {
 
   onSelectStockWheel() {
     if (this.state.catalogLoadingKey) return;
+    const stockKey = this._stockCatalogKeyFor(this.state.modelVariant);
+    // Already on this stock rim — reloading re-runs bore/fit math and can
+    // visibly nudge size even when the inch label is unchanged.
+    if (this.state.selectedCatalogKey === stockKey && this._customWheelsInstalled && !this.state.isCustomUpload) return;
+    this._pendingWheelSizeInch = 19;
     this.setState({ wheelSizeInch: 19, isCustomUpload: false }); // stock defaults to 19", separate from the 21" default for everything else
-    this._loadCatalogWheelByKey(this._stockCatalogKeyFor(this.state.modelVariant));
+    this._loadCatalogWheelByKey(stockKey);
   }
 
   _loadCatalogWheelByKey(key, callback, opts = {}) {
@@ -11879,11 +12561,18 @@ class Component extends DCLogic {
     } else {
       this.setState({ progress: 20, progressText: 'LOADING ' + item.label.toUpperCase() + '...', loading: true, processing: false, catalogLoadingKey: item.key });
     }
+    // Sync hints for onWheelStyle — React setState may not have flushed yet when a
+    // cached GLB install callback runs in the same turn.
+    this._pendingCatalogFitKey = item.key;
+    if (typeof this._pendingWheelSizeInch !== 'number') {
+      this._pendingWheelSizeInch = (typeof item.defaultInch === 'number') ? item.defaultInch : this.state.wheelSizeInch;
+    }
 
     // Turn a loaded/preloaded wheel scene into the installed, resizable rim.
     const install = (scene) => {
       try {
         this._handleUploadedWheelModel(scene, item.label, true);
+        this._pendingCatalogFitKey = null;
         if (callback) {
           callback();
         } else {
@@ -11893,6 +12582,7 @@ class Component extends DCLogic {
           });
         }
       } catch (err) {
+        this._pendingCatalogFitKey = null;
         console.error(err);
         this._finishLoading({
           error: 'Failed to process wheel model: ' + err.message,
@@ -11957,7 +12647,12 @@ class Component extends DCLogic {
 
   onSelectCatalogWheel(item) {
     if (this.state.catalogLoadingKey) return;
-    this.setState({ wheelSizeInch: 21, isCustomUpload: false }); // non-stock catalog wheels default to 21" when picked
+    // Already on this rim — don't reload (avoids fitScale/bore recalculation drift).
+    if (this.state.selectedCatalogKey === item.key && this._customWheelsInstalled && !this.state.isCustomUpload) return;
+    // Non-stock catalog wheels default to 21"; entries may override (e.g. HEV 19").
+    const inch = (typeof item.defaultInch === 'number') ? item.defaultInch : 21;
+    this._pendingWheelSizeInch = inch;
+    this.setState({ wheelSizeInch: inch, isCustomUpload: false });
     this._loadCatalogWheelByKey(item.key);
   }
 
@@ -12327,6 +13022,127 @@ class Component extends DCLogic {
     }
     scene.updateMatrixWorld(true);
 
+    // 7b. Runout correction — what stops a swapped rim looking UNBALANCED.
+    //
+    // Steps 2-7 centre the model on its BOUNDING BOX and align the longest-
+    // versus-equal bbox dimension to Z. Both are proxies, and they are only as
+    // good as the model: a rim whose GLB carries an off-axis extra (a brake
+    // caliper, a stray tab, an asymmetric hub) gets a bbox whose centre and
+    // whose "axle" are both pulled off the rim's real axis of revolution. The
+    // rim then spins about a line that is tilted and offset from its own
+    // centre, and it visibly wobbles — a tilt of even a couple of degrees on a
+    // 0.35 m wheel throws the lip a centimetre in and out per turn.
+    //
+    // Measured over the shipped catalogue by scripts/analyze-rim-symmetry.mjs,
+    // the bbox axle is off the true axis by under 0.5 deg for most rims but by
+    // 12.9 deg on Vorsteiner V-FF109, 9.8 on Vossen VPS 310T, 5.8 on VPS 315T
+    // and 3.7 on Forgiato Multato — exactly the ones that read as unbalanced.
+    //
+    // So measure the wobble directly, the way a wheel shop does: the FIRST
+    // HARMONIC of the outer lip. Fit the lip's axial coordinate as
+    // z ~ z0 + A*cos(t) + B*sin(t) — a perfectly seated wheel has A = B = 0,
+    // and a tilt shows up as exactly this once-per-revolution term (lateral
+    // runout). The fitted plane's normal IS the true axis. The same fit on the
+    // lip's RADIUS gives the centre offset (radial runout). Correct both, then
+    // renormalise so the radius stays exactly 1.0 as everything downstream
+    // assumes.
+    const runoutFix = (() => {
+      const identity = new THREE.Matrix4();
+      const pts = [];
+      const tv = new THREE.Vector3();
+      scene.traverse(c => {
+        const pa = c.isMesh && c.geometry && c.geometry.attributes.position;
+        if (!pa) return;
+        const stride = Math.max(1, Math.ceil(pa.count / 8000));
+        for (let i = 0; i < pa.count; i += stride) {
+          pts.push(tv.fromBufferAttribute(pa, i).applyMatrix4(c.matrixWorld).clone());
+        }
+      });
+      if (pts.length < 300) return identity;
+
+      let rMax = 0;
+      for (const p of pts) { const r = Math.hypot(p.x, p.y); if (r > rMax) rMax = r; }
+      if (!(rMax > 1e-6)) return identity;
+
+      // Least-squares fit of both harmonics over the outer lip band.
+      let n = 0, Szz = 0, Sr = 0;
+      let Scc = 0, Sss = 0, Scs = 0, Sc = 0, Ss = 0;
+      let Szc = 0, Szs = 0, Src = 0, Srs = 0;
+      for (const p of pts) {
+        const r = Math.hypot(p.x, p.y);
+        if (r < rMax * 0.93) continue;
+        const ct = p.x / r, st = p.y / r;
+        n++; Szz += p.z; Sr += r;
+        Scc += ct * ct; Sss += st * st; Scs += ct * st; Sc += ct; Ss += st;
+        Szc += p.z * ct; Szs += p.z * st;
+        Src += r * ct;   Srs += r * st;
+      }
+      if (n < 200) return identity;
+      // Solve the 3x3 normal equations for [amp_cos, amp_sin, offset].
+      const solve = (Syc, Sys, Sy) => {
+        const M = [[Scc, Scs, Sc, Syc], [Scs, Sss, Ss, Sys], [Sc, Ss, n, Sy]];
+        for (let i = 0; i < 3; i++) {
+          let piv = i;
+          for (let k = i + 1; k < 3; k++) if (Math.abs(M[k][i]) > Math.abs(M[piv][i])) piv = k;
+          if (Math.abs(M[piv][i]) < 1e-12) return null;
+          [M[i], M[piv]] = [M[piv], M[i]];
+          for (let k = 0; k < 3; k++) if (k !== i) {
+            const f = M[k][i] / M[i][i];
+            for (let j = i; j < 4; j++) M[k][j] -= f * M[i][j];
+          }
+        }
+        return [M[0][3] / M[0][0], M[1][3] / M[1][1], M[2][3] / M[2][2]];
+      };
+      const zFit = solve(Szc, Szs, Szz);
+      const rFit = solve(Src, Srs, Sr);
+      if (!zFit || !rFit) return identity;
+
+      const [A, B] = zFit;              // lateral runout (tilt)
+      const [cx, cy] = rFit;            // radial runout (centre offset)
+      const rBand = rFit[2];            // mean lip radius
+
+      // Plane through the lip is z = z0 + (A/R)x + (B/R)y, so its normal — the
+      // rim's true axis — is (-A/R, -B/R, 1) normalised.
+      const trueAxis = new THREE.Vector3(-A / rBand, -B / rBand, 1).normalize();
+      const tiltDeg = Math.acos(Math.min(1, Math.abs(trueAxis.z))) * 180 / Math.PI;
+      const offFrac = Math.hypot(cx, cy) / rBand;
+
+      // Leave a well-authored rim alone, and never trust a wild correction:
+      // past ~20 deg the bbox axle was probably not the axle at all and
+      // rotating by the difference would only make it worse.
+      const TILT_MIN_DEG = 0.5, TILT_MAX_DEG = 20, OFF_MIN_FRAC = 0.004;
+      const doTilt = tiltDeg >= TILT_MIN_DEG && tiltDeg <= TILT_MAX_DEG;
+      const doOff  = offFrac >= OFF_MIN_FRAC;
+      if (!doTilt && !doOff) {
+        console.log(`[UploadWheel] Runout within tolerance (tilt ${tiltDeg.toFixed(2)} deg, centre ${(offFrac * 100).toFixed(2)}% of radius) — left as authored.`);
+        return identity;
+      }
+
+      const m = new THREE.Matrix4();
+      if (doTilt) {
+        m.makeRotationFromQuaternion(
+          new THREE.Quaternion().setFromUnitVectors(trueAxis, new THREE.Vector3(0, 0, 1)));
+      }
+      if (doOff) {
+        m.premultiply(new THREE.Matrix4().makeTranslation(-cx, -cy, 0));
+      }
+
+      // Re-normalise: the tilt correction changes the projected radius, and
+      // everything downstream (_customRimNativeRadius, the inch sizing, the
+      // depth fit) is anchored to a native radius of exactly 1.0.
+      let newMax = 0;
+      const q = new THREE.Vector3();
+      for (const p of pts) {
+        q.copy(p).applyMatrix4(m);
+        const r = Math.hypot(q.x, q.y);
+        if (r > newMax) newMax = r;
+      }
+      if (newMax > 1e-6) m.premultiply(new THREE.Matrix4().makeScale(1 / newMax, 1 / newMax, 1 / newMax));
+
+      console.log(`[UploadWheel] Runout corrected: lateral tilt ${tiltDeg.toFixed(2)} deg${doTilt ? '' : ' (skipped)'}, centre offset ${(offFrac * 100).toFixed(2)}% of radius${doOff ? '' : ' (skipped)'}; renormalised by ${(1 / newMax).toFixed(4)}.`);
+      return m;
+    })();
+
     // 8. Flatten the hierarchy and bake c.matrixWorld directly into c.geometry
     const wrapper = new THREE.Group();
     wrapper.name = "Custom_Wheel_Wrapper_" + name;
@@ -12340,8 +13156,9 @@ class Component extends DCLogic {
       if (c.geometry) {
         c.geometry = c.geometry.clone();
         
-        // Bake the combined normalized transform (which is now fully represented by c.matrixWorld)
-        c.geometry.applyMatrix4(c.matrixWorld);
+        // Bake the combined normalized transform (which is now fully represented
+        // by c.matrixWorld), with the runout correction from 7b in front of it.
+        c.geometry.applyMatrix4(new THREE.Matrix4().multiplyMatrices(runoutFix, c.matrixWorld));
         
         // Reset the local transform of the mesh
         c.position.set(0, 0, 0);
@@ -12435,13 +13252,49 @@ class Component extends DCLogic {
       maxZ = found !== null ? found : percentileFallback;
     }
     console.log(`[UploadWheel] Programmatically computed normalized localOuterZ (occlusion-aware outer-band median): ${maxZ}`);
-    this._customRimLocalOuterZ = isFinite(maxZ) ? maxZ : 0.15;
+    // The ray scan answers "where is the outer barrel/lip face", which is the
+    // right anchor for flush alignment — but it is a MEDIAN over ONE radius
+    // band near the rim's edge. Any broad surface sitting further out than
+    // that band (a flat spoke face further in, a lip that rolls over before
+    // the sampled radius) is invisible to it, so the rim gets aligned on a
+    // face that is not actually its outermost one and the real surface ends
+    // up poking out of the tire. Measured on both stock rims: PHEV stood
+    // 11.8mm and GT 14.3mm proud of the tire's outer face where the
+    // PROUD_BIAS_M below only ever intended 3mm.
+    //
+    // Fix: take the outermost of the ray-scan face and a high percentile of
+    // EVERY vertex's depth. The percentile still rejects the isolated
+    // tab/bolt/valve-stem boss the ray scan was written to ignore (a handful
+    // of vertices can't move a 99.5th percentile) while catching a genuine
+    // broad surface, which is exactly the distinction that matters here.
+    // Deliberately left out of CenterZ/HalfSpan below: those feed the
+    // depth-SCALE clamp, a separate mechanism that measures correctly today.
+    let outerZ = maxZ;
+    {
+      // Only raise the flush target from verts near the outer barrel — an
+      // all-vertex (or even outer-band p99.5) tip on deep-barrel rims (GT)
+      // parks the visible face too far inside the tyre. Prefer outer-band p90.
+      const bandZ = [];
+      for (let i = 0; i < _depthVerts.length; i += 2) {
+        if (_depthVerts[i + 1] > meshMaxRadius * 0.85) bandZ.push(_depthVerts[i]);
+      }
+      bandZ.sort((a, b) => a - b);
+      const p90 = bandZ.length
+        ? bandZ[Math.min(bandZ.length - 1, Math.floor(bandZ.length * 0.90))]
+        : -Infinity;
+      if (isFinite(p90) && p90 > outerZ) {
+        console.log(`[UploadWheel] Outer face raised ${outerZ.toFixed(5)} -> ${p90.toFixed(5)} (outer-band p90)`);
+        outerZ = p90;
+      }
+    }
+    this._customRimLocalOuterZ = isFinite(outerZ) ? outerZ : 0.15;
     this._customRimLocalCenterZ = (isFinite(minZ) && isFinite(maxZ)) ? (minZ + maxZ) / 2 : this._customRimLocalOuterZ * 0.5;
     // Half of the rim's own native depth span (in the same normalized-by-radius
     // units as OuterZ/CenterZ) — used later to clamp how deep the rim is
     // allowed to scale so a naturally deep-dish design can't out-scale the
-    // tire's real bore and poke out past its sidewalls.
-    this._customRimLocalHalfSpan = (isFinite(minZ) && isFinite(maxZ)) ? (maxZ - minZ) / 2 : this._customRimLocalOuterZ * 0.5;
+    // tire's real bore and poke out past its sidewalls. Use outerZ (flush
+    // target) so depthFitScale matches the face we actually align to.
+    this._customRimLocalHalfSpan = (isFinite(minZ) && isFinite(outerZ)) ? Math.max(0, (outerZ - minZ) / 2) : this._customRimLocalOuterZ * 0.5;
 
     // Raycast straight down the rotation axis, through the exact centre
     // (x=0, y=0), and take the FRONTMOST surface it hits. Unlike scanning
@@ -12640,6 +13493,40 @@ class Component extends DCLogic {
     });
   }
 
+  _snapshotOriginalWheelsState() {
+    const cornerOk = (arr) =>
+      arr && arr.length > 0 && arr[0] && arr[0]._pivot && arr[0]._rollAxis;
+    if (!cornerOk(this._frontLeftWheels) || !cornerOk(this._frontRightWheels) ||
+        !cornerOk(this._rearLeftWheels) || !cornerOk(this._rearRightWheels)) {
+      return false;
+    }
+    // Never snapshot installed custom-clone meshes — only the stock tire/rim set.
+    if ((this._frontLeftWheels[0].name || '').startsWith('Custom_Wheel_Mesh_')) return false;
+    this._originalWheelsState = {
+      _frontLeftWheels:  [...this._frontLeftWheels],
+      _frontRightWheels: [...this._frontRightWheels],
+      _rearLeftWheels:   [...this._rearLeftWheels],
+      _rearRightWheels:  [...this._rearRightWheels],
+      _allWheels:        [...(this._allWheels || [])],
+      _tireWheels:       [...(this._tireWheels || [])],
+      _rimWheels:        [...(this._rimWheels || [])],
+      _spokesWheels:     [...(this._spokesWheels || [])],
+      _otherRimWheels:   [...(this._otherRimWheels || [])],
+    };
+    return true;
+  }
+
+  _ensureOriginalWheelsState() {
+    const ok = (arr) => arr && arr[0] && arr[0]._pivot && arr[0]._rollAxis;
+    const orig = this._originalWheelsState;
+    if (orig &&
+        ok(orig._frontLeftWheels) && ok(orig._frontRightWheels) &&
+        ok(orig._rearLeftWheels) && ok(orig._rearRightWheels)) {
+      return true;
+    }
+    return this._snapshotOriginalWheelsState();
+  }
+
   onWheelStyle(style) {
     if (style === this.state.wheelStyle && style === 'default' && !this._customWheelsInstalled) return;
 
@@ -12654,18 +13541,8 @@ class Component extends DCLogic {
       this._removeCustomWheelClones();
     }
 
-    if (!this._originalWheelsState) {
-      this._originalWheelsState = {
-        _frontLeftWheels:  [...(this._frontLeftWheels || [])],
-        _frontRightWheels: [...(this._frontRightWheels || [])],
-        _rearLeftWheels:   [...(this._rearLeftWheels || [])],
-        _rearRightWheels:  [...(this._rearRightWheels || [])],
-        _allWheels:        [...(this._allWheels || [])],
-        _tireWheels:       [...(this._tireWheels || [])],
-        _rimWheels:        [...(this._rimWheels || [])],
-        _spokesWheels:     [...(this._spokesWheels || [])],
-        _otherRimWheels:   [...(this._otherRimWheels || [])]
-      };
+    if (style === 'custom' && !this._ensureOriginalWheelsState()) {
+      throw new Error('Wheel pivots not ready for custom rim fit');
     }
 
     const orig = this._originalWheelsState;
@@ -12781,7 +13658,13 @@ class Component extends DCLogic {
       const metersPerWorldUnit = rawMetersPerWorldUnit / EMPIRICAL_SIZE_CORRECTION;
       console.log(`[onWheelStyle] Scale calibration: stock tire outer radius ${stockTireOuterRadiusWorld.toFixed(5)} world-units => ${metersPerWorldUnit.toFixed(5)} metres/world-unit (raw ${rawMetersPerWorldUnit.toFixed(5)}, empirical correction ${EMPIRICAL_SIZE_CORRECTION.toFixed(4)})`);
 
-      const inchSize = this.state.wheelSizeInch || 20;
+      let inchSize;
+      if (typeof this._pendingWheelSizeInch === 'number') {
+        inchSize = this._pendingWheelSizeInch;
+        this._pendingWheelSizeInch = undefined;
+      } else {
+        inchSize = this.state.wheelSizeInch || 20;
+      }
       // Depth (Z / axle-direction) math below is independent of the chosen
       // rim diameter — it's always anchored to a fixed real 20" radius, same
       // as before, likewise converted into this scene's world units.
@@ -12808,7 +13691,7 @@ class Component extends DCLogic {
       // already-steered vertex onto them distorts the axial/radial split, and the
       // distortion grows with the steer angle, so a rim swapped while the wheel is
       // turned would get measured and flush-fit against a skewed tire shape.
-      const measureTire = () => {
+      const measureTire = (live = false) => {
         let axialCenter = 0.0, halfSpan = 0.0, outerFace = 0.0, boreRadius = 0.0;
         if (!firstMesh) return { axialCenter, halfSpan, outerFace, boreRadius };
         const axle = firstMesh._rollAxis;
@@ -12817,9 +13700,12 @@ class Component extends DCLogic {
         orig._tireWheels.forEach(m => {
           if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position && m._initWorld) {
             const pos = m.geometry.attributes.position;
+            const src = live ? null : (m._origLocalPos || pos.array);
             const tempV = new THREE.Vector3();
             for (let i = 0; i < pos.count; i++) {
-              tempV.fromBufferAttribute(pos, i).applyMatrix4(m._initWorld);
+              if (live) tempV.fromBufferAttribute(pos, i);
+              else tempV.set(src[i * 3], src[i * 3 + 1], src[i * 3 + 2]);
+              tempV.applyMatrix4(m._initWorld);
               const proj = tempV.clone().sub(firstMesh._pivot).dot(outwardDir);
               if (proj < minProj) minProj = proj;
               if (proj > maxProj) maxProj = proj;
@@ -12832,23 +13718,33 @@ class Component extends DCLogic {
         outerFace = maxProj;
 
         const faceBand = 0.02; // metres
-        let minRadiusNearFace = Infinity;
+        const faceRadii = [];
         orig._tireWheels.forEach(m => {
           if (orig._frontLeftWheels.includes(m) && m.geometry && m.geometry.attributes.position && m._initWorld) {
             const pos = m.geometry.attributes.position;
+            const src = live ? null : (m._origLocalPos || pos.array);
             const tempV = new THREE.Vector3();
             for (let i = 0; i < pos.count; i++) {
-              tempV.fromBufferAttribute(pos, i).applyMatrix4(m._initWorld);
+              if (live) tempV.fromBufferAttribute(pos, i);
+              else tempV.set(src[i * 3], src[i * 3 + 1], src[i * 3 + 2]);
+              tempV.applyMatrix4(m._initWorld);
               const rel = tempV.clone().sub(firstMesh._pivot);
               const proj = rel.dot(outwardDir);
               if (proj > maxProj - faceBand) {
                 const radial = rel.addScaledVector(outwardDir, -proj).length();
-                if (radial < minRadiusNearFace) minRadiusNearFace = radial;
+                faceRadii.push(radial);
               }
             }
           }
         });
-        if (isFinite(minRadiusNearFace)) boreRadius = minRadiusNearFace;
+        // Absolute min catches hairline lip tips and under-reports the visible
+        // bore (HEV dish looked ~20% small). Use a low percentile of the face
+        // band so the measured hole matches what you see around the rim.
+        if (faceRadii.length) {
+          faceRadii.sort((a, b) => a - b);
+          const idx = Math.min(faceRadii.length - 1, Math.floor(faceRadii.length * 0.12));
+          boreRadius = faceRadii[idx];
+        }
         return { axialCenter, halfSpan, outerFace, boreRadius };
       };
 
@@ -12858,11 +13754,11 @@ class Component extends DCLogic {
       // otherwise leaves a systematic shortfall against the real target.
       const deformTireToTarget = (target) => {
         this._deformTireBore(target, true, scaleFactor);
-        let m = measureTire();
+        let m = measureTire(true);
         if (m.boreRadius > 1e-6 && Math.abs(m.boreRadius - target) > target * 0.01) {
           const corrected = target * (target / m.boreRadius);
           this._deformTireBore(corrected, true, scaleFactor);
-          m = measureTire();
+          m = measureTire(true);
         }
         return m;
       };
@@ -12900,6 +13796,16 @@ class Component extends DCLogic {
       if (realRimRadiusM === undefined) {
         realRimRadiusM = inchSize < 19 ? (T1 + step) : (inchSize > 22 ? T4 + step : T1 + step * (inchSize - 18));
       }
+      // Optional per-catalog fit bias. MUST prefer the wheel being installed
+      // now (_pendingCatalogFitKey / catalogLoadingKey) over selectedCatalogKey:
+      // selected is still the PREVIOUS rim until _finishLoading runs after this
+      // fit, so using it first applied the old wheel's fitScale on click 1 and
+      // the new wheel's on click 2 — visible size jump on the second click.
+      const catKey = this._pendingCatalogFitKey || this.state.catalogLoadingKey || this.state.selectedCatalogKey;
+      const catItem = this._wheelCatalog.find((i) => i.key === catKey);
+      const fitScale = (catItem && typeof catItem.fitScale === 'number' && catItem.fitScale > 0)
+        ? catItem.fitScale : 1;
+      realRimRadiusM *= fitScale;
 
       // Final fit: shrink the tire's bore a hair SMALLER than the rim so
       // the rubber visibly hugs/overlaps the rim's edge instead of leaving
@@ -12945,7 +13851,13 @@ class Component extends DCLogic {
         // sit a touch proud so the rim's lip visibly overlaps the tire.
         const localOuterZAdj = this._customRimLocalOuterZ !== undefined ? this._customRimLocalOuterZ : 0.15;
         const customOutwardExtent = localOuterZAdj * DEPTH_BASELINE_RADIUS_M * depthFitScale;
-        const PROUD_BIAS_M = 0.003; // 3mm real-world
+        // How much metal is allowed to stand outside the tyre's outer face.
+        // Tunable live without a rebuild: window.__rimProud(mm) — negative
+        // values recess the rim behind the tyre instead. Catalog entries may
+        // set proudMm (e.g. deep-barrel GT reads buried at the default 3mm).
+        const PROUD_BIAS_M = this._rimProudBiasM !== undefined
+          ? this._rimProudBiasM
+          : (catItem && typeof catItem.proudMm === 'number' ? catItem.proudMm / 1000 : 0.003);
         const shiftAmount = customOutwardExtent - tireOuterFace - (PROUD_BIAS_M / metersPerWorldUnit);
         if (item.side === 'fl') flShiftAmount = shiftAmount;
 
@@ -13077,6 +13989,10 @@ class Component extends DCLogic {
           const DEPTH_BIAS_METERS = -0.03;
           const autoDepthOffsetMeters = hubDepthRelPivot - stockCaliperOutwardExtent + DEPTH_BIAS_METERS;
           console.log(`[onWheelStyle] Centre-ray caliper auto-fit: centre-ray depth ${hubDepthRelPivot.toFixed(5)}m, stock caliper ${stockCaliperOutwardExtent.toFixed(5)}m, bias ${DEPTH_BIAS_METERS}m -> offset ${(autoDepthOffsetMeters * 100).toFixed(2)}cm`);
+          // Apply sync so the brake shift below in this same pass uses the new
+          // value — setState alone left click-1 on the previous offset and
+          // click-2 on the auto-fit (another second-click visual jump).
+          this.state.wheelDepthOffset = autoDepthOffsetMeters;
           this.setState({ wheelDepthOffset: autoDepthOffsetMeters });
         }
       }
@@ -13128,21 +14044,33 @@ class Component extends DCLogic {
     if (this.requestRender) this.requestRender(6);
   }
 
-  _updateVariantWheelRefs() {
-    if (!this._variants) return;
-    const fields = [
+  _wheelArrayFields() {
+    return [
       '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels',
       '_allWheels', '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels'
     ];
+  }
+
+  _copyWheelArrays(src) {
+    const out = {};
+    this._wheelArrayFields().forEach((f) => { out[f] = src[f] ? [...src[f]] : []; });
+    return out;
+  }
+
+  _applyWheelArrays(dst, src) {
+    if (!dst || !src) return;
+    this._wheelArrayFields().forEach((f) => { if (src[f]) dst[f] = [...src[f]]; });
+  }
+
+  // Catalog installs used to copy live clone arrays onto the HEV donor bag
+  // (because GT inherits those wheels). Switching back then had no native
+  // pivots — PHEV rims stayed hidden and the catalog fit threw.
+  _updateVariantWheelRefs() {
+    if (!this._variants) return;
     const active = (this.state && this.state.modelVariant) || 'hev';
-    const targets = new Set([active]);
-    const activeV = this._variants[active];
-    if (activeV && activeV._inheritedWheelsFrom) targets.add(activeV._inheritedWheelsFrom);
-    targets.forEach((k) => {
-      const v = this._variants[k];
-      if (!v) return;
-      fields.forEach(f => { v[f] = this[f]; });
-    });
+    const v = this._variants[active];
+    if (!v) return;
+    this._wheelArrayFields().forEach((f) => { v[f] = this[f]; });
   }
 
   applyWheelMaterialProperties() {
@@ -13212,6 +14140,7 @@ class Component extends DCLogic {
   }
 
   onWheelSizeInch(inch) {
+    this._pendingWheelSizeInch = inch;
     this.setState({ wheelSizeInch: inch });
     this.onWheelStyle(this.state.wheelStyle);
   }
@@ -13245,31 +14174,53 @@ class Component extends DCLogic {
     if (key === 'studio') {
       this._hdriActiveKey = 'studio';
       this._hdriRequestId = (this._hdriRequestId || 0) + 1;
+      this._setReflectionFlowEnabled(false);
       if (this.roomEnv && this.scene) {
         this._setGeneratedEnvironment(null);
-        // _generateBlurredWheelTexture hides every mesh except one wheel rim
-        // for its capture pass — must run BEFORE the needsUpdate flag is set,
-        // or that internal render consumes the flag against a scene where the
-        // body (and its shadow) is invisible, baking in an empty shadow map
-        // that then sticks (shadowMap.autoUpdate is off).
-        this._generateBlurredWheelTexture();
-        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
-        if (this.requestRender) this.requestRender(4);
+        this._finishHdriSwitch();
       }
       return;
     }
+    if (key === 'dyad') {
+      if (this._hdriActiveKey === 'dyad') return;
+      this._hdriActiveKey = 'dyad';
+      this._hdriRequestId = (this._hdriRequestId || 0) + 1;
+      if (this._dyadEnvTexture) {
+        this._applyDyadEnvironment();
+        return;
+      }
+      if (!this.pmrem || !THREE || !THREE.HDRCubeTextureLoader) {
+        this._hdriActiveKey = null;
+        return;
+      }
+      const requestId = this._hdriRequestId;
+      const loader = new THREE.HDRCubeTextureLoader()
+        .setPath('assets/env/cubemap/')
+        .setDataType(THREE.HalfFloatType);
+      loader.load(
+        ['px.hdr', 'nx.hdr', 'py.hdr', 'ny.hdr', 'pz.hdr', 'nz.hdr'],
+        (cube) => {
+          if (this._unmounted || requestId !== this._hdriRequestId) {
+            cube.dispose();
+            return;
+          }
+          const envTarget = this.pmrem.fromCubemap(cube);
+          this._dyadEnvironmentTarget = envTarget;
+          this._dyadEnvTexture = envTarget.texture;
+          this._applyDyadEnvironment();
+          cube.dispose();
+        },
+        undefined,
+        (err) => {
+          if (this._hdriActiveKey === 'dyad') this._hdriActiveKey = null;
+          console.warn('[Haval H6] Dyad cubemap failed to load', err);
+        }
+      );
+      return;
+    }
     const map = {
-      // st_peters is the DEFAULT hdriKey, so it is on the boot path and is
-      // packaged rather than fetched. It used to point at dl.polyhaven.org,
-      // which from the car is a real internet fetch: measured ~5-10s when the
-      // head unit has connectivity, and an outright failure when it does not —
-      // in which case _setGeneratedEnvironment() never ran and the car rendered
-      // with no HDRI environment at all.
-      //
-      // This is the same 1024x512 Radiance file polyhaven serves, so the look
-      // is unchanged; it just loads from the APK. The remaining entries are
-      // opt-in picks from the config panel and stay remote — they simply fail
-      // when the car is offline.
+      // Packaged so it works offline on the car. Remote Polyhaven / three.js
+      // examples entries are opt-in from the config panel and fail offline.
       st_peters: 'assets/st_peters_square_night_1k.hdr',
       venice: 'venice_sunset_1k.hdr',
       quarry: 'quarry_01_1k.hdr',
@@ -13285,10 +14236,7 @@ class Component extends DCLogic {
     if (!file || !this.rgbe || !this.pmrem || !THREE) return;
     // Boot calls this twice for the same key: once from componentDidMount for
     // state.hdriKey, then again from the restore-saved-settings pass for the
-    // identical saved.hdriKey. The second pass re-fetched the HDR and re-ran the
-    // PMREM convolution for no visible change, so skip a key that is already
-    // applied or in flight. Cleared on failure (below) and on custom upload so
-    // re-selecting the same entry can still recover.
+    // identical saved.hdriKey. Skip a key that is already applied or in flight.
     if (key === this._hdriActiveKey) return;
     this._hdriActiveKey = key;
     const requestId = (this._hdriRequestId || 0) + 1;
@@ -13304,25 +14252,14 @@ class Component extends DCLogic {
         const rt = this._maskHDRBelowHorizon(hdr);
         const envTarget = this.pmrem.fromEquirectangular(rt.texture);
         this._setGeneratedEnvironment(envTarget);
-        // Inject hemisphere flow into car materials (animated reflections)
         this._setupReflectionFlow();
+        this._setReflectionFlowEnabled(true);
         hdr.dispose(); rt.dispose();
-        // Restore canvas vignette background
         this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
-        // _generateBlurredWheelTexture hides every mesh except one wheel rim
-        // for its capture pass — must run BEFORE the needsUpdate flag is set,
-        // or that internal render consumes the flag against a scene where the
-        // body (and its shadow) is invisible, baking in an empty shadow map
-        // that then sticks (shadowMap.autoUpdate is off).
-        this._generateBlurredWheelTexture();
-        if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
-        // This callback doesn't setState, so request a redraw explicitly.
-        if (this.requestRender) this.requestRender(4);
+        this._finishHdriSwitch();
       },
       undefined,
       (err) => {
-        // Let a later selection of this same key retry (the remote entries fail
-        // whenever the car is offline).
         if (this._hdriActiveKey === key) this._hdriActiveKey = null;
         console.warn('[Haval H6] HDRI failed to load: ' + key, err);
       }
@@ -13659,6 +14596,7 @@ class Component extends DCLogic {
         this.loadScript(B + 'examples/js/controls/OrbitControls.js'),
         this.loadScript(B + 'examples/js/objects/Sky.js'),
         this.loadScript(B + 'examples/js/loaders/RGBELoader.js'),
+        this.loadScript(B + 'examples/js/loaders/HDRCubeTextureLoader.js'),
         this.loadScript(B + 'examples/js/environments/RoomEnvironment.js'),
         this.loadScript(B + 'examples/js/shaders/HorizontalBlurShader.js'),
         this.loadScript(B + 'examples/js/shaders/VerticalBlurShader.js'),
@@ -13840,10 +14778,8 @@ class Component extends DCLogic {
       const pmrem = new THREE.PMREMGenerator(renderer);
       this.pmrem = pmrem;
 
-      // Reliable high-contrast studio environment (network-independent), used as
-      // the default. Dark surround with bright HDR softboxes => the clearcoat and
-      // glass show crisp bright reflection streaks (like the reference render)
-      // without washing the paint color the way a uniformly-bright env does.
+      // Studio PMREM is the instant fallback while the packaged Dyad cube
+      // convolves, and the Environment panel can switch back to it.
       const studioEnvScene = this.makeStudioEnv();
       const studioEnvTarget = pmrem.fromScene(studioEnvScene, 0.015);
       this._disposeOwnedObject(studioEnvScene);
@@ -13851,7 +14787,7 @@ class Component extends DCLogic {
       this.roomEnv = studioEnvTarget.texture;
       scene.environment = this.roomEnv;
 
-      // --- Configurable HDRI: drives reflections (background stays flat gray) ---
+      // --- Configurable env: Dyad cube (default) or equirect HDRI overrides ---
       const rgbe = new THREE.RGBELoader();
       if (rgbe.setDataType) rgbe.setDataType(THREE.HalfFloatType);
       this.rgbe = rgbe;
@@ -13962,6 +14898,39 @@ class Component extends DCLogic {
         rendersPerSec: this._setStateRate || 0,
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
 
+      // Wheel-spin state + live tuning, for A/B-ing the spin ON THE CAR over
+      // CDP (see CLAUDE.md). Call with no argument to read; pass a partial
+      // object to patch the tunables, e.g. __wheelSpin({ stepFrac: 0.35 }).
+      // Anything that changes the blur ARC needs a re-capture, which
+      // _generateBlurredWheelTexture does; the rest takes effect next frame.
+      window.__wheelSpin = (patch) => {
+        if (patch && typeof patch === 'object') {
+          Object.assign(this._wheelSpinTune, patch);
+          if ('arcFrac' in patch || 'arcMaxRad' in patch || 'arcMinRad' in patch) {
+            this._generateBlurredWheelTexture();
+          }
+          if (this.requestRender) this.requestRender(2);
+        }
+        const win = this._blurSpeedWindow();
+        const kmh = Math.abs(this._currentMotionSpeed()) * 40;
+        const period = this._rimRepeatRad || (Math.PI * 2 / 5);
+        const deg = (r) => +(r * 180 / Math.PI).toFixed(1);
+        return {
+          speedKmh: +kmh.toFixed(1),
+          fps: +(1 / (this._motionDt || (1 / 18))).toFixed(1),
+          repeatDeg: deg(period),
+          repeatOrder: this._rimRepeatInfo ? this._rimRepeatInfo.order : null,
+          repeatCorr: this._rimRepeatInfo ? +this._rimRepeatInfo.corr.toFixed(2) : null,
+          repeatWeak: this._rimRepeatInfo ? !!this._rimRepeatInfo.weak : null,
+          blurArcDeg: deg(this._blurArcRad || Math.PI / 3),
+          blurStartKmh: +win.start.toFixed(1),
+          blurFullKmh: +win.full.toFixed(1),
+          maxStepDeg: deg(period * this._wheelSpinTune.stepFrac),
+          clamped: !!this._rollClamped,
+          tune: { ...this._wheelSpinTune },
+        };
+      };
+
       // --- Load GLBs (glTF with PBR materials) ---
       // The boot-critical HEV pair ships UNCOMPRESSED (see
       // scripts/build-fast-models.mjs): Draco decode of the car was ~10.3s of
@@ -14016,18 +14985,19 @@ class Component extends DCLogic {
       // The four full-detail stock rims were removed from the car GLB because
       // the catalog pipeline immediately installs the resizable stock rim below.
       // Tires, brakes and wheel transforms remain embedded as its anchors.
-      const HEV_URL = this._perfLow
-        ? 'assets/haval-h6-hev-lite.glb?rev=3'
-        : 'assets/haval-h6-hev.glb?rev=4';
-      const GT_URL = this._perfLow
-        ? 'assets/haval-h6-gt-lite.glb?rev=1'
-        : 'assets/haval-h6-gt.glb';
+      // Only the -lite pair ships. The full-texture originals are build inputs
+      // now and live in assets/_source/ (see scripts/build-lite-textures.mjs),
+      // excluded from the APK by app/build.gradle. One tier means one code path
+      // and one set of files to keep warm — the MMI is the target device, and
+      // at its panel size the 2K interior maps were never resolvable anyway.
+      const HEV_URL = 'assets/haval-h6-hev-lite.glb?rev=4';
+      const GT_URL = 'assets/haval-h6-gt-lite.glb?rev=2';
       // KEEP IN SYNC with the on-disk sizes — the MMI asset stream has no
-      // Content-Length, so the progress bar divides by these. The HEV pair is
-      // shipped uncompressed by scripts/build-fast-models.mjs (hence the jump
-      // from ~5.7MB); the GT pair is still Draco.
-      const HEV_BYTES = this._perfLow ? 14098412 : 34647700;
-      const GT_BYTES = this._perfLow ? 6966928 : 17776560;
+      // Content-Length, so the progress bar divides by these. The HEV lite is
+      // shipped uncompressed by scripts/build-fast-models.mjs (hence its size
+      // relative to GT); the GT lite is still Draco.
+      const HEV_BYTES = 13543364;
+      const GT_BYTES = 6966928;
       const profiles = this._modelProfiles();
       // Boot whichever body was last selected (default HEV). The other GLB is
       // lazy — fetched on the first MODEL toggle (see _setModelVariant) so a
@@ -14118,7 +15088,7 @@ class Component extends DCLogic {
       // finishes, so it adds no network wait on the tail — only the fit/clone
       // work runs then. Reuses the car's loader (Draco/meshopt already set).
       {
-        const stockKey = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
+        const stockKey = this._resolveBootWheelKey();
         const stockItem = this._wheelCatalog.find(i => i.key === stockKey);
         if (stockItem) {
           this._preloadedStock = {
@@ -14358,13 +15328,36 @@ class Component extends DCLogic {
         let needRender = false;
         const speed = this._currentMotionSpeed();
         if (speed !== 0) {
-          if (this._reflectionFlowUniforms) {
+          // Equirect HDRIs only — the Dyad cube / studio PMREM stay static
+          // (the warp is a no-op at offset 0).
+          if (this._reflectionFlowEnabled && this._reflectionFlowUniforms) {
             this._reflectionFlowUniforms.uEnvOffset.value += delta * speed * 0.3;
           }
-          // Roll all wheels on Z axis (axle), steer front wheels on Y
-          // Faked spin speed (half of real speed to look aesthetically pleasing and break wagon-wheel locking):
-          // Real speed w ~ speed * 30.4 rad/s. Half speed ~ speed * 15.2 rad/s.
-          const rollDelta = delta * speed * 15.2;
+          // Smoothed inter-frame interval while moving. The blur crossover is
+          // anchored to it, so it has to be the interval we're ACTUALLY
+          // getting (14-22 fps on the MMI, and it moves) rather than a
+          // nominal one — but heavily smoothed, or a single long frame would
+          // visibly pump the sprite's opacity.
+          this._motionDt = this._motionDt ? this._motionDt * 0.92 + delta * 0.08 : delta;
+
+          // Roll all wheels on Z axis (axle), steer front wheels on Y.
+          // Faked spin rate (about half the true rate for a 0.35 m wheel — it
+          // reads better on a 1920x720 panel).
+          //
+          // Then CLAMP the per-frame step to a fraction of the rim's own
+          // repeat period. Past half a period the render is under-sampled and
+          // the wheel appears to freeze or reverse — the wagon-wheel effect —
+          // and on this unit that starts at ~27 km/h for the stock 5-spoke rim
+          // and as low as ~4 km/h for a 30-spoke one. Clamping trades exact
+          // angular rate (which nobody can read off a blurred wheel anyway)
+          // for a spin that always, at every frame rate, reads as forward.
+          // Note the clamp is applied to the ACTUAL frame interval, not a
+          // smoothed one: aliasing is decided by the real gap between the two
+          // frames the eye sees, so a long frame genuinely must step less.
+          const idealDelta = delta * speed * 15.2;
+          const maxStep = (this._rimRepeatRad || (Math.PI * 2 / 5)) * this._wheelSpinTune.stepFrac;
+          const rollDelta = Math.max(-maxStep, Math.min(maxStep, idealDelta));
+          this._rollClamped = Math.abs(idealDelta) > maxStep + 1e-9;
           if (this._allWheels || this._tireWheels) {
             // Deduped union — see the matching note in _applyWheelTransforms:
             // tires can be excluded from _allWheels (custom/catalog wheels)
@@ -14712,6 +15705,242 @@ class Component extends DCLogic {
   // Per-model name conventions so ONE processing pipeline handles both the
   // HEV/PHEV car and the GT. The GT model uses a completely different mesh/
   // material naming scheme, so its model-specific bits live here as data.
+
+  /* ------------------------------------------------------------ powertrain */
+  /**
+   * Chassis reveal: fades the body and shows the generated powertrain model
+   * (built by scripts/build-powertrain-model.mjs) inside it.
+   *
+   * Placement is the fiddly part, for two reasons. onModelLoaded normalises
+   * every car with scale.setScalar(5 / maxDim), so world units here are "5 per
+   * car length", not metres -- but the powertrain is authored in metres. And
+   * the car faces -X in this scene while the powertrain is authored facing -Z.
+   * Both are resolved by measuring the car's own bounding box at fit time
+   * rather than by hardcoding numbers, so a model swap or re-export cannot
+   * silently break the alignment.
+   */
+  _powertrainTuning() {
+    // Nudges in metres, applied after the automatic fit. The fit centres on the
+    // body box, but the axle midpoint sits slightly behind the body centre
+    // because the overhangs are unequal. Adjust here if it needs a shove.
+    return { scale: 1, x: 0, y: 0, z: 0, ghostOpacity: 0.10 };
+  }
+
+  /** Overall length of the real car -- the one number the metre fit needs. */
+  _carRealLengthM() { return 4.653; }
+
+  _isCarFloorMesh(c) {
+    const norm = (n) => (n || '').toLowerCase().trim().replace(/\.\d+$/, '');
+    const names = ['floor', 'ground', 'backdrop'];
+    const mat = Array.isArray(c.material) ? c.material[0] : c.material;
+    return names.indexOf(norm(c.name)) !== -1
+        || names.indexOf(norm(mat && mat.name)) !== -1;
+  }
+
+  _ensurePowertrain() {
+    if (this._powertrainRig) return Promise.resolve(this._powertrainRig);
+    if (this._powertrainLoading) return this._powertrainLoading;
+    const THREE = this.THREE;
+
+    this._powertrainLoading = Promise.all([
+      fetch('assets/power/haval-powertrain-lite.json').then((r) => r.json()),
+      new Promise((resolve, reject) => {
+        const loader = new THREE.GLTFLoader();
+        const draco = new THREE.DRACOLoader();
+        draco.setDecoderPath('vendor/draco/');
+        loader.setDRACOLoader(draco);
+        loader.load('assets/power/haval-powertrain-lite.glb',
+          (gltf) => resolve(gltf.scene), null, reject);
+      }),
+    ]).then((res) => {
+      const manifest = res[0], root = res[1];
+      root.name = 'H6_Powertrain';
+      root.traverse((o) => {
+        if (!o.isMesh) return;
+        // shadowMap.autoUpdate is off in this app -- leave it that way.
+        o.castShadow = false;
+        o.receiveShadow = false;
+      });
+      const rig = new THREE.Group();
+      rig.name = 'PowertrainRig';
+      rig.visible = false;
+      rig.add(root);
+      // Child of the car, so it inherits every transform the car gets.
+      (this.model || this.scene).add(rig);
+      this._powertrainManifest = manifest;
+      this._powertrainRig = rig;
+      this._powertrainLoading = null;
+      this._applyPowertrainVariant();
+      return rig;
+    }).catch((e) => {
+      console.warn('[Powertrain] load failed', e);
+      this._powertrainLoading = null;
+      return null;
+    });
+    return this._powertrainLoading;
+  }
+
+  /** Pick the pack matching the car actually loaded, and drop what clashes. */
+  _applyPowertrainVariant() {
+    const rig = this._powertrainRig, manifest = this._powertrainManifest;
+    if (!rig || !manifest) return;
+    const key = this._activeProfileKey === 'hev' ? 'hev' : 'phev34';
+    const packs = manifest.batteries || {};
+    const pack = packs[key] || packs[manifest.defaultBattery];
+    if (!pack) return;
+    Object.keys(packs).forEach((k) => {
+      const g = rig.getObjectByName(packs[k].group);
+      if (g) g.visible = packs[k].group === pack.group;
+    });
+    const rear = rig.getObjectByName('Powerplant_Rear');
+    if (rear) rear.visible = (pack.hidesGroups || []).indexOf('Powerplant_Rear') === -1;
+    // The car draws its own wheels. Ours would z-fight with them and cost
+    // ~28k of the model's 44k triangles for nothing.
+    const wheels = rig.getObjectByName('Wheels');
+    if (wheels) wheels.visible = false;
+    this._powertrainPackKey = key;
+  }
+
+  /**
+   * Align to the car's own wheel hubs, not to its bounding box.
+   *
+   * The box route looked reasonable and was wrong twice over: it centres on the
+   * body, but the axle midpoint sits behind that because the overhangs differ,
+   * and it assumes the model's proportions match the real car (measured here,
+   * the box gave 1.0746 units/m against the wheels' 1.0672). The hubs are the
+   * one thing both models genuinely share, so they are what gets matched.
+   */
+  _powertrainWheelFit() {
+    const THREE = this.THREE;
+    const model = this.model;
+    if (!model) return null;
+    const toLocal = new THREE.Matrix4().copy(model.matrixWorld).invert();
+    const centreOf = (arr) => {
+      const box = new THREE.Box3();
+      (arr || []).forEach((o) => {
+        const t = (o && o.mesh) ? o.mesh : ((o && o.c) ? o.c : o);
+        if (t && t.isObject3D) {
+          const b = new THREE.Box3().setFromObject(t);
+          if (!b.isEmpty()) box.union(b);
+        }
+      });
+      return box.isEmpty() ? null : box.applyMatrix4(toLocal).getCenter(new THREE.Vector3());
+    };
+    const fl = centreOf(this._frontLeftWheels), fr = centreOf(this._frontRightWheels);
+    const rl = centreOf(this._rearLeftWheels), rr = centreOf(this._rearRightWheels);
+    if (!fl || !fr || !rl || !rr) return null;
+    const front = fl.clone().add(fr).multiplyScalar(0.5);
+    const rear = rl.clone().add(rr).multiplyScalar(0.5);
+    return { front: front, rear: rear, wheelbase: front.distanceTo(rear) };
+  }
+
+  _fitPowertrain() {
+    const THREE = this.THREE;
+    const rig = this._powertrainRig, model = this.model;
+    if (!rig || !model) return;
+    model.updateMatrixWorld(true);
+
+    // Ground plane: lowest point of the car excluding its backdrop, i.e. the
+    // contact patch. The powertrain is authored with its origin on the ground.
+    const toLocal = new THREE.Matrix4().copy(model.matrixWorld).invert();
+    const box = new THREE.Box3();
+    model.traverse((c) => {
+      if (!c.isMesh || this._isCarFloorMesh(c)) return;
+      if (rig.getObjectById(c.id)) return;   // never measure ourselves
+      const b = new THREE.Box3().setFromObject(c);
+      if (!b.isEmpty()) box.union(b.applyMatrix4(toLocal));
+    });
+    if (box.isEmpty()) return;
+
+    const dims = (this._powertrainManifest && this._powertrainManifest.dims) || {};
+    const wheelbaseM = dims.wheelbase || 2.738;
+    const t = this._powertrainTuning();
+
+    const fit = this._powertrainWheelFit();
+    let unitsPerMetre, cx, cz;
+    if (fit && fit.wheelbase > 0.01) {
+      unitsPerMetre = fit.wheelbase / wheelbaseM;
+      const mid = fit.front.clone().add(fit.rear).multiplyScalar(0.5);
+      cx = mid.x; cz = mid.z;
+      this._powertrainFitMode = 'wheels';
+    } else {
+      // Fallback if the wheel clusters never resolved: body length over the
+      // real car's length. Less accurate, but better than not drawing.
+      unitsPerMetre = box.getSize(new THREE.Vector3()).x / this._carRealLengthM();
+      const centre = box.getCenter(new THREE.Vector3());
+      cx = centre.x; cz = centre.z;
+      this._powertrainFitMode = 'bbox';
+    }
+    unitsPerMetre *= t.scale;
+
+    rig.scale.setScalar(unitsPerMetre);
+    rig.rotation.set(0, Math.PI / 2, 0);   // powertrain nose -Z -> car nose -X
+    rig.position.set(
+      cx + t.x * unitsPerMetre,
+      box.min.y + t.y * unitsPerMetre,
+      cz + t.z * unitsPerMetre,
+    );
+    rig.updateMatrixWorld(true);
+  }
+
+  /** Fade the body so the powertrain reads through it. Fully reversible. */
+  _setBodyGhost(on) {
+    const THREE = this.THREE;
+    const model = this.model;
+    if (!model) return;
+    if (on) {
+      if (this._ghostMats) return;
+      const ghostOpacity = this._powertrainTuning().ghostOpacity;
+      const saved = [];
+      model.traverse((c) => {
+        if (!c.isMesh || this._isCarFloorMesh(c)) return;
+        if (this._powertrainRig && this._powertrainRig.getObjectById(c.id)) return;
+        const list = Array.isArray(c.material) ? c.material : [c.material];
+        // Clone rather than mutate: these materials are shared between meshes,
+        // so editing in place would leak the fade into parts we later restore.
+        const ghost = list.map((m) => {
+          if (!m) return m;
+          const g = m.clone();
+          g.transparent = true;
+          g.opacity = Math.min(m.opacity === undefined ? 1 : m.opacity, ghostOpacity);
+          g.depthWrite = false;
+          g.side = THREE.FrontSide;
+          return g;
+        });
+        saved.push({ mesh: c, material: c.material, renderOrder: c.renderOrder });
+        c.material = Array.isArray(c.material) ? ghost : ghost[0];
+        c.renderOrder = 3;
+      });
+      this._ghostMats = saved;
+    } else {
+      if (!this._ghostMats) return;
+      this._ghostMats.forEach((e) => {
+        const cur = Array.isArray(e.mesh.material) ? e.mesh.material : [e.mesh.material];
+        cur.forEach((m) => { if (m && m.dispose) m.dispose(); });
+        e.mesh.material = e.material;
+        e.mesh.renderOrder = e.renderOrder;
+      });
+      this._ghostMats = null;
+    }
+  }
+
+  _applyPowertrainVisibility(on) {
+    if (!on) {
+      this._setBodyGhost(false);
+      if (this._powertrainRig) this._powertrainRig.visible = false;
+      if (this.requestRender) this.requestRender(6);
+      return;
+    }
+    this._ensurePowertrain().then((rig) => {
+      if (!rig) return;
+      this._applyPowertrainVariant();
+      this._fitPowertrain();
+      rig.visible = true;
+      this._setBodyGhost(true);
+      if (this.requestRender) this.requestRender(6);
+    });
+  }
+
   _modelProfiles() {
     return {
       hev: {
@@ -14865,6 +16094,8 @@ class Component extends DCLogic {
   onModelLoaded(obj, profile, opts) {
     const THREE = this.THREE;
     profile = profile || this._modelProfiles().hev;
+    // Which pack the chassis reveal shows (see _applyPowertrainVariant).
+    if (!opts || opts.primary !== false) this._activeProfileKey = profile.key || 'hev';
     const primary = !opts || opts.primary !== false;
 
 
@@ -14905,12 +16136,31 @@ class Component extends DCLogic {
     obj.scale.setScalar(5 / maxDim);
     obj.updateMatrixWorld(true);
 
-    // Sit the car on the ground and centre it on XZ (floor moves with it)
+    // Sit the car on the ground and centre it on XZ (floor moves with the root
+    // as a child — it is NOT re-anchored when switching HEV↔GT).
     box = carBounds();
     const c2 = box.getCenter(new THREE.Vector3());
     obj.position.x -= c2.x;
     obj.position.z -= c2.z;
-    obj.position.y -= box.min.y;
+    // Seat on TIRE contact, not the full AABB. GT ships unnamed 34-vert helper
+    // meshes under Wheel_*/Tire_* that hang ~13cm below the rubber; seating on
+    // that AABB lifts the whole car so tires float above the (fixed) floor —
+    // PHEV has no such helpers, which is why only GT "flies". Invisible meshes
+    // still count in Box3.setFromObject, so visibility is not a filter here.
+    let seatY = null;
+    {
+      let tireMin = Infinity;
+      const tb = new THREE.Box3();
+      obj.traverse((c) => {
+        if (!c.isMesh || isFloor(c)) return;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        if (!mats.some((m) => m && /tire|tyre/i.test(m.name || ''))) return;
+        tb.setFromObject(c);
+        if (!tb.isEmpty() && tb.min.y < tireMin) tireMin = tb.min.y;
+      });
+      if (isFinite(tireMin)) seatY = tireMin;
+    }
+    obj.position.y -= (seatY != null ? seatY : box.min.y);
     this.scene.add(obj);
     obj.updateMatrixWorld(true);
     if (primary) this._modelHomePos = obj.position.clone();
@@ -15463,12 +16713,27 @@ class Component extends DCLogic {
     const size3 = box3.getSize(new THREE.Vector3());
     const center3 = box3.getCenter(new THREE.Vector3());
 
+    // Anchor ground planes to tire contact, not the full car AABB. Deep
+    // underbody / misclassified wheel meshes (especially GT) can pull
+    // box3.min.y well below the tires — shadow then sits ~10cm under the
+    // rubber and the car reads as flying above its own contact shadow.
+    let groundY = box3.min.y;
+    if (this._tireWheels && this._tireWheels.length) {
+      const tb = new THREE.Box3();
+      let tMin = Infinity;
+      this._tireWheels.forEach((m) => {
+        tb.setFromObject(m);
+        if (!tb.isEmpty() && tb.min.y < tMin) tMin = tb.min.y;
+      });
+      if (isFinite(tMin)) groundY = tMin;
+    }
+
     // Real contact shadow: a ShadowMaterial plane catches the directional light's
     // shadow map. No depth-pass artifacts from glass — glass is excluded from
     // castShadow so it doesn't punch a fake opaque hole in the shadow.
-    this.addShadowCatcher(center3, size3, box3.min.y);
-    this._setupNightSceneLights(center3, size3, box3.min.y);
-    this._setupWindLines(center3, size3, box3.min.y);
+    this.addShadowCatcher(center3, size3, groundY);
+    this._setupNightSceneLights(center3, size3, groundY);
+    this._setupWindLines(center3, size3, groundY);
     const radius = Math.max(size3.x, size3.y, size3.z) * 0.6;
     const fov = this.camera.fov * Math.PI / 180;
     const dist = (radius / Math.sin(fov / 2)) * 1.02;
@@ -15515,7 +16780,13 @@ class Component extends DCLogic {
       // Catalog rims need validated wheel pivots. GT's own classification is
       // wrong, so wait for the hidden HEV donor before installing STOCK.
       const installStock = () => {
-        const key = this.state.selectedCatalogKey || this._stockCatalogKeyFor(this.state.modelVariant);
+        const key = this._resolveBootWheelKey();
+        // Honor saved inch on the first fit so _applyPendingSceneSettings
+        // doesn't immediately re-fit to a different size after STOCK lands.
+        if (typeof this._pendingWheelSizeInch !== 'number') {
+          this._pendingWheelSizeInch = (typeof this.state.wheelSizeInch === 'number')
+            ? this.state.wheelSizeInch : 19;
+        }
         this._loadCatalogWheelByKey(key, () => {
           const done = {
             catalogLoadingKey: null,
@@ -17970,6 +19241,10 @@ class Component extends DCLogic {
     if (!this._variants) this._variants = {};
     const b = { root };
     this._variantFields().forEach((f) => { b[f] = this[f]; });
+    // Frozen copy of THIS body's own classified wheels — never overwritten by
+    // catalog clones or by GT inheriting HEV arrays.
+    b._nativeWheels = this._copyWheelArrays(this);
+    b._nativeSteerOnly = this._steerOnlyMeshes;
     this._variants[key] = b;
   }
 
@@ -17991,6 +19266,8 @@ class Component extends DCLogic {
       this._hevDonorTimer = setTimeout(() => {
         this._hevDonorTimer = null;
         console.warn('[Wheels] HEV donor timed out — installing stock on GT pivots');
+        this._inheritWheelsIfNeeded();
+        if (this.state.modelVariant === 'gt' && this._variants.gt) this._activateVariant('gt');
         this._runHevDonorWaiters();
       }, 20000);
     }
@@ -18011,15 +19288,44 @@ class Component extends DCLogic {
 
   _inheritWheelsIfNeeded() {
     if (!this._variants || !this._variants.gt || !this._variants.hev) return;
-    if (this._variants.gt._inheritedWheelsFrom === 'hev') return;
     this._inheritWheels('gt', 'hev');
+  }
+
+  _hideNativeWheelTree(root) {
+    if (!root) return;
+    // Ancestor names, not material names: GT ships unnamed 34-vert helpers
+    // under Wheel_*/Tire_* with empty materials. Those were left visible and
+    // stretched between the arches as a black smear. Do NOT match /disc/ as a
+    // substring — it hits "discoloration" body meshes.
+    const nodeRe = /wheel|tire|tyre|hub|brake|break|caliper|\brims?\b|\bdisks?\b|\bdiscs?\b/i;
+    const matRe = /tire|tyre|wheel|hub|tripo/i;
+    root.traverse((c) => {
+      if (!c.isMesh) return;
+      let p = c;
+      let underWheel = false;
+      while (p && p !== root) {
+        if (nodeRe.test(p.name || '')) { underWheel = true; break; }
+        p = p.parent;
+      }
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      const matHit = mats.some((m) => m && matRe.test(m.name || ''));
+      if (underWheel || matHit) c.visible = false;
+    });
+  }
+
+  _restoreNativeWheels(variant) {
+    if (!variant || !variant._nativeWheels) return false;
+    this._applyWheelArrays(variant, variant._nativeWheels);
+    if (variant._nativeSteerOnly) variant._steerOnlyMeshes = variant._nativeSteerOnly;
+    (variant._nativeWheels._allWheels || []).forEach((m) => { if (m) m.visible = true; });
+    return true;
   }
 
   _inheritWheels(dstKey, srcKey) {
     const srcV = this._variants && this._variants[srcKey];
     const dstV = this._variants && this._variants[dstKey];
     if (!srcV || !dstV) return;
-    (dstV._allWheels || []).forEach((m) => { m.visible = false; });
+    this._hideNativeWheelTree(dstV.root);
     const profile = this._modelProfiles()[dstKey];
     if (profile && profile.hiddenMeshes && dstV.root) {
       const hideSet = new Set(profile.hiddenMeshes);
@@ -18028,12 +19334,18 @@ class Component extends DCLogic {
     [...(dstV._blurredDiscs || []), ...(dstV._backingDiscs || [])].forEach((d) => {
       if (this.scene) this.scene.remove(d);
     });
-    ['_frontLeftWheels','_frontRightWheels','_rearLeftWheels','_rearRightWheels',
-     '_allWheels','_tireWheels','_rimWheels','_spokesWheels','_otherRimWheels',
-     '_steerOnlyMeshes','_blurredDiscs','_backingDiscs','_carLateralDir',
-    ].forEach((f) => { dstV[f] = srcV[f]; });
+    const srcWheels = srcV._nativeWheels || srcV;
+    this._applyWheelArrays(dstV, srcWheels);
+    ['_steerOnlyMeshes','_blurredDiscs','_backingDiscs','_carLateralDir'].forEach((f) => {
+      dstV[f] = srcV[f];
+    });
+    if (srcV._nativeSteerOnly) dstV._steerOnlyMeshes = srcV._nativeSteerOnly;
     dstV._inheritedWheelsFrom = srcKey;
     console.log('[Wheels]', dstKey, 'inheriting wheels from', srcKey);
+    if (dstV.root && this.state && this.state.modelVariant === dstKey) {
+      this._modelHomePos = dstV.root.position.clone();
+      dstV.root._rideBaseY = dstV.root.position.y;
+    }
   }
 
   _cullDonorMeshes(activeKey) {
@@ -18042,11 +19354,13 @@ class Component extends DCLogic {
     const srcV = this._variants[b._inheritedWheelsFrom];
     if (!srcV || !srcV.root) return;
     if (this._variantHiddenMeshes) return;
+    const native = srcV._nativeWheels || srcV;
     const keepSet = new Set([
-      ...(b._allWheels || []),
-      ...Object.values(b._steerOnlyMeshes || {}).flat(),
-      ...(b._blurredDiscs || []),
-      ...(b._backingDiscs || []),
+      ...(native._allWheels || []),
+      ...(this._customClonedWheels || []),
+      ...Object.values(srcV._nativeSteerOnly || srcV._steerOnlyMeshes || {}).flat(),
+      ...(srcV._blurredDiscs || []),
+      ...(srcV._backingDiscs || []),
     ]);
     const hidden = [];
     srcV.root.traverse(c => {
@@ -18067,6 +19381,18 @@ class Component extends DCLogic {
       this._variantHiddenMeshes.forEach(({ mesh, wasVisible }) => { mesh.visible = wasVisible; });
       this._variantHiddenMeshes = null;
     }
+
+    // Custom rim clones sit on the previous body's suspension. Tear them down
+    // and put each variant's NATIVE tire/rim refs back so the follow-up stock
+    // catalog load can snapshot pivots (HEV bag must not still point at clones).
+    if (this._customClonedWheels) this._removeCustomWheelClones();
+    Object.keys(this._variants).forEach((k) => {
+      const v = this._variants[k];
+      if (v && !v._inheritedWheelsFrom) this._restoreNativeWheels(v);
+    });
+    this._inheritWheelsIfNeeded();
+    this._customWheelsInstalled = false;
+    this._originalWheelsState = null;
 
     // Show the chosen model, hide the others — still respect car-scene gate
     // (loading / appsOnly / pre-intro). Donor wheels stay available, but the
@@ -18090,6 +19416,8 @@ class Component extends DCLogic {
     this._variantFields().forEach((f) => { this[f] = b[f]; });
     this.model = b.root;
     this._wheelsShareCarRoot = !b._inheritedWheelsFrom;
+    this._originalWheelsState = null;
+    this._snapshotOriginalWheelsState();
     // Re-apply the current UI state to the now-active model.
     this._setupReflectionFlow();
     this.applyCarColor(this.state.carColor);
@@ -18192,16 +19520,22 @@ class Component extends DCLogic {
     // is the only thing telling the two apart) is left alone.
     const currentKey = this.state.selectedCatalogKey;
     const onPlaceholderWheel = !this.state.isCustomUpload &&
-      (!currentKey || currentKey === 'haval_gt' || currentKey === 'haval_phev');
+      (!currentKey || this._isStockPlaceholderKey(currentKey));
 
     if (onPlaceholderWheel) {
       this.setState({ modelVariant: v, wheelSizeInch: 19 }); // catalog wheel default size is the smallest selectable (19"), below the general 21" catalog default
 
-      if (this._variants && this._variants[v]) {
-        this._activateVariant(v);
+      const installStock = () => {
+        if (this._variants && this._variants[v]) this._activateVariant(v);
+        this._loadCatalogWheelByKey(this._stockCatalogKeyFor(v));
+      };
+      // GT borrows HEV wheel pivots — wait for the donor before fitting stock.
+      if (v === 'gt') {
+        this._inheritWheelsIfNeeded();
+        this._whenHevDonorReady(installStock);
+      } else {
+        installStock();
       }
-
-      this._loadCatalogWheelByKey(this._stockCatalogKeyFor(v));
     } else {
       this.setState({ modelVariant: v });
       if (this._variants && this._variants[v]) this._activateVariant(v);
@@ -18255,8 +19589,11 @@ class Component extends DCLogic {
 
     if (this._generatedEnvironmentTarget) this._generatedEnvironmentTarget.dispose();
     if (this._studioEnvironmentTarget) this._studioEnvironmentTarget.dispose();
+    if (this._dyadEnvironmentTarget) this._dyadEnvironmentTarget.dispose();
     this._generatedEnvironmentTarget = null;
     this._studioEnvironmentTarget = null;
+    this._dyadEnvironmentTarget = null;
+    this._dyadEnvTexture = null;
     if (this.pmrem && this.pmrem.dispose) this.pmrem.dispose();
     if (this._backgroundTex) this._backgroundTex.dispose();
 
