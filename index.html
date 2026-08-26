@@ -3940,6 +3940,10 @@ class Component extends DCLogic {
       arcFrac: 0.8,
       arcMaxRad: Math.PI / 3,
       arcMinRad: 0.35,
+      // Trailing debounce (ms) on the sprite re-capture. The capture costs
+      // 62 ms on the emulator and the tint sliders fire it per input event,
+      // so a drag used to queue dozens of them. See _requestBlurCapture.
+      captureDebounceMs: 200,
     };
     this._wheelCatalog = [
       // haval_gt and haval_phev are each variant's own extracted stock rim —
@@ -8687,7 +8691,37 @@ class Component extends DCLogic {
     };
   }
 
+  // Trailing debounce around _generateBlurredWheelTexture.
+  //
+  // The capture is one scene render plus one (two, on the two-layer path)
+  // full-screen pass into a 256x256 target, and it measured 62 ms/call on the
+  // emulator — likely 150-250 ms on the MMI. onWheelColor / onWheelRoughness /
+  // onWheelMetalness fire on every `input` event, so dragging a slider used to
+  // queue one capture per event and the whole UI stuttered.
+  //
+  // Same shape as _requestTweenShadow / _settleTweenShadow: cheap work stays
+  // immediate (the material property IS applied per event — the sliders still
+  // respond at once), the expensive refresh is deferred, and the final one is
+  // guaranteed because a trailing debounce only ever fires after the last
+  // event. Anything that must be exact right now (rim swap, arc change, HDRI)
+  // still calls _generateBlurredWheelTexture directly, which cancels a pending
+  // trailing call so the two cannot both run.
+  _requestBlurCapture(delayMs) {
+    const t = this._wheelSpinTune || {};
+    const d = (typeof delayMs === 'number') ? delayMs
+            : (typeof t.captureDebounceMs === 'number' ? t.captureDebounceMs : 200);
+    if (this._blurCaptureTimer) clearTimeout(this._blurCaptureTimer);
+    this._blurCaptureTimer = setTimeout(() => {
+      this._blurCaptureTimer = null;
+      try { this._generateBlurredWheelTexture(); }
+      catch (e) { console.warn('[WheelBlur] debounced capture failed', e && e.message); }
+      if (this.requestRender) this.requestRender(2);
+    }, Math.max(0, d));
+  }
+
   _generateBlurredWheelTexture() {
+    // A direct call supersedes any queued trailing one.
+    if (this._blurCaptureTimer) { clearTimeout(this._blurCaptureTimer); this._blurCaptureTimer = null; }
     if (!this.THREE || !this.renderer || !this._frontLeftWheels || !this._spokesWheels) return;
     if (!this._wheelBlurInitialized) this._initWheelBlur();
 
@@ -14592,22 +14626,25 @@ class Component extends DCLogic {
     this._generateBlurredWheelTexture();
   }
 
+  // The three below fire per `input` event while a slider is dragged. The
+  // material change is immediate; only the blur-sprite re-capture (62 ms on
+  // the emulator) is debounced — see _requestBlurCapture.
   onWheelColor(e) {
     this.setState({ wheelColor: e.target.value });
     this.applyWheelMaterialProperties();
-    this._generateBlurredWheelTexture();
+    this._requestBlurCapture();
   }
 
   onWheelRoughness(e) {
     this.setState({ wheelRoughness: parseFloat(e.target.value) });
     this.applyWheelMaterialProperties();
-    this._generateBlurredWheelTexture();
+    this._requestBlurCapture();
   }
 
   onWheelMetalness(e) {
     this.setState({ wheelMetalness: parseFloat(e.target.value) });
     this.applyWheelMaterialProperties();
-    this._generateBlurredWheelTexture();
+    this._requestBlurCapture();
   }
 
   loadHDRI(key) {
@@ -20247,6 +20284,7 @@ class Component extends DCLogic {
     clearTimeout(this._introKickTimer);
     clearTimeout(this._warmupIdleTimer);
     clearTimeout(this._warmupFallbackTimer);
+    clearTimeout(this._blurCaptureTimer);
     clearInterval(this._perfReportTimer);
     this._hdriRequestId = (this._hdriRequestId || 0) + 1;
     if (this._raf) cancelAnimationFrame(this._raf);
