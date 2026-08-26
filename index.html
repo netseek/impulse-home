@@ -8316,7 +8316,10 @@ class Component extends DCLogic {
     const TWO_PI = Math.PI * 2;
     const cx = (size - 1) / 2, cy = (size - 1) / 2;
     const rOuter = size / 2;
-    const rIn = rOuter * 0.30, rOut = rOuter * 0.95;
+    // The rim no longer fills the frame (see CAPTURE_MARGIN), so the annulus has
+    // to be taken as a fraction of the RIM or it creeps into the empty margin.
+    const rimFrac = 1 / (this._blurCaptureMargin || 1);
+    const rIn = rOuter * 0.30 * rimFrac, rOut = rOuter * 0.95 * rimFrac;
 
     // Two independent profiles. RGB is premultiplied by coverage, so its
     // luminance carries both the spoke shading and the holes; alpha carries
@@ -8720,7 +8723,19 @@ class Component extends DCLogic {
     const axle = flFirst._rollAxis;
     if (!pivot || !axle) return;
 
-    const tempCam = new THREE.OrthographicCamera(-r, r, r, -r, 0.01, 10);
+    // Frame slightly wider than the rim. The frustum used to be exactly +-r, so
+    // the lip landed on the very edge of the texture, where it gets cut by the
+    // frustum and softened by bilinear filtering against the transparent
+    // border — the "the border is getting lost" look, most obvious on rims like
+    // the PHEV stock whose lip is a thin bright ring. Measured alpha across the
+    // outer bins before this: 205, 255, 255, 249 with the last bin running into
+    // the edge. The sprite disc is grown to match (see _resizeBlurredDiscs
+    // below) so the rim still renders at the same world size, just with a
+    // transparent margin around it.
+    const CAPTURE_MARGIN = 1.06;
+    this._blurCaptureMargin = CAPTURE_MARGIN;
+    const rCap = r * CAPTURE_MARGIN;
+    const tempCam = new THREE.OrthographicCamera(-rCap, rCap, rCap, -rCap, 0.01, 10);
     tempCam.position.copy(pivot).addScaledVector(axle, -2.0);
     tempCam.lookAt(pivot);
     tempCam.up.set(0, 1, 0);
@@ -8847,7 +8862,10 @@ class Component extends DCLogic {
     // was sized for whatever rim was present at build time. After a rim swap
     // the new rim's world radius differs, so rescale the discs to match — else
     // the spinning-blur sprite keeps the old rim's size.
-    this._resizeBlurredDiscs(r);
+    // Sized to the FRAMED radius, not the rim radius: the texture spans +-rCap,
+    // so the disc has to span the same for the rim inside it to come out at its
+    // true size.
+    this._resizeBlurredDiscs(rCap);
     // Custom rims mount their face proud of the tire opening, further out along
     // the axle than the fixed 0.115 the discs were built at — so also re-seat
     // the sprites onto the current rim's front face, or they render recessed
