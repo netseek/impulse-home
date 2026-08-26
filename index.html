@@ -8380,52 +8380,111 @@ class Component extends DCLogic {
       return { order: bN, corr: bc, weak: true };
     };
 
-    // Low-order angular brightness harmonics — the lighting the blur shader
-    // divides out. Same readback, so it costs nothing extra. Deferred until
-    // after the repeat order is known, because the order is what decides how
-    // many harmonics are safe to remove.
+    // The lighting map the blur shader divides out. Same readback, so it costs
+    // nothing extra; deferred until the repeat order is known, because the
+    // order decides how much of the spectrum is safe to remove.
+    //
+    // Brightness is taken UN-PREMULTIPLIED (rgb/alpha, opaque pixels only): rgb
+    // alone mixes the rim's shading with its coverage, and it is the shading
+    // that is stuck to the scene rather than to the wheel.
     const measureLobe = (order, weak) => {
-      let mean = 0;
-      for (let b = 0; b < BINS; b++) mean += lum[b];
-      mean /= BINS;
-      // Harmonics 1..order-1. A weak order reading is a guess, so trim the band
+      const ANG = this._lobeAng, RAD = this._lobeRad;
+      const sum = new Float64Array(ANG * RAD), cnt = new Uint32Array(ANG * RAD);
+      for (let y = 0; y < size; y++) {
+        const dy = y - cy;
+        for (let x = 0; x < size; x++) {
+          const dx = x - cx;
+          const rr = Math.hypot(dx, dy) / rOuter;
+          if (rr > 1) continue;
+          const i = (y * size + x) * 4;
+          const al = px[i + 3];
+          if (al < 64) continue;                  // spoke gap: no material to read
+          let ang = Math.atan2(dy, dx);
+          if (ang < 0) ang += TWO_PI;
+          const ai = Math.min(ANG - 1, (ang / TWO_PI * ANG) | 0);
+          const ri = Math.min(RAD - 1, (rr * RAD) | 0);
+          const lumP = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+          sum[ri * ANG + ai] += lumP / al;        // un-premultiply
+          cnt[ri * ANG + ai]++;
+        }
+      }
+      // Harmonics 1..order-1 per radial band. A weak order reading is a guess,
+      // so trim the band rather than risk flattening real spoke structure on it.
+      // Everything below the order, not just the first 8: the shader samples a
+      // map now, so extra harmonics cost nothing. Capped at 8 it left the
+      // 0.65-0.80 band of a 10-fold rim untouched, because that band's worst
+      // term was the 9th. A weak order reading is a guess, so trim the band
       // rather than risk flattening real spoke structure on the strength of it.
-      const kMax = Math.max(0, Math.min((order || 5) - 1, weak ? 3 : 8));
-      const harm = [];
-      let total = 0;
-      for (let k = 1; k <= kMax; k++) {
-        let re = 0, im = 0;
-        for (let b = 0; b < BINS; b++) {
-          const t = (b + 0.5) / BINS * TWO_PI;
-          re += lum[b] * Math.cos(k * t);
-          im += lum[b] * Math.sin(k * t);
+      const kMax = Math.max(0, Math.min((order || 5) - 1, weak ? 3 : 16));
+      const data = this._lobeData;
+      let peak = 0, bands = 0;
+      const prof = new Float64Array(ANG);
+      for (let ri = 0; ri < RAD; ri++) {
+        let mean = 0, have = 0;
+        for (let ai = 0; ai < ANG; ai++) {
+          const n = cnt[ri * ANG + ai];
+          prof[ai] = n ? sum[ri * ANG + ai] / n : NaN;
+          if (n) { mean += prof[ai]; have++; }
         }
-        const A = mean > 1e-6 ? (2 * re / BINS) / mean : 0;
-        const B = mean > 1e-6 ? (2 * im / BINS) / mean : 0;
-        harm.push({ a: A, b: B });
-        total += Math.hypot(A, B);
-      }
-      // Never let a bad reading swing the correction far. Cap on the PEAK of
-      // the reconstructed profile, not on the sum of amplitudes: the harmonics
-      // peak at different angles, so summing them overstates the real swing and
-      // scaled the correction down to about half of what was measured.
-      let peak = 0;
-      for (let b = 0; b < BINS; b++) {
-        const t = (b + 0.5) / BINS * TWO_PI;
-        let f = 0;
-        for (let k = 0; k < harm.length; k++) {
-          f += harm[k].a * Math.cos((k + 1) * t) + harm[k].b * Math.sin((k + 1) * t);
+        // A band that is mostly empty (the hub bore, past the rim edge) gets no
+        // correction rather than a correction fitted to a handful of pixels.
+        // The bar has to stay LOW, though: an open-spoke rim legitimately has
+        // material at only half the angles in its mid-radius bands, and a 0.6
+        // bar dropped exactly those — the 0.65-0.80 band of the 10-fold rim
+        // came back byte-identical with the correction on and off.
+        let ok = have > ANG * 0.2 && kMax > 0;
+        if (ok) {
+          mean /= have;
+          if (!(mean > 1e-6)) ok = false;
         }
-        if (Math.abs(f) > peak) peak = Math.abs(f);
+        if (!ok) {
+          for (let ai = 0; ai < ANG; ai++) data[(ri * ANG + ai) * 4] = 128;
+          continue;
+        }
+        bands++;
+        // Accumulate over the bins that actually HAVE material, normalised by
+        // how many there were. Filling the gaps with the mean and running a
+        // full-circle DFT instead biases every amplitude toward zero in
+        // proportion to how open the rim is, which is backwards: the open rims
+        // are the ones whose lighting shows most.
+        const A = new Float64Array(kMax), B = new Float64Array(kMax);
+        for (let k = 1; k <= kMax; k++) {
+          let re = 0, im = 0;
+          for (let ai = 0; ai < ANG; ai++) {
+            if (!isFinite(prof[ai])) continue;
+            const t = (ai + 0.5) / ANG * TWO_PI;
+            re += prof[ai] * Math.cos(k * t);
+            im += prof[ai] * Math.sin(k * t);
+          }
+          A[k - 1] = (2 * re / have) / mean;
+          B[k - 1] = (2 * im / have) / mean;
+        }
+        // Reconstruct, cap on the band's own PEAK (harmonics peak at different
+        // angles, so capping the sum of amplitudes halves the correction), and
+        // write the factor into the map.
+        const f = new Float64Array(ANG);
+        let bandPeak = 0;
+        for (let ai = 0; ai < ANG; ai++) {
+          const t = (ai + 0.5) / ANG * TWO_PI;
+          let v = 0;
+          for (let k = 1; k <= kMax; k++) v += A[k - 1] * Math.cos(k * t) + B[k - 1] * Math.sin(k * t);
+          f[ai] = v;
+          if (Math.abs(v) > bandPeak) bandPeak = Math.abs(v);
+        }
+        // The outer lip carries a genuine ~40% specular swing, and a 0.30 cap
+        // could only take a quarter of it off. This is bounded by the shader's
+        // divisor clamp as well, so it cannot run away.
+        const PEAK_CAP = 0.45;
+        const scale = bandPeak > PEAK_CAP ? PEAK_CAP / bandPeak : 1;
+        if (bandPeak * scale > peak) peak = bandPeak * scale;
+        for (let ai = 0; ai < ANG; ai++) {
+          const val = 1 + f[ai] * scale;
+          data[(ri * ANG + ai) * 4] = Math.max(0, Math.min(255, Math.round((val - 0.5) * 255)));
+        }
       }
-      const PEAK_CAP = 0.30;
-      if (peak > PEAK_CAP) {
-        const f = PEAK_CAP / peak;
-        harm.forEach(h => { h.a *= f; h.b *= f; });
-      }
-      this._blurLobe = { harm, raw: +total.toFixed(3),
-        peak: +peak.toFixed(3), orders: kMax,
-        scaled: peak > PEAK_CAP ? +(PEAK_CAP / peak).toFixed(2) : 1 };
+      this._lobeTex.needsUpdate = true;
+      this._blurShaderMat.uniforms.uLobeOn.value = bands > 0 ? 1 : 0;
+      this._blurLobe = { orders: kMax, bands, peak: +peak.toFixed(3), raw: +peak.toFixed(3) };
     };
 
     const byLum = best(lum), byAlp = best(alp);
@@ -8475,11 +8534,12 @@ class Component extends DCLogic {
         tSource: { value: null },
         // Per-rim: set from the measured repeat period before every capture.
         uArcRad: { value: Math.PI / 3 },
-        // Per-capture: the cos/sin amplitude of angular brightness harmonics
-        // 1..8, normalised by the mean. Everything BELOW the rim's own repeat
-        // order is lighting, not rim, so it gets divided out. All-zero
-        // disables the correction.
-        uHarm: { value: Array.from({ length: 8 }, () => new THREE.Vector2(0, 0)) }
+        // Per-capture lighting map: for each RADIUS, the sub-spoke-order
+        // angular brightness of the rim at that radius. The shader divides it
+        // out so the scene's reflection stops orbiting with the sprite.
+        // uLobeOn 0 disables it.
+        uLobeTex: { value: null },
+        uLobeOn:  { value: 0 }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -8491,7 +8551,8 @@ class Component extends DCLogic {
       fragmentShader: `
         uniform sampler2D tSource;
         uniform float uArcRad;
-        uniform vec2 uHarm[8];
+        uniform sampler2D uLobeTex;
+        uniform float uLobeOn;
         varying vec2 vUv;
         void main() {
           vec2 center = vec2(0.5, 0.5);
@@ -8540,19 +8601,38 @@ class Component extends DCLogic {
           // divisor is CLAMPED and the result clamped back under alpha —
           // unbounded division here is exactly what blew this sprite out to a
           // pale disc once before.
+          // Sampled per RADIUS as well as per angle. A single correction over
+          // angle only flattens the brightness AVERAGED across the disc, so a
+          // reflection that sits at one radius — the bright ring around the
+          // outer rim — survived it and kept orbiting with the sprite.
           float ang = atan(uv.y, uv.x);
-          float lobe = 1.0;
-          for (int k = 0; k < 8; k++) {
-            float m = float(k + 1);
-            lobe += uHarm[k].x * cos(m * ang) + uHarm[k].y * sin(m * ang);
-          }
-          color.rgb /= clamp(lobe, 0.75, 1.35);
+          float r01 = clamp(length(uv) / 0.5, 0.0, 1.0);
+          float lobe = 0.5 + texture2D(uLobeTex, vec2(ang / 6.2831853, r01)).r;
+          lobe = mix(1.0, lobe, uLobeOn);
+          color.rgb /= clamp(lobe, 0.68, 1.50);
           color.rgb = min(color.rgb, vec3(color.a));
 
           gl_FragColor = color;
         }
       `
     });
+
+    // Correction map, angle across, radius down. Both dimensions power-of-two:
+    // WebGL1 (the car is on WebView 91) only allows REPEAT wrap on POT
+    // textures, and angle has to wrap or there is a seam at the 12 o'clock.
+    this._lobeAng = 64;
+    this._lobeRad = 32;
+    this._lobeData = new Uint8Array(this._lobeAng * this._lobeRad * 4);
+    this._lobeData.fill(128);   // 128 -> factor 1.0, i.e. no correction
+    this._lobeTex = new THREE.DataTexture(this._lobeData, this._lobeAng, this._lobeRad,
+      THREE.RGBAFormat, THREE.UnsignedByteType);
+    this._lobeTex.wrapS = THREE.RepeatWrapping;
+    this._lobeTex.wrapT = THREE.ClampToEdgeWrapping;
+    this._lobeTex.minFilter = THREE.LinearFilter;
+    this._lobeTex.magFilter = THREE.LinearFilter;
+    this._lobeTex.generateMipmaps = false;
+    this._lobeTex.needsUpdate = true;
+    this._blurShaderMat.uniforms.uLobeTex.value = this._lobeTex;
 
     this._blurScene = new THREE.Scene();
     // Setting near/far to -1 and 1 prevents the quad at Z=0 from being clipped by the camera near plane
@@ -8732,15 +8812,6 @@ class Component extends DCLogic {
       const arc = Math.min(t.arcMaxRad, Math.max(t.arcMinRad, this._rimRepeatRad * t.arcFrac));
       this._blurShaderMat.uniforms.uArcRad.value = arc;
       this._blurArcRad = arc;
-    }
-
-    {
-      const slots = this._blurShaderMat.uniforms.uHarm.value;
-      const harm = (this._blurLobe && this._blurLobe.harm) || [];
-      for (let k = 0; k < slots.length; k++) {
-        const h = harm[k];
-        slots[k].set(h ? h.a : 0, h ? h.b : 0);
-      }
     }
 
     this._blurShaderMat.uniforms.tSource.value = this._rtSource.texture;
@@ -15292,8 +15363,9 @@ class Component extends DCLogic {
           repeatCorr: this._rimRepeatInfo ? +this._rimRepeatInfo.corr.toFixed(2) : null,
           repeatWeak: this._rimRepeatInfo ? !!this._rimRepeatInfo.weak : null,
           blurArcDeg: deg(this._blurArcRad || Math.PI / 3),
-          blurLobe: this._blurLobe ? this._blurLobe.raw : null,
+          blurLobePeak: this._blurLobe ? this._blurLobe.peak : null,
           blurLobeOrders: this._blurLobe ? this._blurLobe.orders : null,
+          blurLobeBands: this._blurLobe ? this._blurLobe.bands : null,
           blurStartKmh: +win.start.toFixed(1),
           blurFullKmh: +win.full.toFixed(1),
           maxStepDeg: deg(period * this._wheelSpinTune.stepFrac),

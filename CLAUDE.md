@@ -256,11 +256,33 @@ capture shader, not in the placement:
   the reconstructed profile's PEAK, not the sum of amplitudes: the harmonics
   peak at different angles, and summing them halved the correction.
 
-  What this cannot fix: the sprite still bakes a static reflection into a
-  rotating texture, and dividing out the azimuthal mean only corrects average
-  brightness per angle. A highlight that varies with RADIUS still orbits. Fixing
-  that properly means not rotating the lighting at all — capture flat-lit and
-  composite a static lighting layer over it.
+  **And the correction has to be per RADIUS, not just per angle.** Flattening the
+  azimuthal mean corrects brightness averaged across the disc, so the bright
+  specular ring around the outer lip — which lives at one radius — survived it
+  and kept orbiting. `uLobeTex` is now a 64x32 (angle x radius) map, POT so
+  WebGL1 on the car will take REPEAT wrap on the angle axis. Measured per band
+  on the 10-fold rim, worst sub-order harmonic: 0.156 -> 0.107, 0.133 -> 0.128,
+  0.212 -> 0.110, 0.397 -> 0.263, with the spoke signal at N preserved or up.
+
+  Three traps in building that map, all of which showed as "correction makes it
+  worse" or "correction does nothing":
+  - The map is indexed from angle 0; the shader's `ang/2PI + 0.5` put the lookup
+    half a turn out and DOUBLED the asymmetry (outer band 0.397 -> 0.499).
+    `wrapS = Repeat` handles the negative coordinate on its own.
+  - Read brightness UN-PREMULTIPLIED (rgb/alpha, alpha >= 64 only). Raw rgb
+    mixes shading with coverage, and it is the shading that is stuck to the
+    scene rather than to the wheel.
+  - Accumulate harmonics over the bins that have material, normalised by how
+    many there were. Mean-filling the gaps and running a full-circle DFT biases
+    every amplitude toward zero in proportion to how open the rim is — exactly
+    backwards. A 0.6 coverage bar also skipped whole bands of an open-spoke rim
+    outright; it needs to be ~0.2.
+
+  What this still cannot fix: the sprite bakes a static reflection into a
+  rotating texture, and this only removes the part of it that is separable as
+  sub-order angular structure. Residual is ~0.26 at the lip. Fixing it properly
+  means not rotating the lighting at all — capture flat-lit and composite a
+  static lighting layer over the spinning one.
 
 ## Do not set `needsUpdate` on a render target's texture
 
