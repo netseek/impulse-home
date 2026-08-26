@@ -119,8 +119,8 @@ adb shell setprop log.tag.H6Media DEBUG
 - `?android` selects the mobile performance tier (`_perfMobile`): reduced
   post-processing resolution, fewer anamorphic streak taps, no transmission
   render target, no framebuffer preservation, and an adaptive pixel-ratio floor
-  of 0.7. None of these change what the car looks like — the visible-quality
-  reductions live in the separate opt-in `?lite` tier (`_perfLow`).
+  of 0.75. None of these change what the car looks like. There is no separate
+  `?lite` / `_perfLow` quality hammer.
 - Draco uses the WASM decoder with a single worker on Android. It was previously
   pinned to the JavaScript decoder after WASM worker crashes, but on
   WebView 91.0.4472.114 / SA8155 it measures clean and roughly 3x faster.
