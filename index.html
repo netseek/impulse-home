@@ -3922,17 +3922,16 @@ class Component extends DCLogic {
       arcMinRad: 0.35,
     };
     this._wheelCatalog = [
-      // haval_gt and haval_phev are each variant's own extracted stock rim —
-      // besides being regular catalog entries (so either can be put on the
-      // OTHER variant), they double as what the STOCK button loads for the
-      // currently active variant (see _stockCatalogKeyFor), which is what
+      // haval_gt / haval_phev / haval_hev / haval_phev19 are each trim's own
+      // extracted stock rim — besides being regular catalog entries (so any can
+      // be put on any body), they double as what the STOCK button loads for the
+      // currently active trim (see _stockCatalogKeyFor), which is what
       // gives STOCK a real thumbnail and lets it resize like every other
       // wheel instead of being a separate fixed, non-resizable mesh.
       { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT', defaultInch: 19, proudMm: 8 },
       { key: 'haval_phev',         file: 'HavalPHEV34-wheel.glb?rev=5',    label: 'PHEV34', defaultInch: 19 },
-      // Optional 19" PHEV rim — catalog-only (not stock); loads on demand when picked.
+      // Trim stock rims — each sellable variant loads its own on boot / MODEL cycle.
       { key: 'haval_phev19',       file: 'HavalPHEV19-wheel.glb?rev=3',    label: 'PHEV19', defaultInch: 19 },
-      // Extracted HEV rim — catalog-only; PHEV34 is stock on the HEV/PHEV body.
       { key: 'haval_hev',          file: 'HavalHEV-wheel.glb',             label: 'Haval HEV', defaultInch: 19 },
       { key: 'vossen_lc104t',      file: '3d_vossen_lc104t.glb',           label: 'Vossen LC104T' },
       { key: 'audi_rs5',           file: 'Audi-RS5.glb',                   label: 'Audi RS5' },
@@ -4124,7 +4123,7 @@ class Component extends DCLogic {
     if (typeof saved.curtainOpen === 'number') s.curtainOpen = saved.curtainOpen;
     if (typeof saved.selectedCatalogKey === 'string' || saved.selectedCatalogKey === null) s.selectedCatalogKey = saved.selectedCatalogKey;
     if (s.selectedCatalogKey && this._isStockPlaceholderKey(s.selectedCatalogKey)) {
-      s.selectedCatalogKey = this._stockCatalogKeyFor(s.modelVariant);
+      s.selectedCatalogKey = this._stockCatalogKeyFor(s.modelTrim);
     }
     if (typeof saved.wheelSizeInch === 'number') s.wheelSizeInch = saved.wheelSizeInch;
     if (typeof saved.wheelColor === 'string') s.wheelColor = saved.wheelColor;
@@ -4159,10 +4158,10 @@ class Component extends DCLogic {
       const raw = String(qs.get('model') || hs.get('model') || '').toLowerCase().trim();
       if (!raw) return null;
       const PRESETS = {
-        phev34: { body: 'hev', wheel: 'haval_phev' },
-        phev19: { body: 'hev', wheel: 'haval_phev19' },
-        hev:    { body: 'hev', wheel: 'haval_hev' },
-        gt:     { body: 'gt',  wheel: 'haval_gt' },
+        phev34: { trim: 'phev34', body: 'hev', wheel: 'haval_phev' },
+        phev19: { trim: 'phev19', body: 'hev', wheel: 'haval_phev19' },
+        hev:    { trim: 'hev',    body: 'hev', wheel: 'haval_hev' },
+        gt:     { trim: 'gt',     body: 'gt',  wheel: 'haval_gt' },
       };
       return PRESETS[raw] || null;
     } catch (e) {
@@ -4174,12 +4173,15 @@ class Component extends DCLogic {
     const p = this._parseUrlModelPreset();
     this._urlModelPreset = p;
     if (!p || !this.state) return;
+    this.state.modelTrim = p.trim;
     this.state.modelVariant = p.body;
     this.state.selectedCatalogKey = p.wheel;
   }
 
   _resolvedBootVariant() {
     if (this._urlModelPreset && this._urlModelPreset.body) return this._urlModelPreset.body;
+    const trim = this._trims().find((t) => t.key === (this.state && this.state.modelTrim));
+    if (trim) return trim.body;
     if (this.state && this.state.modelVariant === 'gt') return 'gt';
     if (this._savedSettings && this._savedSettings.modelVariant === 'gt') return 'gt';
     return 'hev';
@@ -7043,7 +7045,7 @@ class Component extends DCLogic {
     // Computed once and reused below for stockRing/stockBg/stockCol/
     // stockThumb/stockImgOpacity/stockImgAnim, instead of each independently
     // recomputing the same key/lookup on every render.
-    const stockKey = this._stockCatalogKeyFor(s.modelVariant);
+    const stockKey = this._stockCatalogKeyFor(s.modelTrim);
     const stockThumbVal = s.catalogThumbs[stockKey];
     const stockReady = !!(stockThumbVal && stockThumbVal !== 'error');
     const palette = [
@@ -7405,7 +7407,7 @@ class Component extends DCLogic {
       // duplicate of the same wheel, so it's the one entry filtered out of
       // the regular grid (the OTHER variant's stock rim stays, as the
       // easiest way to try that variant's look on this one).
-      catalogItems: this._wheelCatalog.filter((item) => item.key !== this._stockCatalogKeyFor(s.modelVariant)).map((item) => {
+      catalogItems: this._wheelCatalog.filter((item) => item.key !== this._stockCatalogKeyFor(s.modelTrim)).map((item) => {
         const active = s.selectedCatalogKey === item.key;
         const thumbVal = s.catalogThumbs[item.key];
         const ready = thumbVal && thumbVal !== 'error';
@@ -12869,21 +12871,27 @@ class Component extends DCLogic {
     if (tab === 'catalog') this._generateCatalogThumbnails();
   }
 
-  // Which catalog wheel represents a given variant's own stock rim.
-  _stockCatalogKeyFor(variant) {
-    if (variant === 'gt') return 'haval_gt';
-    // HEV/PHEV body (modelVariant 'hev') ships with the PHEV34 rim.
-    return 'haval_phev';
+  // Which catalog wheel is stock for a sellable trim (see _trims()).
+  _stockCatalogKeyFor(trimKey) {
+    const trim = trimKey || (this.state && this.state.modelTrim) || 'phev34';
+    const MAP = {
+      phev34: 'haval_phev',
+      gt: 'haval_gt',
+      hev: 'haval_hev',
+      phev19: 'haval_phev19',
+    };
+    return MAP[trim] || MAP.phev34;
   }
 
-  // Saved keys that mean "variant stock", not a deliberate aftermarket pick.
+  // Saved keys that mean "trim stock", not a deliberate aftermarket pick.
   _isStockPlaceholderKey(key) {
-    return key === 'haval_gt' || key === 'haval_phev' || key === 'haval_hev';
+    return key === 'haval_gt' || key === 'haval_phev' || key === 'haval_hev'
+        || key === 'haval_phev19';
   }
 
   _resolveBootWheelKey() {
     if (this._urlModelPreset && this._urlModelPreset.wheel) return this._urlModelPreset.wheel;
-    const stockKey = this._stockCatalogKeyFor(this.state.modelVariant);
+    const stockKey = this._stockCatalogKeyFor(this.state.modelTrim);
     const saved = this.state.selectedCatalogKey;
     if (!saved || saved === stockKey || this._isStockPlaceholderKey(saved)) return stockKey;
     return saved;
@@ -12895,7 +12903,7 @@ class Component extends DCLogic {
 
   onSelectStockWheel() {
     if (this.state.catalogLoadingKey) return;
-    const stockKey = this._stockCatalogKeyFor(this.state.modelVariant);
+    const stockKey = this._stockCatalogKeyFor(this.state.modelTrim);
     // Already on this stock rim — reloading re-runs bore/fit math and can
     // visibly nudge size even when the inch label is unchanged.
     if (this.state.selectedCatalogKey === stockKey && this._customWheelsInstalled && !this.state.isCustomUpload) return;
@@ -16164,6 +16172,9 @@ class Component extends DCLogic {
     const next = list[(i + 1) % list.length];
     const bodyChanged = next.body !== this._currentTrim().body;
     this.setState({ modelTrim: next.key });
+    const currentKey = this.state.selectedCatalogKey;
+    const onPlaceholderWheel = !this.state.isCustomUpload
+      && (!currentKey || this._isStockPlaceholderKey(currentKey));
     if (bodyChanged) {
       // _setModelVariant swaps the body asynchronously, and the rig is parented
       // to this.model -- resyncing inline orphans it on the outgoing car.
@@ -16171,8 +16182,15 @@ class Component extends DCLogic {
       // a cold load every timer fires before the new model exists and the swap
       // silently ends up un-ghosted. Wait for the object to actually change.
       const prev = this.model;
-      this._setModelVariant(next.body);
+      this._setModelVariant(next.body, next.key);
       this._awaitBodySwap(prev);
+    } else if (onPlaceholderWheel) {
+      // Same shell (HEV body), different trim — follow with that trim's stock rim.
+      this._pendingWheelSizeInch = 19;
+      this.setState({ wheelSizeInch: 19 });
+      this._loadCatalogWheelByKey(this._stockCatalogKeyFor(next.key), () => {
+        if (this.state.powertrainOn) this._syncPowertrainToBody();
+      });
     }
     this._syncPowertrainToBody();
   }
@@ -20138,7 +20156,7 @@ class Component extends DCLogic {
     }
   }
 
-  _setModelVariant(v) {
+  _setModelVariant(v, trimKey) {
     if (v === this.state.modelVariant) return;
 
     // Lazy variant load: the other body isn't fetched at startup. On the first
@@ -20148,7 +20166,7 @@ class Component extends DCLogic {
       this.setState({ loading: true, processing: false, progress: 5 });
       this._loadVariantModel(v, (err) => {
         if (err) return; // loader already rolled the overlay back
-        this._applyModelVariant(v);
+        this._applyModelVariant(v, trimKey);
         // Non-stock catalog picks don't start another wheel fetch, so nothing
         // else would clear the overlay that _setModelVariant just raised.
         if (this.state.loading && !this.state.catalogLoadingKey) {
@@ -20158,10 +20176,10 @@ class Component extends DCLogic {
       return;
     }
     this.setState({ loading: true, processing: true, progress: 40 });
-    this._applyModelVariant(v);
+    this._applyModelVariant(v, trimKey);
   }
 
-  _applyModelVariant(v) {
+  _applyModelVariant(v, trimKey) {
     this._persistModelVariant(v);
     // Auto-swap the stock-looking wheel when switching variants: if the user
     // is still on either variant's own stock rim (or hasn't picked anything
@@ -20178,7 +20196,7 @@ class Component extends DCLogic {
 
       const installStock = () => {
         if (this._variants && this._variants[v]) this._activateVariant(v);
-        this._loadCatalogWheelByKey(this._stockCatalogKeyFor(v));
+        this._loadCatalogWheelByKey(this._stockCatalogKeyFor(trimKey));
       };
       // GT borrows HEV wheel pivots — wait for the donor before fitting stock.
       if (v === 'gt') {
