@@ -8380,29 +8380,53 @@ class Component extends DCLogic {
       return { order: bN, corr: bc, weak: true };
     };
 
-    // First harmonic of the angular brightness — the lighting lobe the blur
-    // shader divides out. Same readback, so it costs nothing extra.
-    {
+    // Low-order angular brightness harmonics — the lighting the blur shader
+    // divides out. Same readback, so it costs nothing extra. Deferred until
+    // after the repeat order is known, because the order is what decides how
+    // many harmonics are safe to remove.
+    const measureLobe = (order, weak) => {
       let mean = 0;
       for (let b = 0; b < BINS; b++) mean += lum[b];
       mean /= BINS;
-      let re = 0, im = 0;
+      // Harmonics 1..order-1. A weak order reading is a guess, so trim the band
+      // rather than risk flattening real spoke structure on the strength of it.
+      const kMax = Math.max(0, Math.min((order || 5) - 1, weak ? 3 : 8));
+      const harm = [];
+      let total = 0;
+      for (let k = 1; k <= kMax; k++) {
+        let re = 0, im = 0;
+        for (let b = 0; b < BINS; b++) {
+          const t = (b + 0.5) / BINS * TWO_PI;
+          re += lum[b] * Math.cos(k * t);
+          im += lum[b] * Math.sin(k * t);
+        }
+        const A = mean > 1e-6 ? (2 * re / BINS) / mean : 0;
+        const B = mean > 1e-6 ? (2 * im / BINS) / mean : 0;
+        harm.push({ a: A, b: B });
+        total += Math.hypot(A, B);
+      }
+      // Never let a bad reading swing the correction far. Cap on the PEAK of
+      // the reconstructed profile, not on the sum of amplitudes: the harmonics
+      // peak at different angles, so summing them overstates the real swing and
+      // scaled the correction down to about half of what was measured.
+      let peak = 0;
       for (let b = 0; b < BINS; b++) {
         const t = (b + 0.5) / BINS * TWO_PI;
-        re += lum[b] * Math.cos(t);
-        im += lum[b] * Math.sin(t);
+        let f = 0;
+        for (let k = 0; k < harm.length; k++) {
+          f += harm[k].a * Math.cos((k + 1) * t) + harm[k].b * Math.sin((k + 1) * t);
+        }
+        if (Math.abs(f) > peak) peak = Math.abs(f);
       }
-      const A = mean > 1e-6 ? (2 * re / BINS) / mean : 0;
-      const B = mean > 1e-6 ? (2 * im / BINS) / mean : 0;
-      // Never let a bad reading swing the correction far; the shader clamps
-      // the divisor too, this just keeps the number sane.
-      const cap = 0.35;
-      this._blurLobe = {
-        a: Math.max(-cap, Math.min(cap, A)),
-        b: Math.max(-cap, Math.min(cap, B)),
-        raw: +Math.hypot(A, B).toFixed(3),
-      };
-    }
+      const PEAK_CAP = 0.30;
+      if (peak > PEAK_CAP) {
+        const f = PEAK_CAP / peak;
+        harm.forEach(h => { h.a *= f; h.b *= f; });
+      }
+      this._blurLobe = { harm, raw: +total.toFixed(3),
+        peak: +peak.toFixed(3), orders: kMax,
+        scaled: peak > PEAK_CAP ? +(PEAK_CAP / peak).toFixed(2) : 1 };
+    };
 
     const byLum = best(lum), byAlp = best(alp);
     // Prefer a channel that cleared the bar; if both did, the finer pitch is
@@ -8413,6 +8437,8 @@ class Component extends DCLogic {
       else pick = byLum.order >= byAlp.order ? byLum : byAlp;
     } else pick = byLum || byAlp;
     if (!pick) return null;
+
+    measureLobe(pick.order, pick.weak);
 
     if (pick.weak) {
       // Genuinely unreadable — either an asymmetric rim (which cannot alias,
@@ -8449,10 +8475,11 @@ class Component extends DCLogic {
         tSource: { value: null },
         // Per-rim: set from the measured repeat period before every capture.
         uArcRad: { value: Math.PI / 3 },
-        // Per-capture: the first harmonic of the rim's angular brightness,
-        // i.e. the specular lobe the scene lighting puts on one side of it.
-        // (0,0) disables the correction.
-        uLobe: { value: new THREE.Vector2(0, 0) }
+        // Per-capture: the cos/sin amplitude of angular brightness harmonics
+        // 1..8, normalised by the mean. Everything BELOW the rim's own repeat
+        // order is lighting, not rim, so it gets divided out. All-zero
+        // disables the correction.
+        uHarm: { value: Array.from({ length: 8 }, () => new THREE.Vector2(0, 0)) }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -8464,7 +8491,7 @@ class Component extends DCLogic {
       fragmentShader: `
         uniform sampler2D tSource;
         uniform float uArcRad;
-        uniform vec2 uLobe;
+        uniform vec2 uHarm[8];
         varying vec2 vUv;
         void main() {
           vec2 center = vec2(0.5, 0.5);
@@ -8491,25 +8518,34 @@ class Component extends DCLogic {
           // (50dbd47) filled those holes and turned the sprite into a solid disc.
           color /= float(SAMPLES);
 
-          // Flatten the scene's specular lobe out of the sprite.
+          // Flatten the scene's lighting out of the sprite.
           //
           // An arc average attenuates the Nth angular harmonic by sinc(N*arc/2).
           // The arc has to stay UNDER the spoke pitch or the disc turns
-          // axisymmetric and stops reading as turning (see above), so for a
-          // 5-spoke rim at 57.6 deg it knocks the spoke harmonic down by 4x —
-          // and leaves the FIRST harmonic at 96% of what it was. Measured on
-          // the emulator: h5 0.742 -> 0.149, h1 0.194 -> 0.187. That surviving
-          // h1 is one bright side of the rim, and because the sprite rotates
-          // with _rollAngle it orbits the hub, which reads as a wheel that is
-          // out of balance. A real highlight is a reflection: it stays put in
-          // space while the wheel turns past it.
+          // axisymmetric and stops reading as turning (see above), so it cuts
+          // the SPOKE harmonics hard and barely touches the low-order ones —
+          // which are the scene's reflection on the rim, not the rim. Because
+          // the sprite spins with _rollAngle, that baked lighting orbits the
+          // hub. A real highlight is a reflection: it stays put in space while
+          // the wheel turns past it.
           //
-          // Divide it out. rgb only — alpha is coverage, which lighting does
-          // not change. The divisor is CLAMPED and the result is clamped back
-          // under alpha: unbounded division here is exactly what blew this
-          // sprite out to a pale disc once before.
+          // Correcting only h1 was not enough. Measured on the emulator after
+          // that fix: h1 0.026 (fixed) but h2 0.071 and h3 0.085 survived,
+          // against a spoke signal of h5 0.144 — so most of what was left
+          // rotating was still lighting. Anything below the rim's own repeat
+          // order CANNOT be part of an N-fold symmetric rim, so the whole band
+          // 1..N-1 is divided out and the spokes at N and above are untouched.
+          //
+          // rgb only: alpha is coverage, which lighting does not change. The
+          // divisor is CLAMPED and the result clamped back under alpha —
+          // unbounded division here is exactly what blew this sprite out to a
+          // pale disc once before.
           float ang = atan(uv.y, uv.x);
-          float lobe = 1.0 + uLobe.x * cos(ang) + uLobe.y * sin(ang);
+          float lobe = 1.0;
+          for (int k = 0; k < 8; k++) {
+            float m = float(k + 1);
+            lobe += uHarm[k].x * cos(m * ang) + uHarm[k].y * sin(m * ang);
+          }
           color.rgb /= clamp(lobe, 0.75, 1.35);
           color.rgb = min(color.rgb, vec3(color.a));
 
@@ -8698,8 +8734,13 @@ class Component extends DCLogic {
       this._blurArcRad = arc;
     }
 
-    if (this._blurLobe) {
-      this._blurShaderMat.uniforms.uLobe.value.set(this._blurLobe.a, this._blurLobe.b);
+    {
+      const slots = this._blurShaderMat.uniforms.uHarm.value;
+      const harm = (this._blurLobe && this._blurLobe.harm) || [];
+      for (let k = 0; k < slots.length; k++) {
+        const h = harm[k];
+        slots[k].set(h ? h.a : 0, h ? h.b : 0);
+      }
     }
 
     this._blurShaderMat.uniforms.tSource.value = this._rtSource.texture;
@@ -15252,6 +15293,7 @@ class Component extends DCLogic {
           repeatWeak: this._rimRepeatInfo ? !!this._rimRepeatInfo.weak : null,
           blurArcDeg: deg(this._blurArcRad || Math.PI / 3),
           blurLobe: this._blurLobe ? this._blurLobe.raw : null,
+          blurLobeOrders: this._blurLobe ? this._blurLobe.orders : null,
           blurStartKmh: +win.start.toFixed(1),
           blurFullKmh: +win.full.toFixed(1),
           maxStepDeg: deg(period * this._wheelSpinTune.stepFrac),

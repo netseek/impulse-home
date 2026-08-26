@@ -241,11 +241,26 @@ capture shader, not in the placement:
   scene's specular highlight — one bright side of the rim — and because the
   sprite spins with `_rollAngle` it orbits the hub, which reads as a wheel out
   of balance. A real highlight is a reflection: it stays put while the wheel
-  turns past it. So `uLobe` carries the measured first harmonic and the shader
-  divides it out (h1 0.165 -> 0.072, h5 untouched at 0.150). rgb only — alpha
-  is coverage, which lighting does not change — with the divisor clamped and
-  the result clamped back under alpha, because unbounded division here is
-  exactly what blew this sprite out to a pale disc once before.
+  turns past it.
+
+  Correcting only h1 was not enough — measured after that first attempt, h1 was
+  down to 0.026 but h2 0.071 and h3 0.085 survived against a spoke signal of
+  h5 0.144, so most of what was still rotating was lighting. **Anything below
+  the rim's own repeat order cannot be part of an N-fold symmetric rim**, so
+  `uHarm[8]` now carries harmonics 1..N-1 and the shader divides the whole band
+  out, leaving N and above alone. On the BMW rim (order 10) that takes the
+  sub-order band to <= 0.07 against a spoke signal of 0.275. rgb only — alpha is
+  coverage, which lighting does not change — with the divisor clamped and the
+  result clamped back under alpha, because unbounded division here is exactly
+  what blew this sprite out to a pale disc once before. Cap the correction on
+  the reconstructed profile's PEAK, not the sum of amplitudes: the harmonics
+  peak at different angles, and summing them halved the correction.
+
+  What this cannot fix: the sprite still bakes a static reflection into a
+  rotating texture, and dividing out the azimuthal mean only corrects average
+  brightness per angle. A highlight that varies with RADIUS still orbits. Fixing
+  that properly means not rotating the lighting at all — capture flat-lit and
+  composite a static lighting layer over it.
 
 ## Do not set `needsUpdate` on a render target's texture
 
