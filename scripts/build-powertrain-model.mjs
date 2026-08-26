@@ -564,23 +564,27 @@ for (const [tag, sx, z, hx, front] of [
 // All three ship in one GLB as sibling groups so the widget can switch drivetrain
 // without another download. Each owns its own case, lid, modules, junction and
 // HV runs, because the cable routing genuinely differs between them.
+// Pack heights are set so the tray underside clears the ground by ~175 mm,
+// which is where a real floor pack sits -- tucked up into the floorpan rather
+// than hanging below the sills. Measured in-app against the wheel contact
+// patch, not guessed.
 // `awd` is the important one: only the big PHEV drives the rear axle. The other
 // two are front-drive, so they get no rear motor, no rear half-shafts and no
 // rear HV run at all — see the Powerplant_Rear handling below.
 const PACKS = {
   phev34: {
     label: 'PHEV 34 kWh', kwh: 34, modules: 6, awd: true,
-    x: 0, y: 0.268, z: -0.02, w: 1.26, d: 1.52, h: 0.115,
+    x: 0, y: 0.320, z: -0.02, w: 1.26, d: 1.52, h: 0.115,
   },
   phev19: {
     label: 'PHEV 19 kWh', kwh: 19, modules: 5, awd: false,
-    x: 0, y: 0.268, z: 0.06, w: 1.16, d: 1.10, h: 0.100,
+    x: 0, y: 0.315, z: 0.06, w: 1.16, d: 1.10, h: 0.100,
   },
   hev: {
     // A flat under-floor slab rather than the chunky box the fuel tank was,
     // sitting under the rear seat ahead of the (undriven) rear axle.
     label: 'HEV 2 kWh', kwh: 2, modules: 3, awd: false,
-    x: 0, y: 0.300, z: 0.86, w: 0.78, d: 0.40, h: 0.105,
+    x: 0, y: 0.345, z: 0.86, w: 0.78, d: 0.40, h: 0.105,
   },
 };
 

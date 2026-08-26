@@ -2604,19 +2604,16 @@ window.HavalSplash = (function () {
         </button>
         <button class="hv-tool-btn" onClick="{{ togglePowertrain }}" title="{{ powertrainTooltip }}" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ powertrainBorder }}; color: {{ powertrainCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
           <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="9.5" width="10" height="5" rx="1"></rect><circle cx="5" cy="17" r="2.2"></circle><circle cx="19" cy="17" r="2.2"></circle><path d="M3 12h2M19 12h2"></path></svg></span>
-          <span class="hv-tool-label">CHASSI</span>
+          <span class="hv-tool-label">X-RAY</span>
         </button>
 
-        <button class="hv-tool-btn" onClick="{{ setTimeDay }}" title="Day" style="background: rgba(18,18,20,.40); border: 1px solid {{ timeDayBorder }}; color: {{ timeDayCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
-          <span class="hv-tool-label">DAY</span>
-        </button>
-        <button class="hv-tool-btn" onClick="{{ setTimeNight }}" title="Night" style="background: rgba(18,18,20,.40); border: 1px solid {{ timeNightBorder }}; color: {{ timeNightCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
-          <span class="hv-tool-label">NIGHT</span>
-        </button>
-        <button class="hv-tool-btn hv-tool-btn-text" onClick="{{ setTimeAuto }}" title="Auto (follow car)" style="background: rgba(18,18,20,.40); border: 1px solid {{ timeAutoBorder }}; color: {{ timeAutoCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-label">AUTO</span>
+        <button class="hv-tool-btn" onClick="{{ cycleTimeMode }}" title="{{ timeModeHint }}" style="background: rgba(18,18,20,.40); border: 1px solid {{ timeBtnBorder }}; color: {{ timeBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
+          <span class="hv-tool-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display: {{ timeDayIconDisplay }};"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style="display: {{ timeNightIconDisplay }};"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display: {{ timeAutoIconDisplay }};"><path d="M12 8a2.83 2.83 0 0 0 4 4 4 4 0 1 1-4-4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/><path d="m19.1 4.9-1.4 1.4"/></svg>
+          </span>
+          <span class="hv-tool-label">TIME</span>
         </button>
 
         <button class="hv-tool-btn" onClick="{{ onSaveSettings }}" title="Save settings" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ saveBtnBorder }}; color: {{ saveBtnCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
@@ -3831,6 +3828,7 @@ class Component extends DCLogic {
     layoutCamFlash: false,
     activeGroup: null, // 'tuning' | 'override' | 'env' | 'camera' | 'time' | null — which top-level section owns the submenu
     modelVariant: 'hev',
+    modelTrim: 'phev34',
     motionSpeed: 0,
     wheelAngle: 0,
     carHeightOffset: 0,
@@ -3951,10 +3949,7 @@ class Component extends DCLogic {
       // gives STOCK a real thumbnail and lets it resize like every other
       // wheel instead of being a separate fixed, non-resizable mesh.
       { key: 'haval_gt',           file: 'HavalGT-wheel.glb',              label: 'Haval GT', defaultInch: 19, proudMm: 8 },
-      // Only the decimated build ships; the full rim is a build source under
-      // assets/_source/wheels/. The other catalog entries have no lite variant
-      // yet — see scripts/build-lite-wheel.mjs, which still only knows this one.
-      { key: 'haval_phev',         file: 'HavalPHEV34-wheel.glb?rev=5', liteFile: 'HavalPHEV-wheel-lite.glb?rev=9', label: 'PHEV34', defaultInch: 19 },
+      { key: 'haval_phev',         file: 'HavalPHEV34-wheel.glb?rev=5',    label: 'PHEV34', defaultInch: 19 },
       // Optional 19" PHEV rim — catalog-only (not stock); loads on demand when picked.
       { key: 'haval_phev19',       file: 'HavalPHEV19-wheel.glb?rev=3',    label: 'PHEV19', defaultInch: 19 },
       // Extracted HEV rim — catalog-only; PHEV34 is stock on the HEV/PHEV body.
@@ -4122,6 +4117,10 @@ class Component extends DCLogic {
     // Boot the saved body (GT or HEV) as the primary GLB so a GT session
     // does not also download PHEV at startup. The other variant stays lazy
     // until the MODEL toggle (see _loadVariantModel).
+    if (typeof saved.modelTrim === 'string'
+        && ['phev34', 'gt', 'hev', 'phev19'].indexOf(saved.modelTrim) !== -1) {
+      s.modelTrim = saved.modelTrim;
+    }
     if (saved.modelVariant === 'hev' || saved.modelVariant === 'gt') {
       s.modelVariant = saved.modelVariant;
     }
@@ -4159,7 +4158,8 @@ class Component extends DCLogic {
     if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
     if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
     if (typeof saved.showFps === 'boolean') s.showFps = saved.showFps;
-    if (typeof saved.powertrainOn === 'boolean') s.powertrainOn = saved.powertrainOn;
+    // X-ray is deliberately NOT restored: it is an inspection mode, and the app
+    // should always come up showing the normal car.
     if (typeof saved.resScaleMode === 'string') {
       if (saved.resScaleMode === 'strong' || saved.resScaleMode === 'lite') s.resScaleMode = 'lev1';
       else if (['off','lev1','lev2','on'].indexOf(saved.resScaleMode) !== -1) s.resScaleMode = saved.resScaleMode;
@@ -6964,6 +6964,7 @@ class Component extends DCLogic {
       timeMode: s.timeMode,
       nightMode: s.nightMode,
       modelVariant: s.modelVariant,
+      modelTrim: s.modelTrim || 'phev34',
       carColor: s.carColor,
       lightIntensity: s.lightIntensity,
       exposure: s.exposure,
@@ -6992,7 +6993,6 @@ class Component extends DCLogic {
       wheelTintOverride: s.wheelTintOverride,
       wheelStyle: s.wheelStyle,
       showFps: !!s.showFps,
-      powertrainOn: !!s.powertrainOn,
       resScaleMode: s.resScaleMode || 'off',
       camEventEnabled: !!s.camEventEnabled,
       camCycleEnabled: !!s.camCycleEnabled,
@@ -7113,21 +7113,12 @@ class Component extends DCLogic {
       nightMode: s.nightMode,
       isDayMode: !s.nightMode,
       timeMode: s.timeMode,
-      setTimeDay:   () => { this.setTimeMode('day'); this.setState({ activeGroup: 'time' }); },
-      setTimeNight: () => { this.setTimeMode('night'); this.setState({ activeGroup: 'time' }); },
-      setTimeAuto:  () => { this.setTimeMode('auto'); this.setState({ activeGroup: 'time' }); },
-      timeDayBg:    hv(s.timeMode === 'day').bg,
-      timeNightBg:  hv(s.timeMode === 'night').bg,
-      timeAutoBg:   hv(s.timeMode === 'auto').bg,
-      timeDayBorder:   hv(s.timeMode === 'day').border,
-      timeNightBorder: hv(s.timeMode === 'night').border,
-      timeAutoBorder:  hv(s.timeMode === 'auto').border,
-      timeDayCol:   hv(s.timeMode === 'day').col,
-      timeNightCol: hv(s.timeMode === 'night').col,
-      timeAutoCol:  hv(s.timeMode === 'auto').col,
-      timeModeHint: s.timeMode === 'auto'
-        ? (s.nightMode ? 'Auto · following car (night)' : 'Auto · following car (day)')
-        : (s.timeMode === 'night' ? 'Forced night' : 'Forced day'),
+      cycleTimeMode: () => this.cycleTimeMode(),
+      timeBtnBorder: hv(s.timeMode !== 'auto').border,
+      timeBtnCol:    hv(s.timeMode !== 'auto').col,
+      timeModeHint: (s.timeMode === 'auto'
+        ? (s.nightMode ? 'Day/night · following the car (night)' : 'Day/night · following the car (day)')
+        : (s.timeMode === 'night' ? 'Day/night · locked night' : 'Day/night · locked day')) + ' — tap to cycle',
       labelColor: s.nightMode ? '#c8daea' : '#2b3037',
       hintColor: s.nightMode ? 'rgba(180,210,235,0.55)' : '#6a7077',
       // Spinner + progress bar are the fallback, not the boot experience: while
@@ -7231,7 +7222,9 @@ class Component extends DCLogic {
       mediaPrev: () => this._mediaTransport('prev'),
       mediaPlayPause: () => this._mediaTransport('playPause'),
       mediaNext: () => this._mediaTransport('next'),
-      timeModeLabel: s.timeMode === 'day' ? 'DAY' : (s.timeMode === 'night' ? 'NIGHT' : 'AUTO'),
+      timeDayIconDisplay:   s.timeMode === 'day'   ? 'block' : 'none',
+      timeNightIconDisplay: s.timeMode === 'night' ? 'block' : 'none',
+      timeAutoIconDisplay:  s.timeMode === 'auto'  ? 'block' : 'none',
       configExpanded: !!s.configExpanded,
       showTuningSubmenu: !!(s.configExpanded && s.activeGroup === 'tuning'),
       showOverrideSubmenu: !!(s.configExpanded && s.activeGroup === 'override'),
@@ -7256,7 +7249,7 @@ class Component extends DCLogic {
       powertrainOn: s.powertrainOn,
       powertrainBorder: hv(s.powertrainOn).border,
       powertrainCol:    hv(s.powertrainOn).col,
-      powertrainTooltip: s.powertrainOn ? 'Ocultar chassi' : 'Mostrar chassi',
+      powertrainTooltip: s.powertrainOn ? 'Sair do raio-X' : 'Raio-X do conjunto',
       togglePowertrain: () => this.setState((st) => {
         const powertrainOn = !st.powertrainOn;
         this._applyPowertrainVisibility(powertrainOn);
@@ -7275,9 +7268,6 @@ class Component extends DCLogic {
       tabCameraBorder:   hv(s.panelOpen && s.configSection === 'camera').border,
       tabCameraCol:      hv(s.panelOpen && s.configSection === 'camera').col,
       cameraBtnBg:       hv(s.panelOpen && s.configSection === 'camera').bg,
-      timeIconIsDay:   s.timeMode === 'day',
-      timeIconIsNight: s.timeMode === 'night',
-      timeIconIsAuto:  s.timeMode === 'auto',
       configHeaderTitle: s.configSection === 'paint' ? 'PAINT'
         : s.configSection === 'wheels' ? 'WHEELS'
         : s.configSection === 'env' ? 'ENVIRONMENT'
@@ -7386,12 +7376,13 @@ class Component extends DCLogic {
         { key: 'rr', label: 'REAR RIGHT',  title: 'Toggle rear-right door',  onClick: () => this._setDoorOpen('rr', s.doorRROpen > 0 ? 0 : 100),
           border: s.doorRROpen > 0 ? '#4fd6e8' : 'rgba(79,214,232,.20)', bg: s.doorRROpen > 0 ? 'rgba(79,214,232,.14)' : 'rgba(255,255,255,.04)', col: s.doorRROpen > 0 ? '#4fd6e8' : 'rgba(255,255,255,.70)' },
       ],
-      modelLabel: s.modelVariant === 'gt' ? 'GT' : 'HEV',
-      modelTooltip: s.modelVariant === 'gt' ? 'Switch to HEV' : 'Switch to GT',
+      modelLabel: this._currentTrim().label,
+      modelTooltip: 'Next: ' + this._trims()[
+        (this._trims().findIndex((t) => t.key === this._currentTrim().key) + 1) % 4].label,
       modelBtnBorder: hvOff.border,
       modelBtnCol: hvOff.col,
       modelBtnBg: hvOff.bg,
-      toggleModelVariant: () => this._setModelVariant(s.modelVariant === 'gt' ? 'hev' : 'gt'),
+      toggleModelVariant: () => this._cycleTrim(),
       currentCarPaintHex: activeKey,
       swatches,
       lightIntensity: s.lightIntensity,
@@ -12149,40 +12140,33 @@ class Component extends DCLogic {
       // 2. Compile main scene with this light ON
       this.renderer.compile(this.scene, this.camera);
 
-      // Low tier: the bloom/streak RENDERS below (not just the compile above)
-      // are the expensive part — measured ~100ms total on a desktop GPU with
-      // shaders already cached, so real cost on the target Adreno 640 is
-      // considerably higher. Skip them; the on-demand render loop compiles
-      // those composer passes the first time a light is actually toggled.
-      if (!this._perfLow) {
-        // 3. Compile Bloom composer with this light ON
-        if (this.bloomComposer && this.bloomCam) {
-          this.bloomCam.position.copy(this.camera.position);
-          this.bloomCam.quaternion.copy(this.camera.quaternion);
-          this.bloomCam.updateProjectionMatrix();
+      // 3. Compile Bloom composer with this light ON
+      if (this.bloomComposer && this.bloomCam) {
+        this.bloomCam.position.copy(this.camera.position);
+        this.bloomCam.quaternion.copy(this.camera.quaternion);
+        this.bloomCam.updateProjectionMatrix();
 
-          const savedBg = this.scene.background;
-          this.scene.background = null;
-          this._darkenNonBloom(this.scene);
-          this.bloomComposer.render();
-          this._restoreMaterials();
-          this.scene.background = savedBg;
-        }
+        const savedBg = this.scene.background;
+        this.scene.background = null;
+        this._darkenNonBloom(this.scene);
+        this.bloomComposer.render();
+        this._restoreMaterials();
+        this.scene.background = savedBg;
+      }
 
-        // 4. Compile Streak composer if this group is a streak group
-        const isStreakGroup = /^(headlight|highbeam|reverse|fogFront)$/.test(k);
-        if (isStreakGroup && this.streakComposer && this.streakCam) {
-          this.streakCam.position.copy(this.camera.position);
-          this.streakCam.quaternion.copy(this.camera.quaternion);
-          this.streakCam.updateProjectionMatrix();
+      // 4. Compile Streak composer if this group is a streak group
+      const isStreakGroup = /^(headlight|highbeam|reverse|fogFront)$/.test(k);
+      if (isStreakGroup && this.streakComposer && this.streakCam) {
+        this.streakCam.position.copy(this.camera.position);
+        this.streakCam.quaternion.copy(this.camera.quaternion);
+        this.streakCam.updateProjectionMatrix();
 
-          const savedBg = this.scene.background;
-          this.scene.background = null;
-          this._darkenNonStreak(this.scene);
-          this.streakComposer.render();
-          this._restoreMaterials();
-          this.scene.background = savedBg;
-        }
+        const savedBg = this.scene.background;
+        this.scene.background = null;
+        this._darkenNonStreak(this.scene);
+        this.streakComposer.render();
+        this._restoreMaterials();
+        this.scene.background = savedBg;
       }
 
       // 5. Turn this specific group OFF
@@ -12194,7 +12178,6 @@ class Component extends DCLogic {
   }
 
   _warmupOverlayOnce() {
-    if (this._perfLow) return; // low tier skips the composer renders this depends on
     try {
       if (this.bloomMat && this.streakMat && this.bloomComposer && this.streakComposer) {
         this.bloomMat.map = this.bloomComposer.readBuffer.texture;
@@ -12538,7 +12521,7 @@ class Component extends DCLogic {
   }
 
   _wheelAssetFile(item) {
-    return (this._perfLow && item.liteFile) ? item.liteFile : item.file;
+    return item.file;
   }
 
   onSelectStockWheel() {
@@ -13072,27 +13055,20 @@ class Component extends DCLogic {
       });
       if (pts.length < 300) return identity;
 
-      let rMax = 0;
-      for (const p of pts) { const r = Math.hypot(p.x, p.y); if (r > rMax) rMax = r; }
-      if (!(rMax > 1e-6)) return identity;
-
-      // Least-squares fit of both harmonics over the outer lip band.
-      let n = 0, Szz = 0, Sr = 0;
-      let Scc = 0, Sss = 0, Scs = 0, Sc = 0, Ss = 0;
-      let Szc = 0, Szs = 0, Src = 0, Srs = 0;
-      for (const p of pts) {
-        const r = Math.hypot(p.x, p.y);
-        if (r < rMax * 0.93) continue;
-        const ct = p.x / r, st = p.y / r;
-        n++; Szz += p.z; Sr += r;
-        Scc += ct * ct; Sss += st * st; Scs += ct * st; Sc += ct; Ss += st;
-        Szc += p.z * ct; Szs += p.z * st;
-        Src += r * ct;   Srs += r * st;
-      }
-      if (n < 200) return identity;
-      // Solve the 3x3 normal equations for [amp_cos, amp_sin, offset].
-      const solve = (Syc, Sys, Sy) => {
-        const M = [[Scc, Scs, Sc, Syc], [Scs, Sss, Ss, Sys], [Sc, Ss, n, Sy]];
+      // Shared 3x3 normal-equation solver for a first harmonic:
+      //   value(t) = amp_cos*cos(t) + amp_sin*sin(t) + offset
+      const solveHarmonic = (band, valueOf, cx, cy) => {
+        let n = 0, Scc = 0, Sss = 0, Scs = 0, Sc = 0, Ss = 0, Svc = 0, Svs = 0, Sv = 0;
+        for (const p of band) {
+          const x = p.x - cx, y = p.y - cy;
+          const r = Math.hypot(x, y);
+          if (r < 1e-9) continue;
+          const ct = x / r, st = y / r, v = valueOf(p, r);
+          n++; Scc += ct * ct; Sss += st * st; Scs += ct * st; Sc += ct; Ss += st;
+          Svc += v * ct; Svs += v * st; Sv += v;
+        }
+        if (n < 200) return null;
+        const M = [[Scc, Scs, Sc, Svc], [Scs, Sss, Ss, Svs], [Sc, Ss, n, Sv]];
         for (let i = 0; i < 3; i++) {
           let piv = i;
           for (let k = i + 1; k < 3; k++) if (Math.abs(M[k][i]) > Math.abs(M[piv][i])) piv = k;
@@ -13105,13 +13081,44 @@ class Component extends DCLogic {
         }
         return [M[0][3] / M[0][0], M[1][3] / M[1][1], M[2][3] / M[2][2]];
       };
-      const zFit = solve(Szc, Szs, Szz);
-      const rFit = solve(Src, Srs, Sr);
-      if (!zFit || !rFit) return identity;
 
-      const [A, B] = zFit;              // lateral runout (tilt)
-      const [cx, cy] = rFit;            // radial runout (centre offset)
-      const rBand = rFit[2];            // mean lip radius
+      // ── Pass 1: the lip's TRUE centre, found by iterating ─────────────────
+      // The lip band has to be selected by radius, and radius is measured from
+      // whatever centre we currently believe — so on an off-centre model the
+      // first selection is not a ring at all, it is the far-side arc, and a
+      // first-harmonic fit over an arc is ill-conditioned and returns ~0. That
+      // is how a BMW 19" rim whose bbox is dragged 30 mm up by a badge mesh
+      // floating above the hub sailed through this check reporting a 0.3%
+      // offset: the rim really was 9.5% of its radius low in the tyre.
+      //
+      // Re-selecting the band around each new estimate converges in a few
+      // passes because every correction makes the band more like a full ring.
+      let cx = 0, cy = 0, lipR = 0;
+      const band = () => {
+        let rm = 0;
+        for (const p of pts) { const r = Math.hypot(p.x - cx, p.y - cy); if (r > rm) rm = r; }
+        return pts.filter(p => Math.hypot(p.x - cx, p.y - cy) > rm * 0.93);
+      };
+      let lipBand = band();
+      for (let iter = 0; iter < 8; iter++) {
+        const fit = solveHarmonic(lipBand, (p, r) => r, cx, cy);
+        if (!fit) break;
+        // r(t) ~ R + dx*cos(t) + dy*sin(t) for a circle offset by (dx, dy).
+        const [dx, dy, R] = fit;
+        if (!isFinite(dx) || !isFinite(dy) || !isFinite(R)) break;
+        cx += dx; cy += dy; lipR = R;
+        lipBand = band();
+        if (Math.hypot(dx, dy) < 1e-5) break;
+      }
+      if (!(lipR > 1e-6) || lipBand.length < 200) return identity;
+
+      // ── Pass 2: tilt, from the lip's axial first harmonic ─────────────────
+      // Only meaningful now that the band really is a ring around the true
+      // centre; run over the same corrected band.
+      const zFit = solveHarmonic(lipBand, (p) => p.z, cx, cy);
+      if (!zFit) return identity;
+      const [A, B] = zFit;
+      const rBand = lipR;
 
       // Plane through the lip is z = z0 + (A/R)x + (B/R)y, so its normal — the
       // rim's true axis — is (-A/R, -B/R, 1) normalised.
@@ -13122,21 +13129,22 @@ class Component extends DCLogic {
       // Leave a well-authored rim alone, and never trust a wild correction:
       // past ~20 deg the bbox axle was probably not the axle at all and
       // rotating by the difference would only make it worse.
-      const TILT_MIN_DEG = 0.5, TILT_MAX_DEG = 20, OFF_MIN_FRAC = 0.004;
+      const TILT_MIN_DEG = 0.5, TILT_MAX_DEG = 20;
+      const OFF_MIN_FRAC = 0.004, OFF_MAX_FRAC = 0.30;
       const doTilt = tiltDeg >= TILT_MIN_DEG && tiltDeg <= TILT_MAX_DEG;
-      const doOff  = offFrac >= OFF_MIN_FRAC;
+      const doOff  = offFrac >= OFF_MIN_FRAC && offFrac <= OFF_MAX_FRAC;
       if (!doTilt && !doOff) {
         console.log(`[UploadWheel] Runout within tolerance (tilt ${tiltDeg.toFixed(2)} deg, centre ${(offFrac * 100).toFixed(2)}% of radius) — left as authored.`);
         return identity;
       }
 
+      // Centre first, then tilt about that centre — tilting about the old,
+      // offset origin would swing the whole rim rather than just level it.
       const m = new THREE.Matrix4();
+      if (doOff) m.makeTranslation(-cx, -cy, 0);
       if (doTilt) {
-        m.makeRotationFromQuaternion(
-          new THREE.Quaternion().setFromUnitVectors(trueAxis, new THREE.Vector3(0, 0, 1)));
-      }
-      if (doOff) {
-        m.premultiply(new THREE.Matrix4().makeTranslation(-cx, -cy, 0));
+        m.premultiply(new THREE.Matrix4().makeRotationFromQuaternion(
+          new THREE.Quaternion().setFromUnitVectors(trueAxis, new THREE.Vector3(0, 0, 1))));
       }
 
       // Re-normalise: the tilt correction changes the projected radius, and
@@ -14635,37 +14643,16 @@ class Component extends DCLogic {
       const h = container.clientHeight || window.innerHeight || 720;
 
       // ── Performance tier ──────────────────────────────────────────────────
-      // Opt-in via ?perf=low (the target Haval H6 MMI runs a Snapdragon 8155 /
-      // Adreno 640 — a fill-rate-bound mobile GPU driving a large screen). Low
-      // tier trims the pixel-cost drivers (no MSAA, DPR≤1.0, cheap glass, a
-      // lighter anamorphic streak, smaller/harder shadow) while keeping bloom.
-      // Desktop (no param) is unchanged. Read window.__perfLow() to check.
-      // Activated by ANY of: #lite, ?lite, #perf=low, ?perf=low. The bare
-      // #lite form needs no "=" (awkward to type on the car keyboard) and, being
-      // a hash, survives hosts that drop the query on redirect (`npx serve` on
-      // /index.html does) — so "append #lite to the URL" is the on-car recipe.
+      // The head unit launches with ?android. That enables _perfMobile: knobs
+      // whose cost is invisible at viewing distance (blur-pass scale, streak
+      // taps, transmission RT, framebuffer preservation). Nothing here changes
+      // what the car looks like. There is no separate "lite" / ?perf=low tier.
       {
         const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
         const qs = parse(location.search), hs = parse(location.hash);
-        this._perfLow = (qs.get('perf') === 'low') || (hs.get('perf') === 'low')
-          || qs.has('lite') || hs.has('lite');
         this._androidApp = qs.has('android') || hs.has('android');
       }
-      // Two tiers, because they buy different things:
-      //
-      //   _perfLow    opt-in via ?lite / ?perf=low. Trades VISIBLE quality for
-      //               frames: lower DPR, no MSAA, 1024² hard-PCF shadows, the
-      //               -lite GLBs. This is the "it's still too slow" hammer.
-      //
-      //   _perfMobile true on the head unit as well (?android). Only knobs whose
-      //               cost is invisible at viewing distance: blur-pass render
-      //               scale, streak tap count, the transmission render target,
-      //               framebuffer preservation. Nothing here changes what the
-      //               car looks like, so it is safe to enable unconditionally on
-      //               the MMI — which, note, launches with ?android and NEVER
-      //               ?lite, so before this split it ran the full desktop tier.
-      this._perfMobile = this._perfLow || this._androidApp;
-      window.__perfLow = () => this._perfLow;
+      this._perfMobile = this._androidApp;
       window.__perfMobile = () => this._perfMobile;
 
       // preserveDrawingBuffer forces the driver to keep the back buffer intact
@@ -14674,19 +14661,14 @@ class Component extends DCLogic {
       // toDataURL() call is on the separate thumbnail renderer — and GLTFExporter
       // is already skipped on Android, so on mobile it is pure per-frame cost.
       const renderer = new THREE.WebGLRenderer({
-        antialias: !this._perfLow,
+        antialias: true,
         preserveDrawingBuffer: !this._perfMobile,
       });
-      // Low tier starts at its lowest DPR step (0.75) — smooth-first; the
-      // adaptive loop ramps it up only if the GPU shows headroom. Mobile starts
-      // at native 1.0 and adapts either way. These must match the _dprIdx chosen
-      // below so the renderer and the bookkeeping agree from frame 1.
+      // Boot native and let the resolution-mode logic decide from there. The
+      // default mode is OFF (never reduce), so booting at the motion step
+      // would contradict the saved setting before it has even been applied.
       renderer.setPixelRatio(
-        this._perfLow ? 0.75
-        // Boot native and let the resolution-mode logic decide from there. The
-        // default mode is OFF (never reduce), so booting at the motion step
-        // would contradict the saved setting before it has even been applied.
-        : this._perfMobile ? Math.min(window.devicePixelRatio || 1, 1.0)
+        this._perfMobile ? Math.min(window.devicePixelRatio || 1, 1.0)
         : Math.min(window.devicePixelRatio, 1.5),
       );
       renderer.setSize(w, h);
@@ -14695,7 +14677,7 @@ class Component extends DCLogic {
       if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.shadowMap.enabled = true;
       // Soft PCF is a per-fragment cost every frame; low tier uses hard PCF.
-      renderer.shadowMap.type = this._perfLow ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       // The car and sun are static, so the soft shadow never changes frame to
       // frame — re-rendering a 2048² PCF-soft map every frame is pure waste.
       // Update it only on demand; the shadowMap.needsUpdate=true calls already
@@ -14752,17 +14734,6 @@ class Component extends DCLogic {
         }, 2000);
       }
 
-      if (this._perfLow) {
-        const liteEl = document.createElement('div');
-        liteEl.style.cssText =
-          'font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.12em;' +
-          'color:#ffb454;background:rgba(10,14,18,.55);backdrop-filter:blur(6px);' +
-          '-webkit-backdrop-filter:blur(6px);padding:4px 9px;border-radius:6px;' +
-          'border:1px solid rgba(255,180,84,.3);';
-        liteEl.textContent = 'LITE';
-        hudEl.appendChild(liteEl);
-      }
-
       const scene = new THREE.Scene();
       this.scene = scene;
 
@@ -14810,9 +14781,9 @@ class Component extends DCLogic {
       const dir = new THREE.DirectionalLight(0xffffff, this.state.lightIntensity);
       dir.position.copy(sun).multiplyScalar(26);
       dir.castShadow = true;
-      dir.shadow.mapSize.set(this._perfLow ? 1024 : 2048, this._perfLow ? 1024 : 2048);
+      dir.shadow.mapSize.set(2048, 2048);
       dir.shadow.bias = -0.0003;
-      dir.shadow.radius = this._perfLow ? 4 : 15;
+      dir.shadow.radius = 15;
       scene.add(dir);
       this.dirLight = dir;
       const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0b4bc, 0.28);
@@ -14859,7 +14830,7 @@ class Component extends DCLogic {
       // ── Adaptive pixel ratio ───────────────────────────────────────────────
       // Step DPR within [1.0 .. cap] from sustained render cost (rendered frames
       // only), so weak GPUs stay smooth and strong ones stay crisp.
-      this._dprCap   = this._perfLow ? 1.0 : Math.min(window.devicePixelRatio || 1, 1.5);
+      this._dprCap   = Math.min(window.devicePixelRatio || 1, this._perfMobile ? 1.0 : 1.5);
       // Steps never exceed the device cap (rendering above 1× the display is
       // pure waste). Desktop floors at 1.0; low tier may under-sample down to
       // 0.75 to hold framerate on the weak mobile GPU (a large screen hides it).
@@ -14880,17 +14851,13 @@ class Component extends DCLogic {
       // the context grants real 4x MSAA (SAMPLES=4, and MAX_SAMPLES=4 is the
       // Adreno 640 ceiling). Routing through an RT to run FXAA would forfeit that
       // MSAA for an edge-detect blur - strictly worse.
-      this._dprSteps = this._perfLow
-        ? [0.75, 0.85, 1.0]
-        : [...new Set(
+      this._dprSteps = [...new Set(
             (this._perfMobile ? [0.75, 1.0] : [1.0, 1.25, 1.5])
               .filter(v => v <= this._dprCap).concat(this._dprCap),
           )].sort((a, b) => a - b);
-      // Low tier starts at its lowest step (smooth-first, ramp up if there's
-      // headroom); desktop starts crisp. Mobile starts at 1.0 — native
-      // resolution — and lets the cadence loop move it either way from there.
-      this._dprIdx   = this._perfLow ? 0
-                     : this._perfMobile ? Math.max(0, this._dprSteps.indexOf(1.0))
+      // Desktop starts crisp. Mobile starts at 1.0 — native resolution — and
+      // lets the cadence loop move it either way from there.
+      this._dprIdx   = this._perfMobile ? Math.max(0, this._dprSteps.indexOf(1.0))
                      : this._dprSteps.length - 1;
       this._frameCadence = {
         last: 0, samples: [], avg: 0,
@@ -14910,6 +14877,63 @@ class Component extends DCLogic {
         rendersPerSec: this._setStateRate || 0,
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
 
+      // Objective "is the wheel actually turning?" probe. Samples the roll
+      // angle once per frame for `seconds`, then reports what the EYE gets
+      // rather than what the maths intended: the per-frame step folded into
+      // the rim's own repeat period and wrapped to +-half a period, which is
+      // the only rotation a viewer can resolve. A wheel whose perceived step
+      // sits near zero looks frozen; a negative one looks like it is spinning
+      // backwards. Run it on the car (or the emulator) at several speeds:
+      //   await __spinProbe(4)
+      // It drives nothing — set the speed first, from the UI or _setMotionSpeed.
+      window.__spinProbe = (seconds = 4) => new Promise((resolve) => {
+        const wheel = (this._allWheels || [])[0];
+        if (!wheel) return resolve({ error: 'no wheels' });
+        const period = this._rimRepeatRad || (Math.PI * 2 / 5);
+        const samples = [];
+        let lastAngle = wheel._rollAngle || 0;
+        let lastT = performance.now();
+        const t0 = lastT;
+        const tick = () => {
+          const now = performance.now();
+          const angle = wheel._rollAngle || 0;
+          const dt = (now - lastT) / 1000;
+          if (dt > 0) samples.push({ dt, step: angle - lastAngle });
+          lastT = now; lastAngle = angle;
+          if (now - t0 < seconds * 1000) return requestAnimationFrame(tick);
+
+          const median = (arr) => {
+            if (!arr.length) return 0;
+            const a = arr.slice().sort((x, y) => x - y);
+            return a[a.length >> 1];
+          };
+          // Fold into the repeat period, then into +-half a period: that IS
+          // the apparent rotation between two frames.
+          const perceived = samples.map(s => {
+            let p = s.step % period;
+            if (p > period / 2) p -= period;
+            if (p < -period / 2) p += period;
+            return p;
+          });
+          const deg = (r) => +(r * 180 / Math.PI).toFixed(2);
+          const FROZEN_RAD = 3 * Math.PI / 180;
+          resolve({
+            seconds, frames: samples.length,
+            fpsMedian: +(1 / median(samples.map(s => s.dt))).toFixed(1),
+            speedKmh: +(Math.abs(this._currentMotionSpeed()) * 40).toFixed(1),
+            repeatDeg: deg(period),
+            actualStepDeg: deg(median(samples.map(s => s.step))),
+            perceivedStepDeg: deg(median(perceived)),
+            // Fractions of frames the viewer would read as stuck / reversed.
+            frozenFrac: +(perceived.filter(p => Math.abs(p) < FROZEN_RAD).length / (perceived.length || 1)).toFixed(2),
+            reverseFrac: +(perceived.filter(p => p < 0).length / (perceived.length || 1)).toFixed(2),
+            blurOpacity: (this._blurredDiscs && this._blurredDiscs[0] && this._blurredDiscs[0].material)
+              ? +this._blurredDiscs[0].material.opacity.toFixed(2) : null,
+          });
+        };
+        requestAnimationFrame(tick);
+      });
+
       // Wheel-spin state + live tuning, for A/B-ing the spin ON THE CAR over
       // CDP (see CLAUDE.md). Call with no argument to read; pass a partial
       // object to patch the tunables, e.g. __wheelSpin({ stepFrac: 0.35 }).
@@ -14927,6 +14951,7 @@ class Component extends DCLogic {
         const kmh = Math.abs(this._currentMotionSpeed()) * 40;
         const period = this._rimRepeatRad || (Math.PI * 2 / 5);
         const deg = (r) => +(r * 180 / Math.PI).toFixed(1);
+
         return {
           speedKmh: +kmh.toFixed(1),
           fps: +(1 / (this._motionDt || (1 / 18))).toFixed(1),
@@ -15115,11 +15140,6 @@ class Component extends DCLogic {
         }
       }
 
-      // Keep post-processing tied to the renderer's adaptive DPR in LITE mode.
-      // A 2/3 scale means the initial 0.75 DPR produces the same half-CSS-size
-      // streak target as before, while bloom drops from full CSS resolution to
-      // half. If DPR rises, the soft effects gain resolution with the main view.
-      //
       // Bloom and the anamorphic streak are both BLURS — their output is soft by
       // construction, so target resolution barely shows. Running them at 1 CSS
       // pixel per target pixel (what the head unit did before _perfMobile
@@ -15127,9 +15147,7 @@ class Component extends DCLogic {
       // Mobile renders them at 0.7, which is ~2x the fill for both passes back.
       // Desktop keeps 1.0.
       this._resizePostFX = (W, H) => {
-        const postFxScale = this._perfLow ? renderer.getPixelRatio() * (2 / 3)
-                          : this._perfMobile ? 0.7
-                          : 1;
+        const postFxScale = this._perfMobile ? 0.7 : 1;
         const targetW = Math.max(1, Math.round(W * postFxScale));
         const targetH = Math.max(1, Math.round(H * postFxScale));
         const resizeComposer = (composer) => {
@@ -15180,8 +15198,8 @@ class Component extends DCLogic {
       // desktop 224 px (56×4) with the same falloff, because STREAK_DECAY below
       // is defined per pixel-of-reach rather than per tap. Half the texture
       // fetches, visually identical streak.
-      const STREAK_TAPS  = this._perfLow ? 20   : this._perfMobile ? 28  : 56;
-      const STREAK_STEP  = this._perfLow ? 10.0 : this._perfMobile ? 8.0 : 4.0;  // px of reach per tap
+      const STREAK_TAPS  = this._perfMobile ? 28  : 56;
+      const STREAK_STEP  = this._perfMobile ? 8.0 : 4.0;  // px of reach per tap
       const STREAK_DECAY = (0.065 / 4.0) * STREAK_STEP;         // matches original falloff-vs-reach
       const AnamorphicShader = {
         uniforms: {
@@ -15738,11 +15756,103 @@ class Component extends DCLogic {
    * rather than by hardcoding numbers, so a model swap or re-export cannot
    * silently break the alignment.
    */
+/**
+   * The four sellable variants, in cycle order. Only two BODY meshes exist
+   * (hev and gt), so a trim is a body plus a battery pack -- three of them
+   * share the hev shell and differ only in what is underneath it.
+   */
+  _trims() {
+    return [
+      { key: 'phev34', label: 'PHEV34', body: 'hev', pack: 'phev34' },
+      { key: 'gt',     label: 'GT',     body: 'gt',  pack: 'phev34' },
+      { key: 'hev',    label: 'HEV',    body: 'hev', pack: 'hev' },
+      { key: 'phev19', label: 'PHEV19', body: 'hev', pack: 'phev19' },
+    ];
+  }
+
+  _currentTrim() {
+    const list = this._trims();
+    const key = (this.state && this.state.modelTrim) || 'phev34';
+    return list.find((t) => t.key === key) || list[0];
+  }
+
+  /** Advance one step round the cycle, swapping the body only when it differs. */
+  _cycleTrim() {
+    const list = this._trims();
+    const i = list.findIndex((t) => t.key === this._currentTrim().key);
+    const next = list[(i + 1) % list.length];
+    const bodyChanged = next.body !== this._currentTrim().body;
+    this.setState({ modelTrim: next.key });
+    if (bodyChanged) {
+      // _setModelVariant swaps the body asynchronously, and the rig is parented
+      // to this.model -- resyncing inline orphans it on the outgoing car.
+      // Fixed timeouts are not enough either: the GT body is a 7 MB GLB, so on
+      // a cold load every timer fires before the new model exists and the swap
+      // silently ends up un-ghosted. Wait for the object to actually change.
+      const prev = this.model;
+      this._setModelVariant(next.body);
+      this._awaitBodySwap(prev);
+    }
+    this._syncPowertrainToBody();
+  }
+
+  /** Poll until this.model is genuinely replaced, then resync. */
+  _awaitBodySwap(prevModel) {
+    if (this._bodySwapTimer) clearInterval(this._bodySwapTimer);
+    const started = Date.now();
+    this._bodySwapTimer = setInterval(() => {
+      const swapped = this.model && this.model !== prevModel;
+      const wheelsReady = swapped && !!this._powertrainWheelFit();
+      if (swapped && wheelsReady) {
+        clearInterval(this._bodySwapTimer);
+        this._bodySwapTimer = null;
+        this._syncPowertrainToBody();
+      } else if (Date.now() - started > 20000) {
+        // Give up rather than spin forever; sync with whatever we have.
+        clearInterval(this._bodySwapTimer);
+        this._bodySwapTimer = null;
+        console.warn('[Powertrain] body swap never settled; syncing anyway');
+        this._syncPowertrainToBody();
+      }
+    }, 200);
+  }
+
+  /** Reattach, refit and repaint the rig against whatever body is on screen. */
+  _syncPowertrainToBody() {
+    if (!this._powertrainRig || !this.model) return;
+    this._reattachPowertrain();
+    this._applyPowertrainVariant();
+    if (this.state.powertrainOn) {
+      this._fitPowertrain();
+      this._powertrainRig.visible = true;
+      // Rebuild the ghost: a body swap brings in a whole new material set.
+      this._setBodyGhost(false);
+      this._setBodyGhost(true);
+      this._setShadowSoft(true);
+    }
+    if (this.requestRender) this.requestRender(6);
+  }
+
+  /** Keep the rig parented to whichever car model is currently on screen. */
+  _reattachPowertrain() {
+    const rig = this._powertrainRig;
+    if (!rig || !this.model) return;
+    if (rig.parent !== this.model) {
+      if (rig.parent) rig.parent.remove(rig);
+      this.model.add(rig);
+      this._fitPowertrain();
+    }
+  }
+
   _powertrainTuning() {
     // Nudges in metres, applied after the automatic fit. The fit centres on the
     // body box, but the axle midpoint sits slightly behind the body centre
     // because the overhangs are unequal. Adjust here if it needs a shove.
-    return { scale: 1, x: 0, y: 0, z: 0, ghostOpacity: 0.10 };
+    return { scale: 1, x: 0, y: 0, z: 0, ghostOpacity: 0.10,
+             // Fresnel: how much of the base opacity survives on a surface
+             // facing the camera, and how fast it ramps back up toward the
+             // silhouette. Lower face = more see-through, crisper outline.
+             ghostFace: 0.28, ghostFalloff: 2.2 };
   }
 
   /** Overall length of the real car -- the one number the metre fit needs. */
@@ -15756,19 +15866,71 @@ class Component extends DCLogic {
         || names.indexOf(norm(mat && mat.name)) !== -1;
   }
 
+/**
+   * Warm the x-ray asset in the background so the first toggle is instant.
+   *
+   * Fetching the GLB is only part of the cost. Draco decode and glTF parse are
+   * the loader's job, but shader compilation and texture upload normally happen
+   * on the FIRST RENDER -- so a naive preload still hitches when you toggle.
+   * compile() and initTexture() move both of those into the idle window.
+   *
+   * Deliberately late and idle-gated: the boot path is already contending for
+   * bandwidth with a 7-14 MB car GLB and the packaged HDRI, and this is a
+   * convenience, never something boot should wait on.
+   */
+  _preloadPowertrain() {
+    if (this._powertrainPreloadStarted) return;
+    this._powertrainPreloadStarted = true;
+
+    const warm = () => {
+      const t0 = (performance && performance.now) ? performance.now() : 0;
+      this._ensurePowertrain().then((rig) => {
+        if (!rig) return;
+        try {
+          // Programs first, then textures. Both are otherwise paid on the first
+          // frame the rig is visible, which is exactly the frame we care about.
+          if (this.renderer && this.scene && this.camera) {
+            this.renderer.compile(this.scene, this.camera);
+          }
+          if (this.renderer && this.renderer.initTexture) {
+            const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap'];
+            rig.traverse((o) => {
+              if (!o.isMesh) return;
+              const list = Array.isArray(o.material) ? o.material : [o.material];
+              list.forEach((m) => {
+                if (!m) return;
+                maps.forEach((k) => { if (m[k]) this.renderer.initTexture(m[k]); });
+              });
+            });
+          }
+        } catch (e) {
+          console.warn('[Powertrain] warm-up skipped', e);
+        }
+        const ms = ((performance && performance.now) ? performance.now() : 0) - t0;
+        console.log('[Powertrain] preloaded + warmed in ' + Math.round(ms) + ' ms');
+      });
+    };
+
+    // Let the car settle first, then take an idle slot if the browser offers one.
+    setTimeout(() => {
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 5000 });
+      else setTimeout(warm, 500);
+    }, 6000);
+  }
+
   _ensurePowertrain() {
     if (this._powertrainRig) return Promise.resolve(this._powertrainRig);
     if (this._powertrainLoading) return this._powertrainLoading;
     const THREE = this.THREE;
 
     this._powertrainLoading = Promise.all([
-      fetch('assets/power/haval-powertrain-lite.json').then((r) => r.json()),
+      fetch('assets/power/haval-powertrain.json').then((r) => r.json()),
       new Promise((resolve, reject) => {
         const loader = new THREE.GLTFLoader();
         const draco = new THREE.DRACOLoader();
         draco.setDecoderPath('vendor/draco/');
         loader.setDRACOLoader(draco);
-        loader.load('assets/power/haval-powertrain-lite.glb',
+        loader.load('assets/power/haval-powertrain.glb',
           (gltf) => resolve(gltf.scene), null, reject);
       }),
     ]).then((res) => {
@@ -15803,7 +15965,8 @@ class Component extends DCLogic {
   _applyPowertrainVariant() {
     const rig = this._powertrainRig, manifest = this._powertrainManifest;
     if (!rig || !manifest) return;
-    const key = this._activeProfileKey === 'hev' ? 'hev' : 'phev34';
+    // Trim decides the pack. The loaded body only tells us the shell.
+    const key = this._currentTrim().pack;
     const packs = manifest.batteries || {};
     const pack = packs[key] || packs[manifest.defaultBattery];
     if (!pack) return;
@@ -15875,6 +16038,28 @@ class Component extends DCLogic {
     const wheelbaseM = dims.wheelbase || 2.738;
     const t = this._powertrainTuning();
 
+    // Ground comes from the WHEELS, not from box.min.y. The body box dips below
+    // the contact patch whenever something hangs low -- the GT's side steps put
+    // it 137 mm under, which drove the whole rig into the floor and left the
+    // battery 14 mm below ground. Tyres touch the ground by definition.
+    const wheelObjs = [];
+    [this._allWheels, this._tireWheels, this._rimWheels, this._spokesWheels,
+     this._otherRimWheels, this._customClonedWheels].forEach((list) => {
+      (list || []).forEach((w) => {
+        const o = (w && w.mesh) ? w.mesh : ((w && w.c) ? w.c : w);
+        if (o && o.isObject3D) wheelObjs.push(o);
+      });
+    });
+    let groundY = box.min.y;
+    if (wheelObjs.length) {
+      const wb = new THREE.Box3();
+      wheelObjs.forEach((o) => {
+        const b = new THREE.Box3().setFromObject(o);
+        if (!b.isEmpty()) wb.union(b.applyMatrix4(toLocal));
+      });
+      if (!wb.isEmpty()) groundY = wb.min.y;
+    }
+
     const fit = this._powertrainWheelFit();
     let unitsPerMetre, cx, cz;
     if (fit && fit.wheelbase > 0.01) {
@@ -15896,7 +16081,7 @@ class Component extends DCLogic {
     rig.rotation.set(0, Math.PI / 2, 0);   // powertrain nose -Z -> car nose -X
     rig.position.set(
       cx + t.x * unitsPerMetre,
-      box.min.y + t.y * unitsPerMetre,
+      groundY + t.y * unitsPerMetre,
       cz + t.z * unitsPerMetre,
     );
     rig.updateMatrixWorld(true);
@@ -15910,9 +16095,25 @@ class Component extends DCLogic {
     if (on) {
       if (this._ghostMats) return;
       const ghostOpacity = this._powertrainTuning().ghostOpacity;
+      // Wheels stay solid: fading them left the car floating, and the car's own
+      // rims are better than the ones in the powertrain model (which is why
+      // _applyPowertrainVariant hides those).
+      //
+      // Every wheel list has to be unioned, not just _allWheels: installing a
+      // custom wheel repopulates _tireWheels/_rimWheels but leaves _allWheels
+      // stale, so keying off it alone let all 8 tyres get ghosted.
+      const keepSolid = new Set();
+      [this._allWheels, this._tireWheels, this._rimWheels, this._spokesWheels,
+       this._otherRimWheels, this._customClonedWheels].forEach((list) => {
+        (list || []).forEach((w) => {
+          const m = (w && w.mesh) ? w.mesh : ((w && w.c) ? w.c : w);
+          if (m && m.id !== undefined) keepSolid.add(m.id);
+        });
+      });
       const saved = [];
       model.traverse((c) => {
         if (!c.isMesh || this._isCarFloorMesh(c)) return;
+        if (keepSolid.has(c.id)) return;
         if (this._powertrainRig && this._powertrainRig.getObjectById(c.id)) return;
         const list = Array.isArray(c.material) ? c.material : [c.material];
         // Clone rather than mutate: these materials are shared between meshes,
@@ -15920,10 +16121,13 @@ class Component extends DCLogic {
         const ghost = list.map((m) => {
           if (!m) return m;
           const g = m.clone();
+          this._applyGhostFresnel(g);
           g.transparent = true;
           g.opacity = Math.min(m.opacity === undefined ? 1 : m.opacity, ghostOpacity);
           g.depthWrite = false;
-          g.side = THREE.FrontSide;
+          // Do NOT touch `side`. Forcing FrontSide here inverted every material
+          // authored BackSide -- lamp housings and reflectors -- which is what
+          // made the rear position lamp's red bleed through into the cabin.
           return g;
         });
         saved.push({ mesh: c, material: c.material, renderOrder: c.renderOrder });
@@ -15943,9 +16147,53 @@ class Component extends DCLogic {
     }
   }
 
+  /**
+   * Fade by viewing angle, not uniformly: a surface square-on to the camera goes
+   * nearly clear while grazing angles stay near full opacity. That is what makes
+   * the body read as an outline rather than a haze -- the silhouette and the
+   * wheel arches survive, the flat door skins get out of the way.
+   */
+  _applyGhostFresnel(mat) {
+    const t = this._powertrainTuning();
+    const NL = String.fromCharCode(10);   // keeps GLSL line breaks explicit
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uGhostFace = { value: t.ghostFace };
+      shader.uniforms.uGhostPow = { value: t.ghostFalloff };
+      shader.fragmentShader =
+        'uniform float uGhostFace;' + NL + 'uniform float uGhostPow;' + NL
+        + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        [
+          '#include <dithering_fragment>',
+          '  float gFres = 1.0 - abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) );',
+          '  gl_FragColor.a *= mix( uGhostFace, 1.0, pow( gFres, uGhostPow ) );',
+        ].join(NL)
+      );
+    };
+    // Without a distinct cache key three reuses the un-patched program.
+    mat.customProgramCacheKey = () => 'hvGhostFresnel';
+    mat.needsUpdate = true;
+  }
+
+  /** The contact shadow is sized for a solid car and reads far too heavy under
+   *  a ghosted one, so it is eased back while x-ray is on. */
+  _setShadowSoft(on) {
+    const sc = this.shadowCatcher;
+    if (!sc || !sc.material) return;
+    if (on) {
+      if (this._shadowOpacityWas === undefined) this._shadowOpacityWas = sc.material.opacity;
+      sc.material.opacity = this._shadowOpacityWas * 0.34;
+    } else if (this._shadowOpacityWas !== undefined) {
+      sc.material.opacity = this._shadowOpacityWas;
+      this._shadowOpacityWas = undefined;
+    }
+  }
+
   _applyPowertrainVisibility(on) {
     if (!on) {
       this._setBodyGhost(false);
+      this._setShadowSoft(false);
       if (this._powertrainRig) this._powertrainRig.visible = false;
       if (this.requestRender) this.requestRender(6);
       return;
@@ -15956,6 +16204,7 @@ class Component extends DCLogic {
       this._fitPowertrain();
       rig.visible = true;
       this._setBodyGhost(true);
+      this._setShadowSoft(true);
       if (this.requestRender) this.requestRender(6);
     });
   }
@@ -16498,6 +16747,8 @@ class Component extends DCLogic {
     console.log('[Haval H6] mesh parts (' + meshNames.length + '):', meshNames);
     this.modelParts = meshNames;
     this.model = obj;
+    // Background-warm the x-ray asset; no-op if it already ran.
+    if (primary) this._preloadPowertrain();
 
     const findMesh = (name) => {
       const normKey = name.toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -19631,16 +19882,9 @@ class Component extends DCLogic {
     }
     if (this._hudEl && this._hudEl.parentNode) this._hudEl.parentNode.removeChild(this._hudEl);
     try {
-      ['__perf', '__perfLow', '__archCapRough', '__renderOnce', '__scene',
+      ['__perf', '__archCapRough', '__renderOnce', '__scene',
        '__camera', '__controls', '__renderer', '__app', '__lightGroups']
         .forEach((key) => { delete window[key]; });
-    } catch (_) {}
-  }
-}
-</script>
-</body>
-</html>
-dow[key]; });
     } catch (_) {}
   }
 }
