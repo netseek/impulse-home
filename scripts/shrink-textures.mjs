@@ -29,7 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ASSETS = path.resolve(__dirname, '..', 'assets');
 const BACKUP = path.join(ASSETS, '_backup');
 
-const TARGETS = ['haval-h6-hev.glb', 'haval-h6-gt.glb'];
+const TARGETS = ['_source/haval-h6-hev.glb', '_source/haval-h6-gt.glb'];
 
 const MAX_DIM = 2048;
 const JPEG_QUALITY = 85;

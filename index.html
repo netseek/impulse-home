@@ -9638,7 +9638,7 @@ class Component extends DCLogic {
     // then keeps NUM_SPOT_LIGHTS = 0 in every shader until the user actually
     // asks for night. Once built it stays (tearing it down would force a second
     // full shader recompile on every night toggle).
-    if (next) this._ensureNightRig();
+    const builtRig = next ? this._ensureNightRig() : false;
     this.setState({ nightMode: next });
     // Body paint: re-apply metalness/roughness/envMapIntensity for the current
     // colour under the new day/night mode (see _bodyPaintParams — at night the
@@ -9741,6 +9741,18 @@ class Component extends DCLogic {
     // UI background
     this._applyBackground(next, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
     this._generateBlurredWheelTexture();
+    // First night entry adds 13 SpotLights and recompiles every lit shader over
+    // several frames. shadowMap.autoUpdate is off, so one needsUpdate in
+    // _ensureNightRig is often spent before that recompile finishes — the
+    // ShadowMaterial catcher then stays blank until something else dirties it.
+    // Keep the map dirty across the settle window (and on every day/night flip).
+    this._kickShadowRefresh(builtRig ? 16 : 6);
+  }
+
+  _kickShadowRefresh(frames = 6) {
+    this._shadowRefreshLeft = Math.max(this._shadowRefreshLeft || 0, frames);
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    if (this.requestRender) this.requestRender(frames);
   }
 
   // Shared background texture generator — used for BOTH day and night modes.
@@ -15503,6 +15515,13 @@ class Component extends DCLogic {
         }
         // Forced frames after UI changes / async loads (componentDidUpdate, etc.)
         if (this._renderFrames > 0) { this._renderFrames--; needRender = true; }
+        // Keep the shadow map dirty across multi-frame shader settles (night
+        // SpotLight rig build recompiles every lit material — see _kickShadowRefresh).
+        if (this._shadowRefreshLeft > 0) {
+          this._shadowRefreshLeft--;
+          if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+          needRender = true;
+        }
 
         // Resolution tier (see _setResTier). Entering motion waits for
         // SUSTAINED movement so a tap or a one-pixel nudge never pays for a

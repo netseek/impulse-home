@@ -32,8 +32,8 @@ const io = new NodeIO()
     'draco3d.encoder': await draco3d.createEncoderModule(),
   });
 
-const IN = 'assets/haval-h6-hev.glb';
-const OUT = 'assets/haval-h6-hev.glb';
+const IN = 'assets/_source/haval-h6-hev.glb';
+const OUT = 'assets/_source/haval-h6-hev.glb';
 
 const doc = await io.read(IN);
 const root = doc.getRoot();

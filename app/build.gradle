@@ -59,6 +59,9 @@ def viewerAssets = tasks.register("syncViewerAssets", Sync) {
     from(rootProject.file("assets")) {
         into "assets"
         exclude "_backup/**"
+        // Full-texture originals the viewer never fetches — build inputs for
+        // the -lite files (scripts/build-lite-textures.mjs). ~50MB of APK.
+        exclude "_source/**"
     }
 }
 

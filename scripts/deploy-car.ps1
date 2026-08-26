@@ -81,8 +81,13 @@ function Scan-AdbHosts([string[]]$Prefixes) {
   return @($open)
 }
 
+function Test-IsEmulator([string]$Serial) {
+  return $Serial -match '^(emulator-|127\.0\.0\.1:|localhost:)'
+}
+
 function Find-Car([string]$Adb) {
-  $live = @(Get-AdbRows $Adb | Where-Object { $_.Status -eq 'device' })
+  # Never treat a local emulator as the MMI — even if the viewer APK is installed.
+  $live = @(Get-AdbRows $Adb | Where-Object { $_.Status -eq 'device' -and -not (Test-IsEmulator $_.Serial) })
   foreach ($row in $live) {
     if (Test-Viewer $Adb $row.Serial) { return $row.Serial }
   }

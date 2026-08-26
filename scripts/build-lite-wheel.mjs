@@ -9,7 +9,7 @@ import sharp from 'sharp';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(scriptDir, '..');
-const sourcePath = path.join(projectDir, 'assets', 'wheels', 'HavalPHEV-wheel.glb');
+const sourcePath = path.join(projectDir, 'assets', '_source', 'wheels', 'HavalPHEV-wheel.glb');
 const outputPath = path.join(projectDir, 'assets', 'wheels', 'HavalPHEV-wheel-lite.glb');
 
 const io = new NodeIO()

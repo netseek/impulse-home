@@ -6,9 +6,11 @@ import sharp from 'sharp';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const assetsDir = path.resolve(scriptDir, '..', 'assets');
+// Inputs are the full-texture originals, which are build sources and are not
+// shipped — only the -lite outputs are served (see HEV_URL/GT_URL in index.html).
 const targets = [
-  ['haval-h6-hev.glb', 'haval-h6-hev-lite.glb'],
-  ['haval-h6-gt.glb', 'haval-h6-gt-lite.glb'],
+  ['_source/haval-h6-hev.glb', 'haval-h6-hev-lite.glb'],
+  ['_source/haval-h6-gt.glb', 'haval-h6-gt-lite.glb'],
 ];
 
 const JSON_CHUNK = 0x4e4f534a;

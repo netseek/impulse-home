@@ -64,9 +64,9 @@ const assetsDir = path.resolve(scriptDir, '..', 'assets');
 const backupDir = path.join(assetsDir, '_backup', 'pre-ktx2');
 
 const TARGETS = [
-  'haval-h6-hev.glb',
+  '_source/haval-h6-hev.glb',
   'haval-h6-hev-lite.glb',
-  'haval-h6-gt.glb',
+  '_source/haval-h6-gt.glb',
   'haval-h6-gt-lite.glb',
 ];
 

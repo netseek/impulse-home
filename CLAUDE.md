@@ -104,6 +104,72 @@ explains it. Measure the specific change; do not reason from this table.
   sprite is the cheap equivalent: 8 discs, 256 triangles total, against 374k in
   the main pass.
 
+## Wheel spin is a sampling problem, not a throughput one
+
+A rendered wheel is a strobe. The eye only ever sees it at the frame rate, so
+if the rim advances close to one whole repeat of its own pattern between two
+frames it looks **frozen**, and past half a repeat it looks like it is turning
+**backwards**. On a panel that swings between 14 and 22 fps the apparent rate —
+and the apparent *direction* — swing with it. That is the whole "the wheel
+doesn't spin / seems to struggle" symptom.
+
+It cannot be fixed by making the frame cheaper, and it cannot be fixed by moving
+the transform to the GPU: the GPU renders the same discrete frames. Measured,
+`_applyWheelTransforms` costs **0.05 ms/call for 52 meshes** (desktop; not yet
+re-measured on the car) — about 0.14% of a 36 ms frame. The post-FX passes cost
+2.0 ms and were still not worth rewriting, so this is nowhere near worth moving.
+
+The fix is to keep the per-frame step under the rim's own pitch:
+
+- `_measureRimRepeatRad` measures each rim's **rotational repeat** — the finest
+  rotation that leaves it looking identical — from the real installed geometry,
+  once per rim swap (cached on mesh identity, because the capture also runs on
+  every colour/roughness slider event).
+- The loop clamps the per-frame roll to `stepFrac` (0.45) of that period. The
+  clamp uses the **actual** frame interval, not a smoothed one: aliasing is
+  decided by the real gap between the two frames the eye sees.
+- `_blurSpeedWindow` starts the blur sprite at the speed where that rim begins
+  to alias at the frame rate we are actually getting, and finishes it 1.7x
+  later. All of it is live-tunable from devtools via `window.__wheelSpin()`.
+
+### Measured repeat periods
+
+`npm run analyze:rims` dumps the table for the whole catalogue. The spread is
+the point — one fixed 30 -> 60 km/h crossover could never have suited all of it:
+
+| Rim | Repeat | Aliases from (18 fps) |
+|---|---|---|
+| Haval HEV / PHEV / GT, most 5-spokes | 72 deg | ~27 km/h |
+| Vossen VFS1 / VFS4, VPS 310T | 36 deg | ~13 km/h |
+| Concept L | 20 deg | ~7 km/h |
+| Forgiato Multato | 12 deg | ~4.5 km/h |
+
+The stock rims were only marginally affected — they alias at ~27 and the blur
+used to start at 30 — which is why this looked like an occasional glitch rather
+than a systematic one. The fine-patterned rims spent most of their speed range
+visibly stuck.
+
+## Unbalanced-looking rims are a normalisation bug
+
+A swapped rim is centred on its **bounding box** and aligned by comparing bbox
+dimensions. Both are proxies, and a GLB carrying anything off-axis (a caliper, a
+stray tab, an asymmetric hub) drags both off the rim's real axis of revolution.
+The rim then spins about a tilted, offset line and visibly wobbles — a 2 deg
+tilt throws a 0.35 m lip a centimetre in and out per turn.
+
+`_handleUploadedWheelModel` step 7b now measures this the way a wheel shop does:
+the **first harmonic of the outer lip**. Fit `z ~ z0 + A*cos(t) + B*sin(t)` over
+the lip band — a seated wheel has A = B = 0, and a tilt is exactly this
+once-per-revolution term. The fitted plane's normal is the true axis; the same
+fit on the lip's radius gives the centre offset. Corrected, then renormalised so
+the native radius stays exactly 1.0 as everything downstream assumes.
+
+Measured tilt, bbox axle vs true axis: under 0.5 deg for most of the catalogue,
+but **11.3 deg on Vorsteiner V-FF109**, 3.9 on Vossen VPS 310T, 3.7 on VPS
+315T, 3.5 on Forgiato Multato, 2.8 on VFS4, 1.6 on HF-5, 1.1 on Rotiform KPS. Those are exactly the rims that read as
+unbalanced. Corrections under 0.5 deg are skipped and over 20 deg are refused —
+past that the bbox axle was probably not the axle at all.
+
 ## Visual gotchas in the wheel blur
 
 The spin sprite has burned two separate agents. Both failures were in the
@@ -118,8 +184,11 @@ capture shader, not in the placement:
   color / float(SAMPLES)`.
 - **A full 2*PI sweep is axisymmetric**, so the disc's rotation is invisible and
   there is no speed sensation above the cutover where the sharp spokes hide.
-  `BLUR_ARC_RAD` must stay **below the rim's spoke pitch**; 60 deg suits a 5-8
-  spoke wheel. Measured angular variation went from cv 0.18 to cv 0.40.
+  The arc must stay **below the rim's spoke pitch**; 60 deg suits a 5-8 spoke
+  wheel. Measured angular variation went from cv 0.18 to cv 0.40. It is now the
+  `uArcRad` uniform, set per rim to `0.8 x` the measured repeat and clamped to
+  20-60 deg — a 30-spoke rim would want 12 deg by that rule, which is no blur at
+  all, so it is floored and that rim honestly does smear to a plain disc.
 - Sweep the arc with `float(i) / float(SAMPLES - 1)`, not `/ float(SAMPLES)`,
   or the smear lands off-centre and the wheel looks subtly unbalanced.
 

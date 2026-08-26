@@ -68,7 +68,6 @@ const backupDir = path.join(assetsDir, '_backup', 'pre-decompress');
  * the HEV_URL/HEV_BYTES constants in index.html.
  */
 const TARGETS = [
-  'haval-h6-hev.glb',
   'haval-h6-hev-lite.glb',
 ];
 
