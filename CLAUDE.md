@@ -149,6 +149,29 @@ used to start at 30 — which is why this looked like an occasional glitch rathe
 than a systematic one. The fine-patterned rims spent most of their speed range
 visibly stuck.
 
+## A swapped rim sitting low in its tyre is a ride-height frame bug
+
+`_applyWheelTransforms` counter-shifts the wheels by `-carHeightOffset` so they
+stay grounded when the body moves. That only cancels against a rest pose
+captured at the SAME ride height. The stock meshes cache theirs in `cacheInit`
+at whatever height the app booted with; the custom rim clones were compensating
+by the ABSOLUTE `carHeightOffset`, i.e. assuming the stock capture was at zero.
+
+Boot with a saved ride height and the two frames differ by exactly that height,
+so every swapped rim sits displaced by it — permanently, at every later height
+setting, on every rim, from every camera angle. Measured on the emulator:
+**-29.6 mm at boot height -30 mm, 0.0 mm at boot height 0**. `cacheInit` now
+records `_wheelInitHeightOffset` and the clone compensates by the delta.
+
+**This one hides from an axle-on screenshot AND from a world-space fit.** It
+cost several rounds of wrong answers: a head-on capture makes it look mild, a
+circle fit through a whole tyre mesh reports the wrong centre (that mesh spans
+tread, sidewalls and bore — an algebraic fit over a wide radial band is biased),
+and a brightness centroid measures the highlight, not the geometry. What finally
+worked, and what to reach for first: **extent (min/max) of the rim and of the
+tyre in the plane perpendicular to the axle**, compared to each other. No
+fitting, no rendering, no lighting. Four metrics agreed on it to 0.1 mm.
+
 ## Unbalanced-looking rims are a normalisation bug
 
 A swapped rim is centred on its **bounding box** and aligned by comparing bbox
@@ -163,6 +186,25 @@ the lip band — a seated wheel has A = B = 0, and a tilt is exactly this
 once-per-revolution term. The fitted plane's normal is the true axis; the same
 fit on the lip's radius gives the centre offset. Corrected, then renormalised so
 the native radius stays exactly 1.0 as everything downstream assumes.
+
+**The lip band has to be found by iterating, and getting this wrong is worse
+than not correcting at all.** The band can only be selected by radius, and
+radius is measured from whatever centre you currently believe. On an off-centre
+model the first selection is not a ring — it is the far-side arc — and a
+first-harmonic fit over an arc is ill-conditioned and returns nonsense. Shipped
+once as a single-shot fit, it read a spurious offset on the BMW 19" rim (whose
+bbox is dragged up by a badge mesh floating above the hub) and "corrected" it by
+visibly dropping the rim in the tyre at every wheel size — a rim that was fine
+as authored. Re-selecting the band around each new estimate fixes it; it
+converges in a few passes, because every correction makes the band more like a
+full ring.
+
+**Check this one from PIXELS, not from a world-space fit.** Verifying it by
+fitting circles to `matrixWorld`-transformed vertices gave the same wrong answer
+for both the broken and the fixed build, and only a head-on screenshot of the
+two side by side settled it. `scripts/device-cdp.mjs` will frame and grab one:
+point the camera down the axle from `_pivot`, and compare the black tyre band
+above the rim against the band below.
 
 Measured tilt, bbox axle vs true axis: under 0.5 deg for most of the catalogue,
 but **11.3 deg on Vorsteiner V-FF109**, 3.9 on Vossen VPS 310T, 3.7 on VPS
@@ -191,6 +233,31 @@ capture shader, not in the placement:
   all, so it is floored and that rim honestly does smear to a plain disc.
 - Sweep the arc with `float(i) / float(SAMPLES - 1)`, not `/ float(SAMPLES)`,
   or the smear lands off-centre and the wheel looks subtly unbalanced.
+- **The arc cannot remove the lighting lobe, and the sprite rotates.** An arc
+  average attenuates the Nth angular harmonic by `sinc(N*arc/2)`. The arc has
+  to stay under the spoke pitch (above), so at 57.6 deg it knocks a 5-spoke
+  rim's h5 down 4x but leaves h1 at **96%** of what it was. Measured on the
+  emulator: h5 0.742 -> 0.149, h1 0.194 -> 0.187. That surviving h1 is the
+  scene's specular highlight — one bright side of the rim — and because the
+  sprite spins with `_rollAngle` it orbits the hub, which reads as a wheel out
+  of balance. A real highlight is a reflection: it stays put while the wheel
+  turns past it. So `uLobe` carries the measured first harmonic and the shader
+  divides it out (h1 0.165 -> 0.072, h5 untouched at 0.150). rgb only — alpha
+  is coverage, which lighting does not change — with the divisor clamped and
+  the result clamped back under alpha, because unbounded division here is
+  exactly what blew this sprite out to a pale disc once before.
+
+## Do not set `needsUpdate` on a render target's texture
+
+`_rtSource` / `_rtBlurred` are `WebGLRenderTarget`s. Setting `.texture
+.needsUpdate = true` tells three to re-upload the texture from `texture.image`,
+which for a render target is empty — it wipes the GL texture. The symptom is
+brutal to debug: `readRenderTargetPixels` still returns the old contents, the
+mesh still draws (a flat colour test passes), the material still points at the
+right texture object, and the sprite renders **pure black**. Two hours went into
+chasing a "regression" that was one debug line. If a capture looks wrong,
+reload the page before believing any measurement taken after you have poked at
+texture state from devtools.
 
 ## Media visualisers
 
@@ -206,26 +273,101 @@ means `RECORD_AUDIO`, and the MMI is Android 9 so `AudioPlaybackCapture` (API
 29+) is unavailable. Prototype whether session 0 yields non-silent data before
 building anything on top of it.
 
-## Device access
+## Checking a change without rebuilding the APK
 
-`adb` is not on PATH:
-
-```
-C:\Users\<user>\AppData\Local\Android\Sdk\platform-tools\adb.exe
-```
-
-The head unit's IP is DHCP and changes constantly — it moved six times in a
-single session. Never hardcode it:
+`scripts/device-cdp.mjs` wraps the CDP harness this file keeps referring to and
+works against the emulator or the car:
 
 ```bash
-adb devices | awk '$2=="device" && $1 ~ /:5555$/ {print $1; exit}'
+node scripts/device-cdp.mjs serve        # host server + adb reverse + navigate
+node scripts/device-cdp.mjs eval "__wheelSpin()"
+node scripts/device-cdp.mjs spin 3 12,20,27,35,45 --fps 18
+node scripts/device-cdp.mjs shot out.png
+node scripts/device-cdp.mjs reset        # WebView back on the APK's own copy
 ```
 
-If nothing is listed, check `arp -a` for a live neighbour on your own subnet;
-the unit sometimes reappears on a different network where ICMP passes but TCP
-5555 does not. `pidof com.havalh6.viewer` can return the notification-listener
-service rather than the activity — prefer
-`ps -A | grep "com.havalh6.viewer$"`.
+`serve` is the fast loop: the app loads index.html through a WebViewAssetLoader
+from inside the APK, so `serve` puts the working tree on an `adb reverse`d port
+and navigates the WebView at it. Edit, then `eval "location.reload()"`. No
+gradle, no install. `--serial` picks the device; nothing is hardcoded.
+
+**The emulator is not a performance proxy.** It runs Android 16 / WebView 150 on
+a desktop GPU and renders this scene at 40-60 fps against the MMI's 14-22, and
+its WebView is 59 versions newer than the car's. What it IS good for is anything
+frame-rate *dependent*, because `spin --fps <n>` gates rAF in the page and
+reproduces the car's sampling rate exactly — and holds it steady, which the car
+does not. Confirm the final numbers on the car regardless.
+
+## Device access
+
+Talk to the **car itself** over TCP ADB on the local LAN. Do not use a
+Raspberry Pi, Tailscale jump host, or `scripts/car-gateway/` — those are stale.
+
+`adb` is usually not on PATH:
+
+```
+%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe
+```
+
+The MMI is dual-homed and exposes `:5555` on whichever interface is up:
+
+| Network | Typical subnet |
+|---|---|
+| Home Wi-Fi (`<home-ssid>*`) | `192.168.1.0/24` |
+| Car AP (`HAVAL_SEEK`) | `192.168.33.0/24` |
+
+DHCP moves every session. Never hardcode an IP. `.car-adb-serial` is only a
+last-success hint. Discovery (`scripts/car-adb-common.ps1`) detects whether
+this PC is on **HAVAL_SEEK** (`192.168.33`) or the **home LAN** (`192.168.1`),
+scans that subnet first, then the other, and confirms the MMI (`gwm` /
+`msmnile_gvmq`, or `com.havalh6.viewer` if already installed).
+Both routes are TCP `adb install` / scrcpy — home LAN is the remote APK path;
+you do not need to join the car AP.
+
+Beantechs blocks a bare `adb install` of this package (`beantechs disallow apk
+com.havalh6.viewer`). Deploy uses installer identity `com.autolink.installer`.
+A signature mismatch needs uninstall + that same `-i` reinstall — a plain
+uninstall without Autolink cannot put the app back.
+
+Cursor / VS Code tasks (Terminal → Run Task):
+
+| Task | Script |
+|---|---|
+| Car: connect | `scripts/connect-car.ps1` |
+| Car: share displays | `scripts/share-car-displays.ps1` |
+| Car: deploy | `scripts/deploy-car.ps1` |
+| Car: deploy (skip build) | `scripts/deploy-car.ps1 -SkipBuild` |
+| Car: deploy and share displays | `scripts/deploy-car.ps1 -Share` |
+
+Same via npm: `npm run car:connect` / `car:share` / `car:deploy` /
+`car:deploy:skip-build`.
+
+**Not every `:5555` is the MMI.** Other boxes on the LAN (T-Box / Beceem-class
+hosts) accept TCP 5555 and show `offline`. A live car is `device` **and**
+`pm path com.havalh6.viewer` succeeds. ICMP can fail while ADB still works.
+
+If this PC's ADB key is `unauthorized`, the MMI often never shows the RSA
+dialog. Root telnet on the same IP (`:23`, already a root shell, no password)
+can append this machine's `~\.android\adbkey.pub` to
+`/data/misc/adb/adb_keys` and restart `adbd`.
+
+`pidof com.havalh6.viewer` can return the notification-listener service rather
+than the activity — prefer `ps -A | grep "com.havalh6.viewer$"`.
+
+### Share displays 0 and 3
+
+The panel is two 1920×720 surfaces. **0** is the built-in ("Tela integrada");
+**3** is HDMI ("Tela HDMI"). Portable scrcpy lives at
+`%LOCALAPPDATA%\scrcpy\scrcpy-win64-v4.1\scrcpy.exe`.
+
+```powershell
+.\scripts\share-car-displays.ps1
+```
+
+That rediscovers the car and opens **Haval-Display0** and **Haval-Display3**.
+`--no-audio` is required (Android 9). Mouse→touch works on display 0 only;
+secondary-display input needs Android 10+. `screencap -d 3` is often black
+even when scrcpy is not — dumpsys is the fallback for "what is on D3".
 
 **Ask before any test that needs a human at the car.** A timed capture started
 in the same message as the instruction expires before it is read, and a capture

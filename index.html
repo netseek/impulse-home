@@ -2611,7 +2611,7 @@ window.HavalSplash = (function () {
           <span class="hv-tool-icon">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display: {{ timeDayIconDisplay }};"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style="display: {{ timeNightIconDisplay }};"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display: {{ timeAutoIconDisplay }};"><path d="M12 8a2.83 2.83 0 0 0 4 4 4 4 0 1 1-4-4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/><path d="m19.1 4.9-1.4 1.4"/></svg>
+            <span style="display: {{ timeAutoIconDisplay }};">AUTO</span>
           </span>
           <span class="hv-tool-label">TIME</span>
         </button>
@@ -8279,10 +8279,157 @@ class Component extends DCLogic {
     return out;
   }
 
+  // The finest rotation (radians) that leaves this rim looking identical,
+  // measured from the RENDERED rim rather than from its vertices.
+  //
+  // The first version of this built an angular histogram of vertex COUNT, and
+  // that quietly stopped working on the full-detail rims that actually ship:
+  // their tessellation is dense and near-uniform, so the histogram is almost
+  // flat and the autocorrelation is noise. Measured on the emulator, the stock
+  // rim scored corr 0.92 on the decimated `?lite` GLB and 0.15 on the full one
+  // (81,760 verts over 12 meshes) — every rim fell back to a guessed order and
+  // the anti-alias clamp then held a 5-spoke rim to 13.5 deg/frame when its
+  // real pitch allows 32.4.
+  //
+  // `_rtSource` already holds exactly the right picture: the rim alone, drawn
+  // straight down its own axle by the blur capture. Symmetry read off that is
+  // tessellation-independent by construction — it measures what the eye gets.
+  // The cost is one synchronous 256x256 readback per rim swap, which is why
+  // this is guarded on mesh identity by the caller.
+  _measureRimRepeatFromCapture() {
+    const renderer = this.renderer;
+    const size = this._blurRtSize || 256;
+    if (!renderer || !this._rtSource) return null;
+
+    let px;
+    try {
+      px = new Uint8Array(size * size * 4);
+      renderer.readRenderTargetPixels(this._rtSource, 0, 0, size, size, px);
+    } catch (e) {
+      console.warn('[WheelSpin] capture readback failed', e && e.message);
+      return null;
+    }
+
+    // The ortho frustum is +-r about the rim centre, so the rim's outer edge
+    // sits at the image edge and the centre of the image is the axle.
+    const BINS = 720;
+    const TWO_PI = Math.PI * 2;
+    const cx = (size - 1) / 2, cy = (size - 1) / 2;
+    const rOuter = size / 2;
+    const rIn = rOuter * 0.30, rOut = rOuter * 0.95;
+
+    // Two independent profiles. RGB is premultiplied by coverage, so its
+    // luminance carries both the spoke shading and the holes; alpha carries
+    // the holes alone. A rim with a flat solid face has no alpha structure but
+    // plenty of shading, and a dark rim shot against a transparent background
+    // is the other way round — so build both and use whichever actually has a
+    // repeating pattern in it.
+    const lum = new Float64Array(BINS), alp = new Float64Array(BINS);
+    const cnt = new Float64Array(BINS);
+    for (let y = 0; y < size; y++) {
+      const dy = y - cy;
+      for (let x = 0; x < size; x++) {
+        const dx = x - cx;
+        const rr = Math.hypot(dx, dy);
+        if (rr < rIn || rr > rOut) continue;
+        let a = Math.atan2(dy, dx);
+        if (a < 0) a += TWO_PI;
+        const b = Math.min(BINS - 1, (a / TWO_PI * BINS) | 0);
+        const i = (y * size + x) * 4;
+        lum[b] += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+        alp[b] += px[i + 3];
+        cnt[b] += 1;
+      }
+    }
+    for (let b = 0; b < BINS; b++) {
+      const n = cnt[b] || 1;
+      lum[b] /= n; alp[b] /= n;
+    }
+
+    // Circular autocorrelation at shift 2*PI/N, linearly interpolated so N need
+    // not divide BINS (a 7-spoke rim is real — Forgiato Spettro M). Scan N
+    // downward and take the LARGEST order that still matches: N-fold symmetry
+    // implies symmetry at every divisor of N as well (a 30-spoke rim is
+    // trivially 2-fold), and it is the finest pitch that decides when a
+    // spinning render freezes or runs backwards.
+    const best = (profile) => {
+      let mean = 0;
+      for (let i = 0; i < BINS; i++) mean += profile[i];
+      mean /= BINS;
+      const c = new Float64Array(BINS);
+      let r0 = 0;
+      for (let i = 0; i < BINS; i++) { c[i] = profile[i] - mean; r0 += c[i] * c[i]; }
+      if (r0 <= 1e-9) return null;
+      const corrAt = (N) => {
+        const shift = BINS / N;
+        const i0 = Math.floor(shift), fr = shift - i0;
+        let acc = 0;
+        for (let i = 0; i < BINS; i++) {
+          const a1 = c[(i + i0) % BINS], a2 = c[(i + i0 + 1) % BINS];
+          acc += c[i] * (a1 + (a2 - a1) * fr);
+        }
+        return acc / r0;
+      };
+      const BAR = 0.75;
+      let bc = -2, bN = 1;
+      for (let N = 40; N >= 2; N--) {
+        const cc = corrAt(N);
+        if (cc >= BAR) return { order: N, corr: cc, weak: false };
+        if (cc > bc) { bc = cc; bN = N; }
+      }
+      return { order: bN, corr: bc, weak: true };
+    };
+
+    // First harmonic of the angular brightness — the lighting lobe the blur
+    // shader divides out. Same readback, so it costs nothing extra.
+    {
+      let mean = 0;
+      for (let b = 0; b < BINS; b++) mean += lum[b];
+      mean /= BINS;
+      let re = 0, im = 0;
+      for (let b = 0; b < BINS; b++) {
+        const t = (b + 0.5) / BINS * TWO_PI;
+        re += lum[b] * Math.cos(t);
+        im += lum[b] * Math.sin(t);
+      }
+      const A = mean > 1e-6 ? (2 * re / BINS) / mean : 0;
+      const B = mean > 1e-6 ? (2 * im / BINS) / mean : 0;
+      // Never let a bad reading swing the correction far; the shader clamps
+      // the divisor too, this just keeps the number sane.
+      const cap = 0.35;
+      this._blurLobe = {
+        a: Math.max(-cap, Math.min(cap, A)),
+        b: Math.max(-cap, Math.min(cap, B)),
+        raw: +Math.hypot(A, B).toFixed(3),
+      };
+    }
+
+    const byLum = best(lum), byAlp = best(alp);
+    // Prefer a channel that cleared the bar; if both did, the finer pitch is
+    // the safe one (over-estimating the order only tightens the clamp).
+    let pick = null;
+    if (byLum && byAlp) {
+      if (byLum.weak !== byAlp.weak) pick = byLum.weak ? byAlp : byLum;
+      else pick = byLum.order >= byAlp.order ? byLum : byAlp;
+    } else pick = byLum || byAlp;
+    if (!pick) return null;
+
+    if (pick.weak) {
+      // Genuinely unreadable — either an asymmetric rim (which cannot alias,
+      // so the pitch hardly matters) or a bad capture. Clamp the guess into
+      // 5..12: never coarser than a plain 5-spoke rim, never finer than a
+      // 12-spoke one, and flagged so __wheelSpin() shows it is a guess.
+      const guess = Math.min(12, Math.max(5, pick.order));
+      return { rad: TWO_PI / guess, order: guess, corr: pick.corr, weak: true, from: 'capture' };
+    }
+    return { rad: TWO_PI / pick.order, order: pick.order, corr: pick.corr, weak: false, from: 'capture' };
+  }
+
   _initWheelBlur() {
     if (this._wheelBlurInitialized) return;
     const THREE = this.THREE;
     const size = 256;
+    this._blurRtSize = size;
 
     this._rtSource = new THREE.WebGLRenderTarget(size, size, {
       minFilter: THREE.LinearMipmapLinearFilter,
@@ -8301,7 +8448,11 @@ class Component extends DCLogic {
       uniforms: {
         tSource: { value: null },
         // Per-rim: set from the measured repeat period before every capture.
-        uArcRad: { value: Math.PI / 3 }
+        uArcRad: { value: Math.PI / 3 },
+        // Per-capture: the first harmonic of the rim's angular brightness,
+        // i.e. the specular lobe the scene lighting puts on one side of it.
+        // (0,0) disables the correction.
+        uLobe: { value: new THREE.Vector2(0, 0) }
       },
       vertexShader: `
         varying vec2 vUv;
@@ -8313,6 +8464,7 @@ class Component extends DCLogic {
       fragmentShader: `
         uniform sampler2D tSource;
         uniform float uArcRad;
+        uniform vec2 uLobe;
         varying vec2 vUv;
         void main() {
           vec2 center = vec2(0.5, 0.5);
@@ -8337,7 +8489,31 @@ class Component extends DCLogic {
           // so rgb is already premultiplied by coverage and alpha IS the mask —
           // the holes in the captured rim. Un-premultiplying and boosting alpha
           // (50dbd47) filled those holes and turned the sprite into a solid disc.
-          gl_FragColor = color / float(SAMPLES);
+          color /= float(SAMPLES);
+
+          // Flatten the scene's specular lobe out of the sprite.
+          //
+          // An arc average attenuates the Nth angular harmonic by sinc(N*arc/2).
+          // The arc has to stay UNDER the spoke pitch or the disc turns
+          // axisymmetric and stops reading as turning (see above), so for a
+          // 5-spoke rim at 57.6 deg it knocks the spoke harmonic down by 4x —
+          // and leaves the FIRST harmonic at 96% of what it was. Measured on
+          // the emulator: h5 0.742 -> 0.149, h1 0.194 -> 0.187. That surviving
+          // h1 is one bright side of the rim, and because the sprite rotates
+          // with _rollAngle it orbits the hub, which reads as a wheel that is
+          // out of balance. A real highlight is a reflection: it stays put in
+          // space while the wheel turns past it.
+          //
+          // Divide it out. rgb only — alpha is coverage, which lighting does
+          // not change. The divisor is CLAMPED and the result is clamped back
+          // under alpha: unbounded division here is exactly what blew this
+          // sprite out to a pale disc once before.
+          float ang = atan(uv.y, uv.x);
+          float lobe = 1.0 + uLobe.x * cos(ang) + uLobe.y * sin(ang);
+          color.rgb /= clamp(lobe, 0.75, 1.35);
+          color.rgb = min(color.rgb, vec3(color.a));
+
+          gl_FragColor = color;
         }
       `
     });
@@ -8428,39 +8604,6 @@ class Component extends DCLogic {
     const axle = flFirst._rollAxis;
     if (!pivot || !axle) return;
 
-    // Re-measure this rim's rotational repeat while the wheels are posed at
-    // their unsteered rest pose (see _poseMeshesToInitWorld above) — it drives
-    // both the anti-alias clamp on the roll and the blur crossover speed, and
-    // it changes with every rim swap.
-    // Keyed on mesh identity, because this method is also called on every
-    // wheel-colour / roughness / metalness slider event and on HDRI switches —
-    // none of which change the geometry. Without the guard a slider drag would
-    // re-run a 24k-vertex scan per input event on the MMI.
-    const spokeMeshes = this._frontLeftWheels.filter(m => this._spokesWheels.includes(m));
-    const repSig = spokeMeshes.map(m => m.uuid).join('|');
-    const rep = (repSig && repSig === this._rimRepeatSig)
-      ? null
-      : this._measureRimRepeatRad(spokeMeshes, pivot, axle);
-    if (rep) {
-      this._rimRepeatSig = repSig;
-      this._rimRepeatRad = rep.rad;
-      this._rimRepeatInfo = rep;
-      console.log('[WheelSpin] rim repeats every',
-        (rep.rad * 180 / Math.PI).toFixed(1) + ' deg',
-        '(order ' + rep.order + ', corr ' + rep.corr.toFixed(2) + (rep.weak ? ', weak' : '') + ')');
-    }
-    // The smear must stay under the spoke pitch or the sprite comes out
-    // axisymmetric and reads as standing still (CLAUDE.md). 60 deg only ever
-    // suited a 5-8 spoke rim; a 30-spoke rim needs 12 deg by that rule, which
-    // is no blur at all, so floor it and accept that a rim that fine honestly
-    // does smear to a plain disc.
-    {
-      const t = this._wheelSpinTune;
-      const arc = Math.min(t.arcMaxRad, Math.max(t.arcMinRad, this._rimRepeatRad * t.arcFrac));
-      this._blurShaderMat.uniforms.uArcRad.value = arc;
-      this._blurArcRad = arc;
-    }
-
     const tempCam = new THREE.OrthographicCamera(-r, r, r, -r, 0.01, 10);
     tempCam.position.copy(pivot).addScaledVector(axle, -2.0);
     tempCam.lookAt(pivot);
@@ -8520,6 +8663,44 @@ class Component extends DCLogic {
     savedVisibilities.forEach((vis, obj) => { obj.visible = vis; });
     if (this.shadowCatcher && scOrigVisible !== undefined) this.shadowCatcher.visible = scOrigVisible;
     if (this.nightFloor    && nfOrigVisible !== undefined) this.nightFloor.visible    = nfOrigVisible;
+
+    // Now that _rtSource holds the rim drawn straight down its own axle, read
+    // this rim's rotational repeat off that picture. Keyed on mesh identity,
+    // because this method also runs on every wheel-colour / roughness /
+    // metalness slider event and on HDRI switches — none of which change the
+    // geometry, and a GPU readback per input event would be a real cost.
+    const spokeMeshes = this._frontLeftWheels.filter(m => this._spokesWheels.includes(m));
+    const repSig = spokeMeshes.map(m => m.uuid).join('|');
+    if (repSig && repSig !== this._rimRepeatSig) {
+      const rep = this._measureRimRepeatFromCapture()
+        // Vertex fallback, in case readback is unavailable on some driver.
+        || this._measureRimRepeatRad(spokeMeshes, pivot, axle);
+      if (rep) {
+        this._rimRepeatSig = repSig;
+        this._rimRepeatRad = rep.rad;
+        this._rimRepeatInfo = rep;
+        console.log('[WheelSpin] rim repeats every',
+          (rep.rad * 180 / Math.PI).toFixed(1) + ' deg',
+          '(order ' + rep.order + ', corr ' + rep.corr.toFixed(2)
+            + ', ' + (rep.from || 'verts') + (rep.weak ? ', weak' : '') + ')');
+      }
+    }
+
+    // The smear must stay under the spoke pitch or the sprite comes out
+    // axisymmetric and reads as standing still (CLAUDE.md). 60 deg only ever
+    // suited a 5-8 spoke rim; a 30-spoke rim needs 12 deg by that rule, which
+    // is no blur at all, so floor it and accept that a rim that fine honestly
+    // does smear to a plain disc.
+    {
+      const t = this._wheelSpinTune;
+      const arc = Math.min(t.arcMaxRad, Math.max(t.arcMinRad, this._rimRepeatRad * t.arcFrac));
+      this._blurShaderMat.uniforms.uArcRad.value = arc;
+      this._blurArcRad = arc;
+    }
+
+    if (this._blurLobe) {
+      this._blurShaderMat.uniforms.uLobe.value.set(this._blurLobe.a, this._blurLobe.b);
+    }
 
     this._blurShaderMat.uniforms.tSource.value = this._rtSource.texture;
     renderer.setRenderTarget(this._rtBlurred);
@@ -9115,6 +9296,13 @@ class Component extends DCLogic {
     // parent-local and applies the FULL decompose (pos+quat+scale). Caching the
     // init parent-inverse decouples from any live parent motion, and applying
     // scale (not just quaternion) keeps mirrored/negative-scale wheels intact.
+    // The frame every stock wheel mesh below is captured in. _applyWheelTransforms
+    // counter-shifts wheels by -carHeightOffset, which only cancels against a
+    // capture taken at the SAME ride height — so a custom rim built later has to
+    // be told which height that was, not assume zero. See the clone's
+    // _initParentInv in onWheelStyle.
+    this._wheelInitHeightOffset = (this._wheelsShareCarRoot !== false)
+      ? (this.state.carHeightOffset || 0) : 0;
     const cacheInit = (c) => {
       c.updateWorldMatrix(true, false);
       c._rollAngle = 0;
@@ -9236,14 +9424,108 @@ class Component extends DCLogic {
       // thickness — so no residual gate (a wide rim face legitimately spans many
       // radii). Reject only by distance: a centre far from the cluster centre means
       // a non-concentric part (the lug/valve sliver fits a circle ~250 mm out).
-      if(Math.hypot(cx,cy) > 0.06) return null;
+      // A per-mesh fit is a REFINEMENT of the cluster centre, worth a few mm at
+      // most (the rim's own centre sits ~4 mm off the tyre's). 60 mm was loose
+      // enough to wave through a tyre fit that was 30 mm out, which is what put
+      // every swapped rim low in its tyre.
+      if(Math.hypot(cx,cy) > 0.012) return null;
       return clusterCenter.clone().addScaledVector(u, cx).addScaledVector(w, cy);
     };
     const isTireMat = (c) => (Array.isArray(c.material)?c.material:[c.material])
       .some(m => m && /tire|tyre/i.test(m.name||''));
+
+    // The wheel's TRUE centre, from the tyre's outer tread ring.
+    //
+    // meshSpinCenter above fits a circle through ALL of a mesh's vertices. On a
+    // rim face that is fine — it really is one ring. On a TYRE it is not: the
+    // mesh spans tread, both sidewalls and the bore, i.e. a wide band of radii,
+    // and an algebraic circle fit over a wide band is biased by however the
+    // vertices happen to be distributed across it. Measured on the emulator it
+    // put the front-left centre **30 mm below** the tyre's real centre, and
+    // since the swapped rim is placed on that point, every rim sat 30 mm low in
+    // its tyre at every ride height and every camera angle.
+    //
+    // The outer tread is a single clean circle, so fit only that, and iterate:
+    // the band can only be selected by radius, radius is measured from whatever
+    // centre we currently believe, and on an off-centre start the first
+    // selection is an arc rather than a ring (the same trap as the rim runout
+    // fit). It converges in a few passes. Four independent metrics agree on the
+    // result to 0.1 mm — min/max extent, the 1st-99th and 0.5th-99.5th
+    // percentile extents, and this fit.
+    const tyreAxisCentre = (arr, axis, seed) => {
+      // Deliberately NOT arr.filter(isTireMat): that tests the MATERIAL name,
+      // and this model's tyres are meshes called hub_lb / hub_lb_1 whose
+      // materials do not say "tire" at all, so the filter came back empty and
+      // the correction silently did nothing. The outermost ring in a wheel
+      // cluster is the tread whatever anyone called it, so use the lot.
+      const tyres = arr;
+      if (!tyres.length) return null;
+      let u = new THREE.Vector3(1,0,0); if (Math.abs(u.dot(axis))>0.9) u.set(0,1,0);
+      u.sub(axis.clone().multiplyScalar(u.dot(axis))).normalize();
+      const w = new THREE.Vector3().crossVectors(axis,u).normalize();
+      const pts = [];
+      const v = new THREE.Vector3();
+      tyres.forEach(c => {
+        const pos = c.geometry && c.geometry.attributes && c.geometry.attributes.position;
+        if (!pos || !pos.count) return;
+        c.updateWorldMatrix(true, false);
+        const step = Math.max(1, Math.floor(pos.count / 6000));
+        for (let i = 0; i < pos.count; i += step) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(c.matrixWorld).sub(seed);
+          pts.push([v.dot(u), v.dot(w)]);
+        }
+      });
+      if (pts.length < 400) return null;
+      let cx = 0, cy = 0, R = 0;
+      for (let iter = 0; iter < 10; iter++) {
+        let rMax = 0;
+        for (const [x, y] of pts) { const r = Math.hypot(x-cx, y-cy); if (r > rMax) rMax = r; }
+        const band = pts.filter(([x, y]) => Math.hypot(x-cx, y-cy) > rMax * 0.97);
+        if (band.length < 50) break;
+        let n=0,Scc=0,Sss=0,Scs=0,Sc=0,Ss=0,Svc=0,Svs=0,Sv=0;
+        for (const [x0, y0] of band) {
+          const x = x0-cx, y = y0-cy, r = Math.hypot(x, y);
+          if (r < 1e-9) continue;
+          const ct = x/r, st = y/r;
+          n++; Scc+=ct*ct; Sss+=st*st; Scs+=ct*st; Sc+=ct; Ss+=st;
+          Svc+=r*ct; Svs+=r*st; Sv+=r;
+        }
+        if (n < 20) break;
+        const M=[[Scc,Scs,Sc,Svc],[Scs,Sss,Ss,Svs],[Sc,Ss,n,Sv]];
+        let ok = true;
+        for (let i=0;i<3;i++){
+          let q=i; for(let k=i+1;k<3;k++) if(Math.abs(M[k][i])>Math.abs(M[q][i])) q=k;
+          if (Math.abs(M[q][i]) < 1e-12) { ok = false; break; }
+          [M[i],M[q]]=[M[q],M[i]];
+          for(let k=0;k<3;k++) if(k!==i){const f=M[k][i]/M[i][i]; for(let j=i;j<4;j++) M[k][j]-=f*M[i][j];}
+        }
+        if (!ok) break;
+        const dx = M[0][3]/M[0][0], dy = M[1][3]/M[1][1];
+        if (!isFinite(dx) || !isFinite(dy)) break;
+        cx += dx; cy += dy; R = M[2][3]/M[2][2];
+        if (Math.hypot(dx, dy) < 1e-5) break;
+      }
+      if (!(R > 1e-4)) return null;
+      // A correction bigger than a third of the tyre radius means the seed was
+      // not in the wheel at all; trust nothing that wild.
+      if (Math.hypot(cx, cy) > R * 0.33) return null;
+      return seed.clone().addScaledVector(u, cx).addScaledVector(w, cy);
+    };
     const vertCount = (c) => (c.geometry&&c.geometry.attributes&&c.geometry.attributes.position
       &&c.geometry.attributes.position.count)||0;
-    const assignPivots = (arr, clusterCenter, clusterAxle) => {
+    const assignPivots = (arr, clusterCenterIn, clusterAxle) => {
+      // The tyre's outer tread is the one part of the cluster that is reliably a
+      // single circle about the axle, so it defines the centre; everything else
+      // is refined around it. See tyreAxisCentre for what this replaced.
+      const trueCentre = tyreAxisCentre(arr, clusterAxle, clusterCenterIn);
+      const clusterCenter = trueCentre || clusterCenterIn;
+      if (trueCentre) {
+        const moved = trueCentre.distanceTo(clusterCenterIn);
+        if (moved > 0.002) {
+          console.log('[WheelAxle] centre corrected by', (moved * 1000).toFixed(1),
+            'mm from the tyre outer tread');
+        }
+      }
       // Pass 1: fit each mesh's own spin centre.
       const info = arr.map(c => ({ c, fit: meshSpinCenter(c, clusterAxle, clusterCenter),
         tire: isTireMat(c), verts: vertCount(c) }));
@@ -13949,7 +14231,16 @@ class Component extends DCLogic {
             // undo it here before inverting — otherwise the resized wheel ends
             // up permanently shifted by whatever the ride height was at build
             // time.
-            const liveOffsetY = (this._wheelsShareCarRoot !== false) ? (this.state.carHeightOffset || 0) : 0;
+            // Compensate by the difference from the height the STOCK wheels were
+            // cached at — not by the absolute offset. Assuming zero here meant
+            // that whenever the app booted with a saved ride height (yours was
+            // -30 mm), the clone landed in a different frame from the tyre it
+            // sits in, and every swapped rim was displaced by exactly the boot
+            // ride height: permanently, at every later height, every rim, every
+            // camera angle. Measured: -29.6 mm at boot height -30, 0.0 mm at
+            // boot height 0.
+            const liveOffsetY = (this._wheelsShareCarRoot !== false)
+              ? ((this.state.carHeightOffset || 0) - (this._wheelInitHeightOffset || 0)) : 0;
             cloneMesh._initParentInv = cloneMesh.parent
               ? cloneMesh.parent.matrixWorld.clone().invert().multiply(new THREE.Matrix4().makeTranslation(0, liveOffsetY, 0))
               : new THREE.Matrix4();
@@ -14960,6 +15251,7 @@ class Component extends DCLogic {
           repeatCorr: this._rimRepeatInfo ? +this._rimRepeatInfo.corr.toFixed(2) : null,
           repeatWeak: this._rimRepeatInfo ? !!this._rimRepeatInfo.weak : null,
           blurArcDeg: deg(this._blurArcRad || Math.PI / 3),
+          blurLobe: this._blurLobe ? this._blurLobe.raw : null,
           blurStartKmh: +win.start.toFixed(1),
           blurFullKmh: +win.full.toFixed(1),
           maxStepDeg: deg(period * this._wheelSpinTune.stepFrac),
