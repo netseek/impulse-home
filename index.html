@@ -3504,16 +3504,14 @@ const CAR_SIGNALS = {
   fuelTrip: 'car.basic.cur_journey_avg_fuel_consume',
   fuelAvg: 'car.basic.avg_fuel_consumption',
   evTrip: 'car.ev_info.avg_energy_consume_info_since_startup',
-  // POWER widget — BeanEnergyAssistant Fluxo de energia (RE300 HEV).
-  driveState: 'car.ev_info.energy_drive_state',
+  // POWER widget stats. Mode/ICE/motors come from Impulse packed flow.
   batterySoc: 'car.ev_info.cur_battery_power_percentage',
   evRange: 'car.ev_info.electric_mode_remain_odometer',
   fuelRange: 'car.ev_info.fuel_mode_remain_odometer',
   cycleEv: 'car.ev_info.cycle_energy_consume_info',
   cycleFuel: 'car.ev_info.cycle_fuel_consume_info',
-  chargingState: 'car.ev_info.charging_state',
-  architecture: 'car.configure.ev_drive_architecture',
-  engineState: 'car.basic.engine_state',
+  // Derived by Impulse PowerFlowMapper. Packed v1|state|ice|front|rear.
+  powerFlow: 'haval.power.flow',
 };
 
 // GRAPHS widget — same derivation Impulse uses for evPowerKw.
@@ -3573,44 +3571,26 @@ const CAR_POWER_ASSETS = {
   rearOn: 'assets/power/motor_on_blue.webp',
   rearOnRegen: 'assets/power/motor_on.webp',
 };
-// energy_drive_state → flow. front/rear: 0 off, 1 drive, -1 regen (P2 / P4).
-const CAR_POWER_IDLE = { tone: 'idle', label: 'Parado', ice: false, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 };
-const CAR_POWER_FLOW = {
-  0: CAR_POWER_IDLE,
-  10: CAR_POWER_IDLE,
-  11: { tone: 'idle', label: 'Parado', ice: true, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  21: { tone: 'idle', label: 'Marcha lenta', ice: true, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  14: { tone: 'ev', label: 'Elétrico', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
-  22: { tone: 'ev', label: 'Elétrico', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
-  6:  { tone: 'regen', label: 'Regen', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: -1, iceWheel: 0, front: -1, rear: 0 },
-  13: { tone: 'regen', label: 'Regen', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: -1, iceWheel: 0, front: -1, rear: 0 },
-  15: { tone: 'hybrid', label: 'Híbrido', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
-  16: { tone: 'hybrid', label: 'Híbrido', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
-  17: { tone: 'hybrid', label: 'Híbrido', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
-  3:  { tone: 'ice', label: 'Paralelo', ice: true, batt: false, wheel: true, iceBatt: 0, battWheel: 0, iceWheel: 1, front: 0, rear: 0 },
-  20: { tone: 'hybrid', label: 'Combinado', ice: true, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 1, front: 1, rear: 0 },
-  1:  { tone: 'charge', label: 'Carga', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 0, iceWheel: 1, front: 1, rear: 0 },
-  12: { tone: 'charge', label: 'Carga lenta', ice: true, batt: true, wheel: false, iceBatt: 1, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  18: { tone: 'charge', label: 'Aquecendo', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  23: { tone: 'charge', label: 'Carregando', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  45: { tone: 'charge', label: 'Carregando', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  46: { tone: 'charge', label: 'Carregando', ice: false, batt: true, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 },
-  // P2 (front) / P4 (rear) — layout_car_p2p4 + P2P4FlowView.drawView packed 30–42.
-  30: { tone: 'charge', label: 'Carga P2+P4', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 1 },
-  31: { tone: 'hybrid', label: 'P4 + carga P2', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 1, front: 1, rear: 1 },
-  32: { tone: 'charge', label: 'Carga P2', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 0, iceWheel: 1, front: 1, rear: 0 },
-  33: { tone: 'charge', label: 'Carga P4', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 0, iceWheel: 1, front: 0, rear: 1 },
-  34: { tone: 'hybrid', label: 'Motor + P4', ice: true, batt: false, wheel: true, iceBatt: 0, battWheel: 0, iceWheel: 1, front: 0, rear: 1 },
-  35: { tone: 'hybrid', label: 'Motor + P2+P4', ice: true, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 1, front: 1, rear: 1 },
-  36: { tone: 'hybrid', label: 'Motor + P2', ice: true, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 1, front: 1, rear: 0 },
-  37: { tone: 'hybrid', label: 'P4, carga P2', ice: true, batt: true, wheel: true, iceBatt: 1, battWheel: 1, iceWheel: 0, front: 1, rear: 1 },
-  38: { tone: 'regen', label: 'Regen dianteiro', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: -1, iceWheel: 0, front: -1, rear: 0 },
-  39: { tone: 'regen', label: 'Regen traseiro', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: -1, iceWheel: 0, front: 0, rear: -1 },
-  40: { tone: 'ev', label: 'P2 + P4', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 1 },
-  41: { tone: 'ev', label: 'P4', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 0, rear: 1 },
-  42: { tone: 'ev', label: 'P2', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 0 },
+const CAR_POWER_IDLE = { tone: 'idle', label: 'Parado', ice: false, batt: false, wheel: false, front: 0, rear: 0 };
+const CAR_POWER_STATE_LABEL = {
+  idle: 'Parado',
+  ev: 'Elétrico',
+  hybrid: 'Híbrido',
+  ice: 'Paralelo',
+  regen: 'Regen',
+  charge: 'Carregando',
 };
-const CAR_POWER_DEMO_STATES = [14, 42, 41, 40, 38, 39, 16, 6, 0];
+// Desktop-only cycle when no bus. Same packed shape Impulse publishes.
+const CAR_POWER_DEMO_PACKED = [
+  'v1|ev|0|1|0',
+  'v1|ev|0|0|1',
+  'v1|ev|0|1|1',
+  'v1|regen|0|-1|0',
+  'v1|regen|0|0|-1',
+  'v1|hybrid|1|1|0',
+  'v1|ice|1|0|0',
+  'v1|idle|0|0|0',
+];
 const CAR_WIDGET_HOLD_MS = 500;
 
 // MODES widget — same keys/values as Impulse SettingsMenuContent / Ajustes.
@@ -4005,8 +3985,7 @@ class Component extends DCLogic {
     // Filled from _cameraPresetDefs() once the class methods exist; constructor
     // runs before those, so _tickCamCycle resolves the list lazily.
     this._camCycleKeys = null;
-    this._powerLive = { drive: '', soc: '', evRange: '', fuelRange: '', cycleEv: '', charging: '', evInst: '', arch: '' };
-    this._engineOn = false;
+    this._powerLive = { soc: '', evRange: '', fuelRange: '', cycleEv: '', evInst: '', flow: '' };
     this._graphEvInstEma = null;
     this._graphBusEvTrip = false;
     this._graphBusFuelTrip = false;
@@ -4238,10 +4217,9 @@ class Component extends DCLogic {
             CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent,
             CAR_SIGNALS.fuelInst, CAR_SIGNALS.evConsume,
             CAR_SIGNALS.fuelTrip, CAR_SIGNALS.fuelAvg, CAR_SIGNALS.evTrip,
-            CAR_SIGNALS.driveState, CAR_SIGNALS.batterySoc,
+            CAR_SIGNALS.batterySoc,
             CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange, CAR_SIGNALS.cycleEv,
-            CAR_SIGNALS.cycleFuel, CAR_SIGNALS.chargingState,
-            CAR_SIGNALS.architecture, CAR_SIGNALS.engineState,
+            CAR_SIGNALS.cycleFuel, CAR_SIGNALS.powerFlow,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
       .concat(Object.keys(lights).map((k) => lights[k]))
@@ -4321,7 +4299,6 @@ class Component extends DCLogic {
       // Impulse cluster ignores this key and derives kWh/100 from pack kW × speed.
       return;
     }
-    if (key === CAR_SIGNALS.driveState) { this._powerLive.drive = String(value); return; }
     if (key === CAR_SIGNALS.batterySoc) { this._powerLive.soc = String(value); return; }
     if (key === CAR_SIGNALS.evRange) { this._powerLive.evRange = String(value); return; }
     if (key === CAR_SIGNALS.fuelRange) { this._powerLive.fuelRange = String(value); return; }
@@ -4336,12 +4313,7 @@ class Component extends DCLogic {
       if (this._graphAcceptKpi(n, 0, 40)) this._setGraphValue('fuelCycle', n);
       return;
     }
-    if (key === CAR_SIGNALS.chargingState) { this._powerLive.charging = String(value); return; }
-    if (key === CAR_SIGNALS.architecture) { this._powerLive.arch = String(value); return; }
-    if (key === CAR_SIGNALS.engineState) {
-      this._engineOn = this._carEngineOn(value);
-      return;
-    }
+    if (key === CAR_SIGNALS.powerFlow) { this._powerLive.flow = String(value); return; }
     if (key === CAR_SIGNALS.fuelTrip) {
       const n = this._parseFuelAvg(value);
       if (this._graphAcceptKpi(n, 0, 40)) {
@@ -4509,34 +4481,42 @@ class Component extends DCLogic {
     return which === 'rear' ? CAR_POWER_ASSETS.rearOn : CAR_POWER_ASSETS.frontOn;
   }
 
-  _powerResolveFlow(raw) {
-    const n = parseInt(String(raw == null ? '' : raw).trim(), 10);
-    const flow = CAR_POWER_FLOW[n];
-    return flow || CAR_POWER_IDLE;
+  // Impulse packed snapshot: v1|state|ice|front|rear. Extra trailing fields
+  // (old labelled packs) are ignored.
+  _powerUnpackFlow(raw) {
+    const parts = String(raw == null ? '' : raw).split('|');
+    if (parts.length < 5 || parts[0] !== 'v1') return null;
+    const front = parseInt(parts[3], 10);
+    const rear = parseInt(parts[4], 10);
+    if (!isFinite(front) || !isFinite(rear)) return null;
+    return { state: parts[1], ice: parts[2] === '1', front: front, rear: rear };
   }
 
-  // Dual-motor AWD often lands on an unmapped/idle enum while both axles
-  // are live. If we're moving with pack power, don't sit on Parado.
-  _powerInferAwd(flow, kwRaw) {
-    const iceOn = !!this._engineOn;
-    if (kwRaw < -0.15) {
-      return { tone: 'regen', label: iceOn ? 'Regen' : 'Regen', ice: iceOn, batt: true, wheel: true, iceBatt: iceOn ? 1 : 0, battWheel: -1, iceWheel: 0, front: -1, rear: -1 };
-    }
-    if (kwRaw > 0.15 && iceOn) {
-      return { tone: 'hybrid', label: 'Híbrido', ice: true, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 1, front: 1, rear: 1 };
-    }
-    if (kwRaw > 0.15) {
-      return { tone: 'ev', label: 'P2 + P4', ice: false, batt: true, wheel: true, iceBatt: 0, battWheel: 1, iceWheel: 0, front: 1, rear: 1 };
-    }
-    if (iceOn) {
-      return { tone: 'idle', label: 'Marcha lenta', ice: true, batt: false, wheel: false, iceBatt: 0, battWheel: 0, iceWheel: 0, front: 0, rear: 0 };
-    }
-    return flow;
+  _powerStateLabel(state, iceOn) {
+    if (state === 'idle') return iceOn ? 'Marcha lenta' : 'Parado';
+    return CAR_POWER_STATE_LABEL[state] || 'Parado';
   }
 
-  _powerDemoDrive(now) {
-    const i = Math.floor((now || 0) / 4200) % CAR_POWER_DEMO_STATES.length;
-    return String(CAR_POWER_DEMO_STATES[i]);
+  _powerFromPacked(raw) {
+    const p = this._powerUnpackFlow(raw);
+    if (!p) return null;
+    const state = p.state;
+    const ice = !!p.ice;
+    const batt = state === 'ev' || state === 'hybrid' || state === 'regen' || state === 'charge';
+    return {
+      tone: state,
+      label: this._powerStateLabel(state, ice),
+      ice: ice,
+      batt: batt,
+      wheel: !!(p.front || p.rear),
+      front: p.front,
+      rear: p.rear,
+    };
+  }
+
+  _powerDemoPacked(now) {
+    const i = Math.floor((now || 0) / 4200) % CAR_POWER_DEMO_PACKED.length;
+    return CAR_POWER_DEMO_PACKED[i];
   }
 
   _powerFmtNum(raw, digits) {
@@ -4550,31 +4530,14 @@ class Component extends DCLogic {
   _powerModel(now) {
     const live = this._powerLive || {};
     const demo = !this._graphAnyLive && !(this._busCount > 0);
-    const drive = live.drive !== '' && live.drive != null ? live.drive : (demo ? this._powerDemoDrive(now) : '0');
-    const charging = String(live.charging || '').trim() === '1';
-    let flow = this._powerResolveFlow(drive);
-    if (charging) {
-      // Plugged in: always show charging, regardless of drive-state idle/noise.
-      flow = Object.assign({}, CAR_POWER_FLOW[23] || CAR_POWER_IDLE, {
-        tone: 'charge',
-        label: 'Carregando',
-        batt: true,
-        front: 0,
-        rear: 0,
-        ice: false,
-      });
-    }
+    const flow = this._powerFromPacked(demo ? this._powerDemoPacked(now) : live.flow) || CAR_POWER_IDLE;
     let kwRaw = this._graphDisplay.evPowerKw != null
       ? this._graphDisplay.evPowerKw
       : (this._graphValues.evPowerKw || (demo ? this._graphDemoValue('evPowerKw', now) : 0));
     // Parked / stopped: force a clean 0 kW readout (pack V×I noise otherwise).
-    // Prefer vehicle speed — don't use flow.tone alone (drive-state may be missing).
     const speedKmh = this._carSpeedKmh;
-    const stopped = !demo && !charging && isFinite(speedKmh) && speedKmh < 0.5;
+    const stopped = !demo && flow.tone !== 'charge' && isFinite(speedKmh) && speedKmh < 0.5;
     if (stopped) kwRaw = 0;
-    if (!demo && !charging && !stopped && flow.tone === 'idle') {
-      flow = this._powerInferAwd(flow, kwRaw);
-    }
     const regenKw = kwRaw < -0.4;
     let kwClass = '';
     if (regenKw || flow.tone === 'regen' || flow.tone === 'charge') kwClass = 'regen';
@@ -6569,12 +6532,6 @@ class Component extends DCLogic {
     let s = String(value).trim();
     if (s.charAt(0) === '{') s = s.replace(/^\{|\}$/g, '').split(',')[0].trim();
     return s === '1' || s === 'true';
-  }
-
-  _carEngineOn(value) {
-    const s = String(value == null ? '' : value).trim();
-    if (!s || s === '0' || s === '-1' || s === '10' || s === '14' || s === '15') return false;
-    return true;
   }
 
   _carNumber(value) {
