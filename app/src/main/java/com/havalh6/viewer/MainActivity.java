@@ -808,6 +808,7 @@ public final class MainActivity extends Activity {
     private boolean drawerExpanded;
     private int dockCellPx;
     private int dockIconPx;
+    private int dockIconRowTopPadPx;
     /** Launcher icons, left to right — the order the boot reveal staggers them in. */
     private final List<MotionTrailLayout> launcherItems = new ArrayList<>();
     private ProjectionPresence projectionPresence;
@@ -4560,7 +4561,7 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout stripRow = new android.widget.LinearLayout(this);
         this.stripRow = stripRow;
         stripRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        stripRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        stripRow.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         // Drawer must stay above the scroll band; host clips so icons cannot
         // paint left into the drawer when swiped.
         stripRow.setClipChildren(false);
@@ -4569,7 +4570,11 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
-        modeDrawer = buildModeDrawer(density, itemWidthPx, iconSizePx);
+        int platePx = dockPlatePx(iconSizePx, density);
+        int iconRowTopPad = Math.max(Math.round(8 * density), (stripHeightPx - platePx) / 2);
+        dockIconRowTopPadPx = iconRowTopPad;
+
+        modeDrawer = buildModeDrawer(density, itemWidthPx, iconSizePx, iconRowTopPad);
         // Keep the drawer above any scroll bleed (clip is the real fix; this is belt).
         modeDrawer.setElevation(10f * density);
         stripRow.addView(modeDrawer);
@@ -4598,8 +4603,6 @@ public final class MainActivity extends Activity {
 
         android.widget.LinearLayout iconsLayout = new android.widget.LinearLayout(this);
         iconsLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        int platePx = dockPlatePx(iconSizePx, density);
-        int iconRowTopPad = Math.max(Math.round(8 * density), (stripHeightPx - platePx) / 2);
         iconsLayout.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         iconsLayout.setPadding(Math.round(12 * density), iconRowTopPad, Math.round(24 * density), 0);
         // Trail smear stays inside each item; the scroll view clips the row.
@@ -4803,10 +4806,11 @@ public final class MainActivity extends Activity {
     private static final String STRIP_LAYOUT = "layout";
     private static final String STRIP_CONFIG = "config";
 
-    private android.widget.LinearLayout buildModeDrawer(float density, int cellPx, int iconPx) {
+    private android.widget.LinearLayout buildModeDrawer(float density, int cellPx, int iconPx,
+            int iconRowTopPad) {
         android.widget.LinearLayout drawer = new android.widget.LinearLayout(this);
         drawer.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        drawer.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        drawer.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         drawer.setClipChildren(false);
         drawer.setBackgroundColor(0x00000000);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
@@ -4814,16 +4818,16 @@ public final class MainActivity extends Activity {
         lp.leftMargin = Math.round(8 * density);
         drawer.setLayoutParams(lp);
 
-        modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, dockGlyphApps(iconPx),
+        modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad, dockGlyphApps(iconPx),
                 null, v -> setDrawerExpanded(true));
         modeCollapsedIcon = (android.widget.ImageView) modeCollapsedBtn.findViewWithTag("modeIcon");
         drawer.addView(modeCollapsedBtn);
 
-        modeAppsBtn = makeModeCell(density, cellPx, iconPx, dockGlyphApps(iconPx),
+        modeAppsBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad, dockGlyphApps(iconPx),
                 "Apps", v -> selectStripMode(STRIP_APPS));
-        modeLayoutBtn = makeModeCell(density, cellPx, iconPx, dockGlyphLayout(iconPx),
+        modeLayoutBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad, dockGlyphLayout(iconPx),
                 "Layout", v -> selectStripMode(STRIP_LAYOUT));
-        modeConfigBtn = makeModeCell(density, cellPx, iconPx, dockGlyphConfig(iconPx),
+        modeConfigBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad, dockGlyphConfig(iconPx),
                 "Settings", v -> selectStripMode(STRIP_CONFIG));
         modeAppsBtn.setVisibility(View.GONE);
         modeLayoutBtn.setVisibility(View.GONE);
@@ -4837,19 +4841,19 @@ public final class MainActivity extends Activity {
         return drawer;
     }
 
-    private View makeModeCell(float density, int cellPx, int iconPx, Drawable glyph,
-            String label, View.OnClickListener click) {
+    private View makeModeCell(float density, int cellPx, int iconPx, int iconRowTopPad,
+            Drawable glyph, String label, View.OnClickListener click) {
         android.widget.LinearLayout cell = new android.widget.LinearLayout(this);
         cell.setOrientation(android.widget.LinearLayout.VERTICAL);
-        cell.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        cell.setGravity(android.view.Gravity.TOP | android.view.Gravity.CENTER_HORIZONTAL);
         android.widget.LinearLayout.LayoutParams lp =
                 new android.widget.LinearLayout.LayoutParams(cellPx,
-                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
         cell.setLayoutParams(lp);
+        cell.setPadding(0, iconRowTopPad, 0, 0);
         cell.setClickable(true);
         cell.setFocusable(true);
         cell.setOnClickListener(click);
-        cell.setGravity(android.view.Gravity.CENTER);
 
         FrameLayout iconWrap = new FrameLayout(this);
         int wrapSize = dockPlatePx(iconPx, density);
@@ -4880,16 +4884,20 @@ public final class MainActivity extends Activity {
         android.widget.TextView tv = new android.widget.TextView(this);
         tv.setTag("modeLabel");
         tv.setText(label != null ? label : "");
+        styleDockCaption(tv, density);
         tv.setTextColor(dockLabelColorMuted());
-        tv.setTextSize(11f);
-        tv.setGravity(android.view.Gravity.CENTER);
-        tv.setMaxLines(2);
-        tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tv.setLetterSpacing(0.02f);
-        tv.setPadding(0, Math.round(4 * density), 0, 0);
-        tv.setVisibility(label != null && !label.isEmpty() ? View.VISIBLE : View.GONE);
+        if (dockUiLight) tv.setShadowLayer(0f, 0f, 0f, 0);
+        tv.setVisibility(View.INVISIBLE);
         cell.addView(tv);
         return cell;
+    }
+
+    private View makeModeCell(float density, int cellPx, int iconPx, Drawable glyph,
+            String label, View.OnClickListener click) {
+        int topPad = dockIconRowTopPadPx > 0 ? dockIconRowTopPadPx
+                : Math.round(8 * density);
+        return makeModeCell(density, cellPx, iconPx, topPad, glyph, label, click);
     }
 
     private void setModeCellLabelVisible(View cell, boolean visible) {
@@ -4899,29 +4907,55 @@ public final class MainActivity extends Activity {
         CharSequence text = (label instanceof android.widget.TextView)
                 ? ((android.widget.TextView) label).getText() : null;
         boolean has = text != null && text.length() > 0;
-        label.setVisibility(visible && has ? View.VISIBLE : View.GONE);
+        label.setVisibility(visible && has ? View.VISIBLE : View.INVISIBLE);
     }
 
     /**
-     * Widget-light → frosted light drawer band + dark gray labels.
-     * Widget-dark → darker strip gradient + white labels (classic dock).
+     * Widget-light → frosted plates + soft gray gradient rim.
+     * Widget-dark → frosted white plates + white rim (classic dock).
      */
-    private android.graphics.drawable.GradientDrawable makeDockPlateDrawable(
+    private android.graphics.drawable.Drawable makeDockPlateDrawable(
             boolean selected, float density) {
+        final float r = 14f * density;
+        final int strokePx = Math.max(1, Math.round((selected ? 1.5f : 1f) * density));
+        if (dockUiLight) {
+            android.graphics.drawable.GradientDrawable border =
+                    new android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                            dockPlateBorderGradientColors(selected));
+            border.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            border.setCornerRadius(r);
+
+            android.graphics.drawable.GradientDrawable fill =
+                    new android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                            dockPlateGradientColors(selected));
+            fill.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            fill.setCornerRadius(Math.max(0f, r - strokePx));
+
+            android.graphics.drawable.LayerDrawable layers =
+                    new android.graphics.drawable.LayerDrawable(
+                            new android.graphics.drawable.Drawable[] { border, fill });
+            layers.setLayerInset(1, strokePx, strokePx, strokePx, strokePx);
+            return layers;
+        }
+
         android.graphics.drawable.GradientDrawable d =
                 new android.graphics.drawable.GradientDrawable(
                         android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
                         dockPlateGradientColors(selected));
         d.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        d.setCornerRadius(14f * density);
-        if (dockUiLight) {
-            d.setStroke(Math.max(1, Math.round((selected ? 1.5f : 1.2f) * density)),
-                    selected ? 0xFF3D4550 : 0x664A5568);
-        } else {
-            d.setStroke(Math.max(1, Math.round((selected ? 1.5f : 1.2f) * density)),
-                    selected ? 0xA8FFFFFF : 0x50FFFFFF);
-        }
+        d.setCornerRadius(r);
+        d.setStroke(strokePx,
+                selected ? 0xA8FFFFFF : 0x50FFFFFF);
         return d;
+    }
+
+    /** Soft gray rim for light-widget plates — no hard black stroke. */
+    private int[] dockPlateBorderGradientColors(boolean selected) {
+        return selected
+                ? new int[] { 0xC8D4DCE4, 0x88A8B8C4 }
+                : new int[] { 0xA8C0CCD8, 0x6898A8B8 };
     }
 
     /** Frosted glass fills — keep alpha high enough to read light on the dark drawer band. */
