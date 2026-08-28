@@ -13,12 +13,16 @@
   //   })
   //   - left  → left freeform app is open
   //   - right → 'idle' now-playing card, or 'app' in the right slot
-  //   - mode  → triple (app+car+app), appCar, appsOnly (session-only)
+  //   - mode  → triple (app+car+app), appCar, appsOnly (persisted; dual-pane launchers)
   // Native: AppLauncherBridge.setShellMode(mode), setLaunchSide(side),
+  //         launchAppInSlot(pkg, side), setSplitRatio('1:1'|'2:1'|'1:2'),
+  //         swapApps(), saveAppsOnlyDefault(),
   //         dismissOverlays() — closes freeform so WebView menus can show
+  //         setChromeOnTop(onTop) — raise viewer chrome over freeform
   //         setSlotUse(side, 'app'|'widgets') — implicit: adding a widget
   //         claims the slot; launching an app claims it; emptying it frees it.
   //         saveWidgets(json), loadWidgets()
+  // Payload also includes splitRatio for APP+APP.
   // Fallback: window.onAndroidLauncherPopup(active: boolean)  (left only)
   //
   // Now playing:

@@ -90,6 +90,62 @@ explains it. Measure the specific change; do not reason from this table.
   the models roughly 3x on disk (HEV 11.3 -> 34.6 MB) in exchange for 4 MB of
   VRAM per 2048 map instead of 16 MB.
 
+## Editing GLB assets
+
+Shipped car models are tuned for **load time**, not just appearance. Before
+saving any `.glb` change, preserve whatever compression and layout the file
+already carries:
+
+| File | Geometry | Textures | Notes |
+|---|---|---|---|
+| `assets/haval-h6-hev-lite.glb` (boot path) | raw float32, **no Draco** | KTX2/UASTC @ 1024² | Parsed ~1.7 s on the MMI |
+| `assets/_source/haval-h6-hev.glb` | raw float32 | KTX2/UASTC @ 2048² | Build source for `-lite` |
+| Wheels / GT | Draco or meshopt | KTX2 or JPEG | See each script's header |
+
+**Do not round-trip material-only edits through `@gltf-transform` read/write.**
+It rewrites the BIN chunk (vertex layout, bufferViews, sometimes texture
+packing) even when you only change a roughness value. Measured: a gltf-transform
+save of `haval-h6-hev.glb` altered 33 MB of binary payload; JSON-only surgery
+changed **zero** bytes of BIN. The viewer's CPU-side vertex edits
+(`_deformTireBore`, `computeVertexNormals`) assume `VertexLayout.SEPARATE`
+packed arrays — gltf-transform defaults to interleaved and has rendered the
+car as vertical smears before.
+
+**Safe pattern for material / node / metadata edits:** parse the GLB JSON chunk,
+patch in place, copy the BIN chunk through unchanged. See
+`scripts/patch-hev-trunk-materials.mjs`, `scripts/build-lite-textures.mjs`, and
+`scripts/build-ktx2-textures.mjs` (which document the same constraint).
+
+**Rebuild order when textures or resolution change:**
+
+1. `npm run build:lite-textures` — downscale JPEG sources (`sharp`; cannot read KTX2)
+2. `npm run build:ktx2-textures` — UASTC encode (idempotent; skips already-KTX2)
+3. `npm run build:fast-models` — strip Draco from boot-critical `-lite` only
+
+Never save a boot-critical model with Draco re-introduced, and never replace KTX2
+with raw JPEG in the shipped `-lite` file without re-measuring cold start.
+
+## Standalone body loading
+
+**Goal:** boot or toggle to GT and fetch **only that body's `-lite` GLB**
+plus the small catalog rim — no silent second body.
+
+**`?model=gt`** enables standalone GT boot (dev / pre-car-input). The app loads
+`haval-h6-gt-lite.glb` + `HavalGT-wheel.glb` only — no HEV donor preload.
+Native GT tire clusters and calipers are classified in `_buildGtNativeWheelCorners`.
+
+**Saved-settings GT** (localStorage, no URL) still preloads HEV as donor until
+car-side trim input replaces the URL preset.
+
+**HEV/PHEV** (`?model=phev34` etc.) were already standalone: one `-lite` body +
+stock rim GLB. Embedded tires/brakes stay; stock *rims* were stripped from the
+body GLB long ago.
+
+**When HEV is already loaded** (HEV boot → MODEL toggle to GT), GT still inherits
+HEV wheel pivots via `inheritWheelsFrom: 'hev'` — no second download.
+
+Hook points: `_gtBootStandalone()`, `_gtUsesNativeWheels()`, `_whenHevDonorReady`.
+
 ## Things that look like wins and are not
 
 - **More MSAA.** `MAX_SAMPLES` is 4 on this GPU. You are already there.

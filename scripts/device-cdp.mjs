@@ -180,8 +180,30 @@ function serveRepo(port) {
     '.hdr': 'application/octet-stream', '.ktx2': 'application/octet-stream',
     '.mp4': 'video/mp4', '.woff2': 'font/woff2', '.svg': 'image/svg+xml',
   };
-  const srv = http.createServer((req, res) => {
+  const srv = http.createServer(async (req, res) => {
     const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html';
+    if (rel === '_bing-wallpaper.json') {
+      try {
+        const pages = await Promise.all([0, 8].map(async (idx) => {
+          const upstream = await fetch(
+            `https://www.bing.com/HPImageArchive.aspx?format=js&idx=${idx}&n=8&mkt=en-US`,
+          );
+          if (!upstream.ok) throw new Error('bing ' + upstream.status);
+          return upstream.json();
+        }));
+        const images = pages.flatMap((p) => (p && p.images) || []);
+        const body = JSON.stringify({ images });
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        });
+        res.end(body);
+      } catch (e) {
+        res.writeHead(502, { 'Content-Type': 'text/plain' });
+        res.end('bing proxy failed');
+      }
+      return;
+    }
     const file = path.join(ROOT, rel);
     if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       res.writeHead(404); return res.end('not found');

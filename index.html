@@ -763,13 +763,13 @@ window.HavalSplash = (function () {
     }
     .hv-cam-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
       margin-bottom: 8px;
     }
     .hv-cam-tile {
       aspect-ratio: 1;
-      padding: 6px !important;
+      padding: 3px !important;
       display: flex !important;
       align-items: center;
       justify-content: center;
@@ -817,8 +817,8 @@ window.HavalSplash = (function () {
     .hv-cam-ico-off, .hv-cam-cap-off { display: none; }
     .hv-cam-cap {
       font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      line-height: 1.35;
+      font-size: 7px;
+      line-height: 1.3;
       letter-spacing: .04em;
       text-align: center;
       color: rgba(255,255,255,.45);
@@ -2468,50 +2468,163 @@ window.HavalSplash = (function () {
       z-index: 8;
     }
     .hv-widget-cell.on { border-style: solid; border-color: rgba(255,255,255,.55); background: rgba(255,255,255,.12); }
+    .hv-widget-grid.slot-picking .hv-widget-cell.slot-pick {
+      border-style: dashed;
+      border-color: var(--hv-config-thumb);
+      background: rgba(79,214,232,.12);
+      animation: hv-slot-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes hv-slot-pulse {
+      0%, 100% { opacity: .72; }
+      50% { opacity: 1; }
+    }
+    .hv-widget-slot-banner {
+      position: fixed;
+      z-index: 49;
+      left: 50%;
+      top: calc(var(--hv-safe-top, 22px) + 12px);
+      transform: translateX(-50%);
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--hv-widget-border);
+      background: var(--hv-widget-menu-bg);
+      color: var(--hv-widget-fg);
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .1em;
+      box-shadow: var(--hv-widget-shadow);
+      pointer-events: none;
+    }
+    .hv-center-slot-zone {
+      position: fixed;
+      z-index: 12;
+      touch-action: manipulation;
+      background: transparent;
+    }
+    .hv-center-slot-zone.active {
+      background: rgba(79,214,232,.04);
+      outline: 1px dashed rgba(79,214,232,.22);
+      outline-offset: -4px;
+    }
     .hv-widget-picker {
-      position: absolute;
+      position: fixed;
       z-index: 50;
       top: calc(var(--hv-safe-top, 22px) + 70px);
       left: var(--hv-chrome-main-left, 48px);
       min-width: 240px;
-      padding: 10px;
+      padding: 12px;
       border-radius: 12px;
-      background: rgba(16,21,28,.94);
-      border: 1px solid rgba(255,255,255,.14);
-      box-shadow: 0 14px 36px rgba(0,0,0,.45);
+      background: var(--hv-widget-menu-bg);
+      border: 1px solid var(--hv-widget-border);
+      box-shadow: var(--hv-widget-shadow);
+      color: var(--hv-widget-fg);
+      backdrop-filter: blur(22px) saturate(1.25);
+      -webkit-backdrop-filter: blur(22px) saturate(1.25);
+      box-sizing: border-box;
     }
-    .hv-widget-picker button {
+    .hv-widget-picker.on-board {
+      top: auto;
+      left: auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .hv-widget-picker-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .14em;
+      color: var(--hv-widget-muted);
+      padding: 2px 4px 10px;
+      flex-shrink: 0;
+    }
+    .hv-widget-picker-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+    .hv-widget-thumb {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-end;
+      min-height: 88px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--hv-widget-border);
+      background: var(--hv-widget-bg);
+      color: var(--hv-widget-fg);
+      cursor: pointer;
+      touch-action: manipulation;
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+    }
+    .hv-widget-thumb:disabled { opacity: .35; cursor: default; }
+    .hv-widget-thumb-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .08em;
+      font-weight: 600;
+      z-index: 1;
+    }
+    .hv-widget-thumb-sub {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 11px;
+      opacity: .72;
+      margin-top: 3px;
+      z-index: 1;
+    }
+    .hv-widget-thumb.thumb-media {
+      background: linear-gradient(145deg, rgba(79,214,232,.22), rgba(16,21,28,.55)),
+        radial-gradient(circle at 70% 20%, rgba(255,255,255,.18), transparent 55%);
+    }
+    .hv-widget-thumb.thumb-power {
+      background: linear-gradient(145deg, rgba(62,224,138,.18), rgba(16,21,28,.55)),
+        radial-gradient(circle at 30% 30%, rgba(79,214,232,.16), transparent 50%);
+    }
+    .hv-widget-thumb.thumb-modes {
+      background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(16,21,28,.55)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 8px, transparent 8px 16px);
+    }
+    .hv-widget-thumb.thumb-graphs {
+      background: linear-gradient(145deg, rgba(79,214,232,.12), rgba(16,21,28,.55)),
+        linear-gradient(0deg, rgba(79,214,232,.25) 0 2px, transparent 2px 12px);
+      background-size: 100% 100%, 100% 12px;
+    }
+    .hv-widget-picker button.hv-picker-row {
       display: flex;
       width: 100%;
       align-items: center;
       gap: 8px;
       margin-top: 4px;
-      padding: 8px 10px;
+      padding: 10px 12px;
+      min-height: 44px;
       border-radius: 8px;
-      border: 1px solid rgba(255,255,255,.1);
-      background: transparent;
-      color: #eaf2f8;
+      border: 1px solid var(--hv-widget-border);
+      background: var(--hv-widget-bg);
+      color: var(--hv-widget-fg);
       font-family: 'Space Mono', monospace;
       font-size: 10px;
       letter-spacing: .08em;
       cursor: pointer;
+      touch-action: manipulation;
     }
     .hv-widget-picker button:disabled { opacity: .35; cursor: default; }
     .hv-widget-picker.is-sizes {
       display: flex;
       flex-wrap: wrap;
       align-items: flex-start;
-      gap: 6px;
+      gap: 8px;
       min-width: 0;
     }
-    .hv-widget-picker.is-sizes > div:first-child {
-      flex: 1 0 100%;
-      padding: 2px 4px 2px;
-    }
+    .hv-widget-picker.is-sizes .hv-widget-picker-grid,
+    .hv-widget-picker.is-sizes .hv-widget-picker-title { flex: 1 0 100%; }
     .hv-widget-picker.is-sizes button {
       width: auto;
-      min-width: 52px;
-      min-height: 52px;
+      min-width: 56px;
+      min-height: 56px;
       margin-top: 0;
       justify-content: center;
       padding: 12px 14px 14px;
@@ -3091,8 +3204,8 @@ window.HavalSplash = (function () {
       -webkit-backdrop-filter: blur(6px);
       color: var(--hv-widget-fg, #eaf2f8);
       display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      pointer-events: auto;
+      cursor: default;
+      pointer-events: none;
       box-shadow: var(--hv-widget-shadow, 0 2px 10px rgba(0,0,0,.32));
       transition: background .15s ease, border-color .15s ease, color .15s ease;
       font-size: 0;
@@ -3139,10 +3252,10 @@ window.HavalSplash = (function () {
       flex-direction: column;
       align-items: flex-start;
       gap: 4px;
-      pointer-events: auto;
+      pointer-events: none;
     }
     .hv-hs.flip .hv-hs-menu { left: auto; right: 19px; align-items: flex-end; }
-    .hv-hs.open .hv-hs-menu { display: flex; }
+    .hv-hs.open .hv-hs-menu { display: flex; pointer-events: auto; }
     .hv-hs-menu button {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
@@ -3177,11 +3290,11 @@ window.HavalSplash = (function () {
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       box-shadow: var(--hv-widget-shadow, 0 10px 36px rgba(0,0,0,.22));
-      pointer-events: auto;
+      pointer-events: none;
       z-index: 8;
       display: none;
     }
-    .hv-hs-roof-pop.on { display: block; }
+    .hv-hs-roof-pop.on { display: block; pointer-events: auto; }
     .hv-hs-roof-pop h4 {
       margin: 0 0 10px;
       font-family: 'Space Mono', monospace;
@@ -3374,7 +3487,10 @@ window.HavalSplash = (function () {
 
   <!-- widget boards occupy the same rects as freeform app slots -->
   <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};">
-    <div class="hv-widget-grid {{ widgetPlaceGridClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);">
+    <div class="hv-widget-grid {{ leftGridPickClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);">
+      <sc-for list="{{ leftSlotCells }}" as="sc" hint-placeholder-count="0">
+        <button type="button" class="hv-widget-cell {{ sc.cls }}" style="{{ sc.gridStyle }}" onClick="{{ sc.onClick }}"></button>
+      </sc-for>
       <sc-for list="{{ leftPlaceCells }}" as="pc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ pc.cls }}" style="{{ pc.gridStyle }}" onClick="{{ pc.onClick }}"></button>
       </sc-for>
@@ -3565,7 +3681,10 @@ window.HavalSplash = (function () {
   </div>
 
   <div class="hv-widget-board" style="display: {{ rightBoardDisplay }}; left: {{ rightBoardLeft }}; top: {{ rightBoardTop }}; width: {{ rightBoardWidth }}; height: {{ rightBoardHeight }};">
-    <div class="hv-widget-grid {{ widgetPlaceGridClass }}" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);">
+    <div class="hv-widget-grid {{ rightGridPickClass }}" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);">
+      <sc-for list="{{ rightSlotCells }}" as="sc" hint-placeholder-count="0">
+        <button type="button" class="hv-widget-cell {{ sc.cls }}" style="{{ sc.gridStyle }}" onClick="{{ sc.onClick }}"></button>
+      </sc-for>
       <sc-for list="{{ rightPlaceCells }}" as="pc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ pc.cls }}" style="{{ pc.gridStyle }}" onClick="{{ pc.onClick }}"></button>
       </sc-for>
@@ -3810,13 +3929,29 @@ window.HavalSplash = (function () {
     <button type="button" class="hv-apps-fab {{ appsFabBtnClass }}" onClick="{{ toggleAppsFab }}" title="APP+APP controls">☰</button>
   </div>
 
-  <div class="hv-widget-picker {{ widgetPickerListClass }}" style="display: {{ widgetPickerDisplay }};">
-    <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.14em;opacity:.55;padding:2px 4px 6px;">{{ widgetPickerTitle }}</div>
+  <div class="hv-widget-slot-banner" style="display: {{ widgetSlotBannerDisplay }};">{{ widgetSlotBannerText }}</div>
+
+  <div class="hv-center-slot-zone {{ centerSlotZoneClass }}" style="display: {{ centerSlotZoneDisplay }}; left: {{ centerSlotLeft }}; top: {{ centerSlotTop }}; width: {{ centerSlotWidth }}; height: {{ centerSlotHeight }};" onTouchStart="{{ onCenterSlotHoldStart }}" onTouchEnd="{{ onCenterSlotHoldEnd }}" onTouchCancel="{{ onCenterSlotHoldCancel }}" onMouseDown="{{ onCenterSlotHoldStart }}" onMouseUp="{{ onCenterSlotHoldEnd }}" onMouseLeave="{{ onCenterSlotHoldCancel }}"></div>
+
+  <div class="hv-widget-picker {{ widgetPickerListClass }}" style="display: {{ widgetPickerDisplay }}; {{ widgetPickerStyle }}">
+    <div class="hv-widget-picker-title">{{ widgetPickerTitle }}</div>
+    <sc-if value="{{ widgetPickerIsThumbs }}" hint-placeholder-val="{{ false }}">
+    <div class="hv-widget-picker-grid">
+      <sc-for list="{{ widgetPickerItems }}" as="pi" hint-placeholder-count="0">
+        <button type="button" class="hv-widget-thumb {{ pi.thumbClass }}" onClick="{{ pi.onClick }}" title="{{ pi.title }}" disabled="{{ pi.disabled }}" style="opacity: {{ pi.opacity }};">
+          <span class="hv-widget-thumb-label">{{ pi.label }}</span>
+          <span class="hv-widget-thumb-sub">{{ pi.subLabel }}</span>
+        </button>
+      </sc-for>
+    </div>
+    </sc-if>
+    <sc-if value="{{ widgetPickerIsSizes }}" hint-placeholder-val="{{ true }}">
     <sc-for list="{{ widgetPickerItems }}" as="pi" hint-placeholder-count="0">
       <button type="button" class="{{ pi.btnClass }}" onClick="{{ pi.onClick }}" title="{{ pi.title }}" style="opacity: {{ pi.opacity }};">
         <span class="hv-size-glyph {{ pi.sizeClass }}"></span>{{ pi.label }}
       </button>
     </sc-for>
+    </sc-if>
   </div>
 
   <div class="hv-wallpaper-backdrop {{ wallpaperBackdropClass }}" onClick="{{ closeWallpaperPopup }}"></div>
@@ -3949,13 +4084,6 @@ window.HavalSplash = (function () {
         </sc-for>
       </div>
       </sc-if>
-      <div class="hv-layout-note-card">
-        <div class="hv-layout-note-kicker">WIDGETS</div>
-        <div class="hv-layout-note-text">Hold a widget to configure or delete it.</div>
-      </div>
-      </sc-if>
-      <sc-if value="{{ layoutSectionHidden }}" hint-placeholder-val="{{ true }}">
-      <div style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; line-height: 1.45; opacity: .65;">Switch out of Dual App Split Screen to choose the center background (3D car or wallpaper).</div>
       </sc-if>
     </sc-if>
 
@@ -4787,6 +4915,8 @@ class Component extends DCLogic {
     widgetPlaceMode: null,
     widgetPlaceId: null,
     widgetPlaceFromSide: null,
+    widgetPlaceAnchorX: null,
+    widgetPlaceAnchorY: null,
     widgetMenuId: null,
     widgetMenuSide: null,
     graphEditId: null,
@@ -13816,7 +13946,6 @@ class Component extends DCLogic {
 
   // ── Car hotspots (tap body → bullets; tap outside → safe zone) ───────────
   _getHotspotDefs() {
-    const winMenu = [{ label: 'TOGGLE WINDOWS', cmd: 'toggle_windows' }];
     return [
       { id: 'roof', glyph: '', title: 'Sunroof & curtain',
         menu: [
@@ -13824,10 +13953,6 @@ class Component extends DCLogic {
           { label: 'TOGGLE CURTAIN', cmd: 'toggle_curtain' },
           { label: 'LEVELS…', action: 'roof_levels' },
         ] },
-      { id: 'win_fl', glyph: '', title: 'Front left window', menu: winMenu },
-      { id: 'win_fr', glyph: '', title: 'Front right window', menu: winMenu },
-      { id: 'win_rl', glyph: '', title: 'Rear left window', menu: winMenu },
-      { id: 'win_rr', glyph: '', title: 'Rear right window', menu: winMenu },
       { id: 'engine', glyph: '', title: 'Engine bay',
         menu: [{ label: 'X-RAY', action: 'xray' }] },
       { id: 'camera', glyph: '', title: 'Cameras',
@@ -13846,10 +13971,6 @@ class Component extends DCLogic {
     dot.title = def.title;
     dot.setAttribute('aria-label', def.title);
     if (def.glyph) dot.textContent = def.glyph;
-    dot.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      this._onHotspotDotClick(def.id);
-    });
     const menu = document.createElement('div');
     menu.className = 'hv-hs-menu';
     def.menu.forEach((item) => {
@@ -13989,6 +14110,14 @@ class Component extends DCLogic {
       const dx = e.clientX - d.x;
       const dy = e.clientY - d.y;
       if (Math.hypot(dx, dy) > 10 || performance.now() - d.t > 280) return;
+      if (this._hotspotsVisible) {
+        const dotId = this._hitHotspotDot(e);
+        if (dotId) {
+          this._onHotspotDotClick(dotId);
+          this._armHotspotHideTimer();
+          return;
+        }
+      }
       if (this._raycastCarBody(e)) {
         this._pulseHotspots();
       } else {
@@ -14031,6 +14160,25 @@ class Component extends DCLogic {
       return;
     }
     console.warn('[hotspot] no vehicle bridge for', cmd, value || '');
+  }
+
+  _hitHotspotDot(e, radius) {
+    const r = radius || 20;
+    const screen = this._hsScreen;
+    if (!this._hotspotsVisible || !screen) return null;
+    let best = null;
+    let bestD = r;
+    Object.keys(this._hsEls || {}).forEach((id) => {
+      const el = this._hsEls[id];
+      const pos = screen[id];
+      if (!el || !pos || !el.classList.contains('on')) return;
+      const d = Math.hypot(e.clientX - pos.x, e.clientY - pos.y);
+      if (d <= bestD) {
+        bestD = d;
+        best = id;
+      }
+    });
+    return best;
   }
 
   _onCanvasSafeTap(_e) {
@@ -14154,7 +14302,12 @@ class Component extends DCLogic {
     model.traverse((c) => {
       if (!c.isMesh || !this._isWorldVisible(c)) return;
       const n = (c.name || '').toLowerCase();
-      if (/shadow|ground|blur|wind|xray|powertrain/.test(n)) return;
+      if (/wheelblur|xray|powertrain/i.test(n)) return;
+      let p = c.parent;
+      while (p) {
+        if (p.name === 'PowertrainRig' || p.name === 'H6_Powertrain') return;
+        p = p.parent;
+      }
       out.push(c);
     });
     this._carPickMeshes = out.length ? out : null;
@@ -14191,11 +14344,21 @@ class Component extends DCLogic {
         }
       }
     }
-    (this._windows || []).forEach((w) => {
-      if (w && w.key && w.node) put('win_' + w.key, w.node);
-    });
 
-    if (this._powertrainRig) put('engine', this._powertrainRig);
+    const hlMeshes = this.lightGroups && this.lightGroups.headlight;
+    if (hlMeshes && hlMeshes.length) {
+      const hlBox = new THREE.Box3();
+      hlMeshes.forEach((m) => hlBox.expandByObject(m));
+      if (!hlBox.isEmpty()) {
+        const bodyBox = new THREE.Box3().setFromObject(model);
+        const w = hlBox.getCenter(new THREE.Vector3());
+        w.y = bodyBox.min.y + (bodyBox.max.y - bodyBox.min.y) * 0.48;
+        model.updateMatrixWorld(true);
+        const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+        anchors.engine = w.applyMatrix4(inv);
+      }
+    }
+    if (!anchors.engine && this._powertrainRig) put('engine', this._powertrainRig);
     if (!anchors.engine) {
       const hood = this._hsFindMeshByName(/hood|bonnet|front_hood|motor_hood/i);
       if (hood) put('engine', hood);
@@ -14236,6 +14399,9 @@ class Component extends DCLogic {
     const layerRect = this._hsLayer.getBoundingClientRect();
     this.camera.getWorldDirection(scratch.camFwd);
     const anchors = this._hsAnchors || {};
+    if (!this._hsScreen) this._hsScreen = {};
+    const screen = this._hsScreen;
+    Object.keys(screen).forEach((k) => { delete screen[k]; });
     Object.keys(this._hsEls || {}).forEach((id) => {
       const el = this._hsEls[id];
       const anchor = anchors[id];
@@ -14255,6 +14421,10 @@ class Component extends DCLogic {
       el.classList.add('on');
       const x = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
       const y = (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top);
+      screen[id] = {
+        x: rect.left + (scratch.ndc.x * 0.5 + 0.5) * rect.width,
+        y: rect.top + (-scratch.ndc.y * 0.5 + 0.5) * rect.height,
+      };
       el.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
       scratch.anchorFwd.copy(scratch.v).sub(this.camera.position).normalize();
       const facing = scratch.camFwd.dot(scratch.anchorFwd);
@@ -14264,9 +14434,6 @@ class Component extends DCLogic {
       const s = this.state || {};
       let active = false;
       if (id === 'roof') active = (s.sunroofOpen || 0) > 2 || (s.curtainOpen || 0) > 2;
-      else if (id === 'win_fl' || id === 'win_fr' || id === 'win_rl' || id === 'win_rr') {
-        active = (s.windowsOpen || 0) > 2;
-      }
       else if (id === 'engine') active = !!s.powertrainOn;
       el.classList.toggle('act', active);
     });
@@ -17638,6 +17805,8 @@ class Component extends DCLogic {
           this._camEventDismissedKind = this._camEventKind;
           this._camEventUserOverride = true;
         }
+        Object.values(this._hsEls || {}).forEach((el) => { if (el) el.classList.remove('open'); });
+        this._hsOpenId = null;
         this._pulseHotspots({ deferHide: true });
       });
       controls.addEventListener('end', () => {
@@ -20633,9 +20802,11 @@ class Component extends DCLogic {
     const cam = this._camIconCamera(key);
     if (!cam) return null;
     const px = CAM_ICON_PX;
-    if (!this._camIconRt) {
+    if (!this._camIconRt || this._camIconRt.width !== px) {
+      if (this._camIconRt) this._camIconRt.dispose();
       this._camIconRt = new THREE.WebGLRenderTarget(px, px, { format: THREE.RGBAFormat });
       this._camIconRt.texture.generateMipmaps = false;
+      this._camIconBuf = null;
     }
     // Seen from overhead each of these fills the tile with a slab of floor;
     // the tile wants the car alone on transparent.
@@ -20688,7 +20859,10 @@ class Component extends DCLogic {
 
   // One tile per timer tick rather than a loop: twelve full scene passes back
   // to back is a visible freeze on the MMI right as the panel opens.
-  _ensureCamIcons(delayMs) {
+  _ensureCamIcons(delayMs, opts) {
+    opts = opts || {};
+    if (opts.background) this._camIconBgMode = true;
+    else if (opts.background === false) this._camIconBgMode = false;
     if (!this._camIcons) this._camIcons = {};
     if (this._camIconTimer || this._introActive) return;
     if (!this.renderer || !this.model || !this._fitCenter || !this._fitDist) return;
@@ -20701,6 +20875,23 @@ class Component extends DCLogic {
       delayMs == null ? CAM_ICON_START_MS : delayMs);
   }
 
+  // Prefetch tile renders after boot so opening CAMERA is instant. Waits out
+  // the intro (which owns the renderer) then runs one tile per idle slot.
+  _scheduleCamIconWarmup() {
+    if (this._camIconWarmupArmed) return;
+    this._camIconWarmupArmed = true;
+    const kick = () => {
+      if (this._unmounted) return;
+      if (this.state.loading || this._introActive) {
+        setTimeout(kick, 180);
+        return;
+      }
+      if (!this.renderer || !this.model || !this._fitCenter || !this._fitDist) return;
+      this._ensureCamIcons(CAM_ICON_WARMUP_MS, { background: true });
+    };
+    setTimeout(kick, CAM_ICON_WARMUP_MS);
+  }
+
   _camIconsBusy() {
     return !!(this._camIconTimer || (this._camIconQueue && this._camIconQueue.length));
   }
@@ -20708,13 +20899,21 @@ class Component extends DCLogic {
   _stepCamIcons() {
     this._camIconTimer = null;
     const queue = this._camIconQueue;
-    if (!queue || !queue.length || this.state.activeGroup !== 'camera') {
+    const bg = !!this._camIconBgMode;
+    if (!queue || !queue.length) {
+      this._camIconQueue = null;
+      return;
+    }
+    if (!bg && this.state.activeGroup !== 'camera') {
       this._camIconQueue = null;
       return;
     }
     // A preset tween owns the frame first — a readback mid-tween stutters the
     // very move the user is watching. Skip the slot and retry next tick.
-    let cost = CAM_ICON_GAP_MIN_MS;
+    const gapMin = bg ? CAM_ICON_BG_GAP_MIN_MS : CAM_ICON_GAP_MIN_MS;
+    const gapMax = bg ? CAM_ICON_BG_GAP_MAX_MS : CAM_ICON_GAP_MAX_MS;
+    const duty = bg ? CAM_ICON_BG_DUTY : CAM_ICON_DUTY;
+    let cost = gapMin;
     if (!this._camAnim) {
       const key = queue.shift();
       const t0 = performance.now();
@@ -20729,12 +20928,13 @@ class Component extends DCLogic {
       cost = performance.now() - t0;
       if (url) {
         this._camIcons[key] = url;
-        this.setState({ camIconTick: (this.state.camIconTick || 0) + 1 });
+        if (!bg || this.state.activeGroup === 'camera') {
+          this.setState({ camIconTick: (this.state.camIconTick || 0) + 1 });
+        }
       }
     }
     if (!queue.length) { this._camIconQueue = null; return; }
-    const gap = Math.min(CAM_ICON_GAP_MAX_MS,
-      Math.max(CAM_ICON_GAP_MIN_MS, cost * CAM_ICON_DUTY));
+    const gap = Math.min(gapMax, Math.max(gapMin, cost * duty));
     this._camIconTimer = setTimeout(() => this._stepCamIcons(), gap);
   }
 
@@ -20744,7 +20944,11 @@ class Component extends DCLogic {
     this._camIconBoxCache = null;
     this._camIconQueue = null;
     if (this._camIconTimer) { clearTimeout(this._camIconTimer); this._camIconTimer = null; }
-    if (this.state && this.state.activeGroup === 'camera') this._ensureCamIcons();
+    if (this.state && this.state.activeGroup === 'camera') {
+      this._ensureCamIcons(undefined, { background: false });
+    } else if (this._viewerReady && !this._introActive) {
+      this._ensureCamIcons(0, { background: true });
+    }
   }
 
   _cameraTopPlanInner() {
@@ -21450,6 +21654,7 @@ class Component extends DCLogic {
     if (splash && splash.fadeOut) splash.fadeOut();
     this._revealShellChrome();
     this._introPlayed = true;
+    this._scheduleCamIconWarmup();
   }
 
   /**
@@ -21480,6 +21685,7 @@ class Component extends DCLogic {
       this.setState({ splashActive: false });
       this._revealShellChrome();
       this._introPlayed = true;
+      this._scheduleCamIconWarmup();
       return;
     }
 
@@ -21509,6 +21715,7 @@ class Component extends DCLogic {
       this._revealShellChrome();
       this._syncCamOrbit();
       this._syncEventCamera();
+      this._scheduleCamIconWarmup();
       return;
     }
     this.camera.position.copy(poses.front);
@@ -21556,6 +21763,7 @@ class Component extends DCLogic {
     this._syncCamOrbit();
     this._syncEventCamera();
     if (this.requestRender) this.requestRender(8);
+    this._scheduleCamIconWarmup();
   }
 
   _tickIntro(dt) {
@@ -21917,8 +22125,7 @@ class Component extends DCLogic {
       media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2]] },
       power: { label: 'POWER', title: 'Fluxo', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [3, 1], [2, 2]] },
       modes: { label: 'MODES', title: 'Car modes', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2], [1, 1]] },
-      graphs: { label: 'GRAPHS', title: 'Power', hint: '', sizes: [[1, 1], [2, 1], [3, 1], [2, 2], [3, 2]] },
-      hint: { label: 'TIP', title: 'Widgets', hint: 'Hold a widget to configure or delete it.', sizes: [[1, 1], [2, 1]] },
+      graphs: { label: 'GRAPHS', title: 'Power charts', hint: '', sizes: [[1, 1], [2, 1], [3, 1], [2, 2], [3, 2]] },
     };
   }
 
@@ -22271,6 +22478,114 @@ class Component extends DCLogic {
     return true;
   }
 
+  _centerGapRect(mode) {
+    const m = mode || this._shellMode || this.state.shellMode || 'triple';
+    const left = this._shellLeftBounds || { l: 48, r: 740, t: 40, b: 500 };
+    const right = this._shellRightBounds || { l: 1180, r: 1872, t: 40, b: 500 };
+    if (m === 'appCar') {
+      return { l: left.r, r: right.r || 1872, t: left.t, b: left.b };
+    }
+    return {
+      l: left.r,
+      r: right.l,
+      t: Math.min(left.t, right.t),
+      b: Math.max(left.b, right.b),
+    };
+  }
+
+  _widgetTypeBlocked(mode, type) {
+    return (type === 'media' && this._hasWidgetType(mode, 'media'))
+      || (type === 'modes' && this._hasWidgetType(mode, 'modes'))
+      || (type === 'graphs' && this._hasWidgetType(mode, 'graphs'))
+      || (type === 'power' && this._hasWidgetType(mode, 'power'));
+  }
+
+  _slotHasRoom(side, x, y, mode) {
+    const cols = this._gridColsForMode(mode);
+    const items = this._board(side, mode).items || [];
+    const cat = this._widgetCatalog();
+    return Object.keys(cat).some((key) => {
+      if (this._widgetTypeBlocked(mode, key)) return false;
+      const sizes = cat[key].sizes || [];
+      return sizes.some((sz) => sz[0] <= cols && this._fits(items, cols, x, y, sz[0], sz[1]));
+    });
+  }
+
+  _slotPickerCells(side) {
+    const s = this.state;
+    if (s.widgetPickerStep !== 'slot') return [];
+    if (this._widgetPlaceSides().indexOf(side) < 0) return [];
+    const mode = s.shellMode || 'triple';
+    const cols = this._gridColsForMode(mode);
+    const cells = [];
+    for (let y = 0; y < 2; y++) {
+      for (let x = 0; x < cols; x++) {
+        if (!this._slotHasRoom(side, x, y, mode)) continue;
+        cells.push({
+          cls: 'on slot-pick',
+          gridStyle: 'grid-column:' + (x + 1) + ' / span 1;grid-row:' + (y + 1) + ' / span 1',
+          onClick: () => this._pickWidgetSlot(side, x, y),
+        });
+      }
+    }
+    return cells;
+  }
+
+  _sizesForSlot(side, x, y, type, mode) {
+    const cols = this._gridColsForMode(mode);
+    const def = this._widgetCatalog()[type];
+    if (!def) return [];
+    const items = this._board(side, mode).items || [];
+    return (def.sizes || []).filter((sz) => sz[0] <= cols)
+      .filter((sz) => this._fits(items, cols, x, y, sz[0], sz[1]));
+  }
+
+  _pickerOnBoardStyle(side, leftRect, rightRect) {
+    const rect = side === 'right' ? rightRect : leftRect;
+    return 'left:' + rect.left + ';top:' + rect.top + ';width:' + rect.width + ';height:' + rect.height + ';';
+  }
+
+  _pickWidgetSlot(side, x, y) {
+    this.setState({
+      widgetPickerStep: 'type',
+      widgetPlaceSide: side,
+      widgetPlaceAnchorX: x,
+      widgetPlaceAnchorY: y,
+      widgetPlaceMode: 'add',
+      widgetPlaceType: null,
+      widgetPlaceW: 0,
+      widgetPlaceH: 0,
+    });
+  }
+
+  _onCenterSlotHoldStart(ev) {
+    if (ev && ev.type === 'mousedown' && this._centerSlotTouchActive) return;
+    if (ev && ev.type === 'touchstart') this._centerSlotTouchActive = true;
+    if ((this._shellMode || this.state.shellMode) === 'appsOnly') return;
+    if (this._widgetAddingOn()) return;
+    if (this.state.graphEditId) return;
+    this._centerSlotHoldFired = false;
+    this._centerSlotHoldTimer = setTimeout(() => {
+      this._centerSlotHoldTimer = 0;
+      this._centerSlotHoldFired = true;
+      this._openWidgetPicker('slot');
+    }, CAR_WIDGET_HOLD_MS);
+  }
+
+  _onCenterSlotHoldEnd(ev) {
+    if (ev && ev.type === 'mouseup' && this._centerSlotTouchActive) return;
+    if (ev && (ev.type === 'touchend' || ev.type === 'touchcancel')) this._centerSlotTouchActive = false;
+    if (this._centerSlotHoldTimer) {
+      clearTimeout(this._centerSlotHoldTimer);
+      this._centerSlotHoldTimer = 0;
+    }
+    this._centerSlotHoldFired = false;
+  }
+
+  _onCenterSlotHoldCancel(ev) {
+    this._onCenterSlotHoldEnd(ev);
+  }
+
   _placeCells(side) {
     const s = this.state;
     if (!s.widgetPlaceType || s.widgetPickerStep) return [];
@@ -22314,50 +22629,62 @@ class Component extends DCLogic {
     const rightRect = this._rectCss(this._shellRightBounds, { l: 1180, t: 40, r: 1872, b: 500 });
     const appsFields = this._appsOnlyRenderFields(s, android && onMain && appsOnly, leftRect, rightRect);
     const cols = this._gridColsForMode(mode);
-    const pickerOpen = !appsOnly && !!s.widgetPickerStep;
+    const pickerOpen = !appsOnly && !!s.widgetPickerStep && s.widgetPickerStep !== 'slot';
+    const slotPick = !appsOnly && s.widgetPickerStep === 'slot';
     const addOn = this._widgetAddingOn();
     const addBtn = this._hvBtn(addOn);
     let pickerItems = [];
     let pickerTitle = 'ADD WIDGET';
+    const modeKey = mode;
     if (!appsOnly && s.widgetPickerStep === 'type') {
+      pickerTitle = 'CHOOSE WIDGET';
       const cat = this._widgetCatalog();
-      const usedMedia = this._hasWidgetType(mode, 'media');
-      const usedModes = this._hasWidgetType(mode, 'modes');
-      const usedGraphs = this._hasWidgetType(mode, 'graphs');
-      const usedPower = this._hasWidgetType(mode, 'power');
+      const side = s.widgetPlaceSide;
+      const ax = s.widgetPlaceAnchorX;
+      const ay = s.widgetPlaceAnchorY;
       pickerItems = Object.keys(cat).map((key) => {
-        const blocked = (key === 'media' && usedMedia)
-          || (key === 'modes' && usedModes)
-          || (key === 'graphs' && usedGraphs)
-          || (key === 'power' && usedPower);
+        const blocked = this._widgetTypeBlocked(modeKey, key)
+          || ax == null || ay == null
+          || !this._sizesForSlot(side, ax, ay, key, modeKey).length;
+        const entry = cat[key];
         return {
-          label: cat[key].label + (blocked ? '  ·  added' : ''),
-          title: cat[key].label,
+          label: entry.label + (blocked ? ' · added' : ''),
+          subLabel: entry.title,
+          thumbClass: 'thumb-' + key,
+          title: entry.title,
           btnClass: '',
           sizeClass: '',
+          disabled: blocked,
           opacity: blocked ? '0.35' : '1',
           onClick: blocked ? () => {} : () => this._pickWidgetType(key),
         };
       });
     } else if (!appsOnly && s.widgetPickerStep === 'size') {
-      pickerTitle = 'SIZE';
-      const def = this._widgetCatalog()[s.widgetPlaceType] || { sizes: [[2, 1]] };
-      const ignoreId = s.widgetPlaceId;
-      const found = ignoreId ? this._findWidget(ignoreId, mode) : null;
-      const cur = found && found.item;
-      pickerItems = def.sizes
-        .filter((sz) => sz[0] <= cols)
-        .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, mode, ignoreId))
-        .filter((sz) => !cur || sz[0] !== cur.w || sz[1] !== cur.h)
-        .map((sz) => ({
-          label: '',
-          title: sz[0] + ' × ' + sz[1],
-          btnClass: 'hv-picker-size',
-          sizeClass: 'board-3 size-' + sz[0] + 'x' + sz[1],
-          opacity: '1',
-          onClick: () => this._pickWidgetSize(sz[0], sz[1]),
-        }));
+      pickerTitle = 'PICK SIZE';
+      const side = s.widgetPlaceSide;
+      const ax = s.widgetPlaceAnchorX;
+      const ay = s.widgetPlaceAnchorY;
+      const type = s.widgetPlaceType;
+      const sizes = (ax != null && ay != null && type)
+        ? this._sizesForSlot(side, ax, ay, type, modeKey)
+        : [];
+      pickerItems = sizes.map((sz) => ({
+        label: '',
+        subLabel: '',
+        title: sz[0] + ' × ' + sz[1],
+        btnClass: 'hv-picker-size',
+        sizeClass: 'board-3 size-' + sz[0] + 'x' + sz[1],
+        thumbClass: '',
+        opacity: '1',
+        disabled: false,
+        onClick: () => this._pickWidgetSize(sz[0], sz[1], type),
+      }));
     }
+    const centerGap = this._centerGapRect(mode);
+    const centerRect = this._rectCss(centerGap, { l: 760, r: 1160, t: 40, b: 500 });
+    const pickClass = slotPick ? 'slot-picking' : (
+      (!appsOnly && s.widgetPlaceType && !s.widgetPickerStep && s.widgetPlaceW && s.widgetPlaceH) ? 'placing' : ''
+    );
     this._syncGraphLoop(
       !appsOnly
       && !this.state.loading
@@ -22389,19 +22716,38 @@ class Component extends DCLogic {
       rightBoardHeight: rightRect.height,
       leftGridCols: 'repeat(' + cols + ', 1fr)',
       rightGridCols: 'repeat(' + cols + ', 1fr)',
-      widgetPlaceGridClass: (!appsOnly && s.widgetPlaceType && !s.widgetPickerStep && s.widgetPlaceW && s.widgetPlaceH) ? 'placing' : '',
+      leftGridPickClass: pickClass,
+      rightGridPickClass: pickClass,
+      leftSlotCells: showLeft ? this._slotPickerCells('left') : [],
+      rightSlotCells: showRight ? this._slotPickerCells('right') : [],
       leftWidgetItems: (showLeft ? (this._board('left', mode).items || []) : []).map((it) => this._widgetItemView(it, 'left')),
       rightWidgetItems: (showRight ? (this._board('right', mode).items || []) : []).map((it) => this._widgetItemView(it, 'right')),
       leftPlaceCells: showLeft ? this._placeCells('left') : [],
       rightPlaceCells: showRight ? this._placeCells('right') : [],
-      addWidget: () => { if (!appsOnly) this._openWidgetPicker(); },
+      widgetSlotBannerDisplay: slotPick ? 'block' : 'none',
+      widgetSlotBannerText: 'Tap a highlighted slot · or hold the center to add',
+      centerSlotZoneDisplay: (showLeft && mode === 'triple' && !slotPick && !pickerOpen && !addOn) ? 'block' : 'none',
+      centerSlotZoneClass: '',
+      centerSlotLeft: centerRect.left,
+      centerSlotTop: centerRect.top,
+      centerSlotWidth: centerRect.width,
+      centerSlotHeight: centerRect.height,
+      onCenterSlotHoldStart: (ev) => this._onCenterSlotHoldStart(ev),
+      onCenterSlotHoldEnd: (ev) => this._onCenterSlotHoldEnd(ev),
+      onCenterSlotHoldCancel: (ev) => this._onCenterSlotHoldCancel(ev),
+      addWidget: () => { if (!appsOnly) this._openWidgetPicker('slot'); },
       addWidgetBtnDisplay: 'none',
       addWidgetBtnClass: addOn ? 'on' : '',
       addWidgetBtnBorder: addBtn.border,
       addWidgetBtnCol: addBtn.col,
       addWidgetBtnBg: addBtn.bg,
-      widgetPickerDisplay: pickerOpen ? 'block' : 'none',
-      widgetPickerListClass: s.widgetPickerStep === 'size' ? 'is-sizes' : '',
+      widgetPickerDisplay: pickerOpen ? 'flex' : 'none',
+      widgetPickerListClass: (pickerOpen ? 'on-board ' : '')
+        + (s.widgetPickerStep === 'size' ? 'is-sizes' : (s.widgetPickerStep === 'type' ? 'is-thumbs' : '')),
+      widgetPickerStyle: pickerOpen && s.widgetPlaceSide
+        ? this._pickerOnBoardStyle(s.widgetPlaceSide, leftRect, rightRect) : '',
+      widgetPickerIsThumbs: s.widgetPickerStep === 'type',
+      widgetPickerIsSizes: s.widgetPickerStep === 'size',
       widgetPickerTitle: pickerTitle,
       widgetPickerItems: pickerItems,
       graphEditorDisplay: editor.graphEditorDisplay,
@@ -22684,7 +23030,7 @@ class Component extends DCLogic {
     return !!(s.widgetPickerStep || s.widgetPlaceType);
   }
 
-  _openWidgetPicker() {
+  _openWidgetPicker(step) {
     const mode = this._shellMode || this.state.shellMode || 'triple';
     if (mode === 'appsOnly') return;
     if (this._widgetAddingOn()) {
@@ -22694,7 +23040,7 @@ class Component extends DCLogic {
     this._slotUseBeforePicker = null;
     this._widgetPickerCommitted = false;
     this.setState({
-      widgetPickerStep: 'type',
+      widgetPickerStep: step || 'slot',
       widgetPlaceSide: null,
       widgetPlaceType: null,
       widgetPlaceW: 0,
@@ -22702,6 +23048,8 @@ class Component extends DCLogic {
       widgetPlaceMode: 'add',
       widgetPlaceId: null,
       widgetPlaceFromSide: null,
+      widgetPlaceAnchorX: null,
+      widgetPlaceAnchorY: null,
       widgetMenuId: null,
       widgetMenuSide: null,
       panelOpen: false,
@@ -22731,6 +23079,8 @@ class Component extends DCLogic {
       widgetPlaceMode: null,
       widgetPlaceId: null,
       widgetPlaceFromSide: null,
+      widgetPlaceAnchorX: null,
+      widgetPlaceAnchorY: null,
     });
     if (side && !this._widgetPickerCommitted) {
       this._setSlotUse(side, restore || 'app');
@@ -22739,10 +23089,14 @@ class Component extends DCLogic {
 
   _pickWidgetType(type) {
     const mode = this.state.shellMode || 'triple';
-    const cols = this._gridColsForMode(mode);
-    const def = this._widgetCatalog()[type];
-    const sizes = (def.sizes || [[2, 1]]).filter((sz) => sz[0] <= cols)
-      .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, mode));
+    const side = this.state.widgetPlaceSide;
+    const ax = this.state.widgetPlaceAnchorX;
+    const ay = this.state.widgetPlaceAnchorY;
+    if (side == null || ax == null || ay == null) {
+      this._cancelWidgetPicker();
+      return;
+    }
+    const sizes = this._sizesForSlot(side, ax, ay, type, mode);
     if (!sizes.length) {
       this._cancelWidgetPicker();
       return;
@@ -22751,13 +23105,30 @@ class Component extends DCLogic {
       this._pickWidgetSize(sizes[0][0], sizes[0][1], type);
       return;
     }
-    this.setState({ widgetPickerStep: 'size', widgetPlaceType: type, widgetPlaceMode: 'add' });
+    this.setState({
+      widgetPickerStep: 'size',
+      widgetPlaceType: type,
+      widgetPlaceMode: 'add',
+    });
   }
 
   _pickWidgetSize(w, h, type) {
+    const side = this.state.widgetPlaceSide;
+    const ax = this.state.widgetPlaceAnchorX;
+    const ay = this.state.widgetPlaceAnchorY;
+    const nextType = type || this.state.widgetPlaceType;
+    if (side != null && ax != null && ay != null && nextType) {
+      this.setState({
+        widgetPlaceType: nextType,
+        widgetPlaceMode: 'add',
+        widgetPlaceW: w,
+        widgetPlaceH: h,
+      }, () => this._commitWidget(side, ax, ay, w, h));
+      return;
+    }
     this.setState({
       widgetPickerStep: null,
-      widgetPlaceType: type || this.state.widgetPlaceType,
+      widgetPlaceType: nextType,
       widgetPlaceMode: this.state.widgetPlaceMode || 'add',
       widgetPlaceW: w,
       widgetPlaceH: h,
@@ -22798,6 +23169,8 @@ class Component extends DCLogic {
       widgetPlaceMode: null,
       widgetPlaceId: null,
       widgetPlaceFromSide: null,
+      widgetPlaceAnchorX: null,
+      widgetPlaceAnchorY: null,
     });
   }
 
