@@ -15392,10 +15392,12 @@ class Component extends DCLogic {
     // sit ~0.43 m apart across the bay and their pills overlap head-on.
     if (!this._xrDefs) {
       this._xrDefs = [
-        { key: 'ice',  kicker: 'ICE',      anchor: 'ice',        dy: -13 },
-        { key: 'p2',   kicker: 'P2 FRONT', anchor: 'motorFront', dy: 13 },
-        { key: 'p4',   kicker: 'P4 REAR',  anchor: 'motorRear',  dy: 0 },
-        { key: 'batt', kicker: 'HV PACK',  anchor: null,         dy: 0 },
+        // off = powertrain-local metres; dx/dy = extra screen px on the pill.
+        // Nudged to the flanks so pills do not cover the pack / motors head-on.
+        { key: 'ice',  kicker: 'ICE',      anchor: 'ice',        off: [-0.68, 0.20, 0], dx: -18, dy: -32 },
+        { key: 'p2',   kicker: 'P2 FRONT', anchor: 'motorFront', off: [-0.68, 0.06, 0], dx: -14, dy: 26 },
+        { key: 'p4',   kicker: 'P4 REAR',  anchor: 'motorRear',  off: [0.68, 0.06, 0],  dx: 18,  dy: 10 },
+        { key: 'batt', kicker: 'HV PACK',  anchor: null,         off: [-0.74, 0.42, 0], dx: -22, dy: -48 },
       ];
     }
     return this._xrDefs;
@@ -15493,7 +15495,7 @@ class Component extends DCLogic {
       const pack = (manifest.batteries || {})[key];
       if (pack && pack.position) {
         const dh = (pack.dims && pack.dims.h) || 0.11;
-        battAnchor = [pack.position[0], pack.position[1] + dh * 0.5 + 0.03, pack.position[2]];
+        battAnchor = [pack.position[0], pack.position[1] + dh * 0.5 + 0.06, pack.position[2]];
       }
     }
 
@@ -15520,7 +15522,11 @@ class Component extends DCLogic {
         rec.kick = data.kicker;
         rec.k.textContent = data.kicker;
       }
-      scratch.v.set(anchor[0], anchor[1], anchor[2]);
+      scratch.v.set(
+        anchor[0] + ((def.off && def.off[0]) || 0),
+        anchor[1] + ((def.off && def.off[1]) || 0),
+        anchor[2] + ((def.off && def.off[2]) || 0),
+      );
       rig.localToWorld(scratch.v);
       scratch.ndc.copy(scratch.v).project(this.camera);
       if (scratch.ndc.z > 1) {                    // behind the camera
@@ -15529,8 +15535,10 @@ class Component extends DCLogic {
       }
       placed.push({
         rec: rec,
-        x: (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left),
-        y: (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top) + def.dy,
+        x: (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left)
+            + (def.dx || 0),
+        y: (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top)
+            + (def.dy || 0),
       });
     });
 
@@ -15541,12 +15549,18 @@ class Component extends DCLogic {
     // after them gets pushed down the screen. Only the pill moves; its leader
     // dot stays on the part, so nothing is mislabelled by the shuffle.
     placed.sort((a, b) => a.y - b.y);
-    const GAP = 21;
+    const GAP = 24;
     for (let i = 1; i < placed.length; i++) {
       const prev = placed[i - 1];
       const cur = placed[i];
-      if (Math.abs(cur.x - prev.x) > 190) continue;   // different column, leave it
-      if (cur.y - prev.y < GAP) cur.y = prev.y + GAP;
+      const dx = Math.abs(cur.x - prev.x);
+      const dy = cur.y - prev.y;
+      if (dx > 200) continue;   // different column, leave it
+      if (dy < GAP) cur.y = prev.y + GAP;
+      // Still stacked after the vertical pass — fan out sideways.
+      if (Math.abs(cur.x - prev.x) < 130 && Math.abs(cur.y - prev.y) < GAP + 6) {
+        cur.x = prev.x + (cur.x >= prev.x ? 132 : -132);
+      }
     }
 
     placed.forEach((pl) => {
@@ -19110,8 +19124,9 @@ class Component extends DCLogic {
           if ('beadRadius' in patch) this._ensurePowertrainBeadGeometry();
           if ('beadRadius' in patch || 'beadCount' in patch || 'tubeRadius' in patch) {
             this._rebuildPowertrainBeads();
-          } else if ('haloScale' in patch) {
+          } else if ('haloScale' in patch || 'battHaloScale' in patch) {
             this._rebuildPowertrainHalos();
+            this._rebuildPowertrainBatteryHalo();
           }
           if ('ringCount' in patch || 'ringInner' in patch || 'ringOuter' in patch) {
             this._rebuildPowertrainGround();
@@ -20497,7 +20512,9 @@ class Component extends DCLogic {
         driveMax: 0.75,
         regenMax: 0.75,
         iceMax: 0.50,
-        cellMax: 1.25,
+        cellMax: 1.65,
+        cellColor: '#00ff44',
+        cellLitMin: 0.92,
         hvMax: 0.95,
         idleDim: 0.55,
         idleDimActive: 0.85,
@@ -20565,7 +20582,7 @@ class Component extends DCLogic {
         drive: { color: new THREE.Color('#6ecfff'), max: T.driveMax },
         regen: { color: new THREE.Color('#33ffb8'), max: T.regenMax },
         ice:   { color: new THREE.Color('#ff5a12'), max: T.iceMax },
-        cell:  { color: new THREE.Color('#00ffaa'), max: T.cellMax },
+        cell:  { color: new THREE.Color(T.cellColor || '#00ff44'), max: T.cellMax },
         hv:    { color: new THREE.Color('#58b8ff'), max: T.hvMax },
       };
     } else {
@@ -20573,6 +20590,7 @@ class Component extends DCLogic {
       this._ptGlow.regen.max = T.regenMax;
       this._ptGlow.ice.max = T.iceMax;
       this._ptGlow.cell.max = T.cellMax;
+      this._ptGlow.cell.color.set(T.cellColor || '#00ff44');
       this._ptGlow.hv.max = T.hvMax;
     }
     return this._ptGlow;
@@ -20947,7 +20965,7 @@ class Component extends DCLogic {
     const size = box.getSize(new THREE.Vector3());
     const mat = new THREE.SpriteMaterial({
       map: this._powertrainHaloTexture(),
-      color: new THREE.Color('#00ffaa'),
+      color: new THREE.Color('#00ff44'),
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
@@ -20972,6 +20990,28 @@ class Component extends DCLogic {
       m.emissive.copy(tone.color);
       m.userData.glowBase = tone.max * strength;
       m.emissiveIntensity = m.userData.glowBase;
+    }
+  }
+
+  /** SOC segments: opaque saturated fill — emissive-only on grey cells reads transparent. */
+  _powertrainGlowCell(part, tone, strength) {
+    if (!part || !tone) return;
+    const mats = part.materials;
+    const lit = strength > 0.02;
+    for (let i = 0; i < mats.length; i++) {
+      const m = mats[i];
+      if (!lit) {
+        m.emissive.setHex(0x000000);
+        m.userData.glowBase = 0;
+        m.emissiveIntensity = 0;
+        continue;
+      }
+      m.emissive.copy(tone.color);
+      m.color.copy(tone.color);
+      m.transparent = false;
+      m.opacity = 1;
+      m.userData.glowBase = tone.max * strength;
+      m.emissiveIntensity = tone.max * strength * 1.35;
     }
   }
 
@@ -21025,27 +21065,24 @@ class Component extends DCLogic {
       const modules = pack.modules || [];
       const lit = (socPct / 100) * modules.length;
       const tune = this._powertrainFxTune();
-      const idleDim = flow.tone === 'idle' ? tune.idleDim : tune.idleDimActive;
 
       // Which way the pack is moving energy. Regen counts as charging even
-      // when the wall plug is not involved -- from the pack's point of view a
+      // when the wall plug is not involved — from the pack's point of view a
       // motor running backwards and a charger are the same thing.
       const regenIn = frontDir < 0 || rearDir < 0;
       const charging = plug || regenIn || flow.tone === 'regen';
       const discharging = !charging && (frontDir > 0 || rearDir > 0);
-      // Green going in, blue coming out, green at rest: the same two tones the
-      // rest of the mode already uses for regen and drive.
-      const cellTone = discharging ? G.drive : G.cell;
+      // Green SOC bar always — discharge direction is carried by rings / HV lanes.
+      const cellTone = G.cell;
 
       const cells = [];
       for (let i = 0; i < modules.length; i++) {
         const level = Math.max(0, Math.min(1, lit - i));
-        // Charging lifts the whole bar a little so the pack reads as "taking"
-        // rather than merely "holding".
-        const gain = charging ? 1.15 : 1;
-        this._powertrainGlowPart(parts[modules[i]], cellTone,
-          Math.min(1, level * idleDim * gain));
-        if (parts[modules[i]]) cells.push(parts[modules[i]]);
+        const gain = charging ? 1.12 : 1;
+        const strength = level > 0.01
+          ? Math.max(tune.cellLitMin, Math.min(1, level * gain)) : 0;
+        this._powertrainGlowCell(parts[modules[i]], cellTone, strength);
+        if (parts[modules[i]] && strength > 0.01) cells.push(parts[modules[i]]);
       }
       this._powertrainCells = cells;
       this._powertrainCellDir = charging ? 1 : (discharging ? -1 : 0);
