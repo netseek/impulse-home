@@ -20272,6 +20272,13 @@ class Component extends DCLogic {
     if (!model) return null;
     const toLocal = new THREE.Matrix4().copy(model.matrixWorld).invert();
     const centreOf = (arr) => {
+      if (!arr || !arr.length) return null;
+      // Tyre-axis _pivot is the tread centre; bbox centre drags toward the
+      // heaviest mesh in the cluster and misaligns the chassis hubs.
+      const ref = arr.find((m) => m._pivot) || arr[0];
+      if (ref && ref._pivot) {
+        return ref._pivot.clone().applyMatrix4(toLocal);
+      }
       const box = new THREE.Box3();
       (arr || []).forEach((o) => {
         const t = (o && o.mesh) ? o.mesh : ((o && o.c) ? o.c : o);
@@ -20490,14 +20497,15 @@ class Component extends DCLogic {
         driveMax: 0.75,
         regenMax: 0.75,
         iceMax: 0.50,
-        cellMax: 1.0,
+        cellMax: 1.25,
         hvMax: 0.95,
         idleDim: 0.55,
         idleDimActive: 0.85,
-        beadRadius: 0.055,
-        beadCount: 6,
-        beadSpeed: 0.65,
-        beadOpacity: 1.0,
+        // XRAY_FX_REVERT (2026-08-28): beadRadius 0.055, beadCount 6, beadSpeed 0.65
+        beadRadius: 0.024,
+        beadCount: 8,
+        beadSpeed: 0.48,
+        beadOpacity: 0.95,
         pulseMid: 0.65,
         pulseAmp: 0.35,
         pulseHz: 3.4,
@@ -20506,15 +20514,21 @@ class Component extends DCLogic {
         tubeRadius: 0.048,
         tubeSpeed: 0.55,
         tubeTail: 5.0,
-        tubeGain: 1.0,
+        tubeGain: 1.15,
+        wireGlow: 0.30,
         // Power → scroll rate. The lane visibly speeds up under load, which is
         // the only cue in the mode that carries magnitude rather than state.
         tubeKwRef: 45,
         tubeSpeedMax: 2.6,
         // Soft glow around whichever part is actually working.
         haloScale: 0.85,
-        haloOpacity: 0.22,
+        haloOpacity: 0.28,
         haloOn: 1,
+        // Battery pack halo — SOC read + charging pulse.
+        battHaloScale: 1.08,
+        battHaloMin: 0.22,
+        battChargePulseHz: 1.5,
+        battChargePulseAmp: 0.38,
         // Screen-space callouts naming each part and its state.
         tagsOn: 1,
         // Battery: a fill wave runs through the SOC bar and the module holding
@@ -20522,15 +20536,16 @@ class Component extends DCLogic {
         // moving rather than only how much of it is left.
         cellWaveOn: 1,
         cellWaveAmp: 0.85,
-        cellWaveHz: 0.5,
+        cellWaveHz: 0.35,
         cellEdgeAmp: 0.6,
-        cellEdgeHz: 2.6,
+        cellEdgeHz: 2.0,
         // Ground pulse rings — see _rebuildPowertrainGround.
         ringOn: 1,
         ringCount: 3,
         ringGain: 0.40,
-        ringSpeed: 0.30,
-        ringSpeedMax: 2.2,
+        // XRAY_FX_REVERT: ringSpeed 0.30, ringSpeedMax 2.2
+        ringSpeed: 0.11,
+        ringSpeedMax: 0.95,
         ringKwRef: 45,
         ringMinScale: 0.70,
         ringMaxScale: 2.75,
@@ -20547,11 +20562,11 @@ class Component extends DCLogic {
     const THREE = this.THREE;
     if (!this._ptGlow) {
       this._ptGlow = {
-        drive: { color: new THREE.Color('#2f9bff'), max: T.driveMax },
-        regen: { color: new THREE.Color('#1fd47a'), max: T.regenMax },
+        drive: { color: new THREE.Color('#6ecfff'), max: T.driveMax },
+        regen: { color: new THREE.Color('#33ffb8'), max: T.regenMax },
         ice:   { color: new THREE.Color('#ff5a12'), max: T.iceMax },
-        cell:  { color: new THREE.Color('#2ee089'), max: T.cellMax },
-        hv:    { color: new THREE.Color('#ff6a1a'), max: T.hvMax },
+        cell:  { color: new THREE.Color('#00ffaa'), max: T.cellMax },
+        hv:    { color: new THREE.Color('#58b8ff'), max: T.hvMax },
       };
     } else {
       this._ptGlow.drive.max = T.driveMax;
@@ -20643,7 +20658,8 @@ class Component extends DCLogic {
         uSpeed: { value: 1 },
         uOn:    { value: 0 },
         uTail:  { value: 5.0 },
-        uColor: { value: new THREE.Color('#ff6a1a') },
+        uWireGlow: { value: 0.30 },
+        uColor: { value: new THREE.Color('#58b8ff') },
       },
       vertexShader: [
         'varying vec2 vFlowUv;',
@@ -20658,6 +20674,7 @@ class Component extends DCLogic {
         'uniform float uSpeed;',
         'uniform float uOn;',
         'uniform float uTail;',
+        'uniform float uWireGlow;',
         'uniform vec3 uColor;',
         'varying vec2 vFlowUv;',
         'void main() {',
@@ -20666,10 +20683,12 @@ class Component extends DCLogic {
         // fract() of a scrolling coordinate is a sawtooth; raising it to a
         // power turns that into a bright head with the tail trailing BEHIND,
         // which is what makes the direction legible without animation.
+        '  float wire = uWireGlow * uOn;',
         '  float head = fract( vFlowUv.x * 2.0 - uTime * uSpeed * uDir );',
         '  float packet = pow( head, uTail );',
-        '  float a = ( 0.16 + packet * 0.84 ) * uOn;',
-        '  gl_FragColor = vec4( uColor * ( 0.5 + packet * 1.7 ), a );',
+        '  float a = ( wire + packet * 0.78 ) * uOn;',
+        '  vec3 tint = uColor * ( 0.42 + wire * 2.2 );',
+        '  gl_FragColor = vec4( tint + uColor * packet * 1.55, a );',
         '}',
       ].join(NL),
       transparent: true,
@@ -20898,7 +20917,51 @@ class Component extends DCLogic {
     const rear = make(pack.paths.hvRear, 'rear');
     if (rear) this._powertrainBeadGroups.push(rear);
     this._rebuildPowertrainHalos();
+    this._rebuildPowertrainBatteryHalo();
     this._rebuildPowertrainGround();
+  }
+
+  /** Soft additive halo over the HV pack — SOC level + charging pulse. */
+  _rebuildPowertrainBatteryHalo() {
+    const THREE = this.THREE;
+    const root = this._powertrainFxRoot;
+    if (!root || !THREE) return;
+    if (this._powertrainBatteryHalo) {
+      const h = this._powertrainBatteryHalo;
+      if (h.sprite.parent) h.sprite.parent.remove(h.sprite);
+      if (h.sprite.material) h.sprite.material.dispose();
+      this._powertrainBatteryHalo = null;
+    }
+    const tune = this._powertrainFxTune();
+    const key = this._powertrainPackKey || this._currentTrim().pack;
+    const pack = ((this._powertrainManifest || {}).batteries || {})[key];
+    const parts = this._powertrainParts || {};
+    const casePart = pack && pack.nodes && parts[pack.nodes.case];
+    if (!casePart || !casePart.root) return;
+    root.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    const box = new THREE.Box3().setFromObject(casePart.root);
+    if (box.isEmpty()) return;
+    box.applyMatrix4(inv);
+    const ctr = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const mat = new THREE.SpriteMaterial({
+      map: this._powertrainHaloTexture(),
+      color: new THREE.Color('#00ffaa'),
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.position.copy(ctr);
+    sprite.scale.setScalar(Math.max(size.x, size.y, size.z) * tune.battHaloScale);
+    sprite.renderOrder = 7;
+    sprite.frustumCulled = false;
+    sprite.visible = false;
+    root.add(sprite);
+    this._powertrainBatteryHalo = { sprite: sprite, level: 0 };
   }
 
   _powertrainGlowPart(part, tone, strength) {
@@ -20931,8 +20994,9 @@ class Component extends DCLogic {
     (this._powertrainBeadGroups || []).forEach((b) => {
       b.dir = plug ? 0 : (b.key === 'front' ? frontDir : rearDir);
       if (b.mat) {
+        const tone = b.dir < 0 ? G.regen : G.drive;
         b.mat.uniforms.uDir.value = b.dir < 0 ? -1 : 1;
-        b.mat.uniforms.uColor.value.copy(b.dir < 0 ? G.regen.color : G.hv.color);
+        b.mat.uniforms.uColor.value.copy(tone.color);
       }
     });
 
@@ -20991,7 +21055,13 @@ class Component extends DCLogic {
         Math.min(modules.length - 1, Math.floor(lit)));
 
       this._powertrainGlowPart(parts[pack.nodes.case], cellTone,
-        plug ? 0.30 : (charging ? 0.18 : 0));
+        plug ? 0.48 : (charging ? 0.34 : Math.max(0.14, (socPct / 100) * 0.38)));
+
+      if (this._powertrainBatteryHalo) {
+        this._powertrainBatteryHalo.level = Math.max(
+          tune.battHaloMin, socPct / 100);
+        this._powertrainBatteryHalo.sprite.material.color.copy(cellTone.color);
+      }
 
       this._powertrainGroundDir = charging ? 1 : (discharging ? -1 : 0);
       (this._powertrainRings || []).forEach((m) => {
@@ -21020,6 +21090,10 @@ class Component extends DCLogic {
       h.level = 0;
       h.sprite.visible = false;
     });
+    if (this._powertrainBatteryHalo) {
+      this._powertrainBatteryHalo.level = 0;
+      this._powertrainBatteryHalo.sprite.visible = false;
+    }
     (this._powertrainRings || []).forEach((m) => {
       m.visible = false;
       m.material.uniforms.uAlpha.value = 0;
@@ -21052,6 +21126,7 @@ class Component extends DCLogic {
     const G = this._powertrainGlowTones();
     const tune = this._powertrainFxTune();
     const tmp = this._powertrainBeadPos;
+    if (!this._ptBeadWhite) this._ptBeadWhite = new this.THREE.Color(0xffffff);
 
     // Scroll rate follows load, so the lane visibly hurries under power. This
     // is the only cue in the mode that carries magnitude rather than state.
@@ -21069,6 +21144,7 @@ class Component extends DCLogic {
           u.uSpeed.value = tubeSpeed;
           u.uTail.value = tune.tubeTail;
           u.uOn.value = tune.tubeGain;
+          u.uWireGlow.value = tune.wireGlow;
         }
       }
       for (let i = 0; i < b.meshes.length; i++) {
@@ -21079,9 +21155,10 @@ class Component extends DCLogic {
         if (b.dir < 0) u = 1 - u;
         b.curve.getPointAt(u, tmp);
         m.position.copy(tmp);
-        const s = 0.7 + Math.sin(u * Math.PI) * 0.6;
+        const s = 0.55 + Math.sin(u * Math.PI) * 0.35;
         m.scale.setScalar(s);
-        m.material.color.copy(b.dir < 0 ? G.regen.color : G.hv.color);
+        const tone = b.dir < 0 ? G.regen : G.drive;
+        m.material.color.copy(this._ptBeadWhite).lerp(tone.color, 0.40);
       }
     });
 
@@ -21094,13 +21171,28 @@ class Component extends DCLogic {
       if (lit) h.sprite.material.opacity = h.level * tune.haloOpacity * pulse;
     });
 
+    const cellDir = this._powertrainCellDir || 0;
+    if (this._powertrainBatteryHalo) {
+      const bh = this._powertrainBatteryHalo;
+      const charging = cellDir > 0;
+      let op = bh.level * tune.haloOpacity * 1.35;
+      if (charging) {
+        op *= 0.72 + tune.battChargePulseAmp
+          * (0.5 + 0.5 * Math.sin(t * tune.battChargePulseHz * Math.PI * 2));
+      } else if (cellDir < 0) {
+        op *= pulse;
+      }
+      const lit = op > 0.015;
+      if (bh.sprite.visible !== lit) bh.sprite.visible = lit;
+      if (lit) bh.sprite.material.opacity = op;
+    }
+
     // Battery: a bump travels along the module stack, toward the nose while
     // the pack is charging and toward the tail while it is driving, and the
     // module the level currently sits in breathes on top of that. Intensity
     // only -- the colour was already picked in _applyPowertrainFlow, and
     // rewriting a Color per module per frame buys nothing.
     const cells = this._powertrainCells;
-    const cellDir = this._powertrainCellDir || 0;
     if (cells && cells.length && cellDir && tune.cellWaveOn) {
       const n = cells.length;
       const edge = this._powertrainCellEdge;

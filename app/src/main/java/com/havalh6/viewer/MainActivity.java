@@ -4828,7 +4828,7 @@ public final class MainActivity extends Activity {
         for (android.widget.ImageView iv : dockToolIcons.values()) {
             if (iv == null || iv.getParent() == null) continue;
             View iconWrap = (View) iv.getParent();
-            View colParent = iconWrap.getParent();
+            android.view.ViewParent colParent = iconWrap.getParent();
             if (!(colParent instanceof android.widget.LinearLayout)) continue;
             android.widget.LinearLayout col = (android.widget.LinearLayout) colParent;
             for (int i = 0; i < col.getChildCount(); i++) {
