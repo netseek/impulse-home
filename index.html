@@ -5151,11 +5151,14 @@ function readDebugFlag() {
 }
 
 function readBootShellLayout() {
-  const out = { mode: 'triple', splitRatio: '1:1' };
+  const out = { mode: 'triple', splitRatio: '1:1', lastNonAppsMode: 'triple' };
   const take = (src) => {
     if (!src || typeof src !== 'object') return;
     if (SHELL_MODES.indexOf(src.mode) >= 0) out.mode = src.mode;
     if (SHELL_RATIOS.indexOf(src.splitRatio) >= 0) out.splitRatio = src.splitRatio;
+    if (src.lastNonAppsMode === 'triple' || src.lastNonAppsMode === 'appCar') {
+      out.lastNonAppsMode = src.lastNonAppsMode;
+    }
   };
   try {
     const raw = localStorage.getItem(SHELL_BOOT_KEY);
@@ -5171,16 +5174,33 @@ function readBootShellLayout() {
 }
 
 const BOOT_SHELL = readBootShellLayout();
+let BOOT_SHELL_LAST_NON_APPS = BOOT_SHELL.lastNonAppsMode
+  || (BOOT_SHELL.mode !== 'appsOnly' ? BOOT_SHELL.mode : 'triple');
 
-function persistBootShellLayout(mode, splitRatio) {
+function persistBootShellLayout(mode, splitRatio, opts) {
   if (SHELL_MODES.indexOf(mode) < 0) return;
+  const forceAppsOnly = !!(opts && opts.forceAppsOnly);
+  let bootMode = BOOT_SHELL.mode;
+  if (mode !== 'appsOnly') {
+    BOOT_SHELL_LAST_NON_APPS = mode;
+    bootMode = mode;
+  } else if (forceAppsOnly) {
+    bootMode = 'appsOnly';
+  } else {
+    bootMode = BOOT_SHELL_LAST_NON_APPS
+      || (BOOT_SHELL.mode !== 'appsOnly' ? BOOT_SHELL.mode : 'triple');
+  }
   const next = {
-    mode,
+    mode: bootMode,
     splitRatio: SHELL_RATIOS.indexOf(splitRatio) >= 0 ? splitRatio : BOOT_SHELL.splitRatio,
+    lastNonAppsMode: BOOT_SHELL_LAST_NON_APPS,
   };
-  if (next.mode === BOOT_SHELL.mode && next.splitRatio === BOOT_SHELL.splitRatio) return;
+  if (next.mode === BOOT_SHELL.mode
+      && next.splitRatio === BOOT_SHELL.splitRatio
+      && next.lastNonAppsMode === BOOT_SHELL.lastNonAppsMode) return;
   BOOT_SHELL.mode = next.mode;
   BOOT_SHELL.splitRatio = next.splitRatio;
+  BOOT_SHELL.lastNonAppsMode = next.lastNonAppsMode;
   try { localStorage.setItem(SHELL_BOOT_KEY, JSON.stringify(next)); } catch (e) {}
 }
 
@@ -19111,13 +19131,15 @@ class Component extends DCLogic {
 
       // X-ray powertrain glow / beads / battery SOC — live-tunable over CDP.
       // Call with no args to read; pass a partial object to patch, e.g.
-      // __ptGlow({ driveMax: 0.9, beadRadius: 0.06 }). beadRadius or beadCount
-      // changes rebuild the HV bead meshes.
+      // __ptGlow({ arrowLength: 0.06 }). arrowLength / beadCount rebuild arrows.
       window.__ptGlow = (patch) => {
         if (patch && typeof patch === 'object') {
           Object.assign(this._powertrainFxTune(), patch);
-          if ('beadRadius' in patch) this._ensurePowertrainBeadGeometry();
-          if ('beadRadius' in patch || 'beadCount' in patch || 'tubeRadius' in patch) {
+          if ('beadRadius' in patch || 'arrowLength' in patch || 'arrowWidth' in patch) {
+            this._ensurePowertrainArrowGeometry();
+          }
+          if ('beadRadius' in patch || 'arrowLength' in patch || 'arrowWidth' in patch
+              || 'beadCount' in patch || 'tubeRadius' in patch) {
             this._rebuildPowertrainBeads();
           } else if ('haloScale' in patch || 'battHaloScale' in patch) {
             this._rebuildPowertrainHalos();
@@ -20518,9 +20540,12 @@ class Component extends DCLogic {
         idleDim: 0.55,
         idleDimActive: 0.85,
         beadRadius: 0.024,
-        beadCount: 8,
-        beadSpeed: 0.48,
-        beadOpacity: 0.88,
+        arrowLength: 0.052,
+        arrowWidth: 0.020,
+        beadCount: 5,
+        beadSpeed: 0.40,
+        beadOpacity: 0.92,
+        tubeChevrons: 5.0,
         pulseMid: 0.65,
         pulseAmp: 0.35,
         pulseHz: 3.4,
@@ -20588,8 +20613,13 @@ class Component extends DCLogic {
       this._ptGlow.cell.max = T.cellMax;
       this._ptGlow.cell.color.set(T.cellColor || '#00ff66');
       this._ptGlow.hv.max = T.hvMax;
-      this._ptGlow.wireDrive.color.set(T.wireDriveColor || '#3a9fd4');
-      this._ptGlow.wireRegen.color.set(T.wireRegenColor || '#2ec990');
+      if (!this._ptGlow.wireDrive) {
+        this._ptGlow.wireDrive = { color: new THREE.Color(T.wireDriveColor || '#3a9fd4') };
+        this._ptGlow.wireRegen = { color: new THREE.Color(T.wireRegenColor || '#2ec990') };
+      } else {
+        this._ptGlow.wireDrive.color.set(T.wireDriveColor || '#3a9fd4');
+        this._ptGlow.wireRegen.color.set(T.wireRegenColor || '#2ec990');
+      }
     }
     return this._ptGlow;
   }
@@ -20599,14 +20629,40 @@ class Component extends DCLogic {
     return dir < 0 ? G.wireRegen : G.wireDrive;
   }
 
-  _ensurePowertrainBeadGeometry() {
+  _ensurePowertrainArrowGeometry() {
     const THREE = this.THREE;
     const tune = this._powertrainFxTune();
-    const r = tune.beadRadius;
-    if (this._powertrainBeadGeo && this._powertrainBeadGeoRadius === r) return;
-    if (this._powertrainBeadGeo) this._powertrainBeadGeo.dispose();
-    this._powertrainBeadGeo = new THREE.SphereGeometry(r, 8, 6);
-    this._powertrainBeadGeoRadius = r;
+    const len = tune.arrowLength || 0.052;
+    const w = tune.arrowWidth || tune.beadRadius * 0.85 || 0.020;
+    const sig = len.toFixed(4) + '|' + w.toFixed(4);
+    if (this._powertrainArrowGeo && this._powertrainArrowSig === sig) return;
+    if (this._powertrainArrowGeo) this._powertrainArrowGeo.dispose();
+    // Cone tip +Z — oriented to curve tangent each frame.
+    const geo = new THREE.ConeGeometry(w, len, 4);
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(0, 0, len * 0.5);
+    this._powertrainArrowGeo = geo;
+    this._powertrainArrowSig = sig;
+    this._powertrainBeadGeo = geo;
+    this._powertrainBeadGeoRadius = w;
+  }
+
+  _ensurePowertrainBeadGeometry() {
+    this._ensurePowertrainArrowGeometry();
+  }
+
+  /** Aim a flow arrow along the HV path; flip tip when regen reverses travel. */
+  _orientPowertrainArrow(mesh, curve, u, dir) {
+    const THREE = this.THREE;
+    if (!this._powertrainBeadTan) this._powertrainBeadTan = new THREE.Vector3();
+    if (!this._powertrainBeadQuat) this._powertrainBeadQuat = new THREE.Quaternion();
+    if (!this._powertrainArrowRef) this._powertrainArrowRef = new THREE.Vector3(0, 0, 1);
+    const t = curve.getTangentAt(Math.min(0.998, Math.max(0.002, u)), this._powertrainBeadTan);
+    if (dir < 0) t.negate();
+    if (t.lengthSq() < 1e-8) return;
+    t.normalize();
+    this._powertrainBeadQuat.setFromUnitVectors(this._powertrainArrowRef, t);
+    mesh.quaternion.copy(this._powertrainBeadQuat);
   }
 
   _initPowertrainFx(root) {
@@ -20651,7 +20707,7 @@ class Component extends DCLogic {
     this._powertrainBeadGroups = [];
     this._powertrainFxSig = '';
     this._powertrainFxT = 0;
-    this._ensurePowertrainBeadGeometry();
+    this._ensurePowertrainArrowGeometry();
     if (!this._powertrainBeadPos) this._powertrainBeadPos = new THREE.Vector3();
   }
 
@@ -20680,6 +20736,7 @@ class Component extends DCLogic {
         uOn:    { value: 0 },
         uTail:  { value: 5.0 },
         uWireGlow: { value: 0.30 },
+        uChevrons: { value: 6.0 },
         uColor: { value: new THREE.Color('#58b8ff') },
       },
       vertexShader: [
@@ -20696,19 +20753,26 @@ class Component extends DCLogic {
         'uniform float uOn;',
         'uniform float uTail;',
         'uniform float uWireGlow;',
+        'uniform float uChevrons;',
         'uniform vec3 uColor;',
         'varying vec2 vFlowUv;',
         'void main() {',
-        // TubeGeometry runs u from the curve's start to its end, and every HV
-        // path in the manifest is authored pack -> motor, so +u is discharge.
-        // fract() of a scrolling coordinate is a sawtooth; raising it to a
-        // power turns that into a bright head with the tail trailing BEHIND,
-        // which is what makes the direction legible without animation.
-        '  float wire = uWireGlow * uOn;',
-        '  float head = fract( vFlowUv.x * 2.0 - uTime * uSpeed * uDir );',
-        '  float packet = pow( head, uTail );',
-        '  float a = ( wire * 0.50 + packet * 0.58 ) * uOn;',
-        '  vec3 col = uColor * ( 0.34 + wire * 0.95 + packet * 0.72 );',
+        // Paths authored pack (s=0) -> motor (s=1). uDir flips which end is
+        // the flow destination. No time-based scroll here — repeating fract()
+        // pulses looked like the glow shuttled back and forth; the 3D arrows
+        // carry motion, the tube only states direction.
+        '  float s = vFlowUv.x;',
+        '  float dir = uDir < 0.0 ? -1.0 : 1.0;',
+        '  float dest = dir > 0.0 ? s : 1.0 - s;',
+        '  float ramp = smoothstep( 0.04, 0.90, dest );',
+        '  float base = uWireGlow * ( 0.22 + ramp * 0.78 );',
+        // Static chevrons pointing toward the destination end (>>>).
+        '  float cell = fract( s * uChevrons );',
+        '  float tip = dir > 0.0 ? cell : 1.0 - cell;',
+        '  float tick = ( 1.0 - smoothstep( 0.0, 0.14, tip ) )',
+        '           * smoothstep( 0.52, 0.20, tip );',
+        '  float a = ( base + tick * 0.40 ) * uOn;',
+        '  vec3 col = uColor * ( 0.24 + base * 0.96 + tick * 0.48 );',
         '  gl_FragColor = vec4( col, a );',
         '}',
       ].join(NL),
@@ -20895,26 +20959,21 @@ class Component extends DCLogic {
     const key = this._powertrainPackKey || this._currentTrim().pack;
     const pack = (manifest.batteries || {})[key];
     if (!pack || !pack.paths) return;
-    const geo = this._powertrainBeadGeo;
-    const beadCount = this._powertrainFxTune().beadCount;
+    const geo = this._powertrainArrowGeo || this._powertrainBeadGeo;
+    const arrowCount = this._powertrainFxTune().beadCount;
     const make = (points, lane) => {
       if (!points || !points.length) return null;
       const curve = new THREE.CatmullRomCurve3(
         points.map((p) => new THREE.Vector3(p[0], p[1], p[2]))
       );
       const meshes = [];
-      for (let i = 0; i < beadCount; i++) {
+      for (let i = 0; i < arrowCount; i++) {
         const mat = new THREE.MeshBasicMaterial({
           color: 0xffffff,
           transparent: true,
           opacity: 0,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
-          // The lane is routed under the pack tray and through the subframe,
-          // so with a depth test the powertrain's own castings cover most of
-          // it -- the beads only ever surfaced where the path came out from
-          // under something. Energy is the thing x-ray exists to show, so it
-          // reads through the hardware like the halos do.
           depthTest: false,
         });
         const m = new THREE.Mesh(geo, mat);
@@ -20968,7 +21027,7 @@ class Component extends DCLogic {
     const size = box.getSize(new THREE.Vector3());
     const mat = new THREE.SpriteMaterial({
       map: this._powertrainHaloTexture(),
-      color: new THREE.Color('#00ff44'),
+      color: new THREE.Color('#00ff66'),
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
@@ -21178,11 +21237,8 @@ class Component extends DCLogic {
     const tmp = this._powertrainBeadPos;
     if (!this._ptBeadWhite) this._ptBeadWhite = new this.THREE.Color(0xffffff);
 
-    // Scroll rate follows load, so the lane visibly hurries under power. This
-    // is the only cue in the mode that carries magnitude rather than state.
-    const kwNow = Math.abs(this._powerKwNow(now));
-    const tubeSpeed = tune.tubeSpeed
-      * Math.min(tune.tubeSpeedMax, 0.55 + kwNow / Math.max(1, tune.tubeKwRef));
+    // Constant march speed — load is already shown on the labels / SOC.
+    const arrowSpeed = tune.beadSpeed;
 
     (this._powertrainBeadGroups || []).forEach((b) => {
       const on = b.dir !== 0;
@@ -21190,23 +21246,21 @@ class Component extends DCLogic {
         b.tube.visible = on;
         if (on) {
           const u = b.mat.uniforms;
-          u.uTime.value = t;
-          u.uSpeed.value = tubeSpeed;
-          u.uTail.value = tune.tubeTail;
           u.uOn.value = tune.tubeGain;
           u.uWireGlow.value = tune.wireGlow;
+          u.uChevrons.value = tune.tubeChevrons || 5.0;
         }
       }
-      for (let i = 0; i < b.meshes.length; i++) {
+      const nArr = b.meshes.length;
+      for (let i = 0; i < nArr; i++) {
         const m = b.meshes[i];
         m.material.opacity = on ? tune.beadOpacity : 0;
         if (!on) continue;
-        let u = (t * tune.beadSpeed + i / b.meshes.length) % 1;
+        let u = (t * arrowSpeed + i / nArr) % 1;
         if (b.dir < 0) u = 1 - u;
         b.curve.getPointAt(u, tmp);
         m.position.copy(tmp);
-        const s = 0.55 + Math.sin(u * Math.PI) * 0.35;
-        m.scale.setScalar(s);
+        this._orientPowertrainArrow(m, b.curve, u, b.dir);
         const tone = this._powertrainWireTone(b.dir);
         const tint = tune.wireTint != null ? tune.wireTint : 0.78;
         m.material.color.copy(tone.color).lerp(this._ptBeadWhite, 1 - tint);
@@ -21259,7 +21313,9 @@ class Component extends DCLogic {
         const mats = cells[i].materials;
         for (let k = 0; k < mats.length; k++) {
           const base = mats[k].userData.glowBase || 0;
-          if (base > 0.005) mats[k].emissiveIntensity = base * boost;
+          if (base > 0.005) {
+            mats[k].emissiveIntensity = Math.max(base * 0.94, base * boost);
+          }
         }
       }
     }
@@ -23684,6 +23740,12 @@ class Component extends DCLogic {
   }
 
   _setShellMode(mode) {
+    const prev = this._shellMode || this.state.shellMode || 'triple';
+    if (mode !== 'appsOnly') {
+      BOOT_SHELL_LAST_NON_APPS = mode;
+    } else if (prev !== 'appsOnly') {
+      BOOT_SHELL_LAST_NON_APPS = prev;
+    }
     this._shellMode = mode;
     persistBootShellLayout(mode, this._splitRatio);
     this._cancelWidgetPicker();
@@ -23788,6 +23850,7 @@ class Component extends DCLogic {
   }
 
   _saveAppsOnlyDefault() {
+    persistBootShellLayout('appsOnly', this._splitRatio, { forceAppsOnly: true });
     try {
       if (window.AppLauncherBridge && typeof window.AppLauncherBridge.saveAppsOnlyDefault === 'function') {
         window.AppLauncherBridge.saveAppsOnlyDefault();

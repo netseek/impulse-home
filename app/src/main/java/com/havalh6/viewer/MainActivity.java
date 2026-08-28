@@ -895,6 +895,13 @@ public final class MainActivity extends Activity {
     private int appsFabDownLpY;
     private int appsFabPosX = Integer.MIN_VALUE;
     private int appsFabPosY = Integer.MIN_VALUE;
+    /** Button top (screen coords) while the menu is closed — anchor when opening upward. */
+    private int appsFabBtnAnchorY = Integer.MIN_VALUE;
+    /** Boot default when APP+APP is active but not explicitly saved. */
+    private String lastNonAppsShellMode = SHELL_TRIPLE;
+    private View appsFabScrim;
+    private WindowManager.LayoutParams appsFabScrimLp;
+    private boolean appsFabScrimAttached;
     private Runnable pinMediaBoundsRunnable;
     private final MediaNowPlaying mediaNowPlaying = new MediaNowPlaying();
     /** Full-width 2px load line at display Y=700 (20px above the 720px panel). */
@@ -1419,6 +1426,11 @@ public final class MainActivity extends Activity {
         if (!SHELL_TRIPLE.equals(mode) && !SHELL_APP_CAR.equals(mode) && !SHELL_APPS.equals(mode)) {
             mode = SHELL_TRIPLE;
         }
+        String lastNonApps = prefs.getString("lastNonAppsMode", SHELL_TRIPLE);
+        if (!SHELL_TRIPLE.equals(lastNonApps) && !SHELL_APP_CAR.equals(lastNonApps)) {
+            lastNonApps = SHELL_TRIPLE;
+        }
+        lastNonAppsShellMode = lastNonApps;
         shellMode = mode;
         launchSidePref = prefs.getString("launchSide", "auto");
         nextLaunchLeft = prefs.getBoolean("nextLeft", true);
@@ -1434,7 +1446,15 @@ public final class MainActivity extends Activity {
 
     private void saveShellPrefs() {
         android.content.SharedPreferences.Editor ed = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).edit();
-        ed.putString("mode", shellMode);
+        String bootMode = shellMode;
+        if (SHELL_APPS.equals(shellMode)) {
+            bootMode = lastNonAppsShellMode;
+            ed.putString("lastNonAppsMode", lastNonAppsShellMode);
+        } else {
+            lastNonAppsShellMode = shellMode;
+            ed.putString("lastNonAppsMode", lastNonAppsShellMode);
+        }
+        ed.putString("mode", bootMode);
         ed.putString("launchSide", launchSidePref);
         ed.putBoolean("nextLeft", nextLaunchLeft);
         ed.putString("uiMode", uiMode);
@@ -1448,6 +1468,11 @@ public final class MainActivity extends Activity {
             mode = SHELL_TRIPLE;
         }
         String prev = shellMode;
+        if (SHELL_APPS.equals(mode) && !SHELL_APPS.equals(prev)) {
+            lastNonAppsShellMode = prev;
+        } else if (!SHELL_APPS.equals(mode)) {
+            lastNonAppsShellMode = mode;
+        }
         shellMode = mode;
         saveShellPrefs();
         loadSlotUsesForMode();
@@ -1624,6 +1649,8 @@ public final class MainActivity extends Activity {
 
     private void dismissAppsFabOverlay() {
         appsFabMenuOpen = false;
+        appsFabBtnAnchorY = Integer.MIN_VALUE;
+        dismissAppsFabScrim();
         if (appsFabMenu != null) appsFabMenu.setVisibility(View.GONE);
         if (!appsFabOverlayAttached || appsFabRoot == null) {
             appsFabOverlayAttached = false;
@@ -1761,15 +1788,89 @@ public final class MainActivity extends Activity {
 
     private void clampAppsFabPosition() {
         android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
-        int w = appsFabRoot != null ? Math.max(appsFabRoot.getWidth(), Math.round(56 * dm.density)) : Math.round(56 * dm.density);
-        int h = appsFabRoot != null ? Math.max(appsFabRoot.getHeight(), Math.round(56 * dm.density)) : Math.round(56 * dm.density);
+        int w = appsFabRoot != null && appsFabRoot.getWidth() > 0
+                ? appsFabRoot.getWidth()
+                : Math.round((appsFabMenuOpen ? 300 : 72) * dm.density);
+        int h = appsFabRoot != null && appsFabRoot.getHeight() > 0
+                ? appsFabRoot.getHeight()
+                : Math.round(72 * dm.density);
+        if (appsFabRoot != null && (appsFabRoot.getWidth() <= 0 || appsFabRoot.getHeight() <= 0)) {
+            appsFabRoot.measure(
+                    View.MeasureSpec.makeMeasureSpec(dm.widthPixels, View.MeasureSpec.AT_MOST),
+                    View.MeasureSpec.makeMeasureSpec(dm.heightPixels, View.MeasureSpec.AT_MOST));
+            w = Math.max(w, appsFabRoot.getMeasuredWidth());
+            h = Math.max(h, appsFabRoot.getMeasuredHeight());
+        }
         if (appsFabPosX == Integer.MIN_VALUE) appsFabPosX = 0;
         if (appsFabPosY == Integer.MIN_VALUE) appsFabPosY = 0;
         appsFabPosX = Math.max(0, Math.min(appsFabPosX, Math.max(0, dm.widthPixels - w)));
         appsFabPosY = Math.max(0, Math.min(appsFabPosY, Math.max(0, dm.heightPixels - h)));
     }
 
+    private void ensureAppsFabScrimBuilt() {
+        if (appsFabScrim != null) return;
+        appsFabScrim = new View(this);
+        appsFabScrim.setBackgroundColor(0x00000000);
+        appsFabScrim.setClickable(true);
+        appsFabScrim.setFocusable(true);
+        appsFabScrim.setOnClickListener(v -> setAppsFabMenuOpen(false));
+        appsFabScrimLp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                android.os.Build.VERSION.SDK_INT >= 26
+                        ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                        : WindowManager.LayoutParams.TYPE_PHONE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                android.graphics.PixelFormat.TRANSLUCENT);
+        appsFabScrimLp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+    }
+
+    private void showAppsFabScrim() {
+        if (appsFabScrimAttached) return;
+        ensureAppsFabScrimBuilt();
+        try {
+            if (appsFabUsesSystemOverlay) {
+                getWindowManager().addView(appsFabScrim, appsFabScrimLp);
+                if (appsFabOverlayAttached && appsFabRoot != null && appsFabLp != null) {
+                    getWindowManager().removeView(appsFabRoot);
+                    getWindowManager().addView(appsFabRoot, appsFabLp);
+                }
+            } else if (rootLayout != null) {
+                FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT);
+                rootLayout.addView(appsFabScrim, 0, lp);
+                if (appsFabRoot != null) appsFabRoot.bringToFront();
+            }
+            appsFabScrimAttached = true;
+        } catch (Exception e) {
+            Log.w(TAG, "APP+APP FAB scrim attach failed", e);
+        }
+    }
+
+    private void dismissAppsFabScrim() {
+        if (!appsFabScrimAttached || appsFabScrim == null) {
+            appsFabScrimAttached = false;
+            return;
+        }
+        try {
+            if (appsFabUsesSystemOverlay) {
+                getWindowManager().removeView(appsFabScrim);
+            } else if (appsFabScrim.getParent() instanceof android.view.ViewGroup) {
+                ((android.view.ViewGroup) appsFabScrim.getParent()).removeView(appsFabScrim);
+            }
+        } catch (Exception ignored) {}
+        appsFabScrimAttached = false;
+    }
+
     private void setAppsFabMenuOpen(boolean open) {
+        float d = getResources().getDisplayMetrics().density;
+        int menuGap = Math.round(10 * d);
+        if (open && !appsFabMenuOpen) {
+            appsFabBtnAnchorY = appsFabPosY;
+        }
         appsFabMenuOpen = open;
         if (appsFabMenu != null) {
             appsFabMenu.setVisibility(open ? View.VISIBLE : View.GONE);
@@ -1777,7 +1878,16 @@ public final class MainActivity extends Activity {
         if (appsFabButton != null) {
             appsFabButton.setTextColor(open ? 0xFF4FD6E8 : 0xFFEAF2F8);
         }
-        if (open) refreshAppsFabMenu();
+        if (open) {
+            showAppsFabScrim();
+            refreshAppsFabMenu();
+        } else {
+            dismissAppsFabScrim();
+            if (appsFabBtnAnchorY != Integer.MIN_VALUE) {
+                appsFabPosY = appsFabBtnAnchorY;
+                appsFabBtnAnchorY = Integer.MIN_VALUE;
+            }
+        }
         // In-window FAB sits in our task — raise chrome so the menu isn't under freeforms.
         if (!appsFabUsesSystemOverlay) {
             applyChromeOnTop(open);
@@ -1797,6 +1907,15 @@ public final class MainActivity extends Activity {
         float d = getResources().getDisplayMetrics().density;
         int w = Math.max(appsFabRoot.getMeasuredWidth(), Math.round(72 * d));
         int h = Math.max(appsFabRoot.getMeasuredHeight(), Math.round(72 * d));
+        if (appsFabMenuOpen && appsFabBtnAnchorY != Integer.MIN_VALUE) {
+            int menuH = appsFabMenu != null ? appsFabMenu.getMeasuredHeight() : 0;
+            int btnH = appsFabButton != null ? appsFabButton.getMeasuredHeight() : Math.round(72 * d);
+            if (menuH > 0) {
+                int menuGap = Math.round(10 * d);
+                appsFabPosY = appsFabBtnAnchorY - menuH - menuGap;
+                h = menuH + menuGap + btnH;
+            }
+        }
         clampAppsFabPosition();
         try {
             if (appsFabUsesSystemOverlay && appsFabLp != null) {
@@ -2175,6 +2294,7 @@ public final class MainActivity extends Activity {
         shellMode = SHELL_APPS;
         android.content.SharedPreferences.Editor ed = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).edit();
         ed.putString("mode", SHELL_APPS);
+        ed.putString("lastNonAppsMode", lastNonAppsShellMode);
         ed.putString("splitRatio", splitRatio);
         ed.putString("leftApp", activePopupPackage != null ? activePopupPackage : "");
         ed.putString("rightApp", activeMediaPackage != null ? activeMediaPackage : "");
@@ -4474,15 +4594,14 @@ public final class MainActivity extends Activity {
         // Clip icons to the scroll viewport so they never draw over the drawer.
         scrollView.setClipChildren(true);
         scrollView.setClipToPadding(true);
-        // Nudge app icons down without moving the mode drawer (padding is undone
-        // by CENTER_VERTICAL on iconsLayout; margin on the host shrinks the slot).
-        scrollView.setTranslationY(Math.round(10 * density));
         appsScrollView = scrollView;
 
         android.widget.LinearLayout iconsLayout = new android.widget.LinearLayout(this);
         iconsLayout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        iconsLayout.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
-        iconsLayout.setPadding(Math.round(12 * density), 0, Math.round(24 * density), 0);
+        int platePx = dockPlatePx(iconSizePx, density);
+        int iconRowTopPad = Math.max(Math.round(8 * density), (stripHeightPx - platePx) / 2);
+        iconsLayout.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        iconsLayout.setPadding(Math.round(12 * density), iconRowTopPad, Math.round(24 * density), 0);
         // Trail smear stays inside each item; the scroll view clips the row.
         iconsLayout.setClipChildren(false);
 
@@ -4613,7 +4732,7 @@ public final class MainActivity extends Activity {
             int avail = scrollView.getWidth();
             if (avail <= 0) return;
             iconsLayout.setMinimumWidth(avail);
-            iconsLayout.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
+            iconsLayout.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         });
 
         host.addView(scrollView, new FrameLayout.LayoutParams(
@@ -4733,7 +4852,7 @@ public final class MainActivity extends Activity {
         cell.setGravity(android.view.Gravity.CENTER);
 
         FrameLayout iconWrap = new FrameLayout(this);
-        int wrapSize = Math.round(iconPx + 10 * density);
+        int wrapSize = dockPlatePx(iconPx, density);
         iconWrap.setLayoutParams(new android.widget.LinearLayout.LayoutParams(wrapSize, wrapSize));
         iconWrap.setBackgroundColor(0x00000000);
 
@@ -4794,7 +4913,7 @@ public final class MainActivity extends Activity {
                         android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
                         dockPlateGradientColors(selected));
         d.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        d.setCornerRadius(16f * density);
+        d.setCornerRadius(14f * density);
         if (dockUiLight) {
             d.setStroke(Math.max(1, Math.round((selected ? 1.5f : 1.2f) * density)),
                     selected ? 0xFF3D4550 : 0x664A5568);
@@ -5007,6 +5126,16 @@ public final class MainActivity extends Activity {
         return d;
     }
 
+    /** Square plate behind every dock icon — mode drawer + launcher row share this size. */
+    private static int dockPlatePx(int iconPx, float density) {
+        return iconPx + Math.round(10f * density);
+    }
+
+    /** Uniform inset so GWM emblems and adaptive icons read at the same scale. */
+    private static float launcherIconInsetFrac() {
+        return 0.10f;
+    }
+
     /**
      * Wraps a launcher {@link android.widget.ImageView} in a square rounded plate
      * with drop shadow so adaptive / circular / odd-shaped icons read uniformly.
@@ -5018,7 +5147,7 @@ public final class MainActivity extends Activity {
 
     private android.widget.FrameLayout wrapLauncherIconPlate(
             android.widget.ImageView iconView, int iconSizePx, float density, boolean darkPlate) {
-        int shadowPad = Math.round(4 * density);
+        int platePx = dockPlatePx(iconSizePx, density);
         android.widget.FrameLayout iconBox = new android.widget.FrameLayout(this);
         iconBox.setClipChildren(false);
         iconBox.setClipToPadding(false);
@@ -5026,9 +5155,8 @@ public final class MainActivity extends Activity {
         android.widget.FrameLayout iconFrame = new android.widget.FrameLayout(this);
         iconFrame.setTag("iconPlate");
         android.widget.FrameLayout.LayoutParams frameLp =
-                new android.widget.FrameLayout.LayoutParams(iconSizePx, iconSizePx);
-        frameLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        frameLp.bottomMargin = shadowPad;
+                new android.widget.FrameLayout.LayoutParams(platePx, platePx);
+        frameLp.gravity = android.view.Gravity.CENTER_HORIZONTAL | android.view.Gravity.TOP;
         iconFrame.setLayoutParams(frameLp);
         iconFrame.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
         iconFrame.setElevation(7f * density);
@@ -5036,7 +5164,7 @@ public final class MainActivity extends Activity {
             iconFrame.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         }
 
-        int inset = Math.round(iconSizePx * 0.13f);
+        int inset = Math.round(platePx * launcherIconInsetFrac());
         iconFrame.setPadding(inset, inset, inset, inset);
         iconView.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         iconFrame.addView(iconView, new android.widget.FrameLayout.LayoutParams(
@@ -5979,10 +6107,25 @@ public final class MainActivity extends Activity {
         webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
+    /** Two-line caption band — every dock tile reserves the same height. */
+    private void styleDockCaption(android.widget.TextView labelView, float density) {
+        labelView.setTextSize(11f);
+        labelView.setTextColor(0xE6FFFFFF);
+        labelView.setGravity(android.view.Gravity.TOP | android.view.Gravity.CENTER_HORIZONTAL);
+        labelView.setMaxLines(2);
+        labelView.setMinLines(2);
+        labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        labelView.setLineSpacing(0f, 0.92f);
+        labelView.setIncludeFontPadding(false);
+        labelView.setShadowLayer(3f, 0f, 1f, 0xCC000000);
+        labelView.setPadding(Math.round(2 * density), Math.round(4 * density),
+                Math.round(2 * density), 0);
+    }
+
     private MotionTrailLayout makeDockItem(int itemWidthPx, int iconSizePx, float density) {
         MotionTrailLayout item = new MotionTrailLayout(this);
         item.setOrientation(android.widget.LinearLayout.VERTICAL);
-        item.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        item.setGravity(android.view.Gravity.CENTER_HORIZONTAL | android.view.Gravity.TOP);
         item.setAlpha(0f);
         android.widget.LinearLayout.LayoutParams itemParams = new android.widget.LinearLayout.LayoutParams(
                 itemWidthPx, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -5995,23 +6138,15 @@ public final class MainActivity extends Activity {
         android.widget.ImageView iconView = new android.widget.ImageView(this);
         iconView.setTag("icon");
         android.widget.FrameLayout iconBox = wrapLauncherIconPlate(iconView, iconSizePx, density);
-        int shadowPad = Math.round(4 * density);
+        int platePx = dockPlatePx(iconSizePx, density);
         iconBox.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, iconSizePx + shadowPad));
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, platePx));
         item.addView(iconBox);
 
-        // Caption under every icon.
+        // Caption under every icon — fixed two-line band so icon plates stay aligned.
         android.widget.TextView labelView = new android.widget.TextView(this);
         labelView.setTag("label");
-        labelView.setTextSize(11f);
-        labelView.setTextColor(0xE6FFFFFF);
-        labelView.setGravity(android.view.Gravity.CENTER);
-        labelView.setMaxLines(2);
-        labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        labelView.setLineSpacing(0f, 0.92f);
-        labelView.setShadowLayer(3f, 0f, 1f, 0xCC000000);
-        labelView.setPadding(Math.round(2 * density), Math.round(4 * density),
-                Math.round(2 * density), 0);
+        styleDockCaption(labelView, density);
         item.addView(labelView);
         return item;
     }
@@ -6167,7 +6302,8 @@ public final class MainActivity extends Activity {
             boolean darkPlate = editPackage != null && usesDarkIconPlate(editPackage);
             plate.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
             int iconPx = dockIconPx > 0 ? dockIconPx : Math.round(60 * density);
-            int inset = Math.round(iconPx * (darkPlate ? 0.06f : 0.13f));
+            int platePx = dockPlatePx(iconPx, density);
+            int inset = Math.round(platePx * launcherIconInsetFrac());
             plate.setPadding(inset, inset, inset, inset);
         }
         if (tv != null) {
