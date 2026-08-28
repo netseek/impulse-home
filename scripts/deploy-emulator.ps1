@@ -1,4 +1,5 @@
-# Build, install, and launch the viewer on a local Android emulator (AVD).
+# Build, install, and launch the viewer on the local Haval head-unit AVD.
+# Starts the "Haval" emulator if it is not already running — never a phone AVD.
 param(
   [switch]$SkipBuild,
   [switch]$NoLaunch,
@@ -31,4 +32,4 @@ if (-not $NoLaunch) {
   & $Adb -s $serial shell am start -n $CarActivity
 }
 
-Write-Host "Done. serial=$serial"
+Write-Host "Done. serial=$serial avd=$($HavalAvdName)"

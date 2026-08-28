@@ -35,6 +35,19 @@ gradle assembleRelease
 The build copies `index.html`, `support.js`, `vendor/`, and production files
 under `assets/` into the APK. It intentionally excludes `assets/_backup/`.
 
+## Emulator deploy
+
+Local deploy always uses the **`Haval` AVD** (head-unit profile, 1920×720). Do
+not use a phone/tablet AVD such as `Medium_Phone_API_36.0` — aspect ratio and
+freeform behaviour will not match the MMI.
+
+```powershell
+.\scripts\deploy-emulator.ps1
+```
+
+The script starts the Haval AVD if it is not already running, waits for boot,
+then installs and launches. Reinstall only: `-SkipBuild`.
+
 ## Freeform popups (emulator)
 
 Stock Android emulators often have freeform disabled, so app launches ignore

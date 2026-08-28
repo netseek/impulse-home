@@ -391,6 +391,9 @@ frame-rate *dependent*, because `spin --fps <n>` gates rAF in the page and
 reproduces the car's sampling rate exactly — and holds it steady, which the car
 does not. Confirm the final numbers on the car regardless.
 
+**Emulator deploy uses the `Haval` AVD only** (`scripts/deploy-emulator.ps1`
+auto-starts it). Do not deploy to a phone/tablet AVD — use the head-unit profile.
+
 ## Device access
 
 Talk to the **car itself** over TCP ADB on the local LAN. Do not use a

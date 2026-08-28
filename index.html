@@ -3341,13 +3341,15 @@ window.HavalSplash = (function () {
       letter-spacing: .02em;
       color: rgba(234,242,248,.88);
     }
-    /* Boot progress: full-width 2px blue line on the bottom edge (desktop).
-       Android draws the same line in native chrome — the splash <video>
-       hole-punches through in-page HTML. Vanishes the moment the model is
-       ready, even while the intro is still playing. */
+    /* Boot progress: full-width 2px blue line at fixed Y=700 (20px above the
+       720px panel bottom). Android draws the same line in native chrome — the
+       splash <video> hole-punches through in-page HTML. Vanishes the moment the
+       model is ready, even while the intro is still playing. */
     .hv-boot-line {
-      position: absolute;
-      left: 0; right: 0; bottom: 0;
+      position: fixed;
+      left: 0; right: 0;
+      top: 700px;
+      bottom: auto;
       height: 2px;
       z-index: 45;
       pointer-events: none;
@@ -3470,7 +3472,7 @@ window.HavalSplash = (function () {
       100% { transform: scale(1.9); opacity: 0; }
     }
 
-    /* Camera panel opener — rear-left on the car; shown/hidden with hotspots. */
+    /* Hotspot icon buttons — camera at rear-left wheel gap, x-ray at hood. */
     .hv-cam-fab {
       position: absolute;
       left: 0; top: 0;
@@ -3505,9 +3507,20 @@ window.HavalSplash = (function () {
       border-color: var(--hv-config-chip-on-border, #fff);
       color: var(--hv-config-chip-on-fg, #0b1016);
     }
-    .hv-cam-fab-btn svg {
+    .hv-cam-fab-btn svg,
+    .hv-cam-fab-btn .hv-xray-icon {
       display: block;
       width: 17px; height: 17px;
+    }
+
+    /* Flaticon car-engine glyph — masked so it tracks currentColor like stroke icons. */
+    .hv-xray-icon {
+      display: block;
+      width: 17px;
+      height: 17px;
+      background: currentColor;
+      -webkit-mask: url('assets/icons/xray-engine.png') center / contain no-repeat;
+      mask: url('assets/icons/xray-engine.png') center / contain no-repeat;
     }
 
     .hv-hs-menu {
@@ -3714,7 +3727,7 @@ window.HavalSplash = (function () {
           <span class="hv-tool-label">FPS</span>
         </button>
         <button class="hv-tool-btn" onClick="{{ togglePowertrain }}" title="{{ powertrainTooltip }}" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ powertrainBorder }}; color: {{ powertrainCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
-          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g stroke-opacity=".42"><path d="M2 17.4v-3.5a1.6 1.6 0 0 1 .9-1.4l3-1.4 2.3-3a2.4 2.4 0 0 1 1.9-.9h4.2a2.4 2.4 0 0 1 1.9.9l2.3 3 3 1.4a1.6 1.6 0 0 1 .9 1.4v3.5"></path><circle cx="6.6" cy="18.8" r="1.9"></circle><circle cx="17.4" cy="18.8" r="1.9"></circle></g><rect x="8.1" y="11.8" width="7.8" height="4.3" rx="1.1"></rect><path d="M12.7 12.7 11.1 14.4h1.8l-1.6 1.7" stroke-width="1.2"></path></svg></span>
+          <span class="hv-tool-icon"><span class="hv-xray-icon" aria-hidden="true"></span></span>
           <span class="hv-tool-label">X-RAY</span>
         </button>
 
@@ -5029,6 +5042,13 @@ const CAR_DRL_FOLLOWS_READY = true;
 
 const CAR_OPENING_STEP = 0.006;
 const MANUAL_OPENING_STEP = 0.02;
+const WINDOW_OPENING_STEP = 0.025;
+// Opening tweens were authored as a fixed progress tick per frame at 60 Hz.
+// Scale by delta so full travel takes the same wall-clock time at any fps.
+const OPENING_STEP_REF_FPS = 60;
+function openingStep(stepAt60, deltaSec) {
+  return stepAt60 * deltaSec * OPENING_STEP_REF_FPS;
+}
 
 // Angular rate the wheels are rolled at, per km/h. The loop advances
 // delta * motionSpeed * 15.2 rad and motionSpeed is km/h / 40 (see
@@ -5415,6 +5435,7 @@ class Component extends DCLogic {
     this._widgetSuppressClick = false;
     if (typeof document !== 'undefined') {
       document.addEventListener('click', (e) => this._onWidgetSuppressClick(e), true);
+      document.addEventListener('click', (e) => this._onCameraPanelOutsideClick(e), true);
     }
     try {
       const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
@@ -9607,6 +9628,7 @@ class Component extends DCLogic {
       this._ensureWallpapers(false);
     }
     this._syncCarSceneForShell();
+    if (this.state.widgetThemeMode === 'auto') this._refreshAutoWidgetThemeSample(false);
     if (this.requestRender) this.requestRender(2);
   }
 
@@ -9634,6 +9656,7 @@ class Component extends DCLogic {
         }
         if (this.requestRender) this.requestRender(8);
       }
+      if (this.state.widgetThemeMode === 'auto') this._refreshAutoWidgetThemeSample(true);
       this.saveSettings();
     });
   }
@@ -12366,6 +12389,7 @@ class Component extends DCLogic {
         const discMat = this._spriteMats.length === 0 ? blurredMaterial : makeSpriteMaterial();
         this._spriteMats.push(discMat);
         const disc = new THREE.Mesh(discGeo, discMat);
+        disc.name = 'WheelBlurDisc';
         disc.position.copy(item.center);
         disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), item.axle);
         
@@ -12397,6 +12421,7 @@ class Component extends DCLogic {
 
         // 2. Dark backing disc (placed behind brakes/suspension)
         const backingDisc = new THREE.Mesh(discGeo, backingMaterial);
+        backingDisc.name = 'WheelBlurBacking';
         backingDisc.position.copy(item.center);
         backingDisc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), item.axle);
         
@@ -12718,6 +12743,7 @@ class Component extends DCLogic {
     // ShadowMaterial catcher then stays blank until something else dirties it.
     // Keep the map dirty across the settle window (and on every day/night flip).
     this._kickShadowRefresh(builtRig ? 16 : 6);
+    if (this.state.widgetThemeMode === 'auto') this._refreshAutoWidgetThemeSample(false);
   }
 
   _kickShadowRefresh(frames = 6) {
@@ -14533,8 +14559,6 @@ class Component extends DCLogic {
         ] },
       { id: 'trunk', glyph: '', title: 'Tailgate',
         menu: [{ label: 'TOGGLE TRUNK', cmd: 'toggle_trunk' }] },
-      { id: 'engine', glyph: '', title: 'Engine bay',
-        menu: [{ label: 'X-RAY', action: 'xray' }] },
     ];
   }
 
@@ -14674,27 +14698,39 @@ class Component extends DCLogic {
     });
     roofPop.addEventListener('click', (ev) => ev.stopPropagation());
     this._initCamFab();
+    this._initXrayFab();
 
     const canvas = this.renderer && this.renderer.domElement;
     if (!canvas) return;
     this._hsPtDown = null;
+    this._canvasPointerCount = 0;
     this._onHsPointerDown = (e) => {
       if (e.button !== 0 || this.state.assignMode) return;
-      this._hsPtDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+      this._canvasPointerCount = (this._canvasPointerCount || 0) + 1;
+      if (this._canvasPointerCount > 1) {
+        this._cancelCenterHold();
+        return;
+      }
+      this._hsPtDown = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
       if (this._canCenterHoldAdd() && this._pointInCenterGap(e.clientX, e.clientY)) {
         this._onAddWidgetHoldStart(e);
       }
     };
     this._onHsPointerMove = (e) => {
-      if (!this._hsPtDown) return;
+      if ((this._canvasPointerCount || 0) > 1) {
+        this._cancelCenterHold();
+        return;
+      }
+      if (!this._hsPtDown || e.pointerId !== this._hsPtDown.id) return;
       const dx = e.clientX - this._hsPtDown.x;
       const dy = e.clientY - this._hsPtDown.y;
-      if (Math.hypot(dx, dy) > 10) this._onAddWidgetHoldCancel(e);
+      if (Math.hypot(dx, dy) > 10) this._cancelCenterHold();
     };
     this._onHsPointerUp = (e) => {
       if (e.button !== 0 || this.state.assignMode) return;
-      this._onAddWidgetHoldEnd(e);
-      if (!this._hsPtDown) return;
+      this._canvasPointerCount = Math.max(0, (this._canvasPointerCount || 1) - 1);
+      this._cancelCenterHold();
+      if (!this._hsPtDown || e.pointerId !== this._hsPtDown.id) return;
       const d = this._hsPtDown;
       this._hsPtDown = null;
       const dx = e.clientX - d.x;
@@ -14709,6 +14745,7 @@ class Component extends DCLogic {
         }
       }
       if (this._raycastCarBody(e)) {
+        this._closeCameraPanel();
         this._pulseHotspots();
       } else {
         this._onCanvasSafeTap(e);
@@ -14741,6 +14778,105 @@ class Component extends DCLogic {
     this._camFabBtn = btn;
   }
 
+  _initXrayFab() {
+    if (!this._hsLayer || this._xrayFabEl) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'hv-cam-fab';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hv-cam-fab-btn';
+    btn.title = 'X-ray powertrain';
+    btn.setAttribute('aria-label', 'X-ray powertrain');
+    btn.innerHTML = '<span class="hv-xray-icon" aria-hidden="true"></span>';
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._togglePowertrainFromFab();
+    });
+    wrap.appendChild(btn);
+    this._hsLayer.appendChild(wrap);
+    this._xrayFabEl = wrap;
+    this._xrayFabBtn = btn;
+  }
+
+  _togglePowertrainFromFab() {
+    this.setState((st) => {
+      const powertrainOn = !st.powertrainOn;
+      this._applyPowertrainVisibility(powertrainOn);
+      return { powertrainOn };
+    });
+    this._armHotspotHideTimer();
+    if (this.requestRender) this.requestRender(4);
+  }
+
+  _computeEngineFabAnchor(model) {
+    if (!this.THREE || !model) return null;
+    const THREE = this.THREE;
+    const put = (node) => this._hsNodeAnchorLocal(node);
+    const hlMeshes = this.lightGroups && this.lightGroups.headlight;
+    if (hlMeshes && hlMeshes.length) {
+      const hlBox = new THREE.Box3();
+      hlMeshes.forEach((m) => hlBox.expandByObject(m));
+      if (!hlBox.isEmpty()) {
+        const bodyBox = new THREE.Box3().setFromObject(model);
+        const w = hlBox.getCenter(new THREE.Vector3());
+        w.y = bodyBox.min.y + (bodyBox.max.y - bodyBox.min.y) * 0.48;
+        model.updateMatrixWorld(true);
+        const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+        return w.applyMatrix4(inv);
+      }
+    }
+    if (this._powertrainRig) {
+      const a = put(this._powertrainRig);
+      if (a) return a;
+    }
+    const hood = this._hsFindMeshByName(/hood|bonnet|front_hood|motor_hood/i);
+    if (hood) {
+      const a = put(hood);
+      if (a) return a;
+    }
+    return this._hsBBoxAnchorLocal(model, (_min, _max, c, sz, p) => {
+      p.set(c.x, c.y + sz.y * 0.10, _max.z - sz.z * 0.10);
+    });
+  }
+
+  _rebuildXrayFabAnchor(root) {
+    const model = root || this.model;
+    this._xrayFabAnchor = model ? this._computeEngineFabAnchor(model) : null;
+  }
+
+  _projectHsFab(wrap, btn, anchor, act) {
+    if (!wrap || !this.camera || !this.renderer || !this._hsLayer) return;
+    if (!this._hotspotsVisible) {
+      wrap.classList.remove('on');
+      return;
+    }
+    if (!anchor || !this.model || !this.model.visible) {
+      wrap.classList.remove('on');
+      return;
+    }
+    if (!this._hsFabProj) {
+      this._hsFabProj = {
+        v: new this.THREE.Vector3(),
+        ndc: new this.THREE.Vector3(),
+      };
+    }
+    const scratch = this._hsFabProj;
+    scratch.v.copy(anchor);
+    this.model.localToWorld(scratch.v);
+    scratch.ndc.copy(scratch.v).project(this.camera);
+    if (scratch.ndc.z > 1) {
+      wrap.classList.remove('on');
+      return;
+    }
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const layerRect = this._hsLayer.getBoundingClientRect();
+    const x = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
+    const y = (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top);
+    wrap.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
+    wrap.classList.add('on');
+    if (btn) btn.classList.toggle('act', !!act);
+  }
+
   _rebuildCamFabAnchor(root) {
     if (!this.THREE || !this.model) {
       this._camFabAnchor = null;
@@ -14748,94 +14884,105 @@ class Component extends DCLogic {
     }
     const THREE = this.THREE;
     const model = root || this.model;
-    const skip = new Set([this.floorMesh, this.nightFloor, this.shadowCatcher, this.contactShadow]
-      .filter(Boolean));
-    const box = new THREE.Box3();
-    model.traverse((o) => {
-      if (o.isMesh && o.visible && !skip.has(o)) box.expandByObject(o);
-    });
-    if (box.isEmpty()) {
-      this._camFabAnchor = null;
-      return;
-    }
-    const center = box.getCenter(new THREE.Vector3());
-    const { F, R } = this._carBasis();
-    const corners = [];
-    for (let i = 0; i < 8; i++) {
-      corners.push(new THREE.Vector3(
-        (i & 1) ? box.max.x : box.min.x,
-        (i & 2) ? box.max.y : box.min.y,
-        (i & 4) ? box.max.z : box.min.z));
-    }
-    let fMin = Infinity;
-    let fMax = -Infinity;
-    let rMin = Infinity;
-    let rMax = -Infinity;
-    for (const c of corners) {
-      const rel = c.clone().sub(center);
-      const f = rel.dot(F);
-      const r = rel.dot(R);
-      if (f < fMin) fMin = f;
-      if (f > fMax) fMax = f;
-      if (r < rMin) rMin = r;
-      if (r > rMax) rMax = r;
-    }
-    const inset = 0.06;
-    const height = box.max.y - box.min.y;
-    const spanR = rMax - rMin;
-    const windshield = this._hsFindMeshByName(/windshield|windscreen/i);
-    let world;
-    if (windshield) {
-      const wBox = new THREE.Box3().setFromObject(windshield);
-      world = wBox.getCenter(new THREE.Vector3());
-      // Mirror-cluster / front-camera side of the glass (left flank, not rear door).
-      world.addScaledVector(R, -spanR * 0.18);
-      world.y = wBox.min.y + (wBox.max.y - wBox.min.y) * 0.58;
-    } else {
-      world = center.clone()
-        .addScaledVector(F, fMax - (fMax - fMin) * inset)
-        .addScaledVector(R, rMin + spanR * inset);
-      world.y = box.min.y + height * 0.34;
-    }
     model.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+    let world = this._rearLeftWheelFabWorld();
+    if (!world) {
+      const skip = new Set([this.floorMesh, this.nightFloor, this.shadowCatcher, this.contactShadow]
+        .filter(Boolean));
+      const box = new THREE.Box3();
+      model.traverse((o) => {
+        if (o.isMesh && o.visible && !skip.has(o)) box.expandByObject(o);
+      });
+      if (box.isEmpty()) {
+        this._camFabAnchor = null;
+        return;
+      }
+      const center = box.getCenter(new THREE.Vector3());
+      const { F, R } = this._carBasis();
+      let fMin = Infinity, fMax = -Infinity, rMin = Infinity, rMax = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        const c = new THREE.Vector3(
+          (i & 1) ? box.max.x : box.min.x,
+          (i & 2) ? box.max.y : box.min.y,
+          (i & 4) ? box.max.z : box.min.z);
+        const rel = c.clone().sub(center);
+        const f = rel.dot(F), r = rel.dot(R);
+        if (f < fMin) fMin = f;
+        if (f > fMax) fMax = f;
+        if (r < rMin) rMin = r;
+        if (r > rMax) rMax = r;
+      }
+      const inset = 0.06;
+      const spanR = rMax - rMin;
+      world = center.clone()
+        .addScaledVector(F, fMin + (fMax - fMin) * inset)
+        .addScaledVector(R, rMin + spanR * inset);
+      world.y = box.min.y + (box.max.y - box.min.y) * 0.22;
+      world.addScaledVector(R, -spanR * 0.14);
+    }
     this._camFabAnchor = world.applyMatrix4(inv);
   }
 
+  // Rear-left wheel hub, nudged outboard so the icon sits in the gap beside the
+  // tyre rather than on the body glass.
+  _rearLeftWheelFabWorld() {
+    const wheels = this._rearLeftWheels;
+    if (!wheels || !wheels.length || !this.THREE) return null;
+    const THREE = this.THREE;
+    const box = new THREE.Box3();
+    wheels.forEach((m) => {
+      if (m && m.isMesh && this._isWorldVisible(m)) box.expandByObject(m);
+    });
+    if (box.isEmpty()) return null;
+    const center = box.getCenter(new THREE.Vector3());
+    const ref = wheels.find((m) => m._rollAxis) || wheels[0];
+    const axle = ref && ref._rollAxis ? ref._rollAxis.clone().normalize() : null;
+    let outward;
+    if (axle) outward = axle.clone().negate(); // left side outboard (matches blur discs)
+    else {
+      const { R } = this._carBasis();
+      outward = R.clone().negate();
+    }
+    const size = box.getSize(new THREE.Vector3());
+    const outDist = Math.max(size.x, size.y, size.z) * 0.54 + 0.07;
+    center.addScaledVector(outward, outDist);
+    const { F } = this._carBasis();
+    center.addScaledVector(F, -0.07); // nudge toward rear (screen-right in RL 3/4)
+    center.y = box.min.y + size.y * 0.42;
+    return center;
+  }
+
+  _closeCameraPanel() {
+    if (this.state.panelOpen && this.state.activeGroup === 'camera') {
+      this.setState({ panelOpen: false, activeGroup: null });
+    }
+  }
+
+  _onCameraPanelOutsideClick(e) {
+    if (!this.state.panelOpen || this.state.activeGroup !== 'camera') return;
+    const t = e && e.target;
+    if (t && t.closest && (
+      t.closest('.hv-config-dock')
+      || t.closest('.hv-cam-fab')
+    )) return;
+    this._closeCameraPanel();
+  }
+
   _updateCamFab() {
-    if (!this._camFabEl || !this.camera || !this.renderer || !this._hsLayer) return;
-    if (!this._hotspotsVisible) {
-      this._camFabEl.classList.remove('on');
-      return;
+    const world = this._rearLeftWheelFabWorld();
+    if (world && this.model) {
+      this.model.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(this.model.matrixWorld).invert();
+      if (!this._camFabAnchor) this._camFabAnchor = new this.THREE.Vector3();
+      this._camFabAnchor.copy(world).applyMatrix4(inv);
     }
-    if (!this._camFabAnchor || !this.model || !this.model.visible) {
-      this._camFabEl.classList.remove('on');
-      return;
-    }
-    if (!this._camFabProj) {
-      this._camFabProj = {
-        v: new this.THREE.Vector3(),
-        ndc: new this.THREE.Vector3(),
-      };
-    }
-    const scratch = this._camFabProj;
-    scratch.v.copy(this._camFabAnchor);
-    this.model.localToWorld(scratch.v);
-    scratch.ndc.copy(scratch.v).project(this.camera);
-    if (scratch.ndc.z > 1) {
-      this._camFabEl.classList.remove('on');
-      return;
-    }
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    const layerRect = this._hsLayer.getBoundingClientRect();
-    const x = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
-    const y = (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top);
-    this._camFabEl.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
-    this._camFabEl.classList.add('on');
-    if (this._camFabBtn) {
-      const on = this.state.panelOpen && this.state.activeGroup === 'camera';
-      this._camFabBtn.classList.toggle('act', on);
-    }
+    const on = this.state.panelOpen && this.state.activeGroup === 'camera';
+    this._projectHsFab(this._camFabEl, this._camFabBtn, this._camFabAnchor, on);
+  }
+
+  _updateXrayFab() {
+    this._projectHsFab(this._xrayFabEl, this._xrayFabBtn, this._xrayFabAnchor, !!this.state.powertrainOn);
   }
 
   _teardownHotspots() {
@@ -14846,7 +14993,11 @@ class Component extends DCLogic {
     const canvas = this.renderer && this.renderer.domElement;
     if (canvas) {
       if (this._onHsPointerDown) canvas.removeEventListener('pointerdown', this._onHsPointerDown);
-      if (this._onHsPointerUp) canvas.removeEventListener('pointerup', this._onHsPointerUp);
+      if (this._onHsPointerMove) canvas.removeEventListener('pointermove', this._onHsPointerMove);
+      if (this._onHsPointerUp) {
+        canvas.removeEventListener('pointerup', this._onHsPointerUp);
+        canvas.removeEventListener('pointercancel', this._onHsPointerUp);
+      }
     }
     if (this._hsLayer && this._hsLayer.parentNode) this._hsLayer.parentNode.removeChild(this._hsLayer);
     this._hsLayer = null;
@@ -14856,6 +15007,9 @@ class Component extends DCLogic {
     this._camFabEl = null;
     this._camFabBtn = null;
     this._camFabAnchor = null;
+    this._xrayFabEl = null;
+    this._xrayFabBtn = null;
+    this._xrayFabAnchor = null;
     this._hsEls = null;
     this._hsRoofPop = null;
     this._onHsPointerDown = null;
@@ -14912,6 +15066,7 @@ class Component extends DCLogic {
   }
 
   _onCanvasSafeTap(_e) {
+    this._closeCameraPanel();
     this._hideHotspots();
     // Reserved for future screen switching between layout zones.
   }
@@ -14951,6 +15106,7 @@ class Component extends DCLogic {
     });
     this._updateHotspotLayer();
     this._updateCamFab();
+    this._updateXrayFab();
     if (!deferHide) this._armHotspotHideTimer();
     if (this.requestRender) this.requestRender(8);
   }
@@ -14964,6 +15120,7 @@ class Component extends DCLogic {
       if (el) el.classList.remove('on', 'open', 'act', 'flip');
     });
     if (this._camFabEl) this._camFabEl.classList.remove('on');
+    if (this._xrayFabEl) this._xrayFabEl.classList.remove('on');
   }
 
   _hideHotspots() {
@@ -14989,13 +15146,7 @@ class Component extends DCLogic {
   }
 
   _onHotspotMenuAction(hsId, item) {
-    if (item.action === 'xray') {
-      this.setState((st) => {
-        const powertrainOn = !st.powertrainOn;
-        this._applyPowertrainVisibility(powertrainOn);
-        return { powertrainOn };
-      });
-    } else if (item.action === 'roof_levels') {
+    if (item.action === 'roof_levels') {
       this._openRoofLevelPopup();
       this._armHotspotHideTimer();
       if (this.requestRender) this.requestRender(4);
@@ -15137,6 +15288,7 @@ class Component extends DCLogic {
     this._hsAnchors = anchors;
     this._ensureHotspotElements();
     this._rebuildCamFabAnchor(model);
+    this._rebuildXrayFabAnchor(model);
   }
 
   /**
@@ -15213,7 +15365,6 @@ class Component extends DCLogic {
       const s = this.state || {};
       let active = false;
       if (id === 'roof') active = (s.sunroofOpen || 0) > 2 || (s.curtainOpen || 0) > 2;
-      else if (id === 'engine') active = !!s.powertrainOn;
       else if (id === 'trunk') active = (s.trunkOpen || 0) > 2;
       else if (id === 'windows') {
         active = (s.windowsOpen || 0) > 2
@@ -18509,6 +18660,8 @@ class Component extends DCLogic {
       if (cached && cached.entries) this._wallpaperEntries = cached.entries;
     }
     this._syncCenterFillIndicator();
+    this._lastEffectiveWidgetTheme = this._effectiveWidgetTheme();
+    this._refreshAutoWidgetThemeSample(false);
     this._applyWebShellPreviewLayout();
     if (this._debugMode) {
       console.log('[debug] ?debug=true — layout cameras start from shipped builtins (localStorage ignored)');
@@ -18780,6 +18933,7 @@ class Component extends DCLogic {
       };
       controls.addEventListener('change', () => this.requestRender(2));
       controls.addEventListener('start', () => {
+        this._cancelCenterHold();
         this._camCycleElapsed = 0;
         if (this._camEventKind && this._camEventKind !== 'user') {
           this._camEventDismissedKind = this._camEventKind;
@@ -19460,7 +19614,7 @@ class Component extends DCLogic {
         // Smooth doors animation
         let doorsNeedRender = false;
         if (this._doorProgress && this._doorTargets) {
-          const step = 0.02;
+          const step = openingStep(MANUAL_OPENING_STEP, delta);
           ['fl', 'fr', 'rl', 'rr'].forEach((k) => {
             if (this._doorProgress[k] !== this._doorTargets[k]) {
               if (this._doorProgress[k] < this._doorTargets[k]) {
@@ -19482,7 +19636,7 @@ class Component extends DCLogic {
 
         // Smooth trunk animation
         if (this._trunkProgress !== this._trunkTarget) {
-          const step = 0.02;
+          const step = openingStep(MANUAL_OPENING_STEP, delta);
           if (this._trunkProgress < this._trunkTarget) {
             this._trunkProgress = Math.min(this._trunkTarget, this._trunkProgress + step);
           } else {
@@ -19498,7 +19652,7 @@ class Component extends DCLogic {
         // Smooth window drop
         if (this._windows && this._windows.length
             && this._windowsProgress !== this._windowsTarget) {
-          const step = 0.025;
+          const step = openingStep(WINDOW_OPENING_STEP, delta);
           if (this._windowsProgress < this._windowsTarget) {
             this._windowsProgress = Math.min(this._windowsTarget, this._windowsProgress + step);
           } else {
@@ -19513,7 +19667,7 @@ class Component extends DCLogic {
 
         // Smooth sunroof animation
         if (this._sunroofProgress !== this._sunroofTarget) {
-          const step = this._sunroofStep || MANUAL_OPENING_STEP;
+          const step = openingStep(this._sunroofStep || MANUAL_OPENING_STEP, delta);
           if (this._sunroofProgress < this._sunroofTarget) {
             this._sunroofProgress = Math.min(this._sunroofTarget, this._sunroofProgress + step);
           } else {
@@ -19528,7 +19682,7 @@ class Component extends DCLogic {
 
         // Smooth curtain animation
         if (this._curtainProgress !== this._curtainTarget) {
-          const step = this._curtainStep || MANUAL_OPENING_STEP;
+          const step = openingStep(this._curtainStep || MANUAL_OPENING_STEP, delta);
           if (this._curtainProgress < this._curtainTarget) {
             this._curtainProgress = Math.min(this._curtainTarget, this._curtainProgress + step);
           } else {
@@ -19598,7 +19752,10 @@ class Component extends DCLogic {
         }
         if (this._hotspotsVisible || this._hsRoofPopOpen) {
           this._updateHotspotLayer();
-          if (this._hotspotsVisible) this._updateCamFab();
+          if (this._hotspotsVisible) {
+            this._updateCamFab();
+            this._updateXrayFab();
+          }
         }
         // Callouts follow the camera whenever x-ray is up, independently of the
         // bullets -- those fade out on a timer and these must not.
@@ -20226,6 +20383,11 @@ class Component extends DCLogic {
           const m = (w && w.mesh) ? w.mesh : ((w && w.c) ? w.c : w);
           if (m && m.id !== undefined) keepSolid.add(m.id);
         });
+      });
+      // Blur/backing discs are parented under the wheel cluster, not in the
+      // wheel mesh lists above — ghosting them kills the spin sprite in x-ray.
+      [...(this._blurredDiscs || []), ...(this._backingDiscs || [])].forEach((d) => {
+        if (d && d.id !== undefined) keepSolid.add(d.id);
       });
       const saved = [];
       model.traverse((c) => {
@@ -22415,7 +22577,11 @@ class Component extends DCLogic {
     this._camIcons = null;
     this._camIconBoxCache = null;
     this._camFabAnchor = null;
-    if (this.model) this._rebuildCamFabAnchor();
+    this._xrayFabAnchor = null;
+    if (this.model) {
+      this._rebuildCamFabAnchor();
+      this._rebuildXrayFabAnchor();
+    }
     this._camIconQueue = null;
     if (this._camIconTimer) { clearTimeout(this._camIconTimer); this._camIconTimer = null; }
     if (this.state && this.state.activeGroup === 'camera') {
@@ -23711,6 +23877,10 @@ class Component extends DCLogic {
         this.toggleCameraRail();
         break;
       case 'layout':
+        this.openLayoutPanel();
+        break;
+      case 'cycleWidgetTheme':
+        this.cycleWidgetThemeMode();
         break;
       case 'closePanel':
         this.setState({ panelOpen: false, activeGroup: null });
@@ -23783,6 +23953,7 @@ class Component extends DCLogic {
     if (!bridge || typeof bridge.updateDockIndicators !== 'function') return;
     const s = this.state;
     const paintHex = s.carColor === null ? '#F4F5F7' : String(s.carColor || '#F4F5F7');
+    const effTheme = this._effectiveWidgetTheme(s);
     const payload = {
       model: this._currentTrim().label,
       perf: this._perfModeInfo(s.resScaleMode).icon,
@@ -23790,6 +23961,9 @@ class Component extends DCLogic {
       time: s.timeMode || (s.nightMode ? 'night' : 'day'),
       fps: !!s.showFps,
       xray: !!s.powertrainOn,
+      uiTheme: effTheme,
+      widgetThemeMode: s.widgetThemeMode || 'dark',
+      widgetTheme: effTheme,
     };
     const sig = JSON.stringify(payload);
     if (sig === this._dockIndicatorSig) return;
@@ -24010,9 +24184,19 @@ class Component extends DCLogic {
     });
   }
 
+  _cancelCenterHold() {
+    if (this._centerSlotHoldTimer) {
+      clearTimeout(this._centerSlotHoldTimer);
+      this._centerSlotHoldTimer = 0;
+    }
+    this._centerSlotHoldFired = false;
+    this._centerSlotTouchActive = false;
+  }
+
   _onAddWidgetHoldStart(ev) {
     if (ev && ev.type === 'mousedown' && this._centerSlotTouchActive) return;
     if (ev && ev.type === 'touchstart') this._centerSlotTouchActive = true;
+    if ((this._canvasPointerCount || 0) > 1) return;
     if ((this._shellMode || this.state.shellMode) === 'appsOnly') return;
     if (this._widgetAddingOn()) return;
     if (this.state.graphEditId) return;
@@ -24027,15 +24211,11 @@ class Component extends DCLogic {
   _onAddWidgetHoldEnd(ev) {
     if (ev && ev.type === 'mouseup' && this._centerSlotTouchActive) return;
     if (ev && (ev.type === 'touchend' || ev.type === 'touchcancel')) this._centerSlotTouchActive = false;
-    if (this._centerSlotHoldTimer) {
-      clearTimeout(this._centerSlotHoldTimer);
-      this._centerSlotHoldTimer = 0;
-    }
-    this._centerSlotHoldFired = false;
+    this._cancelCenterHold();
   }
 
   _onAddWidgetHoldCancel(ev) {
-    this._onAddWidgetHoldEnd(ev);
+    this._cancelCenterHold();
   }
 
   _onCenterSlotHoldStart(ev) {

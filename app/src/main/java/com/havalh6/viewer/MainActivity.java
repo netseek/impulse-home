@@ -36,6 +36,9 @@ import android.widget.FrameLayout;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -755,6 +758,7 @@ public final class MainActivity extends Activity {
     };
     private View mediaLaunchAnchor;
     private View stripContainer;
+    private View stripRow;
     /** Mode drawer (1×1 collapsed / 1×3 expanded) leading the launcher strip. */
     private android.widget.LinearLayout modeDrawer;
     private View modeCollapsedBtn;
@@ -774,16 +778,26 @@ public final class MainActivity extends Activity {
     private android.widget.ImageView layoutCenterFillIcon;
     private android.widget.TextView layoutCenterFillLabel;
     private android.widget.ImageView layoutCenterFillGear;
+    private View layoutThemeChip;
+    private android.widget.TextView layoutThemeLabel;
+    private android.widget.TextView layoutTipLabel;
     /** {@code car} or {@code wallpaper} — mirrored from the viewer. */
     private String centerFillMode = "car";
     /** Config-strip tool glyphs keyed by cmd (camera, model, …) for live updates. */
     private final java.util.Map<String, android.widget.ImageView> dockToolIcons =
             new java.util.HashMap<>();
     private int dockToolGlyphPx;
+    /** Mask source for the x-ray / powertrain dock icon (assets/icons/xray-engine.png). */
+    private Bitmap dockXrayGlyphSrc;
     private String dockModelLabel = "PHEV34";
     private String dockPerfLabel = "OFF";
     private String dockPaintHex = "#F4F5F7";
     private String dockTimeMode = "auto";
+    private String dockWidgetThemeMode = "dark";
+    private String dockWidgetThemeEffective = "dark";
+    private boolean dockUiLight = false;
+    private boolean dockFpsOn = false;
+    private boolean dockXrayOn = false;
     /** Content shown to the right of the mode drawer: apps | layout | config. */
     private String stripMode = "apps";
     private boolean drawerExpanded;
@@ -875,7 +889,7 @@ public final class MainActivity extends Activity {
     private int appsFabPosY = Integer.MIN_VALUE;
     private Runnable pinMediaBoundsRunnable;
     private final MediaNowPlaying mediaNowPlaying = new MediaNowPlaying();
-    /** Full-width 2px load line, pinned to the bottom edge (above Impulse). */
+    /** Full-width 2px load line at display Y=700 (20px above the 720px panel). */
     private View bootProgressTrack;
     private View bootProgressFill;
     /** Subtle center spinner once the splash is gone but the GLB is not ready. */
@@ -4219,12 +4233,31 @@ public final class MainActivity extends Activity {
                 .start();
     }
 
+    /** Fixed display Y for the 2px boot line — 20px above the 720px panel. */
+    private static final int BOOT_PROGRESS_LINE_TOP_Y = 700;
+
+    private int bootProgressLineTopMarginPx() {
+        return Math.max(0, BOOT_PROGRESS_LINE_TOP_Y - pageOriginRect().top);
+    }
+
+    private void layoutBootProgressLine() {
+        if (bootProgressTrack == null) return;
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) bootProgressTrack.getLayoutParams();
+        int top = bootProgressLineTopMarginPx();
+        if (lp.topMargin != top || lp.gravity != (android.view.Gravity.TOP | android.view.Gravity.START)) {
+            lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+            lp.topMargin = top;
+            lp.bottomMargin = 0;
+            bootProgressTrack.setLayoutParams(lp);
+        }
+    }
+
     /**
      * Boot load UI above the WebView. The splash &lt;video&gt; hole-punches
      * through in-page HTML, so progress has to live in native chrome:
-     * a full-width 2px blue line on the bottom edge (right above Impulse),
-     * swapped for a subtle center spinner once the clip is gone but the
-     * GLB is still arriving. Hidden the moment the model is ready — even
+     * a full-width 2px blue line at fixed display Y=700 (20px above the panel
+     * bottom), swapped for a subtle center spinner once the clip is gone but
+     * the GLB is still arriving. Hidden the moment the model is ready — even
      * if the intro fade is still playing.
      */
     private void setupBootHud(FrameLayout root) {
@@ -4245,9 +4278,8 @@ public final class MainActivity extends Activity {
         bootProgressFill = fill;
         FrameLayout.LayoutParams trackLp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, lineH);
-        trackLp.gravity = android.view.Gravity.BOTTOM;
-        // Window bottom is already Impulse-overscan-compensated — pin to that edge.
-        trackLp.bottomMargin = 0;
+        trackLp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+        trackLp.topMargin = bootProgressLineTopMarginPx();
         root.addView(track, trackLp);
         bootProgressTrack = track;
         track.setVisibility(View.GONE);
@@ -4279,6 +4311,7 @@ public final class MainActivity extends Activity {
         }
         if (bootCenterLoader != null) bootCenterLoader.setVisibility(View.GONE);
         if (bootProgressTrack == null || bootProgressFill == null) return;
+        layoutBootProgressLine();
         bootProgressTrack.setVisibility(View.VISIBLE);
         bootProgressTrack.bringToFront();
         int w = bootProgressTrack.getWidth();
@@ -4393,6 +4426,7 @@ public final class MainActivity extends Activity {
         stripContainer = strip;
 
         android.widget.LinearLayout stripRow = new android.widget.LinearLayout(this);
+        this.stripRow = stripRow;
         stripRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         stripRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
         // Drawer must stay above the scroll band; host clips so icons cannot
@@ -4594,6 +4628,7 @@ public final class MainActivity extends Activity {
         mediaLaunchAnchor = mediaAnchor;
 
         applyDrawerCollapsedUi(false);
+        applyDockStripBackground();
         refreshLayoutChipSelection();
         updateSlotAnchors();
         updateAppsOnlyChrome();
@@ -4680,7 +4715,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView tv = new android.widget.TextView(this);
         tv.setTag("modeLabel");
         tv.setText(label != null ? label : "");
-        tv.setTextColor(0xE6FFFFFF);
+        tv.setTextColor(dockLabelColorMuted());
         tv.setTextSize(10f);
         tv.setGravity(android.view.Gravity.CENTER);
         tv.setMaxLines(1);
@@ -4702,13 +4737,25 @@ public final class MainActivity extends Activity {
         label.setVisibility(visible && has ? View.VISIBLE : View.GONE);
     }
 
+    /**
+     * Widget-light → frosted light drawer band + dark gray labels.
+     * Widget-dark → darker strip gradient + white labels (classic dock).
+     */
     private android.graphics.drawable.GradientDrawable makeDockPlateDrawable(
             boolean selected, float density) {
         android.graphics.drawable.GradientDrawable d =
                 new android.graphics.drawable.GradientDrawable();
         d.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
         d.setCornerRadius(16f * density);
-        if (selected) {
+        if (dockUiLight) {
+            if (selected) {
+                d.setColor(0xD9FFFFFF);
+                d.setStroke(Math.max(1, Math.round(1.5f * density)), 0xFF3D4550);
+            } else {
+                d.setColor(0xC0FFFFFF);
+                d.setStroke(Math.max(1, Math.round(1.2f * density)), 0x664A5568);
+            }
+        } else if (selected) {
             d.setColor(0x58FFFFFF);
             d.setStroke(Math.max(1, Math.round(1.5f * density)), 0xA8FFFFFF);
         } else {
@@ -4716,6 +4763,139 @@ public final class MainActivity extends Activity {
             d.setStroke(Math.max(1, Math.round(1.2f * density)), 0x50FFFFFF);
         }
         return d;
+    }
+
+    private android.graphics.drawable.GradientDrawable makeDockStripBackgroundDrawable() {
+        android.graphics.drawable.GradientDrawable d =
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        dockUiLight
+                                ? new int[] { 0xE8F2F5F8, 0xF5F8FAFC }
+                                : new int[] { 0xF01A2028, 0xF010141C });
+        d.setCornerRadius(0f);
+        return d;
+    }
+
+    private void applyDockStripBackground() {
+        android.graphics.drawable.GradientDrawable bg = makeDockStripBackgroundDrawable();
+        if (stripRow != null) stripRow.setBackground(bg);
+        if (contentHost != null) contentHost.setBackground(null);
+    }
+
+    private int dockGlyphColor() {
+        return dockUiLight ? 0xFF3D4550 : 0xFFFFFFFF;
+    }
+
+    private int dockLabelColor() {
+        return dockUiLight ? 0xFF3D4550 : 0xFFFFFFFF;
+    }
+
+    private int dockLabelColorMuted() {
+        return dockUiLight ? 0x8F4A5568 : 0xCCFFFFFF;
+    }
+
+    private android.widget.TextView findDockChipLabel(View cell) {
+        if (cell == null) return null;
+        View label = cell.findViewWithTag("dockChipLabel");
+        return label instanceof android.widget.TextView
+                ? (android.widget.TextView) label : null;
+    }
+
+    private void styleDockLabel(android.widget.TextView tv, boolean muted) {
+        if (tv == null) return;
+        tv.setTextColor(muted ? dockLabelColorMuted() : dockLabelColor());
+    }
+
+    private void applyDockUiTheme(boolean light) {
+        if (dockUiLight == light) return;
+        dockUiLight = light;
+        refreshDockChromeTheme();
+    }
+
+    private void refreshDockChromeTheme() {
+        applyDockStripBackground();
+        refreshLayoutChipSelection();
+        refreshLayoutThemeChip();
+        styleDockLabel(layoutTipLabel, true);
+        refreshModeDrawerGlyphs();
+        refreshDockToolCaptions();
+        for (String cmd : dockToolIcons.keySet()) {
+            refreshDockToolGlyph(cmd, dockToolGlyphFor(cmd));
+        }
+    }
+
+    private void refreshDockToolCaptions() {
+        for (android.widget.ImageView iv : dockToolIcons.values()) {
+            if (iv == null || iv.getParent() == null) continue;
+            View iconWrap = (View) iv.getParent();
+            View colParent = iconWrap.getParent();
+            if (!(colParent instanceof android.widget.LinearLayout)) continue;
+            android.widget.LinearLayout col = (android.widget.LinearLayout) colParent;
+            for (int i = 0; i < col.getChildCount(); i++) {
+                View child = col.getChildAt(i);
+                if (child instanceof android.widget.TextView
+                        && "dockToolCaption".equals(child.getTag())) {
+                    android.widget.TextView caption = (android.widget.TextView) child;
+                    styleDockLabel(caption, true);
+                    if (dockUiLight) caption.setShadowLayer(0f, 0f, 0f, 0);
+                    else caption.setShadowLayer(3f, 0f, 1f, 0x99000000);
+                }
+            }
+        }
+    }
+
+    private String dockToolGlyphFor(String cmd) {
+        if ("model".equals(cmd)) return dockModelLabel;
+        if ("perf".equals(cmd)) return dockPerfLabel;
+        if ("paint".equals(cmd)) return dockPaintHex;
+        if ("time".equals(cmd)) return dockTimeMode;
+        if ("fps".equals(cmd)) return dockFpsOn ? "ON" : "OFF";
+        if ("xray".equals(cmd)) return dockXrayOn ? "ON" : "OFF";
+        return "";
+    }
+
+    private void refreshModeDrawerGlyphs() {
+        int iconPx = dockIconPx > 0 ? dockIconPx
+                : Math.round(60 * getResources().getDisplayMetrics().density);
+        if (modeAppsBtn != null) setModeCellIcon(modeAppsBtn, dockGlyphApps(iconPx));
+        if (modeLayoutBtn != null) setModeCellIcon(modeLayoutBtn, dockGlyphLayout(iconPx));
+        if (modeConfigBtn != null) setModeCellIcon(modeConfigBtn, dockGlyphConfig(iconPx));
+        if (modeCollapsedIcon != null) {
+            modeCollapsedIcon.setImageDrawable(glyphForStripMode(stripMode));
+        }
+        styleDockLabel(findModeCellLabel(modeAppsBtn), false);
+        styleDockLabel(findModeCellLabel(modeLayoutBtn), false);
+        styleDockLabel(findModeCellLabel(modeConfigBtn), false);
+    }
+
+    private void setModeCellIcon(View cell, Drawable glyph) {
+        if (cell == null) return;
+        android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
+        if (iv != null) iv.setImageDrawable(glyph);
+    }
+
+    private android.widget.TextView findModeCellLabel(View cell) {
+        if (cell == null) return null;
+        View label = cell.findViewWithTag("modeLabel");
+        return label instanceof android.widget.TextView
+                ? (android.widget.TextView) label : null;
+    }
+
+    private void refreshLayoutThemeChip() {
+        if (layoutThemeChip == null) return;
+        String mode = dockWidgetThemeMode != null ? dockWidgetThemeMode : "dark";
+        String eff = dockWidgetThemeEffective != null ? dockWidgetThemeEffective : "dark";
+        String label;
+        if ("auto".equals(mode)) {
+            label = "UI · Auto (" + ("light".equals(eff) ? "Light" : "Dark") + ")";
+        } else if ("light".equals(mode)) {
+            label = "UI · Light";
+        } else {
+            label = "UI · Dark";
+        }
+        if (layoutThemeLabel != null) layoutThemeLabel.setText(label);
+        styleDockLabel(layoutThemeLabel, false);
+        setModeCellSelected(layoutThemeChip, "light".equals(eff));
     }
 
     /** Solid rounded square behind third-party launcher icons (not dock glyphs). */
@@ -4774,7 +4954,7 @@ public final class MainActivity extends Activity {
         Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         android.graphics.Canvas c = new android.graphics.Canvas(bmp);
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xFFFFFFFF);
+        p.setColor(dockGlyphColor());
         float s = sizePx;
         float pad = s * 0.18f;
         float gap = s * 0.14f;
@@ -4793,7 +4973,7 @@ public final class MainActivity extends Activity {
         Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         android.graphics.Canvas c = new android.graphics.Canvas(bmp);
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xFFFFFFFF);
+        p.setColor(dockGlyphColor());
         p.setStyle(android.graphics.Paint.Style.FILL);
         float s = sizePx;
         float padY = s * 0.18f;
@@ -4989,10 +5169,17 @@ public final class MainActivity extends Activity {
                 "Add Widget", v -> callViewerDock("addWidget"));
         row.addView(layoutAddWidgetChip);
 
+        layoutThemeChip = makeWideDockChip(density, Math.round(152 * density), iconPx,
+                "UI · Dark", v -> callViewerDock("cycleWidgetTheme"));
+        layoutThemeLabel = findDockChipLabel(layoutThemeChip);
+        row.addView(layoutThemeChip);
+
         row.addView(makeDockGap(Math.round(10 * density)));
 
-        row.addView(makeDockTipChip(density, Math.round(300 * density), iconPx,
-                "Segure um widget para configurar ou excluir · segure o fundo para adicionar"));
+        View tipChip = makeDockTipChip(density, Math.round(300 * density), iconPx,
+                "Segure um widget para configurar ou excluir · segure o fundo para adicionar");
+        layoutTipLabel = findDockChipLabel(tipChip);
+        row.addView(tipChip);
         return row;
     }
 
@@ -5001,7 +5188,7 @@ public final class MainActivity extends Activity {
         Drawable d = getResources().getDrawable(resId, getTheme());
         if (d == null) return null;
         d = d.mutate();
-        d.setTint(0xFFFFFFFF);
+        d.setTint(dockGlyphColor());
         return d;
     }
 
@@ -5055,7 +5242,7 @@ public final class MainActivity extends Activity {
         toggle.addView(layoutCenterFillIcon);
 
         layoutCenterFillLabel = new android.widget.TextView(this);
-        layoutCenterFillLabel.setTextColor(0xFFFFFFFF);
+        layoutCenterFillLabel.setTextColor(dockLabelColor());
         layoutCenterFillLabel.setTextSize(11f);
         layoutCenterFillLabel.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
@@ -5119,6 +5306,7 @@ public final class MainActivity extends Activity {
         }
         if (layoutCenterFillLabel != null) {
             layoutCenterFillLabel.setText(wall ? "Wallpaper" : "3D Car");
+            styleDockLabel(layoutCenterFillLabel, false);
         }
         if (layoutCenterFillGear != null) {
             layoutCenterFillGear.setVisibility(wall ? View.VISIBLE : View.GONE);
@@ -5131,7 +5319,7 @@ public final class MainActivity extends Activity {
         Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         android.graphics.Canvas c = new android.graphics.Canvas(bmp);
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xFFFFFFFF);
+        p.setColor(dockGlyphColor());
         float s = sizePx;
         float padY = s * 0.18f;
         float h = s - 2f * padY;
@@ -5204,7 +5392,7 @@ public final class MainActivity extends Activity {
 
         android.widget.TextView tv = new android.widget.TextView(this);
         tv.setText(title);
-        tv.setTextColor(0xFFFFFFFF);
+        tv.setTextColor(dockLabelColor());
         tv.setTextSize(11f);
         tv.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
@@ -5234,17 +5422,19 @@ public final class MainActivity extends Activity {
                 widthPx - Math.round(8 * density), plateH);
         plateLp.gravity = android.view.Gravity.CENTER;
         plate.setLayoutParams(plateLp);
+        plate.setTag("modePlate");
         plate.setBackground(makeDockPlateDrawable(false, density));
         cell.addView(plate);
 
         android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setTag("dockChipLabel");
         FrameLayout.LayoutParams tvLp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT);
         tvLp.gravity = android.view.Gravity.CENTER;
         tv.setLayoutParams(tvLp);
         tv.setText(label);
-        tv.setTextColor(0xFFFFFFFF);
+        tv.setTextColor(dockLabelColor());
         tv.setTextSize(12f);
         tv.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
@@ -5281,8 +5471,9 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.WRAP_CONTENT);
         tvLp.gravity = android.view.Gravity.CENTER;
         tv.setLayoutParams(tvLp);
+        tv.setTag("dockChipLabel");
         tv.setText(label);
-        tv.setTextColor(0xCCFFFFFF);
+        tv.setTextColor(dockLabelColorMuted());
         tv.setTextSize(10.5f);
         tv.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
@@ -5299,7 +5490,27 @@ public final class MainActivity extends Activity {
         setModeCellSelected(layoutTripleChip, SHELL_TRIPLE.equals(shellMode));
         setModeCellSelected(layoutAppCarChip, SHELL_APP_CAR.equals(shellMode));
         setModeCellSelected(layoutAppsChip, SHELL_APPS.equals(shellMode));
+        styleLayoutChipLabel(layoutTripleChip);
+        styleLayoutChipLabel(layoutAppCarChip);
+        styleLayoutChipLabel(layoutAppsChip);
         refreshCenterFillChip();
+        refreshLayoutThemeChip();
+    }
+
+    private void styleLayoutChipLabel(View chip) {
+        if (chip == null) return;
+        for (int i = 0; i < ((android.view.ViewGroup) chip).getChildCount(); i++) {
+            View child = ((android.view.ViewGroup) chip).getChildAt(i);
+            if (child instanceof android.widget.LinearLayout) {
+                android.widget.LinearLayout inner = (android.widget.LinearLayout) child;
+                for (int j = 0; j < inner.getChildCount(); j++) {
+                    View rowChild = inner.getChildAt(j);
+                    if (rowChild instanceof android.widget.TextView) {
+                        styleDockLabel((android.widget.TextView) rowChild, false);
+                    }
+                }
+            }
+        }
     }
 
     private View buildConfigContentRow(float density, int cellPx, int iconPx) {
@@ -5355,11 +5566,37 @@ public final class MainActivity extends Activity {
         return dockToolGlyph(cmd, sizePx, null);
     }
 
+    private Drawable dockGlyphXray(int sizePx) {
+        try {
+            if (dockXrayGlyphSrc == null) {
+                try (InputStream is = getAssets().open("www/assets/icons/xray-engine.png")) {
+                    dockXrayGlyphSrc = BitmapFactory.decodeStream(is);
+                }
+            }
+            if (dockXrayGlyphSrc == null) return null;
+            Bitmap out = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas c = new android.graphics.Canvas(out);
+            android.graphics.Paint p = new android.graphics.Paint(
+                    android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
+            p.setColorFilter(new PorterDuffColorFilter(dockGlyphColor(), PorterDuff.Mode.SRC_IN));
+            c.drawBitmap(dockXrayGlyphSrc, null,
+                    new Rect(0, 0, sizePx, sizePx), p);
+            return new BitmapDrawable(getResources(), out);
+        } catch (Exception e) {
+            Log.w(TAG, "xray dock glyph load failed", e);
+            return null;
+        }
+    }
+
     private Drawable dockToolGlyph(String cmd, int sizePx, String stateOverride) {
+        if ("xray".equals(cmd)) {
+            Drawable xray = dockGlyphXray(sizePx);
+            if (xray != null) return xray;
+        }
         Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         android.graphics.Canvas c = new android.graphics.Canvas(bmp);
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xFFFFFFFF);
+        p.setColor(dockGlyphColor());
         p.setStyle(android.graphics.Paint.Style.STROKE);
         p.setStrokeWidth(Math.max(1.6f, sizePx * 0.075f));
         p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
@@ -5449,6 +5686,7 @@ public final class MainActivity extends Activity {
                 break;
             }
             case "xray":
+                // Bitmap glyph loads above; this stroke fallback only runs if the asset is missing.
                 c.drawRoundRect(7 * u, 9.5f * u, 17 * u, 14.5f * u, 1 * u, 1 * u, p);
                 c.drawCircle(5 * u, 17 * u, 2.2f * u, p);
                 c.drawCircle(19 * u, 17 * u, 2.2f * u, p);
@@ -5503,7 +5741,7 @@ public final class MainActivity extends Activity {
     private void drawDockTextGlyph(android.graphics.Canvas c, android.graphics.Paint p,
             float sizePx, String label) {
         p.setStyle(android.graphics.Paint.Style.FILL);
-        p.setColor(0xFFFFFFFF);
+        p.setColor(dockGlyphColor());
         p.setTextAlign(android.graphics.Paint.Align.CENTER);
         p.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
@@ -5556,12 +5794,14 @@ public final class MainActivity extends Activity {
         col.addView(iconWrap);
 
         android.widget.TextView caption = new android.widget.TextView(this);
+        caption.setTag("dockToolCaption");
         caption.setText(label.toUpperCase());
-        caption.setTextColor(0xF2FFFFFF);
+        caption.setTextColor(dockLabelColorMuted());
         caption.setTextSize(9f);
         caption.setGravity(android.view.Gravity.CENTER);
         caption.setLetterSpacing(0.06f);
-        caption.setShadowLayer(3f, 0f, 1f, 0x99000000);
+        if (dockUiLight) caption.setShadowLayer(0f, 0f, 0f, 0);
+        else caption.setShadowLayer(3f, 0f, 1f, 0x99000000);
         caption.setMaxLines(1);
         caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
         col.addView(caption);
@@ -5588,10 +5828,26 @@ public final class MainActivity extends Activity {
                 String v = o.optString("time", dockTimeMode);
                 if (v != null && !v.isEmpty()) dockTimeMode = v;
             }
+            if (o.has("fps")) dockFpsOn = o.optBoolean("fps", false);
+            if (o.has("xray")) dockXrayOn = o.optBoolean("xray", false);
+            if (o.has("widgetThemeMode")) {
+                String v = o.optString("widgetThemeMode", dockWidgetThemeMode);
+                if (v != null && !v.isEmpty()) dockWidgetThemeMode = v;
+            }
+            if (o.has("widgetTheme")) {
+                String v = o.optString("widgetTheme", dockWidgetThemeEffective);
+                if (v != null && !v.isEmpty()) dockWidgetThemeEffective = v;
+            }
+            if (o.has("uiTheme")) {
+                applyDockUiTheme("light".equals(o.optString("uiTheme", "dark")));
+            }
             refreshDockToolGlyph("model", dockModelLabel);
             refreshDockToolGlyph("perf", dockPerfLabel);
             refreshDockToolGlyph("paint", dockPaintHex);
             refreshDockToolGlyph("time", dockTimeMode);
+            refreshDockToolGlyph("fps", dockFpsOn ? "ON" : "OFF");
+            refreshDockToolGlyph("xray", dockXrayOn ? "ON" : "OFF");
+            refreshLayoutThemeChip();
         } catch (Exception e) {
             Log.w(TAG, "updateDockIndicators parse failed", e);
         }
@@ -5638,7 +5894,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView labelView = new android.widget.TextView(this);
         labelView.setTag("label");
         labelView.setTextSize(10f);
-        labelView.setTextColor(0xE6FFFFFF);
+        labelView.setTextColor(dockLabelColorMuted());
         labelView.setGravity(android.view.Gravity.CENTER);
         labelView.setMaxLines(1);
         labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);

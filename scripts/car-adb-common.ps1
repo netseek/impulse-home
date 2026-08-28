@@ -5,6 +5,8 @@ $CarActivity = 'com.havalh6.viewer/.MainActivity'
 $CarSubnets = @('192.168.33', '192.168.1')
 $CarRoot = Split-Path -Parent $PSScriptRoot
 $CarHintFile = Join-Path $CarRoot '.car-adb-serial'
+# Head-unit AVD for local deploy — not a phone/tablet profile (e.g. Medium_Phone).
+$HavalAvdName = 'Haval'
 
 function Get-Adb {
   $sdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
@@ -226,24 +228,84 @@ function Save-CarSerial([string]$Serial) {
   Set-Content -Path $CarHintFile -Value $Serial -NoNewline
 }
 
-function Find-Emulator([string]$Adb, [string]$PreferredSerial) {
-  $live = @(Get-AdbRows $Adb | Where-Object {
-    $_.Status -eq 'device' -and (Test-IsEmulator $_.Serial)
-  })
-  if (-not $live.Count) {
-    throw 'No Android emulator attached. Start one in Android Studio (AVD), then retry.'
+function Get-EmulatorExe {
+  $exe = Join-Path $env:LOCALAPPDATA 'Android\Sdk\emulator\emulator.exe'
+  if (-not (Test-Path $exe)) { throw 'Android emulator not found (install via SDK Manager).' }
+  return $exe
+}
+
+function Get-EmulatorAvdName([string]$Adb, [string]$Serial) {
+  $out = @(& $Adb -s $Serial emu avd name 2>$null)
+  if ($out.Count -ge 1) {
+    $name = ([string]$out[0]).Trim()
+    if ($name) { return $name }
   }
-  if ($PreferredSerial) {
-    $match = @($live | Where-Object { $_.Serial -eq $PreferredSerial })
-    if (-not $match.Count) {
-      throw "Emulator $PreferredSerial not found. Attached: $($live.Serial -join ', ')"
+  $prop = (& $Adb -s $Serial shell getprop qemu.avd_name 2>$null).Trim()
+  return $prop
+}
+
+function Wait-EmulatorBoot([string]$Adb, [string]$Serial, [int]$TimeoutSec = 180) {
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+  do {
+    $row = Get-AdbRows $Adb | Where-Object { $_.Serial -eq $Serial } | Select-Object -First 1
+    if ($row -and $row.Status -eq 'device') {
+      $boot = (& $Adb -s $Serial shell getprop sys.boot_completed 2>$null).Trim()
+      if ($boot -eq '1') { return $true }
     }
-    return $match[0].Serial
+    Start-Sleep -Seconds 2
+  } while ((Get-Date) -lt $deadline)
+  return $false
+}
+
+function Start-HavalEmulator([string]$Adb) {
+  $avds = @(& (Get-EmulatorExe) -list-avds 2>$null)
+  if ($avds -notcontains $HavalAvdName) {
+    throw "Haval AVD '$HavalAvdName' not found. Create it in Android Studio (AVD Manager), then retry."
   }
-  if ($live.Count -gt 1) {
-    throw "Several emulators attached ($($live.Serial -join ', ')). Pass -Serial emulator-5554"
+  Write-Host "Starting $HavalAvdName emulator ..."
+  Start-Process -FilePath (Get-EmulatorExe) -ArgumentList @('-avd', $HavalAvdName, '-no-snapshot-load')
+  $deadline = (Get-Date).AddSeconds(120)
+  do {
+    Start-Sleep -Seconds 3
+    $rows = @(Get-AdbRows $Adb | Where-Object { (Test-IsEmulator $_.Serial) })
+    foreach ($row in $rows) {
+      if ($row.Status -ne 'device') { continue }
+      $name = Get-EmulatorAvdName $Adb $row.Serial
+      if ($name -eq $HavalAvdName -and (Wait-EmulatorBoot $Adb $row.Serial)) {
+        return $row.Serial
+      }
+    }
+  } while ((Get-Date) -lt $deadline)
+  throw "Timed out waiting for $HavalAvdName emulator to boot."
+}
+
+function Ensure-HavalEmulator([string]$Adb) {
+  $rows = @(Get-AdbRows $Adb | Where-Object { (Test-IsEmulator $_.Serial) })
+  foreach ($row in $rows) {
+    if ($row.Status -ne 'device') { continue }
+    $name = Get-EmulatorAvdName $Adb $row.Serial
+    if ($name -eq $HavalAvdName) {
+      if (Wait-EmulatorBoot $Adb $row.Serial 30) { return $row.Serial }
+    }
   }
-  return $live[0].Serial
+  return Start-HavalEmulator $Adb
+}
+
+function Find-Emulator([string]$Adb, [string]$PreferredSerial) {
+  if ($PreferredSerial) {
+    $row = Get-AdbRows $Adb | Where-Object { $_.Serial -eq $PreferredSerial } | Select-Object -First 1
+    if (-not $row -or $row.Status -ne 'device') {
+      throw "Emulator $PreferredSerial not ready. Attached: $((Get-AdbRows $Adb | ForEach-Object { $_.Serial + ':' + $_.Status }) -join ', ')"
+    }
+    if (-not (Test-IsEmulator $PreferredSerial)) {
+      throw "Serial $PreferredSerial is not an emulator."
+    }
+    if (-not (Wait-EmulatorBoot $Adb $PreferredSerial 30)) {
+      throw "Emulator $PreferredSerial is still booting."
+    }
+    return $PreferredSerial
+  }
+  return Ensure-HavalEmulator $Adb
 }
 
 function Install-EmulatorApk([string]$Adb, [string]$Serial, [string]$Apk) {
