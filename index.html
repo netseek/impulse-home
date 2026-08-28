@@ -3618,8 +3618,8 @@ window.HavalSplash = (function () {
        `color` is set per-tag from JS and everything inherits it. */
     .hv-xr-node {
       position: absolute;
-      left: -4px; top: -4px;
-      width: 8px; height: 8px;
+      left: -5px; top: -5px;
+      width: 10px; height: 10px;
       border-radius: 50%;
       background: currentColor;
       box-shadow: 0 0 0 2px rgba(8,12,16,.55), 0 0 10px 2px currentColor;
@@ -3634,12 +3634,12 @@ window.HavalSplash = (function () {
     .hv-xr.flip .hv-xr-lead { left: auto; right: 3px; }
     .hv-xr-pill {
       position: absolute;
-      left: 13px; top: -11px;
+      left: 15px; top: -13px;
       display: flex;
       align-items: baseline;
-      gap: 6px;
-      padding: 3px 8px;
-      border-radius: 6px;
+      gap: 7px;
+      padding: 5px 10px;
+      border-radius: 7px;
       white-space: nowrap;
       background: rgba(8,12,16,.72);
       backdrop-filter: blur(6px);
@@ -3650,13 +3650,13 @@ window.HavalSplash = (function () {
     }
     .hv-xr.flip .hv-xr-pill { left: auto; right: 13px; }
     .hv-xr-k {
-      font-size: 8px;
-      letter-spacing: .14em;
-      color: rgba(234,242,248,.52);
+      font-size: 11px;
+      letter-spacing: .12em;
+      color: rgba(234,242,248,.58);
     }
     .hv-xr-v {
-      font-size: 10px;
-      letter-spacing: .05em;
+      font-size: 14px;
+      letter-spacing: .04em;
       font-weight: 700;
       color: currentColor;
     }
@@ -15388,19 +15388,14 @@ class Component extends DCLogic {
   // on a timer and the callouts must not.
 
   _xrTagDefs() {
-    // dy nudges the pill off the anchor in screen pixels. The ICE and the P2
-    // sit ~0.43 m apart across the bay and their pills overlap head-on.
-    if (!this._xrDefs) {
-      this._xrDefs = [
-        // off = powertrain-local metres; dx/dy = extra screen px on the pill.
-        // Nudged to the flanks so pills do not cover the pack / motors head-on.
-        { key: 'ice',  kicker: 'ICE',      anchor: 'ice',        off: [-0.68, 0.20, 0], dx: -18, dy: -32 },
-        { key: 'p2',   kicker: 'P2 FRONT', anchor: 'motorFront', off: [-0.68, 0.06, 0], dx: -14, dy: 26 },
-        { key: 'p4',   kicker: 'P4 REAR',  anchor: 'motorRear',  off: [0.68, 0.06, 0],  dx: 18,  dy: 10 },
-        { key: 'batt', kicker: 'HV PACK',  anchor: null,         off: [-0.74, 0.42, 0], dx: -22, dy: -48 },
-      ];
-    }
-    return this._xrDefs;
+    // off = powertrain-local metres; dx/dy = extra screen px on the pill.
+    return [
+      { key: 'ice',  kicker: 'ICE',      anchor: 'ice',        off: [-0.68, 0.20, 0], dx: -18, dy: -32 },
+      { key: 'p2',   kicker: 'P2 FRONT', anchor: 'motorFront', off: [-0.68, 0.06, 0], dx: -14, dy: 26 },
+      { key: 'p4',   kicker: 'P4 REAR',  anchor: 'motorRear',  off: [0.68, 0.06, 0],  dx: 18,  dy: 10 },
+      // Below-left of the pack, outside the ghosted body silhouette.
+      { key: 'batt', kicker: 'HV PACK',  anchor: null,         off: [-0.82, -0.16, 0.32], dx: -24, dy: 58 },
+    ];
   }
 
   _ensureXrayTagLayer() {
@@ -20512,27 +20507,27 @@ class Component extends DCLogic {
         driveMax: 0.75,
         regenMax: 0.75,
         iceMax: 0.50,
-        cellMax: 1.65,
-        cellColor: '#00ff44',
-        cellLitMin: 0.92,
+        cellMax: 2.4,
+        cellColor: '#00ff66',
+        cellLitMin: 1.0,
+        wireDriveColor: '#3a9fd4',
+        wireRegenColor: '#2ec990',
+        wireTint: 0.78,
+        wireGlow: 0.22,
         hvMax: 0.95,
         idleDim: 0.55,
         idleDimActive: 0.85,
-        // XRAY_FX_REVERT (2026-08-28): beadRadius 0.055, beadCount 6, beadSpeed 0.65
         beadRadius: 0.024,
         beadCount: 8,
         beadSpeed: 0.48,
-        beadOpacity: 0.95,
+        beadOpacity: 0.88,
         pulseMid: 0.65,
         pulseAmp: 0.35,
         pulseHz: 3.4,
-        // HV conduit — see _makeFlowTubeMaterial for why the lane is drawn as
-        // a tube and not just as beads.
         tubeRadius: 0.048,
         tubeSpeed: 0.55,
         tubeTail: 5.0,
-        tubeGain: 1.15,
-        wireGlow: 0.30,
+        tubeGain: 0.95,
         // Power → scroll rate. The lane visibly speeds up under load, which is
         // the only cue in the mode that carries magnitude rather than state.
         tubeKwRef: 45,
@@ -20556,16 +20551,15 @@ class Component extends DCLogic {
         cellWaveHz: 0.35,
         cellEdgeAmp: 0.6,
         cellEdgeHz: 2.0,
-        // Ground pulse rings — see _rebuildPowertrainGround.
+        // Single outer ring — subtle breathe + glow pulse; active flow only.
         ringOn: 1,
-        ringCount: 3,
-        ringGain: 0.40,
-        // XRAY_FX_REVERT: ringSpeed 0.30, ringSpeedMax 2.2
-        ringSpeed: 0.11,
-        ringSpeedMax: 0.95,
-        ringKwRef: 45,
-        ringMinScale: 0.70,
-        ringMaxScale: 2.75,
+        ringCount: 1,
+        ringGain: 0.52,
+        ringMaxScale: 2.85,
+        ringScaleBase: 0.965,
+        ringScaleAmp: 0.035,
+        ringPulseHz: 0.26,
+        ringGlowHz: 0.48,
         ringInner: 0.86,
         ringOuter: 1.00,
         ringY: 0.02,
@@ -20582,18 +20576,27 @@ class Component extends DCLogic {
         drive: { color: new THREE.Color('#6ecfff'), max: T.driveMax },
         regen: { color: new THREE.Color('#33ffb8'), max: T.regenMax },
         ice:   { color: new THREE.Color('#ff5a12'), max: T.iceMax },
-        cell:  { color: new THREE.Color(T.cellColor || '#00ff44'), max: T.cellMax },
+        cell:  { color: new THREE.Color(T.cellColor || '#00ff66'), max: T.cellMax },
         hv:    { color: new THREE.Color('#58b8ff'), max: T.hvMax },
+        wireDrive: { color: new THREE.Color(T.wireDriveColor || '#3a9fd4') },
+        wireRegen: { color: new THREE.Color(T.wireRegenColor || '#2ec990') },
       };
     } else {
       this._ptGlow.drive.max = T.driveMax;
       this._ptGlow.regen.max = T.regenMax;
       this._ptGlow.ice.max = T.iceMax;
       this._ptGlow.cell.max = T.cellMax;
-      this._ptGlow.cell.color.set(T.cellColor || '#00ff44');
+      this._ptGlow.cell.color.set(T.cellColor || '#00ff66');
       this._ptGlow.hv.max = T.hvMax;
+      this._ptGlow.wireDrive.color.set(T.wireDriveColor || '#3a9fd4');
+      this._ptGlow.wireRegen.color.set(T.wireRegenColor || '#2ec990');
     }
     return this._ptGlow;
+  }
+
+  _powertrainWireTone(dir) {
+    const G = this._powertrainGlowTones();
+    return dir < 0 ? G.wireRegen : G.wireDrive;
   }
 
   _ensurePowertrainBeadGeometry() {
@@ -20704,9 +20707,9 @@ class Component extends DCLogic {
         '  float wire = uWireGlow * uOn;',
         '  float head = fract( vFlowUv.x * 2.0 - uTime * uSpeed * uDir );',
         '  float packet = pow( head, uTail );',
-        '  float a = ( wire + packet * 0.78 ) * uOn;',
-        '  vec3 tint = uColor * ( 0.42 + wire * 2.2 );',
-        '  gl_FragColor = vec4( tint + uColor * packet * 1.55, a );',
+        '  float a = ( wire * 0.50 + packet * 0.58 ) * uOn;',
+        '  vec3 col = uColor * ( 0.34 + wire * 0.95 + packet * 0.72 );',
+        '  gl_FragColor = vec4( col, a );',
         '}',
       ].join(NL),
       transparent: true,
@@ -20998,20 +21001,28 @@ class Component extends DCLogic {
     if (!part || !tone) return;
     const mats = part.materials;
     const lit = strength > 0.02;
+    if (part.root) part.root.renderOrder = lit ? 14 : 0;
     for (let i = 0; i < mats.length; i++) {
       const m = mats[i];
       if (!lit) {
         m.emissive.setHex(0x000000);
+        m.color.setHex(0x343a42);
+        m.transparent = false;
+        m.opacity = 1;
         m.userData.glowBase = 0;
         m.emissiveIntensity = 0;
+        if (m.envMapIntensity !== undefined) m.envMapIntensity = 0.35;
         continue;
       }
       m.emissive.copy(tone.color);
       m.color.copy(tone.color);
       m.transparent = false;
       m.opacity = 1;
+      m.metalness = 0;
+      m.roughness = 0.38;
+      if (m.envMapIntensity !== undefined) m.envMapIntensity = 0;
       m.userData.glowBase = tone.max * strength;
-      m.emissiveIntensity = tone.max * strength * 1.35;
+      m.emissiveIntensity = tone.max * strength * 1.85;
     }
   }
 
@@ -21034,7 +21045,7 @@ class Component extends DCLogic {
     (this._powertrainBeadGroups || []).forEach((b) => {
       b.dir = plug ? 0 : (b.key === 'front' ? frontDir : rearDir);
       if (b.mat) {
-        const tone = b.dir < 0 ? G.regen : G.drive;
+        const tone = this._powertrainWireTone(b.dir);
         b.mat.uniforms.uDir.value = b.dir < 0 ? -1 : 1;
         b.mat.uniforms.uColor.value.copy(tone.color);
       }
@@ -21100,9 +21111,11 @@ class Component extends DCLogic {
         this._powertrainBatteryHalo.sprite.material.color.copy(cellTone.color);
       }
 
-      this._powertrainGroundDir = charging ? 1 : (discharging ? -1 : 0);
+      this._powertrainGroundDir = (charging || discharging)
+        ? (charging ? 1 : -1) : 0;
+      const ringTone = charging ? G.regen : G.drive;
       (this._powertrainRings || []).forEach((m) => {
-        m.material.uniforms.uColor.value.copy(cellTone.color);
+        m.material.uniforms.uColor.value.copy(ringTone.color);
       });
     }
   }
@@ -21194,8 +21207,9 @@ class Component extends DCLogic {
         m.position.copy(tmp);
         const s = 0.55 + Math.sin(u * Math.PI) * 0.35;
         m.scale.setScalar(s);
-        const tone = b.dir < 0 ? G.regen : G.drive;
-        m.material.color.copy(this._ptBeadWhite).lerp(tone.color, 0.40);
+        const tone = this._powertrainWireTone(b.dir);
+        const tint = tune.wireTint != null ? tune.wireTint : 0.78;
+        m.material.color.copy(tone.color).lerp(this._ptBeadWhite, 1 - tint);
       }
     });
 
@@ -21250,28 +21264,20 @@ class Component extends DCLogic {
       }
     }
 
-    // Ground rings. Travel outward while driving, inward while charging; the
-    // sine envelope keeps them from popping in at either end of the sweep.
+    // Single outer ring: fixed at max radius, subtle breathe + glow pulse.
+    // Hidden on idle — only charging (inward/green) or consuming (outward/blue).
     const rings = this._powertrainRings;
     const groundDir = this._powertrainGroundDir || 0;
     if (rings && rings.length) {
       const live = !!(groundDir && tune.ringOn);
-      if (live) {
-        const n = rings.length;
-        const span = tune.ringMaxScale - tune.ringMinScale;
-        const speed = tune.ringSpeed
-          * Math.min(tune.ringSpeedMax, 0.6 + kwNow / Math.max(1, tune.ringKwRef));
-        for (let i = 0; i < n; i++) {
-          const m = rings[i];
-          let u = (t * speed + i / n) % 1;
-          if (groundDir > 0) u = 1 - u;          // charging pulls inward
-          const sc = tune.ringMinScale + span * u;
-          m.scale.set(sc, sc, 1);
-          // The envelope follows the radius, so a ring is faintest at both the
-          // tightest and the widest point whichever way it is travelling.
-          m.material.uniforms.uAlpha.value = Math.sin(u * Math.PI) * tune.ringGain;
-          if (!m.visible) m.visible = true;
-        }
+      const m = rings[0];
+      if (live && m) {
+        const breathe = 0.5 + 0.5 * Math.sin(t * tune.ringPulseHz * Math.PI * 2);
+        const sc = tune.ringMaxScale * (tune.ringScaleBase + tune.ringScaleAmp * breathe);
+        m.scale.set(sc, sc, 1);
+        const glow = 0.58 + 0.42 * Math.sin(t * tune.ringGlowHz * Math.PI * 2);
+        m.material.uniforms.uAlpha.value = tune.ringGain * glow;
+        if (!m.visible) m.visible = true;
       } else {
         for (let i = 0; i < rings.length; i++) {
           if (rings[i].visible) rings[i].visible = false;
