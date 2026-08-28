@@ -763,7 +763,7 @@ window.HavalSplash = (function () {
     }
     .hv-cam-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       gap: 4px;
       margin-bottom: 8px;
     }
@@ -796,7 +796,6 @@ window.HavalSplash = (function () {
       opacity: 0.78;
     }
     .hv-cam-tile.is-on .hv-cam-ico { opacity: 1; }
-    .hv-cam-ico-flip { transform: scaleX(-1); }
     /* Renders arrive on transparent, and a midnight-blue car on a dark panel
        is nearly invisible without something behind it — an exposure lift does
        not fix that, the paint is dark in every light. So the tile lights the
@@ -812,13 +811,12 @@ window.HavalSplash = (function () {
       background: radial-gradient(circle at 50% 45%,
         rgba(255,255,255,.32) 0%, rgba(255,255,255,.06) 70%);
     }
-    /* While a tile's render is still queued it shows what the view IS, in
-       words. A stand-in drawing would only be read as the finished icon. */
-    .hv-cam-ico-off, .hv-cam-cap-off { display: none; }
+    /* Label until the live render lands; then the image replaces it. */
+    .hv-cam-cap-off { display: none; }
     .hv-cam-cap {
       font-family: 'Space Mono', monospace;
-      font-size: 7px;
-      line-height: 1.3;
+      font-size: 6px;
+      line-height: 1.25;
       letter-spacing: .04em;
       text-align: center;
       color: rgba(255,255,255,.45);
@@ -946,6 +944,7 @@ window.HavalSplash = (function () {
       pointer-events: auto;
       color: #eaf2f8;
       transition: opacity 900ms ease;
+      overflow: hidden;
     }
     /* Boot: the opening shot is the clip and then the car, nothing else. The
        widget boards are held back and faded in last (see _revealShellChrome),
@@ -1124,6 +1123,53 @@ window.HavalSplash = (function () {
     .hv-apps-fab-menu button.on .hv-shell-glyph i {
       opacity: 1;
     }
+    #hv-root.hv-widgets-light .hv-apps-fab-menu {
+      background: rgba(248, 250, 252, 0.94);
+      border-color: rgba(20, 28, 40, 0.14);
+      box-shadow: 0 8px 28px rgba(20, 28, 40, 0.12);
+    }
+    #hv-root.hv-widgets-light .hv-apps-fab-section { color: var(--hv-widget-muted); }
+    #hv-root.hv-widgets-light .hv-apps-fab-menu button {
+      border-color: rgba(20, 28, 40, 0.14);
+      background: rgba(20, 28, 40, 0.05);
+      color: var(--hv-widget-fg);
+    }
+    #hv-root.hv-widgets-light .hv-apps-fab-menu button.on {
+      border-color: rgba(10, 111, 124, 0.45);
+      background: rgba(10, 111, 124, 0.12);
+    }
+    #hv-root.hv-widgets-light .hv-apps-fab-menu .hv-shell-glyph i,
+    #hv-root.hv-widgets-light .hv-apps-fab-menu .hv-apps-ratio-glyph i {
+      background: var(--hv-widget-fg);
+      opacity: 0.82;
+    }
+    #hv-root.hv-widgets-light .hv-apps-fab {
+      border-color: rgba(20, 28, 40, 0.16);
+      background: rgba(248, 250, 252, 0.88);
+      color: var(--hv-widget-fg);
+    }
+    #hv-root.hv-widgets-light .hv-apps-fab.on {
+      border-color: rgba(10, 111, 124, 0.45);
+      background: rgba(10, 111, 124, 0.14);
+      color: #0a6f7c;
+    }
+    #hv-root.hv-widgets-light .hv-shell-menu {
+      background: rgba(248, 250, 252, 0.96);
+      border-color: rgba(20, 28, 40, 0.14);
+      box-shadow: 0 14px 36px rgba(20, 28, 40, 0.14);
+    }
+    #hv-root.hv-widgets-light .hv-shell-opt {
+      border-color: rgba(20, 28, 40, 0.12);
+      color: var(--hv-widget-fg);
+    }
+    #hv-root.hv-widgets-light .hv-shell-opt.on {
+      border-color: rgba(20, 28, 40, 0.42);
+      background: rgba(242, 245, 248, 0.95);
+    }
+    #hv-root.hv-widgets-light .hv-shell-glyph i {
+      background: var(--hv-widget-fg);
+      opacity: 0.82;
+    }
     .hv-apps-fab {
       width: 56px;
       height: 56px;
@@ -1169,6 +1215,7 @@ window.HavalSplash = (function () {
       min-height: 0;
       display: grid;
       gap: 8px;
+      z-index: 1;
     }
     .hv-widget-card.moving { opacity: .48; }
     #hv-root {
@@ -1225,6 +1272,7 @@ window.HavalSplash = (function () {
       user-select: none;
       -webkit-touch-callout: none;
       touch-action: manipulation;
+      z-index: 2;
     }
     .hv-widget-card.editing {
       z-index: 8;
@@ -1281,6 +1329,9 @@ window.HavalSplash = (function () {
       transition: opacity 0.7s ease;
     }
     .hv-wallpaper.on { opacity: 1; }
+    /* Experimental mixed fill: wallpaper behind the WebGL canvas. */
+    #hv-root.hv-fill-mixed .hv-wallpaper.on { z-index: 0; }
+    #hv-root.hv-fill-mixed .hv-canvas-host { position: relative; z-index: 1; }
     .hv-layout-note-card {
       margin-top: 14px;
       padding: 10px 11px;
@@ -1305,7 +1356,7 @@ window.HavalSplash = (function () {
     }
     .hv-layout-fill-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 6px;
       margin-bottom: 10px;
     }
@@ -2480,11 +2531,11 @@ window.HavalSplash = (function () {
     }
     .hv-widget-slot-banner {
       position: fixed;
-      z-index: 49;
+      z-index: 51;
       left: 50%;
       top: calc(var(--hv-safe-top, 22px) + 12px);
       transform: translateX(-50%);
-      padding: 10px 16px;
+      padding: 10px 10px 10px 16px;
       border-radius: 10px;
       border: 1px solid var(--hv-widget-border);
       background: var(--hv-widget-menu-bg);
@@ -2493,13 +2544,51 @@ window.HavalSplash = (function () {
       font-size: 10px;
       letter-spacing: .1em;
       box-shadow: var(--hv-widget-shadow);
-      pointer-events: none;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: min(92vw, 520px);
     }
+    .hv-widget-slot-banner-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .hv-widget-slot-banner-close,
+    .hv-widget-picker-close {
+      background: none;
+      border: none;
+      color: var(--hv-widget-muted);
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 4px 6px;
+      min-width: 36px;
+      min-height: 36px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .hv-widget-picker-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    .hv-widget-picker-backdrop.on {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .hv-widget-picker-backdrop.slot-pick { z-index: 19; }
+    .hv-widget-picker-backdrop.picker-open { z-index: 49; }
     .hv-center-slot-zone {
       position: fixed;
-      z-index: 12;
-      touch-action: manipulation;
+      z-index: 18;
       background: transparent;
+      /* Visual slot hint only — long-press is handled on the canvas so orbit
+         and scroll-to-zoom are not swallowed over the car gap. */
+      pointer-events: none;
     }
     .hv-center-slot-zone.active {
       background: rgba(79,214,232,.04);
@@ -2529,13 +2618,21 @@ window.HavalSplash = (function () {
       display: flex;
       flex-direction: column;
     }
+    .hv-widget-picker-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 2px 2px 10px;
+      flex-shrink: 0;
+    }
     .hv-widget-picker-title {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
       letter-spacing: .14em;
       color: var(--hv-widget-muted);
-      padding: 2px 4px 10px;
-      flex-shrink: 0;
+      flex: 1;
+      min-width: 0;
     }
     .hv-widget-picker-grid {
       display: grid;
@@ -2549,7 +2646,7 @@ window.HavalSplash = (function () {
       flex-direction: column;
       align-items: flex-start;
       justify-content: flex-end;
-      min-height: 88px;
+      min-height: 108px;
       padding: 10px;
       border-radius: 10px;
       border: 1px solid var(--hv-widget-border);
@@ -2562,36 +2659,155 @@ window.HavalSplash = (function () {
       overflow: hidden;
     }
     .hv-widget-thumb:disabled { opacity: .35; cursor: default; }
+    .hv-widget-thumb::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 54px;
+      background: linear-gradient(transparent, rgba(8,12,18,.88));
+      z-index: 1;
+      pointer-events: none;
+    }
+    #hv-root.hv-widgets-light .hv-widget-thumb::after {
+      background: linear-gradient(transparent, rgba(248,250,252,.92));
+    }
+    .hv-widget-thumb-preview {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
     .hv-widget-thumb-label {
       font-family: 'Space Mono', monospace;
       font-size: 10px;
       letter-spacing: .08em;
       font-weight: 600;
-      z-index: 1;
+      position: relative;
+      z-index: 2;
     }
     .hv-widget-thumb-sub {
       font-family: 'Space Grotesk', system-ui, sans-serif;
       font-size: 11px;
       opacity: .72;
       margin-top: 3px;
-      z-index: 1;
+      position: relative;
+      z-index: 2;
     }
-    .hv-widget-thumb.thumb-media {
-      background: linear-gradient(145deg, rgba(79,214,232,.22), rgba(16,21,28,.55)),
-        radial-gradient(circle at 70% 20%, rgba(255,255,255,.18), transparent 55%);
+    .hv-wpick-media {
+      position: absolute;
+      inset: 8px 8px 42px;
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
     }
-    .hv-widget-thumb.thumb-power {
-      background: linear-gradient(145deg, rgba(62,224,138,.18), rgba(16,21,28,.55)),
-        radial-gradient(circle at 30% 30%, rgba(79,214,232,.16), transparent 50%);
+    .hv-wpick-media-art {
+      width: 38%;
+      border-radius: 6px;
+      background: linear-gradient(135deg, rgba(79,214,232,.35), rgba(255,255,255,.08));
+      border: 1px solid rgba(255,255,255,.12);
+      flex-shrink: 0;
     }
-    .hv-widget-thumb.thumb-modes {
-      background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(16,21,28,.55)),
-        repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 8px, transparent 8px 16px);
+    .hv-wpick-media-lines {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      min-width: 0;
     }
-    .hv-widget-thumb.thumb-graphs {
-      background: linear-gradient(145deg, rgba(79,214,232,.12), rgba(16,21,28,.55)),
-        linear-gradient(0deg, rgba(79,214,232,.25) 0 2px, transparent 2px 12px);
-      background-size: 100% 100%, 100% 12px;
+    .hv-wpick-media-lines span {
+      display: block;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255,255,255,.22);
+    }
+    .hv-wpick-media-lines span:first-child { width: 88%; }
+    .hv-wpick-media-lines span:nth-child(2) { width: 62%; opacity: .72; }
+    .hv-wpick-media-lines span:nth-child(3) {
+      width: 100%;
+      height: 3px;
+      margin-top: 4px;
+      background: rgba(79,214,232,.55);
+    }
+    .hv-wpick-power {
+      position: absolute;
+      inset: 6px 6px 40px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .hv-wpick-power img {
+      width: 92%;
+      max-height: 100%;
+      object-fit: contain;
+      object-position: center bottom;
+      opacity: .92;
+    }
+    .hv-wpick-modes {
+      position: absolute;
+      inset: 10px 10px 44px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      justify-content: center;
+    }
+    .hv-wpick-modes-row {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .hv-wpick-modes-row i {
+      font-style: normal;
+      font-family: 'Space Mono', monospace;
+      font-size: 7px;
+      letter-spacing: .06em;
+      padding: 4px 6px;
+      border-radius: 5px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: rgba(234,242,248,.82);
+    }
+    .hv-wpick-modes-row i.on {
+      border-color: rgba(79,214,232,.55);
+      background: rgba(79,214,232,.18);
+      color: #eaf2f8;
+    }
+    .hv-wpick-graphs {
+      position: absolute;
+      inset: 8px 8px 42px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .hv-wpick-graphs-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-family: 'Space Mono', monospace;
+      font-size: 7px;
+      letter-spacing: .1em;
+      opacity: .72;
+    }
+    .hv-wpick-graphs-head strong {
+      font-size: 11px;
+      letter-spacing: .04em;
+      opacity: 1;
+      color: var(--hv-graphs-value, #f2f5f8);
+    }
+    .hv-wpick-graphs-plot {
+      flex: 1;
+      min-height: 0;
+      border-radius: 6px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.08);
+      position: relative;
+      overflow: hidden;
+    }
+    .hv-wpick-graphs-plot svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
     }
     .hv-widget-picker button.hv-picker-row {
       display: flex;
@@ -2614,20 +2830,29 @@ window.HavalSplash = (function () {
     .hv-widget-picker button:disabled { opacity: .35; cursor: default; }
     .hv-widget-picker.is-sizes {
       display: flex;
-      flex-wrap: wrap;
-      align-items: flex-start;
-      gap: 8px;
+      flex-direction: column;
       min-width: 0;
     }
-    .hv-widget-picker.is-sizes .hv-widget-picker-grid,
-    .hv-widget-picker.is-sizes .hv-widget-picker-title { flex: 1 0 100%; }
-    .hv-widget-picker.is-sizes button {
-      width: auto;
-      min-width: 56px;
-      min-height: 56px;
+    .hv-widget-picker-sizes {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .hv-widget-picker.is-sizes .hv-picker-row {
+      width: 100%;
       margin-top: 0;
-      justify-content: center;
-      padding: 12px 14px 14px;
+    }
+    .hv-widget-picker.is-sizes .hv-size-glyph {
+      --on: var(--hv-widget-fg);
+      --off: rgba(255,255,255,.16);
+      flex-shrink: 0;
+    }
+    #hv-root.hv-widgets-light .hv-widget-picker.is-sizes .hv-size-glyph {
+      --on: #1c2430;
+      --off: rgba(28,36,48,.14);
     }
     .hv-size-glyph {
       --on: #eaf2f8;
@@ -3245,6 +3470,46 @@ window.HavalSplash = (function () {
       100% { transform: scale(1.9); opacity: 0; }
     }
 
+    /* Camera panel opener — rear-left on the car; shown/hidden with hotspots. */
+    .hv-cam-fab {
+      position: absolute;
+      left: 0; top: 0;
+      width: 0; height: 0;
+      opacity: 0;
+      visibility: hidden;
+      transform: translate3d(-9999px, -9999px, 0);
+      will-change: transform, opacity;
+      transition: opacity .18s ease;
+    }
+    .hv-cam-fab.on { opacity: 1; visibility: visible; }
+    .hv-cam-fab-btn {
+      position: absolute;
+      left: -17px; top: -17px;
+      width: 34px; height: 34px;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid var(--hv-widget-border, rgba(255,255,255,.28));
+      background: var(--hv-widget-bg, rgba(16,21,28,.42));
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--hv-widget-fg, #eaf2f8);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: var(--hv-widget-shadow, 0 2px 10px rgba(0,0,0,.32));
+      transition: background .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+    }
+    .hv-cam-fab-btn:active { transform: scale(.92); }
+    .hv-cam-fab-btn.act {
+      background: var(--hv-config-chip-on-bg, #f2f5f8);
+      border-color: var(--hv-config-chip-on-border, #fff);
+      color: var(--hv-config-chip-on-fg, #0b1016);
+    }
+    .hv-cam-fab-btn svg {
+      display: block;
+      width: 17px; height: 17px;
+    }
+
     .hv-hs-menu {
       position: absolute;
       left: 19px; top: -14px;
@@ -3386,7 +3651,7 @@ window.HavalSplash = (function () {
 </helmet>
 <div id="hv-root" class="{{ rootClass }}" ref="{{ outerRef }}" style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; background: {{ shellBg }}; font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }}; --hv-safe-left: {{ safeLeft }}; --hv-safe-right: {{ safeRight }}; --hv-safe-bottom: {{ safeBottom }}; --hv-launcher-bottom: {{ launcherBottom }}; --hv-chrome-main-left: {{ chromeMainLeft }};">
 
-  <div ref="{{ containerRef }}" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%;"></div>
+  <div ref="{{ containerRef }}" class="hv-canvas-host" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%;"></div>
   <div class="hv-wallpaper {{ wallpaperClass }}" style="background-image: url('{{ wallpaperUrl }}');"></div>
 
   <div class="hv-boot-line" style="display: {{ bootLineDisplay }};">
@@ -3411,10 +3676,6 @@ window.HavalSplash = (function () {
       </button>
 
       <sc-if value="{{ configExpanded }}" hint-placeholder-val="{{ false }}">
-        <button class="hv-tool-btn hv-tool-btn-icon" onClick="{{ toggleCameraPanel }}" title="Camera" style="background: {{ cameraBtnBg }}; border: 1px solid {{ tabCameraBorder }}; color: {{ tabCameraCol }}; cursor: pointer;">
-          <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
-        </button>
-
         <button class="hv-tool-btn" onClick="{{ setTuningPaint }}" title="Paint color" style="background: rgba(18,18,20,.40); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid {{ tunPaintBorder }}; color: {{ tunPaintCol }}; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.32);">
           <span class="hv-tool-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 2.5c3.7 4.5 6.4 7.7 6.4 10.7A6.4 6.4 0 0 1 12 19.6a6.4 6.4 0 0 1-6.4-6.4c0-3 2.7-6.2 6.4-10.7Z" fill="{{ currentCarPaintHex }}" stroke="currentColor" stroke-opacity=".5" stroke-width="1.5" stroke-linejoin="round"></path><path d="M9.1 13.7a3.1 3.1 0 0 1 1.7-3.9" stroke="#fff" stroke-opacity=".75" stroke-width="1.4" stroke-linecap="round"></path></svg></span>
           <span class="hv-tool-label">PAINT</span>
@@ -3487,7 +3748,7 @@ window.HavalSplash = (function () {
 
   <!-- widget boards occupy the same rects as freeform app slots -->
   <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};">
-    <div class="hv-widget-grid {{ leftGridPickClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);">
+    <div class="hv-widget-grid {{ leftGridPickClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);" onTouchStart="{{ onLeftBoardHoldStart }}" onTouchEnd="{{ onLeftBoardHoldEnd }}" onTouchCancel="{{ onLeftBoardHoldCancel }}" onMouseDown="{{ onLeftBoardHoldStart }}" onMouseUp="{{ onLeftBoardHoldEnd }}" onMouseLeave="{{ onLeftBoardHoldCancel }}">
       <sc-for list="{{ leftSlotCells }}" as="sc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ sc.cls }}" style="{{ sc.gridStyle }}" onClick="{{ sc.onClick }}"></button>
       </sc-for>
@@ -3681,7 +3942,7 @@ window.HavalSplash = (function () {
   </div>
 
   <div class="hv-widget-board" style="display: {{ rightBoardDisplay }}; left: {{ rightBoardLeft }}; top: {{ rightBoardTop }}; width: {{ rightBoardWidth }}; height: {{ rightBoardHeight }};">
-    <div class="hv-widget-grid {{ rightGridPickClass }}" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);">
+    <div class="hv-widget-grid {{ rightGridPickClass }}" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);" onTouchStart="{{ onRightBoardHoldStart }}" onTouchEnd="{{ onRightBoardHoldEnd }}" onTouchCancel="{{ onRightBoardHoldCancel }}" onMouseDown="{{ onRightBoardHoldStart }}" onMouseUp="{{ onRightBoardHoldEnd }}" onMouseLeave="{{ onRightBoardHoldCancel }}">
       <sc-for list="{{ rightSlotCells }}" as="sc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ sc.cls }}" style="{{ sc.gridStyle }}" onClick="{{ sc.onClick }}"></button>
       </sc-for>
@@ -3929,16 +4190,52 @@ window.HavalSplash = (function () {
     <button type="button" class="hv-apps-fab {{ appsFabBtnClass }}" onClick="{{ toggleAppsFab }}" title="APP+APP controls">☰</button>
   </div>
 
-  <div class="hv-widget-slot-banner" style="display: {{ widgetSlotBannerDisplay }};">{{ widgetSlotBannerText }}</div>
+  <div class="hv-widget-slot-banner" style="display: {{ widgetSlotBannerDisplay }};">
+    <span class="hv-widget-slot-banner-text">{{ widgetSlotBannerText }}</span>
+    <button type="button" class="hv-widget-slot-banner-close" onClick="{{ closeWidgetPicker }}" title="Fechar">×</button>
+  </div>
 
-  <div class="hv-center-slot-zone {{ centerSlotZoneClass }}" style="display: {{ centerSlotZoneDisplay }}; left: {{ centerSlotLeft }}; top: {{ centerSlotTop }}; width: {{ centerSlotWidth }}; height: {{ centerSlotHeight }};" onTouchStart="{{ onCenterSlotHoldStart }}" onTouchEnd="{{ onCenterSlotHoldEnd }}" onTouchCancel="{{ onCenterSlotHoldCancel }}" onMouseDown="{{ onCenterSlotHoldStart }}" onMouseUp="{{ onCenterSlotHoldEnd }}" onMouseLeave="{{ onCenterSlotHoldCancel }}"></div>
+  <div class="hv-widget-picker-backdrop {{ widgetPickerBackdropClass }}" style="display: {{ widgetPickerBackdropDisplay }};" onClick="{{ closeWidgetPicker }}"></div>
+
+  <div class="hv-center-slot-zone {{ centerSlotZoneClass }}" style="display: {{ centerSlotZoneDisplay }}; left: {{ centerSlotLeft }}; top: {{ centerSlotTop }}; width: {{ centerSlotWidth }}; height: {{ centerSlotHeight }};"></div>
 
   <div class="hv-widget-picker {{ widgetPickerListClass }}" style="display: {{ widgetPickerDisplay }}; {{ widgetPickerStyle }}">
-    <div class="hv-widget-picker-title">{{ widgetPickerTitle }}</div>
+    <div class="hv-widget-picker-head">
+      <div class="hv-widget-picker-title">{{ widgetPickerTitle }}</div>
+      <button type="button" class="hv-widget-picker-close" onClick="{{ closeWidgetPicker }}" title="Fechar">×</button>
+    </div>
     <sc-if value="{{ widgetPickerIsThumbs }}" hint-placeholder-val="{{ false }}">
     <div class="hv-widget-picker-grid">
       <sc-for list="{{ widgetPickerItems }}" as="pi" hint-placeholder-count="0">
         <button type="button" class="hv-widget-thumb {{ pi.thumbClass }}" onClick="{{ pi.onClick }}" title="{{ pi.title }}" disabled="{{ pi.disabled }}" style="opacity: {{ pi.opacity }};">
+          <div class="hv-widget-thumb-preview">
+            <sc-if value="{{ pi.previewMedia }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-wpick-media">
+                <div class="hv-wpick-media-art"></div>
+                <div class="hv-wpick-media-lines"><span></span><span></span><span></span></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ pi.previewPower }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-wpick-power"><img src="assets/power/car.webp?v=4" alt=""></div>
+            </sc-if>
+            <sc-if value="{{ pi.previewModes }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-wpick-modes">
+                <div class="hv-wpick-modes-row"><i class="on">ECO</i><i>NORMAL</i><i>SPORT</i></div>
+                <div class="hv-wpick-modes-row"><i class="on">EV</i><i>SAVE</i></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ pi.previewGraphs }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-wpick-graphs">
+                <div class="hv-wpick-graphs-head"><span>EV POWER</span><strong>12.4</strong></div>
+                <div class="hv-wpick-graphs-plot">
+                  <svg viewBox="0 0 120 48" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M0 36 L18 28 L34 32 L52 18 L70 24 L88 12 L120 20" fill="none" stroke="rgba(79,214,232,.85)" stroke-width="2"></path>
+                    <path d="M0 42 L120 42" stroke="rgba(255,255,255,.12)" stroke-width="1"></path>
+                  </svg>
+                </div>
+              </div>
+            </sc-if>
+          </div>
           <span class="hv-widget-thumb-label">{{ pi.label }}</span>
           <span class="hv-widget-thumb-sub">{{ pi.subLabel }}</span>
         </button>
@@ -3946,11 +4243,13 @@ window.HavalSplash = (function () {
     </div>
     </sc-if>
     <sc-if value="{{ widgetPickerIsSizes }}" hint-placeholder-val="{{ true }}">
-    <sc-for list="{{ widgetPickerItems }}" as="pi" hint-placeholder-count="0">
-      <button type="button" class="{{ pi.btnClass }}" onClick="{{ pi.onClick }}" title="{{ pi.title }}" style="opacity: {{ pi.opacity }};">
-        <span class="hv-size-glyph {{ pi.sizeClass }}"></span>{{ pi.label }}
-      </button>
-    </sc-for>
+    <div class="hv-widget-picker-sizes">
+      <sc-for list="{{ widgetPickerItems }}" as="pi" hint-placeholder-count="0">
+        <button type="button" class="hv-picker-row" onClick="{{ pi.onClick }}" title="{{ pi.title }}" style="opacity: {{ pi.opacity }};">
+          <span class="hv-size-glyph {{ pi.sizeClass }}"></span>{{ pi.label }}
+        </button>
+      </sc-for>
+    </div>
     </sc-if>
   </div>
 
@@ -4084,6 +4383,19 @@ window.HavalSplash = (function () {
         </sc-for>
       </div>
       </sc-if>
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 8px;">CENTER FILL</div>
+      <div class="hv-layout-fill-row">
+        <button type="button" onClick="{{ setCenterFillCar }}" style="border: 1px solid {{ centerFillCarBorder }}; background: {{ centerFillCarBg }}; color: {{ centerFillCarCol }};">3D</button>
+        <button type="button" onClick="{{ setCenterFillWallpaper }}" style="border: 1px solid {{ centerFillWallBorder }}; background: {{ centerFillWallBg }}; color: {{ centerFillWallCol }};">WALL</button>
+        <button type="button" onClick="{{ setCenterFillMixed }}" title="Experimental: car over Bing wallpaper" style="border: 1px solid {{ centerFillMixedBorder }}; background: {{ centerFillMixedBg }}; color: {{ centerFillMixedCol }};">MIX</button>
+      </div>
+      <sc-if value="{{ showWallpaperConfigureBtn }}" hint-placeholder-val="{{ false }}">
+      <button type="button" onClick="{{ openWallpaperPopup }}" style="width: 100%; margin-bottom: 12px; padding: 9px 8px; border-radius: 7px; border: 1px solid {{ wallpaperConfigureBorder }}; background: {{ wallpaperConfigureBg }}; color: {{ wallpaperConfigureCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600;">CONFIGURE WALLPAPER</button>
+      </sc-if>
+
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin: 4px 0 8px;">WIDGET UI</div>
+      <button type="button" onClick="{{ cycleWidgetThemeMode }}" title="{{ widgetThemeHint }}" style="width: 100%; padding: 10px 8px; border-radius: 7px; border: 1px solid {{ widgetThemeBtnBorder }}; background: {{ widgetThemeBtnBg }}; color: {{ widgetThemeBtnCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600; margin-bottom: 6px;">{{ widgetThemeModeLabel }}</button>
+      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .45; line-height: 1.45; margin-bottom: 4px;">{{ widgetThemeHint }}</div>
       </sc-if>
     </sc-if>
 
@@ -4093,7 +4405,9 @@ window.HavalSplash = (function () {
       <div class="hv-cam-grid">
         <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="12">
           <button class="hv-cam-tile {{ cp.onClass }}" onClick="{{ cp.onClick }}" title="{{ cp.title }}">
-            <img class="hv-cam-ico {{ cp.icoClass }}" src="{{ cp.maskUrl }}" alt="" draggable="false" />
+            <sc-if value="{{ cp.shotUrl }}" hint-placeholder-val="{{ false }}">
+              <img class="hv-cam-ico hv-cam-ico-shot" src="{{ cp.shotUrl }}" alt="" draggable="false" />
+            </sc-if>
             <span class="hv-cam-cap {{ cp.capClass }}">{{ cp.caption }}</span>
           </button>
         </sc-for>
@@ -4745,17 +5059,21 @@ const CAM_ROOF_NOSE_DEG = { top: 135, topSide: 180 };
 // on the 1920x720 panel as the diagonal 'top' does.
 const CAM_ROOF_REACH = { top: 1.10, topSide: 0.79 };
 // Camera tiles are rendered from the live scene, one per timer tick.
-const CAM_ICON_PX = 128;        // tiles are ~56 css px; 128 survives a 2x panel
+const CAM_ICON_PX = 128;        // 6-col tiles are ~36 css px; 128 survives 2x panel
 const CAM_ICON_FILL = 0.88;     // fraction of the tile the car spans
 const CAM_ICON_START_MS = 260;  // let the panel finish opening first
+const CAM_ICON_WARMUP_MS = 900; // after boot + intro, before background prefetch
 // A tile costs one full scene pass plus a readback stall, and that is hardware
 // the numbers in CLAUDE.md say not to guess at: measured 15ms + 37ms on a
 // desktop, unknown on the Adreno. So the gap between tiles is derived from how
 // long the last one actually took (CAM_ICON_DUTY) rather than fixed, which
 // leaves the UI the same share of the frame budget on any unit.
 const CAM_ICON_DUTY = 2.5;      // idle this many times the last render's cost
+const CAM_ICON_BG_DUTY = 4.5;   // gentler when prefetching off-screen after boot
 const CAM_ICON_GAP_MIN_MS = 60;
 const CAM_ICON_GAP_MAX_MS = 500;
+const CAM_ICON_BG_GAP_MIN_MS = 120;
+const CAM_ICON_BG_GAP_MAX_MS = 800;
 // Distance the splash hand-off front pose sits at, in fit-distances. This is a
 // property of the CLIP, not of the layout: it is the framing that makes the
 // cross-fade out of assets/app-splash.mp4 read as one continuous shot.
@@ -4784,6 +5102,20 @@ const BING_WALLPAPER_PAGE = 8;
 const BING_WALLPAPER_PAGES = 2; // 16 recent images — scroll for older
 // Microsoft Bing daily wallpaper — same image pool as Windows Spotlight.
 const BING_WALLPAPER_CACHE_KEY = 'h6_wallpaper_cache_v1';
+
+/** Experimental: ?centerFill=mixed or ?mixed=1 */
+function readUrlCenterFill() {
+  try {
+    const parse = (s) => new URLSearchParams((s || '').replace(/^[#?]/, ''));
+    const qs = parse(location.search), hs = parse(location.hash);
+    const raw = String(qs.get('centerFill') || hs.get('centerFill') || '').toLowerCase().trim();
+    if (raw === 'mixed' || raw === 'wallpaper' || raw === 'car') return raw;
+    if (qs.has('mixed') || hs.has('mixed')) return 'mixed';
+    const m = String(qs.get('mixed') || hs.get('mixed') || '').toLowerCase().trim();
+    if (m === '1' || m === 'true' || m === 'yes') return 'mixed';
+  } catch (e) {}
+  return null;
+}
 
 function readDebugFlag() {
   try {
@@ -4833,7 +5165,7 @@ function persistBootShellLayout(mode, splitRatio) {
 }
 
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'dyad', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, powertrainOn: false, nightMode: false, timeMode: 'auto', widgetTheme: 'dark', nightKeepDayLighting: NIGHT_KEEP_DAY_LIGHTING_DEFAULT, showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
+  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'dyad', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, powertrainOn: false, nightMode: false, timeMode: 'auto', widgetThemeMode: 'dark', nightKeepDayLighting: NIGHT_KEEP_DAY_LIGHTING_DEFAULT, showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
@@ -4853,7 +5185,7 @@ class Component extends DCLogic {
     curtainOpen: 0,
     motionActive: false,
     dayBg: '#efefef',
-    nightBg: '#131415',
+    nightBg: '#060606',
     vignette: { color: '#000000', intensity: 30 },
     grainEnabled: false,
     showGlassTweaks: false,
@@ -4894,7 +5226,7 @@ class Component extends DCLogic {
     mediaArt: '',
     mediaHasTrack: false,
     shellMode: BOOT_SHELL.mode,
-    centerFill: 'car', // 'car' | 'wallpaper'
+    centerFill: readUrlCenterFill() || 'car', // 'car' | 'wallpaper' | 'mixed' (experimental)
     wallpaperAuto: true,
     wallpaperIdx: 0,
     wallpaperLoading: false,
@@ -4969,11 +5301,22 @@ class Component extends DCLogic {
       arcFrac: 0.8,
       arcMaxRad: Math.PI / 3,
       arcMinRad: 0.35,
+      // Trailing debounce (ms) on the sprite re-capture off the tint sliders.
+      captureDebounceMs: 200,
       // Two-layer sprite: the rim is captured twice, once flat-lit and once
       // under the scene. The flat layer spins; the lighting layer does not, so
       // a highlight stays where the light is instead of orbiting the hub.
-      // Set false from devtools to fall back to the single lit capture.
-      twoLayer: true,
+      //
+      // OFF by default, because it is not finished. The lighting layer is
+      // additive — max(lit - flat*gain, 0) — so it can brighten but never
+      // darken, and every shadowed region is lost: measured light mean 5.7
+      // against a lit mean of 44, i.e. it recovers about an eighth of the
+      // shading. It also costs 44 ms/capture against 5.6 ms for the single
+      // layer (a second scene render plus two 256^2 readbacks). Finishing it
+      // means making the lighting layer MULTIPLICATIVE (lit/flat, encoded
+      // around 1.0) so it can darken too. Flip on from devtools to A/B:
+      //   __wheelSpin({ twoLayer: true })
+      twoLayer: false,
       // Flip if the lighting layer counter-rotates the wrong way on a model.
       lightRollSign: 1,
     };
@@ -5206,7 +5549,11 @@ class Component extends DCLogic {
     const s = this.state;
     if (saved.timeMode === 'day' || saved.timeMode === 'night' || saved.timeMode === 'auto') s.timeMode = saved.timeMode;
     if (typeof saved.nightMode === 'boolean' && saved.timeMode !== 'auto') s.nightMode = saved.nightMode;
-    if (saved.widgetTheme === 'light' || saved.widgetTheme === 'dark') s.widgetTheme = saved.widgetTheme;
+    if (saved.widgetThemeMode === 'light' || saved.widgetThemeMode === 'dark' || saved.widgetThemeMode === 'auto') {
+      s.widgetThemeMode = saved.widgetThemeMode;
+    } else if (saved.widgetTheme === 'light' || saved.widgetTheme === 'dark') {
+      s.widgetThemeMode = saved.widgetTheme;
+    }
     // Boot the saved body (GT or HEV) as the primary GLB so a GT session
     // does not also download PHEV at startup. The other variant stays lazy
     // until the MODEL toggle (see _loadVariantModel).
@@ -5252,7 +5599,11 @@ class Component extends DCLogic {
     if (typeof saved.camEventEnabled === 'boolean') s.camEventEnabled = saved.camEventEnabled;
     if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
     if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
-    if (saved.centerFill === 'car' || saved.centerFill === 'wallpaper') s.centerFill = saved.centerFill;
+    const urlFill = readUrlCenterFill();
+    if (urlFill) s.centerFill = urlFill;
+    else if (saved.centerFill === 'car' || saved.centerFill === 'wallpaper' || saved.centerFill === 'mixed') {
+      s.centerFill = saved.centerFill;
+    }
     if (typeof saved.wallpaperAuto === 'boolean') s.wallpaperAuto = saved.wallpaperAuto;
     if (typeof saved.wallpaperIdx === 'number' && saved.wallpaperIdx >= 0) s.wallpaperIdx = saved.wallpaperIdx;
     if (Array.isArray(saved.wallpaperEntries) && saved.wallpaperEntries.length) {
@@ -5681,6 +6032,22 @@ class Component extends DCLogic {
     return demo ? 64 : 0;
   }
 
+  /**
+   * Signed pack power in kW — the same number the POWER card prints, including
+   * its parked clamp (pack V×I noise otherwise reads as a few hundred watts
+   * on a stationary car).
+   */
+  _powerKwNow(now) {
+    const demo = !this._graphAnyLive && !(this._busCount > 0);
+    let kw = this._graphDisplay.evPowerKw != null
+      ? this._graphDisplay.evPowerKw
+      : (this._graphValues.evPowerKw || (demo ? this._graphDemoValue('evPowerKw', now) : 0));
+    const flow = this._powerFlowRaw(now);
+    const speed = this._carSpeedKmh;
+    if (!demo && flow.tone !== 'charge' && isFinite(speed) && speed < 0.5) kw = 0;
+    return this._carNumber(kw) || 0;
+  }
+
   _powerFmtNum(raw, digits) {
     const n = this._carNumber(raw);
     if (!isFinite(n)) return '—';
@@ -6102,6 +6469,8 @@ class Component extends DCLogic {
       || t.closest('.hv-widget-card-menu')
       || t.closest('.hv-widget-cell')
       || t.closest('.hv-widget-picker')
+      || t.closest('.hv-widget-picker-backdrop')
+      || t.closest('.hv-widget-slot-banner')
       || t.closest('.hv-graph-editor')
       || t.closest('.hv-graphs-viz-btn'));
   }
@@ -6109,7 +6478,7 @@ class Component extends DCLogic {
   _onWidgetSuppressClick(e) {
     if (this._widgetSuppressClick) {
       const t = e && e.target;
-      if (t && t.closest && t.closest('.hv-widget-remove, .hv-widget-exit, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-graph-editor')) {
+      if (t && t.closest && t.closest('.hv-widget-remove, .hv-widget-exit, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-widget-picker-backdrop, .hv-widget-slot-banner, .hv-graph-editor')) {
         this._widgetSuppressClick = false;
         return;
       }
@@ -6125,6 +6494,8 @@ class Component extends DCLogic {
       || t.closest('.hv-widget-card-menu')
       || t.closest('.hv-widget-cell')
       || t.closest('.hv-widget-picker')
+      || t.closest('.hv-widget-picker-backdrop')
+      || t.closest('.hv-widget-slot-banner')
       || t.closest('.hv-graph-editor')
     )) return;
     this._dismissWidgetMenu();
@@ -6723,7 +7094,7 @@ class Component extends DCLogic {
   }
 
   _graphTheme() {
-    const light = this.state.widgetTheme === 'light';
+    const light = this._effectiveWidgetTheme() === 'light';
     if (light) {
       return {
         y1: CAR_GRAPH_COLOR_Y1_LIGHT,
@@ -8012,14 +8383,119 @@ class Component extends DCLogic {
     this._applyNightMode(this._readCarIsNight(lightsOverride), !!force);
   }
 
-  setWidgetTheme(theme) {
-    const next = theme === 'light' ? 'light' : 'dark';
-    if (this.state.widgetTheme === next) return;
-    this.setState({ widgetTheme: next });
+  setWidgetThemeMode(mode) {
+    const next = (mode === 'light' || mode === 'dark' || mode === 'auto') ? mode : 'dark';
+    if (this.state.widgetThemeMode === next) return;
+    this.setState({ widgetThemeMode: next }, () => {
+      if (next === 'auto') this._refreshAutoWidgetThemeSample(true);
+      else {
+        this._lastEffectiveWidgetTheme = this._effectiveWidgetTheme();
+        this._syncDockIndicators();
+      }
+      this.saveSettings();
+    });
+  }
+
+  cycleWidgetThemeMode() {
+    const order = ['dark', 'light', 'auto'];
+    const cur = this.state.widgetThemeMode || 'dark';
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    this.setWidgetThemeMode(next);
   }
 
   toggleWidgetTheme() {
-    this.setWidgetTheme(this.state.widgetTheme === 'light' ? 'dark' : 'light');
+    this.cycleWidgetThemeMode();
+  }
+
+  _hexLuminance(hex) {
+    const h = String(hex || '').replace('#', '');
+    if (h.length < 6) return 0.5;
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  _autoSceneIsBright(state) {
+    const s = state || this.state;
+    const fill = this._normalizeCenterFill(s.centerFill);
+    if (fill === 'wallpaper') {
+      if (this._wallpaperBright != null) return this._wallpaperBright >= 0.48;
+      return this._hexLuminance(this._resolvedBg(s)) >= 0.45;
+    }
+    return !s.nightMode;
+  }
+
+  _effectiveWidgetTheme(state) {
+    const s = state || this.state;
+    const mode = s.widgetThemeMode || 'dark';
+    if (mode === 'light') return 'light';
+    if (mode === 'dark') return 'dark';
+    return this._autoSceneIsBright(s) ? 'dark' : 'light';
+  }
+
+  _sampleImageBrightness(url, cb) {
+    if (!url) { if (cb) cb(null); return; }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        const w = 32;
+        const h = 32;
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const d = ctx.getImageData(0, 0, w, h).data;
+        let sum = 0;
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+          n++;
+        }
+        if (cb) cb(n ? sum / n : null);
+      } catch (e) {
+        if (cb) cb(null);
+      }
+    };
+    img.onerror = () => { if (cb) cb(null); };
+    img.src = url;
+  }
+
+  _refreshAutoWidgetThemeSample(forceRender) {
+    const s = this.state;
+    if (s.widgetThemeMode !== 'auto') return;
+    const fill = this._normalizeCenterFill(s.centerFill);
+    if (fill === 'wallpaper') {
+      const entry = this._currentWallpaperEntry();
+      const url = entry && entry.url;
+      if (!url) {
+        this._applyEffectiveWidgetThemeIfChanged(forceRender);
+        return;
+      }
+      if (url === this._wallpaperBrightUrl && this._wallpaperBright != null) {
+        this._applyEffectiveWidgetThemeIfChanged(forceRender);
+        return;
+      }
+      this._wallpaperBrightUrl = url;
+      this._sampleImageBrightness(url, (lum) => {
+        if (lum != null) this._wallpaperBright = lum;
+        this._applyEffectiveWidgetThemeIfChanged(true);
+      });
+      return;
+    }
+    this._wallpaperBright = null;
+    this._wallpaperBrightUrl = null;
+    this._applyEffectiveWidgetThemeIfChanged(forceRender);
+  }
+
+  _applyEffectiveWidgetThemeIfChanged(forceRender) {
+    const eff = this._effectiveWidgetTheme();
+    if (eff === this._lastEffectiveWidgetTheme && !forceRender) return;
+    this._lastEffectiveWidgetTheme = eff;
+    if (forceRender) this.setState({});
+    this._syncDockIndicators();
   }
 
   openConfigSection(section) {
@@ -8086,12 +8562,15 @@ class Component extends DCLogic {
     }
     // Arm first: setState paints the tiles, and they need to know a render
     // is coming or the first frame flashes the fallback glyphs.
-    this._ensureCamIcons();
+    this._camIconBgMode = false;
+    this._ensureCamIcons(undefined, { background: false });
+    const hadIcons = this._camIcons && Object.keys(this._camIcons).length;
     this.setState({
       configExpanded: true,
       panelOpen: true,
       activeGroup: 'camera',
       configSection: 'camera',
+      ...(hadIcons ? { camIconTick: (this.state.camIconTick || 0) + 1 } : {}),
     });
   }
 
@@ -8138,7 +8617,7 @@ class Component extends DCLogic {
     const payload = {
       timeMode: s.timeMode,
       nightMode: s.nightMode,
-      widgetTheme: s.widgetTheme === 'light' ? 'light' : 'dark',
+      widgetThemeMode: (s.widgetThemeMode === 'light' || s.widgetThemeMode === 'auto') ? s.widgetThemeMode : 'dark',
       modelVariant: s.modelVariant,
       modelTrim: s.modelTrim || 'phev34',
       carColor: s.carColor,
@@ -8175,7 +8654,7 @@ class Component extends DCLogic {
       camEventEnabled: !!s.camEventEnabled,
       camCycleEnabled: !!s.camCycleEnabled,
       camOrbitEnabled: !!s.camOrbitEnabled,
-      centerFill: s.centerFill === 'wallpaper' ? 'wallpaper' : 'car',
+      centerFill: (s.centerFill === 'wallpaper' || s.centerFill === 'mixed') ? s.centerFill : 'car',
       wallpaperAuto: !!s.wallpaperAuto,
       wallpaperIdx: Math.max(0, s.wallpaperIdx || 0),
       wallpaperEntries: Array.isArray(this._wallpaperEntries) ? this._wallpaperEntries : [],
@@ -8291,6 +8770,9 @@ class Component extends DCLogic {
     const hv = (on) => this._hvBtn(!!on);
     const hvOff = hv(false);
     this._syncDockIndicators();
+    const effTheme = this._effectiveWidgetTheme(s);
+    const themeMode = s.widgetThemeMode || 'dark';
+    const themeBtn = hv(themeMode !== 'auto');
     return {
       containerRef: this.containerRef,
       outerRef: this.outerRef,
@@ -8305,8 +8787,21 @@ class Component extends DCLogic {
         : (s.timeMode === 'night' ? 'Day/night · locked night' : 'Day/night · locked day')) + ' — tap to cycle',
       labelColor: s.nightMode ? '#c8daea' : '#2b3037',
       hintColor: s.nightMode ? 'rgba(180,210,235,0.55)' : '#6a7077',
-      rootClass: (s.widgetTheme === 'light' ? 'hv-widgets-light' : ''),
-      widgetThemeLabel: s.widgetTheme === 'light' ? 'ESCURO' : 'CLARO',
+      rootClass: (effTheme === 'light' ? 'hv-widgets-light' : '')
+        + (s.centerFill === 'mixed' ? ' hv-fill-mixed' : ''),
+      widgetThemeLabel: themeMode === 'auto'
+        ? 'AUTO'
+        : (effTheme === 'light' ? 'ESCURO' : 'CLARO'),
+      widgetThemeModeLabel: themeMode === 'auto'
+        ? ('UI · AUTO (' + (effTheme === 'light' ? 'LIGHT' : 'DARK') + ')')
+        : (themeMode === 'light' ? 'UI · LIGHT' : 'UI · DARK'),
+      widgetThemeHint: themeMode === 'auto'
+        ? 'Auto picks the opposite of day/night or wallpaper brightness for contrast.'
+        : (themeMode === 'light' ? 'Light widgets and drawer buttons.' : 'Dark widgets and drawer buttons.'),
+      widgetThemeBtnBorder: themeBtn.border,
+      widgetThemeBtnBg: themeBtn.bg,
+      widgetThemeBtnCol: themeBtn.col,
+      cycleWidgetThemeMode: () => this.cycleWidgetThemeMode(),
       toggleWidgetTheme: () => this.toggleWidgetTheme(),
       // Boot line while the splash is up; subtle center spinner once it is gone
       // (skip / clip ended) and the GLB is still arriving. Android draws both
@@ -8475,27 +8970,15 @@ class Component extends DCLogic {
       openSectionLayout: () => this.openLayoutPanel(),
       cameraPresets: (() => {
         const shots = this._camIcons || {};
-        const busy = this._camIconsBusy();
         return this._cameraPresetDefs().map((d) => {
           const on = s.cameraPreset === d.key;
-          // Three states. A render, or — while its render is still queued —
-          // the view's name, because a placeholder drawing would be read as
-          // the finished icon rather than as "not ready yet". The glyphs are
-          // only left for the case where the render was tried and produced
-          // nothing, so a failed readback still leaves a usable grid.
           const shot = shots[d.key];
-          const pending = !shot && busy;
           return {
             ...d,
-            // A render already faces the right way; only the drawn glyph is
-            // shared between a left and a right preset and needs mirroring.
-            icoClass: shot ? 'hv-cam-ico-shot'
-              : pending ? 'hv-cam-ico-off'
-              : (d.flip ? 'hv-cam-ico-flip' : ''),
-            capClass: pending ? '' : 'hv-cam-cap-off',
-            caption: pending ? d.title : '',
+            capClass: shot ? 'hv-cam-cap-off' : '',
+            caption: shot ? '' : (d.label || d.title),
+            shotUrl: shot || '',
             onClass: on ? 'is-on' : '',
-            maskUrl: shot || this._cameraPresetMaskUrl(d.icon),
             onClick: () => this.setCameraPreset(d.key),
           };
         });
@@ -8854,10 +9337,45 @@ class Component extends DCLogic {
     return s.nightMode ? s.nightBg : s.dayBg;
   }
 
+  _normalizeCenterFill(fill) {
+    if (fill === 'wallpaper' || fill === 'mixed') return fill;
+    return 'car';
+  }
+
+  _isMixedCenterFill(state) {
+    return this._normalizeCenterFill((state || this.state).centerFill) === 'mixed';
+  }
+
+  _centerFillUsesWallpaper(state) {
+    const f = this._normalizeCenterFill((state || this.state).centerFill);
+    return f === 'wallpaper' || f === 'mixed';
+  }
+
   _applyBackground(night, dayBg, nightBg, vig, grain) {
     const bg = night ? nightBg : dayBg;
     const vc = vig.color || '#000000';
     const vi = vig.intensity ?? 0;
+    // Mixed fill: Bing wallpaper shows through a transparent canvas.
+    if (this._isMixedCenterFill()) {
+      if (this.scene) this.scene.background = null;
+      if (this.renderer) this.renderer.setClearColor(0x000000, 0);
+      if (this.vignetteMat) {
+        const h = vc.replace('#', '');
+        this.vignetteMat.uniforms.vignetteColor.value.setRGB(
+          parseInt(h.slice(0, 2), 16) / 255,
+          parseInt(h.slice(2, 4), 16) / 255,
+          parseInt(h.slice(4, 6), 16) / 255
+        );
+        this.vignetteMat.uniforms.vignetteIntensity.value = vi / 100;
+      }
+      if (this.outerRef && this.outerRef.current) {
+        this.outerRef.current.style.background = bg;
+        this.outerRef.current.classList.toggle('bg-grain', !!grain);
+      }
+      if (this.requestRender) this.requestRender(4);
+      return;
+    }
+    if (this.renderer) this.renderer.setClearColor(0x000000, 1);
     // Flat scene background — vignette handled by the WebGL shader overlay
     if (this.scene && this.THREE) {
       const textureKey = `${bg}|${grain ? 1 : 0}`;
@@ -9081,7 +9599,7 @@ class Component extends DCLogic {
   }
 
   _syncWallpaperLayer() {
-    const show = this.state.centerFill === 'wallpaper'
+    const show = this._centerFillUsesWallpaper()
       && (this._shellMode || this.state.shellMode || 'triple') !== 'appsOnly';
     const entry = show ? this._currentWallpaperEntry() : null;
     this._wallpaperUrl = entry ? entry.url : '';
@@ -9093,20 +9611,35 @@ class Component extends DCLogic {
   }
 
   _setCenterFill(mode) {
-    const next = mode === 'wallpaper' ? 'wallpaper' : 'car';
+    const next = this._normalizeCenterFill(mode);
     if (this.state.centerFill === next) return;
     const patch = { centerFill: next };
     if (next === 'car') patch.wallpaperPopupOpen = false;
     this.setState(patch, () => {
-      if (next === 'wallpaper') this._ensureWallpapers(false);
+      if (this._centerFillUsesWallpaper()) this._ensureWallpapers(false);
       else this._syncWallpaperLayer();
+      this._applyBackground(
+        this.state.nightMode,
+        this.state.dayBg,
+        this.state.nightBg,
+        this.state.vignette,
+        this.state.grainEnabled
+      );
       this._syncCenterFillIndicator();
+      if (next === 'car' || next === 'mixed') {
+        this._syncCarSceneForShell();
+        this._kickShadowRefresh(16);
+        if (typeof this.renderContactShadow === 'function') {
+          try { this.renderContactShadow(); } catch (e) {}
+        }
+        if (this.requestRender) this.requestRender(8);
+      }
       this.saveSettings();
     });
   }
 
   openWallpaperPopup() {
-    if (this.state.centerFill !== 'wallpaper') return;
+    if (!this._centerFillUsesWallpaper()) return;
     this.setState({ wallpaperPopupOpen: true });
     this._ensureWallpapers(false);
   }
@@ -9166,13 +9699,15 @@ class Component extends DCLogic {
   }
 
   _wallpaperRenderFields(s) {
-    const fill = s.centerFill === 'wallpaper' ? 'wallpaper' : 'car';
+    const fill = this._normalizeCenterFill(s.centerFill);
     const carOn = fill === 'car';
     const wallOn = fill === 'wallpaper';
+    const mixedOn = fill === 'mixed';
     const carBtn = this._hvBtn(carOn);
     const wallBtn = this._hvBtn(wallOn);
+    const mixedBtn = this._hvBtn(mixedOn);
     const appsOnly = (s.shellMode || '') === 'appsOnly';
-    const showWall = wallOn && !appsOnly;
+    const showWall = this._centerFillUsesWallpaper(s) && !appsOnly;
     const entry = showWall ? this._currentWallpaperEntry() : null;
     const entries = this._wallpaperEntries || [];
     const idx = Math.max(0, Math.min(entries.length - 1, s.wallpaperIdx || 0));
@@ -9210,6 +9745,9 @@ class Component extends DCLogic {
       centerFillWallBorder: wallBtn.border,
       centerFillWallBg: wallBtn.bg,
       centerFillWallCol: wallBtn.col,
+      centerFillMixedBorder: mixedBtn.border,
+      centerFillMixedBg: mixedBtn.bg,
+      centerFillMixedCol: mixedBtn.col,
       wallpaperConfigureBorder: cfgBtn.border,
       wallpaperConfigureBg: cfgBtn.bg,
       wallpaperConfigureCol: cfgBtn.col,
@@ -9218,6 +9756,7 @@ class Component extends DCLogic {
         : (s.wallpaperLoading ? 'Fetching from Microsoft Bing…' : 'Connect to Wi‑Fi to load Bing wallpaper'),
       setCenterFillCar: () => this._setCenterFill('car'),
       setCenterFillWallpaper: () => this._setCenterFill('wallpaper'),
+      setCenterFillMixed: () => this._setCenterFill('mixed'),
       openWallpaperPopup: () => this.openWallpaperPopup(),
       closeWallpaperPopup: () => this.closeWallpaperPopup(),
     };
@@ -9344,16 +9883,30 @@ class Component extends DCLogic {
     const map = profile && profile.windows;
     if (!map || !this.THREE || typeof findMesh !== 'function') return;
     const THREE = this.THREE;
+    obj.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4();
     Object.keys(map).forEach((k) => {
       const node = findMesh(map[k]);
-      if (!node) return;
+      if (!node || !node.parent) return;
       const box = new THREE.Box3().setFromObject(node);
       if (box.isEmpty()) return;
+      // setFromObject measures in WORLD units; position.y is in the hinge's.
+      // The model root carries a scale (5 units per car length), so a world
+      // height here would be that factor too large and the pane would sink
+      // through the floor. Doors are shut at this point, so re-boxing across
+      // the hinge transform is exact — its only rotation is about Y.
+      box.applyMatrix4(inv.copy(node.parent.matrixWorld).invert());
+      const hingeY = node.parent.position.y || 0;
+      const hingeX = node.parent.position.x || 0;
       this._windows.push({
         key: k,
         node: node,
         y0: node.position.y,
         drop: (box.max.y - box.min.y) * 0.92,
+        // Rest belt line and pane centre, in the model's own space, kept for
+        // the door hotspot so it never has to re-measure a dropped pane.
+        restY: hingeY + box.min.y,
+        restX: hingeX + (box.min.x + box.max.x) * 0.5,
       });
     });
     console.log('[Haval H6] windows:',
@@ -10125,6 +10678,26 @@ class Component extends DCLogic {
       return { rad: TWO_PI / guess, order: guess, corr: pick.corr, weak: true, from: 'capture' };
     }
     return { rad: TWO_PI / pick.order, order: pick.order, corr: pick.corr, weak: false, from: 'capture' };
+  }
+
+  // Trailing debounce around _generateBlurredWheelTexture.
+  //
+  // The capture is not cheap — measured 5.6 ms single-layer and 44 ms two-layer
+  // on the emulator, and the MMI is a good deal slower. The tint handlers fire
+  // on every `input` event, so dragging a slider used to queue one capture per
+  // pixel of travel. Same shape as _requestTweenShadow / _settleTweenShadow:
+  // coalesce the burst, and a final update is guaranteed because a trailing
+  // debounce only ever fires after the last event.
+  _requestBlurCapture(delayMs) {
+    const t = this._wheelSpinTune || {};
+    const wait = typeof delayMs === 'number' ? delayMs
+      : (typeof t.captureDebounceMs === 'number' ? t.captureDebounceMs : 200);
+    if (this._blurCaptureTimer) clearTimeout(this._blurCaptureTimer);
+    this._blurCaptureTimer = setTimeout(() => {
+      this._blurCaptureTimer = null;
+      try { this._generateBlurredWheelTexture(); }
+      catch (e) { console.warn('[WheelBlur] debounced capture failed', e && e.message); }
+    }, wait);
   }
 
   _initWheelBlur() {
@@ -12107,7 +12680,7 @@ class Component extends DCLogic {
       if (this.nlHeadR) this.nlHeadR.intensity = hi;
       if (this.nlFogF)   this.nlFogF.intensity   = ls.fogFront  ? 0.10 : 0;
       if (this.nlFogR)   this.nlFogR.intensity   = ls.fogRear   ? 0.12 : 0;
-      if (this.nlBrake)  this.nlBrake.intensity  = ls.brake     ? 0.10 : (ls.headlight ? 0.08 : 0);
+      if (this.nlBrake)  this.nlBrake.intensity  = ls.brake     ? 0.055 : (ls.headlight ? 0.04 : 0);
       if (this.nlRev)    this.nlRev.intensity    = ls.reverse   ? 0.07 : 0;
       if (this.nlPos)    this.nlPos.intensity    = ls.position  ? 0.08 : 0;
       const ta = (ls.turnL || ls.hazard) ? 0.04 : 0;
@@ -12379,7 +12952,7 @@ class Component extends DCLogic {
 
     // Pool lights — all aimed straight down from above car height
     this.nlFogF  = makePool(0xe4eeff, pd * 1.0, pa);  aimDown(this.nlFogF,  frontPos);
-    this.nlBrake = makePool(0xff1800, pd * 1.1, pa);  aimDown(this.nlBrake, rearPos);
+    this.nlBrake = makePool(0xdd1400, pd * 0.95, pa);  aimDown(this.nlBrake, rearPos);
     this.nlFogR  = makePool(0xff0000, pd * 0.8, pa);  aimDown(this.nlFogR,  rearPos);
     this.nlRev   = makePool(0xffffff, pd * 0.85, pa); aimDown(this.nlRev,   rearPos);
     // Position lights are at the front, not the centre
@@ -12421,7 +12994,7 @@ class Component extends DCLogic {
       if (this.nlLowBeamR) this.nlLowBeamR.intensity = i;
       if (this.nlBrake) {
         const ls = this.state.lights || {};
-        if (!ls.brake) this.nlBrake.intensity = on ? 0.08 : 0;
+        if (!ls.brake) this.nlBrake.intensity = on ? 0.04 : 0;
       }
       return;
     }
@@ -12447,7 +13020,7 @@ class Component extends DCLogic {
     const map = {
       fogFront:      { pl: this.nlFogF,  i: 0.10 },
       fogRear:       { pl: this.nlFogR,  i: 0.12 },
-      brake:         { pl: this.nlBrake, i: 0.10 },
+      brake:         { pl: this.nlBrake, i: 0.055 },
       reverse:       { pl: this.nlRev,   i: 0.07 },
       // toggleLight uses state key `position`; emissive path passes `positionFront`
       position:      { pl: this.nlPos,   i: 0.08 },
@@ -13953,10 +14526,15 @@ class Component extends DCLogic {
           { label: 'TOGGLE CURTAIN', cmd: 'toggle_curtain' },
           { label: 'LEVELS…', action: 'roof_levels' },
         ] },
+      { id: 'windows', glyph: '', title: 'Windows & doors',
+        menu: [
+          { label: 'TOGGLE WINDOWS', cmd: 'toggle_windows' },
+          { label: 'TOGGLE DOORS', cmd: 'toggle_doors_all' },
+        ] },
+      { id: 'trunk', glyph: '', title: 'Tailgate',
+        menu: [{ label: 'TOGGLE TRUNK', cmd: 'toggle_trunk' }] },
       { id: 'engine', glyph: '', title: 'Engine bay',
         menu: [{ label: 'X-RAY', action: 'xray' }] },
-      { id: 'camera', glyph: '', title: 'Cameras',
-        menu: [{ label: 'CAMERA', action: 'camera' }] },
     ];
   }
 
@@ -14095,6 +14673,7 @@ class Component extends DCLogic {
       this._setRoofLevelPopup(false);
     });
     roofPop.addEventListener('click', (ev) => ev.stopPropagation());
+    this._initCamFab();
 
     const canvas = this.renderer && this.renderer.domElement;
     if (!canvas) return;
@@ -14102,9 +14681,20 @@ class Component extends DCLogic {
     this._onHsPointerDown = (e) => {
       if (e.button !== 0 || this.state.assignMode) return;
       this._hsPtDown = { x: e.clientX, y: e.clientY, t: performance.now() };
+      if (this._canCenterHoldAdd() && this._pointInCenterGap(e.clientX, e.clientY)) {
+        this._onAddWidgetHoldStart(e);
+      }
+    };
+    this._onHsPointerMove = (e) => {
+      if (!this._hsPtDown) return;
+      const dx = e.clientX - this._hsPtDown.x;
+      const dy = e.clientY - this._hsPtDown.y;
+      if (Math.hypot(dx, dy) > 10) this._onAddWidgetHoldCancel(e);
     };
     this._onHsPointerUp = (e) => {
-      if (e.button !== 0 || !this._hsPtDown || this.state.assignMode) return;
+      if (e.button !== 0 || this.state.assignMode) return;
+      this._onAddWidgetHoldEnd(e);
+      if (!this._hsPtDown) return;
       const d = this._hsPtDown;
       this._hsPtDown = null;
       const dx = e.clientX - d.x;
@@ -14125,7 +14715,127 @@ class Component extends DCLogic {
       }
     };
     canvas.addEventListener('pointerdown', this._onHsPointerDown);
+    canvas.addEventListener('pointermove', this._onHsPointerMove);
     canvas.addEventListener('pointerup', this._onHsPointerUp);
+    canvas.addEventListener('pointercancel', this._onHsPointerUp);
+  }
+
+  _initCamFab() {
+    if (!this._hsLayer || this._camFabEl) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'hv-cam-fab';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hv-cam-fab-btn';
+    btn.title = 'Camera views';
+    btn.setAttribute('aria-label', 'Camera views');
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>';
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._hideHotspots();
+      this.toggleCameraRail();
+    });
+    wrap.appendChild(btn);
+    this._hsLayer.appendChild(wrap);
+    this._camFabEl = wrap;
+    this._camFabBtn = btn;
+  }
+
+  _rebuildCamFabAnchor(root) {
+    if (!this.THREE || !this.model) {
+      this._camFabAnchor = null;
+      return;
+    }
+    const THREE = this.THREE;
+    const model = root || this.model;
+    const skip = new Set([this.floorMesh, this.nightFloor, this.shadowCatcher, this.contactShadow]
+      .filter(Boolean));
+    const box = new THREE.Box3();
+    model.traverse((o) => {
+      if (o.isMesh && o.visible && !skip.has(o)) box.expandByObject(o);
+    });
+    if (box.isEmpty()) {
+      this._camFabAnchor = null;
+      return;
+    }
+    const center = box.getCenter(new THREE.Vector3());
+    const { F, R } = this._carBasis();
+    const corners = [];
+    for (let i = 0; i < 8; i++) {
+      corners.push(new THREE.Vector3(
+        (i & 1) ? box.max.x : box.min.x,
+        (i & 2) ? box.max.y : box.min.y,
+        (i & 4) ? box.max.z : box.min.z));
+    }
+    let fMin = Infinity;
+    let fMax = -Infinity;
+    let rMin = Infinity;
+    let rMax = -Infinity;
+    for (const c of corners) {
+      const rel = c.clone().sub(center);
+      const f = rel.dot(F);
+      const r = rel.dot(R);
+      if (f < fMin) fMin = f;
+      if (f > fMax) fMax = f;
+      if (r < rMin) rMin = r;
+      if (r > rMax) rMax = r;
+    }
+    const inset = 0.06;
+    const height = box.max.y - box.min.y;
+    const spanR = rMax - rMin;
+    const windshield = this._hsFindMeshByName(/windshield|windscreen/i);
+    let world;
+    if (windshield) {
+      const wBox = new THREE.Box3().setFromObject(windshield);
+      world = wBox.getCenter(new THREE.Vector3());
+      // Mirror-cluster / front-camera side of the glass (left flank, not rear door).
+      world.addScaledVector(R, -spanR * 0.18);
+      world.y = wBox.min.y + (wBox.max.y - wBox.min.y) * 0.58;
+    } else {
+      world = center.clone()
+        .addScaledVector(F, fMax - (fMax - fMin) * inset)
+        .addScaledVector(R, rMin + spanR * inset);
+      world.y = box.min.y + height * 0.34;
+    }
+    model.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+    this._camFabAnchor = world.applyMatrix4(inv);
+  }
+
+  _updateCamFab() {
+    if (!this._camFabEl || !this.camera || !this.renderer || !this._hsLayer) return;
+    if (!this._hotspotsVisible) {
+      this._camFabEl.classList.remove('on');
+      return;
+    }
+    if (!this._camFabAnchor || !this.model || !this.model.visible) {
+      this._camFabEl.classList.remove('on');
+      return;
+    }
+    if (!this._camFabProj) {
+      this._camFabProj = {
+        v: new this.THREE.Vector3(),
+        ndc: new this.THREE.Vector3(),
+      };
+    }
+    const scratch = this._camFabProj;
+    scratch.v.copy(this._camFabAnchor);
+    this.model.localToWorld(scratch.v);
+    scratch.ndc.copy(scratch.v).project(this.camera);
+    if (scratch.ndc.z > 1) {
+      this._camFabEl.classList.remove('on');
+      return;
+    }
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const layerRect = this._hsLayer.getBoundingClientRect();
+    const x = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
+    const y = (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top);
+    this._camFabEl.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
+    this._camFabEl.classList.add('on');
+    if (this._camFabBtn) {
+      const on = this.state.panelOpen && this.state.activeGroup === 'camera';
+      this._camFabBtn.classList.toggle('act', on);
+    }
   }
 
   _teardownHotspots() {
@@ -14140,6 +14850,12 @@ class Component extends DCLogic {
     }
     if (this._hsLayer && this._hsLayer.parentNode) this._hsLayer.parentNode.removeChild(this._hsLayer);
     this._hsLayer = null;
+    if (this._xrLayer && this._xrLayer.parentNode) this._xrLayer.parentNode.removeChild(this._xrLayer);
+    this._xrLayer = null;
+    this._xrEls = null;
+    this._camFabEl = null;
+    this._camFabBtn = null;
+    this._camFabAnchor = null;
     this._hsEls = null;
     this._hsRoofPop = null;
     this._onHsPointerDown = null;
@@ -14155,8 +14871,22 @@ class Component extends DCLogic {
         return;
       }
     } catch (e) {}
-    if (cmd === 'toggle_doors_all') {
-      this.toggleSideDoors();
+    const s = this.state || {};
+    const local = {
+      toggle_doors_all: () => this.toggleSideDoors(),
+      toggle_windows: () => this.toggleWindows(),
+      toggle_trunk: () => this._setTrunkOpen((s.trunkOpen || 0) > 0 ? 0 : 100),
+      toggle_sunroof: () => {
+        this._sunroofStep = MANUAL_OPENING_STEP;
+        this._setSunroofOpen((s.sunroofOpen || 0) > 0 ? 0 : 100);
+      },
+      toggle_curtain: () => {
+        this._curtainStep = MANUAL_OPENING_STEP;
+        this._setCurtainOpen((s.curtainOpen || 0) > 0 ? 0 : 100);
+      },
+    };
+    if (local[cmd]) {
+      local[cmd]();
       return;
     }
     console.warn('[hotspot] no vehicle bridge for', cmd, value || '');
@@ -14220,6 +14950,7 @@ class Component extends DCLogic {
       if (el) el.classList.remove('open', 'flip');
     });
     this._updateHotspotLayer();
+    this._updateCamFab();
     if (!deferHide) this._armHotspotHideTimer();
     if (this.requestRender) this.requestRender(8);
   }
@@ -14232,6 +14963,7 @@ class Component extends DCLogic {
     Object.values(this._hsEls || {}).forEach((el) => {
       if (el) el.classList.remove('on', 'open', 'act', 'flip');
     });
+    if (this._camFabEl) this._camFabEl.classList.remove('on');
   }
 
   _hideHotspots() {
@@ -14263,8 +14995,6 @@ class Component extends DCLogic {
         this._applyPowertrainVisibility(powertrainOn);
         return { powertrainOn };
       });
-    } else if (item.action === 'camera') {
-      this.toggleCameraRail(true);
     } else if (item.action === 'roof_levels') {
       this._openRoofLevelPopup();
       this._armHotspotHideTimer();
@@ -14370,17 +15100,65 @@ class Component extends DCLogic {
       if (fb) anchors.engine = fb;
     }
 
-    const windshield = this._hsFindMeshByName(/windshield|windscreen/i);
-    if (windshield) put('camera', windshield);
-    if (!anchors.camera) {
-      const cam = this._hsBBoxAnchorLocal(model, (_min, _max, c, sz, p) => {
-        p.set(c.x, c.y + sz.y * 0.34, _max.z - sz.z * 0.05);
+    if (this._trunkHinge) put('trunk', this._trunkHinge);
+    if (!anchors.trunk) {
+      const fb = this._hsBBoxAnchorLocal(model, (_min, _max, c, sz, pt) => {
+        // Nose is -X, so the tailgate is the +X face, a bit above mid-height.
+        pt.set(_max.x - sz.x * 0.03, c.y + sz.y * 0.14, c.z);
       });
-      if (cam) anchors.camera = cam;
+      if (fb) anchors.trunk = fb;
+    }
+
+    // The door bullet gets one anchor per flank. A single one would spend half
+    // of every orbit buried inside the car; _hsResolveAnchor picks the near
+    // side each frame. Height comes from the pane's REST belt line rather than
+    // its live box, so a dropped window does not drag the bullet down with it.
+    const pane = (id, key) => {
+      const wn = (this._windows || []).find((entry) => entry.key === key);
+      if (!wn) return;
+      const a = this._hsNodeAnchorLocal(wn.node);
+      if (!a) return;
+      if (typeof wn.restY === 'number') a.y = wn.restY;
+      if (typeof wn.restX === 'number') a.x = wn.restX;
+      anchors[id] = a;
+    };
+    pane('windowsL', 'fl');
+    pane('windowsR', 'fr');
+    if (!anchors.windowsL || !anchors.windowsR) {
+      // No named glass on this body: fall back to the flanks of the box. size.z
+      // spans the mirrors, so 0.40 lands on the door skin rather than past it.
+      const side = (sign) => this._hsBBoxAnchorLocal(model, (_min, _max, c, sz, pt) => {
+        pt.set(c.x - sz.x * 0.04, c.y + sz.y * 0.16, c.z + sign * sz.z * 0.40);
+      });
+      if (!anchors.windowsL) { const a = side(1); if (a) anchors.windowsL = a; }
+      if (!anchors.windowsR) { const a = side(-1); if (a) anchors.windowsR = a; }
     }
 
     this._hsAnchors = anchors;
     this._ensureHotspotElements();
+    this._rebuildCamFabAnchor(model);
+  }
+
+  /**
+   * Which anchor a bullet uses this frame.
+   *
+   * Most have exactly one. A bullet that exists on both flanks stores `<id>L`
+   * and `<id>R` instead, and the near side is simply whichever is closer to the
+   * camera -- cheaper and steadier than an occlusion raycast, and it flips at
+   * the same moment the car's silhouette does.
+   */
+  _hsResolveAnchor(id, anchors, tmp) {
+    const L = anchors[id + 'L'];
+    const R = anchors[id + 'R'];
+    if (!L || !R) return anchors[id] || null;
+    if (!this.model || !this.camera) return L;
+    tmp.copy(L);
+    this.model.localToWorld(tmp);
+    const dL = tmp.distanceToSquared(this.camera.position);
+    tmp.copy(R);
+    this.model.localToWorld(tmp);
+    const dR = tmp.distanceToSquared(this.camera.position);
+    return dR < dL ? R : L;
   }
 
   _updateHotspotLayer() {
@@ -14392,6 +15170,7 @@ class Component extends DCLogic {
         ndc: new this.THREE.Vector3(),
         camFwd: new this.THREE.Vector3(),
         anchorFwd: new this.THREE.Vector3(),
+        alt: new this.THREE.Vector3(),
       };
     }
     const scratch = this._hsProj;
@@ -14404,7 +15183,7 @@ class Component extends DCLogic {
     Object.keys(screen).forEach((k) => { delete screen[k]; });
     Object.keys(this._hsEls || {}).forEach((id) => {
       const el = this._hsEls[id];
-      const anchor = anchors[id];
+      const anchor = this._hsResolveAnchor(id, anchors, scratch.alt);
       if (!el) return;
       if (!this._hotspotsVisible || !anchor) {
         el.classList.remove('on');
@@ -14435,9 +15214,203 @@ class Component extends DCLogic {
       let active = false;
       if (id === 'roof') active = (s.sunroofOpen || 0) > 2 || (s.curtainOpen || 0) > 2;
       else if (id === 'engine') active = !!s.powertrainOn;
+      else if (id === 'trunk') active = (s.trunkOpen || 0) > 2;
+      else if (id === 'windows') {
+        active = (s.windowsOpen || 0) > 2
+          || (s.doorFLOpen || 0) > 2 || (s.doorFROpen || 0) > 2
+          || (s.doorRLOpen || 0) > 2 || (s.doorRROpen || 0) > 2;
+      }
       el.classList.toggle('act', active);
     });
     if (this._hsRoofPopOpen && this.requestRender) this.requestRender(2);
+  }
+
+  // \u2500\u2500 X-ray callouts \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  //
+  // Glow says "something in here is active". It cannot say WHICH part, what it
+  // is doing, or how hard, and on a ghosted body a colour change three parts
+  // deep is easy to miss entirely. These name the part and print its state
+  // beside it, which is the half of "hard to see what is happening" that no
+  // amount of extra brightness was ever going to reach.
+  //
+  // They ride their own layer rather than the hotspot one: the bullets fade out
+  // on a timer and the callouts must not.
+
+  _xrTagDefs() {
+    // dy nudges the pill off the anchor in screen pixels. The ICE and the P2
+    // sit ~0.43 m apart across the bay and their pills overlap head-on.
+    if (!this._xrDefs) {
+      this._xrDefs = [
+        { key: 'ice',  kicker: 'ICE',      anchor: 'ice',        dy: -13 },
+        { key: 'p2',   kicker: 'P2 FRONT', anchor: 'motorFront', dy: 13 },
+        { key: 'p4',   kicker: 'P4 REAR',  anchor: 'motorRear',  dy: 0 },
+        { key: 'batt', kicker: 'HV PACK',  anchor: null,         dy: 0 },
+      ];
+    }
+    return this._xrDefs;
+  }
+
+  _ensureXrayTagLayer() {
+    if (this._xrLayer) return this._xrLayer;
+    const host = this.containerRef && this.containerRef.current;
+    if (!host) return null;
+    const layer = document.createElement('div');
+    layer.className = 'hv-hs-layer lit';
+    layer.setAttribute('aria-hidden', 'true');
+    host.appendChild(layer);
+    this._xrLayer = layer;
+    this._xrEls = {};
+    this._xrTagDefs().forEach((def) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'hv-xr';
+      const node = document.createElement('span');
+      node.className = 'hv-xr-node';
+      const lead = document.createElement('span');
+      lead.className = 'hv-xr-lead';
+      const pill = document.createElement('span');
+      pill.className = 'hv-xr-pill';
+      const kEl = document.createElement('span');
+      kEl.className = 'hv-xr-k';
+      kEl.textContent = def.kicker;
+      const vEl = document.createElement('span');
+      vEl.className = 'hv-xr-v';
+      pill.appendChild(kEl);
+      pill.appendChild(vEl);
+      wrap.appendChild(node);
+      wrap.appendChild(lead);
+      wrap.appendChild(pill);
+      layer.appendChild(wrap);
+      this._xrEls[def.key] = {
+        el: wrap, k: kEl, v: vEl,
+        x: -9999, y: -9999, on: false, flip: false, txt: '', col: '', kick: def.kicker,
+      };
+    });
+    return layer;
+  }
+
+  /** What each callout should read, from the packed flow the POWER card uses. */
+  _xrTagModel(now) {
+    const flow = this._powerFlowRaw(now);
+    const soc = this._powerSocPct(now);
+    const kw = this._powerKwNow(now);
+    const G = this._powertrainGlowTones();
+    const manifest = this._powertrainManifest;
+    const key = this._powertrainPackKey || this._currentTrim().pack;
+    const pack = manifest && (manifest.batteries || {})[key];
+    const hex = (c) => '#' + c.getHexString();
+    const OFF = 'rgba(234,242,248,.46)';
+    const motor = (dir) => (dir > 0 ? { v: 'DRIVE', c: hex(G.drive.color) }
+                          : dir < 0 ? { v: 'REGEN', c: hex(G.regen.color) }
+                          : { v: 'IDLE', c: OFF });
+    // PHEV19 and HEV have no rear motor at all, so that tag is absent rather
+    // than sitting there reading IDLE over empty floor.
+    const awd = !!(pack && pack.awd);
+    const charging = flow.tone === 'charge' || flow.tone === 'regen' || kw < -0.4;
+    const mag = Math.abs(kw);
+    const sign = mag < 0.05 ? '' : (charging ? '+' : '\u2212');
+    return {
+      ice: { v: flow.ice ? 'RUNNING' : 'OFF', c: flow.ice ? hex(G.ice.color) : OFF },
+      p2: motor(flow.front || 0),
+      p4: awd ? motor(flow.rear || 0) : null,
+      batt: {
+        v: soc + '% \u00b7 ' + sign + (Math.round(mag * 10) / 10).toFixed(1) + ' kW',
+        c: charging ? hex(G.cell.color) : (flow.batt ? hex(G.hv.color) : OFF),
+        kicker: pack ? (pack.kwh + ' kWh') : 'HV PACK',
+      },
+    };
+  }
+
+  _updateXrayTags() {
+    const rig = this._powertrainRig;
+    const want = !!(this.state.powertrainOn && rig && rig.visible
+                    && this._powertrainFxTune().tagsOn);
+    if (!want && !this._xrShown) return;   // already down, nothing to clear
+    this._xrShown = want;
+    if (!want && !this._xrLayer) return;
+    if (!this.camera || !this.renderer || !this.THREE) return;
+    if (!this._ensureXrayTagLayer()) return;
+
+    const manifest = this._powertrainManifest;
+    const anchors = (manifest && manifest.anchors) || {};
+    const model = want ? this._xrTagModel(performance.now()) : null;
+
+    // The pack tag rides the top face of whichever pack is fitted, so it does
+    // not float where the PHEV34 case would have been on an HEV.
+    let battAnchor = null;
+    if (model && manifest) {
+      const key = this._powertrainPackKey || this._currentTrim().pack;
+      const pack = (manifest.batteries || {})[key];
+      if (pack && pack.position) {
+        const dh = (pack.dims && pack.dims.h) || 0.11;
+        battAnchor = [pack.position[0], pack.position[1] + dh * 0.5 + 0.03, pack.position[2]];
+      }
+    }
+
+    if (!this._xrProj) {
+      this._xrProj = { v: new this.THREE.Vector3(), ndc: new this.THREE.Vector3() };
+    }
+    const scratch = this._xrProj;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const layerRect = this._xrLayer.getBoundingClientRect();
+
+    const placed = [];
+    this._xrTagDefs().forEach((def) => {
+      const rec = this._xrEls[def.key];
+      if (!rec) return;
+      const data = model ? model[def.key] : null;
+      const anchor = def.anchor ? anchors[def.anchor] : battAnchor;
+      if (!data || !anchor || !rig) {
+        if (rec.on) { rec.on = false; rec.el.classList.remove('on'); }
+        return;
+      }
+      if (data.v !== rec.txt) { rec.txt = data.v; rec.v.textContent = data.v; }
+      if (data.c !== rec.col) { rec.col = data.c; rec.el.style.color = data.c; }
+      if (data.kicker && data.kicker !== rec.kick) {
+        rec.kick = data.kicker;
+        rec.k.textContent = data.kicker;
+      }
+      scratch.v.set(anchor[0], anchor[1], anchor[2]);
+      rig.localToWorld(scratch.v);
+      scratch.ndc.copy(scratch.v).project(this.camera);
+      if (scratch.ndc.z > 1) {                    // behind the camera
+        if (rec.on) { rec.on = false; rec.el.classList.remove('on'); }
+        return;
+      }
+      placed.push({
+        rec: rec,
+        x: (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left),
+        y: (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top) + def.dy,
+      });
+    });
+
+    // Head-on, the ICE / P2 / pack anchors project within a few pixels of each
+    // other and the pills land in an unreadable pile -- exactly the view
+    // someone reaches for when they want to see what is going on. The per-def
+    // dy nudges are not enough on their own, so anything still overlapping
+    // after them gets pushed down the screen. Only the pill moves; its leader
+    // dot stays on the part, so nothing is mislabelled by the shuffle.
+    placed.sort((a, b) => a.y - b.y);
+    const GAP = 21;
+    for (let i = 1; i < placed.length; i++) {
+      const prev = placed[i - 1];
+      const cur = placed[i];
+      if (Math.abs(cur.x - prev.x) > 190) continue;   // different column, leave it
+      if (cur.y - prev.y < GAP) cur.y = prev.y + GAP;
+    }
+
+    placed.forEach((pl) => {
+      const rec = pl.rec;
+      // Sub-pixel drift is invisible and every write is a compositor update.
+      if (Math.abs(pl.x - rec.x) > 0.4 || Math.abs(pl.y - rec.y) > 0.4) {
+        rec.x = pl.x;
+        rec.y = pl.y;
+        rec.el.style.transform =
+          'translate3d(' + pl.x.toFixed(1) + 'px,' + pl.y.toFixed(1) + 'px,0)';
+      }
+      const flip = pl.x > layerRect.width * 0.62;
+      if (flip !== rec.flip) { rec.flip = flip; rec.el.classList.toggle('flip', flip); }
+      if (!rec.on) { rec.on = true; rec.el.classList.add('on'); }
+    });
   }
 
   _getGlassMeshes() {
@@ -17133,25 +18106,25 @@ class Component extends DCLogic {
   onWheelTintOverride(e) {
     this.setState({ wheelTintOverride: e.target.checked });
     this.applyWheelMaterialProperties();
-    this._generateBlurredWheelTexture();
+    this._requestBlurCapture();
   }
 
   onWheelColor(e) {
     this.setState({ wheelColor: e.target.value });
     this.applyWheelMaterialProperties();
-    this._generateBlurredWheelTexture();
+    this._requestBlurCapture();
   }
 
   onWheelRoughness(e) {
     this.setState({ wheelRoughness: parseFloat(e.target.value) });
     this.applyWheelMaterialProperties();
-    this._generateBlurredWheelTexture();
+    this._requestBlurCapture();
   }
 
   onWheelMetalness(e) {
     this.setState({ wheelMetalness: parseFloat(e.target.value) });
     this.applyWheelMaterialProperties();
-    this._generateBlurredWheelTexture();
+    this._requestBlurCapture();
   }
 
   loadHDRI(key) {
@@ -17529,7 +18502,7 @@ class Component extends DCLogic {
     if (typeof window.__flushAndroidShell === 'function') {
       try { window.__flushAndroidShell(); } catch (e) { console.warn('[AndroidShell]', e); }
     }
-    if (this.state.centerFill === 'wallpaper') {
+    if (this._centerFillUsesWallpaper()) {
       this._ensureWallpapers(false);
     } else {
       const cached = this._loadWallpaperCache();
@@ -17638,6 +18611,7 @@ class Component extends DCLogic {
       // is already skipped on Android, so on mobile it is pure per-frame cost.
       const renderer = new THREE.WebGLRenderer({
         antialias: true,
+        alpha: true,
         preserveDrawingBuffer: !this._perfMobile,
       });
       // Boot native and let the resolution-mode logic decide from there. The
@@ -17663,6 +18637,7 @@ class Component extends DCLogic {
       renderer.shadowMap.needsUpdate = true;
       container.appendChild(renderer.domElement);
       this.renderer = renderer;
+      this._syncCanvasPointerEvents();
       renderer.domElement.addEventListener('webglcontextlost', (ev) => {
         ev.preventDefault();
         console.warn('[GL] context lost');
@@ -17733,7 +18708,12 @@ class Component extends DCLogic {
       // something. Use the SAME colour it will settle on rather than a fixed
       // light grey, so the canvas appearing over the shell is invisible instead
       // of a flash of the wrong colour.
-      scene.background = new THREE.Color(this._resolvedBg());
+      if (this._isMixedCenterFill()) {
+        scene.background = null;
+        renderer.setClearColor(0x000000, 0);
+      } else {
+        scene.background = new THREE.Color(this._resolvedBg());
+      }
 
       // Neutral sky-derived environment for reflections until the HDRI loads.
       const pmrem = new THREE.PMREMGenerator(renderer);
@@ -17862,6 +18842,12 @@ class Component extends DCLogic {
         speedPerSec: this._busSpeedRate || 0,
         rendersPerSec: this._setStateRate || 0,
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
+      // Experimental mixed 3D + wallpaper: __centerFill() reads, __centerFill('mixed') sets.
+      window.__centerFill = (mode) => {
+        if (mode == null) return this._normalizeCenterFill(this.state.centerFill);
+        this._setCenterFill(mode);
+        return this._normalizeCenterFill(this.state.centerFill);
+      };
 
       // Objective "is the wheel actually turning?" probe. Samples the roll
       // angle once per frame for `seconds`, then reports what the EYE gets
@@ -17957,6 +18943,37 @@ class Component extends DCLogic {
           maxStepDeg: deg(period * this._wheelSpinTune.stepFrac),
           clamped: !!this._rollClamped,
           tune: { ...this._wheelSpinTune },
+        };
+      };
+
+      // X-ray powertrain glow / beads / battery SOC — live-tunable over CDP.
+      // Call with no args to read; pass a partial object to patch, e.g.
+      // __ptGlow({ driveMax: 0.9, beadRadius: 0.06 }). beadRadius or beadCount
+      // changes rebuild the HV bead meshes.
+      window.__ptGlow = (patch) => {
+        if (patch && typeof patch === 'object') {
+          Object.assign(this._powertrainFxTune(), patch);
+          if ('beadRadius' in patch) this._ensurePowertrainBeadGeometry();
+          if ('beadRadius' in patch || 'beadCount' in patch || 'tubeRadius' in patch) {
+            this._rebuildPowertrainBeads();
+          } else if ('haloScale' in patch) {
+            this._rebuildPowertrainHalos();
+          }
+          if ('ringCount' in patch || 'ringInner' in patch || 'ringOuter' in patch) {
+            this._rebuildPowertrainGround();
+          }
+          this._powertrainFxSig = '';
+          if (this.requestRender) this.requestRender(4);
+        }
+        const T = this._powertrainFxTune();
+        const flow = this._powerFlowRaw(performance.now());
+        return {
+          powertrainOn: !!(this.state && this.state.powertrainOn),
+          flowTone: flow.tone,
+          flowFront: flow.front,
+          flowRear: flow.rear,
+          socPct: this._powerSocPct(performance.now()),
+          tune: { ...T },
         };
       };
 
@@ -18579,7 +19596,13 @@ class Component extends DCLogic {
           needRender = true;
           this._postFxDirty = true;
         }
-        if (this._hotspotsVisible || this._hsRoofPopOpen) this._updateHotspotLayer();
+        if (this._hotspotsVisible || this._hsRoofPopOpen) {
+          this._updateHotspotLayer();
+          if (this._hotspotsVisible) this._updateCamFab();
+        }
+        // Callouts follow the camera whenever x-ray is up, independently of the
+        // bullets -- those fade out on a timer and these must not.
+        if (this.state.powertrainOn || this._xrLayer) this._updateXrayTags();
         // Forced frames after UI changes / async loads (componentDidUpdate, etc.)
         if (this._renderFrames > 0) { this._renderFrames--; needRender = true; }
         // Keep the shadow map dirty across multi-frame shader settles (night
@@ -19251,6 +20274,13 @@ class Component extends DCLogic {
     const t = this._powertrainTuning();
     const NL = String.fromCharCode(10);   // keeps GLSL line breaks explicit
     mat.onBeforeCompile = (shader) => {
+      // vViewPosition only exists in the lit material shaders. The car also
+      // carries a handful of MeshBasicMaterial and ShaderMaterial parts (4 and
+      // 4 of the 149 ghosted here), whose shaders have no view-space varying at
+      // all -- injecting against it fails to compile, and a failed program
+      // renders as a black hole in the middle of a see-through car with only a
+      // console warning to say why. Those keep the flat opacity instead.
+      if (shader.fragmentShader.indexOf('vViewPosition') === -1) return;
       shader.uniforms.uGhostFace = { value: t.ghostFace };
       shader.uniforms.uGhostPow = { value: t.ghostFalloff };
       shader.fragmentShader =
@@ -19265,8 +20295,10 @@ class Component extends DCLogic {
         ].join(NL)
       );
     };
-    // Without a distinct cache key three reuses the un-patched program.
-    mat.customProgramCacheKey = () => 'hvGhostFresnel';
+    // Without a distinct cache key three reuses the un-patched program. It has
+    // to carry the material type too, or the un-patched basic/shader materials
+    // above would share a cache entry with the patched lit ones.
+    mat.customProgramCacheKey = () => 'hvGhostFresnel|' + mat.type;
     mat.needsUpdate = true;
   }
 
@@ -19288,18 +20320,95 @@ class Component extends DCLogic {
    * X-ray energy FX. The powertrain GLB has no animation clips — glow, HV
    * beads and the pulse are procedural, matching powertrain-preview.html and
    * driven by the same packed flow the 2D POWER card uses (_powerFlowRaw).
+   * Tunables: window.__ptGlow() — see Phase 1 defaults in _powertrainFxTune().
    */
+  _powertrainFxTune() {
+    if (!this._ptFxTune) {
+      this._ptFxTune = {
+        driveMax: 0.75,
+        regenMax: 0.75,
+        iceMax: 0.50,
+        cellMax: 1.0,
+        hvMax: 0.95,
+        idleDim: 0.55,
+        idleDimActive: 0.85,
+        beadRadius: 0.055,
+        beadCount: 6,
+        beadSpeed: 0.65,
+        beadOpacity: 1.0,
+        pulseMid: 0.65,
+        pulseAmp: 0.35,
+        pulseHz: 3.4,
+        // HV conduit — see _makeFlowTubeMaterial for why the lane is drawn as
+        // a tube and not just as beads.
+        tubeRadius: 0.048,
+        tubeSpeed: 0.55,
+        tubeTail: 5.0,
+        tubeGain: 1.0,
+        // Power → scroll rate. The lane visibly speeds up under load, which is
+        // the only cue in the mode that carries magnitude rather than state.
+        tubeKwRef: 45,
+        tubeSpeedMax: 2.6,
+        // Soft glow around whichever part is actually working.
+        haloScale: 0.85,
+        haloOpacity: 0.22,
+        haloOn: 1,
+        // Screen-space callouts naming each part and its state.
+        tagsOn: 1,
+        // Battery: a fill wave runs through the SOC bar and the module holding
+        // the current level breathes, so the pack says which WAY the charge is
+        // moving rather than only how much of it is left.
+        cellWaveOn: 1,
+        cellWaveAmp: 0.85,
+        cellWaveHz: 0.5,
+        cellEdgeAmp: 0.6,
+        cellEdgeHz: 2.6,
+        // Ground pulse rings — see _rebuildPowertrainGround.
+        ringOn: 1,
+        ringCount: 3,
+        ringGain: 0.40,
+        ringSpeed: 0.30,
+        ringSpeedMax: 2.2,
+        ringKwRef: 45,
+        ringMinScale: 0.70,
+        ringMaxScale: 2.75,
+        ringInner: 0.86,
+        ringOuter: 1.00,
+        ringY: 0.02,
+      };
+    }
+    return this._ptFxTune;
+  }
+
   _powertrainGlowTones() {
-    if (this._ptGlow) return this._ptGlow;
+    const T = this._powertrainFxTune();
     const THREE = this.THREE;
-    this._ptGlow = {
-      drive: { color: new THREE.Color('#2f9bff'), max: 0.45 },
-      regen: { color: new THREE.Color('#1fd47a'), max: 0.45 },
-      ice:   { color: new THREE.Color('#ff5a12'), max: 0.36 },
-      cell:  { color: new THREE.Color('#2ee089'), max: 0.85 },
-      hv:    { color: new THREE.Color('#ff6a1a'), max: 0.70 },
-    };
+    if (!this._ptGlow) {
+      this._ptGlow = {
+        drive: { color: new THREE.Color('#2f9bff'), max: T.driveMax },
+        regen: { color: new THREE.Color('#1fd47a'), max: T.regenMax },
+        ice:   { color: new THREE.Color('#ff5a12'), max: T.iceMax },
+        cell:  { color: new THREE.Color('#2ee089'), max: T.cellMax },
+        hv:    { color: new THREE.Color('#ff6a1a'), max: T.hvMax },
+      };
+    } else {
+      this._ptGlow.drive.max = T.driveMax;
+      this._ptGlow.regen.max = T.regenMax;
+      this._ptGlow.ice.max = T.iceMax;
+      this._ptGlow.cell.max = T.cellMax;
+      this._ptGlow.hv.max = T.hvMax;
+    }
     return this._ptGlow;
+  }
+
+  _ensurePowertrainBeadGeometry() {
+    const THREE = this.THREE;
+    const tune = this._powertrainFxTune();
+    const r = tune.beadRadius;
+    if (this._powertrainBeadGeo && this._powertrainBeadGeoRadius === r) return;
+    if (this._powertrainBeadGeo) this._powertrainBeadGeo.dispose();
+    this._powertrainBeadGeo = new THREE.SphereGeometry(r, 8, 6);
+    this._powertrainBeadGeoRadius = r;
   }
 
   _initPowertrainFx(root) {
@@ -19344,10 +20453,224 @@ class Component extends DCLogic {
     this._powertrainBeadGroups = [];
     this._powertrainFxSig = '';
     this._powertrainFxT = 0;
-    if (!this._powertrainBeadGeo) {
-      this._powertrainBeadGeo = new THREE.SphereGeometry(0.036, 8, 6);
-    }
+    this._ensurePowertrainBeadGeometry();
     if (!this._powertrainBeadPos) this._powertrainBeadPos = new THREE.Vector3();
+  }
+
+  /**
+   * The HV lane drawn as a lit conduit rather than only as a string of beads.
+   *
+   * Beads alone read as "some small bright things near the battery". At this
+   * panel's 14-22 fps you get two or three samples of a bead crossing the
+   * screen, which is not enough to see WHICH WAY it went -- the same sampling
+   * problem the wheel spin has, and it cannot be fixed by making the beads
+   * brighter. A tube carries a continuous gradient instead, so the direction of
+   * travel is readable from a single frame, and the scroll rate is then free to
+   * carry magnitude on top of it.
+   *
+   * ~40x5 segments per lane over two lanes: about 800 triangles against the
+   * main pass's 374k, and two draw calls against ~210.
+   */
+  _makeFlowTubeMaterial() {
+    const THREE = this.THREE;
+    const NL = String.fromCharCode(10);   // keeps GLSL line breaks explicit
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uTime:  { value: 0 },
+        uDir:   { value: 1 },
+        uSpeed: { value: 1 },
+        uOn:    { value: 0 },
+        uTail:  { value: 5.0 },
+        uColor: { value: new THREE.Color('#ff6a1a') },
+      },
+      vertexShader: [
+        'varying vec2 vFlowUv;',
+        'void main() {',
+        '  vFlowUv = uv;',
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
+        '}',
+      ].join(NL),
+      fragmentShader: [
+        'uniform float uTime;',
+        'uniform float uDir;',
+        'uniform float uSpeed;',
+        'uniform float uOn;',
+        'uniform float uTail;',
+        'uniform vec3 uColor;',
+        'varying vec2 vFlowUv;',
+        'void main() {',
+        // TubeGeometry runs u from the curve's start to its end, and every HV
+        // path in the manifest is authored pack -> motor, so +u is discharge.
+        // fract() of a scrolling coordinate is a sawtooth; raising it to a
+        // power turns that into a bright head with the tail trailing BEHIND,
+        // which is what makes the direction legible without animation.
+        '  float head = fract( vFlowUv.x * 2.0 - uTime * uSpeed * uDir );',
+        '  float packet = pow( head, uTail );',
+        '  float a = ( 0.16 + packet * 0.84 ) * uOn;',
+        '  gl_FragColor = vec4( uColor * ( 0.5 + packet * 1.7 ), a );',
+        '}',
+      ].join(NL),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      // See the note on _rebuildPowertrainBeads: the lane runs inside the
+      // hardware, so a depth test hides essentially all of it.
+      depthTest: false,
+    });
+  }
+
+  /**
+   * Ground pulse rings.
+   *
+   * The pack and both HV lanes live inside the car, so from most of the app's
+   * cameras they sit behind a lot of geometry and a colour change down there is
+   * easy to miss. A ring on the floor is legible from every angle and carries
+   * the one thing a static SOC bar cannot say: rings travel OUTWARD while the
+   * pack is driving the car and INWARD while it is taking charge.
+   *
+   * Alpha is a sine across the band rather than a hard annulus, and it fades at
+   * both ends of the travel, so nothing pops in or out. Three bands of ~0.3 m
+   * is bounded fill: the geometry IS the visible area, unlike a full disc.
+   */
+  _makeGroundRingMaterial() {
+    const THREE = this.THREE;
+    const NL = String.fromCharCode(10);
+    const tune = this._powertrainFxTune();
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uAlpha: { value: 0 },
+        uInner: { value: tune.ringInner },
+        uOuter: { value: tune.ringOuter },
+        uColor: { value: new THREE.Color('#2ee089') },
+      },
+      vertexShader: [
+        'varying vec2 vRingXY;',
+        'void main() {',
+        '  vRingXY = position.xy;',
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
+        '}',
+      ].join(NL),
+      fragmentShader: [
+        'uniform float uAlpha;',
+        'uniform float uInner;',
+        'uniform float uOuter;',
+        'uniform vec3 uColor;',
+        'varying vec2 vRingXY;',
+        'void main() {',
+        // RingGeometry lies in XY before the mesh is laid flat, so the band
+        // coordinate is just the radius. A sine across it softens both edges.
+        '  float k = ( length( vRingXY ) - uInner ) / max( 1e-4, uOuter - uInner );',
+        '  float band = sin( clamp( k, 0.0, 1.0 ) * 3.14159265 );',
+        '  gl_FragColor = vec4( uColor * band, band * uAlpha );',
+        '}',
+      ].join(NL),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+  }
+
+  _rebuildPowertrainGround() {
+    const THREE = this.THREE;
+    const root = this._powertrainFxRoot;
+    if (!root || !THREE) return;
+    (this._powertrainRings || []).forEach((m) => {
+      if (m.parent) m.parent.remove(m);
+      if (m.geometry) m.geometry.dispose();
+      if (m.material) m.material.dispose();
+    });
+    this._powertrainRings = [];
+    const tune = this._powertrainFxTune();
+    const count = Math.max(1, Math.min(6, Math.round(tune.ringCount)));
+    for (let i = 0; i < count; i++) {
+      const geo = new THREE.RingGeometry(tune.ringInner, tune.ringOuter, 72, 1);
+      const mesh = new THREE.Mesh(geo, this._makeGroundRingMaterial());
+      mesh.rotation.x = -Math.PI / 2;        // stand it on the floor
+      mesh.position.y = tune.ringY;          // clear of the floor plane
+      mesh.renderOrder = 4;
+      mesh.frustumCulled = false;
+      mesh.visible = false;
+      root.add(mesh);
+      this._powertrainRings.push(mesh);
+    }
+  }
+
+  /** 64px radial falloff, reused by every halo sprite. */
+  _powertrainHaloTexture() {
+    if (this._ptHaloTex) return this._ptHaloTex;
+    const THREE = this.THREE;
+    const size = 64;
+    const cv = document.createElement('canvas');
+    cv.width = size;
+    cv.height = size;
+    const g = cv.getContext('2d');
+    const grd = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grd.addColorStop(0.00, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.30, 'rgba(255,255,255,0.32)');
+    grd.addColorStop(1.00, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, size, size);
+    this._ptHaloTex = new THREE.CanvasTexture(cv);
+    return this._ptHaloTex;
+  }
+
+  /**
+   * One soft additive disc per working part, so "which one is on" is answerable
+   * from any angle rather than only from one that happens to show the emissive.
+   *
+   * depthTest is OFF on purpose: the halo is centred INSIDE the part it belongs
+   * to, so a depth test would hide it completely. Only parts that are actually
+   * doing something are made visible, which keeps the overdraw to one or two
+   * discs -- this GPU is fill-rate sensitive and a permanently lit set of four
+   * would be paying for nothing most of the time.
+   */
+  _rebuildPowertrainHalos() {
+    const THREE = this.THREE;
+    const root = this._powertrainFxRoot;
+    if (!root || !THREE) return;
+    (this._powertrainHalos || []).forEach((h) => {
+      if (h.sprite.parent) h.sprite.parent.remove(h.sprite);
+      if (h.sprite.material) h.sprite.material.dispose();
+    });
+    this._powertrainHalos = [];
+    const tune = this._powertrainFxTune();
+    const parts = this._powertrainParts || {};
+    const key = this._powertrainPackKey || this._currentTrim().pack;
+    const pack = ((this._powertrainManifest || {}).batteries || {})[key];
+    const wanted = ['ICE', 'Motor_P2', 'Motor_P4'];
+    if (pack && pack.nodes && pack.nodes.junction) wanted.push(pack.nodes.junction);
+    root.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    const box = new THREE.Box3();
+    const ctr = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    wanted.forEach((name) => {
+      const part = parts[name];
+      if (!part || !part.root) return;
+      box.setFromObject(part.root);
+      if (box.isEmpty()) return;
+      // setFromObject is world-space; the sprite is a child of the rig.
+      box.applyMatrix4(inv);
+      box.getCenter(ctr);
+      box.getSize(size);
+      const mat = new THREE.SpriteMaterial({
+        map: this._powertrainHaloTexture(),
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.copy(ctr);
+      sprite.scale.setScalar(Math.max(size.x, size.y, size.z) * tune.haloScale);
+      sprite.renderOrder = 7;
+      sprite.frustumCulled = false;
+      sprite.visible = false;
+      root.add(sprite);
+      this._powertrainHalos.push({ part: name, sprite: sprite, level: 0 });
+    });
   }
 
   _rebuildPowertrainBeads() {
@@ -19360,38 +20683,60 @@ class Component extends DCLogic {
         if (m.parent) m.parent.remove(m);
         if (m.material && m.material.dispose) m.material.dispose();
       });
+      if (b.tube) {
+        if (b.tube.parent) b.tube.parent.remove(b.tube);
+        if (b.tube.geometry) b.tube.geometry.dispose();
+        if (b.tube.material) b.tube.material.dispose();
+      }
     });
     this._powertrainBeadGroups = [];
     const key = this._powertrainPackKey || this._currentTrim().pack;
     const pack = (manifest.batteries || {})[key];
     if (!pack || !pack.paths) return;
     const geo = this._powertrainBeadGeo;
+    const beadCount = this._powertrainFxTune().beadCount;
     const make = (points, lane) => {
       if (!points || !points.length) return null;
       const curve = new THREE.CatmullRomCurve3(
         points.map((p) => new THREE.Vector3(p[0], p[1], p[2]))
       );
       const meshes = [];
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < beadCount; i++) {
         const mat = new THREE.MeshBasicMaterial({
           color: 0xffffff,
           transparent: true,
           opacity: 0,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
+          // The lane is routed under the pack tray and through the subframe,
+          // so with a depth test the powertrain's own castings cover most of
+          // it -- the beads only ever surfaced where the path came out from
+          // under something. Energy is the thing x-ray exists to show, so it
+          // reads through the hardware like the halos do.
+          depthTest: false,
         });
         const m = new THREE.Mesh(geo, mat);
-        m.renderOrder = 5;
+        m.renderOrder = 9;
         m.frustumCulled = false;
         root.add(m);
         meshes.push(m);
       }
-      return { key: lane, curve: curve, meshes: meshes, dir: 0 };
+      const tubeMat = this._makeFlowTubeMaterial();
+      const tune = this._powertrainFxTune();
+      const tube = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 40, tune.tubeRadius, 5, false), tubeMat);
+      tube.renderOrder = 8;
+      tube.frustumCulled = false;
+      tube.visible = false;
+      root.add(tube);
+      return { key: lane, curve: curve, meshes: meshes, tube: tube, mat: tubeMat, dir: 0 };
     };
     const front = make(pack.paths.hvFront, 'front');
     if (front) this._powertrainBeadGroups.push(front);
     const rear = make(pack.paths.hvRear, 'rear');
     if (rear) this._powertrainBeadGroups.push(rear);
+    this._rebuildPowertrainHalos();
+    this._rebuildPowertrainGround();
   }
 
   _powertrainGlowPart(part, tone, strength) {
@@ -19423,7 +20768,24 @@ class Component extends DCLogic {
 
     (this._powertrainBeadGroups || []).forEach((b) => {
       b.dir = plug ? 0 : (b.key === 'front' ? frontDir : rearDir);
+      if (b.mat) {
+        b.mat.uniforms.uDir.value = b.dir < 0 ? -1 : 1;
+        b.mat.uniforms.uColor.value.copy(b.dir < 0 ? G.regen.color : G.hv.color);
+      }
     });
+
+    const halo = (name, tone, level) => {
+      const list = this._powertrainHalos || [];
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].part !== name) continue;
+        list[i].level = level;
+        list[i].sprite.material.color.copy(tone.color);
+        return;
+      }
+    };
+    halo('ICE', G.ice, flow.ice ? 1 : 0);
+    halo('Motor_P2', frontDir < 0 ? G.regen : G.drive, frontDir ? 1 : 0);
+    halo('Motor_P4', rearDir < 0 ? G.regen : G.drive, rearDir ? 1 : 0);
 
     if (pack && pack.nodes) {
       const hvHot = (frontDir || rearDir || plug) ? 1 : 0;
@@ -19432,15 +20794,47 @@ class Component extends DCLogic {
         this._powertrainGlowPart(parts[pack.nodes.hvRear], G.hv, rearDir ? 1 : 0.15 * hvHot);
       }
       this._powertrainGlowPart(parts[pack.nodes.junction], G.hv, hvHot * 0.6);
+      halo(pack.nodes.junction, G.hv, hvHot ? 0.55 : 0);
 
       const modules = pack.modules || [];
       const lit = (socPct / 100) * modules.length;
-      const idleDim = flow.tone === 'idle' ? 0.35 : 0.85;
+      const tune = this._powertrainFxTune();
+      const idleDim = flow.tone === 'idle' ? tune.idleDim : tune.idleDimActive;
+
+      // Which way the pack is moving energy. Regen counts as charging even
+      // when the wall plug is not involved -- from the pack's point of view a
+      // motor running backwards and a charger are the same thing.
+      const regenIn = frontDir < 0 || rearDir < 0;
+      const charging = plug || regenIn || flow.tone === 'regen';
+      const discharging = !charging && (frontDir > 0 || rearDir > 0);
+      // Green going in, blue coming out, green at rest: the same two tones the
+      // rest of the mode already uses for regen and drive.
+      const cellTone = discharging ? G.drive : G.cell;
+
+      const cells = [];
       for (let i = 0; i < modules.length; i++) {
         const level = Math.max(0, Math.min(1, lit - i));
-        this._powertrainGlowPart(parts[modules[i]], G.cell, level * idleDim);
+        // Charging lifts the whole bar a little so the pack reads as "taking"
+        // rather than merely "holding".
+        const gain = charging ? 1.15 : 1;
+        this._powertrainGlowPart(parts[modules[i]], cellTone,
+          Math.min(1, level * idleDim * gain));
+        if (parts[modules[i]]) cells.push(parts[modules[i]]);
       }
-      this._powertrainGlowPart(parts[pack.nodes.case], G.cell, plug ? 0.12 : 0);
+      this._powertrainCells = cells;
+      this._powertrainCellDir = charging ? 1 : (discharging ? -1 : 0);
+      // The module the level currently sits in — the one worth watching while
+      // the pack fills. floor() of the fill, clamped inside the stack.
+      this._powertrainCellEdge = Math.max(0,
+        Math.min(modules.length - 1, Math.floor(lit)));
+
+      this._powertrainGlowPart(parts[pack.nodes.case], cellTone,
+        plug ? 0.30 : (charging ? 0.18 : 0));
+
+      this._powertrainGroundDir = charging ? 1 : (discharging ? -1 : 0);
+      (this._powertrainRings || []).forEach((m) => {
+        m.material.uniforms.uColor.value.copy(cellTone.color);
+      });
     }
   }
 
@@ -19458,7 +20852,18 @@ class Component extends DCLogic {
     (this._powertrainBeadGroups || []).forEach((b) => {
       b.dir = 0;
       (b.meshes || []).forEach((m) => { m.material.opacity = 0; });
+      if (b.tube) b.tube.visible = false;
     });
+    (this._powertrainHalos || []).forEach((h) => {
+      h.level = 0;
+      h.sprite.visible = false;
+    });
+    (this._powertrainRings || []).forEach((m) => {
+      m.visible = false;
+      m.material.uniforms.uAlpha.value = 0;
+    });
+    this._powertrainCellDir = 0;
+    this._powertrainGroundDir = 0;
     this._powertrainFxSig = '';
   }
 
@@ -19483,15 +20888,32 @@ class Component extends DCLogic {
     this._powertrainFxT = (this._powertrainFxT || 0) + dt;
     const t = this._powertrainFxT;
     const G = this._powertrainGlowTones();
+    const tune = this._powertrainFxTune();
     const tmp = this._powertrainBeadPos;
+
+    // Scroll rate follows load, so the lane visibly hurries under power. This
+    // is the only cue in the mode that carries magnitude rather than state.
+    const kwNow = Math.abs(this._powerKwNow(now));
+    const tubeSpeed = tune.tubeSpeed
+      * Math.min(tune.tubeSpeedMax, 0.55 + kwNow / Math.max(1, tune.tubeKwRef));
 
     (this._powertrainBeadGroups || []).forEach((b) => {
       const on = b.dir !== 0;
+      if (b.tube) {
+        b.tube.visible = on;
+        if (on) {
+          const u = b.mat.uniforms;
+          u.uTime.value = t;
+          u.uSpeed.value = tubeSpeed;
+          u.uTail.value = tune.tubeTail;
+          u.uOn.value = tune.tubeGain;
+        }
+      }
       for (let i = 0; i < b.meshes.length; i++) {
         const m = b.meshes[i];
-        m.material.opacity = on ? 0.85 : 0;
+        m.material.opacity = on ? tune.beadOpacity : 0;
         if (!on) continue;
-        let u = (t * 0.42 + i / b.meshes.length) % 1;
+        let u = (t * tune.beadSpeed + i / b.meshes.length) % 1;
         if (b.dir < 0) u = 1 - u;
         b.curve.getPointAt(u, tmp);
         m.position.copy(tmp);
@@ -19501,7 +20923,71 @@ class Component extends DCLogic {
       }
     });
 
-    const pulse = 0.80 + Math.sin(t * 3.4) * 0.20;
+    const pulse = tune.pulseMid + Math.sin(t * tune.pulseHz) * tune.pulseAmp;
+
+    const haloOn = !!tune.haloOn;
+    (this._powertrainHalos || []).forEach((h) => {
+      const lit = haloOn && h.level > 0.01;
+      if (h.sprite.visible !== lit) h.sprite.visible = lit;
+      if (lit) h.sprite.material.opacity = h.level * tune.haloOpacity * pulse;
+    });
+
+    // Battery: a bump travels along the module stack, toward the nose while
+    // the pack is charging and toward the tail while it is driving, and the
+    // module the level currently sits in breathes on top of that. Intensity
+    // only -- the colour was already picked in _applyPowertrainFlow, and
+    // rewriting a Color per module per frame buys nothing.
+    const cells = this._powertrainCells;
+    const cellDir = this._powertrainCellDir || 0;
+    if (cells && cells.length && cellDir && tune.cellWaveOn) {
+      const n = cells.length;
+      const edge = this._powertrainCellEdge;
+      const travel = t * tune.cellWaveHz * cellDir;
+      const breathe = 0.5 + 0.5 * Math.sin(t * tune.cellEdgeHz);
+      for (let i = 0; i < n; i++) {
+        // cos^3 of the phase: a narrow bump rather than a whole-bar throb, so
+        // you can see it move instead of just seeing everything flash.
+        const phase = (i / n) - travel;
+        const c = 0.5 + 0.5 * Math.cos(phase * Math.PI * 2);
+        let boost = 1 + (c * c * c) * tune.cellWaveAmp;
+        if (cellDir > 0 && i === edge) boost += tune.cellEdgeAmp * breathe;
+        const mats = cells[i].materials;
+        for (let k = 0; k < mats.length; k++) {
+          const base = mats[k].userData.glowBase || 0;
+          if (base > 0.005) mats[k].emissiveIntensity = base * boost;
+        }
+      }
+    }
+
+    // Ground rings. Travel outward while driving, inward while charging; the
+    // sine envelope keeps them from popping in at either end of the sweep.
+    const rings = this._powertrainRings;
+    const groundDir = this._powertrainGroundDir || 0;
+    if (rings && rings.length) {
+      const live = !!(groundDir && tune.ringOn);
+      if (live) {
+        const n = rings.length;
+        const span = tune.ringMaxScale - tune.ringMinScale;
+        const speed = tune.ringSpeed
+          * Math.min(tune.ringSpeedMax, 0.6 + kwNow / Math.max(1, tune.ringKwRef));
+        for (let i = 0; i < n; i++) {
+          const m = rings[i];
+          let u = (t * speed + i / n) % 1;
+          if (groundDir > 0) u = 1 - u;          // charging pulls inward
+          const sc = tune.ringMinScale + span * u;
+          m.scale.set(sc, sc, 1);
+          // The envelope follows the radius, so a ring is faintest at both the
+          // tightest and the widest point whichever way it is travelling.
+          m.material.uniforms.uAlpha.value = Math.sin(u * Math.PI) * tune.ringGain;
+          if (!m.visible) m.visible = true;
+        }
+      } else {
+        for (let i = 0; i < rings.length; i++) {
+          if (rings[i].visible) rings[i].visible = false;
+        }
+      }
+    }
+
     ['ICE', 'Motor_P2', 'Motor_P4'].forEach((name) => {
       const p = this._powertrainParts[name];
       if (!p) return;
@@ -20694,40 +22180,27 @@ class Component extends DCLogic {
   }
 
   _cameraPresetDefs() {
-    // icon: drawing used as a "what you'll see" silhouette. flip mirrors L/R.
+    // label: short tile caption; title: tooltip / accessibility.
     return [
-      { key: 'front',         icon: 'front',     title: 'Front' },
-      { key: 'frontSide',     icon: 'frontSide', title: 'Front three-quarter' },
-      { key: 'side',          icon: 'side',      title: 'Right side' },
-      { key: 'rearSide',      icon: 'rearSide',  title: 'Rear three-quarter' },
-      { key: 'rear',          icon: 'rear',      title: 'Rear' },
-      { key: 'rearSideLeft',  icon: 'rearSide',  title: 'Rear three-quarter, left',  flip: true },
-      { key: 'sideLeft',      icon: 'side',      title: 'Left side',                 flip: true },
-      { key: 'frontSideLeft', icon: 'frontSide', title: 'Front three-quarter, left', flip: true },
-      { key: 'frontTopSide',  icon: 'frontTop',  title: 'Elevated front three-quarter' },
-      { key: 'top',           icon: 'top',       title: 'Roof, nose top-left' },
-      { key: 'rearTopSide',   icon: 'rearTop',   title: 'Elevated rear three-quarter' },
-      { key: 'topSide',       icon: 'topSide',   title: 'Roof, nose left' },
+      { key: 'front',         label: 'Front',  title: 'Front' },
+      { key: 'frontSide',     label: 'F 3/4',  title: 'Front three-quarter' },
+      { key: 'side',          label: 'Right',  title: 'Right side' },
+      { key: 'rearSide',      label: 'R 3/4',  title: 'Rear three-quarter' },
+      { key: 'rear',          label: 'Rear',   title: 'Rear' },
+      { key: 'rearSideLeft',  label: 'R 3/4L', title: 'Rear three-quarter, left' },
+      { key: 'sideLeft',      label: 'Left',   title: 'Left side' },
+      { key: 'frontSideLeft', label: 'F 3/4L', title: 'Front three-quarter, left' },
+      { key: 'frontTopSide',  label: 'Hi F',   title: 'Elevated front three-quarter' },
+      { key: 'top',           label: 'Top',    title: 'Roof, nose top-left' },
+      { key: 'rearTopSide',   label: 'Hi R',   title: 'Elevated rear three-quarter' },
+      { key: 'topSide',       label: 'Top L',  title: 'Roof, nose left' },
     ];
-  }
-
-  _cameraPresetMaskUrl(icon) {
-    if (!this._camMaskUrls) this._camMaskUrls = {};
-    if (this._camMaskUrls[icon]) return this._camMaskUrls[icon];
-    const svg = this._cameraViewSvg(icon);
-    if (!svg) return '';
-    return this._camMaskUrls[icon] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 
   // ── Camera tile renders ───────────────────────────────────────────────
   // The tiles show a real render of THIS car — current paint, wheels, ride
-  // height — from the exact pose the tile selects, so "what you'll see" is
-  // literal instead of a drawing that approximates it. Drawn with the MAIN
-  // renderer: a second WebGL context is not affordable on this unit (the same
-  // reason _generateCatalogThumbnails ships pre-rendered PNGs instead), but
-  // the scene is already resident here, so one extra pass costs only its own
-  // draw calls. The SVG glyphs below stay as the placeholder until each render
-  // lands, and as the permanent fallback if WebGL readback ever fails.
+  // height — from the exact pose the tile selects. Until each render lands the
+  // tile shows a short text label instead of a stand-in drawing.
 
   // Car-only bounds. The ground plane is ~310 m across, so a plain
   // Box3().setFromObject(this.model) frames the floor, not the car.
@@ -20837,9 +22310,8 @@ class Component extends DCLogic {
     if (!buf) return null;
     // The car root is hidden for part of the boot sequence, and a pose whose
     // fit ran against a half-built model can miss it entirely. Either way the
-    // readback comes back fully transparent, so check the result rather than
-    // trying to enumerate the states that produce it — returning null leaves
-    // the glyph up and the key in `missing`, so it retries on the next open.
+    // readback comes back fully transparent — returning null keeps the label
+    // up and the key in `missing`, so it retries on the next slot.
     let opaque = false;
     for (let i = 3; i < buf.length; i += 16) {
       if (buf[i] > 8) { opaque = true; break; }
@@ -20887,7 +22359,7 @@ class Component extends DCLogic {
         return;
       }
       if (!this.renderer || !this.model || !this._fitCenter || !this._fitDist) return;
-      this._ensureCamIcons(CAM_ICON_WARMUP_MS, { background: true });
+      this._ensureCamIcons(0, { background: true });
     };
     setTimeout(kick, CAM_ICON_WARMUP_MS);
   }
@@ -20921,7 +22393,7 @@ class Component extends DCLogic {
       try {
         url = this._renderCamIcon(key);
       } catch (err) {
-        console.warn('[cam icons] render failed, keeping glyphs', key, err);
+        console.warn('[cam icons] render failed, keeping label', key, err);
         this._camIconQueue = null;
         return;
       }
@@ -20942,6 +22414,8 @@ class Component extends DCLogic {
   _invalidateCamIcons() {
     this._camIcons = null;
     this._camIconBoxCache = null;
+    this._camFabAnchor = null;
+    if (this.model) this._rebuildCamFabAnchor();
     this._camIconQueue = null;
     if (this._camIconTimer) { clearTimeout(this._camIconTimer); this._camIconTimer = null; }
     if (this.state && this.state.activeGroup === 'camera') {
@@ -20949,63 +22423,6 @@ class Component extends DCLogic {
     } else if (this._viewerReady && !this._introActive) {
       this._ensureCamIcons(0, { background: true });
     }
-  }
-
-  _cameraTopPlanInner() {
-    // Plan view, nose toward -Y (up) before rotation. Windshield + sunroof are holes.
-    return ""
-      + "<path fill-rule='evenodd' d='M11.1 5h9.8l2.3 3.1v15.6L20.9 27h-9.8l-2.3-3.3V8.1L11.1 5Zm1.6 2.3h6.6L18 10.6h-4L12.7 7.3Zm1.5 6.4h4.6v6.6h-4.6z'/>"
-      + "<rect x='8' y='9.1' width='2.35' height='4.1' rx='1.05'/>"
-      + "<rect x='21.65' y='9.1' width='2.35' height='4.1' rx='1.05'/>"
-      + "<rect x='8' y='18.6' width='2.35' height='4.1' rx='1.05'/>"
-      + "<rect x='21.65' y='18.6' width='2.35' height='4.1' rx='1.05'/>"
-      + "<rect x='7.15' y='14.35' width='1.7' height='3.1' rx='.55'/>"
-      + "<rect x='23.15' y='14.35' width='1.7' height='3.1' rx='.55'/>";
-  }
-
-  // Filled SUV glyphs drawn as the car appears FROM that camera.
-  _cameraViewSvg(icon) {
-    const ns = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='#4fd6e8'>";
-    const map = {
-      front:
-        "<path fill-rule='evenodd' d='M8 13.1 11.1 7.4h9.8L24 13.1V21H8V13.1Zm3.5-3.9h8.8l1.7 3.1H9.8l1.7-3.1Z'/>" +
-        "<path d='M7.2 21h17.6v1.5H7.2z'/>" +
-        "<circle cx='11' cy='23.5' r='2.45'/><circle cx='21' cy='23.5' r='2.45'/>" +
-        "<rect x='9.1' y='16.2' width='4.3' height='1.65' rx='.45'/>" +
-        "<rect x='18.6' y='16.2' width='4.3' height='1.65' rx='.45'/>",
-      rear:
-        "<path fill-rule='evenodd' d='M8 12.6 10.6 7.8h10.8L24 12.6V21H8V12.6Zm4.1-2.8h7.8l1.3 2.7H10.8l1.3-2.7Z'/>" +
-        "<path d='M7.2 21h17.6v1.5H7.2z'/>" +
-        "<circle cx='11' cy='23.5' r='2.45'/><circle cx='21' cy='23.5' r='2.45'/>" +
-        "<rect x='8.7' y='15.5' width='5.1' height='2.05' rx='.5'/>" +
-        "<rect x='18.2' y='15.5' width='5.1' height='2.05' rx='.5'/>",
-      side:
-        "<path fill-rule='evenodd' d='M3.8 18.4 6.6 13.8 11 10.6h8.8l3.2 2.4 4.4.9v5.3H3.8v-.8Zm7.4-6.1h8l2 1.65H10l1.2-1.65Z'/>" +
-        "<path d='M3.8 19.6h22.2v1.35H3.8z'/>" +
-        "<circle cx='10.2' cy='22.8' r='2.65'/><circle cx='22.3' cy='22.8' r='2.65'/>",
-      frontSide:
-        "<path fill-rule='evenodd' d='M6.4 14.7 10.4 8.8l7.2-1 1.3 4.4 7.1 1.3v7.1l-8.2 1.3L6.4 20.4V14.7Zm4.6-4.1 5.6-.7 1 3.1-5.9.8-1-3.2Z'/>" +
-        "<circle cx='11.2' cy='22.3' r='2.35'/><circle cx='20.6' cy='22.9' r='2.35'/>" +
-        "<ellipse cx='24.1' cy='21.5' rx='1.45' ry='1.75'/>" +
-        "<rect x='7.4' y='16.4' width='3.4' height='1.45' rx='.4'/>",
-      rearSide:
-        "<path fill-rule='evenodd' d='M6.6 13.9 9.2 8.9l7.1-.7 1.4 4.3 7.2 1.4v7.1l-8.4 1.3L6.6 20.2V13.9Zm3.8-3.4 5.4-.5.95 3.05-5.6.7-.75-3.25Z'/>" +
-        "<circle cx='11' cy='22.2' r='2.35'/><circle cx='20.8' cy='22.9' r='2.35'/>" +
-        "<ellipse cx='24.2' cy='21.5' rx='1.45' ry='1.75'/>" +
-        "<rect x='7.2' y='15.6' width='4.1' height='1.7' rx='.4'/>",
-      top: "<g transform='rotate(-20 16 16)'>" + this._cameraTopPlanInner() + "</g>",
-      frontTop:
-        "<path fill-rule='evenodd' d='M7.2 15.2 11.6 8.2l8.4-1.4 1.6 5.6 5.2 1.6v6.6l-9.6 1.8L7.2 20.6V15.2Zm4.6-5 6.6-1 1.2 3.8-7 1.1-1-3.9Z'/>" +
-        "<circle cx='12' cy='22.6' r='2.15'/><circle cx='21.4' cy='23.1' r='2.15'/>",
-      rearTop:
-        "<path fill-rule='evenodd' d='M7.4 14.6 10.4 8.4l8.2-1.2 1.6 5.4 5.4 1.6v6.8l-9.8 1.7L7.4 20.2V14.6Zm3.6-4.4 6.2-.8 1.1 3.6-6.6 1-1-3.8Z'/>" +
-        "<circle cx='11.8' cy='22.5' r='2.15'/><circle cx='21.6' cy='23.1' r='2.15'/>" +
-        "<rect x='8' y='16.2' width='4.4' height='1.6' rx='.4'/>",
-      topSide: "<g transform='rotate(-90 16 16)'>" + this._cameraTopPlanInner() + "</g>",
-    };
-    const body = map[icon];
-    if (!body) return '';
-    return ns + body + "</svg>";
   }
 
   _getCameraPresetPose(key) {
@@ -21437,7 +22854,7 @@ class Component extends DCLogic {
   _shouldShowCar() {
     const mode = this._shellMode || (this.state && this.state.shellMode) || 'triple';
     if (mode === 'appsOnly') return false;
-    const fill = (this.state && this.state.centerFill) || 'car';
+    const fill = this._normalizeCenterFill(this.state && this.state.centerFill);
     if (fill === 'wallpaper') return false;
     return true;
   }
@@ -21447,8 +22864,10 @@ class Component extends DCLogic {
    * invisible while loading / before the intro, and in APP+APP layouts.
    */
   _setCarSceneVisible(visible) {
+    const wasShow = this._carSceneVisible;
     const show = !!visible && this._shouldShowCar();
     this._carSceneVisible = show;
+    this._syncCanvasPointerEvents();
 
     const activeKey = (this.state && this.state.modelVariant) || 'hev';
     if (this._variants) {
@@ -21476,16 +22895,25 @@ class Component extends DCLogic {
       this.model.visible = show;
     }
 
+    const mixedFill = this._isMixedCenterFill();
     // Asphalt hidden at night; shadow catcher / contact shadow stay for the
     // car silhouette; nightFloor carries lamp pools only.
-    if (this.shadowCatcher) this.shadowCatcher.visible = show;
+    if (this.shadowCatcher) this.shadowCatcher.visible = show && !mixedFill;
     if (this.contactShadow) this.contactShadow.visible = show;
-    if (this.floorMesh) this.floorMesh.visible = show && !(this.state && this.state.nightMode);
-    if (this.nightFloor) this.nightFloor.visible = show && !!(this.state && this.state.nightMode);
+    if (this.floorMesh) this.floorMesh.visible = show && !(this.state && this.state.nightMode) && !mixedFill;
+    if (this.nightFloor) this.nightFloor.visible = show && !!(this.state && this.state.nightMode) && !mixedFill;
     if (this._windGroup) this._windGroup.visible = show && !!(this.state && this.state.motionSpeed);
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
-    if (this.requestRender) this.requestRender(4);
+    if (show && !wasShow) {
+      if (typeof this.renderContactShadow === 'function') {
+        try { this.renderContactShadow(); } catch (e) {
+          console.warn('[Shadow] contact refresh failed', e);
+        }
+      }
+      this._kickShadowRefresh(16);
+    }
+    if (this.requestRender) this.requestRender(show && !wasShow ? 8 : 4);
 
     // Recapture the spin-blur sprite once the car root is actually visible.
     // Boot classification often runs while the intro still hides the model;
@@ -21763,7 +23191,12 @@ class Component extends DCLogic {
     this._syncCamOrbit();
     this._syncEventCamera();
     if (this.requestRender) this.requestRender(8);
-    this._scheduleCamIconWarmup();
+    if (this.state.activeGroup === 'camera') {
+      this._camIconBgMode = false;
+      this._ensureCamIcons(undefined, { background: false });
+    } else {
+      this._scheduleCamIconWarmup();
+    }
   }
 
   _tickIntro(dt) {
@@ -22329,9 +23762,12 @@ class Component extends DCLogic {
       case 'addWidget':
         this._openWidgetPicker();
         break;
-      case 'toggleCenterFill':
-        this._setCenterFill(this.state.centerFill === 'wallpaper' ? 'car' : 'wallpaper');
+      case 'toggleCenterFill': {
+        const cur = this._normalizeCenterFill(this.state.centerFill);
+        const next = cur === 'car' ? 'wallpaper' : (cur === 'wallpaper' ? 'mixed' : 'car');
+        this._setCenterFill(next);
         break;
+      }
       case 'configureWallpaper':
         this.openWallpaperPopup();
         break;
@@ -22478,6 +23914,22 @@ class Component extends DCLogic {
     return true;
   }
 
+  _canCenterHoldAdd() {
+    const mode = this._shellMode || this.state.shellMode || 'triple';
+    if (mode === 'appsOnly') return false;
+    if (this._widgetAddingOn()) return false;
+    if (this.state.graphEditId) return false;
+    if (this.state.widgetPickerStep) return false;
+    if (this.state.assignMode) return false;
+    return mode === 'triple' || mode === 'appCar';
+  }
+
+  _pointInCenterGap(clientX, clientY) {
+    const gap = this._centerGapRect();
+    if (!gap) return false;
+    return clientX >= gap.l && clientX <= gap.r && clientY >= gap.t && clientY <= gap.b;
+  }
+
   _centerGapRect(mode) {
     const m = mode || this._shellMode || this.state.shellMode || 'triple';
     const left = this._shellLeftBounds || { l: 48, r: 740, t: 40, b: 500 };
@@ -22558,7 +24010,7 @@ class Component extends DCLogic {
     });
   }
 
-  _onCenterSlotHoldStart(ev) {
+  _onAddWidgetHoldStart(ev) {
     if (ev && ev.type === 'mousedown' && this._centerSlotTouchActive) return;
     if (ev && ev.type === 'touchstart') this._centerSlotTouchActive = true;
     if ((this._shellMode || this.state.shellMode) === 'appsOnly') return;
@@ -22572,7 +24024,7 @@ class Component extends DCLogic {
     }, CAR_WIDGET_HOLD_MS);
   }
 
-  _onCenterSlotHoldEnd(ev) {
+  _onAddWidgetHoldEnd(ev) {
     if (ev && ev.type === 'mouseup' && this._centerSlotTouchActive) return;
     if (ev && (ev.type === 'touchend' || ev.type === 'touchcancel')) this._centerSlotTouchActive = false;
     if (this._centerSlotHoldTimer) {
@@ -22582,8 +24034,41 @@ class Component extends DCLogic {
     this._centerSlotHoldFired = false;
   }
 
+  _onAddWidgetHoldCancel(ev) {
+    this._onAddWidgetHoldEnd(ev);
+  }
+
+  _onCenterSlotHoldStart(ev) {
+    this._onAddWidgetHoldStart(ev);
+  }
+
+  _onCenterSlotHoldEnd(ev) {
+    this._onAddWidgetHoldEnd(ev);
+  }
+
   _onCenterSlotHoldCancel(ev) {
-    this._onCenterSlotHoldEnd(ev);
+    this._onAddWidgetHoldCancel(ev);
+  }
+
+  _onBoardHoldStart(side, ev) {
+    if (this.state.widgetPickerStep || this._widgetAddingOn()) return;
+    const t = ev && ev.target;
+    if (t && t.closest && (t.closest('.hv-widget-card') || t.closest('.hv-widget-cell'))) return;
+    this._onAddWidgetHoldStart(ev);
+  }
+
+  _onBoardHoldEnd(side, ev) {
+    this._onAddWidgetHoldEnd(ev);
+  }
+
+  _onBoardHoldCancel(side, ev) {
+    this._onAddWidgetHoldCancel(ev);
+  }
+
+  _syncCanvasPointerEvents() {
+    const el = this.containerRef && this.containerRef.current;
+    if (!el) return;
+    el.style.pointerEvents = this._shouldShowCar() ? 'auto' : 'none';
   }
 
   _placeCells(side) {
@@ -22648,9 +24133,13 @@ class Component extends DCLogic {
           || !this._sizesForSlot(side, ax, ay, key, modeKey).length;
         const entry = cat[key];
         return {
-          label: entry.label + (blocked ? ' · added' : ''),
+          label: entry.label + (blocked ? ' · adicionado' : ''),
           subLabel: entry.title,
           thumbClass: 'thumb-' + key,
+          previewMedia: key === 'media',
+          previewPower: key === 'power',
+          previewModes: key === 'modes',
+          previewGraphs: key === 'graphs',
           title: entry.title,
           btnClass: '',
           sizeClass: '',
@@ -22669,12 +24158,16 @@ class Component extends DCLogic {
         ? this._sizesForSlot(side, ax, ay, type, modeKey)
         : [];
       pickerItems = sizes.map((sz) => ({
-        label: '',
+        label: sz[0] + ' × ' + sz[1],
         subLabel: '',
         title: sz[0] + ' × ' + sz[1],
-        btnClass: 'hv-picker-size',
+        btnClass: 'hv-picker-row',
         sizeClass: 'board-3 size-' + sz[0] + 'x' + sz[1],
         thumbClass: '',
+        previewMedia: false,
+        previewPower: false,
+        previewModes: false,
+        previewGraphs: false,
         opacity: '1',
         disabled: false,
         onClick: () => this._pickWidgetSize(sz[0], sz[1], type),
@@ -22682,6 +24175,8 @@ class Component extends DCLogic {
     }
     const centerGap = this._centerGapRect(mode);
     const centerRect = this._rectCss(centerGap, { l: 760, r: 1160, t: 40, b: 500 });
+    const holdAddWidget = !appsOnly && !slotPick && !pickerOpen && !addOn;
+    const widgetFlowOpen = !appsOnly && (slotPick || pickerOpen || addOn);
     const pickClass = slotPick ? 'slot-picking' : (
       (!appsOnly && s.widgetPlaceType && !s.widgetPickerStep && s.widgetPlaceW && s.widgetPlaceH) ? 'placing' : ''
     );
@@ -22724,14 +24219,25 @@ class Component extends DCLogic {
       rightWidgetItems: (showRight ? (this._board('right', mode).items || []) : []).map((it) => this._widgetItemView(it, 'right')),
       leftPlaceCells: showLeft ? this._placeCells('left') : [],
       rightPlaceCells: showRight ? this._placeCells('right') : [],
-      widgetSlotBannerDisplay: slotPick ? 'block' : 'none',
-      widgetSlotBannerText: 'Tap a highlighted slot · or hold the center to add',
-      centerSlotZoneDisplay: (showLeft && mode === 'triple' && !slotPick && !pickerOpen && !addOn) ? 'block' : 'none',
+      widgetSlotBannerDisplay: slotPick ? 'flex' : 'none',
+      widgetSlotBannerText: 'Toque em um slot destacado · ou segure o fundo para adicionar',
+      widgetPickerBackdropDisplay: widgetFlowOpen ? 'block' : 'none',
+      widgetPickerBackdropClass: widgetFlowOpen
+        ? (pickerOpen ? 'on picker-open' : 'on slot-pick')
+        : '',
+      closeWidgetPicker: () => this._cancelWidgetPicker(),
+      centerSlotZoneDisplay: (holdAddWidget && (mode === 'triple' || mode === 'appCar')) ? 'block' : 'none',
       centerSlotZoneClass: '',
       centerSlotLeft: centerRect.left,
       centerSlotTop: centerRect.top,
       centerSlotWidth: centerRect.width,
       centerSlotHeight: centerRect.height,
+      onLeftBoardHoldStart: (ev) => this._onBoardHoldStart('left', ev),
+      onLeftBoardHoldEnd: (ev) => this._onBoardHoldEnd('left', ev),
+      onLeftBoardHoldCancel: (ev) => this._onBoardHoldCancel('left', ev),
+      onRightBoardHoldStart: (ev) => this._onBoardHoldStart('right', ev),
+      onRightBoardHoldEnd: (ev) => this._onBoardHoldEnd('right', ev),
+      onRightBoardHoldCancel: (ev) => this._onBoardHoldCancel('right', ev),
       onCenterSlotHoldStart: (ev) => this._onCenterSlotHoldStart(ev),
       onCenterSlotHoldEnd: (ev) => this._onCenterSlotHoldEnd(ev),
       onCenterSlotHoldCancel: (ev) => this._onCenterSlotHoldCancel(ev),
@@ -23359,6 +24865,7 @@ class Component extends DCLogic {
     }
     this.setState(patch, () => { this._trySplashHandOff(); });
     this._notifyViewerReady();
+    this._scheduleCamIconWarmup();
     const pendingMedia = this._pendingMediaPayload;
     this._pendingMediaPayload = null;
     if (pendingMedia) {

@@ -4991,8 +4991,8 @@ public final class MainActivity extends Activity {
 
         row.addView(makeDockGap(Math.round(10 * density)));
 
-        row.addView(makeDockTipChip(density, Math.round(248 * density), iconPx,
-                "Hold a widget to configure or delete it"));
+        row.addView(makeDockTipChip(density, Math.round(300 * density), iconPx,
+                "Segure um widget para configurar ou excluir · segure o fundo para adicionar"));
         return row;
     }
 

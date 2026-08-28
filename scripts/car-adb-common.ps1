@@ -225,3 +225,32 @@ function Find-Car([string]$Adb) {
 function Save-CarSerial([string]$Serial) {
   Set-Content -Path $CarHintFile -Value $Serial -NoNewline
 }
+
+function Find-Emulator([string]$Adb, [string]$PreferredSerial) {
+  $live = @(Get-AdbRows $Adb | Where-Object {
+    $_.Status -eq 'device' -and (Test-IsEmulator $_.Serial)
+  })
+  if (-not $live.Count) {
+    throw 'No Android emulator attached. Start one in Android Studio (AVD), then retry.'
+  }
+  if ($PreferredSerial) {
+    $match = @($live | Where-Object { $_.Serial -eq $PreferredSerial })
+    if (-not $match.Count) {
+      throw "Emulator $PreferredSerial not found. Attached: $($live.Serial -join ', ')"
+    }
+    return $match[0].Serial
+  }
+  if ($live.Count -gt 1) {
+    throw "Several emulators attached ($($live.Serial -join ', ')). Pass -Serial emulator-5554"
+  }
+  return $live[0].Serial
+}
+
+function Install-EmulatorApk([string]$Adb, [string]$Serial, [string]$Apk) {
+  Write-Host "Installing on $Serial ..."
+  $out = & $Adb -s $Serial install -r $Apk 2>&1 | Out-String
+  Write-Host $out.Trim()
+  if ($LASTEXITCODE -ne 0 -or $out -match 'Failure \[') {
+    throw "adb install failed: $($out.Trim())"
+  }
+}
