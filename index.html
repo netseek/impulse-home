@@ -3614,52 +3614,6 @@ window.HavalSplash = (function () {
       cursor: pointer;
     }
 
-    /* X-ray callouts: a lit node on the part, a short leader, and a pill.
-       `color` is set per-tag from JS and everything inherits it. */
-    .hv-xr-node {
-      position: absolute;
-      left: -5px; top: -5px;
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: currentColor;
-      box-shadow: 0 0 0 2px rgba(8,12,16,.55), 0 0 10px 2px currentColor;
-    }
-    .hv-xr-lead {
-      position: absolute;
-      left: 3px; top: -1px;
-      width: 11px; height: 2px;
-      background: currentColor;
-      opacity: .65;
-    }
-    .hv-xr.flip .hv-xr-lead { left: auto; right: 3px; }
-    .hv-xr-pill {
-      position: absolute;
-      left: 15px; top: -13px;
-      display: flex;
-      align-items: baseline;
-      gap: 7px;
-      padding: 5px 10px;
-      border-radius: 7px;
-      white-space: nowrap;
-      background: rgba(8,12,16,.72);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      border: 1px solid rgba(255,255,255,.10);
-      box-shadow: 0 3px 12px rgba(0,0,0,.40);
-      font-family: 'Space Mono', monospace;
-    }
-    .hv-xr.flip .hv-xr-pill { left: auto; right: 13px; }
-    .hv-xr-k {
-      font-size: 11px;
-      letter-spacing: .12em;
-      color: rgba(234,242,248,.58);
-    }
-    .hv-xr-v {
-      font-size: 14px;
-      letter-spacing: .04em;
-      font-weight: 700;
-      color: currentColor;
-    }
   </style>
 </helmet>
 <div id="hv-root" class="{{ rootClass }}" ref="{{ outerRef }}" style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; background: {{ shellBg }}; font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }}; --hv-safe-left: {{ safeLeft }}; --hv-safe-right: {{ safeRight }}; --hv-safe-bottom: {{ safeBottom }}; --hv-launcher-bottom: {{ launcherBottom }}; --hv-chrome-main-left: {{ chromeMainLeft }};">
@@ -5343,22 +5297,40 @@ class Component extends DCLogic {
       arcMinRad: 0.35,
       // Trailing debounce (ms) on the sprite re-capture off the tint sliders.
       captureDebounceMs: 200,
-      // Two-layer sprite: the rim is captured twice, once flat-lit and once
-      // under the scene. The flat layer spins; the lighting layer does not, so
-      // a highlight stays where the light is instead of orbiting the hub.
+      // Two-layer sprite: the rim is captured twice, once flat-lit and once under
+      // the scene. The flat layer spins; the lighting layer is a shading RATIO
+      // (lit/flat) that is counter-rotated in the sprite shader so it stays put.
+      // A highlight then sits where the light is and the rim turns underneath it,
+      // which is what a reflection does.
       //
-      // OFF by default, because it is not finished. The lighting layer is
-      // additive — max(lit - flat*gain, 0) — so it can brighten but never
-      // darken, and every shadowed region is lost: measured light mean 5.7
-      // against a lit mean of 44, i.e. it recovers about an eighth of the
-      // shading. It also costs 44 ms/capture against 5.6 ms for the single
-      // layer (a second scene render plus two 256^2 readbacks). Finishing it
-      // means making the lighting layer MULTIPLICATIVE (lit/flat, encoded
-      // around 1.0) so it can darken too. Flip on from devtools to A/B:
-      //   __wheelSpin({ twoLayer: true })
-      twoLayer: false,
+      // Measured: how much the sprite changes between roll 0 and roll 90 drops
+      // from mean |delta| 12.50 to 7.67, a 39% reduction, with the spoke pattern
+      // still changing as it should. An earlier ADDITIVE version of this layer
+      // could only brighten, lost every shadow, and recovered about an eighth of
+      // the shading — hence the ratio.
+      //
+      // Costs 35 ms/capture against 10.6 ms single-layer (a second scene render
+      // plus two readbacks). That is fine because _requestBlurCapture debounces
+      // it — but it is one capture, not one per frame, so keep it that way.
+      // Turn off from devtools with __wheelSpin({ twoLayer: false }).
+      twoLayer: true,
       // Flip if the lighting layer counter-rotates the wrong way on a model.
       lightRollSign: 1,
+      // Rim runout correction (see _handleUploadedWheelModel step 7b).
+      //
+      // OFF, because measured it makes every rim it touches WORSE. Residual
+      // lateral runout of the installed rim about the axis it actually spins on,
+      // correction on vs off:
+      //   vorsteiner_vff109  19.98 deg -> 9.47    forgiato_multato  24.47 -> 5.04
+      //   vossen_vps310t     13.50 deg -> 1.97    vossen_hf5         3.34 -> 1.34
+      //   rotiform_kps        1.76 deg -> 1.00
+      // Every rim it leaves alone sits at 0.00-0.21 deg, so the rims it fires on
+      // are the only unbalanced ones — and it is the cause, not the cure. The
+      // direction or magnitude of the applied rotation is wrong; the measurement
+      // that finds the tilt is sound (it agrees with an independent offline fit),
+      // so the bug is in turning that measurement into a correction.
+      //   __wheelSpin({ runoutFix: true }) to A/B it.
+      runoutFix: false,
     };
     this._wheelCatalog = [
       // haval_gt / haval_phev / haval_hev / haval_phev19 are each trim's own
@@ -10794,26 +10766,31 @@ class Component extends DCLogic {
         void main() {
           vec2 center = vec2(0.5, 0.5);
           vec2 uv = vUv - center;
-          vec4 acc = vec4(0.0);
+          vec4 accLit = vec4(0.0);
+          vec4 accFlat = vec4(0.0);
           const int SAMPLES = 32;
-          for (int i = 0; i < SAMPLES; i++) {
-            float angle = (float(i) / float(SAMPLES - 1) - 0.5) * uArcRad;
+          for (int k = 0; k < SAMPLES; k++) {
+            float angle = (float(k) / float(SAMPLES - 1) - 0.5) * uArcRad;
             float cosA = cos(angle), sinA = sin(angle);
             vec2 r = vec2(uv.x * cosA - uv.y * sinA, uv.x * sinA + uv.y * cosA) + center;
-            vec4 lit = texture2D(tLit, r);
-            vec4 flat4 = texture2D(tFlat, r);
-            // Both are premultiplied by the SAME coverage, so the difference is
-            // still premultiplied and alpha carries straight through. Clamped at
-            // zero: anywhere the flat capture is brighter than the lit one is
-            // noise, not lighting.
-            // The flat capture is raw albedo and comes out far BRIGHTER than the
-            // scene-lit one (43.4 vs 22.2 mean, measured), so an unscaled
-            // difference clamps to zero almost everywhere and the lighting layer
-            // comes back empty. uFlatGain levels the two first, so base*gain +
-            // light reconstructs the lit capture exactly when nothing is rotated.
-            acc += vec4(max(lit.rgb - flat4.rgb * uFlatGain, vec3(0.0)), lit.a);
+            accLit  += texture2D(tLit,  r);
+            accFlat += texture2D(tFlat, r);
           }
-          gl_FragColor = acc / float(SAMPLES);
+          accLit  /= float(SAMPLES);
+          accFlat /= float(SAMPLES);
+          // Divide AFTER the smear, not per tap. The mean of a ratio is not the
+          // ratio of the means: averaging lit/flat tap by tap came out at 0.87 on the
+          // lip where lit/flat of the smeared images is 1.11, so the two-layer sprite
+          // darkened the rim's outer border by ~13% instead of leaving it alone.
+          // Doing it this way makes base * ratio reproduce the smeared lit capture
+          // exactly when nothing is rotated, which is the whole contract.
+          //
+          // Both are premultiplied by the same coverage, so the alphas cancel and what
+          // is left is the true shading multiplier. Encoded x0.25 so a specular lip can
+          // reach 4x without clipping; the sprite shader decodes it.
+          vec3 ratio = accLit.rgb / max(accFlat.rgb * uFlatGain, vec3(1.0 / 255.0));
+          ratio = mix(vec3(1.0), clamp(ratio, 0.0, 4.0), step(0.02, accLit.a));
+          gl_FragColor = vec4(ratio * 0.25, accLit.a);
         }
       `
     });
@@ -11070,10 +11047,18 @@ class Component extends DCLogic {
 
     scene.background = null; // Prevent scene background from filling the target with solid color
 
+    // The offscreen capture skips post-FX (bloom), so the rim lands ~3x darker
+    // than it reads in the main pass. Boost exposure for this render only.
+    const oldExposure = renderer.toneMappingExposure;
+    const CAPTURE_EXPOSURE = 3.0;
+    renderer.toneMappingExposure = oldExposure * CAPTURE_EXPOSURE;
+
     renderer.setRenderTarget(this._rtSource);
     renderer.setClearColor(0x000000, 0.0);
     renderer.clear();
     renderer.render(scene, tempCam);
+
+    renderer.toneMappingExposure = oldExposure;
 
     // Second capture, flat-lit. Swapping each rim material for an UNLIT
     // MeshBasicMaterial carrying the same map/colour/alpha settings gives
@@ -11167,10 +11152,15 @@ class Component extends DCLogic {
       let gain = 1;
       try {
         const rt = this._blurRtSize || 256;   // `size` is local to _initWheelBlur
-        const n = rt * rt * 4;
+        // A horizontal strip through the wheel centre crosses hub, spokes and lip
+        // on both sides, which is plenty for a mean — and it is a quarter of the
+        // pixels, on the readback that dominates this capture's cost.
+        const band = Math.max(8, Math.round(rt / 4));
+        const y0 = Math.round((rt - band) / 2);
+        const n = rt * band * 4;
         const bufL = new Uint8Array(n), bufF = new Uint8Array(n);
-        renderer.readRenderTargetPixels(this._rtSource, 0, 0, rt, rt, bufL);
-        renderer.readRenderTargetPixels(this._rtFlat,   0, 0, rt, rt, bufF);
+        renderer.readRenderTargetPixels(this._rtSource, 0, y0, rt, band, bufL);
+        renderer.readRenderTargetPixels(this._rtFlat,   0, y0, rt, band, bufF);
         let sl = 0, sf = 0, cnt = 0;
         for (let i = 0; i < n; i += 4) {
           if (bufL[i + 3] < 64) continue;
@@ -11214,10 +11204,33 @@ class Component extends DCLogic {
       renderer.render(this._blurScene, this._blurCamera);
       quad.material = prevMat;
     }
+    // Level-match the sprite against the lit rim. Even with CAPTURE_EXPOSURE the
+    // texture is still short of what bloom adds in the main pass — one readback
+    // per capture, same cost as the two-layer flat/lit match above.
+    let spriteGain = 1;
+    try {
+      const rt = this._blurRtSize || 256;
+      const n = rt * rt * 4;
+      const buf = new Uint8Array(n);
+      renderer.readRenderTargetPixels(this._rtBlurred, 0, 0, rt, rt, buf);
+      let sum = 0, cnt = 0;
+      for (let i = 0; i < n; i += 4) {
+        if (buf[i + 3] < 64) continue;
+        sum += buf[i] + buf[i + 1] + buf[i + 2];
+        cnt++;
+      }
+      const mean = cnt ? (sum / cnt / 3) : 0;
+      const SPRITE_TARGET_MEAN = 90;
+      if (mean > 1) spriteGain = Math.min(2.2, Math.max(1, SPRITE_TARGET_MEAN / mean));
+    } catch (e) {
+      console.warn('[WheelBlur] sprite gain match failed', e && e.message);
+    }
+    this._blurSpriteGain = spriteGain;
     if (this._spriteMats) {
       this._spriteMats.forEach((m) => {
         m.uniforms.uTwoLayer.value = twoLayer ? 1 : 0;
         m.uniforms.uBaseGain.value = this._blurFlatGain || 1;
+        m.uniforms.uSpriteGain.value = spriteGain;
       });
     }
 
@@ -11292,7 +11305,13 @@ class Component extends DCLogic {
       const sv = new THREE.Vector3();
       discs.forEach(d => {
         let sf = 1;
-        if (d.parent) { d.parent.getWorldScale(sv); sf = sv.x || 1; }
+        // MAGNITUDE only. The rear suspension nodes are mirrored, so their world
+        // scale is negative, and dividing by it gave the rear discs a NEGATIVE
+        // _baseGeoRadius. CircleGeometry(-0.3) draws an inverted disc, which
+        // rendered as a second, offset ghost wheel beside the real one — and a
+        // negative baseline also fails the `> 1e-6` validity test above, so the
+        // self-heal re-fired on every single capture.
+        if (d.parent) { d.parent.getWorldScale(sv); sf = Math.abs(sv.x) || 1; }
         d._baseGeoRadius = worldRadius / sf;
         d._appliedGeoRadius = undefined;   // force the rebuild below
       });
@@ -11303,12 +11322,13 @@ class Component extends DCLogic {
     if (!isFinite(ratio) || ratio <= 0) return;
     discs.forEach(d => {
       if (d._baseGeoRadius === undefined) return;
-      const target = d._baseGeoRadius * ratio;
+      const hubFrac = d._hubFrac || 1;
+      const target = Math.abs(d._baseGeoRadius * ratio * hubFrac);
       // Skip if already within 0.5% — avoids churning geometry on the many
       // _generateBlurredWheelTexture calls that don't change rim size.
       if (d._appliedGeoRadius !== undefined && Math.abs(d._appliedGeoRadius - target) <= target * 0.005) return;
       const old = d.geometry;
-      d.geometry = new THREE.CircleGeometry(target, 32);
+      d.geometry = new THREE.CircleGeometry(target, hubFrac < 1 ? 24 : 32);
       d._appliedGeoRadius = target;
       if (old && old.dispose) old.dispose();
     });
@@ -12324,6 +12344,7 @@ class Component extends DCLogic {
           uOpacity:  { value: 0 },
           uTwoLayer: { value: 0 },
           uBaseGain: { value: 1 },
+          uSpriteGain: { value: 1 },
         },
         vertexShader: `
           varying vec2 vUv;
@@ -12339,6 +12360,7 @@ class Component extends DCLogic {
           uniform float uOpacity;
           uniform float uTwoLayer;
           uniform float uBaseGain;
+          uniform float uSpriteGain;
           varying vec2 vUv;
           void main() {
             vec4 base = texture2D(tBase, vUv);
@@ -12350,10 +12372,11 @@ class Component extends DCLogic {
             vec2 p = vUv - 0.5;
             vec2 luv = vec2(p.x * c - p.y * s, p.x * s + p.y * c) + 0.5;
             vec3 light = texture2D(tLight, luv).rgb;
-            // Masked by the base's own coverage so lighting never appears in a
-            // spoke gap, and kept premultiplied — see the blur shader's note on
-            // why alpha must stay untouched here.
-            vec3 rgb = base.rgb * mix(1.0, uBaseGain, uTwoLayer) + light * base.a * uTwoLayer;
+            // Multiplicative: the lighting layer is a shading RATIO, so it darkens as
+            // well as brightens. Decoded from the x0.5 encoding, and forced neutral
+            // when the two-layer path is off so the single-layer sprite is untouched.
+            vec3 shade = mix(vec3(1.0), light * 4.0, uTwoLayer);
+            vec3 rgb = base.rgb * uSpriteGain * mix(1.0, uBaseGain, uTwoLayer) * shade;
             rgb = min(rgb, vec3(base.a));
             gl_FragColor = vec4(rgb, base.a) * uOpacity;
           }
@@ -12364,13 +12387,20 @@ class Component extends DCLogic {
         // the mask reads as a muddy sheet instead of holes in the rim.
         premultipliedAlpha: true,
         depthWrite: false,
+        // depthTest MUST stay on. With it off the sprite ignores the depth buffer
+        // entirely and paints over whatever is in front of it — the far-side wheels
+        // were drawing on top of the bonnet and the door, and the far sprite showed
+        // through the near one as a ghost disc. It still does not WRITE depth, so it
+        // composites correctly against the tyre it sits inside.
+        depthTest: true,
         side: THREE.DoubleSide,
       });
       const blurredMaterial = makeSpriteMaterial();
 
       const backingMaterial = new THREE.MeshBasicMaterial({
-        color: 0x0a0a0b, // flat dark shadow to block the white interior
-        side: THREE.DoubleSide
+        color: 0x0a0a0b, // blocks the white hub interior visible through spoke gaps
+        side: THREE.DoubleSide,
+        depthWrite: false,
       });
 
       // Find the parent's world scale factor to convert radius to local units
@@ -12439,9 +12469,14 @@ class Component extends DCLogic {
         
         this._blurredDiscs.push(disc);
 
-        // 2. Dark backing disc (placed behind brakes/suspension)
-        const backingDisc = new THREE.Mesh(discGeo, backingMaterial);
+        // 2. Hub-only backing disc — a full-disc dark sheet showed through the
+        // blur sprite's semi-transparent smear and read as a muddy background.
+        const HUB_BACKING_FRAC = 0.36;
+        const backingGeo = new THREE.CircleGeometry(localRadius * HUB_BACKING_FRAC, 24);
+        const backingDisc = new THREE.Mesh(backingGeo, backingMaterial);
         backingDisc.name = 'WheelBlurBacking';
+        backingDisc._hubFrac = HUB_BACKING_FRAC;
+        backingDisc.renderOrder = 9;
         backingDisc.position.copy(item.center);
         backingDisc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), item.axle);
         
@@ -15021,9 +15056,7 @@ class Component extends DCLogic {
     }
     if (this._hsLayer && this._hsLayer.parentNode) this._hsLayer.parentNode.removeChild(this._hsLayer);
     this._hsLayer = null;
-    if (this._xrLayer && this._xrLayer.parentNode) this._xrLayer.parentNode.removeChild(this._xrLayer);
-    this._xrLayer = null;
-    this._xrEls = null;
+    this._disposeXrayWheelGlows();
     this._camFabEl = null;
     this._camFabBtn = null;
     this._camFabAnchor = null;
@@ -15396,201 +15429,150 @@ class Component extends DCLogic {
     if (this._hsRoofPopOpen && this.requestRender) this.requestRender(2);
   }
 
-  // \u2500\u2500 X-ray callouts \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── X-ray wheel-floor glows ───────────────────────────────────────────────
   //
-  // Glow says "something in here is active". It cannot say WHICH part, what it
-  // is doing, or how hard, and on a ghosted body a colour change three parts
-  // deep is easy to miss entirely. These name the part and print its state
-  // beside it, which is the half of "hard to see what is happening" that no
-  // amount of extra brightness was ever going to reach.
-  //
-  // They ride their own layer rather than the hotspot one: the bullets fade out
-  // on a timer and the callouts must not.
+  // Instead of screen-space labels on the motors, a soft rounded patch on the
+  // floor under each axle — like a contact shadow, but blue while driving
+  // (consuming) and green while regen (generating). Front = P2, rear = P4.
 
-  _xrTagDefs() {
-    // off = powertrain-local metres; dx/dy = extra screen px on the pill.
-    return [
-      { key: 'ice',  kicker: 'ICE',      anchor: 'ice',        off: [-0.68, 0.20, 0], dx: -18, dy: -32 },
-      { key: 'p2',   kicker: 'P2 FRONT', anchor: 'motorFront', off: [-0.68, 0.06, 0], dx: -14, dy: 26 },
-      { key: 'p4',   kicker: 'P4 REAR',  anchor: 'motorRear',  off: [0.68, 0.06, 0],  dx: 18,  dy: 10 },
-      // Below-left of the pack, outside the ghosted body silhouette.
-      { key: 'batt', kicker: 'HV PACK',  anchor: null,         off: [-0.82, -0.16, 0.32], dx: -24, dy: 58 },
-    ];
+  _xrayWheelGlowTexture() {
+    if (this._xrayWheelGlowTex) return this._xrayWheelGlowTex;
+    const THREE = this.THREE;
+    const W = 256;
+    const H = 128;
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+    const padX = 14;
+    const padY = 10;
+    const r = 22;
+    const x = padX;
+    const y = padY;
+    const w = W - padX * 2;
+    const h = H - padY * 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.filter = 'blur(7px)';
+    const grd = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.48);
+    grd.addColorStop(0.00, 'rgba(255,255,255,0.95)');
+    grd.addColorStop(0.45, 'rgba(255,255,255,0.42)');
+    grd.addColorStop(1.00, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grd;
+    ctx.fill();
+    ctx.filter = 'none';
+    this._xrayWheelGlowTex = new THREE.CanvasTexture(cv);
+    this._xrayWheelGlowTex.colorSpace = THREE.SRGBColorSpace;
+    return this._xrayWheelGlowTex;
   }
 
-  _ensureXrayTagLayer() {
-    if (this._xrLayer) return this._xrLayer;
-    const host = this.containerRef && this.containerRef.current;
-    if (!host) return null;
-    const layer = document.createElement('div');
-    layer.className = 'hv-hs-layer lit';
-    layer.setAttribute('aria-hidden', 'true');
-    host.appendChild(layer);
-    this._xrLayer = layer;
-    this._xrEls = {};
-    this._xrTagDefs().forEach((def) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'hv-xr';
-      const node = document.createElement('span');
-      node.className = 'hv-xr-node';
-      const lead = document.createElement('span');
-      lead.className = 'hv-xr-lead';
-      const pill = document.createElement('span');
-      pill.className = 'hv-xr-pill';
-      const kEl = document.createElement('span');
-      kEl.className = 'hv-xr-k';
-      kEl.textContent = def.kicker;
-      const vEl = document.createElement('span');
-      vEl.className = 'hv-xr-v';
-      pill.appendChild(kEl);
-      pill.appendChild(vEl);
-      wrap.appendChild(node);
-      wrap.appendChild(lead);
-      wrap.appendChild(pill);
-      layer.appendChild(wrap);
-      this._xrEls[def.key] = {
-        el: wrap, k: kEl, v: vEl,
-        x: -9999, y: -9999, on: false, flip: false, txt: '', col: '', kick: def.kicker,
-      };
-    });
-    return layer;
-  }
-
-  /** What each callout should read, from the packed flow the POWER card uses. */
-  _xrTagModel(now) {
-    const flow = this._powerFlowRaw(now);
-    const soc = this._powerSocPct(now);
-    const kw = this._powerKwNow(now);
-    const G = this._powertrainGlowTones();
-    const manifest = this._powertrainManifest;
-    const key = this._powertrainPackKey || this._currentTrim().pack;
-    const pack = manifest && (manifest.batteries || {})[key];
-    const hex = (c) => '#' + c.getHexString();
-    const OFF = 'rgba(234,242,248,.46)';
-    const motor = (dir) => (dir > 0 ? { v: 'DRIVE', c: hex(G.drive.color) }
-                          : dir < 0 ? { v: 'REGEN', c: hex(G.regen.color) }
-                          : { v: 'IDLE', c: OFF });
-    // PHEV19 and HEV have no rear motor at all, so that tag is absent rather
-    // than sitting there reading IDLE over empty floor.
-    const awd = !!(pack && pack.awd);
-    const charging = flow.tone === 'charge' || flow.tone === 'regen' || kw < -0.4;
-    const mag = Math.abs(kw);
-    const sign = mag < 0.05 ? '' : (charging ? '+' : '\u2212');
-    return {
-      ice: { v: flow.ice ? 'RUNNING' : 'OFF', c: flow.ice ? hex(G.ice.color) : OFF },
-      p2: motor(flow.front || 0),
-      p4: awd ? motor(flow.rear || 0) : null,
-      batt: {
-        v: soc + '% \u00b7 ' + sign + (Math.round(mag * 10) / 10).toFixed(1) + ' kW',
-        c: charging ? hex(G.cell.color) : (flow.batt ? hex(G.hv.color) : OFF),
-        kicker: pack ? (pack.kwh + ' kWh') : 'HV PACK',
-      },
-    };
-  }
-
-  _updateXrayTags() {
-    const rig = this._powertrainRig;
-    const want = !!(this.state.powertrainOn && rig && rig.visible
-                    && this._powertrainFxTune().tagsOn);
-    if (!want && !this._xrShown) return;   // already down, nothing to clear
-    this._xrShown = want;
-    if (!want && !this._xrLayer) return;
-    if (!this.camera || !this.renderer || !this.THREE) return;
-    if (!this._ensureXrayTagLayer()) return;
-
-    const manifest = this._powertrainManifest;
-    const anchors = (manifest && manifest.anchors) || {};
-    const model = want ? this._xrTagModel(performance.now()) : null;
-
-    // The pack tag rides the top face of whichever pack is fitted, so it does
-    // not float where the PHEV34 case would have been on an HEV.
-    let battAnchor = null;
-    if (model && manifest) {
-      const key = this._powertrainPackKey || this._currentTrim().pack;
-      const pack = (manifest.batteries || {})[key];
-      if (pack && pack.position) {
-        const dh = (pack.dims && pack.dims.h) || 0.11;
-        battAnchor = [pack.position[0], pack.position[1] + dh * 0.5 + 0.06, pack.position[2]];
-      }
-    }
-
-    if (!this._xrProj) {
-      this._xrProj = { v: new this.THREE.Vector3(), ndc: new this.THREE.Vector3() };
-    }
-    const scratch = this._xrProj;
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    const layerRect = this._xrLayer.getBoundingClientRect();
-
-    const placed = [];
-    this._xrTagDefs().forEach((def) => {
-      const rec = this._xrEls[def.key];
-      if (!rec) return;
-      const data = model ? model[def.key] : null;
-      const anchor = def.anchor ? anchors[def.anchor] : battAnchor;
-      if (!data || !anchor || !rig) {
-        if (rec.on) { rec.on = false; rec.el.classList.remove('on'); }
-        return;
-      }
-      if (data.v !== rec.txt) { rec.txt = data.v; rec.v.textContent = data.v; }
-      if (data.c !== rec.col) { rec.col = data.c; rec.el.style.color = data.c; }
-      if (data.kicker && data.kicker !== rec.kick) {
-        rec.kick = data.kicker;
-        rec.k.textContent = data.kicker;
-      }
-      scratch.v.set(
-        anchor[0] + ((def.off && def.off[0]) || 0),
-        anchor[1] + ((def.off && def.off[1]) || 0),
-        anchor[2] + ((def.off && def.off[2]) || 0),
-      );
-      rig.localToWorld(scratch.v);
-      scratch.ndc.copy(scratch.v).project(this.camera);
-      if (scratch.ndc.z > 1) {                    // behind the camera
-        if (rec.on) { rec.on = false; rec.el.classList.remove('on'); }
-        return;
-      }
-      placed.push({
-        rec: rec,
-        x: (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left)
-            + (def.dx || 0),
-        y: (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top)
-            + (def.dy || 0),
+  _ensureXrayWheelGlows() {
+    if (this._xrayWheelGlows) return this._xrayWheelGlows;
+    const THREE = this.THREE;
+    const model = this.model;
+    if (!THREE || !model) return null;
+    const tex = this._xrayWheelGlowTexture();
+    const makePatch = (key) => {
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        color: new THREE.Color('#6ecfff'),
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
       });
-    });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.renderOrder = 5;
+      mesh.frustumCulled = false;
+      mesh.visible = false;
+      return { key: key, mesh: mesh, mat: mat };
+    };
+    const group = new THREE.Group();
+    group.name = 'XrayWheelGlows';
+    const front = makePatch('front');
+    const rear = makePatch('rear');
+    group.add(front.mesh);
+    group.add(rear.mesh);
+    model.add(group);
+    this._xrayWheelGlows = { group: group, front: front, rear: rear };
+    return this._xrayWheelGlows;
+  }
 
-    // Head-on, the ICE / P2 / pack anchors project within a few pixels of each
-    // other and the pills land in an unreadable pile -- exactly the view
-    // someone reaches for when they want to see what is going on. The per-def
-    // dy nudges are not enough on their own, so anything still overlapping
-    // after them gets pushed down the screen. Only the pill moves; its leader
-    // dot stays on the part, so nothing is mislabelled by the shuffle.
-    placed.sort((a, b) => a.y - b.y);
-    const GAP = 24;
-    for (let i = 1; i < placed.length; i++) {
-      const prev = placed[i - 1];
-      const cur = placed[i];
-      const dx = Math.abs(cur.x - prev.x);
-      const dy = cur.y - prev.y;
-      if (dx > 200) continue;   // different column, leave it
-      if (dy < GAP) cur.y = prev.y + GAP;
-      // Still stacked after the vertical pass — fan out sideways.
-      if (Math.abs(cur.x - prev.x) < 130 && Math.abs(cur.y - prev.y) < GAP + 6) {
-        cur.x = prev.x + (cur.x >= prev.x ? 132 : -132);
+  _disposeXrayWheelGlows() {
+    const glows = this._xrayWheelGlows;
+    if (!glows) return;
+    [glows.front, glows.rear].forEach((p) => {
+      if (p.mesh.parent) p.mesh.parent.remove(p.mesh);
+      if (p.mesh.geometry) p.mesh.geometry.dispose();
+      if (p.mat) p.mat.dispose();
+    });
+    if (glows.group.parent) glows.group.parent.remove(glows.group);
+    this._xrayWheelGlows = null;
+  }
+
+  _syncXrayWheelGlows(now) {
+    const want = !!(this.state.powertrainOn && this._powertrainRig && this._powertrainRig.visible);
+    if (!want) {
+      if (this._xrayWheelGlows) {
+        this._xrayWheelGlows.front.mesh.visible = false;
+        this._xrayWheelGlows.rear.mesh.visible = false;
       }
+      return;
+    }
+    if (this.model && this._xrayWheelGlows && this._xrayWheelGlows.group.parent !== this.model) {
+      if (this._xrayWheelGlows.group.parent) {
+        this._xrayWheelGlows.group.parent.remove(this._xrayWheelGlows.group);
+      }
+      this.model.add(this._xrayWheelGlows.group);
+    }
+    const glows = this._ensureXrayWheelGlows();
+    if (!glows) return;
+    const fit = this._powertrainWheelFit();
+    if (!fit) {
+      glows.front.mesh.visible = false;
+      glows.rear.mesh.visible = false;
+      return;
     }
 
-    placed.forEach((pl) => {
-      const rec = pl.rec;
-      // Sub-pixel drift is invisible and every write is a compositor update.
-      if (Math.abs(pl.x - rec.x) > 0.4 || Math.abs(pl.y - rec.y) > 0.4) {
-        rec.x = pl.x;
-        rec.y = pl.y;
-        rec.el.style.transform =
-          'translate3d(' + pl.x.toFixed(1) + 'px,' + pl.y.toFixed(1) + 'px,0)';
-      }
-      const flip = pl.x > layerRect.width * 0.62;
-      if (flip !== rec.flip) { rec.flip = flip; rec.el.classList.toggle('flip', flip); }
-      if (!rec.on) { rec.on = true; rec.el.classList.add('on'); }
-    });
+    const flow = this._powerFlowRaw(now);
+    const manifest = this._powertrainManifest;
+    const packKey = this._powertrainPackKey || this._currentTrim().pack;
+    const pack = manifest && (manifest.batteries || {})[packKey];
+    const awd = !!(pack && pack.awd);
+    const G = this._powertrainGlowTones();
+    const tune = this._powertrainFxTune();
+    const t = this._powertrainFxT || 0;
+    const pulse = tune.pulseMid + Math.sin(t * tune.pulseHz) * tune.pulseAmp;
+    const y = fit.groundY + 0.006;
+    const depth = 0.30;
+    const trackPad = 0.22;
+
+    const applyAxle = (patch, dir, pos, track) => {
+      const on = dir !== 0;
+      patch.mesh.visible = on;
+      if (!on) return;
+      const tone = dir < 0 ? G.regen : G.drive;
+      const gain = dir < 0 ? tune.regenMax : tune.driveMax;
+      patch.mat.color.copy(tone.color);
+      patch.mat.opacity = gain * 0.58 * pulse;
+      patch.mesh.position.set(pos.x, y, pos.z);
+      patch.mesh.scale.set(Math.max(0.9, track + trackPad), depth, 1);
+    };
+
+    applyAxle(glows.front, flow.front || 0, fit.front, fit.frontTrack);
+    applyAxle(glows.rear, awd ? (flow.rear || 0) : 0, fit.rear, fit.rearTrack);
   }
 
   _getGlassMeshes() {
@@ -17238,6 +17220,12 @@ class Component extends DCLogic {
       // Leave a well-authored rim alone, and never trust a wild correction:
       // past ~20 deg the bbox axle was probably not the axle at all and
       // rotating by the difference would only make it worse.
+      // Escape hatch: __wheelSpin({ runoutFix: false }) leaves every rim exactly
+      // as authored, for A/B-ing whether this correction is helping or hurting.
+      if (this._wheelSpinTune && this._wheelSpinTune.runoutFix === false) {
+        console.log('[UploadWheel] Runout correction disabled by tune — left as authored.');
+        return identity;
+      }
       const TILT_MIN_DEG = 0.5, TILT_MAX_DEG = 20;
       const OFF_MIN_FRAC = 0.004, OFF_MAX_FRAC = 0.30;
       const doTilt = tiltDeg >= TILT_MIN_DEG && tiltDeg <= TILT_MAX_DEG;
@@ -19789,9 +19777,10 @@ class Component extends DCLogic {
             this._updateXrayFab();
           }
         }
-        // Callouts follow the camera whenever x-ray is up, independently of the
-        // bullets -- those fade out on a timer and these must not.
-        if (this.state.powertrainOn || this._xrLayer) this._updateXrayTags();
+        // Wheel-floor glows track live flow while x-ray is up.
+        if (this.state.powertrainOn || this._xrayWheelGlows) {
+          this._syncXrayWheelGlows(performance.now());
+        }
         // Forced frames after UI changes / async loads (componentDidUpdate, etc.)
         if (this._renderFrames > 0) { this._renderFrames--; needRender = true; }
         // Keep the shadow map dirty across multi-frame shader settles (night
@@ -20141,17 +20130,24 @@ class Component extends DCLogic {
       this.model.add(rig);
       this._fitPowertrain();
     }
+    if (this._xrayWheelGlows && this._xrayWheelGlows.group.parent !== this.model) {
+      if (this._xrayWheelGlows.group.parent) {
+        this._xrayWheelGlows.group.parent.remove(this._xrayWheelGlows.group);
+      }
+      this.model.add(this._xrayWheelGlows.group);
+    }
   }
 
   _powertrainTuning() {
     // Nudges in metres, applied after the automatic fit. The fit centres on the
     // body box, but the axle midpoint sits slightly behind the body centre
     // because the overhangs are unequal. Adjust here if it needs a shove.
-    return { scale: 1, x: 0, y: 0, z: 0, ghostOpacity: 0.10,
+    return { scale: 1, x: 0, y: 0, z: 0, ghostOpacity: 0.12,
+             ghostColor: 0xffffff,
              // Fresnel: how much of the base opacity survives on a surface
              // facing the camera, and how fast it ramps back up toward the
              // silhouette. Lower face = more see-through, crisper outline.
-             ghostFace: 0.28, ghostFalloff: 2.2 };
+             ghostFace: 0.22, ghostFalloff: 2.2 };
   }
 
   /** Overall length of the real car -- the one number the metre fit needs. */
@@ -20326,7 +20322,28 @@ class Component extends DCLogic {
     if (!fl || !fr || !rl || !rr) return null;
     const front = fl.clone().add(fr).multiplyScalar(0.5);
     const rear = rl.clone().add(rr).multiplyScalar(0.5);
-    return { front: front, rear: rear, wheelbase: front.distanceTo(rear) };
+    let groundY = Infinity;
+    const bumpGround = (arr) => {
+      (arr || []).forEach((w) => {
+        const o = (w && w.mesh) ? w.mesh : ((w && w.c) ? w.c : w);
+        if (!o || !o.isObject3D) return;
+        const b = new THREE.Box3().setFromObject(o);
+        if (!b.isEmpty()) groundY = Math.min(groundY, b.applyMatrix4(toLocal).min.y);
+      });
+    };
+    bumpGround(this._frontLeftWheels);
+    bumpGround(this._frontRightWheels);
+    bumpGround(this._rearLeftWheels);
+    bumpGround(this._rearRightWheels);
+    if (!isFinite(groundY)) groundY = Math.min(fl.y, fr.y, rl.y, rr.y) - 0.32;
+    return {
+      front: front,
+      rear: rear,
+      wheelbase: front.distanceTo(rear),
+      groundY: groundY,
+      frontTrack: fl.distanceTo(fr),
+      rearTrack: rl.distanceTo(rr),
+    };
   }
 
   _fitPowertrain() {
@@ -20407,7 +20424,9 @@ class Component extends DCLogic {
     if (!model) return;
     if (on) {
       if (this._ghostMats) return;
-      const ghostOpacity = this._powertrainTuning().ghostOpacity;
+      const tune = this._powertrainTuning();
+      const ghostOpacity = tune.ghostOpacity;
+      const ghostColor = tune.ghostColor;
       // Wheels stay solid: fading them left the car floating, and the car's own
       // rims are better than the ones in the powertrain model (which is why
       // _applyPowertrainVariant hides those).
@@ -20440,6 +20459,9 @@ class Component extends DCLogic {
           if (!m) return m;
           const g = m.clone();
           this._applyGhostFresnel(g);
+          if (g.color) g.color.set(ghostColor);
+          if (g.emissive) g.emissive.set(0x000000);
+          if (g.emissiveIntensity !== undefined) g.emissiveIntensity = 0;
           g.transparent = true;
           g.opacity = Math.min(m.opacity === undefined ? 1 : m.opacity, ghostOpacity);
           g.depthWrite = false;
@@ -20484,15 +20506,19 @@ class Component extends DCLogic {
       if (shader.fragmentShader.indexOf('vViewPosition') === -1) return;
       shader.uniforms.uGhostFace = { value: t.ghostFace };
       shader.uniforms.uGhostPow = { value: t.ghostFalloff };
+      shader.uniforms.uGhostColor = { value: new this.THREE.Color(t.ghostColor) };
       shader.fragmentShader =
         'uniform float uGhostFace;' + NL + 'uniform float uGhostPow;' + NL
+        + 'uniform vec3 uGhostColor;' + NL
         + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <dithering_fragment>',
         [
           '#include <dithering_fragment>',
           '  float gFres = 1.0 - abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) );',
-          '  gl_FragColor.a *= mix( uGhostFace, 1.0, pow( gFres, uGhostPow ) );',
+          '  float gAlpha = mix( uGhostFace, 1.0, pow( gFres, uGhostPow ) );',
+          '  gl_FragColor.rgb = uGhostColor;',
+          '  gl_FragColor.a *= gAlpha;',
         ].join(NL)
       );
     };
@@ -20529,9 +20555,32 @@ class Component extends DCLogic {
         driveMax: 0.75,
         regenMax: 0.75,
         iceMax: 0.50,
-        cellMax: 2.4,
+        // Emissive intensity of a lit module. Deliberately LOW: measured on
+        // the module face, a green that reads as green needs to stay out of the
+        // ACES highlight rolloff. Sweeping this one pixel gave sat 0.81 at 0.22,
+        // 0.47 at 0.5, 0.28 at 1.0 and 0.06 at 3.0 -- past about 1.0 the tone
+        // curve's channel cross-talk turns any saturated hue white.
+        cellMax: 0.45,
         cellColor: '#00ff66',
         cellLitMin: 1.0,
+        cellEmptyColor: '#0a0d10',
+        // A lit module is DARK with a green emissive, not green-painted. A
+        // bright green albedo picks up the studio key light as white specular
+        // and washes out no matter how the emissive is tuned: measured, a green
+        // albedo topped out at sat 0.31 even with the emissive at zero, while a
+        // dark one reaches 0.81. This is also what a real lit indicator is.
+        cellDarkAlbedo: '#04140b',
+        // The case and lid are big light-grey slabs; under the studio HDRI they
+        // render near-white and swamp everything inside them. Darkening them
+        // took the pack's readable-green area from 0.4% to 9.5%.
+        shellColor: '#141a20',
+        shellMetal: 0.25,
+        shellRough: 0.90,
+        shellEnv: 0.06,
+        // Shell emissive rides its own ceiling so the box never outshines the
+        // cells inside it. At 1.15 (the old cellMax x 0.48) 86% of the pack's
+        // green pixels were clipped; at 0.30 that is 1.4%.
+        caseMax: 0.62,
         wireDriveColor: '#3a9fd4',
         wireRegenColor: '#2ec990',
         wireTint: 0.78,
@@ -20542,10 +20591,10 @@ class Component extends DCLogic {
         beadRadius: 0.024,
         arrowLength: 0.052,
         arrowWidth: 0.020,
-        beadCount: 5,
+        beadCount: 9,
         beadSpeed: 0.40,
         beadOpacity: 0.92,
-        tubeChevrons: 5.0,
+        tubeChevrons: 36.0,
         pulseMid: 0.65,
         pulseAmp: 0.35,
         pulseHz: 3.4,
@@ -20564,17 +20613,21 @@ class Component extends DCLogic {
         // Battery pack halo — SOC read + charging pulse.
         battHaloScale: 1.08,
         battHaloMin: 0.22,
+        // Its own opacity, not the part-halo one: this sprite covers the whole
+        // pack with depthTest off, so it stacks on the brightest thing in the
+        // mode. At the shared 0.28 it drove clipping from 32% to 83% by itself.
+        battHaloOpacity: 0.13,
         battChargePulseHz: 1.5,
         battChargePulseAmp: 0.38,
-        // Screen-space callouts naming each part and its state.
-        tagsOn: 1,
+        // Screen-space wheel patches under each axle (replaces ICE/P2/P4 labels).
+        wheelGlowOn: 1,
         // Battery: a fill wave runs through the SOC bar and the module holding
         // the current level breathes, so the pack says which WAY the charge is
         // moving rather than only how much of it is left.
         cellWaveOn: 1,
-        cellWaveAmp: 0.85,
+        cellWaveAmp: 0.5,
         cellWaveHz: 0.35,
-        cellEdgeAmp: 0.6,
+        cellEdgeAmp: 0.4,
         cellEdgeHz: 2.0,
         // Single outer ring — subtle breathe + glow pulse; active flow only.
         ringOn: 1,
@@ -20658,7 +20711,7 @@ class Component extends DCLogic {
     if (!this._powertrainBeadQuat) this._powertrainBeadQuat = new THREE.Quaternion();
     if (!this._powertrainArrowRef) this._powertrainArrowRef = new THREE.Vector3(0, 0, 1);
     const t = curve.getTangentAt(Math.min(0.998, Math.max(0.002, u)), this._powertrainBeadTan);
-    if (dir < 0) t.negate();
+    if (dir > 0) t.negate();
     if (t.lengthSq() < 1e-8) return;
     t.normalize();
     this._powertrainBeadQuat.setFromUnitVectors(this._powertrainArrowRef, t);
@@ -20757,22 +20810,18 @@ class Component extends DCLogic {
         'uniform vec3 uColor;',
         'varying vec2 vFlowUv;',
         'void main() {',
-        // Paths authored pack (s=0) -> motor (s=1). uDir flips which end is
-        // the flow destination. No time-based scroll here — repeating fract()
-        // pulses looked like the glow shuttled back and forth; the 3D arrows
-        // carry motion, the tube only states direction.
-        '  float s = vFlowUv.x;',
+        // TubeGeometry uv.x runs opposite to curve parameter (motor at 0).
+        '  float s = 1.0 - vFlowUv.x;',
         '  float dir = uDir < 0.0 ? -1.0 : 1.0;',
         '  float dest = dir > 0.0 ? s : 1.0 - s;',
         '  float ramp = smoothstep( 0.04, 0.90, dest );',
         '  float base = uWireGlow * ( 0.22 + ramp * 0.78 );',
-        // Static chevrons pointing toward the destination end (>>>).
         '  float cell = fract( s * uChevrons );',
-        '  float tip = dir > 0.0 ? ( 1.0 - cell ) : cell;',
-        '  float tick = ( 1.0 - smoothstep( 0.0, 0.14, tip ) )',
-        '           * smoothstep( 0.52, 0.20, tip );',
-        '  float a = ( base + tick * 0.40 ) * uOn;',
-        '  vec3 col = uColor * ( 0.24 + base * 0.96 + tick * 0.48 );',
+        '  float tip = dir > 0.0 ? cell : ( 1.0 - cell );',
+        '  float tick = ( 1.0 - smoothstep( 0.0, 0.18, tip ) )',
+        '           * smoothstep( 0.62, 0.22, tip );',
+        '  float a = ( base + tick * 0.52 ) * uOn;',
+        '  vec3 col = uColor * ( 0.24 + base * 0.96 + tick * 0.55 );',
         '  gl_FragColor = vec4( col, a );',
         '}',
       ].join(NL),
@@ -21058,6 +21107,8 @@ class Component extends DCLogic {
   /** SOC segments: opaque saturated fill — emissive-only on grey cells reads transparent. */
   _powertrainGlowCell(part, tone, strength) {
     if (!part || !tone) return;
+    const tune = this._powertrainFxTune();
+    const emptyHex = parseInt(String(tune.cellEmptyColor || '#0a0d10').replace('#', ''), 16);
     const mats = part.materials;
     const lit = strength > 0.02;
     if (part.root) part.root.renderOrder = lit ? 14 : 0;
@@ -21065,23 +21116,28 @@ class Component extends DCLogic {
       const m = mats[i];
       if (!lit) {
         m.emissive.setHex(0x000000);
-        m.color.setHex(0x343a42);
+        m.color.setHex(emptyHex);
         m.transparent = false;
         m.opacity = 1;
+        m.metalness = 0.55;
+        m.roughness = 0.92;
         m.userData.glowBase = 0;
         m.emissiveIntensity = 0;
-        if (m.envMapIntensity !== undefined) m.envMapIntensity = 0.35;
+        if (m.envMapIntensity !== undefined) m.envMapIntensity = 0.08;
         continue;
       }
       m.emissive.copy(tone.color);
-      m.color.copy(tone.color);
+      // Dark body, emissive colour -- see cellDarkAlbedo. Painting the module
+      // green as well made it a green-tinted white under the key light.
+      m.color.setHex(parseInt(
+        String(tune.cellDarkAlbedo || '#04140b').replace('#', ''), 16));
       m.transparent = false;
       m.opacity = 1;
       m.metalness = 0;
-      m.roughness = 0.38;
+      m.roughness = 0.55;
       if (m.envMapIntensity !== undefined) m.envMapIntensity = 0;
       m.userData.glowBase = tone.max * strength;
-      m.emissiveIntensity = tone.max * strength * 1.85;
+      m.emissiveIntensity = tone.max * strength;
     }
   }
 
@@ -21161,7 +21217,26 @@ class Component extends DCLogic {
       this._powertrainCellEdge = Math.max(0,
         Math.min(modules.length - 1, Math.floor(lit)));
 
-      this._powertrainGlowPart(parts[pack.nodes.case], cellTone,
+      // Case + lid: dark, matte, and barely reflective, so the pack reads as a
+      // container with the cells lit inside it rather than a glowing white
+      // brick. Re-applied here rather than once at build time because the
+      // materials are re-cloned whenever the trim swaps the pack.
+      const shellHex = parseInt(
+        String(tune.shellColor || '#141a20').replace('#', ''), 16);
+      [pack.nodes.case, pack.nodes.lid].forEach((n) => {
+        const shell = parts[n];
+        if (!shell) return;
+        for (let i = 0; i < shell.materials.length; i++) {
+          const m = shell.materials[i];
+          m.color.setHex(shellHex);
+          m.metalness = tune.shellMetal;
+          m.roughness = tune.shellRough;
+          if (m.envMapIntensity !== undefined) m.envMapIntensity = tune.shellEnv;
+        }
+      });
+      // The shell glows on its own ceiling so it can never outshine the cells.
+      const caseTone = { color: cellTone.color, max: tune.caseMax };
+      this._powertrainGlowPart(parts[pack.nodes.case], caseTone,
         plug ? 0.48 : (charging ? 0.34 : Math.max(0.14, (socPct / 100) * 0.38)));
 
       if (this._powertrainBatteryHalo) {
@@ -21210,6 +21285,10 @@ class Component extends DCLogic {
     this._powertrainCellDir = 0;
     this._powertrainGroundDir = 0;
     this._powertrainFxSig = '';
+    if (this._xrayWheelGlows) {
+      this._xrayWheelGlows.front.mesh.visible = false;
+      this._xrayWheelGlows.rear.mesh.visible = false;
+    }
   }
 
   /**
@@ -21248,7 +21327,7 @@ class Component extends DCLogic {
           const u = b.mat.uniforms;
           u.uOn.value = tune.tubeGain;
           u.uWireGlow.value = tune.wireGlow;
-          u.uChevrons.value = tune.tubeChevrons || 5.0;
+          u.uChevrons.value = tune.tubeChevrons || 36.0;
         }
       }
       const nArr = b.meshes.length;
@@ -21280,7 +21359,7 @@ class Component extends DCLogic {
     if (this._powertrainBatteryHalo) {
       const bh = this._powertrainBatteryHalo;
       const charging = cellDir > 0;
-      let op = bh.level * tune.haloOpacity * 1.35;
+      let op = bh.level * tune.battHaloOpacity;
       if (charging) {
         op *= 0.72 + tune.battChargePulseAmp
           * (0.5 + 0.5 * Math.sin(t * tune.battChargePulseHz * Math.PI * 2));
@@ -21373,6 +21452,7 @@ class Component extends DCLogic {
       // Seed FX from the live / demo POWER card state immediately.
       this._powertrainFxSig = '';
       this._tickPowertrainFx(0, performance.now());
+      this._syncXrayWheelGlows(performance.now());
       if (this.requestRender) this.requestRender(12);
     });
   }

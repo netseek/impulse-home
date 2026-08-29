@@ -4818,16 +4818,20 @@ public final class MainActivity extends Activity {
         lp.leftMargin = Math.round(8 * density);
         drawer.setLayoutParams(lp);
 
-        modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad, dockGlyphApps(iconPx),
+        modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
+                dockGlyphApps(iconPx, dockGlyphColor(true)),
                 null, v -> setDrawerExpanded(true));
         modeCollapsedIcon = (android.widget.ImageView) modeCollapsedBtn.findViewWithTag("modeIcon");
         drawer.addView(modeCollapsedBtn);
 
-        modeAppsBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad, dockGlyphApps(iconPx),
+        modeAppsBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
+                dockGlyphApps(iconPx, dockGlyphColor(true)),
                 "Apps", v -> selectStripMode(STRIP_APPS));
-        modeLayoutBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad, dockGlyphLayout(iconPx),
+        modeLayoutBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
+                dockGlyphLayout(iconPx, dockGlyphColor(true)),
                 "Layout", v -> selectStripMode(STRIP_LAYOUT));
-        modeConfigBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad, dockGlyphConfig(iconPx),
+        modeConfigBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
+                dockGlyphConfig(iconPx, dockGlyphColor(true)),
                 "Settings", v -> selectStripMode(STRIP_CONFIG));
         modeAppsBtn.setVisibility(View.GONE);
         modeLayoutBtn.setVisibility(View.GONE);
@@ -4955,7 +4959,7 @@ public final class MainActivity extends Activity {
     private int[] dockPlateBorderGradientColors(boolean selected) {
         return selected
                 ? new int[] { 0xC8D4DCE4, 0x88A8B8C4 }
-                : new int[] { 0xA8C0CCD8, 0x6898A8B8 };
+                : new int[] { 0xA0B8C8D4, 0x60A0B0C0 };
     }
 
     /** Frosted glass fills — keep alpha high enough to read light on the dark drawer band. */
@@ -4963,7 +4967,7 @@ public final class MainActivity extends Activity {
         if (dockUiLight) {
             return selected
                     ? new int[] { 0xFFF2F5F8, 0xE8ECF2 }
-                    : new int[] { 0xF0F4F7, 0xD8DEE6 };
+                    : new int[] { 0xFAFCFE, 0xF2F6FA };
         }
         return selected
                 ? new int[] { 0x68FFFFFF, 0x58FFFFFF }
@@ -5027,7 +5031,12 @@ public final class MainActivity extends Activity {
     }
 
     private int dockGlyphColor() {
-        return dockUiLight ? 0xFF3D4550 : 0xFFFFFFFF;
+        return dockGlyphColor(true);
+    }
+
+    private int dockGlyphColor(boolean selected) {
+        if (!dockUiLight) return 0xFFFFFFFF;
+        return selected ? 0xFF3D4550 : 0xFF9AA3AE;
     }
 
     private int dockLabelColor() {
@@ -5035,7 +5044,7 @@ public final class MainActivity extends Activity {
     }
 
     private int dockLabelColorMuted() {
-        return dockUiLight ? 0x8F4A5568 : 0xCCFFFFFF;
+        return dockUiLight ? 0xFF9AA3AE : 0xCCFFFFFF;
     }
 
     private android.widget.TextView findDockChipLabel(View cell) {
@@ -5100,23 +5109,33 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshModeDrawerGlyphs() {
-        int iconPx = dockIconPx > 0 ? dockIconPx
-                : Math.round(60 * getResources().getDisplayMetrics().density);
-        if (modeAppsBtn != null) setModeCellIcon(modeAppsBtn, dockGlyphApps(iconPx));
-        if (modeLayoutBtn != null) setModeCellIcon(modeLayoutBtn, dockGlyphLayout(iconPx));
-        if (modeConfigBtn != null) setModeCellIcon(modeConfigBtn, dockGlyphConfig(iconPx));
-        if (modeCollapsedIcon != null) {
-            modeCollapsedIcon.setImageDrawable(glyphForStripMode(stripMode));
+        if (modeAppsBtn != null && modeAppsBtn.getVisibility() == View.VISIBLE) {
+            setModeCellSelected(modeAppsBtn, STRIP_APPS.equals(stripMode));
         }
-        styleDockLabel(findModeCellLabel(modeAppsBtn), false);
-        styleDockLabel(findModeCellLabel(modeLayoutBtn), false);
-        styleDockLabel(findModeCellLabel(modeConfigBtn), false);
+        if (modeLayoutBtn != null && modeLayoutBtn.getVisibility() == View.VISIBLE) {
+            setModeCellSelected(modeLayoutBtn, STRIP_LAYOUT.equals(stripMode));
+        }
+        if (modeConfigBtn != null && modeConfigBtn.getVisibility() == View.VISIBLE) {
+            setModeCellSelected(modeConfigBtn, STRIP_CONFIG.equals(stripMode));
+        }
+        if (modeCollapsedBtn != null && modeCollapsedBtn.getVisibility() == View.VISIBLE) {
+            setModeCellSelected(modeCollapsedBtn, true);
+        }
     }
 
     private void setModeCellIcon(View cell, Drawable glyph) {
         if (cell == null) return;
         android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
         if (iv != null) iv.setImageDrawable(glyph);
+    }
+
+    private Drawable glyphForModeCell(View cell, int iconPx, boolean selected) {
+        int color = dockGlyphColor(selected);
+        if (cell == modeAppsBtn) return dockGlyphApps(iconPx, color);
+        if (cell == modeLayoutBtn) return dockGlyphLayout(iconPx, color);
+        if (cell == modeConfigBtn) return dockGlyphConfig(iconPx, color);
+        if (cell == modeCollapsedBtn) return glyphForStripMode(stripMode);
+        return null;
     }
 
     private android.widget.TextView findModeCellLabel(View cell) {
@@ -5212,15 +5231,26 @@ public final class MainActivity extends Activity {
         if (cell == null) return;
         View plate = cell.findViewWithTag("modePlate");
         float density = getResources().getDisplayMetrics().density;
+        int iconPx = dockIconPx > 0 ? dockIconPx
+                : Math.round(60 * getResources().getDisplayMetrics().density);
         if (plate != null) plate.setBackground(makeDockPlateDrawable(selected, density));
-        cell.setAlpha(selected ? 1f : 0.78f);
+        cell.setAlpha(dockUiLight ? 1f : (selected ? 1f : 0.78f));
+        android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
+        if (iv != null) {
+            Drawable glyph = glyphForModeCell(cell, iconPx, selected);
+            if (glyph != null) iv.setImageDrawable(glyph);
+        }
+        android.widget.TextView label = findModeCellLabel(cell);
+        if (label != null) {
+            label.setTextColor(selected ? dockLabelColor() : dockLabelColorMuted());
+        }
     }
 
-    private Drawable dockGlyphApps(int sizePx) {
+    private Drawable dockGlyphApps(int sizePx, int color) {
         Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         android.graphics.Canvas c = new android.graphics.Canvas(bmp);
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(dockGlyphColor());
+        p.setColor(color);
         float s = sizePx;
         float pad = s * 0.18f;
         float gap = s * 0.14f;
@@ -5235,11 +5265,11 @@ public final class MainActivity extends Activity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
-    private Drawable dockGlyphLayout(int sizePx) {
+    private Drawable dockGlyphLayout(int sizePx, int color) {
         Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         android.graphics.Canvas c = new android.graphics.Canvas(bmp);
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(dockGlyphColor());
+        p.setColor(color);
         p.setStyle(android.graphics.Paint.Style.FILL);
         float s = sizePx;
         float padY = s * 0.18f;
@@ -5259,18 +5289,19 @@ public final class MainActivity extends Activity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
-    private Drawable dockGlyphConfig(int sizePx) {
-        Drawable d = systemDockIcon(android.R.drawable.ic_menu_preferences);
-        return d != null ? d : new android.graphics.drawable.ColorDrawable(0xFFFFFFFF);
+    private Drawable dockGlyphConfig(int sizePx, int color) {
+        Drawable d = systemDockIcon(android.R.drawable.ic_menu_preferences, color);
+        return d != null ? d : new android.graphics.drawable.ColorDrawable(color);
     }
 
     private Drawable glyphForStripMode(String mode) {
         int size = dockIconPx > 0 ? dockIconPx
                 : Math.round(60 * getResources().getDisplayMetrics().density);
+        int color = dockGlyphColor(true);
         // Draw at full icon size; makeModeCell insets into the plate.
-        if (STRIP_LAYOUT.equals(mode)) return dockGlyphLayout(size);
-        if (STRIP_CONFIG.equals(mode)) return dockGlyphConfig(size);
-        return dockGlyphApps(size);
+        if (STRIP_LAYOUT.equals(mode)) return dockGlyphLayout(size, color);
+        if (STRIP_CONFIG.equals(mode)) return dockGlyphConfig(size, color);
+        return dockGlyphApps(size, color);
     }
 
     private void setDrawerExpanded(boolean expanded) {
@@ -5283,9 +5314,6 @@ public final class MainActivity extends Activity {
         drawerExpanded = false;
         if (modeCollapsedBtn != null) {
             modeCollapsedBtn.setVisibility(View.VISIBLE);
-            if (modeCollapsedIcon != null) {
-                modeCollapsedIcon.setImageDrawable(glyphForStripMode(stripMode));
-            }
             setModeCellSelected(modeCollapsedBtn, true);
             setModeCellLabelVisible(modeCollapsedBtn, false);
         }
@@ -5418,7 +5446,7 @@ public final class MainActivity extends Activity {
 
         int wide = Math.round(200 * density);
         layoutTripleChip = makeWideLayoutChip(density, wide, iconPx, SHELL_TRIPLE,
-                dockGlyphLayout(Math.round(iconPx * 0.55f)), "Car in the middle");
+                dockGlyphLayout(Math.round(iconPx * 0.55f), dockGlyphColor(true)), "Car in the middle");
         layoutAppCarChip = makeWideLayoutChip(density, Math.round(180 * density), iconPx, SHELL_APP_CAR,
                 makeSimpleLayoutGlyph(Math.round(iconPx * 0.55f), 2), "Car on the right");
         layoutAppsChip = makeWideLayoutChip(density, Math.round(220 * density), iconPx, SHELL_APPS,
@@ -5451,12 +5479,16 @@ public final class MainActivity extends Activity {
         return row;
     }
 
-    /** Platform drawable, tinted white for the dock. */
+    /** Platform drawable, tinted for the dock. */
     private Drawable systemDockIcon(int resId) {
+        return systemDockIcon(resId, dockGlyphColor(true));
+    }
+
+    private Drawable systemDockIcon(int resId, int color) {
         Drawable d = getResources().getDrawable(resId, getTheme());
         if (d == null) return null;
         d = d.mutate();
-        d.setTint(dockGlyphColor());
+        d.setTint(color);
         return d;
     }
 
