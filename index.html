@@ -11355,7 +11355,19 @@ class Component extends DCLogic {
     if (!this.THREE || !this._blurredDiscs) return;
     const THREE = this.THREE;
     const BUILD_OUTWARD = 0.115; // the offset discs are created at (see _finalizeWheels)
-    const RECESS = 0.004;        // tuck the sprite edge this far behind the tire's bore-edge face
+    // Seat the sprite where the RIM face is, not behind the tyre's bore edge.
+    //
+    // This used to target the tyre face minus a 4 mm recess, which put the sprite
+    // 8.4 mm further in than the rim it stands in for (measured: rim face 148.4 mm
+    // outward, tyre face 144.0, sprite 140.0). That was invisible while the sprite
+    // had depthTest off and painted over everything; once depth testing was turned
+    // on so it would stop drawing over the car body, the tyre's bore lip started
+    // genuinely occluding the sprite's outer edge and the rim's border vanished at
+    // speed. A real rim sits slightly PROUD of the tyre, so match it. The half
+    // millimetre only exists to win the depth test against the sharp rim during the
+    // crossover blend, where both are drawn.
+    const SPRITE_PROUD = 0.0005;
+    const TYRE_FALLBACK_PROUD = 0.004;
     const sideArr = {
       fl: this._frontLeftWheels, fr: this._frontRightWheels,
       rl: this._rearLeftWheels,  rr: this._rearRightWheels
@@ -11410,7 +11422,24 @@ class Component extends DCLogic {
       const faceOut = isFinite(faceAtEdge) ? faceAtEdge : globalMax;
       if (!isFinite(faceOut)) return;
 
-      const delta = (faceOut - RECESS) - BUILD_OUTWARD;
+      // The rim's own outward face in the same radial band. That is the thing the
+      // sprite replaces, so that is where the sprite belongs.
+      let rimFaceAtEdge = -Infinity;
+      rimArr.forEach(m => {
+        const pos = m.geometry && m.geometry.attributes.position;
+        if (!pos) return;
+        const wm = m._initWorld || m.matrixWorld;
+        for (let i = 0; i < pos.count; i++) {
+          const rel = tmp.fromBufferAttribute(pos, i).applyMatrix4(wm).sub(center);
+          const o = rel.dot(outwardDir);
+          const radial = rel.addScaledVector(outwardDir, -o).length();
+          if (discWorldR > 0 && Math.abs(radial - discWorldR) <= band && o > rimFaceAtEdge) rimFaceAtEdge = o;
+        }
+      });
+      const target = isFinite(rimFaceAtEdge)
+        ? rimFaceAtEdge + SPRITE_PROUD
+        : faceOut + TYRE_FALLBACK_PROUD;
+      const delta = target - BUILD_OUTWARD;
       const shift = new THREE.Matrix4().makeTranslation(
         outwardDir.x * delta, outwardDir.y * delta, outwardDir.z * delta);
       [blur, back].forEach(d => {
