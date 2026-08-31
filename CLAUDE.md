@@ -73,6 +73,31 @@ explains it. Measure the specific change; do not reason from this table.
   every hot signal handler with a change threshold — `_setMotionSpeed` had none
   and re-rendered per `vehicle_speed` frame; `_applyCarSteering` has a 0.5 deg
   deadband for exactly this reason.
+- **A change threshold is not enough on its own for speed.** `_setMotionSpeed`'s
+  0.005-unit (0.2 km/h) deadband only ever protected a parked or dead-steady
+  car; real driving crosses it on nearly every bus frame, so it went back to
+  setState at CAN rate — and each one is `componentDidUpdate` -> `requestRender()`
+  -> `_postFxDirty`, i.e. the whole React tree plus a post-FX rebuild. Simulated
+  at 20 Hz on the emulator:
+
+  | | postFX rebuilds/s | postFX cache hits/s | setState/s |
+  |---|---|---|---|
+  | rolling, quiet bus | 0.2 | 57.5 | 0 |
+  | rolling, speed @20 Hz | 16.8 | 38.1 | 18 |
+  | after the throttle | 5.0 | 54.5 | 5 |
+
+  The wheels never needed it: the render loop reads `_liveMotionSpeed`, which is
+  written exactly on every bus frame. Only the km/h label needs the state, so the
+  setState is throttled to 4 Hz with a trailing commit (stops still apply
+  immediately). **If you add a signal handler that calls setState, throttle it
+  the same way** — the render cost is invisible parked and only bites on a
+  moving car.
+
+- **`resScaleMode: 'off'` does not stop everything adapting.** It stops the
+  MOTION tier reducing, but `_maybeAdaptDPR` still walks `_dprIdx` on its own,
+  and every step calls `_onResize()`. `'max'` is the mode that pins the ladder
+  outright — reach for it when A/B-ing anything frame-rate sensitive, so the
+  resolution cannot move under the measurement.
 - **Resolution is tiered, not fixed.** `_setResTier` runs the ladder's step
   while the camera moves and the ladder's top step once it settles, because an
   idle scene draws nothing and a crisp frame there is free. `resScaleMode`
@@ -267,6 +292,167 @@ but **11.3 deg on Vorsteiner V-FF109**, 3.9 on Vossen VPS 310T, 3.7 on VPS
 315T, 3.5 on Forgiato Multato, 2.8 on VFS4, 1.6 on HF-5, 1.1 on Rotiform KPS. Those are exactly the rims that read as
 unbalanced. Corrections under 0.5 deg are skipped and over 20 deg are refused —
 past that the bbox axle was probably not the axle at all.
+
+**And it is currently OFF (`_wheelSpinTune.runoutFix = false`), because it made
+every rim it touched WORSE.** Residual lateral runout of the *installed* rim
+about the axis it actually spins on, correction on vs off:
+
+| rim | on | off |
+|---|---|---|
+| Vorsteiner V-FF109 | 19.98 deg | 9.47 |
+| Forgiato Multato | 24.47 deg | 5.04 |
+| Vossen VPS 310T | 13.50 deg | 1.97 |
+| Vossen HF-5 | 3.34 deg | 1.34 |
+| Rotiform KPS | 1.76 deg | 1.00 |
+
+Every rim it leaves alone sits at 0.00-0.21 deg, so the rims it fires on are the
+only unbalanced ones — and it is the cause, not the cure. The MEASUREMENT that
+finds the tilt is sound (it agrees with an independent offline fit in
+`scripts/analyze-rim-symmetry.mjs`); the bug is in turning that measurement into
+a rotation — wrong direction or wrong magnitude. Do not switch it back on
+without re-running that table.
+
+## The sprite is a flat disc pretending to be a wheel — its frame matters
+
+Four separate bugs came out of how the four discs are positioned and oriented.
+All of them looked like "the animation is broken" and none of them were in the
+blur maths.
+
+- **`depthTest` must stay ON** (`depthWrite` stays off). With it off the sprite
+  ignores the depth buffer and paints over whatever is in front of it — the
+  far-side wheels drew on top of the bonnet and the door, and the far sprite
+  showed through the near one as a "ghost disc" that cost a long detour to
+  diagnose.
+- **Seat the disc at the RIM's face, not the tyre's.** It used to target the
+  tyre's bore-edge face minus a 4 mm recess, which put it 8.4 mm further in than
+  the rim it stands in for (measured: rim face 148.4 mm outward, tyre 144.0,
+  sprite 140.0). Harmless while `depthTest` was off; the moment depth testing
+  went on, the tyre's bore lip occluded the sprite's outer edge and the rim's
+  border vanished at speed. It now measures the rim's own outward face in the
+  same radial band and sits 0.5 mm proud of it.
+- **Build the disc's frame explicitly: +Z outward, +Y world up.**
+  `setFromUnitVectors` returns the MINIMAL rotation, and the two sides' outward
+  directions are opposite, so the two minimal rotations differ by a 180-degree
+  flip about an arbitrary perpendicular axis. That shipped as an upside-down
+  sprite on the right-hand wheels. The left/right mirroring that remains after
+  this is correct — wheels on opposite sides really do turn opposite ways seen
+  from their own outside.
+- **Derive the lighting layer's counter-rotation sign from geometry**
+  (`normal . axle`), never from the side name. An `isRight ? -1 : 1` guess was
+  wrong because all four discs are built the same way round, and it made the
+  right-hand pair's lighting sweep at twice the roll rate instead of standing
+  still — which reads as those wheels wobbling while the left pair looks fine.
+- **`_resizeBlurredDiscs` must use the magnitude of the parent's world scale.**
+  The rear suspension nodes are mirrored, so their scale is negative; dividing by
+  it gave the rear discs a negative `_baseGeoRadius`, and `CircleGeometry(-0.3)`
+  draws an inverted disc. A negative baseline also fails the `> 1e-6` validity
+  test, so the self-heal re-fired on every capture.
+
+## The static hub behind the sprite
+
+The sprite's smear is semi-transparent by design (alpha IS coverage), so
+whatever sits behind it shows through — and the brake and hub do not rotate,
+which reads as a dead gap inside a spinning wheel. `_wheelSpinTune.hubMode`:
+
+- **`'hide'` (default)** — hide the brake/hub meshes once the sprite is fully
+  faded in, restore them as it fades out. Simplest and looks right.
+- `'off'` — previous behaviour, static brake visible through the smear.
+- `'capture'` — bake the brake into the sprite so it smears too. Physically the
+  most honest (a rotor does spin with the wheel) but it looked bad; kept only
+  for A/B.
+- `'cover'` — **does not work, and the geometry says so up front.** The backing
+  disc sits BEHIND the sprite, so growing it cannot hide anything the smear
+  still lets through; `off` and `cover` render nearly identically. Any occluder
+  has to be in front of the brake, which is what `'hide'` achieves for free.
+
+**Do not try to roll the brake rotor while leaving the caliper still.** It is
+not separable: `Break_Disks` is one mesh, one material, no geometry groups, and
+its 821 verts fall into **30 connected components of which none is a full ring**
+(the largest covers 74% of the circle). Rolling the whole mesh spins the
+caliper, which is visibly wrong.
+
+## The two-layer sprite: what spins and what stays put
+
+`_wheelSpinTune.twoLayer` (on by default). The rim is captured twice — once
+flat-lit (materials swapped for unlit `MeshBasicMaterial` clones carrying the
+same map/colour/alpha, so coverage is byte-identical) and once under the scene.
+The flat layer is smeared and SPINS; the lighting layer is a shading RATIO that
+is counter-rotated in the sprite shader so it STAYS PUT. A highlight then sits
+where the light is and the rim turns underneath it, which is what a reflection
+does.
+
+Measured: how much the sprite changes between roll 0 and roll 90 drops from mean
+|delta| 13.35 to 2.10 on the front-left, a 84% reduction, with the spoke pattern
+still changing as it should.
+
+Three things that are easy to get wrong here, each of which shipped once:
+
+- **Ratio, not difference.** A difference can only ADD light, so every shadowed
+  region is lost — it recovered about an eighth of the shading (light mean 5.7
+  against a lit mean of 44) and the sprite came back flat.
+- **Divide AFTER the smear, not per tap.** The mean of a ratio is not the ratio
+  of the means. Averaging `lit/flat` tap by tap gave 0.87 on the lip where the
+  ratio of the smeared images is 1.11, so the sprite DARKENED the rim's outer
+  border by 11-23% instead of leaving it alone. Accumulate both smears
+  separately and divide once at the end; then `base * ratio` reproduces the
+  smeared lit capture exactly when nothing is rotated, which is the contract the
+  whole split depends on.
+- **Level-match the two captures first.** Raw albedo comes out roughly twice as
+  bright as the lit render (86.1 vs 44.0 mean), so an unscaled comparison is
+  meaningless. `uFlatGain` is computed from a centre strip of both targets — a
+  quarter of the pixels, on the readback that dominates the capture's cost.
+
+Cost: ~30 ms/capture against ~10 ms single-layer. That is fine ONLY because
+`_requestBlurCapture` debounces it — it is one capture per interaction, never
+per frame. Keep it that way.
+
+What it still cannot fix: **the capture is taken from the FRONT-LEFT wheel and
+reused on all four.** The right-hand side therefore carries the left wheel's
+lighting, and anchors measurably worse (roll 0->90 delta 8.55 against 2.10 on
+the left). Fixing that means a second capture per side, roughly doubling the
+cost.
+
+## Measuring wheel changes without fooling yourself
+
+This subsystem has now burned several agents, and in almost every case the wrong
+answer came from a BROKEN MEASUREMENT that was believed over the user's eyes.
+Reach for these in this order.
+
+1. **Extent in the plane perpendicular to the axle.** Min/max of the rim and of
+   the tyre, compared to each other. No fitting, no rendering, no lighting. This
+   is the metric that finally found the 30 mm rim/tyre offset after three others
+   had failed.
+2. **A screenshot with the projected pivot drawn on it.** Project `_pivot`
+   through the camera and draw a crosshair there; then concentricity is a thing
+   you can see rather than infer.
+3. **A/B the same frame with one flag flipped**, and diff the two images. Every
+   real conclusion in this subsystem came from a pair of renders that differed
+   in exactly one thing.
+
+Metrics that have actively lied here, all of which looked reasonable:
+
+- **Least-squares circle fits over a whole tyre or rim mesh.** Those meshes span
+  tread, sidewalls and bore; an algebraic fit over a wide radial band is biased
+  by vertex distribution. One put the front-left centre 30 mm out.
+- **Single-shot fits over a "band selected by radius".** The band is selected
+  from the centre you currently believe, so on an off-centre model it is an arc,
+  not a ring, and the fit is ill-conditioned. Iterate the selection.
+- **Brightness centroids.** They measure where the highlight is, not where the
+  geometry is.
+- **`gl.readPixels` on the default framebuffer** returns empty — the drawing
+  buffer is not preserved. Use `adb exec-out screencap`.
+- **`cmp index.html <packaged asset>`** always differs: the build strips
+  comments (21152 lines becomes 18991). It is not a staleness test.
+
+And two ways to invalidate your own experiment:
+
+- **Setting `.visible = false` on wheel meshes does nothing.**
+  `_applyWheelTransforms` rewrites visibility on every disc and spoke mesh each
+  frame from the current speed. To take a mesh out of a test, detach it from its
+  parent and re-add it afterwards.
+- **Poking texture state from devtools corrupts the run.** See the render-target
+  `needsUpdate` note below; after any such poke, reload before believing
+  anything.
 
 ## Visual gotchas in the wheel blur
 
