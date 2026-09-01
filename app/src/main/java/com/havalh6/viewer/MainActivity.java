@@ -905,7 +905,7 @@ public final class MainActivity extends Activity {
     private boolean appsFabScrimAttached;
     private Runnable pinMediaBoundsRunnable;
     private final MediaNowPlaying mediaNowPlaying = new MediaNowPlaying();
-    /** Full-width 2px load line at display Y=700 (20px above the 720px panel). */
+    /** Full-width 2px load line at display Y=655 (65px above the 720px panel). */
     private View bootProgressTrack;
     private View bootProgressFill;
     /** Subtle center spinner once the splash is gone but the GLB is not ready. */
@@ -4367,8 +4367,8 @@ public final class MainActivity extends Activity {
                 .start();
     }
 
-    /** Fixed display Y for the 2px boot line — 20px above the 720px panel. */
-    private static final int BOOT_PROGRESS_LINE_TOP_Y = 700;
+    /** Fixed display Y for the 2px boot line — 65px above the 720px panel. */
+    private static final int BOOT_PROGRESS_LINE_TOP_Y = 655;
 
     private int bootProgressLineTopMarginPx() {
         return Math.max(0, BOOT_PROGRESS_LINE_TOP_Y - pageOriginRect().top);
@@ -4389,7 +4389,7 @@ public final class MainActivity extends Activity {
     /**
      * Boot load UI above the WebView. The splash &lt;video&gt; hole-punches
      * through in-page HTML, so progress has to live in native chrome:
-     * a full-width 2px blue line at fixed display Y=700 (20px above the panel
+     * a full-width 2px blue line at fixed display Y=655 (65px above the panel
      * bottom), swapped for a subtle center spinner once the clip is gone but
      * the GLB is still arriving. Hidden the moment the model is ready — even
      * if the intro fade is still playing.
