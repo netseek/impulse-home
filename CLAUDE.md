@@ -171,6 +171,50 @@ HEV wheel pivots via `inheritWheelsFrom: 'hev'` — no second download.
 
 Hook points: `_gtBootStandalone()`, `_gtUsesNativeWheels()`, `_whenHevDonorReady`.
 
+## Mixed centerFill: additive materials silently destroy the alpha channel
+
+`centerFill: 'mixed'` puts the Bing wallpaper behind a TRANSPARENT WebGL canvas
+(`scene.background = null`, `setClearColor(0, 0)`), so the drawing buffer's alpha
+is load-bearing: it is the car's coverage mask, and anything that writes alpha
+where the car is not paints the wallpaper out.
+
+**`THREE.AdditiveBlending` writes alpha.** It is
+`blendFuncSeparate(SRC_ALPHA, ONE, SRC_ALPHA, ONE)`, so `dst.a = src.a^2 + dst.a`
+and any additive surface drives alpha to 1 across every pixel it covers —
+whether or not it adds visible light there. On an opaque background that is
+completely invisible, which is why it survived so long. Two surfaces were doing
+it, and each one alone turned the whole car pane opaque black:
+
+- the post-FX **bloom / streak overlay quads**, which are full-screen and whose
+  composers run `RenderPass` with `clearAlpha = 1`, so their targets carry
+  alpha 1 over the entire frame. Triggered by *any* light being on — the
+  reported symptom was "no wallpaper", and the headlights happened to be on.
+- the **night floor**, a plane 12x the car's size, once it was allowed to draw
+  in mixed mode.
+
+`setAdditiveKeepAlpha(THREE, mat)` is the fix: identical RGB factors, alpha
+factors `(Zero, One)` so `dst.a` survives untouched. Reach for it for any new
+additive material that can cover background pixels. The canvas is
+premultiplied-alpha, so colour written where alpha stayed 0 still composites
+additively onto the wallpaper — which is exactly right for a light pool falling
+on the ground.
+
+**Shadows and light pools are wanted in mixed mode; only the solid floor is
+not.** `shadowCatcher` (`ShadowMaterial`, alpha-only) and `nightFloor` (additive)
+both composite correctly over the wallpaper. `floorMesh` is opaque asphalt and
+must stay hidden — and it has **three** writers, not one: `_setCarSceneVisible`
+plus two in the night-mode path. Miss one and the floor reappears on the next
+day/night toggle.
+
+**How to bisect this class of bug** (this is what found it, in about four
+captures): stop the loop with `cancelAnimationFrame(__app._raf)`, then re-run
+the render loop's passes ONE AT A TIME from devtools, screenshotting after each
+with `adb exec-out screencap`. Clear-only, scene-only and scene+vignette all
+composited over the wallpaper correctly; adding the overlay quad blacked out the
+frame. Note `elementsFromPoint` will NOT show `.hv-wallpaper` — it is
+`pointer-events: none` — so it cannot tell you whether that layer is painting;
+bump its `z-index` above the canvas instead and look.
+
 ## Things that look like wins and are not
 
 - **More MSAA.** `MAX_SAMPLES` is 4 on this GPU. You are already there.

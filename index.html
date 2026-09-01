@@ -5126,6 +5126,37 @@ const BING_WALLPAPER_PAGES = 2; // 16 recent images — scroll for older
 // Microsoft Bing daily wallpaper — same image pool as Windows Spotlight.
 const BING_WALLPAPER_CACHE_KEY = 'h6_wallpaper_cache_v1';
 
+/**
+ * Additive in RGB, but leaves the destination ALPHA untouched.
+ *
+ * `THREE.AdditiveBlending` is `blendFuncSeparate(SRC_ALPHA, ONE, SRC_ALPHA,
+ * ONE)` — it accumulates into the alpha channel as well as the colour one, so
+ * `dst.a = src.a^2 + dst.a` and any additive surface drags the drawing buffer's
+ * alpha to 1 across every pixel it covers, glow or no glow. That is invisible
+ * while the scene background is opaque, which is why it went unnoticed for so
+ * long, and fatal in mixed centerFill, where the canvas has to stay transparent
+ * for the wallpaper behind it. Two full-screen-ish additive surfaces — the
+ * post-FX bloom/streak overlay quads and the night floor (a plane 12x the car's
+ * size) — each turned the whole pane opaque black over the wallpaper.
+ *
+ * Alpha factors of (Zero, One) leave `dst.a` exactly as the main opaque pass
+ * left it, so alpha keeps meaning "the car covers this pixel". The RGB factors
+ * are unchanged, so lit output is byte-identical to before on an opaque
+ * background. Note the canvas is premultiplied-alpha, so colour written where
+ * alpha stayed 0 still composites additively onto the wallpaper — which is
+ * exactly what a light pool falling on the ground should do.
+ */
+function setAdditiveKeepAlpha(THREE, material) {
+  material.blending = THREE.CustomBlending;
+  material.blendEquation = THREE.AddEquation;
+  material.blendSrc = THREE.SrcAlphaFactor;
+  material.blendDst = THREE.OneFactor;
+  material.blendEquationAlpha = THREE.AddEquation;
+  material.blendSrcAlpha = THREE.ZeroFactor;
+  material.blendDstAlpha = THREE.OneFactor;
+  return material;
+}
+
 /** Experimental: ?centerFill=mixed or ?mixed=1 */
 function readUrlCenterFill() {
   try {
@@ -12879,7 +12910,8 @@ class Component extends DCLogic {
     // Floor asphalt: hidden at night (BG shows through). Shadow catcher stays
     // so the car still drops a shadow; nightFloor carries lamp pools only.
     if (this.floorMesh) {
-      const showFloor = !next && this._carSceneVisible !== false;
+      const showFloor = !next && this._carSceneVisible !== false
+        && !this._isMixedCenterFill();
       this.floorMesh.visible = showFloor;
       const fm = this.floorMesh.material;
       if (!next) {
@@ -12971,7 +13003,8 @@ class Component extends DCLogic {
       this.nightFloor.visible = !!next && this._carSceneVisible === true;
     }
     if (this.floorMesh) {
-      this.floorMesh.visible = !next && this._carSceneVisible !== false;
+      this.floorMesh.visible = !next && this._carSceneVisible !== false
+        && !this._isMixedCenterFill();
     }
     if (this.shadowCatcher) {
       this.shadowCatcher.visible = this._carSceneVisible !== false;
@@ -13126,12 +13159,15 @@ class Component extends DCLogic {
     // car's bounding box and light groups are in hand.
     this._nightRigGeom = { frontPos, rearPos, beamGnd, poolH, hlH, pd, pa, baseY, carW, carL, leftDir, forwardDir };
 
-    // Night floor — white + AdditiveBlending = invisible where dark, pool colour
-    // where lit. POOL_LAYER only so the main pass (hemi/dir) never washes it.
+    // Night floor — white + additive = invisible where dark, pool colour where
+    // lit. POOL_LAYER only so the main pass (hemi/dir) never washes it.
+    // Alpha-preserving additive (see setAdditiveKeepAlpha): this plane is 12x
+    // the car, so plain AdditiveBlending's alpha accumulation blacked out the
+    // bottom two-thirds of the frame in mixed centerFill.
     const nfMat = new THREE.MeshStandardMaterial({
       color: 0xffffff, roughness: 1.0, metalness: 0, envMapIntensity: 0,
     });
-    nfMat.blending = THREE.AdditiveBlending;
+    setAdditiveKeepAlpha(THREE, nfMat);
     nfMat.transparent = true;
     nfMat.depthWrite = false;
     const dim = Math.max(carW, carL) * 12;   // large enough for full beam reach
@@ -19728,16 +19764,20 @@ class Component extends DCLogic {
       this.sAnaPass = sAna;
       this._resizePostFX(w, h);
 
-      // Additive overlay material — reused for both bloom and streak
+      // Additive overlay material — reused for both bloom and streak.
+      // setAdditiveKeepAlpha, not AdditiveBlending: both composers' RenderPass
+      // runs with clearAlpha = 1, so their targets carry alpha 1 over the WHOLE
+      // frame, not just where a light glows. See that helper for what plain
+      // additive alpha does to mixed centerFill.
       const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-      const bloomMat = new THREE.MeshBasicMaterial({
-        map: null, transparent: true, blending: THREE.AdditiveBlending,
+      const bloomMat = setAdditiveKeepAlpha(THREE, new THREE.MeshBasicMaterial({
+        map: null, transparent: true,
         depthTest: false, depthWrite: false, toneMapped: false,
-      });
-      const streakMat = new THREE.MeshBasicMaterial({
-        map: null, transparent: true, blending: THREE.AdditiveBlending,
+      }));
+      const streakMat = setAdditiveKeepAlpha(THREE, new THREE.MeshBasicMaterial({
+        map: null, transparent: true,
         depthTest: false, depthWrite: false, toneMapped: false,
-      });
+      }));
       const quad = new THREE.PlaneGeometry(2, 2);
       this._overlayQuadGeometry = quad;
       const overlayScene = new THREE.Scene();
@@ -25233,7 +25273,11 @@ class Component extends DCLogic {
     if (!this._androidApp) return;
     const bridge = window.AppLauncherBridge;
     if (!bridge || typeof bridge.updateCenterFill !== 'function') return;
-    const mode = this.state.centerFill === 'wallpaper' ? 'wallpaper' : 'car';
+    // Three states, not two: the dock cycles car -> wallpaper -> mixed, so it
+    // has to be told about 'mixed' or the chip reads "3D Car" while the car is
+    // actually sitting on a wallpaper — and, worse, hides its own gear, which
+    // is the only way to reach the wallpaper picker from the launcher.
+    const mode = this._normalizeCenterFill(this.state.centerFill);
     const appsOnly = (this.state.shellMode || '') === 'appsOnly';
     const payload = { mode, visible: !appsOnly };
     const sig = JSON.stringify(payload);

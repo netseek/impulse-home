@@ -5466,7 +5466,9 @@ public final class MainActivity extends Activity {
 
         row.addView(makeDockGap(Math.round(20 * density)));
 
-        layoutCenterFillChip = makeCenterFillChip(density, Math.round(168 * density), iconPx);
+        // 200dp, not 168: the widest state is "Wallpaper + 3D" WITH the gear
+        // beside it, which ellipsizes at the old width.
+        layoutCenterFillChip = makeCenterFillChip(density, Math.round(200 * density), iconPx);
         row.addView(layoutCenterFillChip);
         refreshCenterFillChip();
 
@@ -5501,7 +5503,10 @@ public final class MainActivity extends Activity {
         return d;
     }
 
-    /** Toggle 3D car / Bing wallpaper; gear configures wallpaper when active. */
+    /**
+     * Cycles 3D car -> Bing wallpaper -> both; the gear configures the
+     * wallpaper in either state that shows one.
+     */
     private View makeCenterFillChip(float density, int widthPx, int iconPx) {
         FrameLayout cell = new FrameLayout(this);
         android.widget.LinearLayout.LayoutParams lp =
@@ -5586,7 +5591,7 @@ public final class MainActivity extends Activity {
             JSONObject o = new JSONObject(json);
             if (o.has("mode")) {
                 String m = o.optString("mode", centerFillMode);
-                centerFillMode = "wallpaper".equals(m) ? "wallpaper" : "car";
+                centerFillMode = ("wallpaper".equals(m) || "mixed".equals(m)) ? m : "car";
             }
             if (layoutCenterFillChip != null && o.has("visible")) {
                 layoutCenterFillChip.setVisibility(o.optBoolean("visible", true)
@@ -5607,20 +5612,26 @@ public final class MainActivity extends Activity {
         if (layoutCenterFillChip.getVisibility() != View.VISIBLE) {
             layoutCenterFillChip.setVisibility(View.VISIBLE);
         }
+        // Three states: 3D car only, wallpaper only, or both (car over
+        // wallpaper). The gear opens the wallpaper picker, so it belongs to
+        // every state that actually shows a wallpaper — mixed included.
+        boolean mixed = "mixed".equals(centerFillMode);
         boolean wall = "wallpaper".equals(centerFillMode);
+        boolean usesWallpaper = wall || mixed;
         if (layoutCenterFillIcon != null) {
             layoutCenterFillIcon.setImageDrawable(systemDockIcon(
-                    wall ? android.R.drawable.ic_menu_gallery
+                    usesWallpaper ? android.R.drawable.ic_menu_gallery
                             : android.R.drawable.ic_menu_directions));
         }
         if (layoutCenterFillLabel != null) {
-            layoutCenterFillLabel.setText(wall ? "Wallpaper" : "3D Car");
+            layoutCenterFillLabel.setText(mixed ? "Wallpaper + 3D"
+                    : (wall ? "Wallpaper" : "3D Car"));
             styleDockLabel(layoutCenterFillLabel, false);
         }
         if (layoutCenterFillGear != null) {
-            layoutCenterFillGear.setVisibility(wall ? View.VISIBLE : View.GONE);
+            layoutCenterFillGear.setVisibility(usesWallpaper ? View.VISIBLE : View.GONE);
         }
-        setModeCellSelected(layoutCenterFillChip, wall);
+        setModeCellSelected(layoutCenterFillChip, usesWallpaper);
     }
 
     private Drawable makeSimpleLayoutGlyph(int sizePx, int kind) {
