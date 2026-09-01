@@ -6377,7 +6377,7 @@ public final class MainActivity extends Activity {
      * target fill, the same idea a real launcher's icon normalizer uses.
      */
     private float adaptiveIconFillScale(Drawable fg) {
-        float targetFill = 0.86f;
+        float targetFill = 0.98f;
         float contentFrac = measureForegroundContentFraction(fg);
         float scale = targetFill / Math.max(contentFrac, 0.35f);
         return Math.max(1f, Math.min(scale, 2.2f));
