@@ -5184,9 +5184,14 @@ public final class MainActivity extends Activity {
         return iconPx + Math.round(10f * density);
     }
 
-    /** Uniform inset so GWM emblems and adaptive icons read at the same scale. */
+    /**
+     * No inset — the icon fills the plate edge to edge and {@code iconFrame}'s
+     * clipToOutline (see {@link #wrapLauncherIconPlate}) trims it to the plate's
+     * own rounded-square shape, instead of shrinking it away from the corners
+     * with padding.
+     */
     private static float launcherIconInsetFrac() {
-        return 0.10f;
+        return 0f;
     }
 
     /**
@@ -5215,6 +5220,10 @@ public final class MainActivity extends Activity {
         iconFrame.setElevation(7f * density);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             iconFrame.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            // Crop the icon itself to the plate's rounded-square outline instead of
+            // padding it away from the corners — that's what let a full-bleed icon
+            // fill edge to edge without square corners poking out past the plate.
+            iconFrame.setClipToOutline(true);
         }
 
         int inset = Math.round(platePx * launcherIconInsetFrac());
