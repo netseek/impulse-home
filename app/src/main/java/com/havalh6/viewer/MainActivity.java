@@ -6344,12 +6344,13 @@ public final class MainActivity extends Activity {
         try {
             android.graphics.drawable.AdaptiveIconDrawable adaptive =
                     (android.graphics.drawable.AdaptiveIconDrawable) icon;
-            Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
-            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
-            int inset = -Math.round(sizePx * 0.25f);
-            int far = sizePx - inset;
             Drawable bg = adaptive.getBackground();
             Drawable fg = adaptive.getForeground();
+            float scale = adaptiveIconFillScale(fg);
+            Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+            int inset = -Math.round(sizePx * (scale - 1f) / 2f);
+            int far = sizePx - inset;
             if (bg != null) {
                 bg.setBounds(inset, inset, far, far);
                 bg.draw(canvas);
@@ -6362,6 +6363,59 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             Log.e(TAG, "Error normalizing adaptive icon", e);
             return icon;
+        }
+    }
+
+    /**
+     * How far to scale an adaptive icon's layers so the glyph reaches a
+     * consistent visual weight. Icon packs bake wildly different amounts of
+     * padding into the foreground layer's own 108dp canvas — a flat Material
+     * glyph (Settings, Camera) already fills nearly edge to edge, while a mark
+     * like Chrome's occupies a much smaller circle in the middle, sized for a
+     * circular launcher mask we never apply. A single fixed crop cannot fit
+     * both: measure each icon's real opaque footprint and scale to a fixed
+     * target fill, the same idea a real launcher's icon normalizer uses.
+     */
+    private float adaptiveIconFillScale(Drawable fg) {
+        float targetFill = 0.86f;
+        float contentFrac = measureForegroundContentFraction(fg);
+        float scale = targetFill / Math.max(contentFrac, 0.35f);
+        return Math.max(1f, Math.min(scale, 2.2f));
+    }
+
+    /** Fraction of the foreground layer's own canvas its opaque glyph occupies. */
+    private float measureForegroundContentFraction(Drawable fg) {
+        if (fg == null) return 1f;
+        Bitmap bmp = null;
+        try {
+            int probe = 96;
+            Drawable.ConstantState cs = fg.getConstantState();
+            Drawable copy = cs != null ? cs.newDrawable().mutate() : fg;
+            bmp = Bitmap.createBitmap(probe, probe, Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+            copy.setBounds(0, 0, probe, probe);
+            copy.draw(canvas);
+            int minX = probe, minY = probe, maxX = -1, maxY = -1;
+            int[] row = new int[probe];
+            for (int y = 0; y < probe; y++) {
+                bmp.getPixels(row, 0, probe, 0, y, probe, 1);
+                for (int x = 0; x < probe; x++) {
+                    if ((row[x] >>> 24) > 16) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+            if (maxX < minX || maxY < minY) return 1f;
+            float w = (maxX - minX + 1) / (float) probe;
+            float h = (maxY - minY + 1) / (float) probe;
+            return Math.max(w, h);
+        } catch (Exception e) {
+            return 1f;
+        } finally {
+            if (bmp != null) bmp.recycle();
         }
     }
 
