@@ -3706,7 +3706,7 @@ window.HavalSplash = (function () {
 
   <!-- bottom hint — tracks compensated --hv-launcher-bottom (60px → 22px gap) -->
   <div style="position: absolute; bottom: max(0px, calc(var(--hv-launcher-bottom, 60px) - 38px)); left: 50%; transform: translateX(-50%); font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: .14em; color: {{ hintColor }}; pointer-events: none; user-select: none; transition: opacity .6s ease, color 0.6s ease; opacity: {{ hintOpacity }};">
-    DRAG TO ORBIT &nbsp;·&nbsp; SCROLL TO ZOOM &nbsp;·&nbsp; RIGHT-DRAG TO PAN
+    DRAG TO ORBIT &nbsp;·&nbsp; SCROLL TO ZOOM
   </div>
   <div class="hv-toast {{ perfToastClass }}">
     <div class="hv-toast-mode">{{ perfToastTitle }}</div>
@@ -5504,12 +5504,16 @@ class Component extends DCLogic {
   _layoutCamStorageKey() { return 'h6_layout_cam_v1'; }
 
   _layoutCamBuiltins() {
-    // Captured from web shell preview (2026-08-28).
     // f/r/y are offsets from the car centre along forward / right / up,
-    // as multiples of the fit distance.
+    // as multiples of the fit distance. viewShift here is only a debug
+    // record of the shift at capture time - it's never read back (see
+    // _relToPose): the live gap-fit shift always overrides it.
     return {
+      // Captured from web shell preview (2026-08-28).
       triple: { f: 1.0912, r: -0.0179, y: 0.0382, tf: 0, tr: 0, ty: 0, viewShift: 0.1752 },
-      appCar: { f: 0.5017, r: 0.5783, y: 0.2108, tf: -0.0177, tr: 0.0275, ty: -0.0253, viewShift: 0.2971 },
+      // Re-captured on the Haval emulator (2026-09-01): near-pure side profile
+      // with slight elevation, in place of the earlier 3/4 front angle.
+      appCar: { f: -0.0009, r: 0.7635, y: 0.2695, tf: -0.0177, tr: 0.0275, ty: -0.0253, viewShift: 0.2981 },
     };
   }
 
@@ -6714,6 +6718,7 @@ class Component extends DCLogic {
       widgetMenuId: null,
       widgetMenuSide: null,
     });
+    this._applyFitCamera();
   }
 
   _closeGraphEditor() {
@@ -19071,6 +19076,13 @@ class Component extends DCLogic {
       controls.maxPolarAngle = Math.PI / 2 - 0.035;
       controls.minDistance = 2;
       controls.maxDistance = 120;
+      // Orbit must always pivot on the car. OrbitControls' default pan (right-drag,
+      // two-finger touch, arrow keys) translates controls.target itself, permanently
+      // moving the pivot off the car centre for every subsequent rotate. There is no
+      // feature here that needs a free-floating target - shell layout framing already
+      // shifts the car on-screen via a projection view offset (_applyShellViewOffset),
+      // not by moving the target - so panning is simply disabled.
+      controls.enablePan = false;
       this.controls = controls;
       this._initMaterialPicker();
       this._initHotspots(container);
@@ -19285,6 +19297,15 @@ class Component extends DCLogic {
               || 'cellGlowBorderWidth' in patch || 'cellGlowBorderMix' in patch
               || 'cellGlowBorderInset' in patch) {
             this._rebuildPowertrainCellGlows();
+          }
+          if ('wheelGlowRadius' in patch || 'wheelGlowY' in patch) {
+            this._rebuildPowertrainWheelGlows();
+          }
+          if ('bloomOn' in patch || 'bloomStrength' in patch) {
+            const want = !!(this._powertrainFxTune().bloomOn && this.state.powertrainOn);
+            this._setXrayBloomMeshes(want);
+            this._setXrayBloomStrength(false);
+            this._setXrayBloomStrength(want);
           }
           this._powertrainFxSig = '';
           if (this.requestRender) this.requestRender(4);
@@ -20021,6 +20042,11 @@ class Component extends DCLogic {
         };
 
         const anyLight = !!(this.state.lights && Object.values(this.state.lights).some(Boolean));
+        // X-ray drives the bloom pass on its own: its emissive parts are the
+        // only bright things in the frame and nothing else would light it.
+        const xrayBloom = !!(this.state.powertrainOn && this._powertrainRig
+          && this._powertrainRig.visible && this._powertrainFxTune().bloomOn
+          && this._xrayBloomMeshes && this._xrayBloomMeshes.length);
         const anyStreak = !!(this.state.lights && (this.state.lights.headlight || this.state.lights.reverse || this.state.lights.fogFront));
 
         // 1) Main scene (car + day lights; nightFloor is on POOL_LAYER only).
@@ -20058,7 +20084,7 @@ class Component extends DCLogic {
         this._perf.mainCalls = renderer.info.render.calls;
         this._perf.mainTris  = renderer.info.render.triangles;
 
-        if (anyLight && this.bloomComposer) {
+        if ((anyLight || xrayBloom) && this.bloomComposer) {
           if (this._postFxDirty) {
             syncCam(this.bloomCam);
             const savedBg = scene.background;
@@ -20419,9 +20445,20 @@ class Component extends DCLogic {
     const packs = manifest.batteries || {};
     const pack = packs[key] || packs[manifest.defaultBattery];
     if (!pack) return;
+    // Assert first, hide second. Only the model's own structural groups --
+    // the FX overlays below have their visibility driven per frame and must
+    // not be forced on here, or they flash for a frame on every swap.
+    ['Chassis', 'Suspension', 'Powerplant_Front', 'Powerplant_Rear', 'Exhaust',
+     'Steering_Rack'].forEach((n) => {
+      const g = rig.getObjectByName(n);
+      if (g) g.traverse((o) => { if (o.isMesh) o.visible = true; });
+    });
     Object.keys(packs).forEach((k) => {
       const g = rig.getObjectByName(packs[k].group);
-      if (g) g.visible = packs[k].group === pack.group;
+      if (!g) return;
+      const show = packs[k].group === pack.group;
+      g.visible = show;
+      if (show) g.traverse((o) => { if (o.isMesh) o.visible = true; });
     });
     const rear = rig.getObjectByName('Powerplant_Rear');
     if (rear) rear.visible = (pack.hidesGroups || []).indexOf('Powerplant_Rear') === -1;
@@ -20431,6 +20468,9 @@ class Component extends DCLogic {
     if (wheels) wheels.visible = false;
     this._powertrainPackKey = key;
     this._rebuildPowertrainBeads();
+    // The pack just changed, so the bloom set is pointing at the old one.
+    this._setXrayBloomMeshes(
+      !!(this.state.powertrainOn && this._powertrainFxTune().bloomOn));
     // Force a flow re-apply on the next tick (pack nodes changed).
     this._powertrainFxSig = '';
   }
@@ -20710,8 +20750,15 @@ class Component extends DCLogic {
         // ACES highlight rolloff. Sweeping this one pixel gave sat 0.81 at 0.22,
         // 0.47 at 0.5, 0.28 at 1.0 and 0.06 at 3.0 -- past about 1.0 the tone
         // curve's channel cross-talk turns any saturated hue white.
-        cellMax: 0.45,
-        cellColor: '#00ff66',
+        // With toneMapped off (see _powertrainGlowCell) intensity no longer
+        // trades against saturation, so this is set by where the pack's own
+        // blue channel starts to fill: measured (104,255,207) sat 0.592 at
+        // 1.0, going cyan at (104,255,255) by 2.4.
+        cellMax: 1.0,
+        // Pure green. With toneMapped off the cell writes this straight out,
+        // so dropping the blue component takes the blue channel out of the
+        // result too -- #00ff66 was rendering (104,255,207), a spring green.
+        cellColor: '#00ff00',
         cellLitMin: 1.0,
         cellEmptyColor: '#0a0d10',
         // A lit module is DARK with a green emissive, not green-painted. A
@@ -20771,7 +20818,10 @@ class Component extends DCLogic {
         tubeSpeedMax: 2.6,
         // Soft glow around whichever part is actually working.
         haloScale: 0.85,
-        haloOpacity: 0.28,
+        // Halved. These sit at the axle CENTRES, inboard between the wheels,
+        // and were the other half of the same complaint. The motors' own
+        // emissive still says which one is working.
+        haloOpacity: 0.14,
         haloOn: 1,
         // Battery pack halo — SOC read + charging pulse.
         battHaloScale: 1.08,
@@ -20780,6 +20830,13 @@ class Component extends DCLogic {
         // pack with depthTest off, so it stacks on the brightest thing in the
         // mode. At the shared 0.28 it drove clipping from 32% to 83% by itself.
         battHaloOpacity: 0.13,
+        // OFF. This sprite is a big soft green cloud centred on the pack --
+        // measured at 52862 px against the wheel patches' 28790, with its
+        // centroid at (671,734) next to the car's own centre (675,637). It
+        // is what reads as 'the recharge glow is in the middle of the car'.
+        // The pack already carries emissive cells, a rim on each and a bloom
+        // bleed, so the cloud was only adding haze.
+        battHaloOn: 0,
         // Per-module bloom. Additive is right HERE and nowhere else in the
         // mode: the pack shell is dark (#141a20), so the green has room to sit
         // on top of it without every channel piling into 255 the way it does
@@ -20796,28 +20853,65 @@ class Component extends DCLogic {
         // gap. They summed there and the pack read as bright stripes BETWEEN
         // the bars rather than as a rim around each one. The band now peaks
         // 10 mm inside the edge and is cut off at it, so the gaps stay dark.
-        cellGlowSpread: 0.03,
-        cellGlowOpacity: 0.42,
+        // Tight to the bar: the rim is inset and cut at the edge, so the only
+        // thing that used to spill past the rectangle was this margin.
+        cellGlowSpread: 0.014,
+        // Widening the band, not brightening it. Measured over the rim's own
+        // footprint, 58% of its pixels were ALREADY clipped at opacity 0.42, so
+        // more opacity only spreads white: 0.60 took clipping to 74.8% for no
+        // extra saturation. Growing the band inward instead took the lit area
+        // from 2144 px to 4872 px with clipping and saturation both held.
+        cellGlowOpacity: 0.48,
         // Just proud of the module's top face and BELOW the lid's, so the
         // lid clips the rim to its own window. Measured in world units the
         // module tops out at 0.375 and the lid at 0.380: the old 0.008 lift
         // put the plane at 0.383, above the lid, where depth testing could
         // not help and the rim painted across the whole pack.
         cellGlowLift: 0.002,
-        cellGlowBorderWidth: 0.013,
-        cellGlowBorderInset: 0.010,
+        cellGlowBorderWidth: 0.034,
+        cellGlowBorderInset: 0.024,
         cellGlowBorderMix: 1.0,
         battChargePulseHz: 1.5,
         battChargePulseAmp: 0.38,
-        // Screen-space wheel patches under each axle (replaces ICE/P2/P4 labels).
+        // Ground patches under the four wheels. They light on regen and on
+        // charge, because that is when the wheels are the SOURCE of the energy
+        // -- the motor halos sit at the axle centres, inboard, which reads as
+        // the middle of the car rather than as anything to do with the tyres.
         wheelGlowOn: 1,
+        // Route the emissive x-ray parts through the app's bloom composer, so
+        // the light actually BLEEDS instead of stopping at the surface. This is
+        // the only thing here that costs real frame time: CLAUDE.md measures
+        // the post-FX passes at 2.0 ms/frame on the head unit, and this forces
+        // the bloom half of that on whenever x-ray is up, regardless of whether
+        // any car light is lit. Set to 0 to get the emission without the bleed.
+        bloomOn: 1,
+        // Softer than the 0.2 the light rig uses. The bloom lands on a
+        // near-white floor, where added light has nowhere to go but toward
+        // white, so at full strength the bleed reads as haze over the whole
+        // car rather than as a glow on the cells.
+        // Raised from 0.09. That was set low while the ring and the motor
+        // casings were also enrolled and their halo covered the car; with only
+        // the six cells feeding it, the bleed stays on the pack and can carry
+        // more without turning into fog.
+        bloomStrength: 0.075,
+        // Both raised. These were set while the battery halo was still laid
+        // over the middle of the car, which is what the eye went to; with that
+        // off they are the only recharge cue on the floor and can carry it.
+        wheelGlowRadius: 0.52,
+        wheelGlowOpacity: 0.72,
+        wheelGlowY: 0.02,
+        wheelGlowHz: 1.1,
         // Battery: a fill wave runs through the SOC bar and the module holding
         // the current level breathes, so the pack says which WAY the charge is
         // moving rather than only how much of it is left.
         cellWaveOn: 1,
-        cellWaveAmp: 0.5,
-        cellWaveHz: 0.35,
-        cellEdgeAmp: 0.4,
+        // The bump that runs along the SOC bar. It travels toward module 5
+        // while the pack fills and back toward module 0 while it drains --
+        // modules light in index order as SOC rises, so "up the indices" is
+        // literally the direction the level moves.
+        cellWaveAmp: 1.35,
+        cellWaveHz: 0.5,
+        cellEdgeAmp: 0.6,
         cellEdgeHz: 2.0,
         // Single outer ring — subtle breathe + glow pulse; active flow only.
         ringOn: 1,
@@ -20831,19 +20925,30 @@ class Component extends DCLogic {
         // ring from sat 0.07 to 0.78. They get their own deeper colours for the
         // same reason: the pale mint/sky tones used for the motors' emissive
         // are lighter than the floor they sit on.
-        // Two shades each: the band is a linear gradient across its width.
-        ringChargeColor: '#8df0c4',
-        ringChargeColor2: '#22b877',
-        ringDriveColor: '#9ad6f5',
-        ringDriveColor2: '#1f78c4',
-        // White hairline on the band edges plus a soft white bloom outside it,
-        // both sized in SCREEN pixels via fwidth so they hold at any zoom.
-        ringBorderPx: 1.0,
-        ringGlowPx: 3.0,
-        ringGlowGain: 0.55,
+        // Solid, not a gradient: both stops are the same colour, and each is
+        // fully saturated (one channel at zero) so the tone survives sitting on
+        // a near-white floor. Keeping the two uniforms lets a gradient come
+        // back from __ptGlow without a code change.
+        ringChargeColor: '#00ff00',
+        ringChargeColor2: '#00ff00',
+        ringDriveColor: '#6cc4f0',
+        ringDriveColor2: '#6cc4f0',
+        // White border on the band edges plus a soft white bloom either side of
+        // it, both sized in SCREEN pixels via fwidth so they hold at any zoom.
+        ringBorderPx: 1.8,
+        // The border no longer goes to solid white -- it blends part way and
+        // carries part of the alpha, so the band's colour reads through it.
+        ringBorderAlpha: 0.62,
+        ringGlowPx: 10.0,
+        ringGlowGain: 1.0,
         // Slack built into the geometry so the outer bloom has somewhere to go.
         ringMargin: 0.12,
-        ringGain: 0.62,
+        // Full strength. The ring's shader writes raw colour (a bare
+        // ShaderMaterial gets no tone mapping), so what was holding it back
+        // was alpha: below 1.0 it composites toward the near-white floor and
+        // reads as paint. Measured peak colour by gain -- 0.62 (160,230,197)
+        // sat 0.304, 0.90 sat 0.498, 1.0 (94,234,167) sat 0.598.
+        ringGain: 1.0,
         ringMaxScale: 2.85,
         ringScaleBase: 0.965,
         ringScaleAmp: 0.035,
@@ -20858,7 +20963,10 @@ class Component extends DCLogic {
         // colour. Never through black -- see _makeGroundRingMaterial.
         ringEdgeWhite: 1.0,
         ringGlowHz: 0.48,
-        ringInner: 0.86,
+        // Narrower band. The border and its bloom are sized in screen
+        // pixels, so thinning the colour fill leaves them untouched and the
+        // white edge carries proportionally more of the ring.
+        ringInner: 0.91,
         ringOuter: 1.00,
         ringY: 0.02,
       };
@@ -20978,6 +21086,7 @@ class Component extends DCLogic {
     this._powertrainParts = parts;
     this._powertrainFxRoot = root;
     this._ptChassisLook = null;   // materials were just re-cloned
+    this._xrayBloomMeshes = [];   // and the old meshes are gone with them
     this._powertrainBeadGroups = [];
     this._powertrainFxSig = '';
     this._powertrainFxT = 0;
@@ -21083,6 +21192,7 @@ class Component extends DCLogic {
         uColor: { value: new THREE.Color('#2ee089') },
         uColor2: { value: new THREE.Color('#22b877') },
         uBorderPx: { value: tune.ringBorderPx },
+        uBorderA: { value: tune.ringBorderAlpha != null ? tune.ringBorderAlpha : 1.0 },
         uGlowPx: { value: tune.ringGlowPx },
         uGlowGain: { value: tune.ringGlowGain },
       },
@@ -21103,6 +21213,7 @@ class Component extends DCLogic {
         'uniform vec3 uColor;',
         'uniform vec3 uColor2;',
         'uniform float uBorderPx;',
+        'uniform float uBorderA;',
         'uniform float uGlowPx;',
         'uniform float uGlowGain;',
         'varying vec2 vRingXY;',
@@ -21129,8 +21240,8 @@ class Component extends DCLogic {
         '  gl *= step( 0.0, outside ) * uGlowGain;',
         // Body first, then the hairline, then the bloom beyond it.
         '  vec3 col = mix( grad, vec3( 1.0 ), uEdgeWhite * ( 1.0 - band ) * 0.35 );',
-        '  col = mix( col, vec3( 1.0 ), clamp( line + gl, 0.0, 1.0 ) );',
-        '  float a = max( band * uAlpha, max( line, gl * 0.85 ) * uAlpha );',
+        '  col = mix( col, vec3( 1.0 ), clamp( line * uBorderA + gl, 0.0, 1.0 ) );',
+        '  float a = max( band * uAlpha, max( line * uBorderA, gl * 0.85 ) * uAlpha );',
         '  gl_FragColor = vec4( col, clamp( a, 0.0, 1.0 ) );',
         '}',
       ].join(NL),
@@ -21170,6 +21281,55 @@ class Component extends DCLogic {
       root.add(mesh);
       this._powertrainRings.push(mesh);
     }
+  }
+
+  /**
+   * A soft patch on the ground under each wheel, lit while that axle is
+   * feeding the pack.
+   *
+   * The motor halos live at the axle CENTRES, which is inboard between the
+   * wheels -- fine for "this motor is working", useless for "this is where the
+   * energy is coming from". These sit on the floor at the hub anchors the
+   * manifest already publishes, so they read as the contact patches they are.
+   */
+  _rebuildPowertrainWheelGlows() {
+    const THREE = this.THREE;
+    const root = this._powertrainFxRoot;
+    const manifest = this._powertrainManifest;
+    if (!root || !THREE || !manifest) return;
+    (this._powertrainWheelGlows || []).forEach((w) => {
+      if (w.mesh.parent) w.mesh.parent.remove(w.mesh);
+      if (w.mesh.geometry) w.mesh.geometry.dispose();
+      if (w.mesh.material) w.mesh.material.dispose();
+    });
+    this._powertrainWheelGlows = [];
+    const anchors = manifest.anchors || {};
+    const tune = this._powertrainFxTune();
+    const r = tune.wheelGlowRadius;
+    [['hubFL', 'front'], ['hubFR', 'front'],
+     ['hubRL', 'rear'], ['hubRR', 'rear']].forEach(([key, axle]) => {
+      const a = anchors[key];
+      if (!a) return;
+      const geo = new THREE.PlaneGeometry(r * 2, r * 2);
+      geo.rotateX(-Math.PI / 2);          // lie on the floor
+      const mat = new THREE.MeshBasicMaterial({
+        map: this._powertrainHaloTexture(),
+        color: new THREE.Color('#33ffb8'),
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      // x/z from the hub, y on the ground -- the rig's origin IS the ground.
+      mesh.position.set(a[0], tune.wheelGlowY, a[2]);
+      mesh.renderOrder = 5;
+      mesh.frustumCulled = false;
+      mesh.visible = false;
+      root.add(mesh);
+      this._powertrainWheelGlows.push({ axle: axle, mesh: mesh, level: 0 });
+    });
   }
 
   /** 64px radial falloff, reused by every halo sprite. */
@@ -21330,6 +21490,7 @@ class Component extends DCLogic {
     this._rebuildPowertrainHalos();
     this._rebuildPowertrainBatteryHalo();
     this._rebuildPowertrainCellGlows();
+    this._rebuildPowertrainWheelGlows();
     this._rebuildPowertrainGround();
   }
 
@@ -21537,6 +21698,7 @@ class Component extends DCLogic {
       if (!lit) {
         m.emissive.setHex(0x000000);
         m.color.setHex(emptyHex);
+        m.toneMapped = true;      // an unlit cell is just a dark box again
         m.transparent = false;
         m.opacity = 1;
         m.metalness = 0.55;
@@ -21556,6 +21718,12 @@ class Component extends DCLogic {
       m.metalness = 0;
       m.roughness = 0.55;
       if (m.envMapIntensity !== undefined) m.envMapIntensity = 0;
+      // A lit cell is EMISSIVE, so it skips tone mapping. ACES rolls saturated
+      // highlights toward white by design, which is why every attempt to make
+      // these brighter made them paler instead -- measured on the bar face,
+      // saturation FELL 0.315 -> 0.098 as intensity went 0.58 -> 2.4. With
+      // toneMapped off it holds at ~0.59 no matter how hard the cell is driven.
+      m.toneMapped = false;
       m.userData.glowBase = tone.max * strength;
       m.emissiveIntensity = tone.max * strength;
     }
@@ -21692,6 +21860,16 @@ class Component extends DCLogic {
         this._powertrainBatteryHalo.sprite.material.color.copy(cellTone.color);
       }
 
+      // Wheel patches: an axle lights when it is REGENERATING, and all four
+      // light on a wall charge (the whole car is taking energy in).
+      const regenFront = frontDir < 0;
+      const regenRear = rearDir < 0;
+      (this._powertrainWheelGlows || []).forEach((w) => {
+        const axleRegen = w.axle === 'front' ? regenFront : regenRear;
+        w.level = plug ? 0.75 : (axleRegen ? 1 : 0);
+        w.mesh.material.color.copy(G.regen.color);
+      });
+
       this._powertrainGroundDir = (charging || discharging)
         ? (charging ? 1 : -1) : 0;
       const ringHex = parseInt(String(charging
@@ -21701,8 +21879,13 @@ class Component extends DCLogic {
         ? (tune.ringChargeColor2 || '#22b877')
         : (tune.ringDriveColor2 || '#1f78c4')).replace('#', ''), 16);
       (this._powertrainRings || []).forEach((m) => {
-        m.material.uniforms.uColor.value.setHex(ringHex);
-        m.material.uniforms.uColor2.value.setHex(ringHex2);
+        const u = m.material.uniforms;
+        u.uColor.value.setHex(ringHex);
+        u.uColor2.value.setHex(ringHex2);
+        u.uBorderPx.value = tune.ringBorderPx;
+        u.uBorderA.value = tune.ringBorderAlpha != null ? tune.ringBorderAlpha : 1.0;
+        u.uGlowPx.value = tune.ringGlowPx;
+        u.uGlowGain.value = tune.ringGlowGain;
       });
     }
   }
@@ -21739,6 +21922,11 @@ class Component extends DCLogic {
       g.level = 0;
       g.sprite.visible = false;
       if (g.sprite.material.uniforms) g.sprite.material.uniforms.uOpacity.value = 0;
+    });
+    (this._powertrainWheelGlows || []).forEach((w) => {
+      w.level = 0;
+      w.mesh.visible = false;
+      w.mesh.material.opacity = 0;
     });
     this._powertrainCellDir = 0;
     this._powertrainGroundDir = 0;
@@ -21828,7 +22016,7 @@ class Component extends DCLogic {
     if (this._powertrainBatteryHalo) {
       const bh = this._powertrainBatteryHalo;
       const charging = cellDir > 0;
-      let op = bh.level * tune.battHaloOpacity;
+      let op = tune.battHaloOn ? bh.level * tune.battHaloOpacity : 0;
       if (charging) {
         op *= 0.72 + tune.battChargePulseAmp
           * (0.5 + 0.5 * Math.sin(t * tune.battChargePulseHz * Math.PI * 2));
@@ -21845,6 +22033,18 @@ class Component extends DCLogic {
     // module the level currently sits in breathes on top of that. Intensity
     // only -- the colour was already picked in _applyPowertrainFlow, and
     // rewriting a Color per module per frame buys nothing.
+    const wheels = this._powertrainWheelGlows;
+    if (wheels && wheels.length) {
+      const wOn = !!tune.wheelGlowOn;
+      const wPulse = 0.72 + 0.28 * Math.sin(t * tune.wheelGlowHz * Math.PI * 2);
+      for (let i = 0; i < wheels.length; i++) {
+        const w = wheels[i];
+        const lit = wOn && w.level > 0.01;
+        if (w.mesh.visible !== lit) w.mesh.visible = lit;
+        if (lit) w.mesh.material.opacity = w.level * tune.wheelGlowOpacity * wPulse;
+      }
+    }
+
     const glows = this._powertrainCellGlows;
     if (glows && glows.length) {
       const gn = glows.length;
@@ -21927,11 +22127,76 @@ class Component extends DCLogic {
     return true;
   }
 
+  /**
+   * Put the emissive x-ray parts into the bloom pass, or take them out again.
+   *
+   * _darkenNonBloom blacks out every mesh that is NOT in _bloomMeshSet and
+   * hides the transparent ones, so membership is what decides who blooms. The
+   * additive layers -- rim planes, halos, wheel patches, the wire -- are all
+   * transparent and stay OUT deliberately: they are already a glow, and
+   * blooming them would double it.
+   *
+   * Every pack module goes in, lit or not. An unlit one has emissive 0, so it
+   * renders black in the bloom pass and contributes nothing; that keeps the set
+   * static per pack instead of needing a rebuild every time SOC moves a cell.
+   */
+  _setXrayBloomMeshes(on) {
+    const BL = this.BLOOM_LAYER || 1;
+    if (!this._bloomMeshSet) this._bloomMeshSet = new Set();
+    (this._xrayBloomMeshes || []).forEach((m) => {
+      m.layers.disable(BL);
+      this._bloomMeshSet.delete(m);
+    });
+    this._xrayBloomMeshes = [];
+    if (!on) return;
+    const parts = this._powertrainParts || {};
+    const add = (obj) => {
+      if (!obj) return;
+      obj.traverse((o) => {
+        if (!o.isMesh) return;
+        o.layers.enable(BL);
+        this._bloomMeshSet.add(o);
+        this._xrayBloomMeshes.push(o);
+      });
+    };
+    const key = this._powertrainPackKey || this._currentTrim().pack;
+    const pack = ((this._powertrainManifest || {}).batteries || {})[key];
+    (pack && pack.modules ? pack.modules : []).forEach((n) => {
+      if (parts[n]) add(parts[n].root);
+    });
+    // Cells only. The ground ring and the motor casings were in here first and
+    // both are large bright shapes -- their halo covered the whole car and read
+    // as fog. UnrealBloom spreads across mips regardless of its radius, so the
+    // size of what you feed it decides the size of the glow.
+  }
+
+  /**
+   * Soften the shared bloom pass while x-ray is the thing driving it, and put
+   * it back for the light rig. Coupled on purpose: there is one pass, and the
+   * strength that suits a headlight against night is far too much for a battery
+   * cell against a white studio floor.
+   */
+  _setXrayBloomStrength(on) {
+    const composer = this.bloomComposer;
+    if (!composer || !composer.passes) return;
+    const pass = composer.passes.find((x) => x && x.strength !== undefined);
+    if (!pass) return;
+    if (on) {
+      if (this._bloomStrengthWas === undefined) this._bloomStrengthWas = pass.strength;
+      pass.strength = this._powertrainFxTune().bloomStrength;
+    } else if (this._bloomStrengthWas !== undefined) {
+      pass.strength = this._bloomStrengthWas;
+      this._bloomStrengthWas = undefined;
+    }
+  }
+
   _applyPowertrainVisibility(on) {
     if (!on) {
       this._setBodyGhost(false);
       this._setShadowSoft(false);
       this._clearPowertrainFx();
+      this._setXrayBloomMeshes(false);
+      this._setXrayBloomStrength(false);
       if (this._powertrainRig) this._powertrainRig.visible = false;
       if (this.requestRender) this.requestRender(6);
       return;
@@ -21947,6 +22212,9 @@ class Component extends DCLogic {
       this._powertrainFxSig = '';
       this._tickPowertrainFx(0, performance.now());
       this._syncXrayWheelGlows(performance.now());
+      const wantBloom = !!this._powertrainFxTune().bloomOn;
+      this._setXrayBloomMeshes(wantBloom);
+      this._setXrayBloomStrength(wantBloom);
       if (this.requestRender) this.requestRender(12);
     });
   }
@@ -22868,15 +23136,114 @@ class Component extends DCLogic {
   }
 
   /**
+   * How many columns at the INNER edge of a widget board (the edge facing the
+   * car) are completely empty - the left board's inner edge is its rightmost
+   * column, the right board's is its leftmost. An empty board (no items placed
+   * yet, or the slot isn't in widget mode) frees every column.
+   */
+  _boardEmptyInnerCols(side, mode) {
+    const cols = this._gridColsForMode(mode);
+    const items = this._board(side, mode).items || [];
+    if (!items.length) return cols;
+    const occ = new Array(cols).fill(false);
+    items.forEach((it) => {
+      const x0 = Math.max(0, it.x || 0);
+      const x1 = Math.min(cols, x0 + Math.max(1, it.w || 1));
+      for (let c = x0; c < x1; c++) occ[c] = true;
+    });
+    let empty = 0;
+    if (side === 'left') {
+      for (let c = cols - 1; c >= 0 && !occ[c]; c--) empty++;
+    } else {
+      for (let c = 0; c < cols && !occ[c]; c++) empty++;
+    }
+    return empty;
+  }
+
+  /**
+   * Shrinks a reserved board rect toward its outer edge by however many inner
+   * columns sit empty, so an under-filled board gives that space back to the
+   * car. A slot showing a freeform app (not the widget grid) keeps its full
+   * reserved rect - there's no per-column occupancy to measure there.
+   */
+  _effectiveBoardBounds(side, mode, bounds) {
+    if (!bounds) return bounds;
+    if ((this._board(side, mode).use || 'app') !== 'widgets') return bounds;
+    const cols = this._gridColsForMode(mode);
+    const emptyCols = this._boardEmptyInnerCols(side, mode);
+    if (!emptyCols) return bounds;
+    const colW = (bounds.r - bounds.l) / cols;
+    const usedCols = Math.max(0, cols - emptyCols);
+    return side === 'left'
+      ? Object.assign({}, bounds, { r: bounds.l + usedCols * colW })
+      : Object.assign({}, bounds, { l: bounds.r - usedCols * colW });
+  }
+
+  /**
+   * Where a candidate pose (saved preset, or the procedural 3/4 fallback)
+   * would project the car's centre on screen, at zero view-shift - measured
+   * with a scratch camera, not guessed. Lets _shellCameraTarget solve for the
+   * EXACT shift that lands the car in the middle of the actual gap, for any
+   * angle/distance/aspect, instead of a hand-tuned gain+clamp pair.
+   */
+  _projectedCenterPx(mode, w, h) {
+    const THREE = window.THREE;
+    if (!THREE || !this._fitCenter || !this._fitDist) return null;
+    const key = (mode === 'triple' || mode === 'appCar') ? mode : null;
+    const saved = key && this._layoutCameras && this._layoutCameras[key];
+    let position, target;
+    if (saved && typeof saved.f === 'number') {
+      ({ position, target } = this._relPositionTarget(saved));
+    } else {
+      const c = this._fitCenter;
+      const d = this._fitDist;
+      position = new THREE.Vector3(c.x - d * 0.66, c.y + d * 0.30, c.z + d * 0.70);
+      target = c;
+    }
+    if (!this._scratchCam) this._scratchCam = new THREE.PerspectiveCamera();
+    const cam = this._scratchCam;
+    cam.fov = (this.camera && this.camera.fov) || 45;
+    cam.aspect = w / h;
+    cam.near = 0.1;
+    cam.far = 10000;
+    cam.position.copy(position);
+    cam.up.set(0, 1, 0);
+    cam.lookAt(target);
+    cam.updateProjectionMatrix();
+    cam.updateMatrixWorld(true);
+    const ndc = this._fitCenter.clone().project(cam);
+    return (ndc.x + 1) / 2 * w;
+  }
+
+  /**
+   * Exact viewShift to land the car's projected centre at gapCenterPx, given
+   * the pixel-shift-per-unit-shift is measured to be exactly 1:1 with width
+   * (setViewOffset is a pure post-projection crop, so this holds regardless
+   * of distance/fov/angle - see the measurement note above _shellCameraTarget).
+   * Falls back to null (caller keeps its own clamp/estimate) if the car's
+   * centre can't be projected yet (e.g. before the model has loaded).
+   */
+  _exactCenterShift(mode, gapCenterPx, w, h) {
+    const x0 = this._projectedCenterPx(mode, w, h);
+    if (x0 == null || !isFinite(x0)) return null;
+    return (gapCenterPx - x0) / w;
+  }
+
+  /**
    * Shell camera framing from the remaining gap between left/right slots.
    * Orbit target stays on the car; on-screen shift uses a projection view
-   * offset so rotation still pivots around the car centre.
+   * offset so rotation still pivots around the car centre. The gap already
+   * grows into whichever inner board columns are not actually holding a
+   * widget (see _effectiveBoardBounds), not just the raw reserved rect.
    */
   _shellCameraTarget(popupActive) {
     const mode = this._shellMode || this.state.shellMode || 'triple';
     const w = window.innerWidth || 1920;
-    const leftB = this._shellLeftBounds || { l: 48, t: 100, r: 740, b: 530 };
-    const rightB = this._shellRightBounds || { l: 1180, t: 100, r: 1872, b: 530 };
+    const h = window.innerHeight || 720;
+    const leftB = this._effectiveBoardBounds('left', mode,
+      this._shellLeftBounds || { l: 48, t: 100, r: 740, b: 530 });
+    const rightB = this._effectiveBoardBounds('right', mode,
+      this._shellRightBounds || { l: 1180, t: 100, r: 1872, b: 530 });
     if (mode === 'appsOnly') {
       return { distMul: 1.22, viewShift: 0 };
     }
@@ -22888,9 +23255,13 @@ class Component extends DCLogic {
       const remaining = Math.max(0.32, Math.min(0.62, gapW / w));
       const gapCenter = (gapL + gapR) * 0.5;
       const offsetFrac = (gapCenter - w * 0.5) / (w * 0.5);
+      const exact = this._exactCenterShift(mode, gapCenter, w, h);
+      const viewShift = exact != null
+        ? Math.max(-0.6, Math.min(0.6, exact))
+        : Math.max(0.08, Math.min(0.36, offsetFrac * 0.55));
       return {
         distMul: Math.max(0.86, Math.min(1.08, 0.72 + remaining * 0.45)),
-        viewShift: Math.max(0.08, Math.min(0.36, offsetFrac * 0.55)),
+        viewShift,
       };
     }
     const gapL = leftB.r;
@@ -22944,8 +23315,10 @@ class Component extends DCLogic {
     };
   }
 
-  _relToPose(rel) {
-    if (!rel || !this._fitCenter || !this._fitDist) return null;
+  // Pure position/target math for a saved relative pose - no dependency on
+  // _shellCameraTarget, so this can be called FROM _shellCameraTarget (to
+  // find where a candidate pose projects on screen) without recursing.
+  _relPositionTarget(rel) {
     const THREE = window.THREE;
     const { F, R } = this._carBasis();
     const c = this._fitCenter.clone();
@@ -22958,11 +23331,23 @@ class Component extends DCLogic {
       .addScaledVector(F, d * (rel.tf || 0))
       .addScaledVector(R, d * (rel.tr || 0))
       .add(new THREE.Vector3(0, d * (rel.ty || 0), 0));
+    return { position, target };
+  }
+
+  _relToPose(rel) {
+    if (!rel || !this._fitCenter || !this._fitDist) return null;
+    const { position, target } = this._relPositionTarget(rel);
+    // f/r/y/tf/tr/ty are a saved VIEWING ANGLE - a deliberate human choice of
+    // direction/elevation, independent of the widget layout. viewShift/distMul
+    // fit that angle into whatever gap the boards currently leave open, so they
+    // always come from the live computation rather than the value captured at
+    // save time - otherwise a saved pose goes stale the moment a widget is
+    // added, removed or resized on either board.
     const auto = this._shellCameraTarget(!!window.__androidPopupActive);
     return {
       position,
       target,
-      viewShift: rel.viewShift != null ? rel.viewShift : (auto.viewShift || 0),
+      viewShift: auto.viewShift || 0,
       distMul: auto.distMul,
     };
   }
@@ -23025,9 +23410,9 @@ class Component extends DCLogic {
     const saved = key && this._layoutCameras && this._layoutCameras[key];
     const hasSaved = !!(saved && typeof saved.f === 'number');
     const home = this._layoutHomePose();
-    const viewShift = (hasSaved && saved.viewShift != null)
-      ? saved.viewShift
-      : (target.viewShift || 0);
+    // viewShift always tracks the LIVE gap (see _relToPose) - a saved pose only
+    // fixes the viewing angle, never the fit-to-gap shift.
+    const viewShift = target.viewShift || 0;
     // While the load intro (or a preset tween) owns the camera, only remember
     // the shell framing — don't snap or apply view-offset over the animation.
     // Applying view-offset here desyncs bloom/streak overlays from the car.
@@ -23062,7 +23447,7 @@ class Component extends DCLogic {
     }
     if (hasSaved) {
       this._fitCam.distMul = target.distMul;
-      if (saved.viewShift == null) this._fitCam.viewShift = target.viewShift || 0;
+      this._fitCam.viewShift = target.viewShift || 0;
       this._applyShellViewOffset(this._fitCam.viewShift || 0);
       return;
     }
@@ -25630,6 +26015,7 @@ class Component extends DCLogic {
       widgetPlaceAnchorX: null,
       widgetPlaceAnchorY: null,
     });
+    this._applyFitCamera();
   }
 
   _removeWidget(side, id) {
@@ -25656,6 +26042,7 @@ class Component extends DCLogic {
     }
     if (!(board.items || []).length) this._setSlotUse(side, 'app');
     this.setState(patch);
+    this._applyFitCamera();
   }
 
   _setSlotUse(side, use) {
@@ -25669,6 +26056,7 @@ class Component extends DCLogic {
     const patch = { widgetRev: (this.state.widgetRev || 0) + 1 };
     patch[stateKey] = next;
     this.setState(patch);
+    this._applyFitCamera();
     try {
       if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setSlotUse === 'function') {
         window.AppLauncherBridge.setSlotUse(side, next);
