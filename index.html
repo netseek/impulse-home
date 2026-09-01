@@ -19385,7 +19385,7 @@ class Component extends DCLogic {
           }
           if ('cellGlowSpread' in patch || 'cellGlowLift' in patch
               || 'cellGlowBorderWidth' in patch || 'cellGlowBorderMix' in patch
-              || 'cellGlowBorderInset' in patch) {
+              || 'cellGlowBorderInset' in patch || 'cellGlowBorderOuter' in patch) {
             this._rebuildPowertrainCellGlows();
           }
           if ('wheelGlowRadius' in patch || 'wheelGlowY' in patch) {
@@ -21005,9 +21005,19 @@ class Component extends DCLogic {
         // put the plane at 0.383, above the lid, where depth testing could
         // not help and the rim painted across the whole pack.
         cellGlowLift: 0.002,
-        cellGlowBorderWidth: 0.034,
+        // Narrow enough that the gaussian has decayed to ~10% by the time it
+        // reaches the module outline, so cutting it there (cellGlowBorderOuter)
+        // leaves no visible seam. At the old 0.034 the band was still at 61%
+        // of peak AT the outline and ran 12 mm past it -- and since cellGapFill
+        // butts the modules together, each rim spilled onto its neighbour and
+        // the two summed additively into the solid green stripes between cells.
+        cellGlowBorderWidth: 0.016,
         cellGlowBorderInset: 0.024,
         cellGlowBorderMix: 1.0,
+        // How far past the module outline the rim may reach, in metres. 0 keeps
+        // every cell's glow inside its own footprint; cellGlowBorderWidth * 0.35
+        // reproduces the old spilling behaviour.
+        cellGlowBorderOuter: 0,
         battChargePulseHz: 1.5,
         battChargePulseAmp: 0.38,
         // Ground patches under the four wheels. They light on regen and on
@@ -21721,6 +21731,7 @@ class Component extends DCLogic {
           uWidth: { value: tune.cellGlowBorderWidth },
           uInset: { value: tune.cellGlowBorderInset },
           uMix: { value: tune.cellGlowBorderMix },
+          uOuter: { value: tune.cellGlowBorderOuter || 0 },
         },
         vertexShader: [
           'varying vec2 vCellPos;',
@@ -21740,6 +21751,7 @@ class Component extends DCLogic {
           'uniform float uWidth;',
           'uniform float uInset;',
           'uniform float uMix;',
+          'uniform float uOuter;',
           'varying vec2 vCellPos;',
           'void main() {',
           // Metres from the bar's centre, then the signed distance to its
@@ -21750,10 +21762,14 @@ class Component extends DCLogic {
           '  vec2 e = abs( vCellPos ) - uHalf;',
           '  float d = length( max( e, vec2( 0.0 ) ) ) + min( max( e.x, e.y ), 0.0 );',
           '  float w = max( 1e-4, uWidth );',
-          // Peak the band uInset INSIDE the outline and cut it at the edge, so
-          // no light lands in the 20 mm gap between neighbouring bars.
+          // Peak the band uInset INSIDE the outline and stop it at uOuter, which
+          // defaults to the outline itself. cellGapFill butts the modules edge
+          // to edge, so anything that reaches past d = 0 lands on the NEIGHBOUR
+          // and the two rims sum additively -- that is what turned the dividers
+          // between cells into solid green stripes while the pack's outer edge,
+          // which has no neighbour to double with, kept the thin rim we wanted.
           '  float t = ( d + uInset ) / w;',
-          '  float edge = exp( - t * t ) * ( 1.0 - smoothstep( 0.0, w * 0.35, d ) );',
+          '  float edge = exp( - t * t ) * ( 1.0 - smoothstep( uOuter - w * 0.35, uOuter, d ) );',
           '  float fill = 1.0 - smoothstep( - w, 0.0, d );',
           '  float g = mix( fill, edge, uMix ) * uOpacity;',
           // Additive: contribution is rgb * alpha, so the colour stays full
