@@ -20528,11 +20528,13 @@ class Component extends DCLogic {
     // the glow planes are sized from these boxes in _rebuildPowertrainCellGlows.
     const span = tuneSpan(this);
     const lift = this._powertrainFxTune().cellLift || 0;
+    const gapFill = this._powertrainFxTune().cellGapFill || 1;
     Object.keys(packs).forEach((k) => {
       (packs[k].modules || []).forEach((n) => {
         const node = rig.getObjectByName(n);
         if (!node) return;
         node.scale.x = span;                // absolute, so re-applying is a no-op
+        node.scale.z = gapFill;
         if (node.userData.cellBaseY === undefined) node.userData.cellBaseY = node.position.y;
         node.position.y = node.userData.cellBaseY + lift;
       });
@@ -20935,16 +20937,20 @@ class Component extends DCLogic {
         // x = 0, so this scales them symmetrically into the window.
         // The bars are authored x +/-0.639 but the lid ends at +/-0.626, so
         // as shipped they overhung it by 13 mm each side and glowed down both
-        // flanks of the pack. 0.97 lands them at +/-0.620: hard against the
-        // lid edge, no dark margin left over, and nothing spilling past it.
-        cellSpanFrac: 0.97,
-        // Lift the bars clear of the lid. Measured in the rig's own space the
-        // module tops sit at y 0.351 and the lid at 0.356 -- the lid is ON TOP
-        // of them, so only its window let any green through and everything
-        // either side of that window read as a dark margin. +0.012 puts the
-        // top faces proud of it, and with the span above holding the ends
-        // 6 mm inside the lid outline they still do not glow down the flanks.
-        cellLift: 0.012,
+        // flanks of the pack. 0.34 tucks them inside the lid's window, which
+        // they already fill across that axis.
+        cellSpanFrac: 0.34,
+        // Closes the dark dividers BETWEEN cells. Those gaps run along the
+        // pack's length (21 mm of spacing per module), not across it, so no
+        // amount of cellSpanFrac could ever have touched them -- that scales
+        // the other axis. Each module's pivot sits at its own z centre, so
+        // 1.10 grows neighbours into each other and the measured gap closes
+        // to exactly 0.
+        cellGapFill: 1.10,
+        // Stays 0: the bars belong UNDER the lid, showing through its window.
+        // Lifting them proud of it exposes their full authored width, which is
+        // the full-pack look, not what is wanted here.
+        cellLift: 0,
         // Widening the band, not brightening it. Measured over the rim's own
         // footprint, 58% of its pixels were ALREADY clipped at opacity 0.42, so
         // more opacity only spreads white: 0.60 took clipping to 74.8% for no
