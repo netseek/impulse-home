@@ -19277,11 +19277,13 @@ class Component extends DCLogic {
             this._rebuildPowertrainHalos();
             this._rebuildPowertrainBatteryHalo();
           }
-          if ('ringCount' in patch || 'ringInner' in patch || 'ringOuter' in patch) {
+          if ('ringCount' in patch || 'ringInner' in patch || 'ringOuter' in patch
+              || 'ringMargin' in patch) {
             this._rebuildPowertrainGround();
           }
           if ('cellGlowSpread' in patch || 'cellGlowLift' in patch
-              || 'cellGlowBorderWidth' in patch || 'cellGlowBorderMix' in patch) {
+              || 'cellGlowBorderWidth' in patch || 'cellGlowBorderMix' in patch
+              || 'cellGlowBorderInset' in patch) {
             this._rebuildPowertrainCellGlows();
           }
           this._powertrainFxSig = '';
@@ -20734,8 +20736,16 @@ class Component extends DCLogic {
         // The travelling arrows stay "almost white" as asked, but with a tint
         // rather than pure white: additive was clipping them to a flat 255 on
         // every channel (measured delta sat 0.097 -- no hue left at all).
-        arrowDriveColor: '#6ec6ff',
-        arrowRegenColor: '#6effc0',
+        arrowDriveColor: '#ffffff',
+        arrowRegenColor: '#ffffff',
+        // Soft additive bloom behind each arrow. The arrow itself is alpha
+        // blended so it stays crisp white; the glow is a separate sprite so it
+        // can be additive without dragging the arrow's own colour with it.
+        arrowGlowOn: 1,
+        arrowGlowScale: 3.4,
+        arrowGlowOpacity: 0.30,
+        arrowGlowDriveColor: '#bfe4ff',
+        arrowGlowRegenColor: '#bfffdd',
         wireTint: 0.78,
         wireGlow: 0.22,
         hvMax: 0.95,
@@ -20780,14 +20790,22 @@ class Component extends DCLogic {
         // to it, not a sprite: a screen-facing square sized off the LONG axis
         // came out 1.7 units across -- a third of the car -- and four of them
         // overlapping filled the frame with one white-green blob.
-        // Outline round each level bar. The first attempt at this used a
-        // 0.055 m band over a 0.18 m spread at 0.34 opacity and the four bars'
-        // haloes merged into one cyan wash across the pack -- hence a band a
-        // third that width, hugging the edge, with no fill component at all.
-        cellGlowSpread: 0.10,
-        cellGlowOpacity: 0.32,
-        cellGlowLift: 0.008,
-        cellGlowBorderWidth: 0.022,
+        // Outline round each level bar, drawn INSIDE its own footprint.
+        // Measured: consecutive modules are only 20 mm apart, so a 22 mm band
+        // centred on the outline put both neighbours' borders into the same
+        // gap. They summed there and the pack read as bright stripes BETWEEN
+        // the bars rather than as a rim around each one. The band now peaks
+        // 10 mm inside the edge and is cut off at it, so the gaps stay dark.
+        cellGlowSpread: 0.03,
+        cellGlowOpacity: 0.42,
+        // Just proud of the module's top face and BELOW the lid's, so the
+        // lid clips the rim to its own window. Measured in world units the
+        // module tops out at 0.375 and the lid at 0.380: the old 0.008 lift
+        // put the plane at 0.383, above the lid, where depth testing could
+        // not help and the rim painted across the whole pack.
+        cellGlowLift: 0.002,
+        cellGlowBorderWidth: 0.013,
+        cellGlowBorderInset: 0.010,
         cellGlowBorderMix: 1.0,
         battChargePulseHz: 1.5,
         battChargePulseAmp: 0.38,
@@ -20813,8 +20831,18 @@ class Component extends DCLogic {
         // ring from sat 0.07 to 0.78. They get their own deeper colours for the
         // same reason: the pale mint/sky tones used for the motors' emissive
         // are lighter than the floor they sit on.
-        ringChargeColor: '#4ede9c',
-        ringDriveColor: '#5ab4ec',
+        // Two shades each: the band is a linear gradient across its width.
+        ringChargeColor: '#8df0c4',
+        ringChargeColor2: '#22b877',
+        ringDriveColor: '#9ad6f5',
+        ringDriveColor2: '#1f78c4',
+        // White hairline on the band edges plus a soft white bloom outside it,
+        // both sized in SCREEN pixels via fwidth so they hold at any zoom.
+        ringBorderPx: 1.0,
+        ringGlowPx: 3.0,
+        ringGlowGain: 0.55,
+        // Slack built into the geometry so the outer bloom has somewhere to go.
+        ringMargin: 0.12,
         ringGain: 0.62,
         ringMaxScale: 2.85,
         ringScaleBase: 0.965,
@@ -21053,7 +21081,13 @@ class Component extends DCLogic {
         uOuter: { value: tune.ringOuter },
         uEdgeWhite: { value: tune.ringEdgeWhite != null ? tune.ringEdgeWhite : 1.0 },
         uColor: { value: new THREE.Color('#2ee089') },
+        uColor2: { value: new THREE.Color('#22b877') },
+        uBorderPx: { value: tune.ringBorderPx },
+        uGlowPx: { value: tune.ringGlowPx },
+        uGlowGain: { value: tune.ringGlowGain },
       },
+      // fwidth() -- WebGL1 needs the extension declared; WebGL2 has it built in.
+      extensions: { derivatives: true },
       vertexShader: [
         'varying vec2 vRingXY;',
         'void main() {',
@@ -21067,16 +21101,37 @@ class Component extends DCLogic {
         'uniform float uOuter;',
         'uniform float uEdgeWhite;',
         'uniform vec3 uColor;',
+        'uniform vec3 uColor2;',
+        'uniform float uBorderPx;',
+        'uniform float uGlowPx;',
+        'uniform float uGlowGain;',
         'varying vec2 vRingXY;',
         'void main() {',
         // RingGeometry lies in XY before the mesh is laid flat, so the band
         // coordinate is just the radius. A sine across it softens both edges.
+        // k runs 0..1 across the nominal band. The geometry is built wider
+        // than that (ringMargin), so k goes negative inside and past 1 outside,
+        // which is where the outer bloom lives.
         '  float k = ( length( vRingXY ) - uInner ) / max( 1e-4, uOuter - uInner );',
-        '  float band = sin( clamp( k, 0.0, 1.0 ) * 3.14159265 );',
-        // Full-strength colour at the core, fading to white at the rim. rgb is
-        // NOT scaled by coverage -- that is what produced the dark halo.
-        '  vec3 col = mix( uColor, vec3( 1.0 ), uEdgeWhite * ( 1.0 - band ) );',
-        '  gl_FragColor = vec4( col, band * uAlpha );',
+        '  float kc = clamp( k, 0.0, 1.0 );',
+        '  float band = sin( kc * 3.14159265 );',
+        // One screen pixel, expressed in k. fwidth is the k change per pixel.
+        '  float px = max( fwidth( k ), 1e-6 );',
+        // Linear gradient between the two shades across the band.
+        '  vec3 grad = mix( uColor, uColor2, kc );',
+        // White hairline on both edges of the band.
+        '  float edgeDist = min( k, 1.0 - k );',
+        '  float line = 1.0 - smoothstep( 0.0, uBorderPx * px, edgeDist );',
+        '  line *= step( -uBorderPx * px, k ) * step( k, 1.0 + uBorderPx * px );',
+        // Soft white bloom OUTSIDE the band only.
+        '  float outside = max( -k, k - 1.0 );',
+        '  float gl = exp( - ( outside * outside ) / ( uGlowPx * px * uGlowPx * px ) );',
+        '  gl *= step( 0.0, outside ) * uGlowGain;',
+        // Body first, then the hairline, then the bloom beyond it.
+        '  vec3 col = mix( grad, vec3( 1.0 ), uEdgeWhite * ( 1.0 - band ) * 0.35 );',
+        '  col = mix( col, vec3( 1.0 ), clamp( line + gl, 0.0, 1.0 ) );',
+        '  float a = max( band * uAlpha, max( line, gl * 0.85 ) * uAlpha );',
+        '  gl_FragColor = vec4( col, clamp( a, 0.0, 1.0 ) );',
         '}',
       ].join(NL),
       transparent: true,
@@ -21101,7 +21156,11 @@ class Component extends DCLogic {
     const tune = this._powertrainFxTune();
     const count = Math.max(1, Math.min(6, Math.round(tune.ringCount)));
     for (let i = 0; i < count; i++) {
-      const geo = new THREE.RingGeometry(tune.ringInner, tune.ringOuter, 72, 1);
+      // Built wider than the nominal band: the shader's k stays anchored to
+      // ringInner/ringOuter, so the slack is where the outer bloom is drawn.
+      const mg = tune.ringMargin || 0;
+      const geo = new THREE.RingGeometry(
+        Math.max(0.01, tune.ringInner - mg), tune.ringOuter + mg, 96, 1);
       const mesh = new THREE.Mesh(geo, this._makeGroundRingMaterial());
       mesh.rotation.x = -Math.PI / 2;        // stand it on the floor
       mesh.position.y = tune.ringY;          // clear of the floor plane
@@ -21233,6 +21292,25 @@ class Component extends DCLogic {
         m.renderOrder = 9;
         m.frustumCulled = false;
         root.add(m);
+        // Bloom sprite parented to the arrow so it tracks it for free.
+        const gs = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: this._powertrainHaloTexture(),
+          color: new THREE.Color(0xffffff),
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          depthTest: false,
+        }));
+        // _powertrainFxTune() directly: `tune` is const-declared further down
+        // this same closure, so referencing it here is a temporal-dead-zone
+        // throw that silently left the whole lane unbuilt.
+        const aTune = this._powertrainFxTune();
+        gs.scale.setScalar((aTune.arrowLength || 0.052) * aTune.arrowGlowScale);
+        gs.renderOrder = 8;
+        gs.frustumCulled = false;
+        m.add(gs);
+        m.userData.glowSprite = gs;
         meshes.push(m);
       }
       const tubeMat = this._makeFlowTubeMaterial();
@@ -21343,12 +21421,17 @@ class Component extends DCLogic {
           uHalf: { value: new THREE.Vector2(size.x * 0.5, size.z * 0.5) },
           uPlane: { value: new THREE.Vector2(size.x + sp, size.z + sp) },
           uWidth: { value: tune.cellGlowBorderWidth },
+          uInset: { value: tune.cellGlowBorderInset },
           uMix: { value: tune.cellGlowBorderMix },
         },
         vertexShader: [
-          'varying vec2 vCellUv;',
+          'varying vec2 vCellPos;',
           'void main() {',
-          '  vCellUv = uv;',
+          // The plane was laid flat with rotateX, so its own local X/Z ARE the
+          // bar's axes, in metres. Deriving the distance from position instead
+          // of uv removes the axis question entirely -- pairing uPlane against
+          // uv got the band running across the bars twice, once each way.
+          '  vCellPos = vec2( position.x, position.z );',
           '  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );',
           '}',
         ].join(NL2),
@@ -21356,21 +21439,23 @@ class Component extends DCLogic {
           'uniform vec3 uColor;',
           'uniform float uOpacity;',
           'uniform vec2 uHalf;',
-          'uniform vec2 uPlane;',
           'uniform float uWidth;',
+          'uniform float uInset;',
           'uniform float uMix;',
-          'varying vec2 vCellUv;',
+          'varying vec2 vCellPos;',
           'void main() {',
           // Metres from the bar's centre, then the signed distance to its
           // rectangle outline: negative inside, zero on the edge, positive out.
           // Doing this in metres and not in plane UV is what keeps the band the
           // same width all the way round -- a module is 1.278 x 0.21 m, so a
           // UV-space band would be six times wider along it than across its end.
-          '  vec2 q = abs( vCellUv - 0.5 ) * uPlane;',
-          '  vec2 e = q - uHalf;',
+          '  vec2 e = abs( vCellPos ) - uHalf;',
           '  float d = length( max( e, vec2( 0.0 ) ) ) + min( max( e.x, e.y ), 0.0 );',
           '  float w = max( 1e-4, uWidth );',
-          '  float edge = exp( - ( d * d ) / ( w * w ) );',
+          // Peak the band uInset INSIDE the outline and cut it at the edge, so
+          // no light lands in the 20 mm gap between neighbouring bars.
+          '  float t = ( d + uInset ) / w;',
+          '  float edge = exp( - t * t ) * ( 1.0 - smoothstep( 0.0, w * 0.35, d ) );',
           '  float fill = 1.0 - smoothstep( - w, 0.0, d );',
           '  float g = mix( fill, edge, uMix ) * uOpacity;',
           // Additive: contribution is rgb * alpha, so the colour stays full
@@ -21381,7 +21466,11 @@ class Component extends DCLogic {
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        depthTest: false,
+        // Depth-tested, unlike every other FX layer here. The module runs the
+        // full width of the pack but the lid only exposes a window onto it, so
+        // letting the lid occlude the rim is what keeps the glow on the green
+        // rectangle you can actually see instead of on the whole bar.
+        depthTest: true,
       });
       const geo = new THREE.PlaneGeometry(size.x + sp, size.z + sp);
       geo.rotateX(-Math.PI / 2);        // lie flat over the bar
@@ -21606,10 +21695,14 @@ class Component extends DCLogic {
       this._powertrainGroundDir = (charging || discharging)
         ? (charging ? 1 : -1) : 0;
       const ringHex = parseInt(String(charging
-        ? (tune.ringChargeColor || '#00c964')
-        : (tune.ringDriveColor || '#0e7fd0')).replace('#', ''), 16);
+        ? (tune.ringChargeColor || '#8df0c4')
+        : (tune.ringDriveColor || '#9ad6f5')).replace('#', ''), 16);
+      const ringHex2 = parseInt(String(charging
+        ? (tune.ringChargeColor2 || '#22b877')
+        : (tune.ringDriveColor2 || '#1f78c4')).replace('#', ''), 16);
       (this._powertrainRings || []).forEach((m) => {
         m.material.uniforms.uColor.value.setHex(ringHex);
+        m.material.uniforms.uColor2.value.setHex(ringHex2);
       });
     }
   }
@@ -21705,12 +21798,20 @@ class Component extends DCLogic {
         b.curve.getPointAt(u, tmp);
         m.position.copy(tmp);
         this._orientPowertrainArrow(m, b.curve, u, b.dir);
-        // Own near-white tint. Lerping the (now deeper) wire colour toward
-        // white gave a mid-tone arrow; these want to read as bright sparks with
-        // just enough hue to say which way the energy is going.
         m.material.color.setHex(parseInt(String(b.dir < 0
-          ? (tune.arrowRegenColor || '#d4ffe9')
-          : (tune.arrowDriveColor || '#d6f0ff')).replace('#', ''), 16));
+          ? (tune.arrowRegenColor || '#ffffff')
+          : (tune.arrowDriveColor || '#ffffff')).replace('#', ''), 16));
+        const gsp = m.userData.glowSprite;
+        if (gsp) {
+          const glowOn = !!tune.arrowGlowOn;
+          if (gsp.visible !== glowOn) gsp.visible = glowOn;
+          if (glowOn) {
+            gsp.material.opacity = tune.beadOpacity * tune.arrowGlowOpacity;
+            gsp.material.color.setHex(parseInt(String(b.dir < 0
+              ? (tune.arrowGlowRegenColor || '#bfffdd')
+              : (tune.arrowGlowDriveColor || '#bfe4ff')).replace('#', ''), 16));
+          }
+        }
       }
     });
 
