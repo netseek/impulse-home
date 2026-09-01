@@ -407,7 +407,7 @@ public final class MainActivity extends Activity {
                     appObj.put("label", label);
 
                     try {
-                        Drawable icon = info.loadIcon(pm);
+                        Drawable icon = normalizeAdaptiveIcon(info.loadIcon(pm), 96);
                         if (icon != null) {
                             int w = Math.max(1, icon.getIntrinsicWidth());
                             int h = Math.max(1, icon.getIntrinsicHeight());
@@ -6320,6 +6320,51 @@ public final class MainActivity extends Activity {
         return info.loadIcon(pm);
     }
 
+    /**
+     * Adaptive icons (API 26+; what {@code info.loadIcon(pm)} returns for almost
+     * every real installed app) keep their glyph inside a safe zone that is only
+     * 72/108 of the drawable's own canvas — the rest is transparent margin a real
+     * launcher crops away when it scales the icon to fill its slot. Drawn at
+     * native scale instead, the glyph reads smaller than our plate and the
+     * plate's own near-white background shows through the margin as a visible
+     * border around it. Scale the layers up by that same 108/72 = 1.5x here so
+     * the safe-zone content fills the target size edge to edge, matching what
+     * every real launcher does.
+     * <p>
+     * Only real installed apps (i.e. the car) hit this — the emulator's pinned
+     * stubs draw our own bundled vector icons ({@code ic_gwm},
+     * {@code ic_energy_assistant}), which are already full-bleed.
+     */
+    private Drawable normalizeAdaptiveIcon(Drawable icon, int sizePx) {
+        if (icon == null || sizePx <= 0
+                || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O
+                || !(icon instanceof android.graphics.drawable.AdaptiveIconDrawable)) {
+            return icon;
+        }
+        try {
+            android.graphics.drawable.AdaptiveIconDrawable adaptive =
+                    (android.graphics.drawable.AdaptiveIconDrawable) icon;
+            Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+            int inset = -Math.round(sizePx * 0.25f);
+            int far = sizePx - inset;
+            Drawable bg = adaptive.getBackground();
+            Drawable fg = adaptive.getForeground();
+            if (bg != null) {
+                bg.setBounds(inset, inset, far, far);
+                bg.draw(canvas);
+            }
+            if (fg != null) {
+                fg.setBounds(inset, inset, far, far);
+                fg.draw(canvas);
+            }
+            return new BitmapDrawable(getResources(), bmp);
+        } catch (Exception e) {
+            Log.e(TAG, "Error normalizing adaptive icon", e);
+            return icon;
+        }
+    }
+
     private boolean isEmulatorDevice() {
         if (emulatorDevice != null) return emulatorDevice;
         String fp = android.os.Build.FINGERPRINT != null ? android.os.Build.FINGERPRINT : "";
@@ -6361,13 +6406,13 @@ public final class MainActivity extends Activity {
         if (item == null) return;
         android.widget.ImageView iv = (android.widget.ImageView) item.findViewWithTag("icon");
         android.widget.TextView tv = (android.widget.TextView) item.findViewWithTag("label");
-        if (iv != null) iv.setImageDrawable(icon);
+        float density = getResources().getDisplayMetrics().density;
+        int iconPx = dockIconPx > 0 ? dockIconPx : Math.round(60 * density);
+        if (iv != null) iv.setImageDrawable(normalizeAdaptiveIcon(icon, iconPx));
         View plate = item.findViewWithTag("iconPlate");
         if (plate != null) {
-            float density = getResources().getDisplayMetrics().density;
             boolean darkPlate = editPackage != null && usesDarkIconPlate(editPackage);
             plate.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
-            int iconPx = dockIconPx > 0 ? dockIconPx : Math.round(60 * density);
             int platePx = dockPlatePx(iconPx, density);
             int inset = Math.round(platePx * launcherIconInsetFrac());
             plate.setPadding(inset, inset, inset, inset);
@@ -6639,7 +6684,7 @@ public final class MainActivity extends Activity {
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
             plateLp.rightMargin = Math.round(10 * d);
             iconPlate.setLayoutParams(plateLp);
-            iv.setImageDrawable(icon);
+            iv.setImageDrawable(normalizeAdaptiveIcon(icon, iconPx));
             row.addView(iconPlate);
 
             android.widget.TextView tv = new android.widget.TextView(this);
