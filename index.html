@@ -20527,10 +20527,14 @@ class Component extends DCLogic {
     // Trim the modules to the lid's window before anything measures them --
     // the glow planes are sized from these boxes in _rebuildPowertrainCellGlows.
     const span = tuneSpan(this);
+    const lift = this._powertrainFxTune().cellLift || 0;
     Object.keys(packs).forEach((k) => {
       (packs[k].modules || []).forEach((n) => {
         const node = rig.getObjectByName(n);
-        if (node) node.scale.x = span;      // absolute, so re-applying is a no-op
+        if (!node) return;
+        node.scale.x = span;                // absolute, so re-applying is a no-op
+        if (node.userData.cellBaseY === undefined) node.userData.cellBaseY = node.position.y;
+        node.position.y = node.userData.cellBaseY + lift;
       });
     });
 
@@ -20929,11 +20933,18 @@ class Component extends DCLogic {
         // the middle (+/-0.17 measured), so the ends poked past the lid edge
         // and glowed down both flanks of the pack. Their node pivots sit at
         // x = 0, so this scales them symmetrically into the window.
-        // 0.70 -> the bars span x +/-0.447 against the pack's +/-0.626 half
-        // width: they fill the centre and the flanks stay dark. 0.34 tucked
-        // them inside the lid window but left them reading as small
-        // separated squares.
-        cellSpanFrac: 0.70,
+        // The bars are authored x +/-0.639 but the lid ends at +/-0.626, so
+        // as shipped they overhung it by 13 mm each side and glowed down both
+        // flanks of the pack. 0.97 lands them at +/-0.620: hard against the
+        // lid edge, no dark margin left over, and nothing spilling past it.
+        cellSpanFrac: 0.97,
+        // Lift the bars clear of the lid. Measured in the rig's own space the
+        // module tops sit at y 0.351 and the lid at 0.356 -- the lid is ON TOP
+        // of them, so only its window let any green through and everything
+        // either side of that window read as a dark margin. +0.012 puts the
+        // top faces proud of it, and with the span above holding the ends
+        // 6 mm inside the lid outline they still do not glow down the flanks.
+        cellLift: 0.012,
         // Widening the band, not brightening it. Measured over the rim's own
         // footprint, 58% of its pixels were ALREADY clipped at opacity 0.42, so
         // more opacity only spreads white: 0.60 took clipping to 74.8% for no
