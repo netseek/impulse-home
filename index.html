@@ -19409,6 +19409,10 @@ class Component extends DCLogic {
               || 'badgeGlowPx' in patch) {
             this._rebuildPowertrainBadges();
           }
+          if ('socTextX' in patch || 'socTextZ' in patch || 'socTextLen' in patch
+              || 'socTextWide' in patch) {
+            this._rebuildPowertrainSocText();
+          }
           if ('bloomOn' in patch || 'bloomStrength' in patch) {
             const want = !!(this._powertrainFxTune().bloomOn && this.state.powertrainOn);
             this._setXrayBloomMeshes(want);
@@ -21082,7 +21086,10 @@ class Component extends DCLogic {
         cellWaveHz: 0.5,
         // The edge cell's blink: a multiplier swept between these two, so it
         // drops well below the neighbouring cells and comes back over them.
-        cellEdgeLow: 0.30,
+        // Near dark at the bottom of the swing. The point is the contrast with
+        // the cells either side of it, and 0.30 still read as "dimmer" rather
+        // than as a cell going out and coming back.
+        cellEdgeLow: 0.08,
         cellEdgeHigh: 2.10,
         // ~1.1 Hz. At the old 2.0 the period was over three seconds, which read
         // as breathing rather than blinking.
@@ -21182,6 +21189,19 @@ class Component extends DCLogic {
         badgeGlowPasses: 3,
         badgeGlowDriveColor: '#00a8ff',
         badgeGlowRegenColor: '#ffffff',
+
+        // Charge percentage on the floor, in the gap between the bodywork and
+        // the ring. The car reaches about 1.0 m to the side and the ring's
+        // inner edge lands near 2.2 m, so 1.70 sits in clear floor between them.
+        socTextOn: 1,
+        socTextX: 1.70,
+        socTextZ: 0,
+        socTextLen: 1.10,
+        socTextWide: 0.62,
+        socTextColor: '#00ff3c',
+        socTextGlowPx: 14,
+        socTextGlowPasses: 3,
+        socTextOpacity: 0.95,
         // Label is knocked out of the plate. badgeTextKnockPx widens the hole,
         // badgeTextEdge* draws the dark edge that gives it definition where
         // plate and floor are close in brightness.
@@ -21635,6 +21655,103 @@ class Component extends DCLogic {
   }
 
   /**
+   * The charge percentage, lying on the floor beside the car in the gap between
+   * the bodywork and the ring. Built per side like the axle plates, so it reads
+   * upright from wherever the spectator is standing.
+   *
+   * Only ever shown on the plug. It is the number you watch while the car is
+   * charging, and it would be noise the rest of the time.
+   */
+  _rebuildPowertrainSocText() {
+    const THREE = this.THREE;
+    const root = this._powertrainFxRoot;
+    if (!root || !THREE) return;
+    (this._powertrainSocText || []).forEach((n) => {
+      if (n.mesh.parent) n.mesh.parent.remove(n.mesh);
+      if (n.mesh.geometry) n.mesh.geometry.dispose();
+      if (n.mesh.material) n.mesh.material.dispose();
+      if (n.tex) n.tex.dispose();
+    });
+    this._powertrainSocText = [];
+    const tune = this._powertrainFxTune();
+    [1, -1].forEach((side) => {
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(tune.socTextLen * PT_BADGE_PX_PER_M);
+      cv.height = Math.round(tune.socTextWide * PT_BADGE_PX_PER_M);
+      const tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = 4;
+      const geo = new THREE.PlaneGeometry(tune.socTextLen, tune.socTextWide);
+      geo.rotateX(-Math.PI / 2);
+      geo.rotateY(tune.badgeSpin);
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex, transparent: true, opacity: 0,
+        depthWrite: false,
+        // Same as the axle plates: it belongs behind the car when it is on the
+        // far side, not painted over the bodywork.
+        depthTest: true,
+        toneMapped: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(tune.socTextX * side, tune.badgeY, tune.socTextZ);
+      mesh.rotation.y = side < 0 ? Math.PI : 0;
+      mesh.renderOrder = 6;
+      mesh.frustumCulled = false;
+      mesh.visible = false;
+      root.add(mesh);
+      this._powertrainSocText.push({ side: side, mesh: mesh, tex: tex, cv: cv, sig: '' });
+    });
+  }
+
+  /** Big, solid and glowing -- read from across the room, not up close. */
+  _paintPowertrainSocText(node, text) {
+    const cv = node.cv;
+    const g = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const tune = this._powertrainFxTune();
+    g.clearRect(0, 0, W, H);
+    // Shrink to fit rather than letting "100%" run off the plate.
+    let px = Math.round(H * 0.78);
+    const fontAt = (n) => 'bold ' + n + 'px system-ui, "Segoe UI", sans-serif';
+    g.font = fontAt(px);
+    const room = W - tune.socTextGlowPx * 3;
+    while (px > 12 && g.measureText(text).width > room) {
+      px -= 4;
+      g.font = fontAt(px);
+    }
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.shadowColor = tune.socTextColor;
+    g.shadowBlur = tune.socTextGlowPx * 2;
+    g.fillStyle = tune.socTextColor;
+    // Repeat fills to build the glow up: one pass barely registers against a
+    // 236/255 floor.
+    for (let i = 0; i < tune.socTextGlowPasses; i++) g.fillText(text, W / 2, H / 2);
+    node.tex.needsUpdate = true;
+  }
+
+  _updatePowertrainSocText(socPct, plugged) {
+    const nodes = this._powertrainSocText;
+    if (!nodes || !nodes.length) return;
+    const tune = this._powertrainFxTune();
+    const on = !!(plugged && tune.socTextOn);
+    const text = Math.round(socPct) + '%';
+    nodes.forEach((n) => {
+      if (!on) {
+        n.mesh.visible = false;
+        n.mesh.material.opacity = 0;
+        n.sig = '';
+        return;
+      }
+      if (n.sig !== text) {
+        n.sig = text;
+        this._paintPowertrainSocText(n, text);
+      }
+      n.mesh.visible = true;
+      n.mesh.material.opacity = tune.socTextOpacity;
+    });
+  }
+
+  /**
    * Paint one plate. `fill` is 0..1 of the width and is the ONLY part that is
    * opaque -- the empty remainder stays transparent so the floor shows through,
    * which is what makes it read as a gauge rather than as a label.
@@ -21952,6 +22069,7 @@ class Component extends DCLogic {
     this._rebuildPowertrainCellGlows();
     this._rebuildPowertrainWheelGlows();
     this._rebuildPowertrainBadges();
+    this._rebuildPowertrainSocText();
     this._rebuildPowertrainGround();
   }
 
@@ -22339,6 +22457,10 @@ class Component extends DCLogic {
 
       this._powertrainGroundDir = (charging || discharging)
         ? (charging ? 1 : -1) : 0;
+      // The ring is now a CHARGING animation and nothing else, so it needs the
+      // plug specifically -- `charging` above also counts regen, which is a
+      // driving state and had the ring flashing up mid-drive.
+      this._powertrainPlugged = plug;
       const ringHex = parseInt(String(charging
         ? (tune.ringChargeColor || '#8df0c4')
         : (tune.ringDriveColor || '#9ad6f5')).replace('#', ''), 16);
@@ -22357,6 +22479,7 @@ class Component extends DCLogic {
     }
 
     this._updatePowertrainBadges(flow);
+    this._updatePowertrainSocText(socPct, plug);
   }
 
   _clearPowertrainFx() {
@@ -22402,8 +22525,14 @@ class Component extends DCLogic {
       b.mesh.material.opacity = 0;
       b.sig = '';
     });
+    (this._powertrainSocText || []).forEach((n) => {
+      n.mesh.visible = false;
+      n.mesh.material.opacity = 0;
+      n.sig = '';
+    });
     this._powertrainCellDir = 0;
     this._powertrainGroundDir = 0;
+    this._powertrainPlugged = false;
     this._powertrainFxSig = '';
     if (this._xrayWheelGlows) {
       this._xrayWheelGlows.front.mesh.visible = false;
@@ -22581,11 +22710,13 @@ class Component extends DCLogic {
     }
 
     // Single outer ring: fixed at max radius, subtle breathe + glow pulse.
-    // Hidden on idle — only charging (inward/green) or consuming (outward/blue).
+    // On the plug only. It used to show while consuming as well, which made it
+    // near-permanent scenery; keeping it for charging alone is what makes it
+    // mean something when it appears.
     const rings = this._powertrainRings;
     const groundDir = this._powertrainGroundDir || 0;
     if (rings && rings.length) {
-      const live = !!(groundDir && tune.ringOn);
+      const live = !!(groundDir && tune.ringOn && this._powertrainPlugged);
       const m = rings[0];
       if (live && m) {
         const breathe = 0.5 + 0.5 * Math.sin(t * tune.ringPulseHz * Math.PI * 2);
