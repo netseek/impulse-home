@@ -582,6 +582,29 @@ chasing a "regression" that was one debug line. If a capture looks wrong,
 reload the page before believing any measurement taken after you have poked at
 texture state from devtools.
 
+## There is no fuel-litres signal — it is derived, and the constant is shared
+
+`CAR_SIGNALS` carries fuel *consumption* (`fuelInst`, `fuelTrip`, `fuelAvg`,
+`cycleFuel`) and fuel *range* (`fuelRange`, km), and for a long time nothing
+that says how much is actually in the tank. The level is
+**`car.basic.remain_fuel_percentage`** — Impulse publishes it, and
+`ThemeBridgeImpl.getAvailableKeys()` is where it is exposed to the cluster
+themes, alongside `fuel_mode_remain_odometer`.
+
+**Litres are not on the bus at all.** Impulse derives them in
+`DashboardCardLayout.formatDashboardFuelLiters` as `percent * 55 / 100` at one
+decimal, from `DASHBOARD_FUEL_TANK_CAPACITY_LITERS = 55f` in `BottomBarUI.kt`;
+its dashboard card prints the pair as `"31.9 L - 210 km"`. The viewer derives
+them the same way from `PT_FUEL_TANK_LITERS = 55`, so the two screens cannot
+quote different amounts of fuel for one tank. **If Impulse ever retunes that
+constant, retune this one too** — a mismatch is invisible in either app alone
+and only shows up when both are on screen at once.
+
+Impulse is the sibling repo at `StudioProjects/haval-app-tool-multimidia`
+(package `br.com.redesurftank.havalshisuku`). Its theme bridge is the reference
+for which car keys are actually readable, so reach for it before concluding a
+signal does not exist — this one was written off as missing more than once.
+
 ## Media visualisers
 
 They have **no audio input**. `_graphVizLevel` derives its level from EV power

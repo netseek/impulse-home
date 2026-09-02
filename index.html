@@ -4781,11 +4781,20 @@ const CAR_SIGNALS = {
   batterySoc: 'car.ev_info.cur_battery_power_percentage',
   evRange: 'car.ev_info.electric_mode_remain_odometer',
   fuelRange: 'car.ev_info.fuel_mode_remain_odometer',
+  // Tank LEVEL, not consumption -- the one fuel key the viewer was missing.
+  // Impulse publishes it to the cluster themes alongside fuel_mode_remain_odometer
+  // and its dashboard card prints the pair as "31.9 L - 210 km".
+  fuelLevel: 'car.basic.remain_fuel_percentage',
   cycleEv: 'car.ev_info.cycle_energy_consume_info',
   cycleFuel: 'car.ev_info.cycle_fuel_consume_info',
   // Derived by Impulse PowerFlowMapper. Packed v1|state|ice|front|rear.
   powerFlow: 'haval.power.flow',
 };
+
+// H6 tank size, used only to turn remain_fuel_percentage into litres for the
+// floor badge. Matches Impulse's DASHBOARD_FUEL_TANK_CAPACITY_LITERS so both
+// screens quote the same number.
+const PT_FUEL_TANK_LITERS = 55;
 
 // GRAPHS widget — same derivation Impulse uses for evPowerKw.
 const CAR_GRAPH_SPAN_MS = 20000;
@@ -5495,7 +5504,8 @@ class Component extends DCLogic {
     // Filled from _cameraPresetDefs() once the class methods exist; constructor
     // runs before those, so _tickCamCycle resolves the list lazily.
     this._camCycleKeys = null;
-    this._powerLive = { soc: '', evRange: '', fuelRange: '', cycleEv: '', evInst: '', flow: '' };
+    this._powerLive = { soc: '', evRange: '', fuelRange: '', fuelLevel: '',
+                        cycleEv: '', evInst: '', flow: '' };
     this._graphEvInstEma = null;
     this._graphBusEvTrip = false;
     this._graphBusFuelTrip = false;
@@ -5832,6 +5842,7 @@ class Component extends DCLogic {
             CAR_SIGNALS.fuelTrip, CAR_SIGNALS.fuelAvg, CAR_SIGNALS.evTrip,
             CAR_SIGNALS.batterySoc,
             CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange, CAR_SIGNALS.cycleEv,
+            CAR_SIGNALS.fuelLevel,
             CAR_SIGNALS.cycleFuel, CAR_SIGNALS.powerFlow,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
@@ -5913,6 +5924,7 @@ class Component extends DCLogic {
     if (key === CAR_SIGNALS.batterySoc) { this._powerLive.soc = String(value); return; }
     if (key === CAR_SIGNALS.evRange) { this._powerLive.evRange = String(value); return; }
     if (key === CAR_SIGNALS.fuelRange) { this._powerLive.fuelRange = String(value); return; }
+    if (key === CAR_SIGNALS.fuelLevel) { this._powerLive.fuelLevel = String(value); return; }
     if (key === CAR_SIGNALS.cycleEv) {
       this._powerLive.cycleEv = String(value);
       const n = this._carNumber(value);
@@ -6153,6 +6165,30 @@ class Component extends DCLogic {
    * its parked clamp (pack V×I noise otherwise reads as a few hundred watts
    * on a stationary car).
    */
+  /**
+   * Tank level 0-100 from `car.basic.remain_fuel_percentage`, the key Impulse
+   * hands the cluster themes. Same shape as _powerSocPct, demo fallback and
+   * all, so the badges read something sensible off the car too.
+   */
+  _powerFuelPct(now) {
+    const live = this._powerLive || {};
+    const demo = !this._graphAnyLive && !(this._busCount > 0);
+    const raw = this._carNumber(live.fuelLevel);
+    if (isFinite(raw) && raw >= 0 && raw <= 100) return Math.round(raw);
+    return demo ? 58 : 0;
+  }
+
+  /**
+   * Litres from that percentage. The bus never sends litres; Impulse's
+   * dashboard card derives them as percent * 55 / 100 at one decimal
+   * (DASHBOARD_FUEL_TANK_CAPACITY_LITERS = 55f), so deriving them the same way
+   * here keeps the viewer and the cluster from disagreeing about the tank.
+   */
+  _powerFuelLiters(pct) {
+    const n = Math.max(0, Math.min(100, pct || 0)) * PT_FUEL_TANK_LITERS / 100;
+    return n.toFixed(1);
+  }
+
   _powerKwNow(now) {
     const demo = !this._graphAnyLive && !(this._busCount > 0);
     let kw = this._graphDisplay.evPowerKw != null
@@ -19391,6 +19427,11 @@ class Component extends DCLogic {
           if ('wheelGlowRadius' in patch || 'wheelGlowY' in patch) {
             this._rebuildPowertrainWheelGlows();
           }
+          if ('badgeX' in patch || 'badgeY' in patch || 'badgeLen' in patch
+              || 'badgeWide' in patch || 'badgeSpin' in patch
+              || 'badgeMidGap' in patch || 'badgeAxleInset' in patch) {
+            this._rebuildPowertrainBadges();
+          }
           if ('bloomOn' in patch || 'bloomStrength' in patch) {
             const want = !!(this._powertrainFxTune().bloomOn && this.state.powertrainOn);
             this._setXrayBloomMeshes(want);
@@ -21116,6 +21157,30 @@ class Component extends DCLogic {
         ringInner: 0.91,
         ringOuter: 1.00,
         ringY: 0.02,
+
+        // Floor badges. Rig-local metres: badgeX sits across the track, badgeLen
+        // runs along it and badgeWide front-to-rear. badgeSpin turns the plate
+        // within the floor plane when the text should read from another side.
+        // Outboard of the wheels, on clear floor. On the centreline the plates
+        // land under the car and, being depthTest:false, paint straight over the
+        // pack and the motors -- legible, but it reads as a sticker on the
+        // chassis rather than an inscription on the ground. Set 0 to centre them.
+        badgeX: 1.30,
+        badgeY: 0.021,          // a hair over the ring and the wheel patches
+        badgeLen: 0.62,
+        badgeWide: 0.26,
+        badgeSpin: 0,
+        badgeMidGap: 0.30,      // plates 2 and 3, straddling the pack centre
+        badgeAxleInset: 0.30,   // plates 1 and 4, pulled inboard of the axles
+        badgeOpacity: 0.95,
+        // The floor is 236/255, so a light fill vanishes against it; 0.8 is what
+        // makes the filled part read as distinct from the transparent remainder.
+        badgeFillAlpha: 0.8,
+        // The blue/green the ground ring already uses for drive vs regen, so a
+        // plate and the ring can never disagree about which way energy is going.
+        badgeDriveColor: '#6cc4f0',
+        badgeRegenColor: '#00ff00',
+        badgeFuelColor: '#ff9a3c',
       };
     }
     return this._ptFxTune;
@@ -21479,6 +21544,195 @@ class Component extends DCLogic {
     });
   }
 
+  /**
+   * Four rounded plates lying on the floor along the car's centreline, aligned
+   * front to rear with the landmarks they describe:
+   *
+   *   [ FW ]        [ battery ]        [ RW ]
+   *   [ 1 ]     [ 2 ]        [ 3 ]     [ 4 ]
+   *
+   * 1 is the front axle (FWD / AWD), 2 and 3 straddle the pack (state of charge,
+   * tank), 4 is the rear axle and only ever says AWD. Placed in RIG-LOCAL space
+   * off the manifest's own hub anchors -- x is the track, z runs front (-) to
+   * rear (+), and the rig's origin is the ground -- so they follow the car
+   * whatever the rig's world transform happens to be.
+   */
+  _rebuildPowertrainBadges() {
+    const THREE = this.THREE;
+    const root = this._powertrainFxRoot;
+    const manifest = this._powertrainManifest;
+    if (!root || !THREE || !manifest) return;
+    (this._powertrainBadges || []).forEach((b) => {
+      if (b.mesh.parent) b.mesh.parent.remove(b.mesh);
+      if (b.mesh.geometry) b.mesh.geometry.dispose();
+      if (b.mesh.material) b.mesh.material.dispose();
+      if (b.tex) b.tex.dispose();
+    });
+    this._powertrainBadges = [];
+    const anchors = manifest.anchors || {};
+    const fl = anchors.hubFL || anchors.hubFR;
+    const rl = anchors.hubRL || anchors.hubRR;
+    if (!fl || !rl) return;
+    const tune = this._powertrainFxTune();
+    const zF = fl[2] + tune.badgeAxleInset;         // pulled inboard of the axle
+    const zR = rl[2] - tune.badgeAxleInset;
+    const gap = tune.badgeMidGap;
+    const slots = [
+      { id: 'front', z: zF },
+      { id: 'soc', z: -gap },
+      { id: 'fuel', z: gap },
+      { id: 'rear', z: zR },
+    ];
+    slots.forEach((slot) => {
+      const cv = document.createElement('canvas');
+      cv.width = 320;
+      cv.height = 132;
+      const tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = 4;
+      const geo = new THREE.PlaneGeometry(tune.badgeLen, tune.badgeWide);
+      geo.rotateX(-Math.PI / 2);                    // lie on the floor
+      geo.rotateY(tune.badgeSpin);                  // which way the text reads
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        // Off, like the ring and the wheel patches: these are floor graphics and
+        // have to read through the chassis, which is what the ghost body is for.
+        // depthTest ON would let the battery tray swallow plates 2 and 3.
+        depthTest: false,
+        toneMapped: false,                          // keep the fills saturated
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(tune.badgeX, tune.badgeY, slot.z);
+      mesh.renderOrder = 6;
+      mesh.frustumCulled = false;
+      mesh.visible = false;
+      root.add(mesh);
+      this._powertrainBadges.push({
+        id: slot.id, mesh: mesh, tex: tex, cv: cv, sig: '',
+      });
+    });
+  }
+
+  /**
+   * Paint one plate. `fill` is 0..1 of the width and is the ONLY part that is
+   * opaque -- the empty remainder stays transparent so the floor shows through,
+   * which is what makes it read as a gauge rather than as a label.
+   */
+  _paintPowertrainBadge(badge, spec) {
+    const cv = badge.cv;
+    const g = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const pad = 6;
+    const x0 = pad, y0 = pad, w = W - pad * 2, h = H - pad * 2;
+    const r = h * 0.34;
+    const round = (x, y, ww, hh, rr) => {
+      g.beginPath();
+      g.moveTo(x + rr, y);
+      g.lineTo(x + ww - rr, y);
+      g.quadraticCurveTo(x + ww, y, x + ww, y + rr);
+      g.lineTo(x + ww, y + hh - rr);
+      g.quadraticCurveTo(x + ww, y + hh, x + ww - rr, y + hh);
+      g.lineTo(x + rr, y + hh);
+      g.quadraticCurveTo(x, y + hh, x, y + hh - rr);
+      g.lineTo(x, y + rr);
+      g.quadraticCurveTo(x, y, x + rr, y);
+      g.closePath();
+    };
+    g.clearRect(0, 0, W, H);
+    const fill = Math.max(0, Math.min(1, spec.fill));
+    if (fill > 0) {
+      g.save();
+      round(x0, y0, w, h, r);
+      g.clip();                                     // the fill is clipped to the pill
+      g.fillStyle = spec.color;
+      g.globalAlpha = spec.fillAlpha;
+      g.fillRect(x0, y0, w * fill, h);
+      g.restore();
+    }
+    g.globalAlpha = 1;
+    round(x0, y0, w, h, r);
+    g.strokeStyle = spec.color;
+    g.lineWidth = 5;
+    g.stroke();
+    g.font = 'bold ' + Math.round(h * 0.46) + 'px system-ui, "Segoe UI", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    // A dark rim keeps the white legible where the text crosses the empty,
+    // transparent half of the pill and the floor shows through behind it.
+    g.lineWidth = 4;
+    g.strokeStyle = 'rgba(0,0,0,0.45)';
+    g.strokeText(spec.text, W / 2, H / 2 + 1);
+    g.fillStyle = '#ffffff';
+    g.fillText(spec.text, W / 2, H / 2 + 1);
+    badge.tex.needsUpdate = true;
+  }
+
+  /**
+   * Decide what each plate says and whether it shows at all. Repaints only when
+   * that plate's own signature changes: this runs from _applyPowertrainFlow,
+   * which is already gated on the flow signature, but SOC and the tank move on
+   * their own and a canvas repaint plus a texture upload is not free.
+   */
+  _updatePowertrainBadges(flow, socPct, fuelPct) {
+    const badges = this._powertrainBadges;
+    if (!badges || !badges.length) return;
+    const tune = this._powertrainFxTune();
+    const manifest = this._powertrainManifest;
+    const key = this._powertrainPackKey || this._currentTrim().pack;
+    const pack = manifest && (manifest.batteries || {})[key];
+    const awdPack = !!(pack && pack.awd);
+    const front = flow.front || 0;
+    const rear = awdPack ? (flow.rear || 0) : 0;
+    // Negative is regen, positive is drive -- the same convention
+    // _applyPowertrainFlow reads to pick its glow tone.
+    const moving = !!(front || rear);
+    const charging = flow.tone === 'charge';
+    const regen = front < 0 || rear < 0;
+    // "All EV motors", which is what makes it AWD rather than an AWD car whose
+    // rear motor happens to be idle.
+    const awdNow = awdPack && !!front && !!rear;
+    const driveColor = regen ? tune.badgeRegenColor : tune.badgeDriveColor;
+    // The axle plates say where the power is going, so they are meaningless
+    // parked and actively wrong on the plug.
+    const axleOn = moving && !charging;
+    badges.forEach((b) => {
+      let spec = null;
+      if (b.id === 'front') {
+        spec = axleOn
+          ? { text: awdNow ? 'AWD' : 'FWD', color: driveColor,
+              fill: 1, fillAlpha: tune.badgeFillAlpha }
+          : null;
+      } else if (b.id === 'rear') {
+        spec = (axleOn && awdNow)
+          ? { text: 'AWD', color: driveColor,
+              fill: 1, fillAlpha: tune.badgeFillAlpha }
+          : null;
+      } else if (b.id === 'soc') {
+        spec = { text: Math.round(socPct) + '%', color: driveColor,
+                 fill: socPct / 100, fillAlpha: tune.badgeFillAlpha };
+      } else if (b.id === 'fuel') {
+        spec = { text: this._powerFuelLiters(fuelPct) + ' L',
+                 color: tune.badgeFuelColor,
+                 fill: fuelPct / 100, fillAlpha: tune.badgeFillAlpha };
+      }
+      if (!spec) {
+        b.mesh.visible = false;
+        b.mesh.material.opacity = 0;
+        b.sig = '';
+        return;
+      }
+      const sig = spec.text + '|' + spec.color + '|' + spec.fill.toFixed(3);
+      if (sig !== b.sig) {
+        b.sig = sig;
+        this._paintPowertrainBadge(b, spec);
+      }
+      b.mesh.visible = true;
+      b.mesh.material.opacity = tune.badgeOpacity;
+    });
+  }
+
   /** 64px radial falloff, reused by every halo sprite. */
   _powertrainHaloTexture() {
     if (this._ptHaloTex) return this._ptHaloTex;
@@ -21638,6 +21892,7 @@ class Component extends DCLogic {
     this._rebuildPowertrainBatteryHalo();
     this._rebuildPowertrainCellGlows();
     this._rebuildPowertrainWheelGlows();
+    this._rebuildPowertrainBadges();
     this._rebuildPowertrainGround();
   }
 
@@ -21882,7 +22137,7 @@ class Component extends DCLogic {
     }
   }
 
-  _applyPowertrainFlow(flow, socPct) {
+  _applyPowertrainFlow(flow, socPct, fuelPct) {
     const parts = this._powertrainParts;
     if (!parts) return;
     const G = this._powertrainGlowTones();
@@ -22041,6 +22296,8 @@ class Component extends DCLogic {
         u.uGlowGain.value = tune.ringGlowGain;
       });
     }
+
+    this._updatePowertrainBadges(flow, socPct, fuelPct);
   }
 
   _clearPowertrainFx() {
@@ -22081,6 +22338,11 @@ class Component extends DCLogic {
       w.mesh.visible = false;
       w.mesh.material.opacity = 0;
     });
+    (this._powertrainBadges || []).forEach((b) => {
+      b.mesh.visible = false;
+      b.mesh.material.opacity = 0;
+      b.sig = '';
+    });
     this._powertrainCellDir = 0;
     this._powertrainGroundDir = 0;
     this._powertrainFxSig = '';
@@ -22102,10 +22364,14 @@ class Component extends DCLogic {
 
     const flow = this._powerFlowRaw(now);
     const socPct = this._powerSocPct(now);
-    const sig = flow.tone + '|' + (flow.ice ? 1 : 0) + '|' + flow.front + '|' + flow.rear + '|' + socPct;
+    // Tank level is in the signature too: the floor badge prints it, and it is
+    // the one input here that moves without the flow state moving with it.
+    const fuelPct = this._powerFuelPct(now);
+    const sig = flow.tone + '|' + (flow.ice ? 1 : 0) + '|' + flow.front + '|' + flow.rear
+      + '|' + socPct + '|' + fuelPct;
     if (sig !== this._powertrainFxSig) {
       this._powertrainFxSig = sig;
-      this._applyPowertrainFlow(flow, socPct);
+      this._applyPowertrainFlow(flow, socPct, fuelPct);
     }
 
     this._powertrainFxT = (this._powertrainFxT || 0) + dt;
