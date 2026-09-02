@@ -21174,13 +21174,11 @@ class Component extends DCLogic {
         badgeRegenColor: '#00ff3c',
         // Only the amber half of the HYBRID split now that the tank plate is gone.
         badgeFuelColor: '#ffa400',
-        badgeBorderColor: '#ffffff',
-        badgeBorderPx: 7,
         // Outer glow, in canvas pixels at PT_BADGE_PX_PER_M -- 5 px is ~12 mm on
         // the floor. Blue while the axle drives, white while it recovers: the
         // plate itself is white on drive and green on regen, so the glow is the
         // opposite each time and the state reads from across the car.
-        badgeGlowPx: 5,
+        badgeGlowPx: 10,
         badgeGlowPasses: 3,
         badgeGlowDriveColor: '#00a8ff',
         badgeGlowRegenColor: '#ffffff',
@@ -21596,12 +21594,18 @@ class Component extends DCLogic {
       slots.push({ id: 'rear', side: side, z: rl[2], len: tune.badgeLen });
     });
     slots.forEach((slot) => {
+      // The pill stays badgeLen x badgeWide; the PLATE is grown by the glow
+      // margin on every side. Sizing the glow out of a fixed plate instead just
+      // ate into the pill, so widening the glow shrank the label.
+      const margin = tune.badgeGlowPx / PT_BADGE_PX_PER_M;
+      const planeLen = slot.len + margin * 2;
+      const planeWide = tune.badgeWide + margin * 2;
       const cv = document.createElement('canvas');
-      cv.width = Math.max(64, Math.round(slot.len * PT_BADGE_PX_PER_M));
-      cv.height = Math.max(32, Math.round(tune.badgeWide * PT_BADGE_PX_PER_M));
+      cv.width = Math.max(64, Math.round(planeLen * PT_BADGE_PX_PER_M));
+      cv.height = Math.max(32, Math.round(planeWide * PT_BADGE_PX_PER_M));
       const tex = new THREE.CanvasTexture(cv);
       tex.anisotropy = 4;
-      const geo = new THREE.PlaneGeometry(slot.len, tune.badgeWide);
+      const geo = new THREE.PlaneGeometry(planeLen, planeWide);
       geo.rotateX(-Math.PI / 2);                    // lie on the floor
       geo.rotateY(tune.badgeSpin);                  // which way the text reads
       const mat = new THREE.MeshBasicMaterial({
@@ -21609,9 +21613,12 @@ class Component extends DCLogic {
         transparent: true,
         opacity: 0,
         depthWrite: false,
-        // Off, like the ring: these are floor graphics and have to read through
-        // the chassis, which is what the ghost body is for.
-        depthTest: false,
+        // ON, unlike the ring and the flow tubes. A plate on the FAR side of the
+        // car belongs behind the car, and with depth testing off it painted over
+        // the wheels and the pack instead, which read as a decal stuck on the
+        // bodywork. The ghost shell is transparent and writes no depth, so the
+        // shell itself still lets them through -- only solid parts occlude.
+        depthTest: true,
         toneMapped: false,                          // keep the fills saturated
       });
       const mesh = new THREE.Mesh(geo, mat);
@@ -21637,10 +21644,9 @@ class Component extends DCLogic {
     const g = cv.getContext('2d');
     const W = cv.width, H = cv.height;
     const tune = this._powertrainFxTune();
-    // Room for half the border plus the glow, or the glow clips at the canvas
-    // edge -- which shows up as the plate ending in a hard line rather than
-    // fading out.
-    const pad = Math.ceil(tune.badgeBorderPx / 2 + tune.badgeGlowPx + 3);
+    // The canvas is built a glow-width larger than the pill on every side, so
+    // this padding is exactly that margin and the glow has room to fade out.
+    const pad = Math.round(tune.badgeGlowPx);
     const x0 = pad, y0 = pad, w = W - pad * 2, h = H - pad * 2;
     const r = h * 0.34;
     const round = (x, y, ww, hh, rr) => {
@@ -21692,17 +21698,6 @@ class Component extends DCLogic {
       g.restore();
     }
     g.globalAlpha = 1;
-    // White, not the fill colour. Against the bright floor the border alone is
-    // low contrast, so it is drawn over a dark hairline that gives it an edge
-    // wherever the plate is transparent.
-    round(x0, y0, w, h, r);
-    g.strokeStyle = 'rgba(0,0,0,0.35)';
-    g.lineWidth = tune.badgeBorderPx + 4;
-    g.stroke();
-    round(x0, y0, w, h, r);
-    g.strokeStyle = tune.badgeBorderColor;
-    g.lineWidth = tune.badgeBorderPx;
-    g.stroke();
     g.font = 'bold ' + Math.round(h * 0.46) + 'px system-ui, "Segoe UI", sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
