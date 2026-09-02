@@ -21186,14 +21186,18 @@ class Component extends DCLogic {
         // them back and forth.
         badgeSideDeadZone: 0.35,
         badgeOpacity: 0.95,
-        // The floor is 236/255, so a light fill vanishes against it; 0.8 is what
-        // makes the filled part read as distinct from the transparent remainder.
-        badgeFillAlpha: 0.8,
-        // The blue/green the ground ring already uses for drive vs regen, so a
-        // plate and the ring can never disagree about which way energy is going.
-        badgeDriveColor: '#6cc4f0',
-        badgeRegenColor: '#00ff00',
-        badgeFuelColor: '#ff9a3c',
+        // The floor is 236/255, so a light fill vanishes against it. Near-opaque
+        // is what makes the filled part read as distinct from the transparent
+        // remainder AND keeps the colour saturated rather than tinted by floor.
+        badgeFillAlpha: 0.92,
+        // Saturated rather than pastel: the material is toneMapped:false, so what
+        // is set here is what lands on the panel, and the floor it sits on is
+        // 236/255 -- a soft tint simply washes out against that.
+        badgeDriveColor: '#00a8ff',
+        badgeRegenColor: '#00ff3c',
+        badgeFuelColor: '#ff7a00',
+        badgeBorderColor: '#ffffff',
+        badgeBorderPx: 7,
       };
     }
     return this._ptFxTune;
@@ -21718,9 +21722,17 @@ class Component extends DCLogic {
       g.restore();
     }
     g.globalAlpha = 1;
+    const tune = this._powertrainFxTune();
+    // White, not the fill colour. Against the bright floor the border alone is
+    // low contrast, so it is drawn over a dark hairline that gives it an edge
+    // wherever the plate is transparent.
     round(x0, y0, w, h, r);
-    g.strokeStyle = spec.color;
-    g.lineWidth = 5;
+    g.strokeStyle = 'rgba(0,0,0,0.35)';
+    g.lineWidth = tune.badgeBorderPx + 4;
+    g.stroke();
+    round(x0, y0, w, h, r);
+    g.strokeStyle = tune.badgeBorderColor;
+    g.lineWidth = tune.badgeBorderPx;
     g.stroke();
     g.font = 'bold ' + Math.round(h * 0.46) + 'px system-ui, "Segoe UI", sans-serif';
     g.textAlign = 'center';
@@ -21756,6 +21768,14 @@ class Component extends DCLogic {
     const moving = !!(front || rear);
     const charging = flow.tone === 'charge';
     const regen = front < 0 || rear < 0;
+    // Each axle plate answers for ITS OWN direction, so a car recovering on one
+    // axle while the other still drives says so instead of averaging the two.
+    const axleSpec = (dir, driveLabel) => ({
+      text: dir < 0 ? 'REGEN' : driveLabel,
+      color: dir < 0 ? tune.badgeRegenColor : tune.badgeDriveColor,
+      fill: 1,
+      fillAlpha: tune.badgeFillAlpha,
+    });
     // "All EV motors", which is what makes it AWD rather than an AWD car whose
     // rear motor happens to be idle.
     const awdNow = awdPack && !!front && !!rear;
@@ -21766,15 +21786,9 @@ class Component extends DCLogic {
     badges.forEach((b) => {
       let spec = null;
       if (b.id === 'front') {
-        spec = axleOn
-          ? { text: awdNow ? 'AWD' : 'FWD', color: driveColor,
-              fill: 1, fillAlpha: tune.badgeFillAlpha }
-          : null;
+        spec = axleOn ? axleSpec(front, awdNow ? 'AWD' : 'FWD') : null;
       } else if (b.id === 'rear') {
-        spec = (axleOn && awdNow)
-          ? { text: 'AWD', color: driveColor,
-              fill: 1, fillAlpha: tune.badgeFillAlpha }
-          : null;
+        spec = (axleOn && awdNow) ? axleSpec(rear, 'AWD') : null;
       } else if (b.id === 'soc') {
         spec = { text: Math.round(socPct) + '%', color: driveColor,
                  fill: socPct / 100, fillAlpha: tune.badgeFillAlpha };
