@@ -4796,6 +4796,11 @@ const CAR_SIGNALS = {
 // screens quote the same number.
 const PT_FUEL_TANK_LITERS = 55;
 
+// Badge canvas resolution, in pixels per metre of plate. Constant across the
+// four plates so the long battery bar and the short fuel bar come out with the
+// same text size and the same corner radius.
+const PT_BADGE_PX_PER_M = 420;
+
 // GRAPHS widget — same derivation Impulse uses for evPowerKw.
 const CAR_GRAPH_SPAN_MS = 20000;
 const CAR_GRAPH_KPI_SPAN_MS = 180000;
@@ -19429,7 +19434,7 @@ class Component extends DCLogic {
           }
           if ('badgeX' in patch || 'badgeY' in patch || 'badgeLen' in patch
               || 'badgeWide' in patch || 'badgeSpin' in patch
-              || 'badgeMidGap' in patch || 'badgeAxleInset' in patch) {
+              || 'badgeGap' in patch || 'badgeSplit' in patch) {
             this._rebuildPowertrainBadges();
           }
           if ('bloomOn' in patch || 'bloomStrength' in patch) {
@@ -21169,9 +21174,17 @@ class Component extends DCLogic {
         badgeY: 0.021,          // a hair over the ring and the wheel patches
         badgeLen: 0.62,
         badgeWide: 0.26,
-        badgeSpin: 0,
-        badgeMidGap: 0.30,      // plates 2 and 3, straddling the pack centre
-        badgeAxleInset: 0.30,   // plates 1 and 4, pulled inboard of the axles
+        // Turned a quarter turn: the plates run ALONG the car, not across it,
+        // so plate 1 lies beside the front wheel and plate 4 beside the rear.
+        badgeSpin: Math.PI / 2,
+        badgeGap: 0.06,         // between neighbouring plates
+        // How the span between the two wheel plates is divided. The pack gets
+        // the long bar, the tank the short one.
+        badgeSplit: 0.65,
+        // World units either side of the car's centreline in which the plates
+        // keep the side they are on, so an orbit over the nose does not flap
+        // them back and forth.
+        badgeSideDeadZone: 0.35,
         badgeOpacity: 0.95,
         // The floor is 236/255, so a light fill vanishes against it; 0.8 is what
         // makes the filled part read as distinct from the transparent remainder.
@@ -21569,27 +21582,40 @@ class Component extends DCLogic {
       if (b.tex) b.tex.dispose();
     });
     this._powertrainBadges = [];
+    this._ptBadgeSide = 0;   // force _faceBadgesToCamera to re-place them
     const anchors = manifest.anchors || {};
     const fl = anchors.hubFL || anchors.hubFR;
     const rl = anchors.hubRL || anchors.hubRR;
     if (!fl || !rl) return;
     const tune = this._powertrainFxTune();
-    const zF = fl[2] + tune.badgeAxleInset;         // pulled inboard of the axle
-    const zR = rl[2] - tune.badgeAxleInset;
-    const gap = tune.badgeMidGap;
+    // Plates 1 and 4 sit ON the hubs, so each reads as belonging to the axle
+    // beside it. Plates 2 and 3 take what is left between their inner edges,
+    // divided badgeSplit / the rest, so the pack is the long bar and the tank
+    // the short one.
+    const zF = fl[2];
+    const zR = rl[2];
+    const wheelLen = tune.badgeLen;
+    const gap = tune.badgeGap;
+    const innerF = zF + wheelLen / 2;
+    const innerR = zR - wheelLen / 2;
+    const usable = Math.max(0.12, (innerR - innerF) - gap * 3);
+    const lenSoc = usable * tune.badgeSplit;
+    const lenFuel = usable - lenSoc;
+    const zSoc = innerF + gap + lenSoc / 2;
+    const zFuel = zSoc + lenSoc / 2 + gap + lenFuel / 2;
     const slots = [
-      { id: 'front', z: zF },
-      { id: 'soc', z: -gap },
-      { id: 'fuel', z: gap },
-      { id: 'rear', z: zR },
+      { id: 'front', z: zF, len: wheelLen },
+      { id: 'soc', z: zSoc, len: lenSoc },
+      { id: 'fuel', z: zFuel, len: lenFuel },
+      { id: 'rear', z: zR, len: wheelLen },
     ];
     slots.forEach((slot) => {
       const cv = document.createElement('canvas');
-      cv.width = 320;
-      cv.height = 132;
+      cv.width = Math.max(64, Math.round(slot.len * PT_BADGE_PX_PER_M));
+      cv.height = Math.max(32, Math.round(tune.badgeWide * PT_BADGE_PX_PER_M));
       const tex = new THREE.CanvasTexture(cv);
       tex.anisotropy = 4;
-      const geo = new THREE.PlaneGeometry(tune.badgeLen, tune.badgeWide);
+      const geo = new THREE.PlaneGeometry(slot.len, tune.badgeWide);
       geo.rotateX(-Math.PI / 2);                    // lie on the floor
       geo.rotateY(tune.badgeSpin);                  // which way the text reads
       const mat = new THREE.MeshBasicMaterial({
@@ -21612,6 +21638,46 @@ class Component extends DCLogic {
       this._powertrainBadges.push({
         id: slot.id, mesh: mesh, tex: tex, cv: cv, sig: '',
       });
+    });
+  }
+
+  /**
+   * Keep the plates on whichever side of the car the spectator is on, turned so
+   * the text still reads upright from there. Looking at a floor graphic from
+   * the far side sees it upside down, so switching sides is a half turn as well
+   * as a move -- and the half turn also carries the fill back to the end the
+   * viewer now reads from, so the bars still fill towards them.
+   *
+   * The side test is a dot against the rig's own +X in world space rather than
+   * worldToLocal, which would invert a matrix every frame for one number.
+   *
+   * The dead zone matters: an orbit passes over the nose and the tail, where
+   * the camera crosses the centreline with the plates edge-on. Without it they
+   * flap from side to side through that whole part of the sweep.
+   */
+  _faceBadgesToCamera() {
+    const badges = this._powertrainBadges;
+    const root = this._powertrainFxRoot;
+    const cam = this.camera;
+    if (!badges || !badges.length || !root || !cam) return;
+    const THREE = this.THREE;
+    if (!this._ptBadgeTmp) {
+      this._ptBadgeTmp = { ax: new THREE.Vector3(), o: new THREE.Vector3(), d: new THREE.Vector3() };
+    }
+    const t = this._ptBadgeTmp;
+    t.ax.set(1, 0, 0).transformDirection(root.matrixWorld);
+    t.o.setFromMatrixPosition(root.matrixWorld);
+    const along = t.d.copy(cam.position).sub(t.o).dot(t.ax);
+    const dead = this._powertrainFxTune().badgeSideDeadZone;
+    let side = this._ptBadgeSide || 1;
+    if (along > dead) side = 1;
+    else if (along < -dead) side = -1;
+    if (side === this._ptBadgeSide) return;
+    this._ptBadgeSide = side;
+    const badgeX = this._powertrainFxTune().badgeX;
+    badges.forEach((b) => {
+      b.mesh.position.x = badgeX * side;
+      b.mesh.rotation.y = side < 0 ? Math.PI : 0;
     });
   }
 
@@ -22361,6 +22427,10 @@ class Component extends DCLogic {
       return false;
     }
     if (!this._powertrainParts) return false;
+
+    // Cheap, and it has to run per frame rather than per flow change: the
+    // spectator orbits without the flow state moving at all.
+    this._faceBadgesToCamera();
 
     const flow = this._powerFlowRaw(now);
     const socPct = this._powerSocPct(now);
