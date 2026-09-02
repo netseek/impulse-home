@@ -19838,6 +19838,10 @@ class Component extends DCLogic {
           if ('wheelGlowRadius' in patch || 'wheelGlowY' in patch) {
             this._rebuildPowertrainWheelGlows();
           }
+          if ('wheelBoxOn' in patch || 'wheelBoxLen' in patch
+              || 'wheelBoxWide' in patch) {
+            this._rebuildPowertrainBadges();
+          }
           if ('badgeX' in patch || 'badgeY' in patch || 'badgeLen' in patch
               || 'badgeWide' in patch || 'badgeSpin' in patch
               || 'badgeGlowPx' in patch || 'axleBarWide' in patch
@@ -21752,6 +21756,17 @@ class Component extends DCLogic {
         // carries what the side plates used to: the state fill (blue driving,
         // green recovering, blue/amber split on the engine) and the white
         // outer glow. No text; the wording moved to the side labels.
+        // Per-wheel traction outline: one box ON each wheel instead of one bar
+        // spanning the axle. Border and halo only, no fill, blinking while that
+        // axle works. wheelBoxOn 0 restores the axle bars.
+        wheelBoxOn: 1,
+        wheelBoxLen: 0.82,      // along the car, a little longer than the tyre
+        wheelBoxWide: 0.46,     // across the track, wider than the tyre
+        wheelBoxBorderPx: 10,
+        // White pulling, green recovering -- the two the eye already reads as
+        // "driving" and "putting it back" everywhere else in this scene.
+        wheelBoxDriveColor: '#ffffff',
+        wheelBoxRegenColor: '#00ff00',
         axleBarWide: 0.40,      // front-to-rear thickness
         axleBarInset: 0.06,     // clear of the side label at each end
         // Half transparent, so the underbody reads through the bar rather than
@@ -22238,18 +22253,35 @@ class Component extends DCLogic {
                    len: tune.badgeLen, wide: tune.badgeWide,
                    spin: tune.badgeSpin, flip: side < 0, glow: false });
     });
-    // ...and one bar per axle, on the centreline, running ACROSS the track
-    // (spin 0 rather than badgeSpin's quarter turn). Its length is the gap
-    // between that axle's two labels, so it stops just short of each one
-    // instead of running under them.
-    const barLen = Math.max(0.2,
-      (tune.badgeX - tune.badgeWide / 2 - tune.axleBarInset) * 2);
-    ['front', 'rear'].forEach((axle) => {
-      slots.push({ id: axle + 'Bar', side: 1, x: 0,
-                   z: axle === 'front' ? fl[2] : rl[2],
-                   len: barLen, wide: tune.axleBarWide,
-                   spin: 0, flip: false, glow: true });
-    });
+    if (tune.wheelBoxOn) {
+      // ...and one outline per WHEEL, on that wheel's own hub anchor. A single
+      // bar across the axle says "this axle", which is already what the label
+      // beside it says; a box on each wheel says which wheels are doing it.
+      // Sized a little larger than the tyre so the border reads AROUND it
+      // rather than disappearing underneath it -- these depth-test, so anything
+      // inside the tyre's footprint is hidden by the tyre.
+      [['hubFL', 'front'], ['hubFR', 'front'],
+       ['hubRL', 'rear'], ['hubRR', 'rear']].forEach(([key, axle]) => {
+        const p = anchors[key];
+        if (!p) return;
+        slots.push({ id: axle + 'Wheel', side: p[0] < 0 ? -1 : 1, x: p[0], z: p[2],
+                     len: tune.wheelBoxLen, wide: tune.wheelBoxWide,
+                     spin: tune.badgeSpin, flip: false, glow: true });
+      });
+    } else {
+      // ...or one bar per axle, on the centreline, running ACROSS the track
+      // (spin 0 rather than badgeSpin's quarter turn). Its length is the gap
+      // between that axle's two labels, so it stops just short of each one
+      // instead of running under them.
+      const barLen = Math.max(0.2,
+        (tune.badgeX - tune.badgeWide / 2 - tune.axleBarInset) * 2);
+      ['front', 'rear'].forEach((axle) => {
+        slots.push({ id: axle + 'Bar', side: 1, x: 0,
+                     z: axle === 'front' ? fl[2] : rl[2],
+                     len: barLen, wide: tune.axleBarWide,
+                     spin: 0, flip: false, glow: true });
+      });
+    }
     slots.forEach((slot) => {
       // The pill stays badgeLen x badgeWide; the PLATE is grown by the glow
       // margin on every side. Sizing the glow out of a fixed plate instead just
@@ -22637,7 +22669,8 @@ class Component extends DCLogic {
       // Bar and label share one axle's state; they only differ in what they
       // draw of it.
       const isBar = b.id === 'frontBar' || b.id === 'rearBar';
-      const isFront = b.id === 'front' || b.id === 'frontBar';
+      const isWheel = b.id === 'frontWheel' || b.id === 'rearWheel';
+      const isFront = b.id === 'front' || b.id === 'frontBar' || b.id === 'frontWheel';
       // Gate on THIS axle's own flow, not on "something is moving". Gating the
       // front on `axleOn` alone lit it blue saying FWD during a rear-only
       // regen, because axleSpec(0) falls through to its drive branch — the
@@ -22647,7 +22680,15 @@ class Component extends DCLogic {
         ? axleSpec(dir, isFront ? (awdNow ? 'AWD' : 'FWD') : (awdNow ? 'AWD' : 'RWD'))
         : null;
       let spec = null;
-      if (base && isBar) {
+      if (base && isWheel) {
+        // Border and halo only: fill 0, no wording. The glow canvas already
+        // draws a band borderPx wide and softens it outward, so the outline and
+        // its blink are the same object -- nothing is painted on the pill at
+        // all, which is why its mesh stays hidden below.
+        const c = dir < 0 ? tune.wheelBoxRegenColor : tune.wheelBoxDriveColor;
+        spec = { text: '', color: c, glowColor: c, fill: 0,
+                 fillAlpha: 1, plate: true, borderPx: tune.wheelBoxBorderPx };
+      } else if (base && isBar) {
         // Colour, border and halo, no wording.
         spec = { text: '', color: base.color, color2: base.color2,
                  glowColor: base.glowColor, fill: base.fill,
@@ -22672,8 +22713,11 @@ class Component extends DCLogic {
         b.sig = sig;
         this._paintPowertrainBadge(b, spec);
       }
-      b.mesh.visible = true;
-      b.mesh.material.opacity = isBar ? tune.axleBarOpacity : tune.badgeOpacity;
+      // A wheel box has nothing on its pill canvas -- it is all border and
+      // halo -- so the pill mesh is a wasted draw call.
+      b.mesh.visible = !isWheel;
+      b.mesh.material.opacity = isWheel ? 0
+        : (isBar ? tune.axleBarOpacity : tune.badgeOpacity);
       if (b.glowMesh) b.glowMesh.visible = true;   // opacity is driven by the tick
     });
   }
