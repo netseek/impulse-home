@@ -283,6 +283,25 @@ Two things that shipped wrong here, both of which look fine on a dark screen:
 on its own must call it too. A 25 s safety timer clears the badge if one is
 missed, so the failure mode is a stuck badge for 25 s, not forever.
 
+**`loading: true` is not what raises the badge — `_carSwapLabel` is.** So a
+path that fetches something WITHOUT touching `loading` still has to opt in,
+and the X-RAY toggle is exactly that one: `_applyPowertrainVisibility` pulls
+its own GLB + manifest the first time it is opened and had no feedback of any
+kind. It now calls `_beginCarSwap('xray')` and deliberately does NOT set
+`loading` — `_syncCarSceneForShell` reads `loading` as "keep the car hidden",
+which is the opposite of what a toggle wants. Three things that path has to
+get right, and any similar one will too:
+
+- **Badge only when the work is really cold.** `_ensurePowertrain` resolves
+  synchronously once the rig exists, so bracketing every press would flash the
+  badge for `MIN_BADGE_MS` on every toggle. Test the thing itself
+  (`!this._powertrainRig`), not whether a toggle happened.
+- **Do not adopt someone else's swap.** `_beginCarSwap` early-returns when one
+  is already active; without also testing `!this._carSwapActive` the caller
+  would go on to `_endCarSwap` a swap it never started.
+- **Give the promise a rejection handler.** A failed load otherwise leaves the
+  badge up until the 25 s safety timer fires.
+
 The badge deliberately outlives `loading: false` (`bootCenterDisplay` also keys
 off `_carSwapLabel`, and `MIN_BADGE_MS` holds it 340 ms), so a cached swap
 still reads as a transition instead of a one-frame blink.

@@ -9334,6 +9334,7 @@ class Component extends DCLogic {
         ? (this._carSwapLabel ? 'block' : 'flex') : 'none',
       bootCenterLabel: this._carSwapLabel === 'wheel' ? 'LOADING WHEEL'
         : this._carSwapLabel === 'upload' ? 'LOADING WHEEL'
+        : this._carSwapLabel === 'xray' ? 'LOADING X-RAY'
         : this._carSwapLabel ? 'LOADING MODEL' : '',
       bootCenterLabelDisplay: this._carSwapLabel ? 'block' : 'none',
       bootCenterCardClass: this._carSwapLabel ? 'hv-badge' : '',
@@ -23687,8 +23688,29 @@ class Component extends DCLogic {
       if (this.requestRender) this.requestRender(6);
       return;
     }
+    // X-ray fetches its own GLB + manifest the first time it is opened.
+    // _preloadPowertrain usually beats the click, but not always -- and this
+    // path set neither `loading` nor a swap, so a cold click sat on a
+    // multi-MB fetch with nothing on screen at all.
+    //
+    // Badged ONLY when the rig is genuinely not there yet: _ensurePowertrain
+    // resolves synchronously once it is, and bracketing a warm toggle would
+    // flash the badge for MIN_BADGE_MS on every single press. The
+    // _carSwapActive test keeps us from adopting -- and then prematurely
+    // ending -- a swap somebody else started.
+    //
+    // Note this deliberately does NOT set `loading: true`, unlike the wheel
+    // and model paths: bootCenterDisplay already keys off _carSwapLabel on its
+    // own, and `loading` is read by _syncCarSceneForShell as "keep the car
+    // hidden", which is the opposite of what an x-ray toggle wants.
+    const cold = !this._powertrainRig && !this._carSwapActive;
+    if (cold) {
+      this._beginCarSwap('xray');
+      this.setState({});                 // paint the badge on the next render
+    }
+    const endBadge = () => { if (cold) this._endCarSwap(); };
     this._ensurePowertrain().then((rig) => {
-      if (!rig) return;
+      if (!rig) { endBadge(); return; }
       this._applyPowertrainVariant();
       this._fitPowertrain();
       rig.visible = true;
@@ -23702,6 +23724,11 @@ class Component extends DCLogic {
       this._setXrayBloomMeshes(wantBloom);
       this._setXrayBloomStrength(wantBloom);
       if (this.requestRender) this.requestRender(12);
+      endBadge();
+    }, (err) => {
+      // Without this the badge would hang until the 25 s safety timer.
+      console.warn('[Powertrain] load failed', err && err.message);
+      endBadge();
     });
   }
 
