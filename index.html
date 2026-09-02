@@ -3535,6 +3535,14 @@ window.HavalSplash = (function () {
       box-shadow: var(--hv-widget-shadow, 0 2px 10px rgba(0,0,0,.32));
       transition: background .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
     }
+    /* Invisible oversized hit zone — enlarges the tap target without touching
+       the visible 34px circle (generated content still hit-tests to the button). */
+    .hv-cam-fab-btn::before {
+      content: '';
+      position: absolute;
+      inset: -13px;
+      border-radius: 50%;
+    }
     .hv-cam-fab-btn:active { transform: scale(.92); }
     .hv-cam-fab-btn.act {
       background: var(--hv-config-chip-on-bg, #f2f5f8);
@@ -15335,7 +15343,7 @@ class Component extends DCLogic {
   }
 
   _hitHotspotDot(e, radius) {
-    const r = radius || 20;
+    const r = radius || 42;
     const screen = this._hsScreen;
     if (!this._hotspotsVisible || !screen) return null;
     let best = null;
@@ -21177,7 +21185,7 @@ class Component extends DCLogic {
         // Saturated rather than pastel: the material is toneMapped:false, so what
         // is set here is what lands on the panel, and the floor it sits on is
         // 236/255 -- a soft tint simply washes out against that.
-        badgeDriveColor: '#ffffff',
+        badgeDriveColor: '#0000ff',
         badgeRegenColor: '#00ff3c',
         // Only the amber half of the HYBRID split now that the tank plate is gone.
         badgeFuelColor: '#ffa400',
@@ -21187,8 +21195,14 @@ class Component extends DCLogic {
         // opposite each time and the state reads from across the car.
         badgeGlowPx: 10,
         badgeGlowPasses: 3,
-        badgeGlowDriveColor: '#00a8ff',
+        // Both glows are white now: the fill carries the state (blue driving,
+        // green recovering) and the glow is what lifts either off the floor.
+        badgeGlowDriveColor: '#ffffff',
         badgeGlowRegenColor: '#ffffff',
+        // Halo pulse while an axle is working. The halo is its own plane, so
+        // this is an opacity change per frame and never a canvas repaint.
+        badgeGlowPulseHz: 0.75,
+        badgeGlowPulseLow: 0.28,
 
         // Charge percentage on the floor, in the gap between the bodywork and
         // the ring. The car reaches about 1.0 m to the side and the ring's
@@ -21596,6 +21610,11 @@ class Component extends DCLogic {
       if (b.mesh.geometry) b.mesh.geometry.dispose();
       if (b.mesh.material) b.mesh.material.dispose();
       if (b.tex) b.tex.dispose();
+      if (b.glowMesh) {
+        if (b.glowMesh.parent) b.glowMesh.parent.remove(b.glowMesh);
+        if (b.glowMesh.material) b.glowMesh.material.dispose();
+      }
+      if (b.glowTex) b.glowTex.dispose();
     });
     this._powertrainBadges = [];
     const anchors = manifest.anchors || {};
@@ -21648,8 +21667,25 @@ class Component extends DCLogic {
       mesh.frustumCulled = false;
       mesh.visible = false;
       root.add(mesh);
+      // Halo twin: same geometry and pose, drawn first, opacity animated.
+      const glowCv = document.createElement('canvas');
+      glowCv.width = cv.width;
+      glowCv.height = cv.height;
+      const glowTex = new THREE.CanvasTexture(glowCv);
+      glowTex.anisotropy = 4;
+      const glowMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        map: glowTex, transparent: true, opacity: 0,
+        depthWrite: false, depthTest: true, toneMapped: false,
+      }));
+      glowMesh.position.copy(mesh.position);
+      glowMesh.rotation.y = mesh.rotation.y;
+      glowMesh.renderOrder = 5;
+      glowMesh.frustumCulled = false;
+      glowMesh.visible = false;
+      root.add(glowMesh);
       this._powertrainBadges.push({
-        id: slot.id, side: slot.side, mesh: mesh, tex: tex, cv: cv, sig: '',
+        id: slot.id, side: slot.side, mesh: mesh, tex: tex, cv: cv,
+        glowMesh: glowMesh, glowTex: glowTex, glowCv: glowCv, sig: '',
       });
     });
   }
@@ -21766,38 +21802,50 @@ class Component extends DCLogic {
     const pad = Math.round(tune.badgeGlowPx);
     const x0 = pad, y0 = pad, w = W - pad * 2, h = H - pad * 2;
     const r = h * 0.34;
-    const round = (x, y, ww, hh, rr) => {
-      g.beginPath();
-      g.moveTo(x + rr, y);
-      g.lineTo(x + ww - rr, y);
-      g.quadraticCurveTo(x + ww, y, x + ww, y + rr);
-      g.lineTo(x + ww, y + hh - rr);
-      g.quadraticCurveTo(x + ww, y + hh, x + ww - rr, y + hh);
-      g.lineTo(x + rr, y + hh);
-      g.quadraticCurveTo(x, y + hh, x, y + hh - rr);
-      g.lineTo(x, y + rr);
-      g.quadraticCurveTo(x, y, x + rr, y);
-      g.closePath();
+    const round = (ctx) => {
+      const x = x0, y = y0, ww = w, hh = h, rr = r;
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.lineTo(x + ww - rr, y);
+      ctx.quadraticCurveTo(x + ww, y, x + ww, y + rr);
+      ctx.lineTo(x + ww, y + hh - rr);
+      ctx.quadraticCurveTo(x + ww, y + hh, x + ww - rr, y + hh);
+      ctx.lineTo(x + rr, y + hh);
+      ctx.quadraticCurveTo(x, y + hh, x, y + hh - rr);
+      ctx.lineTo(x, y + rr);
+      ctx.quadraticCurveTo(x, y, x + rr, y);
+      ctx.closePath();
     };
-    g.clearRect(0, 0, W, H);
-    // Outer glow first, so the fill and the border land on top of it and only
-    // the part that spills outside the pill survives.
+    // The halo goes on its OWN canvas and its own plane behind the pill, so its
+    // opacity can be pulsed every frame without repainting anything. Painting
+    // it into the pill would mean a canvas redraw and a texture upload per
+    // frame, which _requestBlurCapture-grade cost for a throb.
+    const gg = badge.glowCv.getContext('2d');
+    gg.clearRect(0, 0, W, H);
     if (tune.badgeGlowPx > 0 && spec.glowColor) {
-      g.save();
-      g.shadowColor = spec.glowColor;
-      g.shadowBlur = tune.badgeGlowPx * 2;
-      g.strokeStyle = spec.glowColor;
-      g.lineWidth = 2;
+      gg.save();
+      gg.shadowColor = spec.glowColor;
+      gg.shadowBlur = tune.badgeGlowPx * 2;
+      gg.strokeStyle = spec.glowColor;
+      gg.lineWidth = 2;
       for (let i = 0; i < tune.badgeGlowPasses; i++) {
-        round(x0, y0, w, h, r);
-        g.stroke();
+        round(gg);
+        gg.stroke();
       }
-      g.restore();
+      gg.restore();
+      // Punch the pill back out, so only what spills OUTSIDE it survives and
+      // fading the halo can never dim the label sitting on top of it.
+      gg.globalCompositeOperation = 'destination-out';
+      round(gg);
+      gg.fill();
+      gg.globalCompositeOperation = 'source-over';
     }
+    badge.glowTex.needsUpdate = true;
+    g.clearRect(0, 0, W, H);
     const fill = Math.max(0, Math.min(1, spec.fill));
     if (fill > 0) {
       g.save();
-      round(x0, y0, w, h, r);
+      round(g);
       g.clip();                                     // the fill is clipped to the pill
       g.globalAlpha = spec.fillAlpha;
       const fw = w * fill;
@@ -21895,6 +21943,7 @@ class Component extends DCLogic {
       if (!spec) {
         b.mesh.visible = false;
         b.mesh.material.opacity = 0;
+        if (b.glowMesh) { b.glowMesh.visible = false; b.glowMesh.material.opacity = 0; }
         b.sig = '';
         return;
       }
@@ -21906,6 +21955,7 @@ class Component extends DCLogic {
       }
       b.mesh.visible = true;
       b.mesh.material.opacity = tune.badgeOpacity;
+      if (b.glowMesh) b.glowMesh.visible = true;   // opacity is driven by the tick
     });
   }
 
@@ -22523,6 +22573,7 @@ class Component extends DCLogic {
     (this._powertrainBadges || []).forEach((b) => {
       b.mesh.visible = false;
       b.mesh.material.opacity = 0;
+      if (b.glowMesh) { b.glowMesh.visible = false; b.glowMesh.material.opacity = 0; }
       b.sig = '';
     });
     (this._powertrainSocText || []).forEach((n) => {
@@ -22649,9 +22700,30 @@ class Component extends DCLogic {
       }
     }
 
+    // Halo throb on every visible plate. They are only visible while an axle is
+    // pulling or recovering, so this is exactly "traction and regen".
+    const badges = this._powertrainBadges;
+    if (badges && badges.length) {
+      const bp = 0.5 + 0.5 * Math.sin(t * tune.badgeGlowPulseHz * Math.PI * 2);
+      const lo = tune.badgeGlowPulseLow;
+      const bo = (lo + (1 - lo) * bp) * tune.badgeOpacity;
+      for (let i = 0; i < badges.length; i++) {
+        const gm = badges[i].glowMesh;
+        if (gm && gm.visible) gm.material.opacity = bo;
+      }
+    }
+
     const glows = this._powertrainCellGlows;
     if (glows && glows.length) {
-      const gn = glows.length;
+      // Rank among the LIT cells, not the index in the whole stack. The phase
+      // used to span all six modules while only the charged ones are visible,
+      // so a third of every cycle had the peak sitting on a dark cell and the
+      // sweep visibly stalled before restarting.
+      let gLit = 0;
+      for (let i = 0; i < glows.length; i++) {
+        glows[i].litRank = glows[i].level > 0.01 ? gLit++ : -1;
+      }
+      const gn = Math.max(1, gLit);
       const gEdge = this._powertrainCellEdge;
       const gTravel = t * tune.cellWaveHz * (cellDir || 0);
       // Blink for the cell the level sits in. It has to be MULTIPLICATIVE and
@@ -22667,7 +22739,7 @@ class Component extends DCLogic {
         if (!lit) continue;
         let boost = 1;
         if (cellDir && tune.cellWaveOn) {
-          const ph = (g.idx / gn) - gTravel;
+          const ph = (Math.max(0, g.litRank) / gn) - gTravel;
           const cc = 0.5 + 0.5 * Math.cos(ph * Math.PI * 2);
           boost = 1 + (cc * cc * cc) * tune.cellWaveAmp;
           // Either direction: the cell the level sits in is the one worth
@@ -22681,6 +22753,8 @@ class Component extends DCLogic {
 
     const cells = this._powertrainCells;
     if (cells && cells.length && cellDir && tune.cellWaveOn) {
+      // _powertrainCells only ever holds the lit ones, so its own length is
+      // already the span the sweep should cover.
       const n = cells.length;
       const edge = this._powertrainCellEdge;
       const travel = t * tune.cellWaveHz * cellDir;
