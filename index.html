@@ -20538,6 +20538,9 @@ class Component extends DCLogic {
         // board layout re-framing). Only while a swap is up, so it costs
         // nothing the rest of the time.
         if (this._carSwapLabel) this._positionSwapBadge();
+        // Same idea for the charge %: which side is nearest depends on where
+        // the camera is now, so it cannot be decided when the flow changes.
+        if (this.state.powertrainOn) this._syncSocTextNearSide();
         // Wheel-floor glows track live flow while x-ray is up.
         if (this.state.powertrainOn || this._xrayWheelGlows) {
           this._syncXrayWheelGlows(performance.now());
@@ -21786,13 +21789,21 @@ class Component extends DCLogic {
         // and inside the ring's inner edge at ~2.2 m.
         socTextLen: 1.55,
         socTextWide: 0.88,
-        // The SAME green as the charge ring (ringChargeColor) — they are the
-        // only two things on the floor while the car is plugged in, and two
-        // near-but-not-equal greens read as a mistake.
-        socTextColor: '#00ff00',
+        // Option G. Space Grotesk is the app's OWN packaged face (see the
+        // @font-face block) so it is offline-safe on the car; system-ui here
+        // would be Roboto and would not match the rest of the chrome. Weight
+        // 400 rather than bold: the packaged range is 400-600, and asking for
+        // 700 gets a synthesised bold, not a real one.
+        socTextFamily: "'Space Grotesk', system-ui, sans-serif",
+        socTextWeight: '400',
+        // Grey rather than the ring's green. NOTE this needs the opacity below
+        // to carry it: measured, #aab4bd at 50% over the 236 floor composites
+        // to (218,222,225) -- under 20 levels of separation. At 0.85 it lands
+        // near (185,192,198), which reads.
+        socTextColor: '#aab4bd',
         socTextGlowPx: 14,
         socTextGlowPasses: 3,
-        socTextOpacity: 0.50,
+        socTextOpacity: 0.85,
         // Thin semi-transparent white rim round the glyphs. Drawn with the
         // shadow OFF, after the glow passes: with the shadow still set it
         // would just add another glow pass in white and fatten the halo
@@ -22358,7 +22369,7 @@ class Component extends DCLogic {
     g.clearRect(0, 0, W, H);
     // Shrink to fit rather than letting "100%" run off the plate.
     let px = Math.round(H * 0.78);
-    const fontAt = (n) => 'bold ' + n + 'px system-ui, "Segoe UI", sans-serif';
+    const fontAt = (n) => tune.socTextWeight + ' ' + n + 'px ' + tune.socTextFamily;
     g.font = fontAt(px);
     const room = W - tune.socTextGlowPx * 3;
     while (px > 12 && g.measureText(text).width > room) {
@@ -22380,6 +22391,14 @@ class Component extends DCLogic {
       g.strokeText(text, W / 2, H / 2);
     }
     node.tex.needsUpdate = true;
+    // Canvas font fallback is SILENT, and this canvas is painted once and then
+    // cached on its signature -- so a paint that ran before the webfont
+    // arrived would stick as the fallback face forever. Drop the signature so
+    // the next update repaints; document.fonts.check is cheap and this only
+    // ever fails on the first paint of a cold boot.
+    try {
+      if (document.fonts && !document.fonts.check(fontAt(px))) node.sig = '';
+    } catch (e) { /* no FontFaceSet — nothing to retry against */ }
   }
 
   _updatePowertrainSocText(socPct, plugged) {
@@ -22390,6 +22409,7 @@ class Component extends DCLogic {
     const text = Math.round(socPct) + '%';
     nodes.forEach((n) => {
       if (!on) {
+        n.wanted = false;
         n.mesh.visible = false;
         n.mesh.material.opacity = 0;
         n.sig = '';
@@ -22399,9 +22419,46 @@ class Component extends DCLogic {
         n.sig = text;
         this._paintPowertrainSocText(n, text);
       }
-      n.mesh.visible = true;
+      // WANTED, not visible: _syncSocTextNearSide picks which of the two
+      // actually shows. This runs on flow changes only, and the answer depends
+      // on the camera, which moves independently.
+      n.wanted = true;
       n.mesh.material.opacity = tune.socTextOpacity;
     });
+    this._syncSocTextNearSide();
+  }
+
+  /**
+   * Show the % on the NEAR side only. It is built per side so it reads upright
+   * from wherever the spectator stands, but both at once means the far one is
+   * always mirrored away from the viewer and reads as clutter behind the car.
+   *
+   * Nearest by camera distance to the plate's own world position, not by the
+   * sign of anything: the rig can be rotated arbitrarily, so "side +1" is not
+   * reliably the right-hand side of the screen. Cheap enough to run per frame
+   * -- two world positions and a distance compare, only while the % is up.
+   */
+  _syncSocTextNearSide() {
+    const nodes = this._powertrainSocText;
+    if (!nodes || !nodes.length) return;
+    const cam = this.camera;
+    let best = null, bestD = Infinity;
+    if (cam) {
+      if (!this._socNearScratch) this._socNearScratch = new this.THREE.Vector3();
+      const v = this._socNearScratch;
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (!n.wanted) continue;
+        n.mesh.getWorldPosition(v);
+        const d = v.distanceToSquared(cam.position);
+        if (d < bestD) { bestD = d; best = n; }
+      }
+    }
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const show = !!n.wanted && (best ? n === best : true);
+      if (n.mesh.visible !== show) n.mesh.visible = show;
+    }
   }
 
   /**

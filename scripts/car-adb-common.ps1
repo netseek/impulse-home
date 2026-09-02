@@ -40,21 +40,32 @@ function Test-Mmi([string]$Adb, [string]$Serial) {
 }
 
 function Install-CarApk([string]$Adb, [string]$Serial, [string]$Apk) {
+  # 2>&1 on a native command wraps stderr in a NativeCommandError; with the
+  # caller's $ErrorActionPreference='Stop' that becomes a terminating error
+  # and skips the recovery logic below entirely, before $out is ever
+  # inspected. Scope EAP to 'Continue' around every 2>&1 native call here.
+  $callerEap = $ErrorActionPreference
   $installer = 'com.autolink.installer'
   Write-Host "Installing on $Serial as $installer ..."
+  $ErrorActionPreference = 'Continue'
   $out = & $Adb -s $Serial install -r -i $installer $Apk 2>&1 | Out-String
+  $ErrorActionPreference = $callerEap
   Write-Host $out.Trim()
   if ($LASTEXITCODE -eq 0 -and $out -notmatch 'Failure \[') { return }
 
   if ($out -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE') {
     Write-Host 'Signature mismatch — uninstalling then reinstalling via Autolink ...'
+    $ErrorActionPreference = 'Continue'
     $null = & $Adb -s $Serial uninstall $CarPackage 2>&1
+    $ErrorActionPreference = $callerEap
   }
 
   Write-Host 'Pushing APK and pm install -i com.autolink.installer ...'
   & $Adb -s $Serial push $Apk /data/local/tmp/havalh6-viewer.apk
   if ($LASTEXITCODE -ne 0) { throw "adb push failed ($LASTEXITCODE)" }
+  $ErrorActionPreference = 'Continue'
   $pm = & $Adb -s $Serial shell "pm install -r -i $installer /data/local/tmp/havalh6-viewer.apk" 2>&1 | Out-String
+  $ErrorActionPreference = $callerEap
   Write-Host $pm.Trim()
   if ($pm -notmatch '(?m)^Success' -and $LASTEXITCODE -ne 0) {
     throw "pm install failed: $($pm.Trim())"
