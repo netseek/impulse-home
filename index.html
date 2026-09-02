@@ -4791,11 +4791,6 @@ const CAR_SIGNALS = {
   powerFlow: 'haval.power.flow',
 };
 
-// H6 tank size, used only to turn remain_fuel_percentage into litres for the
-// floor badge. Matches Impulse's DASHBOARD_FUEL_TANK_CAPACITY_LITERS so both
-// screens quote the same number.
-const PT_FUEL_TANK_LITERS = 55;
-
 // Badge canvas resolution, in pixels per metre of plate. Constant across the
 // four plates so the long battery bar and the short fuel bar come out with the
 // same text size and the same corner radius.
@@ -6170,30 +6165,6 @@ class Component extends DCLogic {
    * its parked clamp (pack V×I noise otherwise reads as a few hundred watts
    * on a stationary car).
    */
-  /**
-   * Tank level 0-100 from `car.basic.remain_fuel_percentage`, the key Impulse
-   * hands the cluster themes. Same shape as _powerSocPct, demo fallback and
-   * all, so the badges read something sensible off the car too.
-   */
-  _powerFuelPct(now) {
-    const live = this._powerLive || {};
-    const demo = !this._graphAnyLive && !(this._busCount > 0);
-    const raw = this._carNumber(live.fuelLevel);
-    if (isFinite(raw) && raw >= 0 && raw <= 100) return Math.round(raw);
-    return demo ? 58 : 0;
-  }
-
-  /**
-   * Litres from that percentage. The bus never sends litres; Impulse's
-   * dashboard card derives them as percent * 55 / 100 at one decimal
-   * (DASHBOARD_FUEL_TANK_CAPACITY_LITERS = 55f), so deriving them the same way
-   * here keeps the viewer and the cluster from disagreeing about the tank.
-   */
-  _powerFuelLiters(pct) {
-    const n = Math.max(0, Math.min(100, pct || 0)) * PT_FUEL_TANK_LITERS / 100;
-    return n.toFixed(1);
-  }
-
   _powerKwNow(now) {
     const demo = !this._graphAnyLive && !(this._busCount > 0);
     let kw = this._graphDisplay.evPowerKw != null
@@ -15787,7 +15758,8 @@ class Component extends DCLogic {
   }
 
   _syncXrayWheelGlows(now) {
-    const want = !!(this.state.powertrainOn && this._powertrainRig && this._powertrainRig.visible);
+    const want = !!(this.state.powertrainOn && this._powertrainRig && this._powertrainRig.visible
+                    && this._powertrainFxTune().motorGlowOn);
     if (!want) {
       if (this._xrayWheelGlows) {
         this._xrayWheelGlows.front.mesh.visible = false;
@@ -19433,8 +19405,7 @@ class Component extends DCLogic {
             this._rebuildPowertrainWheelGlows();
           }
           if ('badgeX' in patch || 'badgeY' in patch || 'badgeLen' in patch
-              || 'badgeWide' in patch || 'badgeSpin' in patch
-              || 'badgeGap' in patch || 'badgeSplit' in patch) {
+              || 'badgeWide' in patch || 'badgeSpin' in patch) {
             this._rebuildPowertrainBadges();
           }
           if ('bloomOn' in patch || 'bloomStrength' in patch) {
@@ -21070,7 +21041,11 @@ class Component extends DCLogic {
         // charge, because that is when the wheels are the SOURCE of the energy
         // -- the motor halos sit at the axle centres, inboard, which reads as
         // the middle of the car rather than as anything to do with the tyres.
-        wheelGlowOn: 1,
+        // Ground patches under the four wheels, and the pair under the axles
+        // (motorGlowOn). Both read as stray light pooling on the floor rather
+        // than as anything about the powertrain, so both are off.
+        wheelGlowOn: 0,
+        motorGlowOn: 0,
         // Route the emissive x-ray parts through the app's bloom composer, so
         // the light actually BLEEDS instead of stopping at the surface. This is
         // the only thing here that costs real frame time: CLAUDE.md measures
@@ -21104,10 +21079,14 @@ class Component extends DCLogic {
         // literally the direction the level moves.
         cellWaveAmp: 1.35,
         cellWaveHz: 0.5,
-        cellEdgeAmp: 0.6,
-        cellEdgeHz: 2.0,
-        // Exponent on the edge cell's pulse. 1 is the plain sine, which reads
-        // as a slow swell; higher narrows the peak until it blinks.
+        // The edge cell's blink: a multiplier swept between these two, so it
+        // drops well below the neighbouring cells and comes back over them.
+        cellEdgeLow: 0.30,
+        cellEdgeHigh: 2.10,
+        // ~1.1 Hz. At the old 2.0 the period was over three seconds, which read
+        // as breathing rather than blinking.
+        cellEdgeHz: 7.0,
+        // Exponent on the pulse. 1 is the plain sine; higher narrows the peak.
         cellEdgeSharp: 3,
         // Single outer ring — subtle breathe + glow pulse; active flow only.
         ringOn: 1,
@@ -21127,8 +21106,9 @@ class Component extends DCLogic {
         // back from __ptGlow without a code change.
         ringChargeColor: '#00ff00',
         ringChargeColor2: '#00ff00',
-        ringDriveColor: '#6cc4f0',
-        ringDriveColor2: '#6cc4f0',
+        // White while driving; green stays the charge/regen colour.
+        ringDriveColor: '#ffffff',
+        ringDriveColor2: '#ffffff',
         // White border on the band edges plus a soft white bloom either side of
         // it, both sized in SCREEN pixels via fwidth so they hold at any zoom.
         ringBorderPx: 1.8,
@@ -21181,14 +21161,6 @@ class Component extends DCLogic {
         // Turned a quarter turn: the plates run ALONG the car, not across it,
         // so plate 1 lies beside the front wheel and plate 4 beside the rear.
         badgeSpin: Math.PI / 2,
-        badgeGap: 0.06,         // between neighbouring plates
-        // How the span between the two wheel plates is divided. The pack gets
-        // the long bar, the tank the short one.
-        badgeSplit: 0.65,
-        // World units either side of the car's centreline in which the plates
-        // keep the side they are on, so an orbit over the nose does not flap
-        // them back and forth.
-        badgeSideDeadZone: 0.35,
         badgeOpacity: 0.95,
         // The floor is 236/255, so a light fill vanishes against it. Near-opaque
         // is what makes the filled part read as distinct from the transparent
@@ -21199,10 +21171,7 @@ class Component extends DCLogic {
         // 236/255 -- a soft tint simply washes out against that.
         badgeDriveColor: '#ffffff',
         badgeRegenColor: '#00ff3c',
-        // The pack plate is green whatever the car is doing. It borrowed the
-        // drive colour before, which now means it would turn white while
-        // driving and read as a second drive-mode plate rather than a gauge.
-        badgeSocColor: '#00ff3c',
+        // Only the amber half of the HYBRID split now that the tank plate is gone.
         badgeFuelColor: '#ffa400',
         badgeBorderColor: '#ffffff',
         badgeBorderPx: 7,
@@ -21600,33 +21569,21 @@ class Component extends DCLogic {
       if (b.tex) b.tex.dispose();
     });
     this._powertrainBadges = [];
-    this._ptBadgeSide = 0;   // force _faceBadgesToCamera to re-place them
     const anchors = manifest.anchors || {};
     const fl = anchors.hubFL || anchors.hubFR;
     const rl = anchors.hubRL || anchors.hubRR;
     if (!fl || !rl) return;
     const tune = this._powertrainFxTune();
-    // Plates 1 and 4 sit ON the hubs, so each reads as belonging to the axle
-    // beside it. Plates 2 and 3 take what is left between their inner edges,
-    // divided badgeSplit / the rest, so the pack is the long bar and the tank
-    // the short one.
-    const zF = fl[2];
-    const zR = rl[2];
-    const wheelLen = tune.badgeLen;
-    const gap = tune.badgeGap;
-    const innerF = zF + wheelLen / 2;
-    const innerR = zR - wheelLen / 2;
-    const usable = Math.max(0.12, (innerR - innerF) - gap * 3);
-    const lenSoc = usable * tune.badgeSplit;
-    const lenFuel = usable - lenSoc;
-    const zSoc = innerF + gap + lenSoc / 2;
-    const zFuel = zSoc + lenSoc / 2 + gap + lenFuel / 2;
-    const slots = [
-      { id: 'front', z: zF, len: wheelLen },
-      { id: 'soc', z: zSoc, len: lenSoc },
-      { id: 'fuel', z: zFuel, len: lenFuel },
-      { id: 'rear', z: zR, len: wheelLen },
-    ];
+    // One plate per axle PER SIDE, each sitting on its own hub. Both sides
+    // carry the same label, so it is there for a spectator standing anywhere
+    // round the car -- which is also why nothing follows the camera any more.
+    // Each plate's half turn is baked in at build time from the side it is on,
+    // so it reads upright from that side and never has to be re-oriented.
+    const slots = [];
+    [1, -1].forEach((side) => {
+      slots.push({ id: 'front', side: side, z: fl[2], len: tune.badgeLen });
+      slots.push({ id: 'rear', side: side, z: rl[2], len: tune.badgeLen });
+    });
     slots.forEach((slot) => {
       const cv = document.createElement('canvas');
       cv.width = Math.max(64, Math.round(slot.len * PT_BADGE_PX_PER_M));
@@ -21641,61 +21598,21 @@ class Component extends DCLogic {
         transparent: true,
         opacity: 0,
         depthWrite: false,
-        // Off, like the ring and the wheel patches: these are floor graphics and
-        // have to read through the chassis, which is what the ghost body is for.
-        // depthTest ON would let the battery tray swallow plates 2 and 3.
+        // Off, like the ring: these are floor graphics and have to read through
+        // the chassis, which is what the ghost body is for.
         depthTest: false,
         toneMapped: false,                          // keep the fills saturated
       });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(tune.badgeX, tune.badgeY, slot.z);
+      mesh.position.set(tune.badgeX * slot.side, tune.badgeY, slot.z);
+      mesh.rotation.y = slot.side < 0 ? Math.PI : 0;
       mesh.renderOrder = 6;
       mesh.frustumCulled = false;
       mesh.visible = false;
       root.add(mesh);
       this._powertrainBadges.push({
-        id: slot.id, mesh: mesh, tex: tex, cv: cv, sig: '',
+        id: slot.id, side: slot.side, mesh: mesh, tex: tex, cv: cv, sig: '',
       });
-    });
-  }
-
-  /**
-   * Keep the plates on whichever side of the car the spectator is on, turned so
-   * the text still reads upright from there. Looking at a floor graphic from
-   * the far side sees it upside down, so switching sides is a half turn as well
-   * as a move -- and the half turn also carries the fill back to the end the
-   * viewer now reads from, so the bars still fill towards them.
-   *
-   * The side test is a dot against the rig's own +X in world space rather than
-   * worldToLocal, which would invert a matrix every frame for one number.
-   *
-   * The dead zone matters: an orbit passes over the nose and the tail, where
-   * the camera crosses the centreline with the plates edge-on. Without it they
-   * flap from side to side through that whole part of the sweep.
-   */
-  _faceBadgesToCamera() {
-    const badges = this._powertrainBadges;
-    const root = this._powertrainFxRoot;
-    const cam = this.camera;
-    if (!badges || !badges.length || !root || !cam) return;
-    const THREE = this.THREE;
-    if (!this._ptBadgeTmp) {
-      this._ptBadgeTmp = { ax: new THREE.Vector3(), o: new THREE.Vector3(), d: new THREE.Vector3() };
-    }
-    const t = this._ptBadgeTmp;
-    t.ax.set(1, 0, 0).transformDirection(root.matrixWorld);
-    t.o.setFromMatrixPosition(root.matrixWorld);
-    const along = t.d.copy(cam.position).sub(t.o).dot(t.ax);
-    const dead = this._powertrainFxTune().badgeSideDeadZone;
-    let side = this._ptBadgeSide || 1;
-    if (along > dead) side = 1;
-    else if (along < -dead) side = -1;
-    if (side === this._ptBadgeSide) return;
-    this._ptBadgeSide = side;
-    const badgeX = this._powertrainFxTune().badgeX;
-    badges.forEach((b) => {
-      b.mesh.position.x = badgeX * side;
-      b.mesh.rotation.y = side < 0 ? Math.PI : 0;
     });
   }
 
@@ -21785,7 +21702,7 @@ class Component extends DCLogic {
    * which is already gated on the flow signature, but SOC and the tank move on
    * their own and a canvas repaint plus a texture upload is not free.
    */
-  _updatePowertrainBadges(flow, socPct, fuelPct) {
+  _updatePowertrainBadges(flow) {
     const badges = this._powertrainBadges;
     if (!badges || !badges.length) return;
     const tune = this._powertrainFxTune();
@@ -21799,7 +21716,6 @@ class Component extends DCLogic {
     // _applyPowertrainFlow reads to pick its glow tone.
     const moving = !!(front || rear);
     const charging = flow.tone === 'charge';
-    const regen = front < 0 || rear < 0;
     // Each axle plate answers for ITS OWN direction, so a car recovering on one
     // axle while the other still drives says so instead of averaging the two.
     const axleSpec = (dir, driveLabel) => {
@@ -21828,13 +21744,6 @@ class Component extends DCLogic {
         spec = axleOn ? axleSpec(front, awdNow ? 'AWD' : 'FWD') : null;
       } else if (b.id === 'rear') {
         spec = (axleOn && awdNow) ? axleSpec(rear, 'AWD') : null;
-      } else if (b.id === 'soc') {
-        spec = { text: Math.round(socPct) + '%', color: tune.badgeSocColor,
-                 fill: socPct / 100, fillAlpha: tune.badgeFillAlpha };
-      } else if (b.id === 'fuel') {
-        spec = { text: this._powerFuelLiters(fuelPct) + ' L',
-                 color: tune.badgeFuelColor,
-                 fill: fuelPct / 100, fillAlpha: tune.badgeFillAlpha };
       }
       if (!spec) {
         b.mesh.visible = false;
@@ -22257,7 +22166,7 @@ class Component extends DCLogic {
     }
   }
 
-  _applyPowertrainFlow(flow, socPct, fuelPct) {
+  _applyPowertrainFlow(flow, socPct) {
     const parts = this._powertrainParts;
     if (!parts) return;
     const G = this._powertrainGlowTones();
@@ -22417,7 +22326,7 @@ class Component extends DCLogic {
       });
     }
 
-    this._updatePowertrainBadges(flow, socPct, fuelPct);
+    this._updatePowertrainBadges(flow);
   }
 
   _clearPowertrainFx() {
@@ -22482,20 +22391,13 @@ class Component extends DCLogic {
     }
     if (!this._powertrainParts) return false;
 
-    // Cheap, and it has to run per frame rather than per flow change: the
-    // spectator orbits without the flow state moving at all.
-    this._faceBadgesToCamera();
-
     const flow = this._powerFlowRaw(now);
     const socPct = this._powerSocPct(now);
-    // Tank level is in the signature too: the floor badge prints it, and it is
-    // the one input here that moves without the flow state moving with it.
-    const fuelPct = this._powerFuelPct(now);
     const sig = flow.tone + '|' + (flow.ice ? 1 : 0) + '|' + flow.front + '|' + flow.rear
-      + '|' + socPct + '|' + fuelPct;
+      + '|' + socPct;
     if (sig !== this._powertrainFxSig) {
       this._powertrainFxSig = sig;
-      this._applyPowertrainFlow(flow, socPct, fuelPct);
+      this._applyPowertrainFlow(flow, socPct);
     }
 
     this._powertrainFxT = (this._powertrainFxT || 0) + dt;
@@ -22593,8 +22495,12 @@ class Component extends DCLogic {
       const gn = glows.length;
       const gEdge = this._powertrainCellEdge;
       const gTravel = t * tune.cellWaveHz * (cellDir || 0);
-      const gBreathe = Math.pow(0.5 + 0.5 * Math.sin(t * tune.cellEdgeHz),
-                                tune.cellEdgeSharp);
+      // Blink for the cell the level sits in. It has to be MULTIPLICATIVE and
+      // span below 1: the previous additive nudge only ever brightened, by less
+      // than the travelling wave was already moving every other cell, so there
+      // was nothing to see. Dimming is what reads as a blink.
+      const gBlink = tune.cellEdgeLow + (tune.cellEdgeHigh - tune.cellEdgeLow)
+        * Math.pow(0.5 + 0.5 * Math.sin(t * tune.cellEdgeHz), tune.cellEdgeSharp);
       for (let i = 0; i < gn; i++) {
         const g = glows[i];
         const lit = !!tune.cellGlowOn && g.level > 0.01;
@@ -22607,7 +22513,7 @@ class Component extends DCLogic {
           boost = 1 + (cc * cc * cc) * tune.cellWaveAmp;
           // Either direction: the cell the level sits in is the one worth
           // watching whether the pack is filling or draining.
-          if (g.idx === gEdge) boost += tune.cellEdgeAmp * gBreathe;
+          if (g.idx === gEdge) boost *= gBlink;
         }
         g.sprite.material.uniforms.uOpacity.value =
           g.level * tune.cellGlowOpacity * boost;
@@ -22619,20 +22525,26 @@ class Component extends DCLogic {
       const n = cells.length;
       const edge = this._powertrainCellEdge;
       const travel = t * tune.cellWaveHz * cellDir;
-      const breathe = Math.pow(0.5 + 0.5 * Math.sin(t * tune.cellEdgeHz),
-                               tune.cellEdgeSharp);
+      const blink = tune.cellEdgeLow + (tune.cellEdgeHigh - tune.cellEdgeLow)
+        * Math.pow(0.5 + 0.5 * Math.sin(t * tune.cellEdgeHz), tune.cellEdgeSharp);
       for (let i = 0; i < n; i++) {
         // cos^3 of the phase: a narrow bump rather than a whole-bar throb, so
         // you can see it move instead of just seeing everything flash.
         const phase = (i / n) - travel;
         const c = 0.5 + 0.5 * Math.cos(phase * Math.PI * 2);
+        const isEdge = (i === edge);
         let boost = 1 + (c * c * c) * tune.cellWaveAmp;
-        if (i === edge) boost += tune.cellEdgeAmp * breathe;
+        if (isEdge) boost *= blink;
         const mats = cells[i].materials;
         for (let k = 0; k < mats.length; k++) {
           const base = mats[k].userData.glowBase || 0;
           if (base > 0.005) {
-            mats[k].emissiveIntensity = Math.max(base * 0.94, base * boost);
+            // The 0.94 floor stops the travelling wave darkening cells as it
+            // passes. The edge blink is MEANT to darken, so it goes under the
+            // floor -- clamping it there was the other half of why the blink
+            // could not be seen.
+            mats[k].emissiveIntensity = isEdge
+              ? base * boost : Math.max(base * 0.94, base * boost);
           }
         }
       }

@@ -594,11 +594,11 @@ themes, alongside `fuel_mode_remain_odometer`.
 **Litres are not on the bus at all.** Impulse derives them in
 `DashboardCardLayout.formatDashboardFuelLiters` as `percent * 55 / 100` at one
 decimal, from `DASHBOARD_FUEL_TANK_CAPACITY_LITERS = 55f` in `BottomBarUI.kt`;
-its dashboard card prints the pair as `"31.9 L - 210 km"`. The viewer derives
-them the same way from `PT_FUEL_TANK_LITERS = 55`, so the two screens cannot
-quote different amounts of fuel for one tank. **If Impulse ever retunes that
-constant, retune this one too** — a mismatch is invisible in either app alone
-and only shows up when both are on screen at once.
+its dashboard card prints the pair as `"31.9 L - 210 km"`. The viewer subscribes
+the level but does not currently display litres -- a floor badge that did was
+removed as redundant with the POWER card. **If you add one back, derive them the
+same way rather than picking a tank size**, or the two screens will quote
+different amounts of fuel for one tank, which is invisible in either app alone.
 
 Impulse is the sibling repo at `StudioProjects/haval-app-tool-multimidia`
 (package `br.com.redesurftank.havalshisuku`). Its theme bridge is the reference
