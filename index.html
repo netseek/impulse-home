@@ -19405,7 +19405,8 @@ class Component extends DCLogic {
             this._rebuildPowertrainWheelGlows();
           }
           if ('badgeX' in patch || 'badgeY' in patch || 'badgeLen' in patch
-              || 'badgeWide' in patch || 'badgeSpin' in patch) {
+              || 'badgeWide' in patch || 'badgeSpin' in patch
+              || 'badgeGlowPx' in patch) {
             this._rebuildPowertrainBadges();
           }
           if ('bloomOn' in patch || 'bloomStrength' in patch) {
@@ -21175,11 +21176,21 @@ class Component extends DCLogic {
         badgeFuelColor: '#ffa400',
         badgeBorderColor: '#ffffff',
         badgeBorderPx: 7,
+        // Outer glow, in canvas pixels at PT_BADGE_PX_PER_M -- 5 px is ~12 mm on
+        // the floor. Blue while the axle drives, white while it recovers: the
+        // plate itself is white on drive and green on regen, so the glow is the
+        // opposite each time and the state reads from across the car.
+        badgeGlowPx: 5,
+        badgeGlowPasses: 3,
+        badgeGlowDriveColor: '#00a8ff',
+        badgeGlowRegenColor: '#ffffff',
         // Label is knocked out of the plate. badgeTextKnockPx widens the hole,
         // badgeTextEdge* draws the dark edge that gives it definition where
         // plate and floor are close in brightness.
         badgeTextKnockPx: 2,
-        badgeTextEdgePx: 3,
+        // 0 = the letters are holes and nothing else. Raise it to put a dark rim
+        // back round them.
+        badgeTextEdgePx: 0,
         badgeTextEdgeColor: 'rgba(0,0,0,0.55)',
       };
     }
@@ -21625,7 +21636,11 @@ class Component extends DCLogic {
     const cv = badge.cv;
     const g = cv.getContext('2d');
     const W = cv.width, H = cv.height;
-    const pad = 6;
+    const tune = this._powertrainFxTune();
+    // Room for half the border plus the glow, or the glow clips at the canvas
+    // edge -- which shows up as the plate ending in a hard line rather than
+    // fading out.
+    const pad = Math.ceil(tune.badgeBorderPx / 2 + tune.badgeGlowPx + 3);
     const x0 = pad, y0 = pad, w = W - pad * 2, h = H - pad * 2;
     const r = h * 0.34;
     const round = (x, y, ww, hh, rr) => {
@@ -21642,6 +21657,20 @@ class Component extends DCLogic {
       g.closePath();
     };
     g.clearRect(0, 0, W, H);
+    // Outer glow first, so the fill and the border land on top of it and only
+    // the part that spills outside the pill survives.
+    if (tune.badgeGlowPx > 0 && spec.glowColor) {
+      g.save();
+      g.shadowColor = spec.glowColor;
+      g.shadowBlur = tune.badgeGlowPx * 2;
+      g.strokeStyle = spec.glowColor;
+      g.lineWidth = 2;
+      for (let i = 0; i < tune.badgeGlowPasses; i++) {
+        round(x0, y0, w, h, r);
+        g.stroke();
+      }
+      g.restore();
+    }
     const fill = Math.max(0, Math.min(1, spec.fill));
     if (fill > 0) {
       g.save();
@@ -21663,7 +21692,6 @@ class Component extends DCLogic {
       g.restore();
     }
     g.globalAlpha = 1;
-    const tune = this._powertrainFxTune();
     // White, not the fill colour. Against the bright floor the border alone is
     // low contrast, so it is drawn over a dark hairline that gives it an edge
     // wherever the plate is transparent.
@@ -21687,12 +21715,15 @@ class Component extends DCLogic {
     g.strokeText(spec.text, tx, ty);              // widen the hole a little
     g.fillText(spec.text, tx, ty);
     g.globalCompositeOperation = 'source-over';
-    // The hole alone is weak where the plate and the floor are both bright, so
-    // the letterform gets a dark edge. Half of it falls inside the hole, which
-    // keeps the letter itself transparent.
-    g.lineWidth = tune.badgeTextEdgePx;
-    g.strokeStyle = tune.badgeTextEdgeColor;
-    g.strokeText(spec.text, tx, ty);
+    // Nothing is drawn back over the hole: the label is pure knockout, so what
+    // reads it is the fill around it and the outer glow, not any ink of its own.
+    // badgeTextEdgePx > 0 puts a dark rim back if the letters need help where
+    // plate and floor are close in brightness.
+    if (tune.badgeTextEdgePx > 0) {
+      g.lineWidth = tune.badgeTextEdgePx;
+      g.strokeStyle = tune.badgeTextEdgeColor;
+      g.strokeText(spec.text, tx, ty);
+    }
     badge.tex.needsUpdate = true;
   }
 
@@ -21721,15 +21752,19 @@ class Component extends DCLogic {
     const axleSpec = (dir, driveLabel) => {
       if (dir < 0) {
         return { text: 'REGEN', color: tune.badgeRegenColor,
+                 glowColor: tune.badgeGlowRegenColor,
                  fill: 1, fillAlpha: tune.badgeFillAlpha };
       }
       // Engine running as well as the motor: one plate, both sources, split
-      // white/amber so the fill itself says where the effort comes from.
+      // white/amber so the fill itself says where the effort comes from. Still
+      // a driving state, so it keeps the drive glow.
       if (flow.ice) {
         return { text: 'HYBRID', color: tune.badgeDriveColor,
-                 color2: tune.badgeFuelColor, fill: 1, fillAlpha: tune.badgeFillAlpha };
+                 color2: tune.badgeFuelColor, glowColor: tune.badgeGlowDriveColor,
+                 fill: 1, fillAlpha: tune.badgeFillAlpha };
       }
       return { text: driveLabel, color: tune.badgeDriveColor,
+               glowColor: tune.badgeGlowDriveColor,
                fill: 1, fillAlpha: tune.badgeFillAlpha };
     };
     // "All EV motors", which is what makes it AWD rather than an AWD car whose
@@ -21752,7 +21787,7 @@ class Component extends DCLogic {
         return;
       }
       const sig = spec.text + '|' + spec.color + '|' + (spec.color2 || '')
-        + '|' + spec.fill.toFixed(3);
+        + '|' + (spec.glowColor || '') + '|' + spec.fill.toFixed(3);
       if (sig !== b.sig) {
         b.sig = sig;
         this._paintPowertrainBadge(b, spec);
