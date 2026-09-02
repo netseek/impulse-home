@@ -690,6 +690,27 @@ window.HavalSplash = (function () {
       border-radius: 4px;
       background: rgba(255,255,255,.04);
     }
+    /* Wrapper exists only to anchor the busy spinner over the thumbnail — the
+       rim that is being fetched is the one the user just tapped, so that tile
+       is where they are already looking. */
+    .hv-wheel-thumb {
+      position: relative;
+      display: block;
+      width: 100%;
+      line-height: 0;
+    }
+    .hv-wheel-thumb-spin {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      border: 2px solid rgba(0,0,0,.28);
+      border-top-color: #4fd6e8;
+      border-radius: 50%;
+      animation: vp-spin .9s linear infinite;
+    }
     .hv-wheel-card span {
       font-family: 'Space Mono', monospace;
       font-size: 7px;
@@ -967,6 +988,14 @@ window.HavalSplash = (function () {
     @media (max-width: 640px) {
       .hv-toolbar button.hv-tool-btn { width: 54px !important; min-width: 54px !important; }
     }
+    /* The board is a RESERVED RECT, not a surface. Where it actually holds a
+       widget the card takes the pointer; everywhere else the board is empty
+       air over the 3D scene, and a drag there should orbit the car exactly as
+       it does over the centre gap. So the board and its grid are transparent
+       to the pointer and only the cards (and the placement/slot-pick cells,
+       which exist only while placing) take it back. Long-press-to-add still
+       works over the empty stretch — it is handled on the canvas instead, the
+       same way .hv-center-slot-zone already does it (_pointInWidgetHoldZone). */
     .hv-widget-board {
       position: absolute;
       z-index: 20;
@@ -975,11 +1004,14 @@ window.HavalSplash = (function () {
       flex-direction: column;
       gap: 8px;
       padding: 0;
-      pointer-events: auto;
+      pointer-events: none;
       color: #eaf2f8;
       transition: opacity 900ms ease;
       overflow: hidden;
     }
+    .hv-widget-grid { pointer-events: none; }
+    .hv-widget-card,
+    .hv-widget-cell { pointer-events: auto; }
     /* Boot: the opening shot is the clip and then the car, nothing else. The
        widget boards are held back and faded in last (see _revealShellChrome),
        two seconds after the launcher icons start flying in. The class is on
@@ -988,6 +1020,9 @@ window.HavalSplash = (function () {
        going. pointer-events off too, so an invisible board can't swallow a tap
        in the meantime. */
     body.hv-boot .hv-widget-board { opacity: 0; pointer-events: none; }
+    /* Cards/cells now opt back INTO pointer events, so an invisible board can
+       still swallow a tap through them unless they are held back too. */
+    body.hv-boot .hv-widget-board * { pointer-events: none; }
     body.hv-boot .hv-page-stub { opacity: 0; }
     body.hv-boot .hv-apps-pane { opacity: 0; pointer-events: none; }
     body.hv-boot .hv-apps-fab-wrap { opacity: 0; pointer-events: none; }
@@ -1066,6 +1101,120 @@ window.HavalSplash = (function () {
       -webkit-box-orient: vertical;
       opacity: 0.9;
     }
+    /* Long-press an app tile to rename / re-icon it. Sits above the widget
+       picker (49/50) and the slot banner (51). */
+    .hv-app-edit-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(0,0,0,.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hv-app-edit {
+      width: min(560px, 86vw);
+      max-height: 88vh;
+      overflow-y: auto;
+      padding: 16px 18px 14px;
+      border-radius: 14px;
+      background: var(--hv-widget-menu-bg);
+      border: 1px solid var(--hv-widget-border);
+      box-shadow: var(--hv-widget-shadow);
+      color: var(--hv-widget-fg);
+      backdrop-filter: blur(22px) saturate(1.25);
+      -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    }
+    .hv-app-edit-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .hv-app-edit-head img {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      object-fit: contain;
+      background: rgba(0,0,0,0.25);
+    }
+    .hv-app-edit-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: .12em;
+    }
+    .hv-app-edit-pkg {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .06em;
+      opacity: .45;
+      word-break: break-all;
+    }
+    .hv-app-edit-kicker {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .18em;
+      opacity: .5;
+      margin: 12px 0 7px;
+    }
+    .hv-app-edit-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--hv-widget-border);
+      background: rgba(0,0,0,0.22);
+      color: var(--hv-widget-fg);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+    }
+    .hv-app-edit-icons {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+      gap: 7px;
+    }
+    .hv-app-edit-icon {
+      height: 46px;
+      padding: 5px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hv-app-edit-icon img { width: 100%; height: 100%; object-fit: contain; }
+    .hv-app-edit-icon.on { border-color: #4fd6e8; background: rgba(79,214,232,.14); }
+    .hv-app-edit-colors { display: flex; gap: 9px; flex-wrap: wrap; }
+    .hv-app-edit-color {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      padding: 0;
+    }
+    .hv-app-edit-color.on { border-color: var(--hv-widget-fg); }
+    .hv-app-edit-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .hv-app-edit-btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--hv-widget-border);
+      background: transparent;
+      color: var(--hv-widget-fg);
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .12em;
+      cursor: pointer;
+    }
+    .hv-app-edit-btn.primary { border-color: #4fd6e8; color: #4fd6e8; }
+    .hv-app-edit-btn.ghost { opacity: .6; margin-right: auto; }
     .hv-apps-fab-wrap {
       position: absolute;
       z-index: 30;
@@ -3416,6 +3565,79 @@ window.HavalSplash = (function () {
       animation: vp-spin .9s linear infinite;
       opacity: .85;
     }
+    /* Same spinner, reused post-boot for a MODEL / WHEEL swap — the boot HUD
+       is a cold-start-only affair (splash line, then native progress), so a
+       later load had no feedback of any kind.
+
+       Cold boot draws it centred over the dark shell, where a bare ring reads
+       fine, so that case stays exactly as it was — .hv-badge is only added
+       when there is a swap label.
+
+       A post-boot swap gets neither. Centred it read as a modal popup over the
+       whole panel, and the car is rarely AT the panel centre anyway
+       (_shellCameraTarget shifts it into whatever gap the widget boards
+       leave). So the swap case is a small pill PINNED UNDER THE CAR by
+       _positionSwapBadge. It keeps a backing fill because what it sits on
+       varies: the day scene is near-white, night is near-black, and mixed
+       centerFill puts an arbitrary Bing photo back there — a bare ring at
+       rgba(255,255,255,.14) measured invisible in day mode. No
+       backdrop-filter, which would cost a blur of the live canvas on the MMI
+       for legibility a flat fill already buys. */
+    .hv-boot-center-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .hv-boot-center-card.hv-badge {
+      position: absolute;
+      left: 0;
+      top: 0;
+      flex-direction: row;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 10px 4px 7px;
+      border-radius: 999px;
+      background: rgba(10,14,18,.52);
+      border: 1px solid rgba(255,255,255,.09);
+      box-shadow: 0 2px 10px rgba(0,0,0,.20);
+      white-space: nowrap;
+    }
+    .hv-boot-center-label {
+      margin-top: 12px;
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .20em;
+      color: rgba(234,242,248,.62);
+    }
+    .hv-boot-center-card.hv-badge .hv-boot-center-spin {
+      width: 12px;
+      height: 12px;
+      border-width: 1.5px;
+    }
+    .hv-boot-center-card.hv-badge .hv-boot-center-label {
+      margin-top: 0;
+      font-size: 7px;
+      letter-spacing: .16em;
+      color: rgba(234,242,248,.80);
+    }
+    /* Swap veil. A post-boot body/rim change rebuilds the car in place, and the
+       car used to stay on screen through all of it — the new body landing
+       before its wheels, the light warm-up drawing a frame, the blur sprite
+       still carrying the previous rim. The host fades out, the swap happens
+       behind it, the finished car fades back in. Opacity only: it stays on the
+       compositor, and it works over the Bing wallpaper in mixed centerFill
+       (where the canvas is transparent) exactly as it does over the shell. */
+    .hv-canvas-host {
+      transition: opacity .18s ease;
+    }
+    .hv-canvas-host.hv-swapping {
+      opacity: 0;
+      pointer-events: none !important;
+      transition: opacity .18s ease;
+    }
+    .hv-canvas-host.hv-swap-in {
+      transition: opacity .3s ease;
+    }
 
     /* ── Hotspots + x-ray callouts ─────────────────────────────────
        Markers pinned to real points on the car, projected to screen every
@@ -3534,6 +3756,14 @@ window.HavalSplash = (function () {
       pointer-events: auto;
       box-shadow: var(--hv-widget-shadow, 0 2px 10px rgba(0,0,0,.32));
       transition: background .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+    }
+    /* Invisible oversized hit zone — enlarges the tap target without touching
+       the visible 34px circle (generated content still hit-tests to the button). */
+    .hv-cam-fab-btn::before {
+      content: '';
+      position: absolute;
+      inset: -13px;
+      border-radius: 50%;
     }
     .hv-cam-fab-btn:active { transform: scale(.92); }
     .hv-cam-fab-btn.act {
@@ -3659,7 +3889,10 @@ window.HavalSplash = (function () {
     <span style="width: {{ progressWidth }};"></span>
   </div>
   <div class="hv-boot-center" style="display: {{ bootCenterDisplay }};">
-    <div class="hv-boot-center-spin"></div>
+    <div class="hv-boot-center-card {{ bootCenterCardClass }}">
+      <div class="hv-boot-center-spin"></div>
+      <div class="hv-boot-center-label" style="display: {{ bootCenterLabelDisplay }};">{{ bootCenterLabel }}</div>
+    </div>
   </div>
 
   <!-- top chrome: desktop config toolbar only — Android uses the launcher drawer -->
@@ -4156,7 +4389,7 @@ window.HavalSplash = (function () {
     <div class="hv-apps-pane-title">LEFT</div>
     <div class="hv-apps-grid">
       <sc-for list="{{ appsPaneLeftItems }}" as="ap" hint-placeholder-count="0">
-        <button type="button" class="hv-apps-tile" onClick="{{ ap.onClick }}" title="{{ ap.label }}">
+        <button type="button" class="hv-apps-tile" onClick="{{ ap.onClick }}" title="{{ ap.label }}" onTouchStart="{{ ap.onHoldStart }}" onTouchEnd="{{ ap.onHoldEnd }}" onTouchCancel="{{ ap.onHoldCancel }}" onMouseDown="{{ ap.onHoldStart }}" onMouseUp="{{ ap.onHoldEnd }}" onMouseLeave="{{ ap.onHoldCancel }}" onContextMenu="{{ ap.onContextMenu }}">
           <img src="{{ ap.icon }}" alt="">
           <span class="hv-apps-tile-label">{{ ap.label }}</span>
         </button>
@@ -4167,11 +4400,50 @@ window.HavalSplash = (function () {
     <div class="hv-apps-pane-title">RIGHT</div>
     <div class="hv-apps-grid">
       <sc-for list="{{ appsPaneRightItems }}" as="ap" hint-placeholder-count="0">
-        <button type="button" class="hv-apps-tile" onClick="{{ ap.onClick }}" title="{{ ap.label }}">
+        <button type="button" class="hv-apps-tile" onClick="{{ ap.onClick }}" title="{{ ap.label }}" onTouchStart="{{ ap.onHoldStart }}" onTouchEnd="{{ ap.onHoldEnd }}" onTouchCancel="{{ ap.onHoldCancel }}" onMouseDown="{{ ap.onHoldStart }}" onMouseUp="{{ ap.onHoldEnd }}" onMouseLeave="{{ ap.onHoldCancel }}" onContextMenu="{{ ap.onContextMenu }}">
           <img src="{{ ap.icon }}" alt="">
           <span class="hv-apps-tile-label">{{ ap.label }}</span>
         </button>
       </sc-for>
+    </div>
+  </div>
+
+  <!-- APP+APP: long-press a tile to rename / re-icon it -->
+  <div class="hv-app-edit-backdrop" style="display: {{ appEditDisplay }};" onClick="{{ onAppEditCancel }}">
+    <div class="hv-app-edit" onClick="{{ onAppEditStop }}">
+      <div class="hv-app-edit-head">
+        <img src="{{ appEditHeadIcon }}" alt="">
+        <div>
+          <div class="hv-app-edit-title">{{ appEditTitle }}</div>
+          <div class="hv-app-edit-pkg">{{ appEditPkgLabel }}</div>
+        </div>
+      </div>
+
+      <div class="hv-app-edit-kicker">NAME</div>
+      <input class="hv-app-edit-input" type="text" value="{{ appEditNameValue }}"
+        placeholder="{{ appEditNamePlaceholder }}" onInput="{{ onAppEditName }}" />
+
+      <div class="hv-app-edit-kicker">ICON</div>
+      <div class="hv-app-edit-icons">
+        <sc-for list="{{ appEditIconItems }}" as="ic" hint-placeholder-count="0">
+          <button type="button" class="hv-app-edit-icon {{ ic.cls }}" onClick="{{ ic.onClick }}" title="{{ ic.title }}">
+            <img src="{{ ic.icon }}" alt="">
+          </button>
+        </sc-for>
+      </div>
+
+      <div class="hv-app-edit-kicker" style="display: {{ appEditColorsDisplay }};">TINT</div>
+      <div class="hv-app-edit-colors" style="display: {{ appEditColorsDisplay }};">
+        <sc-for list="{{ appEditColorItems }}" as="cl" hint-placeholder-count="0">
+          <button type="button" class="hv-app-edit-color {{ cl.cls }}" style="{{ cl.style }}" onClick="{{ cl.onClick }}"></button>
+        </sc-for>
+      </div>
+
+      <div class="hv-app-edit-actions">
+        <button type="button" class="hv-app-edit-btn ghost" onClick="{{ onAppEditReset }}">RESET</button>
+        <button type="button" class="hv-app-edit-btn" onClick="{{ onAppEditCancel }}">CANCEL</button>
+        <button type="button" class="hv-app-edit-btn primary" onClick="{{ onAppEditSave }}">SAVE</button>
+      </div>
     </div>
   </div>
 
@@ -4631,12 +4903,18 @@ window.HavalSplash = (function () {
         <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM CATALOG</div>
         <div class="slim-scrollbar hv-wheel-catalog" style="grid-template-columns: {{ wheelCatalogCols }};">
           <button type="button" class="hv-wheel-card" onClick="{{ onSelectStockWheel }}" title="Stock" style="border: 1px solid {{ stockRing }}; background: {{ stockBg }};">
-            <img src="{{ stockThumb }}" style="opacity: {{ stockImgOpacity }}; animation: {{ stockImgAnim }};" />
+            <div class="hv-wheel-thumb">
+              <img src="{{ stockThumb }}" style="opacity: {{ stockImgOpacity }}; animation: {{ stockImgAnim }};" />
+              <div class="hv-wheel-thumb-spin" style="display: {{ stockSpinDisplay }};"></div>
+            </div>
             <span style="color: {{ stockCol }};">STOCK</span>
           </button>
           <sc-for list="{{ catalogItems }}" as="cw" hint-placeholder-count="21">
             <button type="button" class="hv-wheel-card" onClick="{{ cw.onClick }}" title="{{ cw.label }}" style="border: 1px solid {{ cw.ring }}; background: {{ cw.bg }};">
-              <img src="{{ cw.thumb }}" style="opacity: {{ cw.imgOpacity }}; animation: {{ cw.imgAnim }};" />
+              <div class="hv-wheel-thumb">
+                <img src="{{ cw.thumb }}" style="opacity: {{ cw.imgOpacity }}; animation: {{ cw.imgAnim }};" />
+                <div class="hv-wheel-thumb-spin" style="display: {{ cw.spinDisplay }};"></div>
+              </div>
               <span style="color: {{ cw.textColor }};">{{ cw.label }}</span>
             </button>
           </sc-for>
@@ -4865,18 +5143,108 @@ const CAR_POWER_STATE_LABEL = {
   regen: 'Regen',
   charge: 'Carregando',
 };
-// Desktop-only cycle when no bus. Same packed shape Impulse publishes.
+// Desktop-only cycle when no bus. Same packed shape Impulse publishes:
+// v1|state|ice|front|rear, front/rear signed (+drive, -regen, 0 idle).
+//
+// This is the ONLY way the floor bars, the motor/engine art and the POWER card
+// get exercised off the car, so it walks every state those have to render
+// rather than a representative few. Keep it that way when adding a state: if
+// it is not in here it is not being looked at until someone drives the car.
 const CAR_POWER_DEMO_PACKED = [
-  'v1|ev|0|1|0',
-  'v1|ev|0|0|1',
-  'v1|ev|0|1|1',
-  'v1|regen|0|-1|0',
-  'v1|regen|0|0|-1',
-  'v1|hybrid|1|1|0',
-  'v1|ice|1|0|0',
-  'v1|idle|0|0|0',
+  'v1|ev|0|1|0',        // FWD — front motor only
+  'v1|ev|0|1|1',        // AWD — both motors
+  'v1|idle|1|0|0',      // engine running, car not moving (marcha lenta)
+  'v1|hybrid|1|1|0',    // engine + front motor
+  'v1|hybrid|1|1|1',    // engine + both motors
+  'v1|regen|0|-1|0',    // front axle recovering
+  'v1|regen|0|0|-1',    // rear axle recovering
+  'v1|regen|0|-1|-1',   // both axles recovering
+  'v1|idle|0|0|0',      // parked, nothing running
+  'v1|charge|0|0|0',    // on the plug
 ];
 const CAR_WIDGET_HOLD_MS = 500;
+
+/**
+ * Per-app name / icon overrides, set by long-pressing a launcher tile.
+ *
+ * Android has no per-package icon or label override table — `loadIcon()` and
+ * `loadLabel()` resolve out of the target APK's own resources — so a launcher
+ * that offers icon customisation has to keep its own map. This is ours:
+ * `{ "<package>": { name?, icon?, color? } }`, sparse, page-side, applied at
+ * render in `_appsOnlyRenderFields`. The native bridge keeps returning stock
+ * icons and knows nothing about this.
+ */
+const APP_OVERRIDES_KEY = 'h6_appOverrides';
+
+/** Tints offered in the edit sheet. First entry is the default. */
+const APP_ICON_COLORS = ['#e6edf6', '#4fd6e8', '#7ee787', '#ffd166', '#ff8fa3', '#c4a7ff'];
+
+/**
+ * The built-in substitute icons, drawn on the tile's own dark plate.
+ *
+ * Deliberately geometric rather than brand marks: a launcher that shipped
+ * recognisable third-party logos would be redistributing them. These say what
+ * an app *is* — the user picks "music" for whichever music app they run.
+ * `svg` is inner markup for a 24x24 viewBox with `CCC` standing in for the
+ * chosen tint; see appIconDataUrl().
+ */
+const APP_ICON_SET = [
+  { slug: 'music', label: 'Music', svg: '<circle cx="8" cy="17.5" r="3.2" fill="CCC"/><path d="M10.4 5.2 19 3.2v3.4l-8.6 2z" fill="CCC"/><rect x="10.4" y="4" width="1.8" height="13.5" fill="CCC"/>' },
+  { slug: 'video', label: 'Video', svg: '<rect x="2.5" y="6" width="13" height="12" rx="2.5" fill="CCC"/><path d="M17 11.2 21.5 8v8l-4.5-3.2z" fill="CCC"/>' },
+  { slug: 'radio', label: 'Radio', svg: '<rect x="2.5" y="8" width="19" height="12" rx="2.5" fill="CCC"/><circle cx="8" cy="14" r="3.6" fill="#0b0f14"/><rect x="14" y="11" width="5.5" height="1.8" rx="0.9" fill="#0b0f14"/><rect x="14" y="15" width="5.5" height="1.8" rx="0.9" fill="#0b0f14"/><rect x="13" y="3.4" width="6.5" height="1.7" rx="0.85" transform="rotate(20 13 3.4)" fill="CCC"/>' },
+  { slug: 'maps', label: 'Maps', svg: '<path d="M12 2a7.2 7.2 0 0 0-7.2 7.2C4.8 14.6 12 22 12 22s7.2-7.4 7.2-12.8A7.2 7.2 0 0 0 12 2z" fill="CCC"/><circle cx="12" cy="9.3" r="2.9" fill="#0b0f14"/>' },
+  { slug: 'phone', label: 'Phone', svg: '<path d="M7.4 10.9a14.4 14.4 0 0 0 5.7 5.7l2-2a1.2 1.2 0 0 1 1.2-.3 12 12 0 0 0 3.4.6 1.2 1.2 0 0 1 1.2 1.2v3.1a1.2 1.2 0 0 1-1.2 1.2A17.6 17.6 0 0 1 2.6 4.3 1.2 1.2 0 0 1 3.8 3.1h3.1a1.2 1.2 0 0 1 1.2 1.2 12 12 0 0 0 .6 3.4 1.2 1.2 0 0 1-.3 1.2l-2 2z" fill="CCC"/>' },
+  { slug: 'message', label: 'Message', svg: '<path d="M20 3.5H4A2.2 2.2 0 0 0 1.8 5.7v8.9A2.2 2.2 0 0 0 4 16.8h2.6v4.2l4.8-4.2H20a2.2 2.2 0 0 0 2.2-2.2V5.7A2.2 2.2 0 0 0 20 3.5z" fill="CCC"/>' },
+  { slug: 'browser', label: 'Browser', svg: '<circle cx="12" cy="12" r="9.2" fill="none" stroke="CCC" stroke-width="1.9"/><ellipse cx="12" cy="12" rx="4" ry="9.2" fill="none" stroke="CCC" stroke-width="1.7"/><path d="M3.2 12h17.6" stroke="CCC" stroke-width="1.7"/>' },
+  { slug: 'camera', label: 'Camera', svg: '<path fill-rule="evenodd" d="M9.2 3.5h5.6l1.4 2.2H20A2.2 2.2 0 0 1 22.2 7.9v10A2.2 2.2 0 0 1 20 20.1H4a2.2 2.2 0 0 1-2.2-2.2v-10A2.2 2.2 0 0 1 4 5.7h3.8l1.4-2.2zM12 8.6a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6z" fill="CCC"/>' },
+  { slug: 'photos', label: 'Photos', svg: '<path fill-rule="evenodd" d="M3.4 4h17.2A1.4 1.4 0 0 1 22 5.4v13.2a1.4 1.4 0 0 1-1.4 1.4H3.4A1.4 1.4 0 0 1 2 18.6V5.4A1.4 1.4 0 0 1 3.4 4zm1 13.6h15.2l-4.8-6.4-3.6 4.6-2.5-2.9-4.3 4.7zM7.6 6.9a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8z" fill="CCC"/>' },
+  { slug: 'tune', label: 'Settings', svg: '<path d="M3 6.6h11M17.6 6.6H21M3 12h3.4M10 12h11M3 17.4h11M17.6 17.4H21" stroke="CCC" stroke-width="1.9" stroke-linecap="round"/><circle cx="15.6" cy="6.6" r="2.4" fill="CCC"/><circle cx="8.2" cy="12" r="2.4" fill="CCC"/><circle cx="15.6" cy="17.4" r="2.4" fill="CCC"/>' },
+  { slug: 'car', label: 'Car', svg: '<path d="M4.2 11.2 6 6.4A2 2 0 0 1 7.9 5h8.2a2 2 0 0 1 1.9 1.4l1.8 4.8v6a1 1 0 0 1-1 1h-1.4a1 1 0 0 1-1-1v-1H6.6v1a1 1 0 0 1-1 1H4.2a1 1 0 0 1-1-1v-6z" fill="CCC"/><circle cx="7.4" cy="13.6" r="1.5" fill="#0b0f14"/><circle cx="16.6" cy="13.6" r="1.5" fill="#0b0f14"/>' },
+  { slug: 'bolt', label: 'Charge', svg: '<path d="M13.4 2 4.6 14h5.6l-1.2 8 9.4-12.6h-5.8z" fill="CCC"/>' },
+  { slug: 'weather', label: 'Weather', svg: '<circle cx="16.8" cy="6.2" r="3.6" fill="CCC"/><path d="M6.6 20a4.6 4.6 0 0 1 .5-9.2 6 6 0 0 1 11.4 1.6 3.9 3.9 0 0 1-.6 7.6z" fill="CCC"/><circle cx="16.8" cy="6.2" r="5.1" fill="none" stroke="#0b0f14" stroke-width="1.1"/>' },
+  { slug: 'calendar', label: 'Calendar', svg: '<rect x="3" y="5" width="18" height="16" rx="2.2" fill="CCC"/><rect x="3" y="5" width="18" height="4.4" rx="2.2" fill="#0b0f14" opacity=".55"/><rect x="6.6" y="2.6" width="2" height="4.4" rx="1" fill="CCC"/><rect x="15.4" y="2.6" width="2" height="4.4" rx="1" fill="CCC"/><rect x="6.4" y="12" width="4" height="4" rx="1" fill="#0b0f14"/>' },
+  { slug: 'clock', label: 'Clock', svg: '<circle cx="12" cy="12" r="9.2" fill="none" stroke="CCC" stroke-width="2"/><path d="M12 6.6V12l3.8 2.4" stroke="CCC" stroke-width="2" stroke-linecap="round" fill="none"/>' },
+  { slug: 'folder', label: 'Files', svg: '<path d="M2.8 6.4a2 2 0 0 1 2-2h4l2.2 2.2h8.2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4.8a2 2 0 0 1-2-2z" fill="CCC"/>' },
+  { slug: 'download', label: 'Download', svg: '<path d="M12 3v11m0 0 4.4-4.4M12 14l-4.4-4.4" stroke="CCC" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M4 17.6v1.4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.4" stroke="CCC" stroke-width="2.1" stroke-linecap="round" fill="none"/>' },
+  { slug: 'store', label: 'Store', svg: '<path d="M5 7.6h14l1.2 12A1.6 1.6 0 0 1 18.6 21.4H5.4A1.6 1.6 0 0 1 3.8 19.6z" fill="CCC"/><path d="M8.4 9.4V6.6a3.6 3.6 0 0 1 7.2 0v2.8" stroke="CCC" stroke-width="1.9" fill="none" stroke-linecap="round"/>' },
+  { slug: 'game', label: 'Game', svg: '<rect x="1.8" y="7" width="20.4" height="11" rx="4.4" fill="CCC"/><rect x="5.4" y="11.4" width="4.6" height="1.7" rx="0.85" fill="#0b0f14"/><rect x="6.85" y="9.95" width="1.7" height="4.6" rx="0.85" fill="#0b0f14"/><circle cx="16.4" cy="11.2" r="1.5" fill="#0b0f14"/><circle cx="18.8" cy="14" r="1.5" fill="#0b0f14"/>' },
+  { slug: 'star', label: 'Star', svg: '<path d="M12 2.4 14.9 8.3l6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5-4.7-4.6 6.5-.9z" fill="CCC"/>' },
+  { slug: 'tv', label: 'TV', svg: '<rect x="2.2" y="4.4" width="19.6" height="13" rx="2.2" fill="CCC"/><path d="M8 20.6h8" stroke="CCC" stroke-width="2" stroke-linecap="round"/>' },
+  { slug: 'mail', label: 'Mail', svg: '<rect x="2.2" y="4.8" width="19.6" height="14.4" rx="2.2" fill="CCC"/><path d="m3.6 7 8.4 6 8.4-6" stroke="#0b0f14" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' },
+  { slug: 'wifi', label: 'Network', svg: '<path d="M2.6 8.6a14 14 0 0 1 18.8 0M5.8 12.4a9.4 9.4 0 0 1 12.4 0M9 16.2a4.8 4.8 0 0 1 6 0" stroke="CCC" stroke-width="2.1" stroke-linecap="round" fill="none"/><circle cx="12" cy="19.6" r="1.7" fill="CCC"/>' },
+  { slug: 'speaker', label: 'Speaker', svg: '<rect x="5" y="2.6" width="14" height="18.8" rx="2.6" fill="CCC"/><circle cx="12" cy="15" r="3.6" fill="#0b0f14"/><circle cx="12" cy="6.8" r="1.8" fill="#0b0f14"/>' },
+];
+
+const APP_ICON_BY_SLUG = (() => {
+  const m = {};
+  APP_ICON_SET.forEach((it) => { m[it.slug] = it; });
+  return m;
+})();
+
+function loadAppOverrides() {
+  try {
+    const raw = localStorage.getItem(APP_OVERRIDES_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch (e) { return {}; }
+}
+
+function saveAppOverrides(map) {
+  try { localStorage.setItem(APP_OVERRIDES_KEY, JSON.stringify(map || {})); } catch (e) {}
+}
+
+/**
+ * A built-in icon as a data URL, so a substituted tile stays a plain `<img>`
+ * and needs no change to the tile markup or its CSS.
+ */
+function appIconDataUrl(slug, color) {
+  const item = APP_ICON_BY_SLUG[slug];
+  if (!item) return '';
+  const tint = /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : APP_ICON_COLORS[0];
+  const inner = item.svg.split('CCC').join(tint);
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' + inner + '</svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
 
 // MODES widget — same keys/values as Impulse SettingsMenuContent / Ajustes.
 // One chip per option so a tap writes the raw CAN value (no cycle).
@@ -5079,6 +5447,13 @@ const CAM_MOVE_THRESH = 0.05;       // ~2 km/h — cycle + restore-on-drive
 const CAM_CYCLE_SEC = 60;
 const CAM_EVENT_RESTORE_SEC = 2.0;  // hold event view after openings settle, then restore
 const CAM_ORBIT_SPEED = 0.22;       // OrbitControls: 2.0 = 30s/rev; this is ~5.5 min
+// How far a user pan may slide the car off centre, as a fraction of the
+// viewport. Pan is re-expressed as a projection view offset (_rebaseOrbitPan),
+// and past roughly half a screen the frustum shear starts clipping the car's
+// own shadow/floor against the near plane — and there is nothing left to look
+// at anyway. The layout's own fit-to-gap shift already reaches 0.6 on appCar.
+const USER_PAN_MAX_X = 0.5;
+const USER_PAN_MAX_Y = 0.4;
 // On-event presets: doors → camera #10 (top), roof/curtain → #12 (topSide).
 const CAM_EVENT_PRESET = { doors: 'top', trunk: 'rear', roof: 'topSide' };
 // The two roof views ('top', 'topSide') are specified as a tilt off vertical
@@ -5344,6 +5719,12 @@ class Component extends DCLogic {
     appsFabOpen: false,
     splitRatio: BOOT_SHELL.splitRatio,
     appsCatalogRev: 0,
+    // Long-press editor for a launcher tile. appEditPkg null = closed; the
+    // other three fields are the unsaved draft.
+    appEditPkg: null,
+    appEditName: '',
+    appEditIcon: '',
+    appEditColor: '',
   };
 
   constructor(props) {
@@ -8937,7 +9318,25 @@ class Component extends DCLogic {
       // in native chrome (video hole-punch). Line vanishes the moment loading
       // finishes — even if the intro fade is still playing.
       bootLineDisplay: s.loading && !s.error && s.splashActive && !this._androidApp ? 'block' : 'none',
-      bootCenterDisplay: s.loading && !s.error && !s.splashActive && !this._viewerReady && !this._androidApp ? 'flex' : 'none',
+      // Two jobs. Before the viewer is ready this is the cold-boot spinner that
+      // takes over from the splash line (native chrome draws its own on
+      // Android, hence _androidApp). After that it is the ONLY feedback a
+      // MODEL / chassis / rim swap has — _syncBootHud deliberately mirrors
+      // cold boot only, so post-boot loads used to run with nothing on screen
+      // at all. Shown on Android too, because the native HUD is down by then.
+      // `|| _carSwapLabel` keeps it up past loading:false — _endCarSwap holds
+      // the veil for up to MIN_VEIL_MS after that, and dropping the spinner at
+      // loading:false left that window showing an empty faded stage.
+      // Boot centres its ring with flex; a swap badge is absolutely placed
+      // inside this layer by _positionSwapBadge, so the layer is a plain block.
+      bootCenterDisplay: (s.loading || !!this._carSwapLabel) && !s.error
+        && (this._viewerReady ? true : (!s.splashActive && !this._androidApp))
+        ? (this._carSwapLabel ? 'block' : 'flex') : 'none',
+      bootCenterLabel: this._carSwapLabel === 'wheel' ? 'LOADING WHEEL'
+        : this._carSwapLabel === 'upload' ? 'LOADING WHEEL'
+        : this._carSwapLabel ? 'LOADING MODEL' : '',
+      bootCenterLabelDisplay: this._carSwapLabel ? 'block' : 'none',
+      bootCenterCardClass: this._carSwapLabel ? 'hv-badge' : '',
       errorDisplay: s.error ? 'flex' : 'none',
       errorMsg: s.error || '',
       progressText: s.processing ? 'PROCESSING…' : (Math.round(s.progress) + '%'),
@@ -9264,8 +9663,9 @@ class Component extends DCLogic {
       stockBg:   hv(s.selectedCatalogKey === stockKey).bg,
       stockCol:  hv(s.selectedCatalogKey === stockKey).col,
       stockThumb: stockReady ? stockThumbVal : this._catalogPlaceholderThumb,
-      stockImgOpacity: stockReady ? '1' : '.4',
+      stockImgOpacity: s.catalogLoadingKey === stockKey ? '.3' : (stockReady ? '1' : '.4'),
       stockImgAnim: stockReady ? 'none' : 'vp-pulse 1.6s ease-in-out infinite',
+      stockSpinDisplay: s.catalogLoadingKey === stockKey ? 'block' : 'none',
       onSelectStockWheel: () => this.onSelectStockWheel(),
       // The current variant's own stock rim is already shown via the STOCK
       // slot itself — listing it again here would just be a redundant
@@ -9277,12 +9677,14 @@ class Component extends DCLogic {
         const chip = hv(active);
         const thumbVal = s.catalogThumbs[item.key];
         const ready = thumbVal && thumbVal !== 'error';
+        const busy = s.catalogLoadingKey === item.key;
         return {
           key: item.key,
           label: item.label,
           thumb: ready ? thumbVal : this._catalogPlaceholderThumb,
-          imgOpacity: ready ? '1' : '.4',
+          imgOpacity: busy ? '.3' : (ready ? '1' : '.4'),
           imgAnim: ready ? 'none' : 'vp-pulse 1.6s ease-in-out infinite',
+          spinDisplay: busy ? 'block' : 'none',
           ring: chip.border,
           bg: chip.bg,
           textColor: chip.col,
@@ -15002,7 +15404,7 @@ class Component extends DCLogic {
         return;
       }
       this._hsPtDown = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
-      if (this._canCenterHoldAdd() && this._pointInCenterGap(e.clientX, e.clientY)) {
+      if (this._canCenterHoldAdd() && this._pointInWidgetHoldZone(e.clientX, e.clientY)) {
         this._onAddWidgetHoldStart(e);
       }
     };
@@ -15335,7 +15737,7 @@ class Component extends DCLogic {
   }
 
   _hitHotspotDot(e, radius) {
-    const r = radius || 20;
+    const r = radius || 42;
     const screen = this._hsScreen;
     if (!this._hotspotsVisible || !screen) return null;
     let best = null;
@@ -16498,6 +16900,18 @@ class Component extends DCLogic {
     }
   }
 
+  /**
+   * Compile the additive bloom/streak overlay programs once.
+   *
+   * This used to render the overlay scene straight to the DEFAULT framebuffer,
+   * and the main loop leaves `autoClear` at TRUE — so the warm-up CLEARED the
+   * panel and then painted nothing but two additive full-screen quads over it.
+   * One frame of that is the "screen flickers while something is loading"
+   * symptom, and it fires on every path that warms lights: the background
+   * warm-up after boot, and the synchronous warm-up run when a second body
+   * arrives. Rendering into a 4x4 scratch target compiles exactly the same
+   * programs and cannot be seen — size is irrelevant to shader compilation.
+   */
   _warmupOverlayOnce() {
     try {
       if (this.bloomMat && this.streakMat && this.bloomComposer && this.streakComposer) {
@@ -16507,7 +16921,13 @@ class Component extends DCLogic {
         this.streakMat.map = this.streakComposer.readBuffer.texture;
         this.streakMat.visible = true;
         this.streakMat.needsUpdate = true;
+        if (!this._warmupRt && this.THREE) {
+          this._warmupRt = new this.THREE.WebGLRenderTarget(4, 4);
+        }
+        const prevRt = this.renderer.getRenderTarget();
+        if (this._warmupRt) this.renderer.setRenderTarget(this._warmupRt);
         this.renderer.render(this.overlayScene, this.orthoCamera);
+        this.renderer.setRenderTarget(prevRt);
 
         this.bloomMat.visible = false;
         this.streakMat.visible = false;
@@ -16777,6 +17197,7 @@ class Component extends DCLogic {
     const file = e.target.files && e.target.files[0];
     if (!file || !THREE) return;
 
+    this._beginCarSwap('upload');
     this.setState({ progress: 20, progressText: 'LOADING UPLOADED WHEEL...', loading: true, processing: false, selectedCatalogKey: null, wheelSizeInch: 21 }); // non-stock wheels default to 21" when picked
     const url = URL.createObjectURL(file);
     const loader = new THREE.GLTFLoader();
@@ -16801,6 +17222,7 @@ class Component extends DCLogic {
           console.error(err);
           this.setState({ error: 'Failed to process wheel model: ' + err.message, loading: false });
         }
+        this._endCarSwap();
       },
       (xhr) => {
         if (xhr.lengthComputable) {
@@ -16812,6 +17234,7 @@ class Component extends DCLogic {
         URL.revokeObjectURL(url);
         console.error(err);
         this.setState({ error: 'Failed to load glTF/GLB file.', loading: false });
+        this._endCarSwap();
       }
     );
   }
@@ -16874,6 +17297,7 @@ class Component extends DCLogic {
       return;
     }
 
+    this._beginCarSwap('wheel');
     // opts.initial: the cold-start STOCK swap fired right after the car is
     // processed. The car's loader overlay is still up, so keep it in the
     // PROCESSING state instead of resetting the bar to 20% — that reset read as
@@ -19174,18 +19598,27 @@ class Component extends DCLogic {
       controls.maxPolarAngle = Math.PI / 2 - 0.035;
       controls.minDistance = 2;
       controls.maxDistance = 120;
-      // Orbit must always pivot on the car. OrbitControls' default pan (right-drag,
-      // two-finger touch, arrow keys) translates controls.target itself, permanently
-      // moving the pivot off the car centre for every subsequent rotate. There is no
-      // feature here that needs a free-floating target - shell layout framing already
-      // shifts the car on-screen via a projection view offset (_applyShellViewOffset),
-      // not by moving the target - so panning is simply disabled.
-      // Panning is ON at the user's request. The trade it carries: OrbitControls'
-      // pan translates controls.target itself, so after a pan the orbit pivot is
-      // no longer the car and every later rotate swings around the shifted
-      // point. Nothing resets it, so a double-click-to-recentre would be the
-      // follow-up if that starts to bite.
+      // Orbit must always pivot on the car. OrbitControls' pan translates
+      // controls.target itself, which moves the pivot off the car centre for
+      // every subsequent rotate - the camera then swings around a point that is
+      // no longer the thing you are looking at, which is exactly the "orbit is
+      // not intuitive after I move the car sideways" symptom.
+      //
+      // Panning is still ON: it is wanted. It just does not get to keep the
+      // pivot. Every frame, _rebaseOrbitPan() folds whatever pan has landed on
+      // the target back out of the world and into the projection view offset -
+      // the same post-projection crop the shell layout already uses to slide
+      // the car into the widget gap. The picture is identical; the pivot stays
+      // on the car forever.
+      //
+      // screenSpacePanning is what makes that exact: pan then lies wholly in
+      // the camera's right/up plane, so it carries no component along the view
+      // direction and a pure 2D crop can reproduce it with no change of
+      // distance or perspective.
       controls.enablePan = true;
+      controls.screenSpacePanning = true;
+      // Accumulated user pan, in pixels of view offset (see _applyShellViewOffset).
+      this._userPanPx = { x: 0, y: 0 };
       this.controls = controls;
       this._initMaterialPicker();
       this._initHotspots(container);
@@ -19406,11 +19839,13 @@ class Component extends DCLogic {
           }
           if ('badgeX' in patch || 'badgeY' in patch || 'badgeLen' in patch
               || 'badgeWide' in patch || 'badgeSpin' in patch
-              || 'badgeGlowPx' in patch) {
+              || 'badgeGlowPx' in patch || 'axleBarWide' in patch
+              || 'axleBarInset' in patch || 'axleBarBorderPx' in patch
+              || 'axleBarFillAlpha' in patch) {
             this._rebuildPowertrainBadges();
           }
           if ('socTextX' in patch || 'socTextZ' in patch || 'socTextLen' in patch
-              || 'socTextWide' in patch) {
+              || 'socTextWide' in patch || 'socTextEdgePx' in patch) {
             this._rebuildPowertrainSocText();
           }
           if ('bloomOn' in patch || 'bloomStrength' in patch) {
@@ -19431,6 +19866,30 @@ class Component extends DCLogic {
           flowRear: flow.rear,
           socPct: this._powerSocPct(performance.now()),
           tune: { ...T },
+        };
+      };
+
+      // X-ray body ghost -- the Fresnel that fades the bodywork. Read with no
+      // args, patch with a partial: __ptGhost({ ghostEdge: 0.4 }).
+      // The uniforms are baked into cloned materials at compile time, so a
+      // patch rebuilds the ghost (off then on) rather than poking uniforms.
+      window.__ptGhost = (patch) => {
+        const T = this._powertrainTuning();
+        if (patch && typeof patch === 'object') {
+          Object.assign(T, patch);
+          if (this._ghostMats) {
+            this._setBodyGhost(false);
+            this._setBodyGhost(true);
+          }
+          if (this.requestRender) this.requestRender(4);
+        }
+        return {
+          powertrainOn: !!(this.state && this.state.powertrainOn),
+          ghosted: !!(this._ghostMats && this._ghostMats.length),
+          ghostFace: T.ghostFace,
+          ghostEdge: T.ghostEdge,
+          ghostFalloff: T.ghostFalloff,
+          ghostOpacity: T.ghostOpacity,
         };
       };
 
@@ -19583,7 +20042,7 @@ class Component extends DCLogic {
             console.warn(v.toUpperCase() + ' model failed to load', err);
             this._variantLoadState[v] = 'idle';
             const cb = this._variantOnReady[v]; this._variantOnReady[v] = null;
-            if (!silent) this.setState({ loading: false, processing: false });
+            if (!silent) { this.setState({ loading: false, processing: false }); this._endCarSwap(); }
             this._runHevDonorWaiters();
             if (cb) cb(err);
           }
@@ -19615,6 +20074,7 @@ class Component extends DCLogic {
         (err) => {
           console.error('GLB load error', err);
           this.setState({ error: 'The model failed to load. Check the file path and that the Draco decoder is reachable.' });
+          this._endCarSwap();
         }
       );
 
@@ -20057,6 +20517,16 @@ class Component extends DCLogic {
           needRender = true;
           this._postFxDirty = true;
         }
+        // Immediately after update(), before anything reads the camera: move
+        // any pan OrbitControls just applied off controls.target and into the
+        // view offset, so the orbit pivot is still the car on the next rotate.
+        // Skipped while a tween or the intro owns the camera — those drive
+        // target themselves, and a pose they are heading for may legitimately
+        // sit off the car centre until they land.
+        if (!this._camAnim && !this._introActive && this._rebaseOrbitPan()) {
+          needRender = true;
+          this._postFxDirty = true;
+        }
         if (this._hotspotsVisible || this._hsRoofPopOpen) {
           this._updateHotspotLayer();
           if (this._hotspotsVisible) {
@@ -20064,6 +20534,10 @@ class Component extends DCLogic {
             this._updateXrayFab();
           }
         }
+        // Badge follows the car if the camera moves mid-swap (orbit, or the
+        // board layout re-framing). Only while a swap is up, so it costs
+        // nothing the rest of the time.
+        if (this._carSwapLabel) this._positionSwapBadge();
         // Wheel-floor glows track live flow while x-ray is up.
         if (this.state.powertrainOn || this._xrayWheelGlows) {
           this._syncXrayWheelGlows(performance.now());
@@ -20434,12 +20908,27 @@ class Component extends DCLogic {
     // Nudges in metres, applied after the automatic fit. The fit centres on the
     // body box, but the axle midpoint sits slightly behind the body centre
     // because the overhangs are unequal. Adjust here if it needs a shove.
-    return { scale: 1, x: 0, y: 0, z: 0, ghostOpacity: 0.12,
-             ghostColor: 0xffffff,
-             // Fresnel: how much of the base opacity survives on a surface
-             // facing the camera, and how fast it ramps back up toward the
-             // silhouette. Lower face = more see-through, crisper outline.
-             ghostFace: 0.22, ghostFalloff: 2.2 };
+    //
+    // Cached rather than rebuilt per call, so __ptGhost() can patch it live.
+    if (!this._ptTune) {
+      this._ptTune = {
+        scale: 1, x: 0, y: 0, z: 0, ghostOpacity: 0.12,
+        ghostColor: 0xffffff,
+        // Fresnel: how much of the base opacity survives on a surface facing
+        // the camera (ghostFace), how much survives at the silhouette
+        // (ghostEdge), and how fast it ramps between the two (ghostFalloff).
+        //
+        // ghostEdge used to be a hard-coded 1.0 against a falloff of 2.2 -- a
+        // narrow band running all the way to opaque white. Every panel edge in
+        // the body then drew as a thin bright line and the car read as a
+        // wireframe rather than a ghost. depthWrite is off, so those lines also
+        // STACK: a door skin, its inner panel and the far side each contribute
+        // one. Capping the peak and widening the band is what turns them back
+        // into a gradient.
+        ghostFace: 0.20, ghostEdge: 0.55, ghostFalloff: 1.6,
+      };
+    }
+    return this._ptTune;
   }
 
   /** Overall length of the real car -- the one number the metre fit needs. */
@@ -20815,9 +21304,14 @@ class Component extends DCLogic {
 
   /**
    * Fade by viewing angle, not uniformly: a surface square-on to the camera goes
-   * nearly clear while grazing angles stay near full opacity. That is what makes
-   * the body read as an outline rather than a haze -- the silhouette and the
-   * wheel arches survive, the flat door skins get out of the way.
+   * nearly clear while grazing angles hold more of their opacity. That is what
+   * makes the body read as an outline rather than a haze -- the silhouette and
+   * the wheel arches survive, the flat door skins get out of the way.
+   *
+   * The grazing end stops at ghostEdge, NOT at 1.0. Running it to full opacity
+   * is what made the car look like a wireframe: every panel edge is a grazing
+   * angle, so each one drew a hard white line, and with depthWrite off they
+   * stacked through the body.
    */
   _applyGhostFresnel(mat) {
     const t = this._powertrainTuning();
@@ -20831,10 +21325,12 @@ class Component extends DCLogic {
       // console warning to say why. Those keep the flat opacity instead.
       if (shader.fragmentShader.indexOf('vViewPosition') === -1) return;
       shader.uniforms.uGhostFace = { value: t.ghostFace };
+      shader.uniforms.uGhostEdge = { value: t.ghostEdge };
       shader.uniforms.uGhostPow = { value: t.ghostFalloff };
       shader.uniforms.uGhostColor = { value: new this.THREE.Color(t.ghostColor) };
       shader.fragmentShader =
-        'uniform float uGhostFace;' + NL + 'uniform float uGhostPow;' + NL
+        'uniform float uGhostFace;' + NL + 'uniform float uGhostEdge;' + NL
+        + 'uniform float uGhostPow;' + NL
         + 'uniform vec3 uGhostColor;' + NL
         + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace(
@@ -20842,7 +21338,14 @@ class Component extends DCLogic {
         [
           '#include <dithering_fragment>',
           '  float gFres = 1.0 - abs( dot( normalize( vNormal ), normalize( vViewPosition ) ) );',
-          '  float gAlpha = mix( uGhostFace, 1.0, pow( gFres, uGhostPow ) );',
+          '  float gRamp = pow( gFres, uGhostPow );',
+          // Ease the ramp at BOTH ends. pow() on its own leaves a knee right at
+          // the silhouette -- the steepest part of the curve is the last few
+          // degrees before the edge, which is exactly the hard outline we are
+          // trying to lose. smoothstep flattens the top so the rim arrives
+          // gradually, and flattens the bottom so flat panels stay see-through.
+          '  gRamp = gRamp * gRamp * ( 3.0 - 2.0 * gRamp );',
+          '  float gAlpha = mix( uGhostFace, uGhostEdge, gRamp );',
           '  gl_FragColor.rgb = uGhostColor;',
           '  gl_FragColor.a *= gAlpha;',
         ].join(NL)
@@ -21084,6 +21587,31 @@ class Component extends DCLogic {
         // literally the direction the level moves.
         cellWaveAmp: 1.35,
         cellWaveHz: 0.5,
+        // CONSUMPTION gets a stepped chase instead of that travelling cosine:
+        // one module lights at a time, walking from the LAST module to the
+        // first and then restarting at the last. Charging keeps the smooth
+        // wave — filling really is a level rising through the stack, whereas
+        // draining reads better as a discrete "next one, next one".
+        // cellChaseHz is in MODULES per second, not cycles: a six-module pack
+        // at 2.2 takes ~2.7 s to walk the stack, and a pack showing only two
+        // lit modules takes ~0.9 s, which is the behaviour you want — the
+        // step rate stays put as the pack drains instead of the whole sweep
+        // speeding up.
+        cellChaseOn: 1,
+        cellChaseHz: 2.2,
+        // How dark a module goes when the head is not on it. THE CHASE DIMS;
+        // it cannot brighten. A lit module's emissive is cellMax x cellLitMin
+        // = 1.0 of pure green, i.e. already at the channel ceiling, so
+        // multiplying it UP is a no-op: measured, base x1 and chase-peak x2.35
+        // both render (0, 1, 0) -- the identical pixel. That is why the first
+        // version of this chase was invisible while the edge blink, which
+        // swings DOWN to 0.08, was obvious. Same lesson the blink learned
+        // (see cellEdgeLow), arrived at twice.
+        cellChaseLow: 0.22,
+        // Trail length in modules. Just over 1 keeps it to "this one, with the
+        // last one still dying" rather than a bump spanning the whole pack.
+        cellChaseTail: 1.25,
+        cellChaseSharp: 2.0,
         // The edge cell's blink: a multiplier swept between these two, so it
         // drops well below the neighbouring cells and comes back over them.
         // Near dark at the bottom of the swing. The point is the contrast with
@@ -21133,7 +21661,13 @@ class Component extends DCLogic {
         // was alpha: below 1.0 it composites toward the near-white floor and
         // reads as paint. Measured peak colour by gain -- 0.62 (160,230,197)
         // sat 0.304, 0.90 sat 0.498, 1.0 (94,234,167) sat 0.598.
-        ringGain: 1.0,
+        // Half transparent, to match the axle bars and the % text. NOTE the
+        // measurement above: alpha is the ONLY thing carrying this ring's
+        // saturation against a near-white floor, and dropping it costs colour
+        // -- gain 1.0 measured sat 0.598, 0.90 sat 0.498, 0.62 sat 0.304. At
+        // 0.50 the ring is a paler green than it was by design, not by
+        // accident. Put it back to 1.0 if it reads as washed out.
+        ringGain: 0.50,
         ringMaxScale: 2.85,
         ringScaleBase: 0.965,
         ringScaleAmp: 0.035,
@@ -21179,7 +21713,14 @@ class Component extends DCLogic {
         // 236/255 -- a soft tint simply washes out against that.
         badgeDriveColor: '#007bff',
         badgeRegenColor: '#00ff00',
-        // Only the amber half of the HYBRID split now that the tank plate is gone.
+        // The WHOLE hybrid bar, not half of it. It was a blue/amber split
+        // saying "motor and engine at once"; one flat colour reads at a glance
+        // and the split did not, at a bar this size on a moving car. The
+        // painter still honours spec.color2 if anything ever wants a split
+        // back — nothing produces one now.
+        badgeHybridColor: '#ffffff',
+        // Kept for anything that still wants the fuel tone; the hybrid bar no
+        // longer uses it.
         badgeFuelColor: '#ffa400',
         // Outer glow, in canvas pixels at PT_BADGE_PX_PER_M -- so 40 px is about
         // 95 mm ON THE FLOOR, next to a plate 620 mm long. Sized in screen-pixel
@@ -21192,10 +21733,44 @@ class Component extends DCLogic {
         // green recovering) and the glow is what lifts either off the floor.
         badgeGlowDriveColor: '#ffffff',
         badgeGlowRegenColor: '#ffffff',
-        // Halo pulse while an axle is working. The halo is its own plane, so
-        // this is an opacity change per frame and never a canvas repaint.
+        // Border/halo pulse while an axle is working. The halo is its own
+        // plane, so this is an opacity change per frame and never a canvas
+        // repaint. Low is 0 so the border fades right out and comes back
+        // rather than throbbing between two visible levels; the gamma shapes
+        // that into a bloom-and-decay instead of a symmetric sine.
         badgeGlowPulseHz: 0.75,
-        badgeGlowPulseLow: 0.28,
+        badgeGlowPulseLow: 0,
+        badgeGlowPulseGamma: 1.8,
+
+        // Axle bars. One rounded rect ACROSS the car per axle, on the
+        // centreline at that axle's hub z, spanning the gap between the axle's
+        // two side labels — so it passes under the car between the wheels. It
+        // carries what the side plates used to: the state fill (blue driving,
+        // green recovering, blue/amber split on the engine) and the white
+        // outer glow. No text; the wording moved to the side labels.
+        axleBarWide: 0.40,      // front-to-rear thickness
+        axleBarInset: 0.06,     // clear of the side label at each end
+        // Half transparent, so the underbody reads through the bar rather than
+        // the bar reading as a solid panel laid over the floor. Exactly 0.50
+        // on the panel: the fill inside the canvas is left fully opaque
+        // (axleBarFillAlpha) so this mesh opacity IS the whole story, instead
+        // of compounding with the plates' old 0.90 and landing at 0.45.
+        axleBarOpacity: 0.50,
+        axleBarFillAlpha: 1.0,
+        // The BORDER is not halved with it. It lives on the halo twin, so it
+        // gets its own scale -- a 50% fill with a 50% border loses the edge
+        // that makes the bar read at all where the pack occludes its middle.
+        axleBarGlowOpacity: 0.95,
+        // Soft white border ON the bar's own edge, in canvas px at
+        // PT_BADGE_PX_PER_M -- so 12 px is about 29 mm of floor. It is painted
+        // into the halo twin, not the bar, so the pulse below is an opacity
+        // change per frame and never a canvas repaint.
+        axleBarBorderPx: 12,
+        // Side labels are now INK on the floor rather than a hole knocked out
+        // of a plate — there is no plate left to knock them out of. Dark grey
+        // against the 236/255 floor. NOTE this is a day-floor colour; on the
+        // night floor it wants a light ink instead.
+        badgeTextColor: '#3a4048',
 
         // Charge percentage on the floor, in the gap between the bodywork and
         // the ring. The car reaches about 1.0 m to the side and the ring's
@@ -21203,12 +21778,27 @@ class Component extends DCLogic {
         socTextOn: 1,
         socTextX: 1.70,
         socTextZ: 0,
-        socTextLen: 1.10,
-        socTextWide: 0.62,
-        socTextColor: '#00ff3c',
+        // The glyph height is 0.78 of the PLATE (see _paintPowertrainSocText),
+        // so the type is grown by growing these rather than by raising that
+        // factor, which would only start clipping. socTextWide is the ACROSS
+        // -car dimension (badgeSpin turns the plate a quarter turn), so at
+        // 0.88 the plate spans x 1.26..2.14 — still clear of the car at ~1.0 m
+        // and inside the ring's inner edge at ~2.2 m.
+        socTextLen: 1.55,
+        socTextWide: 0.88,
+        // The SAME green as the charge ring (ringChargeColor) — they are the
+        // only two things on the floor while the car is plugged in, and two
+        // near-but-not-equal greens read as a mistake.
+        socTextColor: '#00ff00',
         socTextGlowPx: 14,
         socTextGlowPasses: 3,
-        socTextOpacity: 0.95,
+        socTextOpacity: 0.50,
+        // Thin semi-transparent white rim round the glyphs. Drawn with the
+        // shadow OFF, after the glow passes: with the shadow still set it
+        // would just add another glow pass in white and fatten the halo
+        // instead of drawing an edge. Thin against a ~290 px glyph.
+        socTextEdgePx: 4,
+        socTextEdgeColor: 'rgba(255,255,255,0.55)',
         // Label is knocked out of the plate. badgeTextKnockPx widens the hole,
         // badgeTextEdge* draws the dark edge that gives it definition where
         // plate and floor are close in brightness.
@@ -21581,17 +22171,25 @@ class Component extends DCLogic {
   }
 
   /**
-   * Four rounded plates lying on the floor along the car's centreline, aligned
-   * front to rear with the landmarks they describe:
+   * Floor graphics for the two axles, in RIG-LOCAL space off the manifest's own
+   * hub anchors -- x is the track, z runs front (-) to rear (+), and the rig's
+   * origin is the ground -- so they follow the car whatever the rig's world
+   * transform happens to be. Seen from above:
    *
-   *   [ FW ]        [ battery ]        [ RW ]
-   *   [ 1 ]     [ 2 ]        [ 3 ]     [ 4 ]
+   *      AWD  [======== bar ========]  AWD      <- front hub z
+   *      AWD  [======== bar ========]  AWD      <- rear hub z
    *
-   * 1 is the front axle (FWD / AWD), 2 and 3 straddle the pack (state of charge,
-   * tank), 4 is the rear axle and only ever says AWD. Placed in RIG-LOCAL space
-   * off the manifest's own hub anchors -- x is the track, z runs front (-) to
-   * rear (+), and the rig's origin is the ground -- so they follow the car
-   * whatever the rig's world transform happens to be.
+   * Per axle that is one BAR on the centreline running across the track, and
+   * one LABEL outboard of each wheel. The two carry different halves of the
+   * job and are built from the same slot list:
+   *
+   * - the bar is the coloured, glowing part (blue driving, green recovering,
+   *   blue/amber split when the engine is in it too) and has no text;
+   * - the labels are text only -- no plate, no fill, no halo -- one per side so
+   *   the wording is there for a spectator standing anywhere round the car.
+   *
+   * It used to be the other way round: the labels sat on their own filled,
+   * glowing pills and there was nothing on the centreline.
    */
   _rebuildPowertrainBadges() {
     const THREE = this.THREE;
@@ -21615,15 +22213,30 @@ class Component extends DCLogic {
     const rl = anchors.hubRL || anchors.hubRR;
     if (!fl || !rl) return;
     const tune = this._powertrainFxTune();
-    // One plate per axle PER SIDE, each sitting on its own hub. Both sides
-    // carry the same label, so it is there for a spectator standing anywhere
-    // round the car -- which is also why nothing follows the camera any more.
-    // Each plate's half turn is baked in at build time from the side it is on,
-    // so it reads upright from that side and never has to be re-oriented.
+// One label per axle PER SIDE, each sitting outboard of its own hub. Both
+    // sides carry the same wording, which is also why nothing follows the
+    // camera any more. Each label's half turn is baked in at build time from
+    // the side it is on, so it reads upright from that side.
     const slots = [];
     [1, -1].forEach((side) => {
-      slots.push({ id: 'front', side: side, z: fl[2], len: tune.badgeLen });
-      slots.push({ id: 'rear', side: side, z: rl[2], len: tune.badgeLen });
+      slots.push({ id: 'front', side: side, x: tune.badgeX * side, z: fl[2],
+                   len: tune.badgeLen, wide: tune.badgeWide,
+                   spin: tune.badgeSpin, flip: side < 0, glow: false });
+      slots.push({ id: 'rear', side: side, x: tune.badgeX * side, z: rl[2],
+                   len: tune.badgeLen, wide: tune.badgeWide,
+                   spin: tune.badgeSpin, flip: side < 0, glow: false });
+    });
+    // ...and one bar per axle, on the centreline, running ACROSS the track
+    // (spin 0 rather than badgeSpin's quarter turn). Its length is the gap
+    // between that axle's two labels, so it stops just short of each one
+    // instead of running under them.
+    const barLen = Math.max(0.2,
+      (tune.badgeX - tune.badgeWide / 2 - tune.axleBarInset) * 2);
+    ['front', 'rear'].forEach((axle) => {
+      slots.push({ id: axle + 'Bar', side: 1, x: 0,
+                   z: axle === 'front' ? fl[2] : rl[2],
+                   len: barLen, wide: tune.axleBarWide,
+                   spin: 0, flip: false, glow: true });
     });
     slots.forEach((slot) => {
       // The pill stays badgeLen x badgeWide; the PLATE is grown by the glow
@@ -21631,7 +22244,7 @@ class Component extends DCLogic {
       // ate into the pill, so widening the glow shrank the label.
       const margin = tune.badgeGlowPx / PT_BADGE_PX_PER_M;
       const planeLen = slot.len + margin * 2;
-      const planeWide = tune.badgeWide + margin * 2;
+      const planeWide = slot.wide + margin * 2;
       const cv = document.createElement('canvas');
       cv.width = Math.max(64, Math.round(planeLen * PT_BADGE_PX_PER_M));
       cv.height = Math.max(32, Math.round(planeWide * PT_BADGE_PX_PER_M));
@@ -21639,7 +22252,7 @@ class Component extends DCLogic {
       tex.anisotropy = 4;
       const geo = new THREE.PlaneGeometry(planeLen, planeWide);
       geo.rotateX(-Math.PI / 2);                    // lie on the floor
-      geo.rotateY(tune.badgeSpin);                  // which way the text reads
+      geo.rotateY(slot.spin);                       // along the car, or across it
       const mat = new THREE.MeshBasicMaterial({
         map: tex,
         transparent: true,
@@ -21654,30 +22267,35 @@ class Component extends DCLogic {
         toneMapped: false,                          // keep the fills saturated
       });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(tune.badgeX * slot.side, tune.badgeY, slot.z);
-      mesh.rotation.y = slot.side < 0 ? Math.PI : 0;
+      mesh.position.set(slot.x, tune.badgeY, slot.z);
+      mesh.rotation.y = slot.flip ? Math.PI : 0;
       mesh.renderOrder = 6;
       mesh.frustumCulled = false;
       mesh.visible = false;
       root.add(mesh);
       // Halo twin: same geometry and pose, drawn first, opacity animated.
-      const glowCv = document.createElement('canvas');
-      glowCv.width = cv.width;
-      glowCv.height = cv.height;
-      const glowTex = new THREE.CanvasTexture(glowCv);
-      glowTex.anisotropy = 4;
-      const glowMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-        map: glowTex, transparent: true, opacity: 0,
-        depthWrite: false, depthTest: true, toneMapped: false,
-      }));
-      glowMesh.position.copy(mesh.position);
-      glowMesh.rotation.y = mesh.rotation.y;
-      glowMesh.renderOrder = 5;
-      glowMesh.frustumCulled = false;
-      glowMesh.visible = false;
-      root.add(glowMesh);
+      // Bars only -- the labels are bare ink with nothing to halo.
+      let glowMesh = null, glowTex = null, glowCv = null;
+      if (slot.glow) {
+        glowCv = document.createElement('canvas');
+        glowCv.width = cv.width;
+        glowCv.height = cv.height;
+        glowTex = new THREE.CanvasTexture(glowCv);
+        glowTex.anisotropy = 4;
+        glowMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+          map: glowTex, transparent: true, opacity: 0,
+          depthWrite: false, depthTest: true, toneMapped: false,
+        }));
+        glowMesh.position.copy(mesh.position);
+        glowMesh.rotation.y = mesh.rotation.y;
+        glowMesh.renderOrder = 5;
+        glowMesh.frustumCulled = false;
+        glowMesh.visible = false;
+        root.add(glowMesh);
+      }
       this._powertrainBadges.push({
         id: slot.id, side: slot.side, mesh: mesh, tex: tex, cv: cv,
+        wide: slot.wide,
         glowMesh: glowMesh, glowTex: glowTex, glowCv: glowCv, sig: '',
       });
     });
@@ -21755,6 +22373,12 @@ class Component extends DCLogic {
     // Repeat fills to build the glow up: one pass barely registers against a
     // 236/255 floor.
     for (let i = 0; i < tune.socTextGlowPasses; i++) g.fillText(text, W / 2, H / 2);
+    if (tune.socTextEdgePx > 0) {
+      g.shadowBlur = 0;                            // an edge, not another glow
+      g.lineWidth = tune.socTextEdgePx;
+      g.strokeStyle = tune.socTextEdgeColor;
+      g.strokeText(text, W / 2, H / 2);
+    }
     node.tex.needsUpdate = true;
   }
 
@@ -21781,9 +22405,15 @@ class Component extends DCLogic {
   }
 
   /**
-   * Paint one plate. `fill` is 0..1 of the width and is the ONLY part that is
-   * opaque -- the empty remainder stays transparent so the floor shows through,
-   * which is what makes it read as a gauge rather than as a label.
+   * Paint one slot. Two shapes come through here:
+   *
+   * - a BAR (`spec.plate`): rounded rect, filled, with its halo painted onto
+   *   the twin canvas. `fill` is 0..1 of the width and is the ONLY part that
+   *   is opaque -- the empty remainder stays transparent so the floor shows
+   *   through, which is what makes it read as a gauge rather than a label.
+   * - a LABEL (`spec.textColor`): text alone, painted as ink. The old labels
+   *   were knocked OUT of their plate, which only works while there is a plate
+   *   behind them; with the plate gone a knockout is a hole in nothing.
    */
   _paintPowertrainBadge(badge, spec) {
     const cv = badge.cv;
@@ -21795,9 +22425,15 @@ class Component extends DCLogic {
     const pad = Math.round(tune.badgeGlowPx);
     const x0 = pad, y0 = pad, w = W - pad * 2, h = H - pad * 2;
     const r = h * 0.34;
-    const round = (ctx) => {
-      const x = x0, y = y0, ww = w, hh = h, rr = r;
-      ctx.beginPath();
+    // `inset` shrinks the path evenly on all four sides, which is how the
+    // border band is cut: stroke the full path, then punch out the inset one.
+    const round = (ctx, inset) => {
+      const ins = Math.max(0, inset || 0);
+      ctx.beginPath();                              // empty path if we bail
+      const ww = w - ins * 2, hh = h - ins * 2;
+      if (ww <= 0 || hh <= 0) return;
+      const x = x0 + ins, y = y0 + ins;
+      const rr = Math.max(0, Math.min(r - ins, Math.min(ww, hh) / 2));
       ctx.moveTo(x + rr, y);
       ctx.lineTo(x + ww - rr, y);
       ctx.quadraticCurveTo(x + ww, y, x + ww, y + rr);
@@ -21813,29 +22449,35 @@ class Component extends DCLogic {
     // opacity can be pulsed every frame without repainting anything. Painting
     // it into the pill would mean a canvas redraw and a texture upload per
     // frame, which _requestBlurCapture-grade cost for a throb.
-    const gg = badge.glowCv.getContext('2d');
-    gg.clearRect(0, 0, W, H);
-    if (tune.badgeGlowPx > 0 && spec.glowColor) {
+    const gg = badge.glowCv ? badge.glowCv.getContext('2d') : null;
+    const borderPx = Math.max(0, spec.borderPx || 0);
+    if (gg) gg.clearRect(0, 0, W, H);
+    if (gg && tune.badgeGlowPx > 0 && spec.glowColor) {
       gg.save();
       gg.shadowColor = spec.glowColor;
       gg.shadowBlur = tune.badgeGlowPx * 2;
       gg.strokeStyle = spec.glowColor;
-      gg.lineWidth = 2;
+      // The stroke is CENTRED on the path, so half of it lands inside the
+      // pill. Width 2*borderPx therefore leaves a band exactly borderPx wide
+      // once the inset is punched below, and the shadow softens both of its
+      // edges. borderPx 0 is the old behaviour: a hairline, all of which is
+      // punched away, leaving only the outward spill.
+      gg.lineWidth = borderPx > 0 ? borderPx * 2 : 2;
       for (let i = 0; i < tune.badgeGlowPasses; i++) {
         round(gg);
         gg.stroke();
       }
       gg.restore();
-      // Punch the pill back out, so only what spills OUTSIDE it survives and
-      // fading the halo can never dim the label sitting on top of it.
+      // Punch the pill back out so fading the halo can never dim what sits on
+      // top of it -- inset by the border width, so the band survives.
       gg.globalCompositeOperation = 'destination-out';
-      round(gg);
+      round(gg, borderPx);
       gg.fill();
       gg.globalCompositeOperation = 'source-over';
     }
-    badge.glowTex.needsUpdate = true;
+    if (badge.glowTex) badge.glowTex.needsUpdate = true;
     g.clearRect(0, 0, W, H);
-    const fill = Math.max(0, Math.min(1, spec.fill));
+    const fill = spec.plate ? Math.max(0, Math.min(1, spec.fill)) : 0;
     if (fill > 0) {
       g.save();
       round(g);
@@ -21856,26 +22498,33 @@ class Component extends DCLogic {
       g.restore();
     }
     g.globalAlpha = 1;
-    g.font = 'bold ' + Math.round(h * 0.46) + 'px system-ui, "Segoe UI", sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    const tx = W / 2, ty = H / 2 + 1;
-    // Knocked OUT of the plate rather than painted on it: the letters are holes
-    // and the floor reads straight through them. That is why no ink colour has
-    // to be chosen per fill -- a white plate would have swallowed white text.
-    g.globalCompositeOperation = 'destination-out';
-    g.lineWidth = tune.badgeTextKnockPx;
-    g.strokeText(spec.text, tx, ty);              // widen the hole a little
-    g.fillText(spec.text, tx, ty);
-    g.globalCompositeOperation = 'source-over';
-    // Nothing is drawn back over the hole: the label is pure knockout, so what
-    // reads it is the fill around it and the outer glow, not any ink of its own.
-    // badgeTextEdgePx > 0 puts a dark rim back if the letters need help where
-    // plate and floor are close in brightness.
-    if (tune.badgeTextEdgePx > 0) {
-      g.lineWidth = tune.badgeTextEdgePx;
-      g.strokeStyle = tune.badgeTextEdgeColor;
-      g.strokeText(spec.text, tx, ty);
+    if (spec.text) {
+      g.font = 'bold ' + Math.round(h * 0.46) + 'px system-ui, "Segoe UI", sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      const tx = W / 2, ty = H / 2 + 1;
+      if (spec.textColor) {
+        // Ink on the floor. No plate behind it, so it is drawn normally.
+        g.fillStyle = spec.textColor;
+        g.fillText(spec.text, tx, ty);
+      } else {
+        // Knocked OUT of the plate rather than painted on it: the letters are
+        // holes and the floor reads straight through them. That is why no ink
+        // colour has to be chosen per fill -- a white plate would have
+        // swallowed white text.
+        g.globalCompositeOperation = 'destination-out';
+        g.lineWidth = tune.badgeTextKnockPx;
+        g.strokeText(spec.text, tx, ty);          // widen the hole a little
+        g.fillText(spec.text, tx, ty);
+        g.globalCompositeOperation = 'source-over';
+        // badgeTextEdgePx > 0 puts a dark rim back if the letters need help
+        // where plate and floor are close in brightness.
+        if (tune.badgeTextEdgePx > 0) {
+          g.lineWidth = tune.badgeTextEdgePx;
+          g.strokeStyle = tune.badgeTextEdgeColor;
+          g.strokeText(spec.text, tx, ty);
+        }
+      }
     }
     badge.tex.needsUpdate = true;
   }
@@ -21908,12 +22557,12 @@ class Component extends DCLogic {
                  glowColor: tune.badgeGlowRegenColor,
                  fill: 1, fillAlpha: tune.badgeFillAlpha };
       }
-      // Engine running as well as the motor: one plate, both sources, split
-      // white/amber so the fill itself says where the effort comes from. Still
-      // a driving state, so it keeps the drive glow.
+      // Engine running as well as the motor: the whole bar goes amber, so
+      // "the engine is in this" is one colour rather than a split to read.
+      // Still a driving state, so it keeps the drive glow.
       if (flow.ice) {
-        return { text: 'HYBRID', color: tune.badgeDriveColor,
-                 color2: tune.badgeFuelColor, glowColor: tune.badgeGlowDriveColor,
+        return { text: 'HYBRID', color: tune.badgeHybridColor,
+                 glowColor: tune.badgeGlowDriveColor,
                  fill: 1, fillAlpha: tune.badgeFillAlpha };
       }
       return { text: driveLabel, color: tune.badgeDriveColor,
@@ -21927,11 +22576,29 @@ class Component extends DCLogic {
     // parked and actively wrong on the plug.
     const axleOn = moving && !charging;
     badges.forEach((b) => {
+      // Bar and label share one axle's state; they only differ in what they
+      // draw of it.
+      const isBar = b.id === 'frontBar' || b.id === 'rearBar';
+      const isFront = b.id === 'front' || b.id === 'frontBar';
+      // Gate on THIS axle's own flow, not on "something is moving". Gating the
+      // front on `axleOn` alone lit it blue saying FWD during a rear-only
+      // regen, because axleSpec(0) falls through to its drive branch — the
+      // front axle was reported as pulling while it was doing nothing at all.
+      const dir = isFront ? front : rear;
+      const base = (axleOn && dir !== 0)
+        ? axleSpec(dir, isFront ? (awdNow ? 'AWD' : 'FWD') : (awdNow ? 'AWD' : 'RWD'))
+        : null;
       let spec = null;
-      if (b.id === 'front') {
-        spec = axleOn ? axleSpec(front, awdNow ? 'AWD' : 'FWD') : null;
-      } else if (b.id === 'rear') {
-        spec = (axleOn && awdNow) ? axleSpec(rear, 'AWD') : null;
+      if (base && isBar) {
+        // Colour, border and halo, no wording.
+        spec = { text: '', color: base.color, color2: base.color2,
+                 glowColor: base.glowColor, fill: base.fill,
+                 fillAlpha: tune.axleBarFillAlpha, plate: true,
+                 borderPx: tune.axleBarBorderPx };
+      } else if (base) {
+        // Wording, no plate and no halo.
+        spec = { text: base.text, textColor: tune.badgeTextColor,
+                 fill: 0, plate: false };
       }
       if (!spec) {
         b.mesh.visible = false;
@@ -21940,16 +22607,50 @@ class Component extends DCLogic {
         b.sig = '';
         return;
       }
-      const sig = spec.text + '|' + spec.color + '|' + (spec.color2 || '')
-        + '|' + (spec.glowColor || '') + '|' + spec.fill.toFixed(3);
+      const sig = spec.text + '|' + (spec.color || '') + '|' + (spec.color2 || '')
+        + '|' + (spec.glowColor || '') + '|' + (spec.textColor || '')
+        + '|' + spec.fill.toFixed(3);
       if (sig !== b.sig) {
         b.sig = sig;
         this._paintPowertrainBadge(b, spec);
       }
       b.mesh.visible = true;
-      b.mesh.material.opacity = tune.badgeOpacity;
+      b.mesh.material.opacity = isBar ? tune.axleBarOpacity : tune.badgeOpacity;
       if (b.glowMesh) b.glowMesh.visible = true;   // opacity is driven by the tick
     });
+  }
+
+  /**
+   * How much brighter module `rank` (its rank among the LIT modules, not its
+   * index in the stack) should be right now. Both the glow sprites and the
+   * module emissives call this, so the two can never disagree about where the
+   * highlight is -- they used to carry the same phase expression twice.
+   *
+   * Charging is a travelling cosine bump: the level really is rising through
+   * the stack, and a smooth wave says that. Discharging is a stepped chase
+   * from the last lit module down to the first, wrapping back to the last.
+   */
+  _cellSweepBoost(rank, n, t, dir, tune) {
+    if (!dir) return 1;
+    const span = Math.max(1, n);
+    if (dir < 0 && tune.cellChaseOn) {
+      // Head walks DOWN the ranks, so a module the head has just left sits at
+      // a slightly HIGHER rank -- which is why the trail is on positive d.
+      const head = (span - 1) - ((t * tune.cellChaseHz) % span);
+      let d = rank - head;
+      d = ((d % span) + span) % span;
+      const tail = Math.max(0.05, tune.cellChaseTail);
+      const env = d <= tail ? Math.pow(1 - d / tail, tune.cellChaseSharp) : 0;
+      // Spans [cellChaseLow .. 1], never above: the head sits at full and
+      // everything else is pulled down. See cellChaseLow for why up is a no-op.
+      const low = tune.cellChaseLow;
+      return low + (1 - low) * env;
+    }
+    // cos^3 of the phase: a narrow bump rather than a whole-bar throb, so you
+    // can see it move instead of just seeing everything flash.
+    const ph = (rank / span) - t * tune.cellWaveHz * dir;
+    const c = 0.5 + 0.5 * Math.cos(ph * Math.PI * 2);
+    return 1 + (c * c * c) * tune.cellWaveAmp;
   }
 
   /** 64px radial falloff, reused by every halo sprite. */
@@ -22419,6 +23120,11 @@ class Component extends DCLogic {
       const regenIn = frontDir < 0 || rearDir < 0;
       const charging = plug || regenIn || flow.tone === 'regen';
       const discharging = !charging && (frontDir > 0 || rearDir > 0);
+      // Engine running with nothing else going on — parked, marcha lenta. The
+      // pack is neither filling nor draining, so neither sweep applies, but a
+      // dead-still stack next to a running engine reads as "x-ray is frozen".
+      // It gets the edge-cell blink on its own.
+      this._powertrainCellIdleBlink = !!(flow.ice && !charging && !discharging);
       // Green SOC bar always — discharge direction is carried by rings / HV lanes.
       const cellTone = G.cell;
 
@@ -22580,6 +23286,7 @@ class Component extends DCLogic {
       n.sig = '';
     });
     this._powertrainCellDir = 0;
+    this._powertrainCellIdleBlink = false;
     this._powertrainGroundDir = 0;
     this._powertrainPlugged = false;
     this._powertrainFxSig = '';
@@ -22698,18 +23405,38 @@ class Component extends DCLogic {
       }
     }
 
-    // Halo throb on every visible plate. They are only visible while an axle is
-    // pulling or recovering, so this is exactly "traction and regen".
+    // Border/halo throb on every visible bar. They are only visible while an
+    // axle is pulling or recovering, so this is exactly "traction and regen".
     const badges = this._powertrainBadges;
     if (badges && badges.length) {
-      const bp = 0.5 + 0.5 * Math.sin(t * tune.badgeGlowPulseHz * Math.PI * 2);
+      let bp = 0.5 + 0.5 * Math.sin(t * tune.badgeGlowPulseHz * Math.PI * 2);
+      // Gamma > 1 holds it near zero for longer, so the border reads as
+      // blooming up and dying away rather than breathing between two levels.
+      const gam = tune.badgeGlowPulseGamma || 1;
+      if (gam !== 1) bp = Math.pow(bp, gam);
       const lo = tune.badgeGlowPulseLow;
-      const bo = (lo + (1 - lo) * bp) * tune.badgeOpacity;
+      const bo = (lo + (1 - lo) * bp) * tune.axleBarGlowOpacity;
       for (let i = 0; i < badges.length; i++) {
         const gm = badges[i].glowMesh;
         if (gm && gm.visible) gm.material.opacity = bo;
       }
     }
+
+    // Who animates the module stack, and how:
+    //
+    //   charging        travelling wave  + edge blink
+    //   consuming       stepped chase    (NO edge blink)
+    //   engine idling   nothing moving   + edge blink
+    //
+    // The chase and the blink CANNOT both run. Measured on a 4-module stack,
+    // the blink swings the edge cell 0.08x..2.05x at 7 Hz while the chase's
+    // peak is 2.3x -- and the edge cell is the one the chase starts from, so
+    // the strobe simply ate it. That is why the chase looked like it was not
+    // there: it was running correctly and being drowned out.
+    const cellIdleBlink = !!this._powertrainCellIdleBlink;
+    const cellChasing = cellDir < 0 && !!tune.cellChaseOn;
+    const cellAnim = (cellDir !== 0 || cellIdleBlink) && !!tune.cellWaveOn;
+    const cellBlinkOn = cellAnim && !cellChasing;
 
     const glows = this._powertrainCellGlows;
     if (glows && glows.length) {
@@ -22723,7 +23450,6 @@ class Component extends DCLogic {
       }
       const gn = Math.max(1, gLit);
       const gEdge = this._powertrainCellEdge;
-      const gTravel = t * tune.cellWaveHz * (cellDir || 0);
       // Blink for the cell the level sits in. It has to be MULTIPLICATIVE and
       // span below 1: the previous additive nudge only ever brightened, by less
       // than the travelling wave was already moving every other cell, so there
@@ -22736,13 +23462,11 @@ class Component extends DCLogic {
         if (g.sprite.visible !== lit) g.sprite.visible = lit;
         if (!lit) continue;
         let boost = 1;
-        if (cellDir && tune.cellWaveOn) {
-          const ph = (Math.max(0, g.litRank) / gn) - gTravel;
-          const cc = 0.5 + 0.5 * Math.cos(ph * Math.PI * 2);
-          boost = 1 + (cc * cc * cc) * tune.cellWaveAmp;
-          // Either direction: the cell the level sits in is the one worth
-          // watching whether the pack is filling or draining.
-          if (g.idx === gEdge) boost *= gBlink;
+        if (cellAnim) {
+          if (cellDir) {
+            boost = this._cellSweepBoost(Math.max(0, g.litRank), gn, t, cellDir, tune);
+          }
+          if (cellBlinkOn && g.idx === gEdge) boost *= gBlink;
         }
         g.sprite.material.uniforms.uOpacity.value =
           g.level * tune.cellGlowOpacity * boost;
@@ -22750,40 +23474,45 @@ class Component extends DCLogic {
     }
 
     const cells = this._powertrainCells;
-    if (cells && cells.length && cellDir && tune.cellWaveOn) {
+    if (cells && cells.length && cellAnim) {
       // _powertrainCells only ever holds the lit ones, so its own length is
       // already the span the sweep should cover.
       const n = cells.length;
       const edge = this._powertrainCellEdge;
-      const travel = t * tune.cellWaveHz * cellDir;
       const blink = tune.cellEdgeLow + (tune.cellEdgeHigh - tune.cellEdgeLow)
         * Math.pow(0.5 + 0.5 * Math.sin(t * tune.cellEdgeHz), tune.cellEdgeSharp);
       for (let i = 0; i < n; i++) {
-        // cos^3 of the phase: a narrow bump rather than a whole-bar throb, so
-        // you can see it move instead of just seeing everything flash.
-        const phase = (i / n) - travel;
-        const c = 0.5 + 0.5 * Math.cos(phase * Math.PI * 2);
-        const isEdge = (i === edge);
-        let boost = 1 + (c * c * c) * tune.cellWaveAmp;
+        // Not the edge cell at all when the blink is off, so the treatment
+        // below reverts to "like any other module".
+        const isEdge = cellBlinkOn && (i === edge);
+        let boost = cellDir ? this._cellSweepBoost(i, n, t, cellDir, tune) : 1;
         if (isEdge) boost *= blink;
+        // Cells that are MEANT to go dark: the blinking edge cell, and every
+        // module the chase head is not currently on. Both need the 0.94 floor
+        // lifted and the albedo to follow them down -- that pair is the whole
+        // reason either effect is visible at all.
+        const dim = isEdge || cellChasing;
+        const albedoMul = cellChasing
+          ? Math.min(1, boost)
+          : (isEdge ? Math.min(1, blink) : 1);
         const mats = cells[i].materials;
         for (let k = 0; k < mats.length; k++) {
           const base = mats[k].userData.glowBase || 0;
           if (base > 0.005) {
-            // The 0.94 floor stops the travelling wave darkening cells as it
-            // passes. The edge blink is MEANT to darken, so it goes under the
-            // floor -- clamping it there was the other half of why the blink
-            // could not be seen.
-            mats[k].emissiveIntensity = isEdge
+            // The 0.94 floor stops the travelling CHARGE wave darkening cells
+            // as it passes. Anything that is supposed to darken goes under it.
+            mats[k].emissiveIntensity = dim
               ? base * boost : Math.max(base * 0.94, base * boost);
           }
-          // Body colour follows the blink down as well, so the cell goes DARK
-          // rather than merely losing its green. Neighbours are restored every
-          // frame because the edge cell moves as the pack fills and drains.
+          // Body colour follows it down as well, so the cell goes DARK rather
+          // than merely losing its green -- measured at the trough, dropping
+          // emissive alone read (213, 222, 217), a pale grey, because the body
+          // colour underneath never moved. Restored every frame because which
+          // module is dark changes continuously.
           const ab = mats[k].userData.albedoBase;
           if (ab !== undefined) {
             mats[k].color.setHex(ab);
-            if (isEdge) mats[k].color.multiplyScalar(Math.min(1, blink));
+            if (albedoMul < 1) mats[k].color.multiplyScalar(albedoMul);
           }
         }
       }
@@ -23976,21 +24705,98 @@ class Component extends DCLogic {
     };
   }
 
+  _viewportSize() {
+    const el = this.renderer && this.renderer.domElement;
+    return {
+      w: (el && (el.clientWidth || el.width)) || window.innerWidth || 1920,
+      h: (el && (el.clientHeight || el.height)) || window.innerHeight || 720,
+    };
+  }
+
+  /**
+   * The view offset carries TWO shifts that must not overwrite each other: the
+   * layout's fit-to-gap shift (recomputed live from the board rects, passed in
+   * here) and the user's own pan (_userPanPx, in pixels - see _rebaseOrbitPan).
+   * They are simply added; the layout half stays in `shift` so _currentViewShift
+   * can still report it on its own for save/tween purposes.
+   */
   _applyShellViewOffset(shift) {
     if (!this.camera) return;
-    const el = this.renderer && this.renderer.domElement;
-    const w = (el && (el.clientWidth || el.width)) || window.innerWidth || 1920;
-    const h = (el && (el.clientHeight || el.height)) || window.innerHeight || 720;
-    if (!shift) {
+    const { w, h } = this._viewportSize();
+    this._layoutViewShift = shift || 0;
+    const pan = this._userPanPx || (this._userPanPx = { x: 0, y: 0 });
+    const offsetX = -this._layoutViewShift * w + (pan.x || 0);
+    const offsetY = (pan.y || 0);
+    if (!offsetX && !offsetY) {
       if (typeof this.camera.clearViewOffset === 'function') this.camera.clearViewOffset();
     } else if (typeof this.camera.setViewOffset === 'function') {
-      this.camera.setViewOffset(w, h, -shift * w, 0, w, h);
+      this.camera.setViewOffset(w, h, offsetX, offsetY, w, h);
     }
     this.camera.updateProjectionMatrix();
     this._postFxDirty = true;
   }
 
+  _setUserPan(x, y) {
+    const { w, h } = this._viewportSize();
+    const cx = Math.max(-w * USER_PAN_MAX_X, Math.min(w * USER_PAN_MAX_X, x || 0));
+    const cy = Math.max(-h * USER_PAN_MAX_Y, Math.min(h * USER_PAN_MAX_Y, y || 0));
+    const pan = this._userPanPx || (this._userPanPx = { x: 0, y: 0 });
+    if (pan.x === cx && pan.y === cy) return false;
+    pan.x = cx;
+    pan.y = cy;
+    return true;
+  }
+
+  /**
+   * Fold whatever pan OrbitControls has applied back out of the world and into
+   * the projection view offset, so controls.target never leaves the car.
+   *
+   * OrbitControls pans by translating camera AND target by the same vector.
+   * Undoing that translation on both leaves the offset between them - and so
+   * the orbit radius, the spherical angles and the lookAt orientation - exactly
+   * as they were; only the world position moves back. With screenSpacePanning
+   * the translation is wholly in the camera's right/up plane, so re-applying it
+   * as a pixel crop reproduces the same picture (setViewOffset is a pure
+   * post-projection shift - see the note above _shellCameraTarget).
+   *
+   * Net effect: pan still moves the car on screen, and rotate still pivots on
+   * the car, at any pan.
+   */
+  _rebaseOrbitPan() {
+    const THREE = window.THREE;
+    if (!THREE || !this.camera || !this.controls || !this._fitCenter) return false;
+    // Runs every frame; scratch vectors so the common no-pan case allocates
+    // nothing at all.
+    const scratch = this._panScratch || (this._panScratch = {
+      delta: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(),
+    });
+    const delta = scratch.delta.copy(this.controls.target).sub(this._fitCenter);
+    if (delta.lengthSq() < 1e-10) return false;
+    const { h } = this._viewportSize();
+    // Same world-units-per-pixel OrbitControls' own pan() uses - clientHeight
+    // only, so the aspect ratio never distorts the rate.
+    const dist = this.camera.position.distanceTo(this.controls.target);
+    const wpp = 2 * dist * Math.tan(this.camera.fov / 2 * Math.PI / 180) / h;
+    if (!(wpp > 1e-9)) return false;
+    // camera.matrix lags a frame after OrbitControls' lookAt(); refresh it
+    // before reading the basis columns out of it.
+    this.camera.updateMatrix();
+    const right = scratch.right.setFromMatrixColumn(this.camera.matrix, 0);
+    const up = scratch.up.setFromMatrixColumn(this.camera.matrix, 1);
+    const pan = this._userPanPx || (this._userPanPx = { x: 0, y: 0 });
+    // Moving the camera by +delta shifts the car by (-dr, +du) px on screen
+    // (screen y is down); the crop that puts it back is the negative of that.
+    this._setUserPan(pan.x + delta.dot(right) / wpp, pan.y - delta.dot(up) / wpp);
+    this.camera.position.sub(delta);
+    this.controls.target.copy(this._fitCenter);
+    this.camera.updateMatrix();
+    this.camera.updateMatrixWorld(true);
+    this._applyShellViewOffset(this._layoutViewShift || 0);
+    return true;
+  }
+
   _currentViewShift() {
+    if (typeof this._layoutViewShift === 'number') return this._layoutViewShift;
     const v = this.camera && this.camera.view;
     if (v && v.enabled && v.fullWidth) return -v.offsetX / v.fullWidth;
     return (this._fitCam && this._fitCam.viewShift) || 0;
@@ -24004,6 +24810,8 @@ class Component extends DCLogic {
     const off = this.camera.position.clone().sub(c);
     const offT = this.controls.target.clone().sub(c);
     const round = (n) => Math.round(n * 10000) / 10000;
+    const { w, h } = this._viewportSize();
+    const pan = this._userPanPx || { x: 0, y: 0 };
     return {
       f: round(off.dot(F) / d),
       r: round(off.dot(R) / d),
@@ -24011,6 +24819,11 @@ class Component extends DCLogic {
       tf: round(offT.dot(F) / d),
       tr: round(offT.dot(R) / d),
       ty: round(offT.y / d),
+      // The user's pan lives in the view offset, not in the target, so it has
+      // to be saved separately - as a fraction of the viewport, because the
+      // panel it is restored on may not be the size it was captured at.
+      px: round(pan.x / w),
+      py: round(pan.y / h),
       viewShift: round(this._currentViewShift()),
     };
   }
@@ -24049,6 +24862,8 @@ class Component extends DCLogic {
       target,
       viewShift: auto.viewShift || 0,
       distMul: auto.distMul,
+      panX: rel.px || 0,
+      panY: rel.py || 0,
     };
   }
 
@@ -24064,7 +24879,7 @@ class Component extends DCLogic {
       c.y + dist * 0.30,
       c.z + dist * 0.70
     );
-    return { position, target: c, viewShift: pose.viewShift || 0, distMul };
+    return { position, target: c, viewShift: pose.viewShift || 0, distMul, panX: 0, panY: 0 };
   }
 
   _layoutHomePose() {
@@ -24083,6 +24898,9 @@ class Component extends DCLogic {
       const dist = this.camera.position.distanceTo(this.controls.target);
       this.camera.near = Math.max(0.05, dist / 120);
       this.camera.far = Math.max(100, dist * 120);
+      // A snap re-establishes the framing outright, so the live pan goes with
+      // it - replaced by whatever the pose carries (zero for a procedural one).
+      this._applyPosePan(home);
       this._applyShellViewOffset(home.viewShift != null ? home.viewShift : ((pose && pose.viewShift) || 0));
       this.controls.update();
       return;
@@ -24098,8 +24916,20 @@ class Component extends DCLogic {
     this.controls.target.copy(c);
     this.camera.near = dist / 120;
     this.camera.far = dist * 120;
+    this._applyPosePan(pose);
     this._applyShellViewOffset(pose.viewShift || 0);
     this.controls.update();
+  }
+
+  /**
+   * Pan a pose asks for, in pixels. Poses store it as a fraction of the
+   * viewport (see _captureCurrentLayoutCam); anything with no pan field - a
+   * camera preset, the procedural home - resets it, which is what "go to this
+   * view" should mean.
+   */
+  _applyPosePan(pose) {
+    const { w, h } = this._viewportSize();
+    this._setUserPan(((pose && pose.panX) || 0) * w, ((pose && pose.panY) || 0) * h);
   }
 
   _applyFitCamera(popupActive) {
@@ -24493,6 +25323,8 @@ class Component extends DCLogic {
 
   _animateCameraTo(pose, durationSec) {
     if (!pose || !this.camera || !this.controls) return;
+    const { w, h } = this._viewportSize();
+    const pan = this._userPanPx || { x: 0, y: 0 };
     this._camAnim = {
       fromPos: this.camera.position.clone(),
       fromTarget: this.controls.target.clone(),
@@ -24500,6 +25332,11 @@ class Component extends DCLogic {
       toTarget: pose.target.clone(),
       fromShift: this._currentViewShift(),
       toShift: pose.viewShift != null ? pose.viewShift : this._currentViewShift(),
+      // Ease the user's pan out over the same move rather than dropping it on
+      // the first frame - otherwise every preset tile starts with the car
+      // jumping back to centre before the camera has gone anywhere.
+      fromPan: { x: pan.x || 0, y: pan.y || 0 },
+      toPan: { x: ((pose.panX || 0) * w), y: ((pose.panY || 0) * h) },
       t: 0,
       dur: Math.max(0.2, durationSec || 1.1),
     };
@@ -24522,8 +25359,14 @@ class Component extends DCLogic {
     this.camera.near = Math.max(0.05, dist / 120);
     this.camera.far = Math.max(100, dist * 120);
     this.camera.updateProjectionMatrix();
+    if (a.fromPan && a.toPan) {
+      this._setUserPan(a.fromPan.x + (a.toPan.x - a.fromPan.x) * e,
+        a.fromPan.y + (a.toPan.y - a.fromPan.y) * e);
+    }
     if (a.fromShift != null && a.toShift != null) {
       this._applyShellViewOffset(a.fromShift + (a.toShift - a.fromShift) * e);
+    } else if (a.fromPan && a.toPan) {
+      this._applyShellViewOffset(this._layoutViewShift || 0);
     }
     this.controls.update();
     if (a.t >= 1) {
@@ -24946,6 +25789,142 @@ class Component extends DCLogic {
         console.warn('[WheelBlur] visible-car recapture failed', e);
       }
     }
+  }
+
+  /**
+   * Bracket a POST-BOOT car swap (MODEL / chassis toggle, rim change).
+   *
+   * THIS USED TO VEIL THE CAR: the canvas host faded to opacity 0, the scene
+   * was culled behind it, and the finished car faded back in, so nobody
+   * watched the new body land wheel-less while its stock rim was still being
+   * fetched. That fade was removed on request — over the light day scene it
+   * read as the whole screen washing out to white. The swap is now covered by
+   * the badge alone, which means the rebuild IS briefly visible again: the new
+   * body pops in, is drawn once by the light warm-up, and stands there without
+   * wheels until the rim arrives (and a rim swap shows the previous rim's blur
+   * smear until `_endCarSwap` flushes the recapture). That is the accepted
+   * trade; the CSS for the veil (.hv-swapping / .hv-swap-in) is left in place
+   * so it can be restored by re-adding the two class toggles.
+   *
+   * `_endCarSwap` is called from `_finishLoading`, which every load path
+   * funnels through; the ones that bail out to `loading: false` on their own
+   * call it directly, and a safety timer clears the badge if something new
+   * ever forgets to.
+   */
+  /**
+   * Pin the swap badge under the CAR rather than in the middle of the panel.
+   * Same projection the hotspot FABs use (see _projectHsFab): the camera's
+   * view offset is baked into its projection matrix, so a plain .project()
+   * already accounts for the shift _shellCameraTarget applies.
+   *
+   * All EIGHT corners of the fit box are projected and the lowest one on
+   * SCREEN wins, rather than projecting the single world-space point under the
+   * car's centre. That point is not the bottom of the car on screen: the
+   * camera looks down at the car, so the contact patch at (centre.x, centre.z)
+   * projects onto the middle of the bodywork, and the badge landed across the
+   * doors. The silhouette's lowest corner is under the car from any angle.
+   *
+   * Falls back to the layer centre when there is nothing to project against
+   * (no _fitCenter yet, or the box behind the camera) rather than stranding
+   * the badge off-panel.
+   */
+  _positionSwapBadge() {
+    if (!this._carSwapLabel) return;
+    const el = this._swapBadgeEl
+      || (this._swapBadgeEl = document.querySelector('.hv-boot-center-card'));
+    if (!el || !el.parentElement) return;
+    const layerRect = el.parentElement.getBoundingClientRect();
+    if (!layerRect.width || !layerRect.height) return;
+    let x = layerRect.width / 2;
+    let y = layerRect.height / 2;
+    const THREE = this.THREE;
+    if (THREE && this.camera && this.renderer && this._fitCenter && this._fitSize) {
+      if (!this._swapBadgeProj) this._swapBadgeProj = new THREE.Vector3();
+      const v = this._swapBadgeProj;
+      const c = this._fitCenter, sz = this._fitSize;
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      const offX = rect.left - layerRect.left;
+      const offY = rect.top - layerRect.top;
+      let cx = null, maxY = -Infinity, ok = true;
+      for (let i = 0; i < 8 && ok; i++) {
+        v.set(
+          c.x + (i & 1 ? sz.x : -sz.x) * 0.5,
+          c.y + (i & 2 ? sz.y : -sz.y) * 0.5,
+          c.z + (i & 4 ? sz.z : -sz.z) * 0.5
+        );
+        v.project(this.camera);
+        if (!isFinite(v.x) || !isFinite(v.y) || v.z > 1) { ok = false; break; }
+        const py = (-v.y * 0.5 + 0.5) * rect.height + offY;
+        if (py > maxY) maxY = py;
+      }
+      if (ok) {
+        v.copy(c).project(this.camera);
+        if (isFinite(v.x)) cx = (v.x * 0.5 + 0.5) * rect.width + offX;
+      }
+      if (cx != null && isFinite(maxY)) { x = cx; y = maxY + 14; }
+    }
+    // offsetWidth is 0 on the first call of a swap — the layer is still
+    // display:none until the caller's setState lands — hence the fallbacks.
+    const w = el.offsetWidth || 116;
+    const h = el.offsetHeight || 24;
+    x = Math.max(w / 2 + 10, Math.min(layerRect.width - w / 2 - 10, x));
+    y = Math.max(10, Math.min(layerRect.height - h - 10, y));
+    el.style.transform = 'translate3d(' + Math.round(x) + 'px,' + Math.round(y)
+      + 'px,0) translate(-50%,0)';
+  }
+
+  _beginCarSwap(kind) {
+    if (!this._viewerReady) return;      // boot owns its own reveal
+    if (this._carSwapActive) return;     // outermost caller names the swap
+    this._carSwapActive = true;
+    this._carSwapLabel = kind || 'model';
+    this._positionSwapBadge();
+    // ...and again once the caller's setState has actually shown the layer, so
+    // the clamp above runs against a measured badge instead of the fallbacks.
+    requestAnimationFrame(() => this._positionSwapBadge());
+    this._carSwapStart = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    // No fade-out and no cull: the car stays on screen for the whole swap and
+    // the badge is the only thing that marks it. See the note above.
+    clearTimeout(this._carSwapSafetyTimer);
+    this._carSwapSafetyTimer = setTimeout(() => {
+      console.warn('[CarSwap] no _finishLoading after 25s — clearing the badge anyway');
+      this._endCarSwap();
+    }, 25000);
+  }
+
+  _endCarSwap() {
+    if (!this._carSwapActive) return;
+    this._carSwapActive = false;
+    clearTimeout(this._carSwapSafetyTimer); this._carSwapSafetyTimer = null;
+
+    // Flush the debounced sprite capture NOW. It is keyed to the rim that just
+    // landed, and revealing before it runs shows the new rim wearing the old
+    // one's smear — only on a moving car, which is exactly when the sprite is
+    // up. One capture per swap, which is what the debounce is protecting.
+    if (this._blurCaptureTimer) {
+      clearTimeout(this._blurCaptureTimer);
+      this._blurCaptureTimer = null;
+      try { this._generateBlurredWheelTexture(); }
+      catch (e) { console.warn('[WheelBlur] swap-end capture failed', e && e.message); }
+    }
+
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const held = now - (this._carSwapStart || now);
+    const dropBadge = () => {
+      clearTimeout(this._carSwapRevealTimer);
+      this._carSwapRevealTimer = null;
+      if (this._carSwapLabel == null) return;
+      this._carSwapLabel = null;
+      if (this._unmounted) return;
+      this.setState({});
+      if (this.requestRender) this.requestRender(6);
+    };
+    // A cached / already-parsed swap finishes almost instantly. Hold the badge
+    // long enough that it reads as a transition rather than a one-frame blink.
+    const MIN_BADGE_MS = 340;
+    clearTimeout(this._carSwapRevealTimer);
+    if (held >= MIN_BADGE_MS) dropBadge();
+    else this._carSwapRevealTimer = setTimeout(dropBadge, MIN_BADGE_MS - held);
   }
 
   _syncCarSceneForShell() {
@@ -25471,6 +26450,92 @@ class Component extends DCLogic {
     }
   }
 
+  /** Per-package name / icon overrides, read through once and kept in memory. */
+  _appOverrides() {
+    if (!this._appOverrideMap) this._appOverrideMap = loadAppOverrides();
+    return this._appOverrideMap;
+  }
+
+  /**
+   * Hold to edit, mirroring the widget cards' idiom (`CAR_WIDGET_HOLD_MS`).
+   * The tile is a <button>, so the hold has to suppress the click that would
+   * otherwise launch the app on release.
+   */
+  _onAppTileHoldStart(app, ev) {
+    if (ev && ev.type === 'mousedown' && this._appTileTouchActive) return;
+    if (ev && ev.type === 'touchstart') this._appTileTouchActive = true;
+    this._clearAppTileHold();
+    this._appTileHoldFired = false;
+    this._appTileHoldTimer = setTimeout(() => {
+      this._appTileHoldTimer = 0;
+      this._appTileHoldFired = true;
+      this._appTileSuppressClick = true;
+      this._openAppEdit(app);
+    }, CAR_WIDGET_HOLD_MS);
+  }
+
+  _onAppTileHoldEnd(app, ev) {
+    if (ev && ev.type === 'mouseup' && this._appTileTouchActive) return;
+    if (ev && (ev.type === 'touchend' || ev.type === 'touchcancel')) this._appTileTouchActive = false;
+    this._clearAppTileHold();
+  }
+
+  _onAppTileHoldCancel() {
+    this._clearAppTileHold();
+  }
+
+  _clearAppTileHold() {
+    if (this._appTileHoldTimer) {
+      clearTimeout(this._appTileHoldTimer);
+      this._appTileHoldTimer = 0;
+    }
+  }
+
+  _openAppEdit(app) {
+    if (!app || !app.packageName) return;
+    const cur = this._appOverrides()[app.packageName] || {};
+    this.setState({
+      appEditPkg: app.packageName,
+      appEditName: (typeof cur.name === 'string') ? cur.name : '',
+      appEditIcon: cur.icon || '',
+      appEditColor: cur.color || APP_ICON_COLORS[0],
+    });
+  }
+
+  _closeAppEdit() {
+    if (!this.state.appEditPkg) return;
+    this.setState({ appEditPkg: null, appEditName: '', appEditIcon: '', appEditColor: '' });
+  }
+
+  /** Write the draft through, dropping the entry entirely when it overrides nothing. */
+  _saveAppEdit() {
+    const pkg = this.state.appEditPkg;
+    if (!pkg) return;
+    const map = this._appOverrides();
+    const name = (this.state.appEditName || '').trim();
+    const icon = this.state.appEditIcon || '';
+    if (!name && !icon) {
+      delete map[pkg];
+    } else {
+      const entry = {};
+      if (name) entry.name = name;
+      if (icon) {
+        entry.icon = icon;
+        entry.color = this.state.appEditColor || APP_ICON_COLORS[0];
+      }
+      map[pkg] = entry;
+    }
+    saveAppOverrides(map);
+    this._closeAppEdit();
+    // The catalog itself has not changed — only how it renders.
+    this.setState({ appsCatalogRev: (this.state.appsCatalogRev || 0) + 1 });
+  }
+
+  /** Back to the app's own name and icon. */
+  _clearAppEdit() {
+    this.setState({ appEditName: '', appEditIcon: '' });
+  }
+
   _setAppsFabOpen(open) {
     const next = !!open;
     if (!!this.state.appsFabOpen === next) {
@@ -25542,16 +26607,35 @@ class Component extends DCLogic {
         setAppsRatio12: () => {},
         swapAppsSlots: () => {},
         saveAppsOnlyDefault: () => {},
+        ...this._appEditRenderFields(null, false),
       };
     }
     this._ensureAppsCatalog();
     const catalog = Array.isArray(this._appsCatalog) ? this._appsCatalog : [];
-    const mk = (side) => catalog.map((app) => ({
-      label: app.label || app.packageName || '',
-      icon: app.icon || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-      onClick: () => this._launchAppInSlot(app.packageName, side),
-    }));
+    const overrides = this._appOverrides();
+    const FALLBACK_ICON = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    const mk = (side) => catalog.map((app) => {
+      const ov = overrides[app.packageName] || {};
+      const custom = ov.icon ? appIconDataUrl(ov.icon, ov.color) : '';
+      return {
+        label: ov.name || app.label || app.packageName || '',
+        icon: custom || app.icon || FALLBACK_ICON,
+        onClick: () => {
+          // A hold already opened the editor — swallow the click it releases into.
+          if (this._appTileSuppressClick) { this._appTileSuppressClick = false; return; }
+          this._launchAppInSlot(app.packageName, side);
+        },
+        onHoldStart: (ev) => this._onAppTileHoldStart(app, ev),
+        onHoldEnd: (ev) => this._onAppTileHoldEnd(app, ev),
+        onHoldCancel: (ev) => this._onAppTileHoldCancel(app, ev),
+        onContextMenu: (ev) => {
+          if (ev && ev.preventDefault) ev.preventDefault();
+          this._openAppEdit(app);
+        },
+      };
+    });
     return {
+      ...this._appEditRenderFields(catalog, true),
       appsPaneDisplay: 'flex',
       appsFabDisplay: 'none',
       appsFabMenuDisplay: 'none',
@@ -25567,6 +26651,78 @@ class Component extends DCLogic {
       setAppsRatio12: () => {},
       swapAppsSlots: () => {},
       saveAppsOnlyDefault: () => {},
+    };
+  }
+
+  /** Bindings for the long-press edit sheet. Closed unless a tile asked for it. */
+  _appEditRenderFields(catalog, visible) {
+    const pkg = visible ? this.state.appEditPkg : null;
+    if (!pkg) {
+      return {
+        appEditDisplay: 'none',
+        appEditTitle: '',
+        appEditPkgLabel: '',
+        appEditHeadIcon: '',
+        appEditNameValue: '',
+        appEditNamePlaceholder: '',
+        appEditIconItems: [],
+        appEditColorItems: [],
+        appEditColorsDisplay: 'none',
+        onAppEditName: () => {},
+        onAppEditSave: () => {},
+        onAppEditCancel: () => {},
+        onAppEditReset: () => {},
+        onAppEditStop: () => {},
+      };
+    }
+    const list = Array.isArray(catalog) ? catalog : [];
+    let app = null;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i] && list[i].packageName === pkg) { app = list[i]; break; }
+    }
+    if (!app) app = { packageName: pkg, label: '', icon: '' };
+
+    const stockIcon = app.icon || '';
+    const chosen = this.state.appEditIcon || '';
+    const color = this.state.appEditColor || APP_ICON_COLORS[0];
+
+    // "Default" first, then the built-in set, all previewed in the live tint.
+    const iconItems = [{
+      cls: chosen ? '' : 'on',
+      icon: stockIcon,
+      title: 'App default',
+      onClick: () => this.setState({ appEditIcon: '' }),
+    }];
+    for (let i = 0; i < APP_ICON_SET.length; i++) {
+      const it = APP_ICON_SET[i];
+      iconItems.push({
+        cls: chosen === it.slug ? 'on' : '',
+        icon: appIconDataUrl(it.slug, color),
+        title: it.label,
+        onClick: () => this.setState({ appEditIcon: it.slug }),
+      });
+    }
+
+    return {
+      appEditDisplay: 'flex',
+      appEditTitle: (this.state.appEditName || '').trim() || app.label || pkg,
+      appEditPkgLabel: pkg,
+      appEditHeadIcon: chosen ? appIconDataUrl(chosen, color) : stockIcon,
+      appEditNameValue: this.state.appEditName || '',
+      appEditNamePlaceholder: app.label || pkg,
+      appEditIconItems: iconItems,
+      appEditColorItems: APP_ICON_COLORS.map((c) => ({
+        cls: c === color ? 'on' : '',
+        style: 'background: ' + c + ';',
+        onClick: () => this.setState({ appEditColor: c }),
+      })),
+      // Tint only means anything once a built-in icon is chosen.
+      appEditColorsDisplay: chosen ? 'flex' : 'none',
+      onAppEditName: (ev) => this.setState({ appEditName: (ev && ev.target) ? ev.target.value : '' }),
+      onAppEditSave: () => this._saveAppEdit(),
+      onAppEditCancel: () => this._closeAppEdit(),
+      onAppEditReset: () => this._clearAppEdit(),
+      onAppEditStop: (ev) => { if (ev && ev.stopPropagation) ev.stopPropagation(); },
     };
   }
 
@@ -25679,7 +26835,12 @@ class Component extends DCLogic {
 
   _configDockFields(s, leftRect) {
     const appsOnly = (s.shellMode || '') === 'appsOnly';
-    const open = !appsOnly && !s.loading && !s.error && !!s.panelOpen && !!s.configSection;
+    // `s.loading` alone would close and re-open the dock on every post-boot
+    // load — which is exactly what happens when you pick a rim FROM this dock.
+    // Only the cold boot (viewer not ready yet) should suppress it; the rest of
+    // the chrome already uses this same test (see panelBodyDisplay).
+    const open = !appsOnly && !(s.loading && !this._viewerReady) && !s.error
+      && !!s.panelOpen && !!s.configSection;
     const cols = this._gridColsForMode(s.shellMode);
     const empty = {
       configDockDisplay: 'none',
@@ -25967,6 +27128,42 @@ class Component extends DCLogic {
     const gap = this._centerGapRect();
     if (!gap) return false;
     return clientX >= gap.l && clientX <= gap.r && clientY >= gap.t && clientY <= gap.b;
+  }
+
+  /**
+   * Which widget board (if any) a point falls in. Board rects only - no test
+   * for what the slot is being used for, and none for whether a card is under
+   * the point: this is only ever asked about a press that ALREADY reached the
+   * canvas, and everything that could legitimately answer for those pixels
+   * (a widget card, a freeform app pane, the toolbar) keeps its own pointer
+   * events and would have taken the press first.
+   */
+  _boardSideAt(clientX, clientY) {
+    const mode = this._shellMode || this.state.shellMode || 'triple';
+    if (mode === 'appsOnly') return null;
+    if ((this.state.chromePage || 'main') !== 'main') return null;
+    const sides = mode === 'appCar' ? ['left'] : ['left', 'right'];
+    for (let i = 0; i < sides.length; i++) {
+      const side = sides[i];
+      const b = side === 'left'
+        ? (this._shellLeftBounds || { l: 48, t: 40, r: 740, b: 500 })
+        : (this._shellRightBounds || { l: 1180, t: 40, r: 1872, b: 500 });
+      if (clientX >= b.l && clientX <= b.r && clientY >= b.t && clientY <= b.b) return side;
+    }
+    return null;
+  }
+
+  /**
+   * Where a long-press on the CANVAS offers "add widget". The centre gap has
+   * always been one. An empty stretch of a widget board is now another: the
+   * board stopped swallowing pointer events where it holds no card (so a drag
+   * there orbits the car), which also took the board's own long-press handler
+   * out of reach over those same pixels. A press that lands here has already
+   * missed every card - the cards keep their pointer events - so the point
+   * being inside the board rect is enough to know it hit empty board.
+   */
+  _pointInWidgetHoldZone(clientX, clientY) {
+    return this._pointInCenterGap(clientX, clientY) || !!this._boardSideAt(clientX, clientY);
   }
 
   _centerGapRect(mode) {
@@ -26912,6 +28109,7 @@ class Component extends DCLogic {
       this._pendingShellPatch = null;
     }
     this.setState(patch, () => { this._trySplashHandOff(); });
+    this._endCarSwap();
     this._notifyViewerReady();
     this._scheduleCamIconWarmup();
     const pendingMedia = this._pendingMediaPayload;
@@ -27189,6 +28387,7 @@ class Component extends DCLogic {
 
   _setModelVariant(v, trimKey) {
     if (v === this.state.modelVariant) return;
+    this._beginCarSwap('model');
 
     // Lazy variant load: the other body isn't fetched at startup. On the first
     // switch to a not-yet-loaded variant, show the loader, fetch + process it,
@@ -27254,6 +28453,8 @@ class Component extends DCLogic {
     clearTimeout(this._introKickTimer);
     clearTimeout(this._warmupIdleTimer);
     clearTimeout(this._warmupFallbackTimer);
+    clearTimeout(this._carSwapSafetyTimer);
+    clearTimeout(this._carSwapRevealTimer);
     clearInterval(this._perfReportTimer);
     this._hdriRequestId = (this._hdriRequestId || 0) + 1;
     if (this._raf) cancelAnimationFrame(this._raf);
@@ -27281,7 +28482,7 @@ class Component extends DCLogic {
       if (composer.dispose) composer.dispose();
     });
 
-    [this._rtSource, this._rtBlurred].forEach((target) => {
+    [this._rtSource, this._rtBlurred, this._warmupRt].forEach((target) => {
       if (target && target.dispose) target.dispose();
     });
     [this.scene, this._blurScene, this.overlayScene, this.vignetteScene].forEach((scene) => {

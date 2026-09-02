@@ -215,6 +215,82 @@ frame. Note `elementsFromPoint` will NOT show `.hv-wallpaper` — it is
 `pointer-events: none` — so it cannot tell you whether that layer is painting;
 bump its `z-index` above the canvas instead and look.
 
+## Anything that renders outside the loop inherits `autoClear = true`
+
+The main loop ends every frame with `renderer.autoClear = true` (it flips it
+off only around the overlay and vignette passes, and puts it straight back).
+Anything that renders from OUTSIDE the loop therefore starts by CLEARING the
+panel — and if what it then draws is the additive bloom/streak overlay, the
+frame is a full-screen flash. That is a one-frame flicker at 14-22 fps, i.e.
+50-70 ms, and it is plainly visible.
+
+`_warmupOverlayOnce` did exactly this. It rendered `overlayScene` to the
+DEFAULT framebuffer to force the overlay programs to compile, and it fires on
+both warm-up paths — the background one after boot, and the synchronous one
+that runs when a second body arrives. Symptom: "the screen flickers while
+something is loading", which reads like a shadow or mask problem and is not.
+
+Fix, and the pattern for any future warm-up: render into a **4x4 scratch render
+target** and restore the previous target. Shader compilation does not care
+about the target's size, so a compile-only render never needs the real one. The
+same applies to any diagnostic or capture you add — `_generateBlurredWheelTexture`
+already gets this right, saving and restoring both the target and the clear
+colour around its work.
+
+## Post-boot swaps are badged, not veiled; a new load path has to opt in
+
+Cold boot hides the car until it is finished (`_pendingIntro` ->
+`_finishLoading` -> intro). Post-boot loads had nothing, so a MODEL toggle
+showed the new body land in the scene, get drawn by the light warm-up, and then
+stand there wheel-less for as long as its stock rim took to fetch.
+
+`_beginCarSwap(kind)` / `_endCarSwap()` bracket that window. **They used to
+veil it** — canvas host faded to opacity 0, scene culled behind it, finished car
+faded back in. That fade was removed on request: over the light day scene it
+read as the whole screen washing out to white. So the rebuild IS visible again,
+by choice. What is left is `_endCarSwap`'s flush of the debounced blur capture
+(so a new rim never appears wearing the previous rim's smear) and the badge.
+The veil's CSS (`.hv-swapping` / `.hv-swap-in`) is still in the file; restoring
+it is re-adding the two class toggles in `_beginCarSwap` / `_endCarSwap`.
+
+**The badge is the only feedback a post-boot load has.** `.hv-boot-center`
+carries both it and the cold-boot spinner, keyed on `_carSwapLabel`:
+
+- no label (cold boot) — bare ring, flex-centred on the panel, unchanged.
+- label — small pill (`.hv-badge`, ring + `LOADING MODEL` / `LOADING WHEEL`)
+  placed by `_positionSwapBadge`.
+
+Two things that shipped wrong here, both of which look fine on a dark screen:
+
+- **The bare ring is invisible in day mode.** Its track is
+  `rgba(255,255,255,.14)` and the caption 62% white — styled for the dark boot
+  shell, then reused over a near-white day scene and, in mixed centerFill, over
+  an arbitrary Bing photo. Hence the pill's backing fill. Not
+  `backdrop-filter`: that buys nothing a flat fill does not, and costs a blur
+  of the live canvas on the MMI.
+- **Do not anchor the badge on the world point under the car's centre.** The
+  camera looks DOWN at the car, so `(fitCenter.x, bottom, fitCenter.z)`
+  projects onto the middle of the bodywork and the badge lands across the
+  doors. `_positionSwapBadge` projects all eight fit-box corners and takes the
+  lowest one on SCREEN, which is under the car from any angle. Nor is the panel
+  centre right — `_shellCameraTarget` shifts the car into whatever gap the
+  widget boards leave, so a centred indicator is neither on the car nor
+  obviously about it.
+
+**If you add a path that sets `loading: true` after boot, call
+`_beginCarSwap`.** The end is usually free — every normal path funnels through
+`_finishLoading`, which calls `_endCarSwap` — but a path that clears `loading`
+on its own must call it too. A 25 s safety timer clears the badge if one is
+missed, so the failure mode is a stuck badge for 25 s, not forever.
+
+The badge deliberately outlives `loading: false` (`bootCenterDisplay` also keys
+off `_carSwapLabel`, and `MIN_BADGE_MS` holds it 340 ms), so a cached swap
+still reads as a transition instead of a one-frame blink.
+
+One thing NOT to gate chrome visibility on: `s.loading`. That is what made the
+config dock close and re-open on every rim swap;
+`!(s.loading && !this._viewerReady)` is the test the rest of the chrome uses.
+
 ## Things that look like wins and are not
 
 - **More MSAA.** `MAX_SAMPLES` is 4 on this GPU. You are already there.
