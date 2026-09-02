@@ -21177,7 +21177,7 @@ class Component extends DCLogic {
         // Saturated rather than pastel: the material is toneMapped:false, so what
         // is set here is what lands on the panel, and the floor it sits on is
         // 236/255 -- a soft tint simply washes out against that.
-        badgeDriveColor: '#0000ff',
+        badgeDriveColor: '#007bff',
         badgeRegenColor: '#00ff3c',
         // Only the amber half of the HYBRID split now that the tank plate is gone.
         badgeFuelColor: '#ffa400',
@@ -22340,6 +22340,11 @@ class Component extends DCLogic {
       // green as well made it a green-tinted white under the key light.
       m.color.setHex(parseInt(
         String(tune.cellDarkAlbedo || '#04140b').replace('#', ''), 16));
+      // Remembered so the edge blink can drive the albedo down with the
+      // emissive. Dropping emissive alone only drains the green out of the
+      // cell -- measured at the trough it read (213, 222, 217), a pale grey,
+      // because the body colour underneath never moved.
+      m.userData.albedoBase = m.color.getHex();
       m.transparent = false;
       m.opacity = 1;
       m.metalness = 0;
@@ -22770,6 +22775,14 @@ class Component extends DCLogic {
             // could not be seen.
             mats[k].emissiveIntensity = isEdge
               ? base * boost : Math.max(base * 0.94, base * boost);
+          }
+          // Body colour follows the blink down as well, so the cell goes DARK
+          // rather than merely losing its green. Neighbours are restored every
+          // frame because the edge cell moves as the pack fills and drains.
+          const ab = mats[k].userData.albedoBase;
+          if (ab !== undefined) {
+            mats[k].color.setHex(ab);
+            if (isEdge) mats[k].color.multiplyScalar(Math.min(1, blink));
           }
         }
       }
