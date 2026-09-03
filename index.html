@@ -21763,6 +21763,9 @@ class Component extends DCLogic {
         wheelBoxLen: 0.82,      // along the car, a little longer than the tyre
         wheelBoxWide: 0.46,     // across the track, wider than the tyre
         wheelBoxBorderPx: 10,
+        // Half transparent, and that is the PEAK of the fade -- the outline
+        // spends most of the cycle fainter than this.
+        wheelBoxOpacity: 0.5,
         // White pulling, green recovering -- the two the eye already reads as
         // "driving" and "putting it back" everywhere else in this scene.
         wheelBoxDriveColor: '#ffffff',
@@ -22588,6 +22591,17 @@ class Component extends DCLogic {
       g.restore();
     }
     g.globalAlpha = 1;
+    if (spec.strokePx > 0 && spec.color) {
+      // A hard-edged outline, not a shadowed one. The halo was drawn with
+      // shadowBlur, which spreads past the canvas and got clipped square at the
+      // edges when it was brightest -- the crop shows up exactly at peak,
+      // because that is when the tail is still above zero when it runs out of
+      // canvas. A plain stroke has no tail to lose.
+      g.lineWidth = spec.strokePx;
+      g.strokeStyle = spec.color;
+      round(g);
+      g.stroke();
+    }
     if (spec.text) {
       g.font = 'bold ' + Math.round(h * 0.46) + 'px system-ui, "Segoe UI", sans-serif';
       g.textAlign = 'center';
@@ -22681,13 +22695,12 @@ class Component extends DCLogic {
         : null;
       let spec = null;
       if (base && isWheel) {
-        // Border and halo only: fill 0, no wording. The glow canvas already
-        // draws a band borderPx wide and softens it outward, so the outline and
-        // its blink are the same object -- nothing is painted on the pill at
-        // all, which is why its mesh stays hidden below.
+        // The rectangle IS the indicator: a stroked outline, no fill, no
+        // wording and deliberately no glowColor, so the halo canvas stays empty
+        // and the shape alone carries the fade.
         const c = dir < 0 ? tune.wheelBoxRegenColor : tune.wheelBoxDriveColor;
-        spec = { text: '', color: c, glowColor: c, fill: 0,
-                 fillAlpha: 1, plate: true, borderPx: tune.wheelBoxBorderPx };
+        spec = { text: '', color: c, fill: 0, fillAlpha: 1, plate: true,
+                 strokePx: tune.wheelBoxBorderPx };
       } else if (base && isBar) {
         // Colour, border and halo, no wording.
         spec = { text: '', color: base.color, color2: base.color2,
@@ -22708,17 +22721,17 @@ class Component extends DCLogic {
       }
       const sig = spec.text + '|' + (spec.color || '') + '|' + (spec.color2 || '')
         + '|' + (spec.glowColor || '') + '|' + (spec.textColor || '')
-        + '|' + spec.fill.toFixed(3);
+        + '|' + (spec.strokePx || 0) + '|' + spec.fill.toFixed(3);
       if (sig !== b.sig) {
         b.sig = sig;
         this._paintPowertrainBadge(b, spec);
       }
-      // A wheel box has nothing on its pill canvas -- it is all border and
-      // halo -- so the pill mesh is a wasted draw call.
-      b.mesh.visible = !isWheel;
+      b.mesh.visible = true;
+      // The wheel outline's own opacity is the fade, so the tick owns it.
       b.mesh.material.opacity = isWheel ? 0
         : (isBar ? tune.axleBarOpacity : tune.badgeOpacity);
-      if (b.glowMesh) b.glowMesh.visible = true;   // opacity is driven by the tick
+      // No halo on a wheel outline -- its glow canvas is empty anyway.
+      if (b.glowMesh) b.glowMesh.visible = !isWheel;
     });
   }
 
@@ -23518,9 +23531,16 @@ class Component extends DCLogic {
       if (gam !== 1) bp = Math.pow(bp, gam);
       const lo = tune.badgeGlowPulseLow;
       const bo = (lo + (1 - lo) * bp) * tune.axleBarGlowOpacity;
+      const wheelPeak = tune.wheelBoxOpacity;
       for (let i = 0; i < badges.length; i++) {
-        const gm = badges[i].glowMesh;
+        const b = badges[i];
+        const gm = b.glowMesh;
         if (gm && gm.visible) gm.material.opacity = bo;
+        // A wheel outline has no halo: the rectangle itself is what fades, so
+        // the same curve drives its own material instead.
+        if (b.mesh.visible && (b.id === 'frontWheel' || b.id === 'rearWheel')) {
+          b.mesh.material.opacity = (lo + (1 - lo) * bp) * wheelPeak;
+        }
       }
     }
 
