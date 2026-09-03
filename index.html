@@ -21407,7 +21407,20 @@ class Component extends DCLogic {
         // result too -- #00ff66 was rendering (104,255,207), a spring green.
         cellColor: '#00ff00',
         cellLitMin: 1.0,
-        cellEmptyColor: '#0a0d10',
+        // A discharged module. It is a dark box, but metalness 0.55 let it pick
+        // the studio environment straight back up and it read as light grey --
+        // brighter than the DIMMED lit cells beside it, which inverted the
+        // whole gauge. Near-dielectric and almost no env is what keeps an empty
+        // cell reading as empty.
+        // Taken to the floor of what is actually available. Measured through
+        // the lid and the ghost shell, a discharged module reads 122 at the old
+        // settings and 96 with a perfectly black one -- and 85 with the module
+        // deleted from the scene outright. Most of what is left is the lid, not
+        // the cell, so 97 is as dark as an empty cell can be made from here.
+        cellEmptyColor: '#03050a',
+        cellEmptyMetal: 0,
+        cellEmptyRough: 0.95,
+        cellEmptyEnv: 0,
         // A lit module is DARK with a green emissive, not green-painted. A
         // bright green albedo picks up the studio key light as white specular
         // and washes out no matter how the emissive is tuned: measured, a green
@@ -21615,7 +21628,11 @@ class Component extends DCLogic {
         // version of this chase was invisible while the edge blink, which
         // swings DOWN to 0.08, was obvious. Same lesson the blink learned
         // (see cellEdgeLow), arrived at twice.
-        cellChaseLow: 0.22,
+        // Matches cellEdgeLow, deliberately. At 0.22 the fill still rendered as
+        // a solid mid-green while the rim -- which starts lower -- visibly went
+        // out, so the chase read as "only the border is animating". The two
+        // floors have to agree for the whole cell to darken together.
+        cellChaseLow: 0.08,
         // Trail length in modules. Just over 1 keeps it to "this one, with the
         // last one still dying" rather than a bump spanning the whole pack.
         cellChaseTail: 1.25,
@@ -23145,11 +23162,11 @@ class Component extends DCLogic {
         m.toneMapped = true;      // an unlit cell is just a dark box again
         m.transparent = false;
         m.opacity = 1;
-        m.metalness = 0.55;
-        m.roughness = 0.92;
+        m.metalness = tune.cellEmptyMetal;
+        m.roughness = tune.cellEmptyRough;
         m.userData.glowBase = 0;
         m.emissiveIntensity = 0;
-        if (m.envMapIntensity !== undefined) m.envMapIntensity = 0.08;
+        if (m.envMapIntensity !== undefined) m.envMapIntensity = tune.cellEmptyEnv;
         continue;
       }
       m.emissive.copy(tone.color);
