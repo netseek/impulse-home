@@ -1160,8 +1160,16 @@ public final class MainActivity extends Activity {
                 // Remember the rail's real width from a moment it was reported, so
                 // slots still clear it while we have it hidden.
                 widestNavInsetPx = Math.max(widestNavInsetPx, insets.getSystemWindowInsetLeft());
-                r.left += insets.getSystemWindowInsetLeft();
-                r.top += insets.getSystemWindowInsetTop();
+                widestTopInsetPx = Math.max(widestTopInsetPx, insets.getSystemWindowInsetTop());
+                // Use the remembered values, not the live read. Opening a slot sets
+                // FLAG_LAYOUT_NO_LIMITS (see applyLauncherFocusPolicy), which makes
+                // this window full-bleed and drops these insets to 0 — so a rect
+                // measured before the launch and one measured after disagreed by the
+                // rail and header, and every consumer recomputed a slot the freeform
+                // window was no longer in. The bars are the MMI's own and draw over
+                // every app window whatever the insets say.
+                r.left += widestNavInsetPx;
+                r.top += widestTopInsetPx;
                 r.right -= insets.getSystemWindowInsetRight();
                 r.bottom -= insets.getSystemWindowInsetBottom();
             }
@@ -2974,6 +2982,8 @@ public final class MainActivity extends Activity {
     private int lastRaisedTaskId = -1;
     /** Largest left inset ever reported — the nav rail's width while it was up. */
     private int widestNavInsetPx;
+    /** Same, for the MMI header. No resource fallback exists for it. */
+    private int widestTopInsetPx;
     private int loggedNavReservePx = -1;
     private int loggedOverscanBottomPx = -1;
 
