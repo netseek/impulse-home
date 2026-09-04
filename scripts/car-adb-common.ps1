@@ -2,6 +2,7 @@
 # Talks to the car on the LAN. Do not use a Pi / Tailscale gateway.
 $CarPackage = 'com.havalh6.viewer'
 $CarActivity = 'com.havalh6.viewer/.MainActivity'
+$CarMediaListener = 'com.havalh6.viewer/com.havalh6.viewer.MediaNotificationListener'
 $CarSubnets = @('192.168.33', '192.168.1')
 $CarRoot = Split-Path -Parent $PSScriptRoot
 $CarHintFile = Join-Path $CarRoot '.car-adb-serial'
@@ -71,6 +72,34 @@ function Install-CarApk([string]$Adb, [string]$Serial, [string]$Apk) {
     throw "pm install failed: $($pm.Trim())"
   }
   if ($pm -match 'Failure \[') { throw "pm install failed: $($pm.Trim())" }
+}
+
+# The notification listener is what MediaSessionManager.getActiveSessions needs;
+# without it the media rail only ever sees Android Auto / USB via MediaCenter,
+# and anything with a real MediaSession (YouTube, Spotify, a browser) shows
+# nothing at all. The grant lives in a secure setting keyed on the component,
+# so an uninstall - which Install-CarApk does on a signature mismatch - drops
+# it silently. Re-assert it on every deploy rather than leaving it to a
+# remembered manual adb step.
+function Grant-CarMediaAccess([string]$Adb, [string]$Serial) {
+  $callerEap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $current = & $Adb -s $Serial shell settings get secure enabled_notification_listeners 2>&1 | Out-String
+  $ErrorActionPreference = $callerEap
+  if ($current -match [regex]::Escape($CarMediaListener)) {
+    Write-Host 'Notification listener already granted.'
+    return
+  }
+  Write-Host 'Granting notification listener access (media rail) ...'
+  $ErrorActionPreference = 'Continue'
+  $null = & $Adb -s $Serial shell cmd notification allow_listener $CarMediaListener 2>&1
+  $after = & $Adb -s $Serial shell settings get secure enabled_notification_listeners 2>&1 | Out-String
+  $ErrorActionPreference = $callerEap
+  if ($after -match [regex]::Escape($CarMediaListener)) {
+    Write-Host 'Notification listener granted.'
+  } else {
+    Write-Warning "Could not grant $CarMediaListener - the media rail will show ENABLE MEDIA ACCESS."
+  }
 }
 
 function Connect-Adb([string]$Adb, [string]$Target) {
