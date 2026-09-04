@@ -69,12 +69,31 @@ same music icon closes that window and restores the idle now-playing card.
 
 The idle media card reads the active `MediaSession` via a notification listener
 (session watch runs inside `MediaNotificationListener`). Without that access the
-column shows “Notification access required”; music apps still launch into the
-right slot. Enable once (re-run after each reinstall):
+column shows “ENABLE MEDIA ACCESS”; music apps still launch into the
+right slot.
+
+`scripts/deploy-car.ps1` re-asserts the grant on every deploy
+(`Grant-CarMediaAccess`), so normally there is nothing to do. Do it by hand only
+when installing some other way:
 
 ```powershell
 adb shell cmd notification allow_listener com.havalh6.viewer/com.havalh6.viewer.MediaNotificationListener
 ```
+
+**The grant is keyed on the component and an uninstall drops it**, and
+`Install-CarApk` uninstalls whenever the signature does not match. That is the
+whole failure mode behind “the media widget stopped showing anything”: MediaCenter
+still covers Android Auto and USB, so Android Auto keeps working while every app
+with a real `MediaSession` — YouTube, Spotify, a browser — goes blank. Check it
+with:
+
+```bash
+adb shell settings get secure enabled_notification_listeners
+```
+
+The viewer's component has to appear in that colon-separated list. A live
+session shows `controllers: 2` (the app plus the viewer) under
+`adb shell dumpsys media_session`.
 
 Then reopen the viewer. Transport buttons (prev / play-pause / next) talk to the
 session’s `MediaController`.

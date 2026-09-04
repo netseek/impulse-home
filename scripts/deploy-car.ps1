@@ -26,6 +26,7 @@ if (-not (Test-Path $Apk)) { throw "APK missing: $Apk" }
 $serial = Find-Car $Adb
 Save-CarSerial $serial
 Install-CarApk $Adb $serial $Apk
+Grant-CarMediaAccess $Adb $serial
 
 if (-not $NoLaunch) {
   Write-Host 'Launching viewer ...'
