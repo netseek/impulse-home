@@ -5185,10 +5185,15 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * No inset — the icon fills the plate edge to edge and {@code iconFrame}'s
-     * clipToOutline (see {@link #wrapLauncherIconPlate}) trims it to the plate's
-     * own rounded-square shape, instead of shrinking it away from the corners
-     * with padding.
+     * No inset. A normalized adaptive icon (see {@link #normalizeAdaptiveIcon})
+     * is always drawn back out as a fully opaque {@code sizePx x sizePx}
+     * bitmap — its background layer fills that square edge to edge regardless
+     * of {@link #adaptiveIconFillScale}, so {@code clipToOutline} in
+     * {@link #wrapLauncherIconPlate} only ever trims that bitmap's own corner
+     * pixels, exactly like a real launcher's mask. Insetting here instead
+     * shrinks the icon inside the frame and exposes the plate's own fill as a
+     * visible ring around every icon — tried once, and it read as a border
+     * around icons that never needed the padding.
      */
     private static float launcherIconInsetFrac() {
         return 0f;
@@ -6347,9 +6352,12 @@ public final class MainActivity extends Activity {
      * launcher crops away when it scales the icon to fill its slot. Drawn at
      * native scale instead, the glyph reads smaller than our plate and the
      * plate's own near-white background shows through the margin as a visible
-     * border around it. Scale the layers up by that same 108/72 = 1.5x here so
-     * the safe-zone content fills the target size edge to edge, matching what
-     * every real launcher does.
+     * border around it. {@link #adaptiveIconFillScale} scales the layers up to
+     * close that margin — a compliant icon exactly at the 72/108 safe zone
+     * gets ~1.23x, well under the naive 108/72 = 1.5x unwrap, and even a glyph
+     * padded far past the safe zone (a small centered mark like Chrome's) is
+     * capped at 1.6x so it can't balloon past the plate and get sliced by its
+     * rounded corners.
      * <p>
      * Only real installed apps (i.e. the car) hit this — the emulator's pinned
      * stubs draw our own bundled vector icons ({@code ic_gwm},
@@ -6397,10 +6405,10 @@ public final class MainActivity extends Activity {
      * target fill, the same idea a real launcher's icon normalizer uses.
      */
     private float adaptiveIconFillScale(Drawable fg) {
-        float targetFill = 0.98f;
+        float targetFill = 0.82f;
         float contentFrac = measureForegroundContentFraction(fg);
         float scale = targetFill / Math.max(contentFrac, 0.35f);
-        return Math.max(1f, Math.min(scale, 2.2f));
+        return Math.max(1f, Math.min(scale, 1.6f));
     }
 
     /** Fraction of the foreground layer's own canvas its opaque glyph occupies. */
