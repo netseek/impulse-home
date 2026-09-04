@@ -5216,9 +5216,9 @@ window.HavalSplash = (function () {
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL ANGLE</div>
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">LEFT ←  → RIGHT</span>
-        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelAngleLabel }}</span>
+        <span data-steer-label="1" style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelAngleLabel }}</span>
       </div>
-      <input type="range" min="-35" max="35" step="0.1" value="{{ wheelAngle }}" onChange="{{ onWheelAngle }}" onInput="{{ onWheelAngle }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
+      <input data-steer-range="1" type="range" min="-35" max="35" step="0.1" value="{{ wheelAngle }}" onChange="{{ onWheelAngle }}" onInput="{{ onWheelAngle }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
 
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">SPEED</div>
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
@@ -9232,8 +9232,7 @@ class Component extends DCLogic {
       if (Math.abs(kmh - this._carSpeedAtHold) < 0.5) return;
       this._motionSpeedHeldByUi = false;
     }
-    this._setMotionSpeed(kmh / CAR_SPEED_KMH_PER_UNIT);
-    this._syncEventCamera();
+    this._setMotionSpeed(kmh / CAR_SPEED_KMH_PER_UNIT);   // syncs the event camera
   }
 
   /**
@@ -9586,8 +9585,8 @@ class Component extends DCLogic {
       vignette: { ...s.vignette },
       grainEnabled: s.grainEnabled,
       lights: { ...s.lights },
-      motionSpeed: s.motionSpeed,
-      wheelAngle: s.wheelAngle,
+      motionSpeed: this._currentMotionSpeed(),
+      wheelAngle: this._currentWheelAngle(),
       carHeightOffset: s.carHeightOffset,
       doorFLOpen: s.doorFLOpen,
       doorFROpen: s.doorFROpen,
@@ -9657,8 +9656,8 @@ class Component extends DCLogic {
     if (typeof saved.hdriKey === 'string' && saved.hdriKey !== 'custom' && typeof this.loadHDRI === 'function') {
       try { this.loadHDRI(saved.hdriKey); } catch (e) {}
     }
-    if (typeof saved.wheelAngle === 'number') this._setWheelAngle(saved.wheelAngle);
-    if (typeof saved.motionSpeed === 'number') this._setMotionSpeed(saved.motionSpeed);
+    if (typeof saved.wheelAngle === 'number') this._setWheelAngle(saved.wheelAngle, true);
+    if (typeof saved.motionSpeed === 'number') this._setMotionSpeed(saved.motionSpeed, true);
     if (typeof saved.carHeightOffset === 'number') this._applyCarHeightOffset();
     const doorMap = { fl: 'doorFLOpen', fr: 'doorFROpen', rl: 'doorRLOpen', rr: 'doorRROpen' };
     Object.keys(doorMap).forEach((k) => {
@@ -9701,6 +9700,12 @@ class Component extends DCLogic {
 
   renderVals() {
     const s = this.state;
+    // Speed and steer stream at CAN rate and deliberately never commit (see
+    // "Live values"), so their state entries go stale by design. Read the live
+    // value here so any commit driven by something else still mounts the
+    // OVERRIDE sliders at the car's real position.
+    const liveSpeed = this._currentMotionSpeed();
+    const liveSteer = this._currentWheelAngle();
     // Computed once and reused below for stockRing/stockBg/stockCol/
     // stockThumb/stockImgOpacity/stockImgAnim, instead of each independently
     // recomputing the same key/lookup on every render.
@@ -10160,16 +10165,16 @@ class Component extends DCLogic {
       size22Col: s.wheelSizeInch === 22 ? '#4fd6e8' : 'rgba(255,255,255,.45)',
       wheelTintOverride: s.wheelTintOverride,
       onWheelTintOverride: (e) => this.onWheelTintOverride(e),
-      wheelAngle:      s.wheelAngle,
-      wheelAngleLabel: (Number(s.wheelAngle) || 0).toFixed(1) + '°',
+      wheelAngle:      liveSteer,
+      wheelAngleLabel: liveSteer.toFixed(1) + '°',
       onWheelAngle:  (e) => { this._holdMotionFromUi('steer'); this._setWheelAngle(parseFloat(e.target.value)); },
-      motionSpeed:      s.motionSpeed,
-      motionSpeedLabel: Math.round(Math.abs(s.motionSpeed) * 40) + ' km/h' + (s.motionSpeed < 0 ? ' ↩' : ''),
-      motionSpeedPct:   (Math.max(0, Math.min(1, ((s.motionSpeed || 0) + 5) / 10)) * 100).toFixed(2) + '%',
+      motionSpeed:      liveSpeed,
+      motionSpeedLabel: Math.round(Math.abs(liveSpeed) * 40) + ' km/h' + (liveSpeed < 0 ? ' ↩' : ''),
+      motionSpeedPct:   (Math.max(0, Math.min(1, (liveSpeed + 5) / 10)) * 100).toFixed(2) + '%',
       onMotionRangeDown: (e) => this._startMotionRange(e),
       onMotionSlower: () => this._nudgeMotionSpeed(-0.25),
       onMotionFaster: () => this._nudgeMotionSpeed(0.25),
-      onMotionStop:  () => { this._holdMotionFromUi('speed'); this._setMotionSpeed(0); },
+      onMotionStop:  () => { this._holdMotionFromUi('speed'); this._setMotionSpeed(0, true); },
       carHeightVal:   s.carHeightOffset * 100,
       carHeightLabel: (s.carHeightOffset * 100 > 0 ? '+' : '') + (s.carHeightOffset * 100).toFixed(1) + ' cm',
       onCarHeight:    (e) => this._setCarHeight(parseFloat(e.target.value)),
@@ -10972,9 +10977,12 @@ class Component extends DCLogic {
   }
 
   // ── Motion controls ─────────────────────────────────────────────────────
-  _setWheelAngle(deg) {
+  // Same contract as _setMotionSpeed: streams at CAN rate without committing.
+  // _applyWheelTransforms reads _currentWheelAngle(), and the OVERRIDE panel's
+  // readout is painted directly, so a live bus never re-renders the tree.
+  _setWheelAngle(deg, commitNow) {
     const v = Math.round((isFinite(deg) ? deg : 0) * 10) / 10;
-    this.setState({ wheelAngle: v });
+    this._liveSet('wheelAngle', v, { commit: !!commitNow });
     this._applyWheelTransforms();
   }
 
@@ -10994,7 +11002,7 @@ class Component extends DCLogic {
   _applyWheelTransforms(fromLoop) {
     if (!this.THREE || !this._allWheels) return;
     const THREE    = this.THREE;
-    const steerRad = (this.state.wheelAngle || 0) * Math.PI / 180;
+    const steerRad = this._currentWheelAngle() * Math.PI / 180;
     // Keep temporary math objects in one reusable bundle. This method runs on
     // every rendered motion frame, so allocating matrices/vectors here causes
     // avoidable garbage collection pauses on memory-constrained devices.
@@ -11214,16 +11222,131 @@ class Component extends DCLogic {
   // 0.005 units is 0.2 km/h (CAR_SPEED_KMH_PER_UNIT = 40) - far below anything
   // visible in wheel roll. A stop is always applied exactly, so the wheels
   // cannot be left spinning by the deadband.
+  // ── Live values ─────────────────────────────────────────────────────────
+  //
+  // A CAN signal that drives the 3D scene must NOT travel through setState.
+  // Measured on the car WHILE DRIVING (2026-09-04, HEV, mixed centerFill):
+  // one React commit is **197 ms p50 / 250 ms p90**, because renderVals() is a
+  // single 554-line expression that recomputes everything and React then
+  // reconciles the whole tree. At the 4 Hz the speed throttle already allowed,
+  // that is 3 x 197 ms = **56% of wall clock inside React**, which starved rAF
+  // to 4-5 fps while the actual WebGL submit was only 20.5 ms.
+  //
+  // The older comment below this block assumed a commit cost ~2 ms (one post-FX
+  // rebuild). That number came from the emulator. Throttling a 197 ms commit to
+  // 4 Hz does not save you; not committing at all does.
+  //
+  // So a live value:
+  //   - is written on EVERY bus frame into `this._live` — free, no React,
+  //     and the render loop reads it directly;
+  //   - paints any mounted readout STRAIGHT into the DOM via its declared
+  //     `paint()`, which is what _applyMotionRange has always done for drags;
+  //   - commits to React state only when explicitly asked (`{ commit: true }`),
+  //     i.e. a settle or a user gesture, never a stream frame.
+  //
+  // If you add a hot signal handler, route it through here instead of
+  // setState. `__diag()` reports commitsPerSec and the state keys driving them,
+  // so a regression announces itself rather than waiting for someone to notice
+  // the frame rate on a drive.
+  _liveDefine(key, def) {
+    if (!this._liveDefs) this._liveDefs = {};
+    if (!this._live) this._live = {};
+    this._liveDefs[key] = def || {};
+  }
+
+  /** Read a live value, falling back to React state before the first write. */
+  _liveGet(key, dflt) {
+    const v = this._live ? this._live[key] : undefined;
+    if (v !== undefined) return v;
+    const s = this.state ? this.state[key] : undefined;
+    return s === undefined ? dflt : s;
+  }
+
+  /**
+   * Write a live value. Always mirrors + paints; commits only when asked.
+   * Returns true if the value actually changed.
+   */
+  _liveSet(key, value, opts) {
+    if (!this._live) this._live = {};
+    if (!this._livePainted) this._livePainted = {};
+    const prev = this._live[key];
+    const changed = prev !== value;
+    // The live value is ALWAYS the exact latest — the render loop reads it and
+    // the wheels must not lag. Only the paint below is rate-limited.
+    this._live[key] = value;
+    this._liveWrites = (this._liveWrites || 0) + 1;
+
+    const def = this._liveDefs && this._liveDefs[key];
+    if (def && def.paint) {
+      // Compare against the last PAINTED value, not the last value: a slow
+      // creep of sub-epsilon steps must still eventually repaint, which a
+      // frame-to-frame delta would never notice.
+      const eps = typeof def.epsilon === 'number' ? def.epsilon : 0;
+      const shown = this._livePainted[key];
+      const worth = shown === undefined
+        || (typeof value === 'number' && typeof shown === 'number'
+          ? Math.abs(value - shown) >= eps
+          : shown !== value);
+      if (worth) {
+        this._livePainted[key] = value;
+        // A paint targets nodes that may not be mounted (the MOTION sliders
+        // live behind <sc-if overrideIsMotion>), so a miss is normal.
+        try { def.paint.call(this, value, prev); }
+        catch (e) { if (this._carTrace) console.warn('[live] paint failed for', key, e); }
+      }
+    }
+
+    if (opts && opts.commit && this.state && this.state[key] !== value) {
+      this._liveCommits = (this._liveCommits || 0) + 1;
+      this.setState({ [key]: value });
+    }
+    return changed;
+  }
+
+  /** Paint targets for the OVERRIDE -> MOTION panel. Mounted only while open. */
+  _installLiveDefs() {
+    this._liveDefine('motionSpeed', {
+      epsilon: 0.005,   // 0.2 km/h — below one digit of the label
+      paint(v) {
+        const label = document.querySelector('[data-speed-label]');
+        if (label) {
+          label.textContent = Math.round(Math.abs(v) * 40) + ' km/h' + (v < 0 ? ' ↩' : '');
+        }
+        const range = document.querySelector('.hv-range');
+        if (!range) return;
+        const pct = (Math.max(0, Math.min(1, (v + 5) / 10)) * 100).toFixed(2) + '%';
+        const fill = range.querySelector('.hv-range-fill');
+        const thumb = range.querySelector('.hv-range-thumb');
+        if (fill) fill.style.width = pct;
+        if (thumb) thumb.style.left = pct;
+      },
+    });
+    this._liveDefine('wheelAngle', {
+      epsilon: 0.05,    // half of the 0.1 deg the label shows
+      paint(v) {
+        const label = document.querySelector('[data-steer-label]');
+        if (label) label.textContent = (Number(v) || 0).toFixed(1) + '°';
+        const input = document.querySelector('[data-steer-range]');
+        // Do not fight the user's own drag on the native range input.
+        if (input && document.activeElement !== input) input.value = String(v);
+      },
+    });
+  }
+
   _currentMotionSpeed() {
-    return (typeof this._liveMotionSpeed === 'number')
-      ? this._liveMotionSpeed
-      : (this.state.motionSpeed || 0);
+    const v = this._liveGet('motionSpeed');
+    return typeof v === 'number' ? v : 0;
+  }
+
+  _currentWheelAngle() {
+    const v = this._liveGet('wheelAngle');
+    return typeof v === 'number' ? v : 0;
   }
 
   _nudgeMotionSpeed(delta) {
     this._holdMotionFromUi('speed');
     const v = Math.max(-5, Math.min(5, this._currentMotionSpeed() + delta));
-    this._setMotionSpeed(v);
+    this._setMotionSpeed(v, true);
   }
 
   _startMotionRange(e) {
@@ -11254,17 +11377,8 @@ class Component extends DCLogic {
     let u = (pt.clientX - rect.left) / Math.max(rect.width, 1);
     u = Math.max(0, Math.min(1, u));
     const v = Math.round((-5 + u * 10) / 0.05) * 0.05;
-    this._liveMotionSpeed = v;
-    const pct = (u * 100) + '%';
-    const fill = el.querySelector('.hv-range-fill');
-    const thumb = el.querySelector('.hv-range-thumb');
-    if (fill) fill.style.width = pct;
-    if (thumb) thumb.style.left = pct;
-    const label = el.parentNode && el.parentNode.parentNode
-      && el.parentNode.parentNode.querySelector('[data-speed-label]');
-    if (label) {
-      label.textContent = Math.round(Math.abs(v) * 40) + ' km/h' + (v < 0 ? ' ↩' : '');
-    }
+    this._liveSet('motionSpeed', v);
+    this.requestRender(2);
   }
 
   _endMotionRange() {
@@ -11280,46 +11394,37 @@ class Component extends DCLogic {
     }
     this._rangeDragging = false;
     this._motionRangeEl = null;
-    this.setState({ motionSpeed: this._currentMotionSpeed() });
+    this._liveSet('motionSpeed', this._currentMotionSpeed(), { commit: true });
   }
 
-  // The wheels do NOT need the state update — the render loop reads
-  // _liveMotionSpeed, which is set exactly here on every bus frame. setState
-  // exists only to move the km/h label, and it is expensive: it re-renders the
-  // whole React tree AND, via componentDidUpdate -> requestRender(), forces a
-  // post-FX rebuild. Measured on the emulator with vehicle_speed at 20 Hz:
-  // post-FX went from 0.2 rebuilds/sec (fully cached) to 16.8, with 18
-  // setStates/sec. On the MMI a post-FX rebuild is 2.0 ms against a 45-70 ms
-  // frame, so that is real.
+  // HISTORY, because this method has now been wrong twice in the same place:
+  // it used to setState on every bus frame, then (after an EMULATOR
+  // measurement) it kept the setState but throttled it to 4 Hz, on the theory
+  // that a commit cost ~2 ms of post-FX rebuild. Measured on the CAR while
+  // driving, a commit is 197 ms, so 4 Hz still burned 56% of the main thread
+  // and the frame rate sat at 4-5 fps. The throttle was treating the symptom.
+  // There is no safe rate at which to re-render this tree from the CAN bus.
   //
-  // The 0.005-unit (0.2 km/h) deadband below only ever protected a PARKED or
-  // dead-steady car; genuine driving crosses it on nearly every frame. So the
-  // state update is throttled as well, with a trailing update so the label
-  // always settles on the true value. Stops are still applied immediately.
-  _setMotionSpeed(speed) {
+  // Streams at CAN rate. Never commits: the render loop reads the live value,
+  // and the km/h readout + slider are painted straight into the DOM by the
+  // motionSpeed paint(). The old 4 Hz setState throttle is gone -- see the
+  // "Live values" block above for why throttling a 197 ms commit is not enough.
+  //
+  // `commitNow` is for the settle points a user gesture produces (drag end,
+  // nudge, STOP), where one commit is cheap and keeps state.motionSpeed honest
+  // for anything that reads it outside the live path.
+  _setMotionSpeed(speed, commitNow) {
     const v = isFinite(speed) ? speed : 0;
-    this._liveMotionSpeed = v;
-    const prev = this.state.motionSpeed;
-    const stopping = v === 0 && prev !== 0;
-    if (!this._rangeDragging && !stopping && typeof prev === 'number' && Math.abs(prev - v) < 0.005) return;
-    if (this._rangeDragging) return;
-  
-    const commit = () => {
-      this._motionStateTimer = null;
-      this._motionStateMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-      this.setState({ motionSpeed: this._liveMotionSpeed });
-      this._syncEventCamera();
-    };
-    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    const MIN_MS = 250;   // 4 Hz is plenty for a km/h readout
-    if (stopping || !this._motionStateMs || now - this._motionStateMs >= MIN_MS) {
-      if (this._motionStateTimer) { clearTimeout(this._motionStateTimer); this._motionStateTimer = null; }
-      commit();
+    if (this._rangeDragging && !commitNow) {
+      // A drag owns the DOM. Mirror the value (the loop still reads it) but do
+      // not paint, or a bus frame would yank the thumb out from under the
+      // finger. Matches what the old code did before its `if (dragging) return`.
+      if (!this._live) this._live = {};
+      this._live.motionSpeed = v;
       return;
     }
-    if (!this._motionStateTimer) {
-      this._motionStateTimer = setTimeout(commit, MIN_MS - (now - this._motionStateMs));
-    }
+    this._liveSet('motionSpeed', v, { commit: !!commitNow });
+    this._syncEventCamera();
   }
 
   // Raises/lowers the car body (glass, interior, lights, shared floor) while
@@ -15031,7 +15136,7 @@ class Component extends DCLogic {
       return false;
     }
     // Paths depend on steering — rebuild only when the wheel angle changes.
-    const wa = this.state.wheelAngle || 0;
+    const wa = this._currentWheelAngle();
     if (wa !== this._windSteerCached) this._rebuildWindPaths(wa);
     this._windGroup.visible = true;
 
@@ -20397,12 +20502,129 @@ class Component extends DCLogic {
       this._lastActiveMs  = 0;
       this._refineFrames  = 0;
       this._perf = { fps: 0, lastMs: 0, renderedFrames: 0, dpr: this._dprSteps[this._dprIdx] };
+      this._installLiveDefs();
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
         resTier: this._resTier,
         busPerSec: this._busRate || 0,
         speedPerSec: this._busSpeedRate || 0,
         rendersPerSec: this._setStateRate || 0,
+        // NOTE: mainCalls/mainTris are captured in the loop BEFORE the overlay
+        // passes overwrite renderer.info, because info.autoReset resets the
+        // counters on every render() call. Read them from here, never from
+        // renderer.info directly after a frame — that reports only the LAST
+        // pass (1 call / 2 triangles for the shadow-overlay quad) and reads as
+        // an empty scene. That cost a real detour once.
         drawCalls: this._perf.mainCalls || 0, triangles: this._perf.mainTris || 0 });
+
+      // ── __diag(): the standing answer to "why is the frame rate bad?" ─────
+      //
+      // Every number here was hand-rolled from devtools during the 2026-09-04
+      // drive that found the 197 ms React commit, and re-deriving them cost
+      // more than the fix did. They are permanent now. scripts/device-perf.mjs
+      // runs this against the car or the emulator and prints the table.
+      //
+      // The decisive pair is bareRafP50 vs timerLagP50:
+      //   both stalled  -> the MAIN THREAD is blocked (long tasks; look at
+      //                    commitMsP50 and the setState keys below)
+      //   only rAF      -> GPU / compositor back-pressure
+      //   rAF == 0 and timerLag ~= 1000 -> the WebView is `hidden` while still
+      //                    on the panel. Chromium kills rAF and clamps timers
+      //                    to 1 Hz. The render loop is rAF-only, so it stops.
+      //                    Happens when another app takes focus (a freeform
+      //                    window, the OEM scene manager).
+      window.__diag = (ms) => new Promise((resolve) => {
+        const dur = Math.max(2000, Number(ms) || 10000);
+        const t0 = performance.now();
+        const f0 = this._perf.renderedFrames || 0;
+
+        // Commit cost + attribution. Wrapping setState/componentDidUpdate is
+        // exactly what had to be done by hand; doing it here costs nothing
+        // until someone calls __diag().
+        const keys = {};
+        const commitMs = [];
+        let pendingAt = null;
+        const origSetState = this.setState;
+        const origCdu = this.componentDidUpdate;
+        this.setState = function (partial, cb) {
+          if (pendingAt == null) pendingAt = performance.now();
+          const ks = typeof partial === 'function' ? ['(fn)'] : Object.keys(partial || {});
+          for (const k of ks) keys[k] = (keys[k] || 0) + 1;
+          return origSetState.call(this, partial, cb);
+        };
+        this.componentDidUpdate = function (...a) {
+          const r = origCdu.apply(this, a);
+          if (pendingAt != null) { commitMs.push(performance.now() - pendingAt); pendingAt = null; }
+          return r;
+        };
+
+        // An EMPTY rAF and a zero-delay timer, measured independently of any
+        // rendering we do. This is what separates "our frame is expensive"
+        // from "we are never given a frame".
+        const rafGaps = []; const timerLag = [];
+        let last = performance.now(); let ticks = 0; let go = true;
+        const bare = () => {
+          if (!go) return;
+          const n = performance.now();
+          if (ticks > 2) rafGaps.push(n - last);
+          last = n; ticks++;
+          requestAnimationFrame(bare);
+        };
+        requestAnimationFrame(bare);
+        const spin = () => {
+          if (!go) return;
+          const s0 = performance.now();
+          setTimeout(() => { timerLag.push(performance.now() - s0); spin(); }, 0);
+        };
+        spin();
+
+        const pf0 = this._perf.postFxRenders || 0;
+        const ph0 = this._perf.postFxCacheHits || 0;
+        const lw0 = this._liveWrites || 0;
+        const lc0 = this._liveCommits || 0;
+
+        setTimeout(() => {
+          go = false;
+          this.setState = origSetState;
+          this.componentDidUpdate = origCdu;
+          const dt = (performance.now() - t0) / 1000;
+          const q = (a, p) => {
+            if (!a.length) return null;
+            const v = [...a].sort((x, y) => x - y);
+            return +v[Math.min(v.length - 1, Math.floor(v.length * p))].toFixed(1);
+          };
+          const total = commitMs.reduce((s2, d) => s2 + d, 0);
+          resolve({
+            windowSec: +dt.toFixed(1),
+            realFps: +(((this._perf.renderedFrames || 0) - f0) / dt).toFixed(2),
+            submitMsP50: this._perf.submitMs,
+            // Main-thread health
+            bareRafP50: q(rafGaps, 0.5), bareRafP90: q(rafGaps, 0.9),
+            bareRafPerSec: +(ticks / dt).toFixed(1),
+            timerLagP50: q(timerLag, 0.5), timerLagP90: q(timerLag, 0.9),
+            // React
+            commits: commitMs.length,
+            commitsPerSec: +(commitMs.length / dt).toFixed(2),
+            commitMsP50: q(commitMs, 0.5), commitMsP90: q(commitMs, 0.9),
+            pctWallInCommits: +(100 * total / (dt * 1000)).toFixed(1),
+            setStateKeys: Object.fromEntries(
+              Object.entries(keys).sort((a, b) => b[1] - a[1]).slice(0, 12)),
+            // Live-value seam: writes should be many, commits near zero.
+            liveWritesPerSec: +(((this._liveWrites || 0) - lw0) / dt).toFixed(1),
+            liveCommitsPerSec: +(((this._liveCommits || 0) - lc0) / dt).toFixed(2),
+            // Scene
+            postFxRebuildsPerSec: +(((this._perf.postFxRenders || 0) - pf0) / dt).toFixed(2),
+            postFxCacheHitsPerSec: +(((this._perf.postFxCacheHits || 0) - ph0) / dt).toFixed(2),
+            drawCalls: this._perf.mainCalls || 0,
+            triangles: this._perf.mainTris || 0,
+            dpr: this._perf.dpr, resTier: this._resTier,
+            busPerSec: this._busRate || 0, speedPerSec: this._busSpeedRate || 0,
+            // Environment
+            visibility: document.visibilityState,
+            rafAlive: ticks > 2,
+            centerFill: this.state.centerFill, nightMode: !!this.state.nightMode,
+          });
+        }, dur);
+      });
       // Experimental mixed 3D + wallpaper: __centerFill() reads, __centerFill('mixed') sets.
       window.__centerFill = (mode) => {
         if (mode == null) return this._normalizeCenterFill(this.state.centerFill);
@@ -21270,7 +21492,7 @@ class Component extends DCLogic {
           this._camBusyMs = _nowRes;
           if (this._graphRaf) this._applyGraphLoopGate();
         }
-        const carMoving = Math.abs((this.state && this.state.motionSpeed) || 0) > 0;
+        const carMoving = Math.abs(this._currentMotionSpeed()) > 0;
         const allowReduce = this._resReductionAllowed(cameraBusy, carMoving);
         if (needRender) {
           this._lastActiveMs = _nowRes;
@@ -21352,6 +21574,15 @@ class Component extends DCLogic {
         const dir = this.dirLight;
         if (nightPools && sc) sc.layers.disable(0);
         renderer.autoClear = true;
+        // info.autoReset wipes the counters on EVERY render() call, so the
+        // capture below has to happen while this pass is still the last one.
+        // It used to sit after the night-pool block, which ends with the
+        // 1-draw-call shadow-overlay pass -- so at night __perf() reported
+        // "1 call / 2 triangles" and read as an empty scene. That invalidated
+        // an x-ray A/B before anyone noticed. Accumulate instead: reset once
+        // here, let every scene pass add to it, and read after 1c.
+        renderer.info.autoReset = false;
+        renderer.info.reset();
         renderer.render(scene, camera);
         // 1b) Night ground pools — SpotLights + nightFloor on POOL_LAYER only.
         if (nightPools) {
@@ -21375,9 +21606,12 @@ class Component extends DCLogic {
           renderer.autoClear = true;
           if (sc) sc.layers.enable(0);
         }
-        // Capture main-scene cost before the overlay passes overwrite info.render
+        // Total across every scene pass (main + night pools + shadow overlay),
+        // captured before the overlay quads add themselves. autoReset goes back
+        // on so nothing downstream inherits a frozen counter.
         this._perf.mainCalls = renderer.info.render.calls;
         this._perf.mainTris  = renderer.info.render.triangles;
+        renderer.info.autoReset = true;
 
         if ((anyLight || xrayBloom) && this.bloomComposer) {
           if (this._postFxDirty) {
@@ -26638,7 +26872,7 @@ class Component extends DCLogic {
     if (this.contactShadow) this.contactShadow.visible = show;
     if (this.floorMesh) this.floorMesh.visible = show && !(this.state && this.state.nightMode) && !mixedFill;
     if (this.nightFloor) this.nightFloor.visible = show && !!(this.state && this.state.nightMode);
-    if (this._windGroup) this._windGroup.visible = show && !!(this.state && this.state.motionSpeed);
+    if (this._windGroup) this._windGroup.visible = show && !!this._currentMotionSpeed();
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (show && !wasShow) {

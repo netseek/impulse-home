@@ -22,6 +22,31 @@ Both of these turned out to be wrong when finally measured:
 
 ### How to measure
 
+**Start here — one command, against the car or the emulator:**
+
+```bash
+npm run car:perf
+```
+
+`scripts/device-perf.mjs` runs `window.__diag()` and prints the table plus a
+verdict line. Use `--sec 20`, `--json` (for diffing A/B runs), `--watch`.
+
+`__diag(ms)` is the standing battery. It exists because the investigation that
+found the 197 ms React commit had to hand-roll five throwaway CDP probes to
+reach a one-line answer. **Read these as PAIRS, never in isolation** — every
+wrong turn in that session came from one number read alone:
+
+| Signal | Reading |
+|---|---|
+| `bareRafP50` **and** `timerLagP50` both high | main thread blocked by long tasks — look at `commitMsP50` and `setStateKeys` |
+| `bareRafP50` high, `timerLagP50` low | GPU / compositor bound — resolution, post-FX, other apps on the panel |
+| `bareRafPerSec: 0`, `timerLagP50 ≈ 1000` | the WebView is **hidden** — see below. Not a rendering problem at all |
+| `liveCommitsPerSec` > ~1 | a hot signal is passing `{ commit: true }` through the `_live` seam |
+
+`bareRafP50` is an **empty** rAF callback and `timerLagP50` a `setTimeout(0)`.
+Neither touches WebGL, which is exactly what makes them able to tell "our frame
+is expensive" apart from "we are never given a frame".
+
 `window.__perf()` exposes `fps`, `submitMs`, `cadenceMs`, `drawCalls`,
 `triangles`, `resTier`, `busPerSec`, `speedPerSec`, `rendersPerSec`. A debug
 build ships it to logcat every 2 s:
@@ -30,9 +55,14 @@ build ships it to logcat every 2 s:
 adb logcat -s H6Perf
 ```
 
+**`drawCalls` / `triangles` come from `_perf.mainCalls`, captured inside the
+loop before the overlay passes.** Do not read `renderer.info` yourself after a
+frame: `info.autoReset` resets it on every `render()`, so you get only the last
+pass — 1 call and 2 triangles for the shadow-overlay quad, which reads as an
+empty scene and has cost a real detour.
+
 For A/B work, drive the camera from devtools over CDP rather than by hand.
-The harness used for every number in this file is in the scratchpad pattern:
-forward `webview_devtools_remote_<pid>`, then `Runtime.evaluate`.
+The harness used for every number in this file is `scripts/device-cdp.mjs`.
 
 **Benchmark hygiene, learned the hard way:**
 
@@ -47,6 +77,25 @@ forward `webview_devtools_remote_<pid>`, then `Runtime.evaluate`.
   emergency resolution tier at a real ~19 fps.
 - **Check the window is actually on screen.** A collapsed or backgrounded viewer
   renders at 1x1, every frame is instant, and every derived number is garbage.
+- **This unit drifts ~2x over MINUTES, so sequential arms cannot be compared.**
+  Measured 2026-09-04: the same scene, same DPR, same tier, camera driven
+  identically, read 19-26 fps in one run and 31-39 fps eight minutes later. Two
+  back-to-back repeats of one arm differed by 11%. A "before" and an "after"
+  taken minutes apart are measuring the drift, not the change.
+  **Interleave the arms** (A,B,A,B...) and compare PAIRED deltas. A real effect
+  shows the same sign in every pair; the magnitude will still wander. This
+  produced one false finding before it was caught ("the wallpaper costs 7.4
+  ms/frame" — it costs nothing measurable) and explains an inexplicable
+  "pinning DPR halved the frame rate" result from the same session.
+
+- **The GPU is not the bottleneck, and `gl.finish()` proves it in one line.**
+  There is no `EXT_disjoint_timer_query` on this driver, so time `gl.finish()`
+  instead: it blocks until the GPU queue drains, so its duration IS the GPU
+  backlog. Measured **0.1 ms p50 across eight independent arms** — the GPU is
+  idle, waiting for us. Frame cost here is CPU-side: GL driver command
+  translation and Chromium compositing, both of which land in `(program)` in a
+  CPU profile (62% of wall). Before optimising anything for fill rate, re-run
+  that check; "it is fill-rate bound" has now been wrong twice in this file.
 
 ## Known performance characteristics
 
@@ -57,6 +106,13 @@ forward `webview_devtools_remote_<pid>`, then `Runtime.evaluate`.
 | All post-FX (bloom + streak) | +2.0 ms/frame |
 | MSAA | 4x, and `MAX_SAMPLES` is 4 — already at the driver ceiling |
 | Main pass | ~210 draw calls, ~374k triangles |
+
+**Measured 2026-09-04: the WebGL canvas costs ~19 ms/frame of MAIN-THREAD
+time** (median of 4 interleaved pairs, all positive: 11.5, 7.3, 19.0, 23.7),
+while the GPU backlog stays at 0.1 ms. With the canvas hidden the page runs
+at 16.6-25.7 ms/frame. So that 19 ms is CPU-side driver + compositing, not
+GPU execution — which is why moving the render off the main thread is worth
+considering, and why cutting resolution is not the lever it looks like.
 
 Resolution is close to linear in pixel count, so it IS fill-rate sensitive —
 but the frame also carries ~20-25 ms of `submitMs`, so neither axis alone
@@ -73,25 +129,57 @@ explains it. Measure the specific change; do not reason from this table.
   every hot signal handler with a change threshold — `_setMotionSpeed` had none
   and re-rendered per `vehicle_speed` frame; `_applyCarSteering` has a 0.5 deg
   deadband for exactly this reason.
-- **A change threshold is not enough on its own for speed.** `_setMotionSpeed`'s
-  0.005-unit (0.2 km/h) deadband only ever protected a parked or dead-steady
-  car; real driving crosses it on nearly every bus frame, so it went back to
-  setState at CAN rate — and each one is `componentDidUpdate` -> `requestRender()`
-  -> `_postFxDirty`, i.e. the whole React tree plus a post-FX rebuild. Simulated
-  at 20 Hz on the emulator:
+- **A hot CAN signal must never reach `setState` at all — throttling it is not
+  enough.** This one was got wrong twice, and the second time only because the
+  first fix was measured on the emulator.
 
-  | | postFX rebuilds/s | postFX cache hits/s | setState/s |
+  A React commit in this app costs **197 ms p50 / 250 ms p90, measured on the
+  car while driving** (2026-09-04, HEV, mixed centerFill). `renderVals()` is a
+  single ~554-line return expression that recomputes everything, and React then
+  reconciles the whole tree. So the arithmetic that matters is:
+
+  | | commits/s | ms each | share of wall clock |
   |---|---|---|---|
-  | rolling, quiet bus | 0.2 | 57.5 | 0 |
-  | rolling, speed @20 Hz | 16.8 | 38.1 | 18 |
-  | after the throttle | 5.0 | 54.5 | 5 |
+  | `_setMotionSpeed`, throttled to 4 Hz | 3.0 | 197 | **56%** |
+  | after moving it off React | 0 | — | 0% |
 
-  The wheels never needed it: the render loop reads `_liveMotionSpeed`, which is
-  written exactly on every bus frame. Only the km/h label needs the state, so the
-  setState is throttled to 4 Hz with a trailing commit (stops still apply
-  immediately). **If you add a signal handler that calls setState, throttle it
-  the same way** — the render cost is invisible parked and only bites on a
-  moving car.
+  At 56% of the main thread the render loop cannot get frames: rAF and
+  `setTimeout(0)` were both delayed ~210-250 ms and the panel sat at **4-5 fps
+  while `submitMs` was only 20.5 ms**. The renderer was never the problem.
+
+  The earlier note here claimed a commit cost ~2 ms (one post-FX rebuild) and
+  concluded that throttling to 4 Hz was sufficient. That 2 ms came from the
+  emulator. **There is no safe rate at which to re-render this tree from the
+  bus.**
+
+  The fix is the `_live*` seam (`_liveDefine` / `_liveSet` / `_liveGet`, next to
+  `_currentMotionSpeed`). A live value is written on every bus frame into
+  `this._live` — free, and what the render loop already read — and anything
+  visible is painted straight into the DOM by its declared `paint()`. React is
+  committed to only at settle points (`{ commit: true }`): drag end, nudge,
+  STOP, restore-from-saved.
+
+  **If you add a signal handler, route it through `_liveSet`, not `setState`.**
+  `__diag()` reports `commitsPerSec`, `commitMsP50` and the state keys driving
+  them, plus `liveCommitsPerSec` — which should stay near zero. The cost is
+  invisible parked and only bites on a moving car, so a driveway test will not
+  find this for you.
+
+- **A hidden WebView is still on the panel, and its render loop is dead.** The
+  loop is driven only by `requestAnimationFrame`. When another app takes window
+  focus — a freeform app in a launcher slot, the OEM scene manager — Android
+  marks our window not-visible, the WebView sets `document.visibilityState =
+  'hidden'`, and **Chromium stops servicing rAF entirely and clamps timers to
+  1 Hz**. Measured on the car: `bareRafPerSec: 0`, `timerLagP50: 999.7 ms`,
+  while the car was plainly still drawn on screen.
+
+  This reads exactly like a rendering problem and is not one. `__diag()` reports
+  `visibility` and `rafAlive` so it can be told apart in one look. Note
+  `applyLauncherFocusPolicy()` (MainActivity) *deliberately* drops focus while a
+  freeform overlay is open, so this is reachable by design, not only by
+  accident. `componentDidUpdate` already documents the same hazard for the
+  splash hand-off, which is why that path has a timeout floor rather than
+  trusting rAF.
 
 - **`resScaleMode: 'off'` does not stop everything adapting.** It stops the
   MOTION tier reducing, but `_maybeAdaptDPR` still walks `_dprIdx` on its own,
