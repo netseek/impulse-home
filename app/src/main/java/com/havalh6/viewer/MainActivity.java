@@ -84,6 +84,14 @@ public final class MainActivity extends Activity {
     private static final String ACTION_SET_TASK_BOUNDS =
             "br.com.redesurftank.havalshisuku.ACTION_SET_TASK_BOUNDS";
 
+    /** Commands exposed to data-driven bottom cards. Keep this deliberately narrow. */
+    private static final java.util.Set<String> BOTTOM_CARD_ACTIONS =
+            new java.util.HashSet<>(java.util.Arrays.asList(
+                    "ac", "addWidget", "openDesktopStudio", "previousDesktop", "nextDesktop",
+                    "toggleDockMode", "showLauncher", "showCards", "cycleWidgetTheme",
+                    "toggleCenterFill", "configureWallpaper", "closePanel"
+            ));
+
     /** Names shared with Impulse's API gate. */
     private static final class ImpulseApi {
         static final String EXTRA_CALLER = "caller";
@@ -114,7 +122,6 @@ public final class MainActivity extends Activity {
     /** Vehicle commands that require a 0-100 opening level. */
     private static final java.util.Set<String> VEHICLE_LEVEL_COMMANDS =
             new java.util.HashSet<>(java.util.Arrays.asList(
-                    "set_windows_level",
                     "set_sunroof_level",
                     "set_curtain_level"
             ));
@@ -845,7 +852,11 @@ public final class MainActivity extends Activity {
     private View layoutCardsSurfaceChip;
     private android.widget.TextView activeDesktopTitle;
     private android.widget.TextView activeDesktopMeta;
+    private android.widget.LinearLayout quickCardsRow;
     private final List<View> quickCardViews = new ArrayList<>();
+    private final List<BottomCardDescriptor> bottomCards = new ArrayList<>();
+    private boolean bottomCardsConfigured;
+    private int bottomCardLimit;
     private android.widget.TextView quickClimateValue;
     private android.widget.TextView quickConsumptionValue;
     private android.widget.TextView quickMediaTitle;
@@ -853,6 +864,7 @@ public final class MainActivity extends Activity {
     private String quickMediaPackage = "";
     private boolean quickMediaPlaying;
     private String dockSurfaceMode = DOCK_SURFACE_LAUNCHER;
+    private boolean desktopStudioOpen;
     private String activeDesktopName = "Desktop";
     private int activeDesktopIndex;
     private int desktopCount = 1;
@@ -874,6 +886,20 @@ public final class MainActivity extends Activity {
     private boolean dockUiLight = false;
     private boolean dockFpsOn = false;
     private boolean dockXrayOn = false;
+
+    private static final class BottomCardDescriptor {
+        final String id;
+        final String title;
+        final String value;
+        final String action;
+
+        BottomCardDescriptor(String id, String title, String value, String action) {
+            this.id = id;
+            this.title = title;
+            this.value = value;
+            this.action = action;
+        }
+    }
     /** Content shown to the right of the mode drawer: apps | layout | config. */
     private String stripMode = "apps";
     private boolean drawerExpanded;
@@ -4313,7 +4339,7 @@ public final class MainActivity extends Activity {
             maybeRestoreAppsOnlySlots();
             return;
         }
-        if (stripContainer != null) stripContainer.setVisibility(View.VISIBLE);
+        if (stripContainer != null) stripContainer.setVisibility(desktopStudioOpen ? View.GONE : View.VISIBLE);
         if (launcherItems.isEmpty()) return;
 
         float density = getResources().getDisplayMetrics().density;
@@ -4955,44 +4981,26 @@ public final class MainActivity extends Activity {
         lp.leftMargin = Math.round(8 * density);
         drawer.setLayoutParams(lp);
 
+        // One clear dock affordance: Apps reveals the launcher; pressing it
+        // again returns to the glanceable Cards surface. Layout and settings
+        // deliberately live in the Workspace card, not a second hidden menu.
         modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
                 dockGlyphApps(iconPx, dockGlyphColor(true)),
-                null, v -> setDrawerExpanded(true));
-        modeCollapsedIcon = (android.widget.ImageView) modeCollapsedBtn.findViewWithTag("modeIcon");
-        drawer.addView(modeCollapsedBtn);
-
-        modeAppsBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
-                dockGlyphApps(iconPx, dockGlyphColor(true)),
-                "Apps", v -> selectStripMode(STRIP_APPS));
-        modeLayoutBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
-                dockGlyphLayout(iconPx, dockGlyphColor(true)),
-                "Layout", v -> selectStripMode(STRIP_LAYOUT));
-        modeConfigBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
-                dockGlyphConfig(iconPx, dockGlyphColor(true)),
-                "Settings", v -> selectStripMode(STRIP_CONFIG));
-        modeSurfaceBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
-                dockGlyphCards(iconPx, dockGlyphColor(true)),
-                "Cards", v -> {
+                "Apps", v -> {
                     toggleDockSurface();
                     selectStripMode(STRIP_APPS);
                 });
-        modeSurfaceBtn.setContentDescription("Switch bottom surface");
-        modeSurfaceBtn.setOnLongClickListener(v -> {
+        modeCollapsedBtn.setContentDescription("Show or hide app launcher");
+        modeCollapsedBtn.setOnLongClickListener(v -> {
             callViewerDock("openDesktopStudio");
             return true;
         });
-        modeAppsBtn.setVisibility(View.GONE);
-        modeLayoutBtn.setVisibility(View.GONE);
-        modeConfigBtn.setVisibility(View.GONE);
-        modeSurfaceBtn.setVisibility(View.GONE);
-        setModeCellLabelVisible(modeAppsBtn, false);
-        setModeCellLabelVisible(modeLayoutBtn, false);
-        setModeCellLabelVisible(modeConfigBtn, false);
-        setModeCellLabelVisible(modeSurfaceBtn, false);
-        drawer.addView(modeAppsBtn);
-        drawer.addView(modeLayoutBtn);
-        drawer.addView(modeConfigBtn);
-        drawer.addView(modeSurfaceBtn);
+        modeCollapsedIcon = (android.widget.ImageView) modeCollapsedBtn.findViewWithTag("modeIcon");
+        drawer.addView(modeCollapsedBtn);
+        modeAppsBtn = null;
+        modeLayoutBtn = null;
+        modeConfigBtn = null;
+        modeSurfaceBtn = null;
         return drawer;
     }
 
@@ -5542,7 +5550,7 @@ public final class MainActivity extends Activity {
         if (modeCollapsedBtn != null) {
             modeCollapsedBtn.setVisibility(View.VISIBLE);
             setModeCellSelected(modeCollapsedBtn, true);
-            setModeCellLabelVisible(modeCollapsedBtn, false);
+            setModeCellLabelVisible(modeCollapsedBtn, true);
         }
         if (modeAppsBtn != null) {
             modeAppsBtn.setVisibility(View.GONE);
@@ -5755,6 +5763,51 @@ public final class MainActivity extends Activity {
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
         row.setPadding(Math.round(10 * density), Math.round(12 * density),
                 Math.round(24 * density), Math.round(12 * density));
+        quickCardsRow = row;
+        populateQuickCardsRow(row, density);
+
+        scroll.addView(row, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        return scroll;
+    }
+
+    private void populateQuickCardsRow(android.widget.LinearLayout row, float density) {
+        row.removeAllViews();
+        quickCardViews.clear();
+        quickClimateValue = null;
+        quickConsumptionValue = null;
+        quickMediaTitle = null;
+        quickMediaPlayPause = null;
+
+        // Cards mode starts with one predictable Workspace card. It exposes
+        // both routes users need after hiding the launcher: get back to apps
+        // or organize desktops/cards. This replaces the old Apps/Layout/
+        // Settings/Launcher drawer quartet.
+        row.addView(makeQuickWorkspaceCard(density));
+
+        if (bottomCardsConfigured) {
+            int count = Math.min(bottomCards.size(), bottomCardLimit);
+            for (int i = 0; i < count; i++) {
+                final BottomCardDescriptor descriptor = bottomCards.get(i);
+                // Media is the one rail card with meaningful immediate controls.
+                // Keep its transport surface when users reorder/select it instead
+                // of reducing it to a generic navigation tile.
+                if ("media".equals(descriptor.id)) {
+                    View media = makeQuickMediaCard(density);
+                    media.setTag("bottomCard:" + descriptor.id);
+                    row.addView(media);
+                    continue;
+                }
+                int widthDp = descriptor.value.length() > 28 ? 238 : 190;
+                View card = makeQuickTextCard(density, widthDp, descriptor.title, descriptor.value,
+                        descriptor.title + (descriptor.value.isEmpty() ? "" : ": " + descriptor.value),
+                        v -> callViewerDock(descriptor.action));
+                card.setTag("bottomCard:" + descriptor.id);
+                row.addView(card);
+            }
+            return;
+        }
 
         View climate = makeQuickTextCard(density, 218, "CLIMATE",
                 "— °C  ·  Fan —  ·  AUTO —",
@@ -5770,19 +5823,72 @@ public final class MainActivity extends Activity {
         row.addView(consumption);
 
         row.addView(makeQuickMediaCard(density));
+    }
 
-        View customize = makeQuickTextCard(density, 158, "CUSTOMIZE", "Desktop Studio",
-                "Customize cards and desktops", v -> callViewerDock("openDesktopStudio"));
-        customize.setOnLongClickListener(v -> {
-            callViewerDock("openDesktopStudio");
-            return true;
-        });
-        row.addView(customize);
+    private View makeQuickWorkspaceCard(float density) {
+        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int pad = Math.round(14 * density);
+        card.setPadding(pad, Math.round(8 * density), pad, Math.round(8 * density));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(226 * density), Math.round(74 * density));
+        lp.rightMargin = Math.round(10 * density);
+        card.setLayoutParams(lp);
+        card.setContentDescription("Workspace: apps and layout manager");
+        card.setBackground(makeFrostStateDrawable(true, density));
+        card.setElevation(3f * density);
+        quickCardViews.add(card);
 
-        scroll.addView(row, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
-        return scroll;
+        android.widget.TextView heading = new android.widget.TextView(this);
+        heading.setText("WORKSPACE");
+        heading.setTag("frostSecondary");
+        heading.setTextSize(9.5f);
+        heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        heading.setLetterSpacing(0.11f);
+        card.addView(heading);
+
+        android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
+        actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        actions.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        android.widget.LinearLayout.LayoutParams actionsLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
+        actionsLp.topMargin = Math.round(3 * density);
+        actions.setLayoutParams(actionsLp);
+        actions.addView(makeWorkspaceAction(density, "APPS", "Show app launcher",
+                v -> chooseDockSurface(DOCK_SURFACE_LAUNCHER, true)));
+        actions.addView(makeWorkspaceAction(density, "ORGANIZE", "Open Desktop Studio",
+                v -> callViewerDock("openDesktopStudio")));
+        card.addView(actions);
+        return card;
+    }
+
+    private View makeWorkspaceAction(float density, String label, String description,
+            View.OnClickListener click) {
+        android.widget.TextView button = new android.widget.TextView(this);
+        button.setText(label);
+        button.setContentDescription(description);
+        button.setGravity(android.view.Gravity.CENTER);
+        button.setTextSize(8.5f);
+        button.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        button.setLetterSpacing(0.07f);
+        button.setClickable(true);
+        button.setFocusable(true);
+        button.setOnClickListener(click);
+        button.setTextColor(dockGlyphColor(true));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(8f * density);
+        bg.setColor(dockUiLight ? 0x55FFFFFF : 0x22FFFFFF);
+        bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0x8A));
+        button.setBackground(bg);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                0, Math.round(28 * density), 1f);
+        lp.rightMargin = Math.round(5 * density);
+        button.setLayoutParams(lp);
+        return button;
     }
 
     private View makeQuickTextCard(float density, int widthDp, String title, String value,
@@ -6803,6 +6909,12 @@ public final class MainActivity extends Activity {
                 if (name != null && !name.trim().isEmpty()) activeDesktopName = name.trim();
             }
             if (o.has("desktopCount")) desktopCount = Math.max(1, o.optInt("desktopCount", 1));
+            if (o.has("desktopStudioOpen")) {
+                desktopStudioOpen = o.optBoolean("desktopStudioOpen", false);
+                if (stripContainer != null && launcherRevealed) {
+                    stripContainer.setVisibility(desktopStudioOpen ? View.GONE : View.VISIBLE);
+                }
+            }
             if (o.has("activeDesktopIndex")) {
                 activeDesktopIndex = Math.max(0, o.optInt("activeDesktopIndex", 0));
             }
@@ -6812,6 +6924,7 @@ public final class MainActivity extends Activity {
                     dockAccentColor = parseCssColor(accent.trim(), dockAccentColor);
                 }
             }
+            applyBottomCardsConfiguration(o);
             applyQuickCardIndicators(o);
             if (o.has("model")) {
                 String v = o.optString("model", dockModelLabel);
@@ -6856,6 +6969,80 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Applies the optional web-owned Cards surface contract. Absence intentionally restores the
+     * native fallback cards so older web bundles and partial indicator payloads remain usable.
+     */
+    private void applyBottomCardsConfiguration(JSONObject root) {
+        if (root == null || !root.has("bottomCards")) {
+            if (!bottomCardsConfigured) return;
+            bottomCardsConfigured = false;
+            bottomCardLimit = 0;
+            bottomCards.clear();
+            rebuildQuickCardsRow();
+            return;
+        }
+
+        JSONArray rawCards = root.optJSONArray("bottomCards");
+        if (rawCards == null) {
+            if (!bottomCardsConfigured && bottomCards.isEmpty()) return;
+            bottomCardsConfigured = false;
+            bottomCardLimit = 0;
+            bottomCards.clear();
+            rebuildQuickCardsRow();
+            return;
+        }
+
+        List<BottomCardDescriptor> next = new ArrayList<>();
+        int max = Math.min(rawCards.length(), 8);
+        for (int i = 0; i < max; i++) {
+            JSONObject raw = rawCards.optJSONObject(i);
+            if (raw == null) continue;
+            String id = cleanBottomCardText(raw.optString("id", ""), 32);
+            String title = cleanBottomCardText(raw.optString("title", ""), 24);
+            String value = cleanBottomCardText(raw.optString("value", ""), 48);
+            String action = raw.optString("action", "").trim();
+            if (id.isEmpty() || title.isEmpty() || !BOTTOM_CARD_ACTIONS.contains(action)) continue;
+            next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value, action));
+        }
+
+        int requested = root.has("bottomCardLimit")
+                ? root.optInt("bottomCardLimit", next.size()) : next.size();
+        int nextLimit = Math.max(0, Math.min(requested, next.size()));
+        if (bottomCardsConfigured && bottomCardLimit == nextLimit
+                && sameBottomCards(bottomCards, next)) return;
+
+        bottomCardsConfigured = true;
+        bottomCardLimit = nextLimit;
+        bottomCards.clear();
+        bottomCards.addAll(next);
+        rebuildQuickCardsRow();
+    }
+
+    private String cleanBottomCardText(String value, int maxLength) {
+        String clean = cleanIndicator(value);
+        return clean.length() > maxLength ? clean.substring(0, maxLength) : clean;
+    }
+
+    private boolean sameBottomCards(List<BottomCardDescriptor> a, List<BottomCardDescriptor> b) {
+        if (a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) {
+            BottomCardDescriptor left = a.get(i);
+            BottomCardDescriptor right = b.get(i);
+            if (!left.id.equals(right.id) || !left.title.equals(right.title)
+                    || !left.value.equals(right.value) || !left.action.equals(right.action)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void rebuildQuickCardsRow() {
+        if (quickCardsRow == null) return;
+        populateQuickCardsRow(quickCardsRow, getResources().getDisplayMetrics().density);
+        refreshQuickCardsTheme();
+    }
+
     private void applyQuickCardIndicators(JSONObject o) {
         if (o == null) return;
         String climate = cleanIndicator(o.optString("climateSummary", ""));
@@ -6878,7 +7065,9 @@ public final class MainActivity extends Activity {
             }
             climate = b.toString();
         }
-        if (!climate.isEmpty() && quickClimateValue != null) quickClimateValue.setText(climate);
+        if (quickClimateValue != null && o.has("climateSummary")) {
+            quickClimateValue.setText(climate.isEmpty() ? "— °C  ·  Fan —  ·  AUTO —" : climate);
+        }
 
         String consumption = cleanIndicator(o.optString("consumptionSummary", ""));
         Object rawConsumption = o.opt("consumption");
@@ -6891,8 +7080,8 @@ public final class MainActivity extends Activity {
                 && rawConsumption != JSONObject.NULL) {
             consumption = cleanIndicator(String.valueOf(rawConsumption));
         }
-        if (!consumption.isEmpty() && quickConsumptionValue != null) {
-            quickConsumptionValue.setText(consumption);
+        if (quickConsumptionValue != null && o.has("consumptionSummary")) {
+            quickConsumptionValue.setText(consumption.isEmpty() ? "—" : consumption);
         }
     }
 

@@ -35,6 +35,19 @@ gradle assembleRelease
 The build copies `index.html`, `support.js`, `vendor/`, and production files
 under `assets/` into the APK. It intentionally excludes `assets/_backup/`.
 
+## Browser preview
+
+For a fast desktop smoke test, serve the source from the repository root (the
+browser blocks some `file://` module requests):
+
+```powershell
+node -e "require('http').createServer((q,s)=>require('fs').createReadStream('index.html').pipe(s)).listen(8765,'127.0.0.1')"
+```
+
+Open `http://localhost:8765/?nosplash=1&debug=1` in Chrome or Edge. The debug
+flag shows the full shell preview, including widget boards; omit it for the
+car-first home view.
+
 ## Emulator deploy
 
 Local deploy always uses the **`Haval` AVD** (head-unit profile, 1920×720). Do
@@ -47,6 +60,18 @@ freeform behaviour will not match the MMI.
 
 The script starts the Haval AVD if it is not already running, waits for boot,
 then installs and launches. Reinstall only: `-SkipBuild`.
+
+## Desktop and card smoke test
+
+After the opening animation, long-press an empty margin beside the workspace to
+open **Desktop Studio**. Its Layout tab changes the card canvas between 2×2,
+3×2 and 3×3 slots; the Cards tab configures the lower rail's card set, order
+and visible-card limit. Each virtual desktop keeps those choices separately.
+
+To change desktops, swipe horizontally in either **inset side gutter** (a thin
+empty strip just inside the display edge, above the lower rail). The inset is
+intentional: it leaves Android's outer-edge Back/Home gesture untouched. The
+desktop switcher arrows remain available for precise selection.
 
 ## Freeform popups (emulator)
 
@@ -213,12 +238,12 @@ injection.
 - `open_windows`, `close_windows`, `open_sunroof`, `close_sunroof`, `open_curtain`, `close_curtain`
 - Legacy-compatible: `toggle_windows`, `toggle_sunroof`, `toggle_curtain`, `toggle_doors_all`, `toggle_trunk`
 
-For precise controls it may instead be `set_windows_level`,
-`set_sunroof_level`, or `set_curtain_level`, with `value` as an integer from
-`0` through `100`. The viewer debounces drag updates but flushes the final value
-on release. Impulse should perform its normal safety/interlock checks, then
-publish the resulting status through the usual telemetry path; that telemetry is
-the authoritative state for the renderer.
+For precise roof controls it may instead be `set_sunroof_level` or
+`set_curtain_level`, with `value` as an integer from `0` through `100`. The
+viewer debounces drag updates but flushes the final value on release. Impulse
+should perform its normal safety/interlock checks, then publish the resulting
+status through the usual telemetry path; that telemetry is the authoritative
+state for the renderer.
 
 ### Freeform task ids (keeping popups on top)
 

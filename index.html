@@ -4021,28 +4021,60 @@ window.HavalSplash = (function () {
     .hv-desktop-switcher {
       position: absolute;
       z-index: 74;
-      top: max(8px, var(--hv-safe-top, 22px));
+      top: max(4px, var(--hv-safe-top, 22px));
       left: 50%;
       transform: translateX(-50%);
-      height: 44px;
-      padding: 0 4px;
+      height: 32px;
+      padding: 0 2px;
       align-items: center;
       gap: 2px;
       border: 1px solid var(--hv-frost-edge);
-      border-radius: 16px;
+      border-radius: 12px;
       color: var(--hv-widget-fg, #edf5fa);
       user-select: none;
     }
     .hv-desktop-switcher button { color: inherit; border: 0; background: transparent; cursor: pointer; }
-    .hv-desktop-arrow { width: 44px; height: 44px; border-radius: 13px !important; font: 300 25px/1 system-ui; }
+    .hv-desktop-arrow { width: 32px; height: 32px; border-radius: 10px !important; font: 300 21px/1 system-ui; }
     .hv-desktop-arrow:active { background: rgba(255,255,255,.09) !important; transform: scale(.94); }
-    .hv-desktop-current { min-width: 122px; height: 44px; padding: 3px 10px 2px; display: flex; align-items: baseline; justify-content: center; gap: 9px; }
-    .hv-desktop-name { max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; font-size: 13px; letter-spacing: .015em; }
-    .hv-desktop-count { font: 8px/1 'Space Mono', monospace; opacity: .52; }
-    .hv-desktop-dots { display: flex; align-items: center; justify-content: center; min-height: 44px; gap: 1px; }
-    .hv-desktop-dot { position: relative; width: 24px; height: 44px; padding: 0; }
-    .hv-desktop-dot::after { content: ''; position: absolute; width: 5px; height: 5px; border-radius: 5px; background: currentColor; opacity: .28; left: 50%; top: 50%; transform: translate(-50%,-50%); transition: width .2s ease, opacity .2s ease, background .2s ease; }
-    .hv-desktop-dot.on::after { width: 18px; opacity: 1; background: var(--hv-accent); }
+    .hv-desktop-current { min-width: 92px; height: 32px; padding: 2px 7px; display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+    .hv-desktop-name { max-width: 86px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; font-size: 11px; letter-spacing: .015em; }
+    .hv-desktop-count { font: 7px/1 'Space Mono', monospace; opacity: .52; }
+    .hv-desktop-dots { display: flex; align-items: center; justify-content: center; min-height: 32px; gap: 0; }
+    .hv-desktop-dot { position: relative; width: 18px; height: 32px; padding: 0; }
+    .hv-desktop-dot::after { content: ''; position: absolute; width: 4px; height: 4px; border-radius: 5px; background: currentColor; opacity: .28; left: 50%; top: 50%; transform: translate(-50%,-50%); transition: width .2s ease, opacity .2s ease, background .2s ease; }
+    .hv-desktop-dot.on::after { width: 13px; opacity: 1; background: var(--hv-accent); }
+    /* Keep a small system-gesture margin on both outer edges. These invisible
+       gutters are intentionally inset: the Android back/home gesture must
+       remain available even when a widget fills an entire board. */
+    .hv-desktop-swipe-edge { position:absolute; z-index:31; top:96px; bottom:calc(var(--hv-launcher-bottom, 60px) + 118px); width:44px; opacity:0; touch-action:pan-y; }
+    .hv-desktop-swipe-edge.left { left:52px; } .hv-desktop-swipe-edge.right { right:52px; }
+
+    /* Persistent 2D controls for the 3D stage. They are intentionally placed
+       from the stage bounds, rather than pinned to a changing mesh hotspot:
+       driver muscle-memory should survive every camera angle. */
+    .hv-car-stage-action {
+      position: absolute;
+      z-index: 34;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border: 1px solid var(--hv-frost-edge);
+      border-radius: 14px;
+      background-color: var(--hv-frost-fill);
+      background-image: var(--hv-frost-noise);
+      color: var(--hv-widget-fg, #edf5fa);
+      box-shadow: inset 0 1px 0 var(--hv-frost-inner), var(--hv-frost-shadow);
+      -webkit-backdrop-filter: blur(14px) saturate(1.18);
+      backdrop-filter: blur(14px) saturate(1.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .hv-car-stage-action:active { transform: scale(.94); border-color: var(--hv-accent); color: var(--hv-accent); }
+    .hv-car-stage-action svg { width: 18px; height: 18px; }
+    .hv-car-stage-action .hv-stage-dots { display: grid; grid-template-columns: repeat(3, 4px); gap: 3px; }
+    .hv-car-stage-action .hv-stage-dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; display: block; }
 
     .hv-desktop-studio-backdrop {
       position: absolute; inset: 0; z-index: 82; pointer-events: none; opacity: 0;
@@ -4182,7 +4214,7 @@ window.HavalSplash = (function () {
     </div>
   </div>
 
-  <div class="hv-desktop-switcher" style="display: {{ desktopSwitcherDisplay }};" role="navigation" aria-label="Virtual desktops">
+  <div class="hv-desktop-switcher" style="display: {{ desktopSwitcherDisplay }}; {{ desktopSwitcherStyle }}" role="navigation" aria-label="Virtual desktops">
     <button type="button" class="hv-desktop-arrow" onClick="{{ previousDesktop }}" aria-label="Previous desktop" title="Previous desktop · Ctrl+Left">‹</button>
     <button type="button" class="hv-desktop-current" onClick="{{ openDesktopStudio }}" aria-label="Open Desktop Studio">
       <span class="hv-desktop-name">{{ desktopName }}</span>
@@ -4195,6 +4227,14 @@ window.HavalSplash = (function () {
     </div>
     <button type="button" class="hv-desktop-arrow" onClick="{{ nextDesktop }}" aria-label="Next desktop" title="Next desktop · Ctrl+Right">›</button>
   </div>
+
+  <!-- Stable, 2D corners of the model stage: aesthetics left, camera right. -->
+  <button type="button" class="hv-car-stage-action" style="display: {{ stageAestheticDisplay }}; {{ stageAestheticStyle }}" onClick="{{ openStageAesthetics }}" title="Vehicle appearance" aria-label="Vehicle appearance">
+    <span class="hv-stage-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+  </button>
+  <button type="button" class="hv-car-stage-action" style="display: {{ stageCameraDisplay }}; {{ stageCameraStyle }}" onClick="{{ openStageCamera }}" title="Camera views" aria-label="Camera views">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+  </button>
 
   <!-- top chrome: desktop config toolbar only — Android uses the launcher drawer -->
   <div class="hv-chrome" style="color: {{ labelColor }}; transition: color 0.6s ease;">
@@ -4297,8 +4337,10 @@ window.HavalSplash = (function () {
   </div>
 
   <!-- widget boards occupy the same rects as freeform app slots -->
+  <div class="hv-desktop-swipe-edge left" style="display: {{ desktopSwipeEdgesDisplay }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}"></div>
+  <div class="hv-desktop-swipe-edge right" style="display: {{ desktopSwipeEdgesDisplay }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}"></div>
   <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};">
-    <div class="hv-widget-grid {{ leftGridPickClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: repeat(2, 1fr);" onTouchStart="{{ onLeftBoardHoldStart }}" onTouchEnd="{{ onLeftBoardHoldEnd }}" onTouchCancel="{{ onLeftBoardHoldCancel }}" onMouseDown="{{ onLeftBoardHoldStart }}" onMouseUp="{{ onLeftBoardHoldEnd }}" onMouseLeave="{{ onLeftBoardHoldCancel }}">
+    <div class="hv-widget-grid {{ leftGridPickClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: {{ leftGridRows }};" onTouchStart="{{ onLeftBoardHoldStart }}" onTouchEnd="{{ onLeftBoardHoldEnd }}" onTouchCancel="{{ onLeftBoardHoldCancel }}" onMouseDown="{{ onLeftBoardHoldStart }}" onMouseUp="{{ onLeftBoardHoldEnd }}" onMouseLeave="{{ onLeftBoardHoldCancel }}">
       <sc-for list="{{ leftSlotCells }}" as="sc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ sc.cls }}" style="{{ sc.gridStyle }}" onClick="{{ sc.onClick }}"></button>
       </sc-for>
@@ -4511,7 +4553,7 @@ window.HavalSplash = (function () {
   </div>
 
   <div class="hv-widget-board" style="display: {{ rightBoardDisplay }}; left: {{ rightBoardLeft }}; top: {{ rightBoardTop }}; width: {{ rightBoardWidth }}; height: {{ rightBoardHeight }};">
-    <div class="hv-widget-grid {{ rightGridPickClass }}" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: repeat(2, 1fr);" onTouchStart="{{ onRightBoardHoldStart }}" onTouchEnd="{{ onRightBoardHoldEnd }}" onTouchCancel="{{ onRightBoardHoldCancel }}" onMouseDown="{{ onRightBoardHoldStart }}" onMouseUp="{{ onRightBoardHoldEnd }}" onMouseLeave="{{ onRightBoardHoldCancel }}">
+    <div class="hv-widget-grid {{ rightGridPickClass }}" style="grid-template-columns: {{ rightGridCols }}; grid-template-rows: {{ rightGridRows }};" onTouchStart="{{ onRightBoardHoldStart }}" onTouchEnd="{{ onRightBoardHoldEnd }}" onTouchCancel="{{ onRightBoardHoldCancel }}" onMouseDown="{{ onRightBoardHoldStart }}" onMouseUp="{{ onRightBoardHoldEnd }}" onMouseLeave="{{ onRightBoardHoldCancel }}">
       <sc-for list="{{ rightSlotCells }}" as="sc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ sc.cls }}" style="{{ sc.gridStyle }}" onClick="{{ sc.onClick }}"></button>
       </sc-for>
@@ -4954,6 +4996,20 @@ window.HavalSplash = (function () {
           <button type="button" class="{{ studioRatio21Class }}" onClick="{{ studioSetRatio21 }}">2 : 1</button>
           <button type="button" class="{{ studioRatio12Class }}" onClick="{{ studioSetRatio12 }}">1 : 2</button>
         </div>
+        <div class="hv-studio-label">WIDGET CANVAS</div>
+        <div class="hv-studio-chip-row">
+          <sc-for list="{{ studioGridPresets }}" as="gp" hint-placeholder-count="3">
+            <button type="button" class="{{ gp.cls }}" onClick="{{ gp.onClick }}" title="{{ gp.detail }}">{{ gp.label }}</button>
+          </sc-for>
+        </div>
+        <div class="hv-studio-note">Full size uses every slot in the selected canvas. Dense layouts fit more cards; comfortable layouts keep controls larger.</div>
+        <div class="hv-studio-label">PANEL CONTENT</div>
+        <div class="hv-studio-chip-row">
+          <button type="button" class="{{ studioLeftAppClass }}" onClick="{{ studioSetLeftApp }}">Left app</button>
+          <button type="button" class="{{ studioLeftWidgetsClass }}" onClick="{{ studioSetLeftWidgets }}">Left widgets</button>
+          <button type="button" class="{{ studioRightAppClass }}" onClick="{{ studioSetRightApp }}" disabled="{{ studioRightDisabled }}">Right app</button>
+          <button type="button" class="{{ studioRightWidgetsClass }}" onClick="{{ studioSetRightWidgets }}" disabled="{{ studioRightDisabled }}">Right widgets</button>
+        </div>
       </sc-if>
       <sc-if value="{{ studioIsAppearance }}" hint-placeholder-val="{{ false }}">
         <div class="hv-studio-label">CARD THEME</div>
@@ -4973,6 +5029,23 @@ window.HavalSplash = (function () {
       <sc-if value="{{ studioIsCards }}" hint-placeholder-val="{{ false }}">
         <div class="hv-studio-copy"><strong>Glanceable cards.</strong><span>Add media, power flow, vehicle modes, climate or live analytics to any open slot.</span></div>
         <button type="button" class="hv-studio-primary" onClick="{{ studioOpenCards }}">Add a card</button>
+        <div class="hv-studio-label">BOTTOM CARD RAIL</div>
+        <div class="hv-studio-chip-row">
+          <sc-for list="{{ studioBottomLimitItems }}" as="bl" hint-placeholder-count="4">
+            <button type="button" class="{{ bl.cls }}" onClick="{{ bl.onClick }}">{{ bl.label }}</button>
+          </sc-for>
+        </div>
+        <div class="hv-studio-actions">
+          <sc-for list="{{ studioBottomCardItems }}" as="bc" hint-placeholder-count="5">
+            <button type="button" class="{{ bc.cls }}" onClick="{{ bc.onToggle }}" title="{{ bc.title }}"><span>{{ bc.label }}</span><small> · {{ bc.state }}</small></button>
+          </sc-for>
+        </div>
+        <div class="hv-studio-chip-row">
+          <sc-for list="{{ studioBottomOrderItems }}" as="bo" hint-placeholder-count="4">
+            <button type="button" class="{{ bo.cls }}" onClick="{{ bo.onLeft }}" title="Move left">‹ {{ bo.label }}</button>
+            <button type="button" class="{{ bo.cls }}" onClick="{{ bo.onRight }}" title="Move right">{{ bo.label }} ›</button>
+          </sc-for>
+        </div>
         <div class="hv-studio-note">Long-press a card to move, resize, configure or remove it.</div>
       </sc-if>
       <sc-if value="{{ studioIsAdvanced }}" hint-placeholder-val="{{ false }}">
@@ -5583,7 +5656,7 @@ const CAR_POWER_DEMO_PACKED = [
 ];
 const CAR_WIDGET_HOLD_MS = 500;
 const H6_DESKTOPS_KEY = 'h6_desktops_v1';
-const H6_DESKTOPS_VERSION = 1;
+const H6_DESKTOPS_VERSION = 2;
 const H6_MAX_DESKTOPS = 6;
 const H6_DESKTOP_ACCENTS = [
   { key: 'cyan', color: '#63d9e7' },
@@ -5598,6 +5671,18 @@ const H6_GRAPH_PERIODS = [
   { key: '5min', label: '5 min' }, { key: '30min', label: '30 min' },
   { key: 'hour', label: 'Hour' }, { key: 'day', label: 'Day' },
   { key: 'month', label: 'Month' }, { key: 'year', label: 'Year' },
+];
+const H6_GRID_PRESETS = [
+  { key: 'comfortable', label: 'Comfort', detail: '2 × 2 slots', cols: 2, rows: 2 },
+  { key: 'balanced', label: 'Balanced', detail: '3 × 2 slots', cols: 3, rows: 2 },
+  { key: 'dense', label: 'Dense', detail: '3 × 3 slots', cols: 3, rows: 3 },
+];
+const H6_BOTTOM_CARD_CATALOG = [
+  { id: 'climate', title: 'Climate', action: 'ac' },
+  { id: 'consumption', title: 'Consumption', action: 'addWidget' },
+  { id: 'media', title: 'Media', action: 'addWidget' },
+  { id: 'desktops', title: 'Desktops', action: 'openDesktopStudio' },
+  { id: 'customize', title: 'Customize', action: 'openDesktopStudio' },
 ];
 
 /**
@@ -7187,6 +7272,20 @@ class Component extends DCLogic {
     this._graphValues[key] = n;
     this._graphLiveKeys[key] = true;
     this._graphAnyLive = true;
+    if (key === 'evTrip' || key === 'fuelAvg') this._scheduleConsumptionRefresh();
+  }
+
+  _scheduleConsumptionRefresh() {
+    if (this._consumptionRefreshTimer || this._unmounted) return;
+    const mode = this._shellMode || this.state.shellMode || 'triple';
+    if (!this._hasWidgetType(mode, 'consumption')) return;
+    this._consumptionRefreshTimer = setTimeout(() => {
+      this._consumptionRefreshTimer = 0;
+      if (this._unmounted) return;
+      this.setState((s) => ({ consumptionRev: (s.consumptionRev || 0) + 1 }), () => {
+        this._syncDockIndicators();
+      });
+    }, 220);
   }
 
   _pushGraphSample(key, now, value) {
@@ -7533,28 +7632,28 @@ class Component extends DCLogic {
   _widgetResizeSizes(item, mode) {
     const m = mode || this.state.shellMode || 'triple';
     const cols = this._gridColsForMode(m);
-    const cat = this._widgetCatalog()[item.type] || { sizes: [] };
+    const rows = this._gridRowsForMode(m);
     const cw = Number(item.w) || 2;
     const ch = Number(item.h) || 1;
-    return (cat.sizes || [])
-      .filter((sz) => sz[0] <= cols)
+    return this._widgetSizes(item.type, m)
       .filter((sz) => sz[0] !== cw || sz[1] !== ch)
-      .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, m, item.id));
+      .filter((sz) => this._sizeFitsAnySide(sz[0], sz[1], cols, rows, m, item.id));
   }
 
   _widgetCanMove(item, fromSide, mode) {
     const m = mode || this.state.shellMode || 'triple';
     const cols = this._gridColsForMode(m);
+    const rows = this._gridRowsForMode(m);
     const sides = this._widgetPlaceSides(m);
     const w = Number(item.w) || 2;
     const h = Number(item.h) || 1;
     for (let i = 0; i < sides.length; i++) {
       const side = sides[i];
       const items = this._board(side, m).items || [];
-      for (let y = 0; y < 2; y++) {
+      for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
           if (side === fromSide && x === item.x && y === item.y) continue;
-          if (this._fits(items, cols, x, y, w, h, item.id)) return true;
+          if (this._fits(items, cols, x, y, w, h, item.id, rows)) return true;
         }
       }
     }
@@ -15702,8 +15801,10 @@ class Component extends DCLogic {
     return [
       { id: 'roof', glyph: '', title: 'Sunroof & curtain',
         menu: [
-          { label: 'TOGGLE SUNROOF', cmd: 'toggle_sunroof' },
-          { label: 'TOGGLE CURTAIN', cmd: 'toggle_curtain' },
+          { label: 'OPEN SUNROOF', cmd: 'open_sunroof' },
+          { label: 'CLOSE SUNROOF', cmd: 'close_sunroof' },
+          { label: 'OPEN CURTAIN', cmd: 'open_curtain' },
+          { label: 'CLOSE CURTAIN', cmd: 'close_curtain' },
           { label: 'LEVELS…', action: 'roof_levels' },
         ] },
       { id: 'windows', glyph: '', title: 'Windows & doors',
@@ -16236,7 +16337,7 @@ class Component extends DCLogic {
 
   _vehicleOpeningCommand(kind) {
     const commands = {
-      windows: { set: 'set_windows_level', open: 'open_windows', close: 'close_windows' },
+      windows: { open: 'open_windows', close: 'close_windows' },
       sunroof: { set: 'set_sunroof_level', open: 'open_sunroof', close: 'close_sunroof' },
       curtain: { set: 'set_curtain_level', open: 'open_curtain', close: 'close_curtain' },
     };
@@ -16265,7 +16366,7 @@ class Component extends DCLogic {
 
   _queueVehicleOpeningLevel(kind, raw) {
     const command = this._vehicleOpeningCommand(kind);
-    if (!command) return;
+    if (!command || !command.set) return;
     const level = this._applyVehicleOpeningLevel(kind, raw);
     if (!this._vehicleOpeningTimers) this._vehicleOpeningTimers = {};
     this._clearVehicleOpeningLevel(kind);
@@ -16285,7 +16386,7 @@ class Component extends DCLogic {
 
   _flushVehicleOpeningLevel(kind) {
     const command = this._vehicleOpeningCommand(kind);
-    if (!command || !this._vehicleOpeningTimers || this._vehicleOpeningTimers[kind] == null) return;
+    if (!command || !command.set || !this._vehicleOpeningTimers || this._vehicleOpeningTimers[kind] == null) return;
     const timer = this._vehicleOpeningTimers[kind];
     clearTimeout(timer);
     delete this._vehicleOpeningTimers[kind];
@@ -16295,7 +16396,7 @@ class Component extends DCLogic {
 
   _setVehicleOpeningLevel(kind, raw) {
     const command = this._vehicleOpeningCommand(kind);
-    if (!command) return;
+    if (!command || !command.set) return;
     this._clearVehicleOpeningLevel(kind);
     const level = this._applyVehicleOpeningLevel(kind, raw);
     this._sendCarCommand(command.set, String(level), { skipLocal: true });
@@ -16312,7 +16413,6 @@ class Component extends DCLogic {
   _applyCarCommandLocally(cmd, value) {
     const s = this.state || {};
     const levels = {
-      set_windows_level: 'windows',
       set_sunroof_level: 'sunroof',
       set_curtain_level: 'curtain',
     };
@@ -27628,6 +27728,43 @@ class Component extends DCLogic {
     return H6_DESKTOP_ACCENTS[0];
   }
 
+  _defaultDesktopGrid() {
+    return {
+      triple: { cols: 2, rows: 2 },
+      appCar: { cols: 3, rows: 2 },
+      appsOnly: { cols: 2, rows: 2 },
+    };
+  }
+
+  _normalizeDesktopGrid(raw) {
+    const base = this._defaultDesktopGrid();
+    const src = raw && typeof raw === 'object' ? raw : {};
+    Object.keys(base).forEach((mode) => {
+      const candidate = src[mode] || {};
+      const cols = parseInt(candidate.cols, 10);
+      const rows = parseInt(candidate.rows, 10);
+      if (cols >= 2 && cols <= 3) base[mode].cols = cols;
+      if (rows >= 2 && rows <= 3) base[mode].rows = rows;
+    });
+    return base;
+  }
+
+  _defaultBottomCards() {
+    return ['climate', 'consumption', 'media', 'customize'];
+  }
+
+  _normalizeBottomCards(raw) {
+    const allowed = H6_BOTTOM_CARD_CATALOG.map((card) => card.id);
+    const seen = {};
+    const next = Array.isArray(raw) ? raw.filter((id) => {
+      const key = String(id || '');
+      if (seen[key] || allowed.indexOf(key) < 0) return false;
+      seen[key] = true;
+      return true;
+    }) : [];
+    return next.length ? next.slice(0, allowed.length) : this._defaultBottomCards();
+  }
+
   _desktopSnapshot(name, id, layout) {
     const s = this.state || {};
     const accent = this._desktopAccent(s.accentKey, s.accentColor);
@@ -27644,6 +27781,9 @@ class Component extends DCLogic {
       accentKey: accent.key,
       accentColor: accent.color,
       dockMode: s.dockMode === 'cards' ? 'cards' : 'launcher',
+      slotGrid: this._cloneDesktopValue(this._desktopGrid || this._defaultDesktopGrid(), this._defaultDesktopGrid()),
+      bottomCards: this._normalizeBottomCards(this._desktopBottomCards),
+      bottomCardLimit: Math.max(1, Math.min(H6_BOTTOM_CARD_CATALOG.length, parseInt(this._bottomCardLimit, 10) || 4)),
       widgetLayout: this._cloneDesktopValue(layout || this._widgetLayout || this._defaultWidgetLayout(), this._defaultWidgetLayout()),
     };
   }
@@ -27663,6 +27803,9 @@ class Component extends DCLogic {
     base.accentKey = accent.key;
     base.accentColor = accent.color;
     base.dockMode = d.dockMode === 'cards' ? 'cards' : 'launcher';
+    base.slotGrid = this._normalizeDesktopGrid(d.slotGrid);
+    base.bottomCards = this._normalizeBottomCards(d.bottomCards);
+    base.bottomCardLimit = Math.max(1, Math.min(H6_BOTTOM_CARD_CATALOG.length, parseInt(d.bottomCardLimit, 10) || 4));
     base.widgetLayout = this._parseWidgetLayout(d.widgetLayout || base.widgetLayout);
     return base;
   }
@@ -27672,7 +27815,7 @@ class Component extends DCLogic {
     try { store = JSON.parse(localStorage.getItem(H6_DESKTOPS_KEY) || 'null'); } catch (e) { store = null; }
     let desktops = [];
     let active = 0;
-    if (store && store.version === H6_DESKTOPS_VERSION && Array.isArray(store.desktops)) {
+    if (store && (store.version === 1 || store.version === H6_DESKTOPS_VERSION) && Array.isArray(store.desktops)) {
       for (let i = 0; i < store.desktops.length && desktops.length < H6_MAX_DESKTOPS; i++) {
         desktops.push(this._normalizeDesktop(store.desktops[i], 'Desktop ' + (i + 1)));
       }
@@ -27700,6 +27843,9 @@ class Component extends DCLogic {
     this._desktopIndex = active;
     const current = desktops[active];
     this._widgetLayout = this._cloneDesktopValue(current.widgetLayout, this._defaultWidgetLayout());
+    this._desktopGrid = this._normalizeDesktopGrid(current.slotGrid);
+    this._desktopBottomCards = this._normalizeBottomCards(current.bottomCards);
+    this._bottomCardLimit = current.bottomCardLimit;
     this._widgetsReady = true;
     this._pendingSlotSync = true;
     this._shellMode = current.shellMode;
@@ -27751,6 +27897,9 @@ class Component extends DCLogic {
     const d = this._normalizeDesktop(this._desktops[nextIndex], 'Desktop ' + (nextIndex + 1));
     this._desktops[nextIndex] = d;
     this._widgetLayout = this._cloneDesktopValue(d.widgetLayout, this._defaultWidgetLayout());
+    this._desktopGrid = this._normalizeDesktopGrid(d.slotGrid);
+    this._desktopBottomCards = this._normalizeBottomCards(d.bottomCards);
+    this._bottomCardLimit = d.bottomCardLimit;
     this._widgetsReady = true;
     this._shellMode = d.shellMode;
     this._splitRatio = d.splitRatio;
@@ -27798,10 +27947,10 @@ class Component extends DCLogic {
   _nextDesktop() { this._switchDesktop((this._desktopIndex || 0) + 1); }
 
   _openDesktopStudio(tab) {
-    this.setState({ desktopStudioOpen: true, desktopStudioTab: tab || this.state.desktopStudioTab || 'desktop', panelOpen: false });
+    this.setState({ desktopStudioOpen: true, desktopStudioTab: tab || this.state.desktopStudioTab || 'desktop', panelOpen: false }, () => this._syncDockIndicators());
   }
 
-  _closeDesktopStudio() { this.setState({ desktopStudioOpen: false }); }
+  _closeDesktopStudio() { this.setState({ desktopStudioOpen: false }, () => this._syncDockIndicators()); }
 
   _openWallpaperFromStudio() {
     this._closeDesktopStudio();
@@ -27872,6 +28021,79 @@ class Component extends DCLogic {
     this.setState({ dockMode: next }, () => { this._persistActiveDesktop(); this._syncDockIndicators(); });
   }
 
+  _desktopNotice(title, message) {
+    clearTimeout(this._perfToastTimer);
+    this._perfToastTimer = setTimeout(() => {
+      if (!this._unmounted) this.setState({ perfToastOn: false });
+    }, 2800);
+    this.setState({ perfToastOn: true, perfToastTitle: title, perfToastMsg: message });
+  }
+
+  _setDesktopGridPreset(key) {
+    const preset = H6_GRID_PRESETS.filter((item) => item.key === key)[0];
+    const mode = this._shellMode || this.state.shellMode || 'triple';
+    if (!preset || mode === 'appsOnly') return;
+    const next = this._normalizeDesktopGrid(this._desktopGrid);
+    const boardSides = this._widgetPlaceSides(mode);
+    for (let i = 0; i < boardSides.length; i++) {
+      const items = (this._board(boardSides[i], mode).items || []).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      const placed = [];
+      for (let j = 0; j < items.length; j++) {
+        const item = items[j];
+        if (!this._fits(placed, preset.cols, item.x, item.y, item.w, item.h, item.id, preset.rows)) {
+          this._desktopNotice('GRID KEPT', 'Move or resize cards before reducing this canvas.');
+          return;
+        }
+        placed.push(item);
+      }
+    }
+    next[mode] = { cols: preset.cols, rows: preset.rows };
+    this._desktopGrid = next;
+    this.setState((s) => ({ desktopRev: (s.desktopRev || 0) + 1, widgetRev: (s.widgetRev || 0) + 1 }), () => {
+      this._persistWidgets();
+      this._syncDockIndicators();
+    });
+  }
+
+  _toggleBottomCard(id) {
+    const allowed = H6_BOTTOM_CARD_CATALOG.map((card) => card.id);
+    if (allowed.indexOf(id) < 0) return;
+    const current = this._normalizeBottomCards(this._desktopBottomCards);
+    const index = current.indexOf(id);
+    const next = index >= 0 ? current.filter((key) => key !== id) : current.concat([id]);
+    if (!next.length) {
+      this._desktopNotice('ONE CARD REQUIRED', 'Keep at least one card in the bottom rail.');
+      return;
+    }
+    this._desktopBottomCards = next;
+    this.setState((s) => ({ desktopRev: (s.desktopRev || 0) + 1 }), () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
+  _moveBottomCard(id, direction) {
+    const cards = this._normalizeBottomCards(this._desktopBottomCards);
+    const from = cards.indexOf(id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= cards.length) return;
+    const next = cards.slice();
+    const hold = next[from]; next[from] = next[to]; next[to] = hold;
+    this._desktopBottomCards = next;
+    this.setState((s) => ({ desktopRev: (s.desktopRev || 0) + 1 }), () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
+  _setBottomCardLimit(limit) {
+    this._bottomCardLimit = Math.max(1, Math.min(H6_BOTTOM_CARD_CATALOG.length, parseInt(limit, 10) || 4));
+    this.setState((s) => ({ desktopRev: (s.desktopRev || 0) + 1 }), () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
   _onDesktopKey(ev) {
     if (!ev || !ev.ctrlKey || ev.altKey || ev.metaKey) return;
     const t = ev.target;
@@ -27882,8 +28104,16 @@ class Component extends DCLogic {
 
   _onDesktopGestureStart(ev) {
     const p = this._eventClientPoint(ev);
-    if (!p || !this._pointInCenterGap(p.x, p.y) || this.state.desktopStudioOpen) return;
-    this._desktopGesture = { x: p.x, y: p.y, at: Date.now(), moved: false };
+    const mode = this._shellMode || this.state.shellMode || 'triple';
+    // Swiping desktops lives in an empty widget-board gutter. The 3D canvas,
+    // launcher, cards and every interactive widget retain their own gestures.
+    if (!p || !this._pointInDesktopSwipeZone(p.x, p.y) || mode === 'appsOnly'
+      || this.state.desktopStudioOpen || this._widgetAddingOn() || this.state.graphEditId
+      || this.state.widgetMenuId || this.state.widgetPickerStep) return;
+    this._desktopGesture = {
+      x: p.x, y: p.y, at: Date.now(), moved: false,
+      controlsEnabled: this.controls ? this.controls.enabled !== false : null,
+    };
     clearTimeout(this._desktopGestureHoldTimer);
     this._desktopGestureHoldTimer = setTimeout(() => {
       if (!this._desktopGesture || this._desktopGesture.moved) return;
@@ -27901,6 +28131,7 @@ class Component extends DCLogic {
     if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
       this._desktopGesture.moved = true;
       clearTimeout(this._desktopGestureHoldTimer);
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 18 && this.controls) this.controls.enabled = false;
     }
   }
 
@@ -27909,6 +28140,7 @@ class Component extends DCLogic {
     clearTimeout(this._desktopGestureHoldTimer);
     this._desktopGestureHoldTimer = 0;
     this._desktopGesture = null;
+    if (g && this.controls && g.controlsEnabled != null) this.controls.enabled = g.controlsEnabled;
     if (!g || !g.moved) return;
     const p = this._eventClientPoint(ev);
     if (!p) return;
@@ -27920,9 +28152,11 @@ class Component extends DCLogic {
   }
 
   _onDesktopGestureCancel() {
+    const g = this._desktopGesture;
     clearTimeout(this._desktopGestureHoldTimer);
     this._desktopGestureHoldTimer = 0;
     this._desktopGesture = null;
+    if (g && this.controls && g.controlsEnabled != null) this.controls.enabled = g.controlsEnabled;
   }
 
   _onDesktopDotHoldStart(index, ev) {
@@ -27949,10 +28183,24 @@ class Component extends DCLogic {
     const current = list[index] || { name: 'Drive' };
     const tab = s.desktopStudioTab || 'desktop';
     const self = this;
+    const mode = s.shellMode || 'triple';
+    const grid = this._normalizeDesktopGrid(this._desktopGrid)[mode] || { cols: 2, rows: 2 };
+    const bottomCards = this._normalizeBottomCards(this._desktopBottomCards);
+    const bottomLimit = Math.max(1, Math.min(H6_BOTTOM_CARD_CATALOG.length, this._bottomCardLimit || 4));
     return {
       accentColor: s.accentColor || '#63d9e7',
       desktopSwitcherDisplay: (!s.error && (!s.loading || this._viewerReady)
         && !s.widgetPickerStep && !s.widgetPlaceType && !s.widgetPlaceMode) ? 'flex' : 'none',
+      desktopSwipeEdgesDisplay: (!s.error && !s.desktopStudioOpen && !s.widgetPickerStep
+        && !s.widgetPlaceType && (s.shellMode || 'triple') !== 'appsOnly') ? 'block' : 'none',
+      desktopSwipeStart: (ev) => this._onDesktopGestureStart(ev),
+      desktopSwipeMove: (ev) => this._onDesktopGestureMove(ev),
+      desktopSwipeEnd: (ev) => this._onDesktopGestureEnd(ev),
+      desktopSwipeCancel: () => this._onDesktopGestureCancel(),
+      // The virtual-desktop control is navigation, not a widget. Keep it
+      // compact and centred even when a canvas is filled, so it has one stable
+      // location across all desktop layouts.
+      desktopSwitcherStyle: '',
       desktopName: current.name,
       desktopCountLabel: (index + 1) + ' / ' + Math.max(1, list.length),
       desktopDots: list.map((d, i) => ({
@@ -28000,10 +28248,49 @@ class Component extends DCLogic {
       studioSetRatio11: () => this._setSplitRatio('1:1'),
       studioSetRatio21: () => this._setSplitRatio('2:1'),
       studioSetRatio12: () => this._setSplitRatio('1:2'),
+      studioGridPresets: H6_GRID_PRESETS.map((preset) => ({
+        label: preset.label,
+        detail: preset.detail,
+        cls: grid.cols === preset.cols && grid.rows === preset.rows ? 'on' : '',
+        onClick: () => this._setDesktopGridPreset(preset.key),
+      })),
+      studioLeftAppClass: this._board('left', mode).use === 'app' ? 'on' : '',
+      studioLeftWidgetsClass: this._board('left', mode).use === 'widgets' ? 'on' : '',
+      studioSetLeftApp: () => this._setSlotUse('left', 'app'),
+      studioSetLeftWidgets: () => this._setSlotUse('left', 'widgets'),
+      studioRightAppClass: this._board('right', mode).use === 'app' ? 'on' : '',
+      studioRightWidgetsClass: this._board('right', mode).use === 'widgets' ? 'on' : '',
+      studioRightDisabled: mode === 'appCar' || mode === 'appsOnly',
+      studioSetRightApp: () => { if (mode === 'triple') this._setSlotUse('right', 'app'); },
+      studioSetRightWidgets: () => { if (mode === 'triple') this._setSlotUse('right', 'widgets'); },
       studioDockLauncherClass: s.dockMode === 'launcher' ? 'on' : '',
       studioDockCardsClass: s.dockMode !== 'launcher' ? 'on' : '',
       studioShowLauncher: () => this._setDockMode('launcher'),
       studioShowCards: () => this._setDockMode('cards'),
+      studioBottomLimitItems: [2, 3, 4, 5].map((limit) => ({
+        label: String(limit),
+        cls: limit === bottomLimit ? 'on' : '',
+        onClick: () => this._setBottomCardLimit(limit),
+      })),
+      studioBottomCardItems: H6_BOTTOM_CARD_CATALOG.map((card) => {
+        const enabled = bottomCards.indexOf(card.id) >= 0;
+        return {
+          label: card.title,
+          title: (enabled ? 'Hide ' : 'Show ') + card.title,
+          state: enabled ? 'On' : 'Off',
+          cls: enabled ? 'on' : '',
+          onToggle: () => this._toggleBottomCard(card.id),
+        };
+      }),
+      studioBottomOrderItems: bottomCards.map((id, cardIndex) => {
+        const card = H6_BOTTOM_CARD_CATALOG.filter((entry) => entry.id === id)[0] || { title: id };
+        return {
+          label: card.title,
+          cls: cardIndex < bottomLimit ? 'on' : '',
+          onLeft: () => this._moveBottomCard(id, -1),
+          onRight: () => this._moveBottomCard(id, 1),
+        };
+      }),
       studioThemeDarkClass: s.widgetThemeMode === 'dark' ? 'on' : '',
       studioThemeLightClass: s.widgetThemeMode === 'light' ? 'on' : '',
       studioThemeAutoClass: s.widgetThemeMode === 'auto' ? 'on' : '',
@@ -28166,6 +28453,26 @@ class Component extends DCLogic {
     };
   }
 
+  _widgetSizes(type, mode) {
+    const def = this._widgetCatalog()[type];
+    if (!def) return [];
+    const cols = this._gridColsForMode(mode);
+    const rows = this._gridRowsForMode(mode);
+    const seen = {};
+    const sizes = (def.sizes || []).concat([[cols, rows]]);
+    return sizes.filter((size) => {
+      const w = Math.max(1, Math.min(cols, parseInt(size[0], 10) || 1));
+      const h = Math.max(1, Math.min(rows, parseInt(size[1], 10) || 1));
+      const key = w + 'x' + h;
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    }).map((size) => [
+      Math.max(1, Math.min(cols, parseInt(size[0], 10) || 1)),
+      Math.max(1, Math.min(rows, parseInt(size[1], 10) || 1)),
+    ]);
+  }
+
   _defaultWidgetLayout() {
     const media = { id: 'w-media', type: 'media', x: 0, y: 0, w: 2, h: 2 };
     return {
@@ -28227,7 +28534,15 @@ class Component extends DCLogic {
   }
 
   _gridColsForMode(mode) {
-    return mode === 'triple' ? 2 : 3;
+    const key = mode || this._shellMode || this.state.shellMode || 'triple';
+    const grid = this._normalizeDesktopGrid(this._desktopGrid);
+    return grid[key] ? grid[key].cols : (key === 'triple' ? 2 : 3);
+  }
+
+  _gridRowsForMode(mode) {
+    const key = mode || this._shellMode || this.state.shellMode || 'triple';
+    const grid = this._normalizeDesktopGrid(this._desktopGrid);
+    return grid[key] ? grid[key].rows : 2;
   }
 
   _currentBoards(mode) {
@@ -28252,7 +28567,7 @@ class Component extends DCLogic {
   }
 
   _configPanelSpan(s, cols) {
-    return { w: Math.min(2, cols), h: 2 };
+    return { w: Math.min(2, cols), h: this._gridRowsForMode(s.shellMode) };
   }
 
   _configDockFields(s, leftRect) {
@@ -28264,6 +28579,7 @@ class Component extends DCLogic {
     const open = !appsOnly && !(s.loading && !this._viewerReady) && !s.error
       && !!s.panelOpen && !!s.configSection;
     const cols = this._gridColsForMode(s.shellMode);
+    const rows = this._gridRowsForMode(s.shellMode);
     const empty = {
       configDockDisplay: 'none',
       configDockLeft: leftRect.left,
@@ -28422,8 +28738,10 @@ class Component extends DCLogic {
     const s = this.state;
     const paintHex = s.carColor === null ? '#F4F5F7' : String(s.carColor || '#F4F5F7');
     const effTheme = this._effectiveWidgetTheme(s);
-    let climateSummary;
-    let consumptionSummary;
+    // Empty strings are intentional: native quick cards use the key's presence
+    // to clear stale values when switching to a desktop without that card.
+    let climateSummary = '';
+    let consumptionSummary = '';
     const boards = this._currentBoards(s.shellMode || 'triple');
     const cardItems = [];
     if (boards.left && Array.isArray(boards.left.items)) cardItems.push.apply(cardItems, boards.left.items);
@@ -28440,6 +28758,18 @@ class Component extends DCLogic {
         consumptionSummary = view.consumptionFuel + ' L/100 · ' + view.consumptionEv + ' kWh';
       }
     }
+    const bottomValues = {
+      climate: climateSummary || 'Add Climate',
+      consumption: consumptionSummary || 'Add Consumption',
+      media: s.mediaTitle || 'Now playing',
+      desktops: (this._desktops && this._desktops[this._desktopIndex || 0]
+        ? this._desktops[this._desktopIndex || 0].name : 'Drive'),
+      customize: 'Desktop Studio',
+    };
+    const bottomCards = this._normalizeBottomCards(this._desktopBottomCards)
+      .map((id) => H6_BOTTOM_CARD_CATALOG.filter((card) => card.id === id)[0])
+      .filter(Boolean)
+      .map((card) => ({ id: card.id, title: card.title, value: bottomValues[card.id] || '', action: card.action }));
     const payload = {
       model: this._currentTrim().label,
       perf: this._perfModeInfo(s.resScaleMode).icon,
@@ -28456,6 +28786,9 @@ class Component extends DCLogic {
       activeDesktopIndex: Math.max(0, this._desktopIndex || 0),
       desktopCount: this._desktops ? this._desktops.length : 1,
       accent: s.accentColor || '#63d9e7',
+      desktopStudioOpen: !!s.desktopStudioOpen,
+      bottomCards: bottomCards,
+      bottomCardLimit: Math.max(1, Math.min(bottomCards.length, parseInt(this._bottomCardLimit, 10) || 4)),
       climateSummary: climateSummary,
       consumptionSummary: consumptionSummary,
     };
@@ -28489,13 +28822,13 @@ class Component extends DCLogic {
     return sides;
   }
 
-  _sizeFitsAnySide(w, h, cols, mode, ignoreId) {
+  _sizeFitsAnySide(w, h, cols, rows, mode, ignoreId) {
     const sides = this._widgetPlaceSides(mode);
     for (let i = 0; i < sides.length; i++) {
       const items = this._board(sides[i], mode).items || [];
-      for (let y = 0; y < 2; y++) {
+      for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
-          if (this._fits(items, cols, x, y, w, h, ignoreId)) return true;
+          if (this._fits(items, cols, x, y, w, h, ignoreId, rows)) return true;
         }
       }
     }
@@ -28585,8 +28918,9 @@ class Component extends DCLogic {
     return view;
   }
 
-  _fits(items, cols, x, y, w, h, ignoreId) {
-    if (x < 0 || y < 0 || x + w > cols || y + h > 2) return false;
+  _fits(items, cols, x, y, w, h, ignoreId, rows) {
+    const maxRows = rows || this._gridRowsForMode();
+    if (x < 0 || y < 0 || x + w > cols || y + h > maxRows) return false;
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       if (ignoreId && it.id === ignoreId) continue;
@@ -28647,6 +28981,16 @@ class Component extends DCLogic {
     return this._pointInCenterGap(clientX, clientY) || !!this._boardSideAt(clientX, clientY);
   }
 
+  _pointInDesktopSwipeZone(clientX, clientY) {
+    if (this._boardSideAt(clientX, clientY)) return true;
+    const width = (typeof window !== 'undefined' && window.innerWidth) || 1920;
+    const height = (typeof window !== 'undefined' && window.innerHeight) || 720;
+    // Always keep two narrow, non-model edge gutters available when cards fill
+    // every panel. They deliberately end above the launcher rail.
+    return clientY >= 96 && clientY <= height - 178
+      && ((clientX >= 52 && clientX <= 96) || (clientX >= width - 96 && clientX <= width - 52));
+  }
+
   _centerGapRect(mode) {
     const m = mode || this._shellMode || this.state.shellMode || 'triple';
     const left = this._shellLeftBounds || { l: 48, r: 740, t: 40, b: 500 };
@@ -28673,12 +29017,13 @@ class Component extends DCLogic {
 
   _slotHasRoom(side, x, y, mode) {
     const cols = this._gridColsForMode(mode);
+    const rows = this._gridRowsForMode(mode);
     const items = this._board(side, mode).items || [];
     const cat = this._widgetCatalog();
     return Object.keys(cat).some((key) => {
       if (this._widgetTypeBlocked(mode, key)) return false;
       const sizes = cat[key].sizes || [];
-      return sizes.some((sz) => sz[0] <= cols && this._fits(items, cols, x, y, sz[0], sz[1]));
+      return this._widgetSizes(key, mode).some((sz) => this._fits(items, cols, x, y, sz[0], sz[1], null, rows));
     });
   }
 
@@ -28688,8 +29033,9 @@ class Component extends DCLogic {
     if (this._widgetPlaceSides().indexOf(side) < 0) return [];
     const mode = s.shellMode || 'triple';
     const cols = this._gridColsForMode(mode);
+    const rows = this._gridRowsForMode(mode);
     const cells = [];
-    for (let y = 0; y < 2; y++) {
+    for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         if (!this._slotHasRoom(side, x, y, mode)) continue;
         cells.push({
@@ -28704,11 +29050,11 @@ class Component extends DCLogic {
 
   _sizesForSlot(side, x, y, type, mode) {
     const cols = this._gridColsForMode(mode);
-    const def = this._widgetCatalog()[type];
-    if (!def) return [];
+    const rows = this._gridRowsForMode(mode);
+    if (!this._widgetCatalog()[type]) return [];
     const items = this._board(side, mode).items || [];
-    return (def.sizes || []).filter((sz) => sz[0] <= cols)
-      .filter((sz) => this._fits(items, cols, x, y, sz[0], sz[1]));
+    return this._widgetSizes(type, mode)
+      .filter((sz) => this._fits(items, cols, x, y, sz[0], sz[1], null, rows));
   }
 
   _pickerOnBoardStyle(side, leftRect, rightRect) {
@@ -28805,12 +29151,13 @@ class Component extends DCLogic {
     if (s.widgetPlaceSide && s.widgetPlaceSide !== side) return [];
     if (this._widgetPlaceSides().indexOf(side) < 0) return [];
     const cols = this._gridColsForMode(s.shellMode);
+    const rows = this._gridRowsForMode(s.shellMode);
     const items = this._board(side).items || [];
     const ignoreId = (s.widgetPlaceMode === 'move' || s.widgetPlaceMode === 'resize') ? s.widgetPlaceId : null;
     const cells = [];
-    for (let y = 0; y < 2; y++) {
+    for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
-        if (!this._fits(items, cols, x, y, w, h, ignoreId)) continue;
+        if (!this._fits(items, cols, x, y, w, h, ignoreId, rows)) continue;
         cells.push({
           cls: 'on',
           gridStyle: 'grid-column:' + (x + 1) + ' / span 1;grid-row:' + (y + 1) + ' / span 1',
@@ -28884,10 +29231,11 @@ class Component extends DCLogic {
       const sizes = (ax != null && ay != null && type)
         ? this._sizesForSlot(side, ax, ay, type, modeKey)
         : [];
+      const isFull = (sz) => sz[0] === this._gridColsForMode(modeKey) && sz[1] === this._gridRowsForMode(modeKey);
       pickerItems = sizes.map((sz) => ({
-        label: sz[0] + ' × ' + sz[1],
-        subLabel: '',
-        title: sz[0] + ' × ' + sz[1],
+        label: isFull(sz) ? 'FULL SIZE' : (sz[0] + ' × ' + sz[1]),
+        subLabel: isFull(sz) ? 'Use the entire widget canvas' : '',
+        title: isFull(sz) ? 'Full size' : (sz[0] + ' × ' + sz[1]),
         btnClass: 'hv-picker-row',
         sizeClass: 'board-3 size-' + sz[0] + 'x' + sz[1],
         thumbClass: '',
@@ -28904,8 +29252,14 @@ class Component extends DCLogic {
     }
     const centerGap = this._centerGapRect(mode);
     const centerRect = this._rectCss(centerGap, { l: 760, r: 1160, t: 40, b: 500 });
+    const stageLeft = parseFloat(centerRect.left) || 760;
+    const stageTop = parseFloat(centerRect.top) || 40;
+    const stageWidth = parseFloat(centerRect.width) || 400;
+    const stageHeight = parseFloat(centerRect.height) || 460;
     const holdAddWidget = !appsOnly && !slotPick && !pickerOpen && !addOn;
     const widgetFlowOpen = !appsOnly && (slotPick || pickerOpen || addOn);
+    const stageControlsVisible = android && onMain && !appsOnly && !widgetFlowOpen
+      && !s.desktopStudioOpen && !s.panelOpen ? 'flex' : 'none';
     const pickClass = slotPick ? 'slot-picking' : (
       (!appsOnly && s.widgetPlaceType && !s.widgetPickerStep && s.widgetPlaceW && s.widgetPlaceH) ? 'placing' : ''
     );
@@ -28940,6 +29294,8 @@ class Component extends DCLogic {
       rightBoardHeight: rightRect.height,
       leftGridCols: 'repeat(' + cols + ', 1fr)',
       rightGridCols: 'repeat(' + cols + ', 1fr)',
+      leftGridRows: 'repeat(' + this._gridRowsForMode(mode) + ', 1fr)',
+      rightGridRows: 'repeat(' + this._gridRowsForMode(mode) + ', 1fr)',
       leftGridPickClass: pickClass,
       rightGridPickClass: pickClass,
       leftSlotCells: showLeft ? this._slotPickerCells('left') : [],
@@ -28963,6 +29319,16 @@ class Component extends DCLogic {
       centerSlotTop: centerRect.top,
       centerSlotWidth: centerRect.width,
       centerSlotHeight: centerRect.height,
+      stageAestheticDisplay: stageControlsVisible,
+      stageCameraDisplay: stageControlsVisible,
+      stageAestheticStyle: 'left:' + Math.round(stageLeft + 10) + 'px;top:'
+        + Math.round(stageTop + stageHeight - 50) + 'px;',
+      stageCameraStyle: 'left:' + Math.round(stageLeft + stageWidth - 52) + 'px;top:'
+        + Math.round(stageTop + stageHeight - 50) + 'px;',
+      openStageAesthetics: () => this._toggleConfigSection('paint', {
+        activeGroup: 'tuning', tuningSubTab: 'paint',
+      }),
+      openStageCamera: () => this.toggleCameraRail(),
       onLeftBoardHoldStart: (ev) => this._onBoardHoldStart('left', ev),
       onLeftBoardHoldEnd: (ev) => this._onBoardHoldEnd('left', ev),
       onLeftBoardHoldCancel: (ev) => this._onBoardHoldCancel('left', ev),
@@ -29049,9 +29415,10 @@ class Component extends DCLogic {
     const width = Math.max(0, (b.r || 0) - (b.l || 0));
     const height = Math.max(0, (b.b || 0) - (b.t || 0));
     const cols = this._gridColsForMode(this.state.shellMode || 'triple');
+    const rows = this._gridRowsForMode(this.state.shellMode || 'triple');
     const gap = 8;
     const cellW = cols > 0 ? (width - gap * (cols - 1)) / cols : width;
-    const cellH = (height - gap) / 2;
+    const cellH = rows > 0 ? (height - gap * (rows - 1)) / rows : height;
     const x = item.x || 0;
     const y = item.y || 0;
     const w = item.w || 1;
@@ -29948,6 +30315,7 @@ class Component extends DCLogic {
     clearTimeout(this._desktopPersistTimer);
     clearTimeout(this._desktopGestureHoldTimer);
     clearTimeout(this._desktopDotHoldTimer);
+    clearTimeout(this._consumptionRefreshTimer);
     clearInterval(this._perfReportTimer);
     this._hdriRequestId = (this._hdriRequestId || 0) + 1;
     if (this._raf) cancelAnimationFrame(this._raf);
