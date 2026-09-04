@@ -21783,6 +21783,11 @@ class Component extends DCLogic {
         // Half transparent, and that is the PEAK of the fade -- the outline
         // spends most of the cycle fainter than this.
         wheelBoxOpacity: 0.5,
+        // Fraction of wheelBoxOpacity the outline still shows at the BOTTOM of
+        // the fade. 0 would let it vanish completely between blinks, same as
+        // the axle bar's halo; the wheel outline is the only thing that marks
+        // that wheel at all, so it stays half as visible rather than gone.
+        wheelBoxOpacityLow: 0.5,
         // White pulling, green recovering -- the two the eye already reads as
         // "driving" and "putting it back" everywhere else in this scene.
         wheelBoxDriveColor: '#ffffff',
@@ -23549,6 +23554,12 @@ class Component extends DCLogic {
       const lo = tune.badgeGlowPulseLow;
       const bo = (lo + (1 - lo) * bp) * tune.axleBarGlowOpacity;
       const wheelPeak = tune.wheelBoxOpacity;
+      // Its own floor, not the shared `lo`: the axle bar's halo is meant to
+      // disappear between pulses, but the wheel outline is the only marker on
+      // that wheel and going fully transparent read as it switching off
+      // rather than dimming.
+      const wheelLo = tune.wheelBoxOpacityLow;
+      const wheelOp = (wheelLo + (1 - wheelLo) * bp) * wheelPeak;
       for (let i = 0; i < badges.length; i++) {
         const b = badges[i];
         const gm = b.glowMesh;
@@ -23556,7 +23567,7 @@ class Component extends DCLogic {
         // A wheel outline has no halo: the rectangle itself is what fades, so
         // the same curve drives its own material instead.
         if (b.mesh.visible && (b.id === 'frontWheel' || b.id === 'rearWheel')) {
-          b.mesh.material.opacity = (lo + (1 - lo) * bp) * wheelPeak;
+          b.mesh.material.opacity = wheelOp;
         }
       }
     }
