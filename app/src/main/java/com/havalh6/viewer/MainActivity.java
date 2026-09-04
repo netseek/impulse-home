@@ -96,6 +96,28 @@ public final class MainActivity extends Activity {
     /** Viewer → Impulse: body commands (windows, sunroof, curtain, doors). */
     private static final String ACTION_VEHICLE_COMMAND =
             "br.com.redesurftank.havalshisuku.ACTION_VEHICLE_COMMAND";
+    /** Vehicle commands that carry no value extra. */
+    private static final java.util.Set<String> VEHICLE_COMMANDS_WITHOUT_VALUE =
+            new java.util.HashSet<>(java.util.Arrays.asList(
+                    "toggle_doors_all",
+                    "toggle_windows",
+                    "toggle_trunk",
+                    "toggle_sunroof",
+                    "toggle_curtain",
+                    "open_windows",
+                    "close_windows",
+                    "open_sunroof",
+                    "close_sunroof",
+                    "open_curtain",
+                    "close_curtain"
+            ));
+    /** Vehicle commands that require a 0-100 opening level. */
+    private static final java.util.Set<String> VEHICLE_LEVEL_COMMANDS =
+            new java.util.HashSet<>(java.util.Arrays.asList(
+                    "set_windows_level",
+                    "set_sunroof_level",
+                    "set_curtain_level"
+            ));
     private static final java.util.Set<String> WRITABLE_CAR_KEYS =
             new java.util.HashSet<>(java.util.Arrays.asList(
                     "car.drive_setting.drive_mode",
@@ -199,6 +221,24 @@ public final class MainActivity extends Activity {
         return (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
+    /**
+     * Returns a canonical decimal vehicle level, or {@code null} when {@code value}
+     * is not an unsigned base-10 integer in the supported 0-100 range.
+     */
+    private static String normalizeVehicleLevel(String value) {
+        if (value == null || value.isEmpty()) return null;
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (character < '0' || character > '9') return null;
+        }
+        try {
+            int level = Integer.parseInt(value);
+            return level >= 0 && level <= 100 ? Integer.toString(level) : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     public class TelemetryBridge {
         @JavascriptInterface
         public String getCarData(String key) {
@@ -233,16 +273,27 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public void invokeVehicleCommand(String command, String value) {
-            if (command == null || command.isEmpty()) return;
-            final String safeCommand = command.trim();
-            if (safeCommand.length() > 48) {
-                Log.w(TAG, "Blocked oversized invokeVehicleCommand");
+            if (command == null || (!VEHICLE_COMMANDS_WITHOUT_VALUE.contains(command)
+                    && !VEHICLE_LEVEL_COMMANDS.contains(command))) {
+                Log.w(TAG, "Blocked unsupported vehicle command: " + command);
                 return;
             }
-            final String safeValue = value == null ? "" : value.trim();
-            if (safeValue.length() > 16) {
-                Log.w(TAG, "Blocked oversized vehicle command value");
-                return;
+            final String safeCommand = command;
+            final String safeValue;
+            if (VEHICLE_COMMANDS_WITHOUT_VALUE.contains(safeCommand)) {
+                if (value != null && !value.isEmpty()) {
+                    Log.w(TAG, "Blocked vehicle command value for " + safeCommand
+                            + ": command requires an empty value");
+                    return;
+                }
+                safeValue = "";
+            } else {
+                safeValue = normalizeVehicleLevel(value);
+                if (safeValue == null) {
+                    Log.w(TAG, "Blocked vehicle command value for " + safeCommand
+                            + ": expected a base-10 integer from 0 through 100");
+                    return;
+                }
             }
             mainHandler.post(() -> {
                 try {
@@ -764,14 +815,18 @@ public final class MainActivity extends Activity {
     private View mediaLaunchAnchor;
     private View stripContainer;
     private View stripRow;
-    /** Mode drawer (1×1 collapsed / 1×3 expanded) leading the launcher strip. */
+    /** Mode drawer (1×1 collapsed / 1×4 expanded) leading the launcher strip. */
     private android.widget.LinearLayout modeDrawer;
     private View modeCollapsedBtn;
     private View modeAppsBtn;
     private View modeLayoutBtn;
     private View modeConfigBtn;
+    /** Direct Launcher/Cards switch in the expanded drawer. */
+    private View modeSurfaceBtn;
     private android.widget.ImageView modeCollapsedIcon;
     private View appsScrollView;
+    /** Alternate low-profile bottom surface; mutually exclusive with appsScrollView. */
+    private View cardsScrollView;
     private View layoutContentRow;
     private View configContentScroll;
     private View contentHost;
@@ -786,6 +841,22 @@ public final class MainActivity extends Activity {
     private View layoutThemeChip;
     private android.widget.TextView layoutThemeLabel;
     private android.widget.TextView layoutTipLabel;
+    private View layoutLauncherSurfaceChip;
+    private View layoutCardsSurfaceChip;
+    private android.widget.TextView activeDesktopTitle;
+    private android.widget.TextView activeDesktopMeta;
+    private final List<View> quickCardViews = new ArrayList<>();
+    private android.widget.TextView quickClimateValue;
+    private android.widget.TextView quickConsumptionValue;
+    private android.widget.TextView quickMediaTitle;
+    private android.widget.TextView quickMediaPlayPause;
+    private String quickMediaPackage = "";
+    private boolean quickMediaPlaying;
+    private String dockSurfaceMode = DOCK_SURFACE_LAUNCHER;
+    private String activeDesktopName = "Desktop";
+    private int activeDesktopIndex;
+    private int desktopCount = 1;
+    private int dockAccentColor = 0xFF6FAEFF;
     /** {@code car} or {@code wallpaper} — mirrored from the viewer. */
     private String centerFillMode = "car";
     /** Config-strip tool glyphs keyed by cmd (camera, model, …) for live updates. */
@@ -941,6 +1012,9 @@ public final class MainActivity extends Activity {
     private static final String SHELL_APP_CAR = "appCar";
     private static final String SHELL_APPS = "appsOnly";
     private static final String PREFS_SHELL = "h6_shell";
+    private static final String PREF_DOCK_SURFACE = "dockSurfaceMode";
+    private static final String DOCK_SURFACE_LAUNCHER = "launcher";
+    private static final String DOCK_SURFACE_CARDS = "cards";
     private static final Rect FULLSCREEN_BOUNDS = new Rect(0, 0, 1920, 720);
     /** {@code WindowConfiguration.WINDOWING_MODE_FREEFORM} (API 28+). */
     private static final int WINDOWING_MODE_FREEFORM = 5;
@@ -1439,10 +1513,48 @@ public final class MainActivity extends Activity {
         splitRatio = isValidSplitRatio(ratio) ? ratio : "1:1";
         pendingRestoreLeft = prefs.getString("leftApp", "");
         pendingRestoreRight = prefs.getString("rightApp", "");
+        dockSurfaceMode = normalizeDockSurfaceMode(
+                prefs.getString(PREF_DOCK_SURFACE, DOCK_SURFACE_LAUNCHER));
         appsOnlyRestoreDone = false;
         loadAppsFabPos();
         uiMode = readUiModePref();
         loadSlotUsesForMode();
+        refreshDockSurfaceUi(false);
+    }
+
+    private String normalizeDockSurfaceMode(String mode) {
+        return DOCK_SURFACE_CARDS.equals(mode)
+                ? DOCK_SURFACE_CARDS : DOCK_SURFACE_LAUNCHER;
+    }
+
+    private void persistDockSurfaceMode() {
+        getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                .edit()
+                .putString(PREF_DOCK_SURFACE, dockSurfaceMode)
+                .apply();
+    }
+
+    /**
+     * Native changes are optimistic so the control feels immediate. The next
+     * updateDockIndicators callback is authoritative and can settle us back to
+     * the page's persisted desktop state.
+     */
+    private void chooseDockSurface(String mode, boolean notifyPage) {
+        dockSurfaceMode = normalizeDockSurfaceMode(mode);
+        persistDockSurfaceMode();
+        refreshDockSurfaceUi(true);
+        if (notifyPage) {
+            callViewerDock(DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
+                    ? "showCards" : "showLauncher");
+        }
+    }
+
+    private void toggleDockSurface() {
+        dockSurfaceMode = DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
+                ? DOCK_SURFACE_LAUNCHER : DOCK_SURFACE_CARDS;
+        persistDockSurfaceMode();
+        refreshDockSurfaceUi(true);
+        callViewerDock("toggleDockMode");
     }
 
     private void saveShellPrefs() {
@@ -3918,6 +4030,7 @@ public final class MainActivity extends Activity {
             @Override
             public void onUpdate(org.json.JSONObject payload) {
                 notifyMediaNowPlaying(payload);
+                mainHandler.post(() -> updateQuickMediaCard(payload));
             }
 
             @Override
@@ -4529,6 +4642,8 @@ public final class MainActivity extends Activity {
         loadRecentApps();
         loadHiddenApps();
         loadWindowApps();
+        dockSurfaceMode = normalizeDockSurfaceMode(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
+                .getString(PREF_DOCK_SURFACE, DOCK_SURFACE_LAUNCHER));
         float density = getResources().getDisplayMetrics().density;
         // Bigger than the old 52/78: dropping the captions freed vertical room in
         // the dock band. GWM tiles use the full Impulse ic_gwm asset on black.
@@ -4742,6 +4857,17 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
+        cardsScrollView = buildQuickCardsRow(density, iconSizePx);
+        cardsScrollView.setVisibility(DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
+                ? View.VISIBLE : View.GONE);
+        cardsScrollView.setAlpha(DOCK_SURFACE_CARDS.equals(dockSurfaceMode) ? 1f : 0f);
+        host.addView(cardsScrollView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        scrollView.setVisibility(DOCK_SURFACE_LAUNCHER.equals(dockSurfaceMode)
+                ? View.VISIBLE : View.GONE);
+        scrollView.setAlpha(DOCK_SURFACE_LAUNCHER.equals(dockSurfaceMode) ? 1f : 0f);
+
         layoutContentRow = buildLayoutContentRow(density, itemWidthPx, iconSizePx);
         layoutContentRow.setVisibility(View.GONE);
         layoutContentRow.setAlpha(0f);
@@ -4796,6 +4922,7 @@ public final class MainActivity extends Activity {
 
         applyDrawerCollapsedUi(false);
         refreshLayoutChipSelection();
+        refreshDockSurfaceUi(false);
         updateSlotAnchors();
         updateAppsOnlyChrome();
     }
@@ -4833,15 +4960,29 @@ public final class MainActivity extends Activity {
         modeConfigBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
                 dockGlyphConfig(iconPx, dockGlyphColor(true)),
                 "Settings", v -> selectStripMode(STRIP_CONFIG));
+        modeSurfaceBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
+                dockGlyphCards(iconPx, dockGlyphColor(true)),
+                "Cards", v -> {
+                    toggleDockSurface();
+                    selectStripMode(STRIP_APPS);
+                });
+        modeSurfaceBtn.setContentDescription("Switch bottom surface");
+        modeSurfaceBtn.setOnLongClickListener(v -> {
+            callViewerDock("openDesktopStudio");
+            return true;
+        });
         modeAppsBtn.setVisibility(View.GONE);
         modeLayoutBtn.setVisibility(View.GONE);
         modeConfigBtn.setVisibility(View.GONE);
+        modeSurfaceBtn.setVisibility(View.GONE);
         setModeCellLabelVisible(modeAppsBtn, false);
         setModeCellLabelVisible(modeLayoutBtn, false);
         setModeCellLabelVisible(modeConfigBtn, false);
+        setModeCellLabelVisible(modeSurfaceBtn, false);
         drawer.addView(modeAppsBtn);
         drawer.addView(modeLayoutBtn);
         drawer.addView(modeConfigBtn);
+        drawer.addView(modeSurfaceBtn);
         return drawer;
     }
 
@@ -4858,6 +4999,7 @@ public final class MainActivity extends Activity {
         cell.setClickable(true);
         cell.setFocusable(true);
         cell.setOnClickListener(click);
+        if (label != null && !label.isEmpty()) cell.setContentDescription(label);
 
         FrameLayout iconWrap = new FrameLayout(this);
         int wrapSize = dockPlatePx(iconPx, density);
@@ -4958,7 +5100,7 @@ public final class MainActivity extends Activity {
     /** Soft gray rim for light-widget plates — no hard black stroke. */
     private int[] dockPlateBorderGradientColors(boolean selected) {
         return selected
-                ? new int[] { 0xC8D4DCE4, 0x88A8B8C4 }
+                ? new int[] { withAlpha(dockAccentColor, 0xD0), 0x8898AABC }
                 : new int[] { 0xA0B8C8D4, 0x60A0B0C0 };
     }
 
@@ -4966,12 +5108,25 @@ public final class MainActivity extends Activity {
     private int[] dockPlateGradientColors(boolean selected) {
         if (dockUiLight) {
             return selected
-                    ? new int[] { 0xFFF2F5F8, 0xE8ECF2 }
-                    : new int[] { 0xFAFCFE, 0xF2F6FA };
+                    ? new int[] { blendArgb(0xFFF8FAFC, dockAccentColor, 0.13f),
+                            blendArgb(0xFFEDF2F6, dockAccentColor, 0.08f) }
+                    : new int[] { 0xFFFAFCFE, 0xFFF2F6FA };
         }
         return selected
-                ? new int[] { 0x68FFFFFF, 0x58FFFFFF }
+                ? new int[] { withAlpha(dockAccentColor, 0x72), 0x58FFFFFF }
                 : new int[] { 0x5AFFFFFF, 0x48FFFFFF };
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static int blendArgb(int base, int tint, float amount) {
+        float a = Math.max(0f, Math.min(1f, amount));
+        int r = Math.round(((base >> 16) & 0xff) * (1f - a) + ((tint >> 16) & 0xff) * a);
+        int g = Math.round(((base >> 8) & 0xff) * (1f - a) + ((tint >> 8) & 0xff) * a);
+        int b = Math.round((base & 0xff) * (1f - a) + (tint & 0xff) * a);
+        return 0xff000000 | (r << 16) | (g << 8) | b;
     }
 
   /** Layout/config drawer band stays transparent like the apps launcher strip. */
@@ -4979,6 +5134,7 @@ public final class MainActivity extends Activity {
         clearDockStripBackground(stripRow);
         clearDockStripBackground(contentHost);
         clearDockStripBackground(appsScrollView);
+        clearDockStripBackground(cardsScrollView);
         clearDockStripBackground(modeDrawer);
         clearDockStripBackground(layoutContentRow);
         clearDockStripBackground(configContentScroll);
@@ -5003,8 +5159,13 @@ public final class MainActivity extends Activity {
         if (modeConfigBtn != null && modeConfigBtn.getVisibility() == View.VISIBLE) {
             setModeCellSelected(modeConfigBtn, STRIP_CONFIG.equals(stripMode));
         }
+        if (modeSurfaceBtn != null && modeSurfaceBtn.getVisibility() == View.VISIBLE) {
+            setModeCellSelected(modeSurfaceBtn, DOCK_SURFACE_CARDS.equals(dockSurfaceMode));
+        }
+        refreshDockSurfaceUi(false);
         refreshConfigToolPlates();
         refreshLayoutTipPlate();
+        refreshQuickCardsTheme();
     }
 
     private void refreshConfigToolPlates() {
@@ -5035,8 +5196,9 @@ public final class MainActivity extends Activity {
     }
 
     private int dockGlyphColor(boolean selected) {
-        if (!dockUiLight) return 0xFFFFFFFF;
-        return selected ? 0xFF3D4550 : 0xFF9AA3AE;
+        if (selected) return dockAccentColor;
+        if (!dockUiLight) return 0xE8FFFFFF;
+        return 0xFF7E8996;
     }
 
     private int dockLabelColor() {
@@ -5073,6 +5235,7 @@ public final class MainActivity extends Activity {
         styleDockLabel(layoutTipLabel, true);
         refreshModeDrawerGlyphs();
         refreshDockToolCaptions();
+        refreshLauncherIconPlates();
         for (String cmd : dockToolIcons.keySet()) {
             refreshDockToolGlyph(cmd, dockToolGlyphFor(cmd));
         }
@@ -5121,6 +5284,9 @@ public final class MainActivity extends Activity {
         if (modeCollapsedBtn != null && modeCollapsedBtn.getVisibility() == View.VISIBLE) {
             setModeCellSelected(modeCollapsedBtn, true);
         }
+        if (modeSurfaceBtn != null && modeSurfaceBtn.getVisibility() == View.VISIBLE) {
+            setModeCellSelected(modeSurfaceBtn, DOCK_SURFACE_CARDS.equals(dockSurfaceMode));
+        }
     }
 
     private void setModeCellIcon(View cell, Drawable glyph) {
@@ -5134,6 +5300,8 @@ public final class MainActivity extends Activity {
         if (cell == modeAppsBtn) return dockGlyphApps(iconPx, color);
         if (cell == modeLayoutBtn) return dockGlyphLayout(iconPx, color);
         if (cell == modeConfigBtn) return dockGlyphConfig(iconPx, color);
+        if (cell == modeSurfaceBtn) return DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
+                ? dockGlyphApps(iconPx, color) : dockGlyphCards(iconPx, color);
         if (cell == modeCollapsedBtn) return glyphForStripMode(stripMode);
         return null;
     }
@@ -5151,11 +5319,11 @@ public final class MainActivity extends Activity {
         String eff = dockWidgetThemeEffective != null ? dockWidgetThemeEffective : "dark";
         String label;
         if ("auto".equals(mode)) {
-            label = "UI · Auto (" + ("light".equals(eff) ? "Light" : "Dark") + ")";
+            label = "Appearance · Auto";
         } else if ("light".equals(mode)) {
-            label = "UI · Light";
+            label = "Appearance · Light";
         } else {
-            label = "UI · Dark";
+            label = "Appearance · Dark";
         }
         if (layoutThemeLabel != null) layoutThemeLabel.setText(label);
         styleDockLabel(layoutThemeLabel, false);
@@ -5163,20 +5331,27 @@ public final class MainActivity extends Activity {
     }
 
     /** Solid rounded square behind third-party launcher icons (not dock glyphs). */
-    private android.graphics.drawable.GradientDrawable makeLauncherIconPlateDrawable(
+    private android.graphics.drawable.Drawable makeLauncherIconPlateDrawable(
             float density, boolean dark) {
-        android.graphics.drawable.GradientDrawable d =
-                new android.graphics.drawable.GradientDrawable();
-        d.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        d.setCornerRadius(14f * density);
-        if (dark) {
-            d.setColor(0xFF000000);
-            d.setStroke(Math.max(1, Math.round(0.6f * density)), 0x33FFFFFF);
-        } else {
-            d.setColor(0xFFF3F3F5);
-            d.setStroke(Math.max(1, Math.round(0.6f * density)), 0x22000000);
-        }
-        return d;
+        int stroke = Math.max(1, Math.round(density));
+        float radius = 14f * density;
+        android.graphics.drawable.GradientDrawable border = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                dark ? new int[] { 0x7AFFFFFF, 0x1FFFFFFF }
+                        : (dockUiLight ? new int[] { 0x66FFFFFF, 0x2493A2B2 }
+                                : new int[] { 0x88FFFFFF, 0x34FFFFFF }));
+        border.setCornerRadius(radius);
+        android.graphics.drawable.GradientDrawable fill = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                dark ? (dockUiLight ? new int[] { 0xFF202733, 0xFF10151C }
+                        : new int[] { 0xF20A0D12, 0xEC000000 })
+                        : (dockUiLight ? new int[] { 0xFFFCFDFE, 0xFFF0F4F7 }
+                                : new int[] { 0xF8F3F6FA, 0xE8DFE6EC }));
+        fill.setCornerRadius(Math.max(0f, radius - stroke));
+        android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
+                new Drawable[] { border, fill });
+        layers.setLayerInset(1, stroke, stroke, stroke, stroke);
+        return layers;
     }
 
     /** Square plate behind every dock icon — mode drawer + launcher row share this size. */
@@ -5238,6 +5413,7 @@ public final class MainActivity extends Activity {
 
     private void setModeCellSelected(View cell, boolean selected) {
         if (cell == null) return;
+        cell.setSelected(selected);
         View plate = cell.findViewWithTag("modePlate");
         float density = getResources().getDisplayMetrics().density;
         int iconPx = dockIconPx > 0 ? dockIconPx
@@ -5272,6 +5448,33 @@ public final class MainActivity extends Activity {
             }
         }
         return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
+    }
+
+    private void refreshLauncherIconPlates() {
+        float density = getResources().getDisplayMetrics().density;
+        for (MotionTrailLayout item : launcherItems) {
+            if (item == null) continue;
+            View plate = item.findViewWithTag("iconPlate");
+            if (plate == null) continue;
+            boolean dark = Boolean.TRUE.equals(item.getTag());
+            plate.setBackground(makeLauncherIconPlateDrawable(density, dark));
+        }
+    }
+
+    private Drawable dockGlyphCards(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setColor(color);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeWidth(Math.max(2f, sizePx * 0.075f));
+        float s = sizePx;
+        c.drawRoundRect(s * 0.15f, s * 0.20f, s * 0.85f, s * 0.47f,
+                s * 0.08f, s * 0.08f, p);
+        c.drawRoundRect(s * 0.15f, s * 0.56f, s * 0.58f, s * 0.82f,
+                s * 0.08f, s * 0.08f, p);
+        c.drawCircle(s * 0.74f, s * 0.69f, s * 0.12f, p);
+        return new BitmapDrawable(getResources(), bmp);
     }
 
     private Drawable dockGlyphLayout(int sizePx, int color) {
@@ -5338,6 +5541,10 @@ public final class MainActivity extends Activity {
             modeConfigBtn.setVisibility(View.GONE);
             setModeCellLabelVisible(modeConfigBtn, false);
         }
+        if (modeSurfaceBtn != null) {
+            modeSurfaceBtn.setVisibility(View.GONE);
+            setModeCellLabelVisible(modeSurfaceBtn, false);
+        }
         if (modeDrawer != null && dockCellPx > 0) {
             android.widget.LinearLayout.LayoutParams lp =
                     (android.widget.LinearLayout.LayoutParams) modeDrawer.getLayoutParams();
@@ -5378,11 +5585,22 @@ public final class MainActivity extends Activity {
             setModeCellSelected(modeConfigBtn, STRIP_CONFIG.equals(stripMode));
             setModeCellLabelVisible(modeConfigBtn, true);
         }
+        if (modeSurfaceBtn != null) {
+            modeSurfaceBtn.setVisibility(View.VISIBLE);
+            setModeCellSelected(modeSurfaceBtn, DOCK_SURFACE_CARDS.equals(dockSurfaceMode));
+            android.widget.TextView label = findModeCellLabel(modeSurfaceBtn);
+            if (label != null) label.setText(DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
+                    ? "Launcher" : "Cards");
+            modeSurfaceBtn.setContentDescription(DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
+                    ? "Show launcher. Long press to customize"
+                    : "Show quick cards. Long press to customize");
+            setModeCellLabelVisible(modeSurfaceBtn, true);
+        }
         if (modeDrawer != null && dockCellPx > 0) {
             android.widget.LinearLayout.LayoutParams lp =
                     (android.widget.LinearLayout.LayoutParams) modeDrawer.getLayoutParams();
             if (lp != null) {
-                final int target = dockCellPx * 3;
+                final int target = dockCellPx * 4;
                 android.animation.ValueAnimator anim =
                         android.animation.ValueAnimator.ofInt(Math.max(dockCellPx, lp.width), target);
                 anim.setDuration(200);
@@ -5410,12 +5628,13 @@ public final class MainActivity extends Activity {
 
     private void showStripContent(String mode, boolean fade) {
         View apps = appsScrollView;
+        View cards = cardsScrollView;
         View layout = layoutContentRow;
         View config = configContentScroll;
-        View show = apps;
+        View show = DOCK_SURFACE_CARDS.equals(dockSurfaceMode) ? cards : apps;
         if (STRIP_LAYOUT.equals(mode)) show = layout;
         else if (STRIP_CONFIG.equals(mode)) show = config;
-        View[] all = { apps, layout, config };
+        View[] all = { apps, cards, layout, config };
         for (View v : all) {
             if (v == null) continue;
             if (v == show) {
@@ -5445,49 +5664,467 @@ public final class MainActivity extends Activity {
         showStripContent(to, true);
     }
 
+    private void refreshDockSurfaceUi(boolean animate) {
+        boolean cards = DOCK_SURFACE_CARDS.equals(dockSurfaceMode);
+        setModeCellSelected(layoutLauncherSurfaceChip, !cards);
+        setModeCellSelected(layoutCardsSurfaceChip, cards);
+        if (layoutLauncherSurfaceChip != null) layoutLauncherSurfaceChip.setSelected(!cards);
+        if (layoutCardsSurfaceChip != null) layoutCardsSurfaceChip.setSelected(cards);
+        if (modeSurfaceBtn != null) {
+            android.widget.TextView label = findModeCellLabel(modeSurfaceBtn);
+            if (label != null) label.setText(cards ? "Launcher" : "Cards");
+            modeSurfaceBtn.setContentDescription(cards
+                    ? "Show launcher. Long press to customize"
+                    : "Show quick cards. Long press to customize");
+            if (modeSurfaceBtn.getVisibility() == View.VISIBLE) {
+                setModeCellSelected(modeSurfaceBtn, cards);
+                setModeCellLabelVisible(modeSurfaceBtn, true);
+            }
+        }
+        if (STRIP_APPS.equals(stripMode) && appsScrollView != null && cardsScrollView != null) {
+            showStripContent(STRIP_APPS, animate);
+        }
+        refreshQuickCardsTheme();
+        refreshDesktopIndicator();
+    }
+
+    private android.graphics.drawable.Drawable makeFrostLayer(boolean selected, float density) {
+        int inset = Math.max(1, Math.round(density));
+        float radius = 16f * density;
+        android.graphics.drawable.GradientDrawable rim = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                selected
+                        ? new int[] { withAlpha(dockAccentColor, 0xD8), withAlpha(dockAccentColor, 0x60) }
+                        : (dockUiLight ? new int[] { 0xB8FFFFFF, 0x4F8A99A8 }
+                                : new int[] { 0x70FFFFFF, 0x20FFFFFF }));
+        rim.setCornerRadius(radius);
+        int[] fillColors;
+        if (dockUiLight) {
+            fillColors = selected
+                    ? new int[] { blendArgb(0xF8F8FAFC, dockAccentColor, 0.10f),
+                            blendArgb(0xF0E9EEF3, dockAccentColor, 0.06f) }
+                    : new int[] { 0xF2F7F9FB, 0xE9E9EFF4 };
+        } else {
+            fillColors = selected
+                    ? new int[] { withAlpha(dockAccentColor, 0x55), 0xB51A222D }
+                    : new int[] { 0xB51A222D, 0x9E0B1017 };
+        }
+        android.graphics.drawable.GradientDrawable fill = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, fillColors);
+        fill.setCornerRadius(Math.max(0f, radius - inset));
+        android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
+                new Drawable[] { rim, fill });
+        layers.setLayerInset(1, inset, inset, inset, inset);
+        return layers;
+    }
+
+    private android.graphics.drawable.Drawable makeFrostStateDrawable(
+            boolean selected, float density) {
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[] { android.R.attr.state_pressed }, makeFrostLayer(true, density));
+        states.addState(new int[] { android.R.attr.state_selected }, makeFrostLayer(true, density));
+        states.addState(new int[0], makeFrostLayer(selected, density));
+        return states;
+    }
+
+    private View buildQuickCardsRow(float density, int iconPx) {
+        BounceHorizontalScrollView scroll = new BounceHorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setFadingEdgeLength(Math.round(42 * density));
+        scroll.setClipChildren(true);
+        scroll.setClipToPadding(true);
+        scroll.setBackgroundColor(0x00000000);
+
+        android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(Math.round(10 * density), Math.round(12 * density),
+                Math.round(24 * density), Math.round(12 * density));
+
+        View climate = makeQuickTextCard(density, 218, "CLIMATE",
+                "— °C  ·  Fan —  ·  AUTO —",
+                "Climate summary. Opens the climate page when available",
+                v -> callViewerDock("ac"));
+        quickClimateValue = (android.widget.TextView) climate.findViewWithTag("quickValue");
+        row.addView(climate);
+
+        View consumption = makeQuickTextCard(density, 196, "CONSUMPTION", "—",
+                "Consumption summary. Opens card selection",
+                v -> callViewerDock("addWidget"));
+        quickConsumptionValue = (android.widget.TextView) consumption.findViewWithTag("quickValue");
+        row.addView(consumption);
+
+        row.addView(makeQuickMediaCard(density));
+
+        View customize = makeQuickTextCard(density, 158, "CUSTOMIZE", "Desktop Studio",
+                "Customize cards and desktops", v -> callViewerDock("openDesktopStudio"));
+        customize.setOnLongClickListener(v -> {
+            callViewerDock("openDesktopStudio");
+            return true;
+        });
+        row.addView(customize);
+
+        scroll.addView(row, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        return scroll;
+    }
+
+    private View makeQuickTextCard(float density, int widthDp, String title, String value,
+            String description, View.OnClickListener click) {
+        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int padH = Math.round(16 * density);
+        card.setPadding(padH, Math.round(8 * density), padH, Math.round(8 * density));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(widthDp * density), Math.round(74 * density));
+        lp.rightMargin = Math.round(10 * density);
+        card.setLayoutParams(lp);
+        card.setMinimumHeight(Math.round(60 * density));
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setContentDescription(description);
+        card.setOnClickListener(click);
+        card.setBackground(makeFrostStateDrawable(false, density));
+        card.setElevation(3f * density);
+        quickCardViews.add(card);
+
+        android.widget.TextView heading = new android.widget.TextView(this);
+        heading.setTag("frostSecondary");
+        heading.setText(title);
+        heading.setTextSize(9.5f);
+        heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        heading.setLetterSpacing(0.11f);
+        card.addView(heading);
+
+        android.widget.TextView body = new android.widget.TextView(this);
+        body.setTag("quickValue");
+        body.setText(value);
+        body.setTextSize(14f);
+        body.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        body.setMaxLines(1);
+        body.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        android.widget.LinearLayout.LayoutParams bodyLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        bodyLp.topMargin = Math.round(4 * density);
+        body.setLayoutParams(bodyLp);
+        card.addView(body);
+        return card;
+    }
+
+    private View makeQuickMediaCard(float density) {
+        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        card.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        card.setPadding(Math.round(14 * density), Math.round(7 * density),
+                Math.round(8 * density), Math.round(7 * density));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(330 * density), Math.round(74 * density));
+        lp.rightMargin = Math.round(10 * density);
+        card.setLayoutParams(lp);
+        card.setBackground(makeFrostStateDrawable(false, density));
+        card.setElevation(3f * density);
+        card.setContentDescription("Media quick controls");
+        quickCardViews.add(card);
+
+        android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
+        copy.setOrientation(android.widget.LinearLayout.VERTICAL);
+        copy.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        android.widget.LinearLayout.LayoutParams copyLp = new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+        copy.setLayoutParams(copyLp);
+        android.widget.TextView heading = new android.widget.TextView(this);
+        heading.setTag("frostSecondary");
+        heading.setText("MEDIA");
+        heading.setTextSize(9.5f);
+        heading.setLetterSpacing(0.11f);
+        copy.addView(heading);
+        quickMediaTitle = new android.widget.TextView(this);
+        quickMediaTitle.setTag("quickValue");
+        quickMediaTitle.setText("Nothing playing");
+        quickMediaTitle.setTextSize(13f);
+        quickMediaTitle.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        quickMediaTitle.setMaxLines(1);
+        quickMediaTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(quickMediaTitle);
+        copy.setClickable(true);
+        copy.setFocusable(true);
+        copy.setContentDescription("Open current media app");
+        copy.setOnClickListener(v -> {
+            if (quickMediaPackage != null && !quickMediaPackage.isEmpty()) {
+                launchAppForPackage(quickMediaPackage,
+                        quickMediaTitle != null ? quickMediaTitle.getText().toString() : "Media");
+            }
+        });
+        card.addView(copy);
+
+        card.addView(makeQuickMediaButton(density, "‹", "Previous track", v -> mediaNowPlaying.prev()));
+        quickMediaPlayPause = makeQuickMediaButton(density, "▶", "Play", v -> mediaNowPlaying.playPause());
+        card.addView(quickMediaPlayPause);
+        card.addView(makeQuickMediaButton(density, "›", "Next track", v -> mediaNowPlaying.next()));
+        return card;
+    }
+
+    private android.widget.TextView makeQuickMediaButton(float density, String text,
+            String description, View.OnClickListener click) {
+        android.widget.TextView button = new android.widget.TextView(this);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(46 * density), Math.round(48 * density));
+        lp.leftMargin = Math.round(2 * density);
+        button.setLayoutParams(lp);
+        button.setGravity(android.view.Gravity.CENTER);
+        button.setText(text);
+        button.setTextSize(20f);
+        button.setTag("frostAction");
+        button.setContentDescription(description);
+        button.setClickable(true);
+        button.setFocusable(true);
+        button.setBackground(makeDockPlateDrawable(false, density));
+        button.setOnClickListener(click);
+        return button;
+    }
+
+    private void updateQuickMediaCard(JSONObject payload) {
+        if (payload == null) return;
+        quickMediaPackage = payload.optString("packageName", "");
+        quickMediaPlaying = payload.optBoolean("playing", false);
+        boolean hasTrack = payload.optBoolean("hasTrack", false);
+        String title = payload.optString("title", "");
+        String app = payload.optString("appLabel", "");
+        String display = hasTrack && !title.isEmpty() ? title
+                : (!app.isEmpty() ? app : "Nothing playing");
+        if (quickMediaTitle != null) quickMediaTitle.setText(display);
+        if (quickMediaPlayPause != null) {
+            quickMediaPlayPause.setText(quickMediaPlaying ? "Ⅱ" : "▶");
+            quickMediaPlayPause.setContentDescription(quickMediaPlaying ? "Pause" : "Play");
+        }
+    }
+
+    private void refreshQuickCardsTheme() {
+        float density = getResources().getDisplayMetrics().density;
+        for (View card : quickCardViews) {
+            if (card == null) continue;
+            card.setBackground(makeFrostStateDrawable(card.isSelected(), density));
+            tintFrostText(card);
+        }
+        if (quickMediaPlayPause != null) {
+            quickMediaPlayPause.setBackground(makeDockPlateDrawable(false, density));
+        }
+    }
+
+    private void tintFrostText(View view) {
+        if (view instanceof android.widget.TextView) {
+            Object tag = view.getTag();
+            ((android.widget.TextView) view).setTextColor("frostSecondary".equals(tag)
+                    ? dockLabelColorMuted() : dockLabelColor());
+            if ("frostAction".equals(tag)) {
+                view.setBackground(makeDockPlateDrawable(false,
+                        getResources().getDisplayMetrics().density));
+            }
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) tintFrostText(group.getChildAt(i));
+        }
+    }
+
+    private void refreshDesktopIndicator() {
+        int count = Math.max(1, desktopCount);
+        int index = Math.max(0, Math.min(activeDesktopIndex, count - 1));
+        String name = activeDesktopName == null || activeDesktopName.trim().isEmpty()
+                ? "Desktop" : activeDesktopName.trim();
+        if (activeDesktopTitle != null) activeDesktopTitle.setText(name);
+        if (activeDesktopMeta != null) activeDesktopMeta.setText((index + 1) + " of " + count);
+        if (activeDesktopTitle != null && activeDesktopTitle.getParent() instanceof View) {
+            View card = (View) activeDesktopTitle.getParent();
+            card.setBackground(makeFrostStateDrawable(true,
+                    getResources().getDisplayMetrics().density));
+            activeDesktopTitle.setTextColor(dockLabelColor());
+            if (activeDesktopMeta != null) activeDesktopMeta.setTextColor(dockLabelColorMuted());
+            card.setContentDescription(name + ", desktop " + (index + 1) + " of " + count
+                    + ". Tap or long press to customize");
+        }
+    }
+
     private View buildLayoutContentRow(float density, int cellPx, int iconPx) {
+        BounceHorizontalScrollView scroll = new BounceHorizontalScrollView(this, false);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setFadingEdgeLength(Math.round(48 * density));
+        scroll.setClipChildren(true);
+        scroll.setClipToPadding(true);
+        scroll.setBackgroundColor(0x00000000);
+
         android.widget.LinearLayout row = new android.widget.LinearLayout(this);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
-        row.setPadding(Math.round(8 * density), 0, Math.round(16 * density), 0);
+        row.setPadding(Math.round(8 * density), Math.round(4 * density),
+                Math.round(24 * density), Math.round(4 * density));
         row.setClipChildren(false);
         row.setBackgroundColor(0x00000000);
 
-        int wide = Math.round(200 * density);
-        layoutTripleChip = makeWideLayoutChip(density, wide, iconPx, SHELL_TRIPLE,
-                dockGlyphLayout(Math.round(iconPx * 0.55f), dockGlyphColor(true)), "Car in the middle");
-        layoutAppCarChip = makeWideLayoutChip(density, Math.round(180 * density), iconPx, SHELL_APP_CAR,
-                makeSimpleLayoutGlyph(Math.round(iconPx * 0.55f), 2), "Car on the right");
-        layoutAppsChip = makeWideLayoutChip(density, Math.round(220 * density), iconPx, SHELL_APPS,
-                makeSimpleLayoutGlyph(Math.round(iconPx * 0.55f), 3), "Dual App Split Screen");
-        row.addView(layoutTripleChip);
-        row.addView(layoutAppCarChip);
-        row.addView(layoutAppsChip);
+        android.widget.LinearLayout desktopControls = new android.widget.LinearLayout(this);
+        desktopControls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        desktopControls.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        View prev = makeWideDockChip(density, Math.round(64 * density), iconPx,
+                "‹", v -> callViewerDock("previousDesktop"));
+        prev.setContentDescription("Previous desktop");
+        desktopControls.addView(prev);
+        View current = makeDesktopStatusChip(density, Math.round(178 * density), iconPx);
+        current.setOnClickListener(v -> callViewerDock("openDesktopStudio"));
+        current.setOnLongClickListener(v -> {
+            callViewerDock("openDesktopStudio");
+            return true;
+        });
+        desktopControls.addView(current);
+        View next = makeWideDockChip(density, Math.round(64 * density), iconPx,
+                "›", v -> callViewerDock("nextDesktop"));
+        next.setContentDescription("Next desktop");
+        desktopControls.addView(next);
+        View customize = makeWideDockChip(density, Math.round(118 * density), iconPx,
+                "Customize", v -> callViewerDock("openDesktopStudio"));
+        customize.setContentDescription("Customize desktop");
+        desktopControls.addView(customize);
+        row.addView(makeLayoutGroup(density, "DESKTOP", desktopControls));
+        row.addView(makeLayoutDivider(density));
 
-        row.addView(makeDockGap(Math.round(20 * density)));
+        android.widget.LinearLayout viewControls = new android.widget.LinearLayout(this);
+        viewControls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        viewControls.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        layoutTripleChip = makeWideLayoutChip(density, Math.round(156 * density), iconPx,
+                SHELL_TRIPLE, dockGlyphLayout(Math.round(iconPx * 0.48f), dockGlyphColor(true)),
+                "Car + panels");
+        layoutAppCarChip = makeWideLayoutChip(density, Math.round(138 * density), iconPx,
+                SHELL_APP_CAR, makeSimpleLayoutGlyph(Math.round(iconPx * 0.48f), 2),
+                "Car focus");
+        layoutAppsChip = makeWideLayoutChip(density, Math.round(126 * density), iconPx,
+                SHELL_APPS, makeSimpleLayoutGlyph(Math.round(iconPx * 0.48f), 3),
+                "Two apps");
+        viewControls.addView(layoutTripleChip);
+        viewControls.addView(layoutAppCarChip);
+        viewControls.addView(layoutAppsChip);
+        row.addView(makeLayoutGroup(density, "VIEW", viewControls));
+        row.addView(makeLayoutDivider(density));
 
-        // 200dp, not 168: the widest state is "Wallpaper + 3D" WITH the gear
-        // beside it, which ellipsizes at the old width.
-        layoutCenterFillChip = makeCenterFillChip(density, Math.round(200 * density), iconPx);
-        row.addView(layoutCenterFillChip);
+        android.widget.LinearLayout bottomControls = new android.widget.LinearLayout(this);
+        bottomControls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        bottomControls.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        layoutLauncherSurfaceChip = makeWideDockChip(density, Math.round(116 * density), iconPx,
+                "Launcher", v -> chooseDockSurface(DOCK_SURFACE_LAUNCHER, true));
+        layoutLauncherSurfaceChip.setContentDescription("Show app launcher. Long press to customize");
+        layoutLauncherSurfaceChip.setOnLongClickListener(v -> {
+            callViewerDock("openDesktopStudio");
+            return true;
+        });
+        layoutCardsSurfaceChip = makeWideDockChip(density, Math.round(102 * density), iconPx,
+                "Cards", v -> chooseDockSurface(DOCK_SURFACE_CARDS, true));
+        layoutCardsSurfaceChip.setContentDescription("Show quick cards. Long press to customize");
+        layoutCardsSurfaceChip.setOnLongClickListener(v -> {
+            callViewerDock("openDesktopStudio");
+            return true;
+        });
+        bottomControls.addView(layoutLauncherSurfaceChip);
+        bottomControls.addView(layoutCardsSurfaceChip);
+        row.addView(makeLayoutGroup(density, "BOTTOM", bottomControls));
+        row.addView(makeLayoutDivider(density));
+
+        android.widget.LinearLayout otherControls = new android.widget.LinearLayout(this);
+        otherControls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        otherControls.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        layoutCenterFillChip = makeCenterFillChip(density, Math.round(190 * density), iconPx);
+        otherControls.addView(layoutCenterFillChip);
         refreshCenterFillChip();
 
-        layoutAddWidgetChip = makeWideDockChip(density, Math.round(148 * density), iconPx,
-                "Add Widget", v -> callViewerDock("addWidget"));
-        row.addView(layoutAddWidgetChip);
+        layoutAddWidgetChip = makeWideDockChip(density, Math.round(126 * density), iconPx,
+                "Add card", v -> callViewerDock("addWidget"));
+        layoutAddWidgetChip.setContentDescription("Add card");
+        otherControls.addView(layoutAddWidgetChip);
 
-        layoutThemeChip = makeWideDockChip(density, Math.round(152 * density), iconPx,
-                "UI · Dark", v -> callViewerDock("cycleWidgetTheme"));
+        layoutThemeChip = makeWideDockChip(density, Math.round(142 * density), iconPx,
+                "Appearance", v -> callViewerDock("cycleWidgetTheme"));
         layoutThemeLabel = findDockChipLabel(layoutThemeChip);
-        row.addView(layoutThemeChip);
+        layoutThemeChip.setContentDescription("Cycle appearance theme");
+        otherControls.addView(layoutThemeChip);
+        row.addView(makeLayoutGroup(density, "OTHER", otherControls));
 
-        row.addView(makeDockGap(Math.round(10 * density)));
+        scroll.addView(row, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        return scroll;
+    }
 
-        View tipChip = makeDockTipChip(density, Math.round(300 * density), iconPx,
-                "Segure um widget para configurar ou excluir · segure o fundo para adicionar");
-        layoutTipLabel = findDockChipLabel(tipChip);
-        row.addView(tipChip);
-        return row;
+    private View makeLayoutGroup(float density, String label, View controls) {
+        android.widget.LinearLayout group = new android.widget.LinearLayout(this);
+        group.setOrientation(android.widget.LinearLayout.VERTICAL);
+        group.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        android.widget.LinearLayout.LayoutParams groupLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+        group.setLayoutParams(groupLp);
+        android.widget.TextView heading = new android.widget.TextView(this);
+        heading.setText(label);
+        heading.setTextSize(9f);
+        heading.setTextColor(dockLabelColorMuted());
+        heading.setLetterSpacing(0.12f);
+        heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        android.widget.LinearLayout.LayoutParams headingLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                Math.round(18 * density));
+        headingLp.leftMargin = Math.round(8 * density);
+        heading.setLayoutParams(headingLp);
+        group.addView(heading);
+        group.addView(controls, new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 0, 1f));
+        return group;
+    }
+
+    private View makeLayoutDivider(float density) {
+        View divider = new View(this);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                Math.max(1, Math.round(density)), Math.round(76 * density));
+        lp.leftMargin = Math.round(12 * density);
+        lp.rightMargin = Math.round(12 * density);
+        divider.setLayoutParams(lp);
+        divider.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
+        return divider;
+    }
+
+    private View makeDesktopStatusChip(float density, int widthPx, int iconPx) {
+        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setGravity(android.view.Gravity.CENTER);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                widthPx, Math.round(iconPx + 10 * density));
+        lp.leftMargin = Math.round(4 * density);
+        card.setLayoutParams(lp);
+        card.setPadding(Math.round(12 * density), 0, Math.round(12 * density), 0);
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setBackground(makeFrostStateDrawable(true, density));
+        activeDesktopTitle = new android.widget.TextView(this);
+        activeDesktopTitle.setText(activeDesktopName);
+        activeDesktopTitle.setTextColor(dockLabelColor());
+        activeDesktopTitle.setTextSize(13f);
+        activeDesktopTitle.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        activeDesktopTitle.setMaxLines(1);
+        activeDesktopTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        activeDesktopTitle.setGravity(android.view.Gravity.CENTER);
+        card.addView(activeDesktopTitle);
+        activeDesktopMeta = new android.widget.TextView(this);
+        activeDesktopMeta.setText("1 of 1");
+        activeDesktopMeta.setTextColor(dockLabelColorMuted());
+        activeDesktopMeta.setTextSize(10f);
+        activeDesktopMeta.setLetterSpacing(0.08f);
+        activeDesktopMeta.setGravity(android.view.Gravity.CENTER);
+        card.addView(activeDesktopMeta);
+        refreshDesktopIndicator();
+        return card;
     }
 
     /** Platform drawable, tinted for the dock. */
@@ -5735,6 +6372,7 @@ public final class MainActivity extends Activity {
         cell.setClickable(true);
         cell.setFocusable(true);
         cell.setOnClickListener(click);
+        cell.setContentDescription(label);
 
         View plate = new View(this);
         int plateH = Math.round(iconPx + 10 * density);
@@ -5816,6 +6454,8 @@ public final class MainActivity extends Activity {
         styleLayoutChipLabel(layoutAppsChip);
         refreshCenterFillChip();
         refreshLayoutThemeChip();
+        refreshDockSurfaceUi(false);
+        refreshDesktopIndicator();
     }
 
     private void styleLayoutChipLabel(View chip) {
@@ -6136,6 +6776,28 @@ public final class MainActivity extends Activity {
         if (json == null || json.isEmpty()) return;
         try {
             JSONObject o = new JSONObject(json);
+            if (o.has("dockMode")) {
+                String mode = o.optString("dockMode", dockSurfaceMode);
+                if (DOCK_SURFACE_LAUNCHER.equals(mode) || DOCK_SURFACE_CARDS.equals(mode)) {
+                    dockSurfaceMode = mode;
+                    persistDockSurfaceMode();
+                }
+            }
+            if (o.has("activeDesktopName")) {
+                String name = o.optString("activeDesktopName", activeDesktopName);
+                if (name != null && !name.trim().isEmpty()) activeDesktopName = name.trim();
+            }
+            if (o.has("desktopCount")) desktopCount = Math.max(1, o.optInt("desktopCount", 1));
+            if (o.has("activeDesktopIndex")) {
+                activeDesktopIndex = Math.max(0, o.optInt("activeDesktopIndex", 0));
+            }
+            if (o.has("accent")) {
+                String accent = o.optString("accent", "");
+                if (accent != null && accent.trim().startsWith("#")) {
+                    dockAccentColor = parseCssColor(accent.trim(), dockAccentColor);
+                }
+            }
+            applyQuickCardIndicators(o);
             if (o.has("model")) {
                 String v = o.optString("model", dockModelLabel);
                 if (v != null && !v.isEmpty()) dockModelLabel = v;
@@ -6172,9 +6834,57 @@ public final class MainActivity extends Activity {
             refreshDockToolGlyph("fps", dockFpsOn ? "ON" : "OFF");
             refreshDockToolGlyph("xray", dockXrayOn ? "ON" : "OFF");
             refreshLayoutThemeChip();
+            refreshDockSurfaceUi(false);
+            refreshAllDockPlates();
         } catch (Exception e) {
             Log.w(TAG, "updateDockIndicators parse failed", e);
         }
+    }
+
+    private void applyQuickCardIndicators(JSONObject o) {
+        if (o == null) return;
+        String climate = cleanIndicator(o.optString("climateSummary", ""));
+        JSONObject climateObj = o.optJSONObject("climate");
+        if (climate.isEmpty() && climateObj != null) {
+            String temp = cleanIndicator(climateObj.optString("temperature",
+                    climateObj.optString("temp", "")));
+            String fan = cleanIndicator(climateObj.optString("fan", ""));
+            String auto = climateObj.has("auto")
+                    ? (climateObj.optBoolean("auto", false) ? "AUTO ON" : "AUTO OFF") : "";
+            StringBuilder b = new StringBuilder();
+            if (!temp.isEmpty()) b.append(temp).append(temp.contains("°") ? "" : " °C");
+            if (!fan.isEmpty()) {
+                if (b.length() > 0) b.append("  ·  ");
+                b.append("Fan ").append(fan);
+            }
+            if (!auto.isEmpty()) {
+                if (b.length() > 0) b.append("  ·  ");
+                b.append(auto);
+            }
+            climate = b.toString();
+        }
+        if (!climate.isEmpty() && quickClimateValue != null) quickClimateValue.setText(climate);
+
+        String consumption = cleanIndicator(o.optString("consumptionSummary", ""));
+        Object rawConsumption = o.opt("consumption");
+        if (consumption.isEmpty() && rawConsumption instanceof JSONObject) {
+            JSONObject c = (JSONObject) rawConsumption;
+            String value = cleanIndicator(c.optString("value", ""));
+            String unit = cleanIndicator(c.optString("unit", ""));
+            if (!value.isEmpty()) consumption = value + (unit.isEmpty() ? "" : " " + unit);
+        } else if (consumption.isEmpty() && rawConsumption != null
+                && rawConsumption != JSONObject.NULL) {
+            consumption = cleanIndicator(String.valueOf(rawConsumption));
+        }
+        if (!consumption.isEmpty() && quickConsumptionValue != null) {
+            quickConsumptionValue.setText(consumption);
+        }
+    }
+
+    private String cleanIndicator(String value) {
+        if (value == null) return "";
+        String clean = value.trim().replace('\n', ' ').replace('\r', ' ');
+        return clean.length() > 48 ? clean.substring(0, 48) : clean;
     }
 
     private void refreshDockToolGlyph(String cmd, String state) {
@@ -6486,6 +7196,7 @@ public final class MainActivity extends Activity {
         View plate = item.findViewWithTag("iconPlate");
         if (plate != null) {
             boolean darkPlate = editPackage != null && usesDarkIconPlate(editPackage);
+            item.setTag(Boolean.valueOf(darkPlate));
             plate.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
             int platePx = dockPlatePx(iconPx, density);
             int inset = Math.round(platePx * launcherIconInsetFrac());

@@ -178,6 +178,29 @@ Registering only one of them is silent failure — nothing arrives and the model
 never moves. The per-key `android.intent.haval.*` broadcasts are **not** usable
 here: they are `setPackage()`-scoped to havalshisuku itself.
 
+### Vehicle body controls (viewer → Impulse)
+
+The viewer sends body actions only through the explicit, package-scoped Impulse
+contract below. The native bridge rejects commands outside this list before it
+ever broadcasts, so an asset-page regression cannot become arbitrary command
+injection.
+
+| Action | Extras | Meaning |
+| --- | --- | --- |
+| `br.com.redesurftank.havalshisuku.ACTION_VEHICLE_COMMAND` | `caller`, `command`, optional `value` | Viewer → Impulse body-control request |
+
+`command` may be one of these value-less actions:
+
+- `open_windows`, `close_windows`, `open_sunroof`, `close_sunroof`, `open_curtain`, `close_curtain`
+- Legacy-compatible: `toggle_windows`, `toggle_sunroof`, `toggle_curtain`, `toggle_doors_all`, `toggle_trunk`
+
+For precise controls it may instead be `set_windows_level`,
+`set_sunroof_level`, or `set_curtain_level`, with `value` as an integer from
+`0` through `100`. The viewer debounces drag updates but flushes the final value
+on release. Impulse should perform its normal safety/interlock checks, then
+publish the resulting status through the usual telemetry path; that telemetry is
+the authoritative state for the renderer.
+
 ### Freeform task ids (keeping popups on top)
 
 The MMI is Android 9, where freeform windows are ordinary stacks in one z-list:
