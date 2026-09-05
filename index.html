@@ -14908,10 +14908,13 @@ class Component extends DCLogic {
       for (let i = 0; i < K; i++) ts[i] = i / (K - 1);
       geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
-      const mat = new THREE.LineBasicMaterial({
+      // setAdditiveKeepAlpha: plain AdditiveBlending also writes alpha, so the
+      // full polyline (incl. black "dark" vertices between comet passes) punched
+      // opaque black curves through mixed centerFill's transparent canvas.
+      const mat = setAdditiveKeepAlpha(THREE, new THREE.LineBasicMaterial({
         vertexColors: true, transparent: true, depthWrite: false, depthTest: true,
-        blending: THREE.AdditiveBlending, toneMapped: false,
-      });
+        toneMapped: false,
+      }));
       const line = new THREE.Line(geo, mat);
       line.frustumCulled = false;
       line.renderOrder = 3;
