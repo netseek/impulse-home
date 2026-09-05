@@ -165,6 +165,33 @@ explains it. Measure the specific change; do not reason from this table.
   invisible parked and only bites on a moving car, so a driveway test will not
   find this for you.
 
+  **This is not a one-off, and a "threshold" is the tell.** Within a day of
+  fixing the speed signal, the SAME failure was measured again on
+  `mediaPositionMs` — the media progress bar. It had a 400 ms threshold and the
+  comment "keep React state in sync so re-renders don't reset the bar to 0",
+  and both were wrong the same way the speed deadband was:
+
+  - a threshold only ever protects a PAUSED player / a PARKED car. Anything
+    actually running crosses it on every tick. Measured while driving: 23
+    commits in a 15 s window, React back to **65.9% of wall clock** at 105 ms
+    p50 / 957 ms p90.
+  - the state it was "keeping in sync" was already redundant — `renderVals`
+    prefers `this._mediaPositionMs` over `s.mediaPositionMs`, so a re-render
+    could not have reset the bar anyway.
+
+  Removing that one commit, measured on the car:
+
+  | | before | after |
+  |---|---|---|
+  | fps | 6.66 | **11.43** |
+  | React share of wall | 65.9% | **10.3%** |
+  | `timerLagP50` | 49.9 ms | **6.2 ms** |
+  | post-FX served from cache | 50% | **81%** |
+
+  So: when you find a per-tick `setState` guarded by a magnitude threshold,
+  the threshold is the bug, not the fix. Check whether `renderVals` already
+  reads a live mirror — twice now, it did.
+
 - **A hidden WebView is still on the panel, and its render loop is dead.** The
   loop is driven only by `requestAnimationFrame`. When another app takes window
   focus — a freeform app in a launcher slot, the OEM scene manager — Android
@@ -397,6 +424,90 @@ still reads as a transition instead of a one-frame blink.
 One thing NOT to gate chrome visibility on: `s.loading`. That is what made the
 config dock close and re-open on every rim swap;
 `!(s.loading && !this._viewerReady)` is the test the rest of the chrome uses.
+
+## X-ray mode is a second model, not a transparency effect
+
+`xray` is `state.powertrainOn`, and it does three separate expensive things.
+Measured on the car, interleaved pairs, rig confirmed visible in every ON arm:
+
+| | x-ray off | x-ray on |
+|---|---|---|
+| draw calls | 178 | **383** |
+| triangles | 344,716 | **497,362** |
+| `submitMs` | 27.3 | 35.9 |
+| GPU backlog (`gl.finish`) | 0.1 ms | 0.1 ms |
+
+1. **It adds the powertrain rig** — 131 meshes, 115,328 triangles. "The car is
+   almost transparent so it should be cheap" is backwards: transparency removes
+   early-Z and *adds* a whole drivetrain behind the shell.
+2. **It never lets the scene idle.** `_tickPowertrainFx` returns true whenever
+   the rig is animating, i.e. always. Camera still, nothing moving, three
+   interleaved pairs: **4.74 renders/s with x-ray off, 9.69 with it on**, and
+   `timerLagP50` 49.3 ms → 105.9 ms.
+3. **It used to rebuild post-FX on every single frame.** The tell is
+   `postFxPerSec` exactly equalling `rendersPerSec` (9.69 = 9.69 in all three
+   arms) while x-ray off ran 1.58 rebuilds against 4.74 renders.
+
+   **`requestRender()` sets `_postFxDirty` unconditionally**, so throttling at
+   the call site does nothing — the very next line undoes it. Measured with a
+   trap on the flag: `requestRender` was setting it 17.45x/s against the
+   throttle's intended 4.49x/s. Hence `requestRender(n, keepPostFx)`; the x-ray
+   tick passes `true` and a 5 Hz throttle (`PT_POSTFX_HZ`) is then the only
+   thing that invalidates the overlay.
+
+### The ghost body
+
+`_setBodyGhost` used to keep the whole body and clone all ~42 materials into
+transparent ones — full draw-call count, no early-Z, and ~44 transparent meshes
+in the per-frame depth sort. It is now a purpose-built asset,
+`scripts/build-xray-ghost.mjs` (`npm run build:xray-ghost`):
+
+| | draw calls | triangles | size |
+|---|---|---|---|
+| HEV ghost | 132 → **2** | 142,332 → 58,766 | 12.9 MB → **0.29 MB** |
+| GT ghost | 99 → **2** | 128,581 → 48,305 | 6.6 MB → **0.20 MB** |
+
+**Merging matters more than decimating.** The GPU is idle here (backlog
+0.1 ms), so the cost is CPU-side draw submission — a 5k-triangle ghost split
+across 40 draw calls would be WORSE than a 100k-triangle ghost in one. One
+material, no textures, Draco (legitimate: x-ray is not boot-critical).
+
+`window.__xrayGhost(false)` reverts to the material-clone path for A/B.
+
+Three classifier traps, all caught by `--dry` before anything was written:
+
+- a bare `/disc/` matches **"discoloration"** and threw three body panels out.
+- the HEV spells its brake discs **`Break_Disks`**, and its meshes are
+  **unnamed** — only the node name identifies them. The GT's wheels are
+  identifiable **only by material name** (`Wheel`).
+- consulting material names then breaks lamps: a GT rear cluster carries
+  `Chrome | BrakeLight | PositionLight_Rear`. Structural names decide first;
+  materials are a fallback, must ALL read as wheel parts, and a
+  `light|lamp|lens` match vetoes.
+
+And two integration bugs worth not repeating:
+
+- **hide the ghost unconditionally when x-ray closes**, not inside the
+  "did we hide the shell" branch — the asset arriving mid-toggle re-runs the
+  pair and leaves a second see-through car inside the real one.
+- **guard the "asset not ready yet" retry.** With `__xrayGhost(false)`,
+  `_useGhostBodyModel()` always returns false, the cached promise resolves
+  instantly, and the retry re-enters `_setBodyGhost(true)` forever. That hangs
+  the page and the WebView reloads under it — which reads as random crashes
+  during an A/B, not as a loop.
+
+## Anything Hz-denominated must run off the wall clock
+
+`_tickPowertrainFx` accumulated the render loop's `_dt`, which was clamped to
+`[8 ms, 50 ms]`. Below 20 fps — most of this panel's range — the clock advanced
+50 ms per frame while real time advanced 200+, so `cellEdgeHz: 7.0` was not
+7 Hz, and the rate it actually ran at moved with the frame rate. The symptom is
+"the blink is tied to fps, not time", and it applies to every Hz-denominated
+animation behind that clock. It now derives from `now` directly, seeded so the
+phase does not jump.
+
+Watch for the same shape anywhere a per-frame delta is clamped "for safety":
+the clamp is correct for tweens and physics and wrong for anything periodic.
 
 ## Things that look like wins and are not
 

@@ -5875,6 +5875,8 @@ const WHEEL_RAD_PER_S_PER_KMH = 15.2 / 40;
 
 // ASSUMPTION: vehicle_speed is km/h. The viewer's motionSpeed unit is km/h/40
 // (see motionSpeedLabel, which renders Math.abs(motionSpeed) * 40 + ' km/h').
+// X-ray bloom rebuild ceiling, Hz. See the note at the _tickPowertrainFx call.
+const PT_POSTFX_HZ = 5;
 const CAR_SPEED_KMH_PER_UNIT = 40;
 
 // Event / cycle / orbit camera behaviour (CAMERA → OPTIONS).
@@ -20436,9 +20438,17 @@ class Component extends DCLogic {
       // redraw. Continuous wheel roll/reflection flow can then reuse the last
       // result instead of rendering the full car two extra times per frame.
       this._postFxDirty = true;
-      this.requestRender = (n = 3) => {
+      // keepPostFx: request frames WITHOUT invalidating the cached bloom/streak
+      // overlay. For a caller that runs every frame (the x-ray FX tick), the
+      // unconditional dirty here is the whole cost: it made post-FX rebuild on
+      // literally every frame, and no throttle at the call site can help,
+      // because this line runs immediately after it. Measured with the trap on
+      // _postFxDirty: requestRender was setting it 17.45x/s against the x-ray
+      // throttle's intended 4.49x/s. Default is unchanged for every other
+      // caller -- omit it and post-FX invalidates exactly as before.
+      this.requestRender = (n = 3, keepPostFx) => {
         this._renderFrames = Math.max(this._renderFrames || 0, n);
-        this._postFxDirty = true;
+        if (!keepPostFx) this._postFxDirty = true;
         // Lets the resolution tier tell external redraw requests apart from
         // the refine pass's own trailing frames - see _setResTier.
         this._extRenderSeq = (this._extRenderSeq || 0) + 1;
@@ -20503,6 +20513,14 @@ class Component extends DCLogic {
       this._refineFrames  = 0;
       this._perf = { fps: 0, lastMs: 0, renderedFrames: 0, dpr: this._dprSteps[this._dprIdx] };
       this._installLiveDefs();
+      // A/B the x-ray ghost: __xrayGhost() reads, __xrayGhost(false) reverts to
+      // the material-clone path so the draw-call delta can be measured live.
+      window.__xrayGhost = (on) => {
+        if (on == null) return this._xrayGhostModel !== false;
+        this._xrayGhostModel = !!on;
+        if (this.state.powertrainOn) { this._setBodyGhost(false); this._setBodyGhost(true); }
+        return this._xrayGhostModel;
+      };
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
         resTier: this._resTier,
         busPerSec: this._busRate || 0,
@@ -21393,14 +21411,29 @@ class Component extends DCLogic {
         this._applyWheelTransforms(true);
 
         const _now = performance.now();
-        const _dt = Math.min(0.05, Math.max(0.008, (this._fitCamLastMs ? (_now - this._fitCamLastMs) : 16) / 1000));
+        const _dt = (this._fitCamLastMs ? (_now - this._fitCamLastMs) : 16) / 1000;
         this._fitCamLastMs = _now;
         // X-ray powertrain: glow + HV beads follow the POWER card flow. Keep
         // the on-demand loop alive while the mode is open (pulse / beads).
         if (this._tickPowertrainFx(_dt, _now)) {
           needRender = true;
-          this._postFxDirty = true;
-          this.requestRender(2);
+          // Dirtying post-FX from the FX tick made the bloom composer rebuild
+          // on EVERY frame while x-ray is open. Measured on the car, camera
+          // still, three interleaved pairs: 9.69 rebuilds/s with x-ray on
+          // against 1.58/s with it off -- 6.1x, on a scene where nothing was
+          // moving. The glow it is rebuilding for is a slow pulse (cellEdgeHz
+          // 7, bead travel), so it does not need a rebuild per frame; the
+          // cached overlay quad is reused in between exactly as it is for
+          // headlights. Timer lag p50 with x-ray open was 105.9 ms vs 49.3 ms
+          // closed, so this was also the thread's problem, not just the GPU's.
+          const _ptFxMs = 1000 / PT_POSTFX_HZ;
+          if (!this._ptPostFxMs || _now - this._ptPostFxMs >= _ptFxMs) {
+            this._ptPostFxMs = _now;
+            this._postFxDirty = true;
+          }
+          // keepPostFx: the throttle above is the ONLY thing allowed to
+          // invalidate the overlay while x-ray is open.
+          this.requestRender(2, true);
         }
         let cameraBusy = false;
         if (this._tickIntro(_dt)) {
@@ -22172,12 +22205,169 @@ class Component extends DCLogic {
   }
 
   /** Fade the body so the powertrain reads through it. Fully reversible. */
+  /**
+   * X-RAY GHOST BODY
+   * ================
+   * The original ghost kept the whole body and cloned every material into a
+   * transparent one (the `else` fallback below). Measured on the car, x-ray
+   * therefore cost +205 draw calls and +152,646 triangles against x-ray off,
+   * at a GPU backlog of 0.1 ms -- i.e. the cost was CPU-side draw submission,
+   * not triangle throughput. On top of that the ghosted body loses early-Z and
+   * adds ~44 transparent meshes to the per-frame depth sort.
+   *
+   * So the ghost is now a purpose-built asset: ONE mesh, ONE material, no
+   * textures (scripts/build-xray-ghost.mjs). 132 draw calls -> 2 on the HEV,
+   * 99 -> 2 on the GT, 12.9 MB -> 0.29 MB. That is worth far more than
+   * decimating polygons would be -- a 5k-triangle ghost split across 40 draw
+   * calls would be WORSE than a 100k-triangle ghost in one.
+   *
+   * Doors, lights and glass do not animate in x-ray, so nothing needs to stay
+   * separable and the whole shell can be a single primitive.
+   *
+   * window.__xrayGhost(false) falls back to the material-clone path for A/B.
+   */
+  _ghostBodyUrl() {
+    // phev34 / phev19 / hev all ride the HEV body; only GT differs.
+    return this.state.modelTrim === 'gt'
+      ? 'assets/haval-h6-gt-ghost.glb'
+      : 'assets/haval-h6-hev-ghost.glb';
+  }
+
+  _ensureGhostBody() {
+    const url = this._ghostBodyUrl();
+    if (this._ghostBody && this._ghostBodyFor === url) return Promise.resolve(this._ghostBody);
+    if (this._ghostBodyLoadingFor === url && this._ghostBodyLoading) return this._ghostBodyLoading;
+    const THREE = this.THREE;
+    if (!THREE || !this.model) return Promise.resolve(null);
+
+    // A body swap invalidates the previous ghost.
+    if (this._ghostBody) {
+      if (this._ghostBody.parent) this._ghostBody.parent.remove(this._ghostBody);
+      this._ghostBody.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+      this._ghostBody = null;
+    }
+
+    this._ghostBodyLoadingFor = url;
+    this._ghostBodyLoading = new Promise((resolve) => {
+      const loader = new THREE.GLTFLoader();
+      const draco = new THREE.DRACOLoader();
+      draco.setDecoderPath('vendor/draco/');
+      loader.setDRACOLoader(draco);
+      loader.load(url, (gltf) => {
+        const root = gltf.scene;
+        root.name = 'XrayGhostBody';
+        root.visible = false;
+        root.traverse((o) => {
+          if (!o.isMesh) return;
+          o.castShadow = false;
+          o.receiveShadow = false;
+          o.renderOrder = 3;
+        });
+        // Child of the car, exactly like the powertrain rig, so it inherits
+        // every transform the body gets. The asset's vertices were baked in the
+        // source GLB's own scene space (gltf-transform flatten()), which is the
+        // same space this.model's meshes sit in, so no fit step is needed.
+        (this.model || this.scene).add(root);
+        this._ghostBody = root;
+        this._ghostBodyFor = url;
+        this._ghostBodyLoading = null;
+        resolve(root);
+      }, null, (err) => {
+        console.warn('[xray] ghost body failed to load, falling back to material ghost:', url, err);
+        this._ghostBody = null;
+        this._ghostBodyFor = null;
+        this._ghostBodyLoading = null;
+        resolve(null);
+      });
+    });
+    return this._ghostBodyLoading;
+  }
+
+  /** The meshes the material-clone path would have ghosted, i.e. the shell. */
+  _ghostableBodyMeshes() {
+    const keepSolid = new Set();
+    [this._allWheels, this._tireWheels, this._rimWheels, this._spokesWheels,
+     this._otherRimWheels, this._customClonedWheels].forEach((list) => {
+      (list || []).forEach((w) => {
+        const m = (w && w.mesh) ? w.mesh : ((w && w.c) ? w.c : w);
+        if (m && m.id !== undefined) keepSolid.add(m.id);
+      });
+    });
+    [...(this._blurredDiscs || []), ...(this._backingDiscs || [])].forEach((d) => {
+      if (d && d.id !== undefined) keepSolid.add(d.id);
+    });
+    const out = [];
+    this.model.traverse((c) => {
+      if (!c.isMesh || this._isCarFloorMesh(c)) return;
+      if (keepSolid.has(c.id)) return;
+      if (this._powertrainRig && this._powertrainRig.getObjectById(c.id)) return;
+      if (this._ghostBody && this._ghostBody.getObjectById(c.id)) return;
+      out.push(c);
+    });
+    return out;
+  }
+
+  /** Swap the real shell out for the single-mesh ghost. Returns false if not ready. */
+  _useGhostBodyModel() {
+    if (this._xrayGhostModel === false) return false;
+    const ghost = this._ghostBody;
+    if (!ghost) return false;
+    const tune = this._powertrainTuning();
+    const hidden = [];
+    this._ghostableBodyMeshes().forEach((m) => {
+      if (m.visible) { hidden.push(m); m.visible = false; }
+    });
+    if (!hidden.length) return false;
+    ghost.visible = true;
+    ghost.traverse((o) => {
+      if (!o.isMesh || o._ghostPrepared) return;
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      list.forEach((g) => {
+        if (!g) return;
+        this._applyGhostFresnel(g);
+        if (g.color) g.color.set(tune.ghostColor);
+        if (g.emissive) g.emissive.set(0x000000);
+        if (g.emissiveIntensity !== undefined) g.emissiveIntensity = 0;
+        g.transparent = true;
+        g.opacity = tune.ghostOpacity;
+        g.depthWrite = false;
+        g.needsUpdate = true;
+      });
+      o._ghostPrepared = true;
+    });
+    this._ghostHidden = hidden;
+    return true;
+  }
+
   _setBodyGhost(on) {
     const THREE = this.THREE;
     const model = this.model;
     if (!model) return;
     if (on) {
-      if (this._ghostMats) return;
+      if (this._ghostMats || this._ghostHidden) return;
+      // Preferred path: one merged ghost mesh. Falls through to the
+      // material-clone path below on the very first open (asset still
+      // fetching) or if the asset is missing, then swaps in on arrival.
+      if (this._useGhostBodyModel()) {
+        if (this.requestRender) this.requestRender(4);
+        return;
+      }
+      // Chase the asset ONLY when the ghost path is enabled and the asset is
+      // genuinely absent. Without both guards this recursed forever: with
+      // __xrayGhost(false), _useGhostBodyModel() always returns false, the
+      // promise resolves instantly from cache, and the retry re-entered
+      // _setBodyGhost(true) on every turn. That hung the page and the WebView
+      // reloaded under it -- which looked like random crashes during an A/B.
+      if (this._xrayGhostModel !== false && !this._ghostBody && !this._ghostChasing) {
+        this._ghostChasing = true;
+        this._ensureGhostBody().then((g) => {
+          this._ghostChasing = false;
+          if (!g || !this.state.powertrainOn) return;
+          // Re-run now the asset is here: drop the cloned materials first.
+          this._setBodyGhost(false);
+          this._setBodyGhost(true);
+        }, () => { this._ghostChasing = false; });
+      }
       const tune = this._powertrainTuning();
       const ghostOpacity = tune.ghostOpacity;
       const ghostColor = tune.ghostColor;
@@ -22230,6 +22420,16 @@ class Component extends DCLogic {
       });
       this._ghostMats = saved;
     } else {
+      // Unconditionally, and BEFORE the _ghostHidden guard: the ghost can be
+      // visible without _ghostHidden being set (the asset arriving mid-toggle
+      // re-runs this pair), and leaving it on paints a second, see-through car
+      // inside the real one with x-ray already closed. Caught on the car.
+      if (this._ghostBody) this._ghostBody.visible = false;
+      if (this._ghostHidden) {
+        this._ghostHidden.forEach((m) => { m.visible = true; });
+        this._ghostHidden = null;
+        if (this.requestRender) this.requestRender(4);
+      }
       if (!this._ghostMats) return;
       this._ghostMats.forEach((e) => {
         const cur = Array.isArray(e.mesh.material) ? e.mesh.material : [e.mesh.material];
@@ -22911,6 +23111,7 @@ class Component extends DCLogic {
     this._powertrainBeadGroups = [];
     this._powertrainFxSig = '';
     this._powertrainFxT = 0;
+    this._powertrainFxT0 = null;   // restart the wall clock with the rig
     this._ensurePowertrainArrowGeometry();
     if (!this._powertrainBeadPos) this._powertrainBeadPos = new THREE.Vector3();
   }
@@ -24368,6 +24569,11 @@ class Component extends DCLogic {
    * Advance glow / beads while x-ray is on. Returns true when the on-demand
    * render loop must keep ticking (pulse + marching beads).
    */
+  // How often the x-ray glow may rebuild the bloom composer, in Hz. The FX
+  // tick itself still runs every frame (the beads and cell blink must move at
+  // frame rate); this only rate-limits the post-FX rebuild behind them.
+  // 5 Hz was chosen as the point where the glow still tracks the pulse without
+  // the rebuild landing on every frame -- re-measure with __diag() if changed.
   _tickPowertrainFx(dt, now) {
     if (!this.state.powertrainOn || !this._powertrainRig || !this._powertrainRig.visible) {
       return false;
@@ -24383,7 +24589,21 @@ class Component extends DCLogic {
       this._applyPowertrainFlow(flow, socPct);
     }
 
-    this._powertrainFxT = (this._powertrainFxT || 0) + dt;
+    // Wall clock, NOT accumulated frame deltas. The caller's dt was clamped to
+    // [8 ms, 50 ms], so below 20 fps -- which is most of this panel's range --
+    // the clock advanced 50 ms per frame while real time advanced 200+ ms. Every
+    // Hz-denominated animation below (cellEdgeHz 7.0, cellChaseHz, the ring
+    // pulse) then ran at a fraction of its stated rate, and that fraction moved
+    // with the frame rate: the blink visibly slowed down as the scene got
+    // busier. A 7 Hz blink has to be 7 Hz at 4 fps too.
+    //
+    // Seeded from the existing value so the phase does not jump when this is
+    // reached mid-animation; _powertrainFxT0 is cleared wherever the clock is
+    // reset to 0.
+    if (this._powertrainFxT0 == null) {
+      this._powertrainFxT0 = now - (this._powertrainFxT || 0) * 1000;
+    }
+    this._powertrainFxT = (now - this._powertrainFxT0) / 1000;
     const t = this._powertrainFxT;
     const G = this._powertrainGlowTones();
     const tune = this._powertrainFxTune();
@@ -26872,7 +27092,13 @@ class Component extends DCLogic {
     if (this.contactShadow) this.contactShadow.visible = show;
     if (this.floorMesh) this.floorMesh.visible = show && !(this.state && this.state.nightMode) && !mixedFill;
     if (this.nightFloor) this.nightFloor.visible = show && !!(this.state && this.state.nightMode);
-    if (this._windGroup) this._windGroup.visible = show && !!this._currentMotionSpeed();
+    // _updateWindLines owns the speed threshold (WIND_ON = 1.0, i.e. 40 km/h)
+    // and re-evaluates it every frame. Deciding visibility from a plain
+    // "speed != 0" here was a SECOND, far lower threshold, and whichever ran
+    // last won -- so reapplying scene visibility switched the streaks on at any
+    // speed above zero. Only force them off with the rest of the scene; let the
+    // per-frame gate be the one that ever turns them on.
+    if (this._windGroup && !show) this._windGroup.visible = false;
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (show && !wasShow) {
@@ -29795,10 +30021,17 @@ class Component extends DCLogic {
     if (this.state.loading) return;
     const pos = Number(ms) || 0;
     this._mediaPositionMs = pos;
-    // Keep React state in sync so re-renders (e.g. art attach) don't reset the bar to 0.
-    if (Math.abs((this.state.mediaPositionMs || 0) - pos) >= 400) {
-      this.setState({ mediaPositionMs: pos });
-    }
+    // No setState. renderVals already prefers _mediaPositionMs over
+    // state.mediaPositionMs (see mediaProgressPct / mediaTimeCur), so a
+    // re-render cannot reset the bar to 0 -- which is the only thing the old
+    // 400 ms-threshold commit was protecting.
+    //
+    // That threshold was the same mistake the speed signal made: it only ever
+    // protects a PAUSED player, and a playing one crosses it on every tick.
+    // Measured on the car while driving, it fired 23x in a 15 s window and put
+    // React back to 65.9% of wall clock at 105 ms p50 / 957 ms p90 per commit
+    // -- after motionSpeed had already been moved off React for exactly this.
+    // See "A hot CAN signal must never reach setState at all" in CLAUDE.md.
     this._syncMediaPositionDom(pos, this.state.mediaDurationMs || 0);
   }
 

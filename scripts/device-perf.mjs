@@ -124,7 +124,12 @@ function verdict(d) {
     out.push('WEBVIEW HIDDEN — Chromium has stopped rAF and clamped timers to 1 Hz. '
       + 'The render loop is rAF-only, so it is not the scene: another app has focus.');
   }
-  const blocked = d.timerLagP50 != null && d.timerLagP50 > 50;
+  // React time dominates the verdict: a run measured 65.9% of wall clock in
+  // commits while timerLagP50 sat at 49.9 ms, just under a flat >50 threshold,
+  // and this printed "GPU/COMPOSITOR BOUND" for a textbook blocked main thread.
+  // If we are spending a fifth of the frame committing, that IS the answer.
+  const heavyReact = d.pctWallInCommits > 20;
+  const blocked = heavyReact || (d.timerLagP50 != null && d.timerLagP50 > 50);
   const rafSlow = d.bareRafP50 != null && d.bareRafP50 > 40;
   if (blocked && rafSlow) {
     out.push(`MAIN THREAD BLOCKED — an empty rAF (${d.bareRafP50} ms) and a 0 ms timer `
