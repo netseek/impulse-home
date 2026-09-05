@@ -27099,6 +27099,9 @@ class Component extends DCLogic {
     } else if (this.model) {
       this.model.visible = show;
     }
+    // Re-assert through the single writer so a scene-visibility change during a
+    // swap cannot reveal the half-built incoming body.
+    if (this._variants && this._activeVariantKey) this._applyVariantVisibility();
 
     const mixedFill = this._isMixedCenterFill();
     // Mixed fill (car over wallpaper): the opaque asphalt disc has to stay
@@ -27219,8 +27222,42 @@ class Component extends DCLogic {
     // display:none until the caller's setState lands — hence the fallbacks.
     const w = el.offsetWidth || 116;
     const h = el.offsetHeight || 24;
-    x = Math.max(w / 2 + 10, Math.min(layerRect.width - w / 2 - 10, x));
-    y = Math.max(10, Math.min(layerRect.height - h - 10, y));
+
+    // Clamp into the band the CAR occupies, not just the layer: between the
+    // widget boards horizontally and above the launcher strip vertically. Under
+    // the car is still where it wants to be; this only bites when that would
+    // put the pill on top of the widgets or the app row, where it is both
+    // unreadable and in the way. The board rects are the same ones
+    // _shellCameraTarget uses to decide where to put the car in the first
+    // place, so the pill lands in the gap the car was aimed at.
+    let minX = w / 2 + 10;
+    let maxX = layerRect.width - w / 2 - 10;
+    let maxY = layerRect.height - h - 10;
+    try {
+      const mode = this._shellMode || this.state.shellMode || 'triple';
+      if (mode !== 'appsOnly' && typeof this._effectiveBoardBounds === 'function') {
+        const lb = this._effectiveBoardBounds('left', mode,
+          this._shellLeftBounds || { l: 48, t: 100, r: 740, b: 530 });
+        const rb = this._effectiveBoardBounds('right', mode,
+          this._shellRightBounds || { l: 1180, t: 100, r: 1872, b: 530 });
+        if (lb && isFinite(lb.r)) minX = Math.max(minX, lb.r + w / 2 + 8);
+        // appCar leaves the right half free — no right board to avoid.
+        if (mode !== 'appCar' && rb && isFinite(rb.l)) {
+          maxX = Math.min(maxX, rb.l - w / 2 - 8);
+        }
+        const strip = Math.min(
+          lb && isFinite(lb.b) ? lb.b : Infinity,
+          rb && isFinite(rb.b) ? rb.b : Infinity,
+        );
+        if (isFinite(strip)) maxY = Math.min(maxY, strip - h - 8);
+      }
+    } catch (e) { /* fall back to the plain layer clamp below */ }
+    // A narrow gap can invert the clamp; a centred pill beats a NaN one.
+    if (!(minX <= maxX)) { minX = w / 2 + 10; maxX = layerRect.width - w / 2 - 10; }
+    if (!(maxY > 10)) maxY = layerRect.height - h - 10;
+
+    x = Math.max(minX, Math.min(maxX, x));
+    y = Math.max(10, Math.min(maxY, y));
     el.style.transform = 'translate3d(' + Math.round(x) + 'px,' + Math.round(y)
       + 'px,0) translate(-50%,0)';
   }
@@ -27230,6 +27267,10 @@ class Component extends DCLogic {
     if (this._carSwapActive) return;     // outermost caller names the swap
     this._carSwapActive = true;
     this._carSwapLabel = kind || 'model';
+    // Hold the body that is on screen right now. If the swap does not change
+    // the body (wheel, upload, x-ray) this equals the incoming key and
+    // _applyVariantVisibility is a no-op.
+    this._swapHoldVariant = this._activeVariantKey || null;
     this._positionSwapBadge();
     // ...and again once the caller's setState has actually shown the layer, so
     // the clamp above runs against a measured badge instead of the fallbacks.
@@ -27248,6 +27289,15 @@ class Component extends DCLogic {
     if (!this._carSwapActive) return;
     this._carSwapActive = false;
     clearTimeout(this._carSwapSafetyTimer); this._carSwapSafetyTimer = null;
+
+    // Release the hold and reveal the finished car in one frame. This also runs
+    // from the 25 s safety timer, so a load that never reports done reveals
+    // whatever it managed rather than leaving the previous body up forever.
+    if (this._swapHoldVariant) {
+      this._swapHoldVariant = null;
+      this._applyVariantVisibility();
+      if (this.requestRender) this.requestRender(6);
+    }
 
     // Flush the debounced sprite capture NOW. It is keyed to the rim that just
     // landed, and revealing before it runs shows the new rim wearing the old
@@ -30242,6 +30292,36 @@ class Component extends DCLogic {
     this._variantHiddenMeshes = hidden;
   }
 
+  /**
+   * The ONE place variant root visibility is written.
+   *
+   * `_swapHoldVariant` keeps the OUTGOING body on screen for the whole swap.
+   * Both variants stay resident (see _variants), so this costs nothing but a
+   * visible flag: the new body is built, fitted and wheeled while hidden
+   * behind the old one, and _endCarSwap flips them in a single frame once
+   * everything has landed.
+   *
+   * This is deliberately NOT the veil that was removed before -- that faded the
+   * whole canvas to transparent and read as the screen washing out to white
+   * over a light day scene. Nothing fades here; the outgoing car simply stays
+   * until the incoming one is complete, so there is never a wheel-less car on
+   * screen and never a blank frame.
+   *
+   * Body swaps only in practice: a wheel or x-ray swap has hold === active, so
+   * this is a no-op for them.
+   */
+  _applyVariantVisibility() {
+    if (!this._variants) return;
+    const showCar = this._carSceneVisible === true;
+    const shown = (this._swapHoldVariant && this._variants[this._swapHoldVariant])
+      ? this._swapHoldVariant
+      : this._activeVariantKey;
+    Object.keys(this._variants).forEach((k) => {
+      const r = this._variants[k] && this._variants[k].root;
+      if (r) r.visible = showCar && (k === shown);
+    });
+  }
+
   _activateVariant(key) {
     if (!this._variants || !this._variants[key]) return;
     const b = this._variants[key];
@@ -30268,11 +30348,8 @@ class Component extends DCLogic {
     // (loading / appsOnly / pre-intro). Donor wheels stay available, but the
     // donor BODY must never draw: cull it even while the car is still hidden
     // so the first visible frame cannot stack GT + PHEV.
-    const showCar = this._carSceneVisible === true;
-    Object.keys(this._variants).forEach((k) => {
-      const r = this._variants[k] && this._variants[k].root;
-      if (r) r.visible = showCar && (k === key);
-    });
+    this._activeVariantKey = key;
+    this._applyVariantVisibility();
 
     if (b._inheritedWheelsFrom) {
       const srcV = this._variants[b._inheritedWheelsFrom];
