@@ -22227,15 +22227,34 @@ class Component extends DCLogic {
    * window.__xrayGhost(false) falls back to the material-clone path for A/B.
    */
   _ghostBodyUrl() {
-    // phev34 / phev19 / hev all ride the HEV body; only GT differs.
-    return this.state.modelTrim === 'gt'
+    // Keyed off the trim table's own `body` field, not the trim key, so a trim
+    // added to _trims() picks up the right ghost automatically. Today:
+    // phev34 / hev / phev19 -> 'hev', gt -> 'gt'.
+    const body = (this._currentTrim && this._currentTrim().body)
+      || (this.state.modelTrim === 'gt' ? 'gt' : 'hev');
+    return body === 'gt'
       ? 'assets/haval-h6-gt-ghost.glb'
       : 'assets/haval-h6-hev-ghost.glb';
   }
 
+  /**
+   * The cached ghost is only good for the body it was loaded for AND while it
+   * is still parented to the live model. A trim change that swaps the body
+   * (see _trims(): only GT differs -- phev34/hev/phev19 all ride the HEV body)
+   * replaces this.model, so a cached ghost is then either the wrong shape or
+   * orphaned on the destroyed car. _syncPowertrainToBody re-runs
+   * _setBodyGhost(false/true) after a swap, and without this check that would
+   * hide the NEW shell and show the OLD ghost.
+   */
+  _ghostBodyUsable() {
+    return !!(this._ghostBody
+      && this._ghostBodyFor === this._ghostBodyUrl()
+      && this._ghostBody.parent === this.model);
+  }
+
   _ensureGhostBody() {
     const url = this._ghostBodyUrl();
-    if (this._ghostBody && this._ghostBodyFor === url) return Promise.resolve(this._ghostBody);
+    if (this._ghostBodyUsable()) return Promise.resolve(this._ghostBody);
     if (this._ghostBodyLoadingFor === url && this._ghostBodyLoading) return this._ghostBodyLoading;
     const THREE = this.THREE;
     if (!THREE || !this.model) return Promise.resolve(null);
@@ -22310,8 +22329,8 @@ class Component extends DCLogic {
   /** Swap the real shell out for the single-mesh ghost. Returns false if not ready. */
   _useGhostBodyModel() {
     if (this._xrayGhostModel === false) return false;
+    if (!this._ghostBodyUsable()) return false;
     const ghost = this._ghostBody;
-    if (!ghost) return false;
     const tune = this._powertrainTuning();
     const hidden = [];
     this._ghostableBodyMeshes().forEach((m) => {
@@ -22358,7 +22377,7 @@ class Component extends DCLogic {
       // promise resolves instantly from cache, and the retry re-entered
       // _setBodyGhost(true) on every turn. That hung the page and the WebView
       // reloaded under it -- which looked like random crashes during an A/B.
-      if (this._xrayGhostModel !== false && !this._ghostBody && !this._ghostChasing) {
+      if (this._xrayGhostModel !== false && !this._ghostBodyUsable() && !this._ghostChasing) {
         this._ghostChasing = true;
         this._ensureGhostBody().then((g) => {
           this._ghostChasing = false;
