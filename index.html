@@ -27101,7 +27101,7 @@ class Component extends DCLogic {
     }
     // Re-assert through the single writer so a scene-visibility change during a
     // swap cannot reveal the half-built incoming body.
-    if (this._variants && this._activeVariantKey) this._applyVariantVisibility();
+    if (this._variants) this._applyVariantVisibility();
 
     const mixedFill = this._isMixedCenterFill();
     // Mixed fill (car over wallpaper): the opaque asphalt disc has to stay
@@ -27270,7 +27270,7 @@ class Component extends DCLogic {
     // Hold the body that is on screen right now. If the swap does not change
     // the body (wheel, upload, x-ray) this equals the incoming key and
     // _applyVariantVisibility is a no-op.
-    this._swapHoldVariant = this._activeVariantKey || null;
+    this._swapHoldVariant = this._currentVariantKey() || null;
     this._positionSwapBadge();
     // ...and again once the caller's setState has actually shown the layer, so
     // the clamp above runs against a measured badge instead of the fallbacks.
@@ -30310,12 +30310,21 @@ class Component extends DCLogic {
    * Body swaps only in practice: a wheel or x-ray swap has hold === active, so
    * this is a no-op for them.
    */
+  _currentVariantKey() {
+    // _activateVariant never runs on the boot path, so _activeVariantKey stays
+    // undefined until the first swap completes. state.modelVariant is what the
+    // boot path set, and is the authoritative fallback.
+    return this._activeVariantKey
+      || (this.state && this.state.modelVariant)
+      || 'hev';
+  }
+
   _applyVariantVisibility() {
     if (!this._variants) return;
     const showCar = this._carSceneVisible === true;
     const shown = (this._swapHoldVariant && this._variants[this._swapHoldVariant])
       ? this._swapHoldVariant
-      : this._activeVariantKey;
+      : this._currentVariantKey();
     Object.keys(this._variants).forEach((k) => {
       const r = this._variants[k] && this._variants[k].root;
       if (r) r.visible = showCar && (k === shown);
