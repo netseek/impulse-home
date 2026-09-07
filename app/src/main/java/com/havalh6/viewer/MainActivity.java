@@ -89,7 +89,11 @@ public final class MainActivity extends Activity {
             new java.util.HashSet<>(java.util.Arrays.asList(
                     "ac", "addWidget", "openDesktopStudio", "previousDesktop", "nextDesktop",
                     "toggleDockMode", "showLauncher", "showCards", "cycleWidgetTheme",
-                    "toggleCenterFill", "configureWallpaper", "closePanel"
+                    "toggleCenterFill", "configureWallpaper", "closePanel",
+                    // Navigation-only commands implemented by the web shell. They do not
+                    // invoke vehicle APIs from Android.
+                    "openClimate", "openConsumption", "openNavigation", "openPower",
+                    "cycleDriveMode", "cyclePowerMode", "cycleRegenMode", "openRoofControls"
             ));
 
     /** Names shared with Impulse's API gate. */
@@ -138,6 +142,21 @@ public final class MainActivity extends Activity {
     private static final String ASSET_PREFIX = "/assets/";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android";
+
+    /** Demo telemetry is an emulator concern; a real head unit must fail visibly, never fabricate. */
+    private static boolean isProbablyEmulator() {
+        String fingerprint = String.valueOf(android.os.Build.FINGERPRINT).toLowerCase(java.util.Locale.US);
+        String model = String.valueOf(android.os.Build.MODEL).toLowerCase(java.util.Locale.US);
+        String product = String.valueOf(android.os.Build.PRODUCT).toLowerCase(java.util.Locale.US);
+        return fingerprint.contains("generic") || fingerprint.contains("emulator")
+                || fingerprint.contains("unknown") || model.contains("sdk_gphone")
+                || model.contains("emulator") || model.contains("android sdk built for")
+                || product.contains("sdk") || product.contains("emulator") || product.contains("simulator");
+    }
+
+    private static String viewerUrl() {
+        return VIEWER_URL + (isProbablyEmulator() ? "&demo=1" : "&demo=0");
+    }
 
     private WebView webView;
     private ValueCallback<Uri[]> pendingFiles;
@@ -821,6 +840,8 @@ public final class MainActivity extends Activity {
     };
     private View mediaLaunchAnchor;
     private View stripContainer;
+    /** Visual preview of the 60dp area reserved for Impulse's persistent bar. */
+    private View impulseReserveBand;
     private View stripRow;
     /** Mode drawer (1×1 collapsed / 1×4 expanded) leading the launcher strip. */
     private android.widget.LinearLayout modeDrawer;
@@ -859,8 +880,20 @@ public final class MainActivity extends Activity {
     private int bottomCardLimit;
     private android.widget.TextView quickClimateValue;
     private android.widget.TextView quickConsumptionValue;
+    /** Value fields in web-configured cards, keyed by their stable card id. */
+    private final java.util.Map<String, android.widget.TextView> quickCardValues =
+            new java.util.HashMap<>();
+    private final java.util.Map<String, android.widget.TextView> quickCardDetails =
+            new java.util.HashMap<>();
+    private final java.util.Map<String, QuickCardGraphicView> quickCardGraphics =
+            new java.util.HashMap<>();
+    private android.widget.ImageView quickMediaArt;
+    private boolean quickMediaHasArt;
     private android.widget.TextView quickMediaTitle;
+    private android.widget.TextView quickMediaArtist;
     private android.widget.TextView quickMediaPlayPause;
+    private final java.util.List<android.widget.TextView> quickMediaButtons = new java.util.ArrayList<>();
+    private boolean quickMediaAvailable;
     private String quickMediaPackage = "";
     private boolean quickMediaPlaying;
     private String dockSurfaceMode = DOCK_SURFACE_LAUNCHER;
@@ -868,7 +901,9 @@ public final class MainActivity extends Activity {
     private String activeDesktopName = "Desktop";
     private int activeDesktopIndex;
     private int desktopCount = 1;
-    private int dockAccentColor = 0xFF6FAEFF;
+    // Muted cyan keeps the frost surfaces readable without the pale blue cast
+    // that made the selected launcher plate look disconnected from the theme.
+    private int dockAccentColor = 0xFF2AA7B7;
     /** {@code car} or {@code wallpaper} — mirrored from the viewer. */
     private String centerFillMode = "car";
     /** Config-strip tool glyphs keyed by cmd (camera, model, …) for live updates. */
@@ -892,12 +927,368 @@ public final class MainActivity extends Activity {
         final String title;
         final String value;
         final String action;
+        final String primary;
+        final String secondary;
+        final String metricA;
+        final String metricB;
+        final int progress;
 
-        BottomCardDescriptor(String id, String title, String value, String action) {
+        BottomCardDescriptor(String id, String title, String value, String action,
+                String primary, String secondary, String metricA, String metricB, int progress) {
             this.id = id;
             this.title = title;
             this.value = value;
             this.action = action;
+            this.primary = primary;
+            this.secondary = secondary;
+            this.metricA = metricA;
+            this.metricB = metricB;
+            this.progress = Math.max(0, Math.min(100, progress));
+        }
+    }
+
+    /** Compact, data-driven illustrations used by the CoffeeOS-style rail cards. */
+    private final class QuickCardGraphicView extends View {
+        private BottomCardDescriptor descriptor;
+        private final android.graphics.Paint paint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF oval = new android.graphics.RectF();
+
+        QuickCardGraphicView(Context context, BottomCardDescriptor descriptor) {
+            super(context);
+            this.descriptor = descriptor;
+            setWillNotDraw(false);
+            setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        }
+
+        void setDescriptor(BottomCardDescriptor next) {
+            descriptor = next;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(android.graphics.Canvas canvas) {
+            super.onDraw(canvas);
+            if (descriptor == null) return;
+            float w = getWidth();
+            float h = getHeight();
+            if (w <= 0f || h <= 0f) return;
+            int accent = dockAccentColor;
+            int muted = dockUiLight ? 0x55323C48 : 0x66FFFFFF;
+            int strong = dockUiLight ? 0xCC25303B : 0xE6FFFFFF;
+            switch (descriptor.id) {
+                case "range": drawRing(canvas, w, h, accent, muted, true); break;
+                case "status": drawGauge(canvas, w, h, accent, muted, strong); break;
+                case "climate": drawClimate(canvas, w, h, accent, muted); break;
+                case "consumption": drawBars(canvas, w, h, accent, muted); break;
+                case "navigation": drawNavigation(canvas, w, h, accent, muted); break;
+                case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
+                case "clock": drawClock(canvas, w, h, accent, muted, strong); break;
+                case "desktops": drawDesktops(canvas, w, h, accent, muted); break;
+                case "driveMode": drawDriveMode(canvas, w, h, accent, muted); break;
+                case "powerMode": drawPowerMode(canvas, w, h, accent, muted); break;
+                case "regen": drawRegen(canvas, w, h, accent, muted); break;
+                case "roof": drawRoof(canvas, w, h, accent, muted, strong); break;
+                default: drawRing(canvas, w, h, accent, muted, false); break;
+            }
+        }
+
+        private void stroke(int color, float width) {
+            paint.setStyle(android.graphics.Paint.Style.STROKE);
+            paint.setStrokeWidth(width);
+            paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            paint.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+            paint.setColor(color);
+        }
+
+        private void fill(int color) {
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(color);
+        }
+
+        private void drawRing(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, boolean bolt) {
+            float size = Math.min(w, h) * 0.72f;
+            float left = (w - size) * 0.5f, top = (h - size) * 0.5f;
+            oval.set(left, top, left + size, top + size);
+            stroke(muted, Math.max(3f, size * 0.105f));
+            c.drawArc(oval, -90f, 360f, false, paint);
+            stroke(accent, Math.max(3f, size * 0.105f));
+            c.drawArc(oval, -90f, 360f * descriptor.progress / 100f, false, paint);
+            if (bolt) {
+                android.graphics.Path p = new android.graphics.Path();
+                p.moveTo(w * .53f, h * .25f);
+                p.lineTo(w * .37f, h * .53f);
+                p.lineTo(w * .50f, h * .53f);
+                p.lineTo(w * .43f, h * .76f);
+                p.lineTo(w * .65f, h * .43f);
+                p.lineTo(w * .51f, h * .43f);
+                p.close();
+                fill(accent);
+                c.drawPath(p, paint);
+            }
+        }
+
+        private void drawGauge(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            float pad = w * .13f;
+            oval.set(pad, h * .25f, w - pad, h * .93f);
+            stroke(muted, Math.max(3f, w * .065f));
+            c.drawArc(oval, 190f, 160f, false, paint);
+            stroke(accent, Math.max(3f, w * .065f));
+            c.drawArc(oval, 190f, 160f * descriptor.progress / 100f, false, paint);
+            float a = (float) Math.toRadians(190f + 160f * descriptor.progress / 100f);
+            float cx = w * .5f, cy = h * .60f, r = w * .24f;
+            stroke(strong, Math.max(2f, w * .035f));
+            c.drawLine(cx, cy, cx + (float) Math.cos(a) * r,
+                    cy + (float) Math.sin(a) * r, paint);
+            fill(accent);
+            c.drawCircle(cx, cy, Math.max(3f, w * .055f), paint);
+        }
+
+        private void drawClimate(android.graphics.Canvas c, float w, float h,
+                int accent, int muted) {
+            float cx = w * .48f, cy = h * .52f;
+            stroke(muted, Math.max(2f, w * .035f));
+            c.drawCircle(cx, cy, w * .12f, paint);
+            for (int i = 0; i < 8; i++) {
+                float a = (float) Math.toRadians(i * 45f);
+                float r1 = w * .21f, r2 = w * .31f;
+                c.drawLine(cx + (float) Math.cos(a) * r1, cy + (float) Math.sin(a) * r1,
+                        cx + (float) Math.cos(a) * r2, cy + (float) Math.sin(a) * r2, paint);
+            }
+            fill(withAlpha(accent, 0x44));
+            c.drawCircle(cx, cy, w * .20f, paint);
+            fill(accent);
+            c.drawCircle(cx, cy, w * .09f, paint);
+            for (int i = 0; i < 3; i++) {
+                float a = (float) Math.toRadians(i * 120f - 90f);
+                oval.set(cx + (float) Math.cos(a) * w * .10f - w * .07f,
+                        cy + (float) Math.sin(a) * w * .10f - h * .035f,
+                        cx + (float) Math.cos(a) * w * .10f + w * .07f,
+                        cy + (float) Math.sin(a) * w * .10f + h * .035f);
+                c.drawOval(oval, paint);
+            }
+        }
+
+        private void drawBars(android.graphics.Canvas c, float w, float h,
+                int accent, int muted) {
+            float base = h * .83f, gap = w * .055f, bw = w * .09f;
+            for (int i = 0; i < 6; i++) {
+                float ratio = new float[] {.28f, .48f, .38f, .70f, .56f, .86f}[i];
+                float left = w * .15f + i * (bw + gap);
+                float top = base - h * .62f * ratio;
+                fill(i >= 3 ? accent : muted);
+                c.drawRoundRect(left, top, left + bw, base, bw * .35f, bw * .35f, paint);
+            }
+            stroke(muted, Math.max(1f, w * .018f));
+            c.drawLine(w * .10f, base, w * .91f, base, paint);
+        }
+
+        private void drawNavigation(android.graphics.Canvas c, float w, float h,
+                int accent, int muted) {
+            android.graphics.Path route = new android.graphics.Path();
+            route.moveTo(w * .18f, h * .84f);
+            route.cubicTo(w * .22f, h * .54f, w * .45f, h * .69f, w * .48f, h * .43f);
+            route.cubicTo(w * .50f, h * .28f, w * .66f, h * .29f, w * .80f, h * .29f);
+            stroke(muted, Math.max(4f, w * .07f));
+            c.drawPath(route, paint);
+            stroke(accent, Math.max(2f, w * .035f));
+            c.drawPath(route, paint);
+            android.graphics.Path arrow = new android.graphics.Path();
+            arrow.moveTo(w * .67f, h * .15f);
+            arrow.lineTo(w * .83f, h * .29f);
+            arrow.lineTo(w * .67f, h * .43f);
+            stroke(accent, Math.max(3f, w * .045f));
+            c.drawPath(arrow, paint);
+            fill(accent);
+            c.drawCircle(w * .18f, h * .84f, Math.max(3f, w * .05f), paint);
+        }
+
+        private void drawTires(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            // A compact top view: the tapered body reads as a vehicle even at
+            // launcher-card size, while each tyre remains a separate signal.
+            android.graphics.Path body = new android.graphics.Path();
+            body.moveTo(w * .43f, h * .08f);
+            body.quadTo(w * .50f, h * .03f, w * .57f, h * .08f);
+            body.lineTo(w * .66f, h * .20f);
+            body.lineTo(w * .69f, h * .76f);
+            body.quadTo(w * .66f, h * .91f, w * .56f, h * .95f);
+            body.lineTo(w * .44f, h * .95f);
+            body.quadTo(w * .34f, h * .91f, w * .31f, h * .76f);
+            body.lineTo(w * .34f, h * .20f);
+            body.close();
+            fill(withAlpha(muted, 0x20));
+            c.drawPath(body, paint);
+            stroke(strong, Math.max(2f, w * .026f));
+            c.drawPath(body, paint);
+
+            fill(withAlpha(accent, 0x28));
+            c.drawRoundRect(w * .39f, h * .22f, w * .61f, h * .67f,
+                    w * .075f, w * .075f, paint);
+            stroke(muted, Math.max(1.5f, w * .018f));
+            c.drawRoundRect(w * .39f, h * .22f, w * .61f, h * .67f,
+                    w * .075f, w * .075f, paint);
+            c.drawLine(w * .39f, h * .43f, w * .61f, h * .43f, paint);
+            c.drawLine(w * .38f, h * .76f, w * .62f, h * .76f, paint);
+
+            float[] xs = {w * .255f, w * .745f, w * .255f, w * .745f};
+            float[] ys = {h * .28f, h * .28f, h * .71f, h * .71f};
+            int active = descriptor.progress <= 0 ? 0
+                    : Math.min(4, Math.max(1, (descriptor.progress + 24) / 25));
+            for (int i = 0; i < 4; i++) {
+                float tyreL = xs[i] - w * .055f;
+                float tyreR = xs[i] + w * .055f;
+                float tyreT = ys[i] - h * .095f;
+                float tyreB = ys[i] + h * .095f;
+                fill(withAlpha(strong, 0x32));
+                c.drawRoundRect(tyreL, tyreT, tyreR, tyreB,
+                        w * .04f, w * .04f, paint);
+                stroke(i < active ? accent : muted, Math.max(2.5f, w * .035f));
+                c.drawRoundRect(tyreL, tyreT, tyreR, tyreB,
+                        w * .04f, w * .04f, paint);
+                fill(i < active ? accent : muted);
+                c.drawCircle(xs[i], ys[i], Math.max(2f, w * .023f), paint);
+            }
+        }
+
+        private void drawClock(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            float cx = w * .5f, cy = h * .5f, r = Math.min(w, h) * .34f;
+            stroke(muted, Math.max(2f, w * .03f));
+            c.drawCircle(cx, cy, r, paint);
+            java.util.Calendar now = java.util.Calendar.getInstance();
+            float minute = now.get(java.util.Calendar.MINUTE);
+            float hour = now.get(java.util.Calendar.HOUR) + minute / 60f;
+            float ma = (float) Math.toRadians(minute * 6f - 90f);
+            float ha = (float) Math.toRadians(hour * 30f - 90f);
+            stroke(accent, Math.max(2f, w * .035f));
+            c.drawLine(cx, cy, cx + (float) Math.cos(ma) * r * .72f,
+                    cy + (float) Math.sin(ma) * r * .72f, paint);
+            stroke(strong, Math.max(3f, w * .045f));
+            c.drawLine(cx, cy, cx + (float) Math.cos(ha) * r * .48f,
+                    cy + (float) Math.sin(ha) * r * .48f, paint);
+            fill(accent);
+            c.drawCircle(cx, cy, Math.max(3f, w * .045f), paint);
+        }
+
+        private void drawDriveMode(android.graphics.Canvas c, float w, float h,
+                int accent, int muted) {
+            stroke(muted, Math.max(3f, w * .04f));
+            c.drawLine(w * .18f, h * .82f, w * .40f, h * .25f, paint);
+            c.drawLine(w * .82f, h * .82f, w * .60f, h * .25f, paint);
+            stroke(accent, Math.max(2f, w * .028f));
+            c.drawLine(w * .50f, h * .78f, w * .50f, h * .25f, paint);
+            fill(accent);
+            float y = h * (.78f - .52f * descriptor.progress / 100f);
+            c.drawCircle(w * .50f, y, Math.max(4f, w * .07f), paint);
+            stroke(accent, Math.max(2f, w * .028f));
+            c.drawLine(w * .46f, y + w * .05f, w * .50f, y + w * .10f, paint);
+            c.drawLine(w * .50f, y + w * .10f, w * .54f, y + w * .05f, paint);
+        }
+
+        private void drawPowerMode(android.graphics.Canvas c, float w, float h,
+                int accent, int muted) {
+            float l = w * .16f, t = h * .28f, r = w * .82f, b = h * .72f;
+            stroke(muted, Math.max(3f, w * .04f));
+            c.drawRoundRect(l, t, r, b, w * .10f, w * .10f, paint);
+            fill(muted);
+            c.drawRoundRect(r, h * .43f, w * .90f, h * .57f, w * .03f, w * .03f, paint);
+            fill(withAlpha(accent, 0x88));
+            c.drawRoundRect(l + w * .08f, t + h * .10f,
+                    l + w * .08f + (r - l - w * .16f) * descriptor.progress / 100f,
+                    b - h * .10f, w * .04f, w * .04f, paint);
+            android.graphics.Path bolt = new android.graphics.Path();
+            bolt.moveTo(w * .57f, h * .15f);
+            bolt.lineTo(w * .40f, h * .52f);
+            bolt.lineTo(w * .53f, h * .52f);
+            bolt.lineTo(w * .45f, h * .86f);
+            bolt.lineTo(w * .70f, h * .43f);
+            bolt.lineTo(w * .56f, h * .43f);
+            bolt.close();
+            fill(accent);
+            c.drawPath(bolt, paint);
+        }
+
+        private void drawRegen(android.graphics.Canvas c, float w, float h,
+                int accent, int muted) {
+            float cx = w * .48f, cy = h * .52f, r = Math.min(w, h) * .30f;
+            stroke(muted, Math.max(3f, w * .045f));
+            oval.set(cx - r, cy - r, cx + r, cy + r);
+            c.drawArc(oval, 35f, 285f, false, paint);
+            stroke(accent, Math.max(3f, w * .045f));
+            c.drawArc(oval, 35f, 185f * descriptor.progress / 100f, false, paint);
+            android.graphics.Path arrow = new android.graphics.Path();
+            arrow.moveTo(cx + r * .72f, cy - r * .80f);
+            arrow.lineTo(cx + r * 1.04f, cy - r * .37f);
+            arrow.lineTo(cx + r * .52f, cy - r * .40f);
+            stroke(accent, Math.max(2f, w * .035f));
+            c.drawPath(arrow, paint);
+            for (int i = 0; i < 3; i++) {
+                float x = w * (.25f + i * .18f);
+                float top = h * (.72f - (.13f + i * .07f));
+                fill(i < 2 ? accent : muted);
+                c.drawRoundRect(x, top, x + w * .09f, h * .75f,
+                        w * .025f, w * .025f, paint);
+            }
+        }
+
+        private void drawRoof(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            android.graphics.Path shell = new android.graphics.Path();
+            shell.moveTo(w * .42f, h * .07f);
+            shell.quadTo(w * .50f, h * .02f, w * .58f, h * .07f);
+            shell.lineTo(w * .68f, h * .22f);
+            shell.lineTo(w * .66f, h * .82f);
+            shell.quadTo(w * .62f, h * .94f, w * .50f, h * .96f);
+            shell.quadTo(w * .38f, h * .94f, w * .34f, h * .82f);
+            shell.lineTo(w * .32f, h * .22f);
+            shell.close();
+            fill(withAlpha(muted, 0x1D));
+            c.drawPath(shell, paint);
+            stroke(strong, Math.max(2f, w * .025f));
+            c.drawPath(shell, paint);
+
+            float glassL = w * .39f, glassR = w * .61f;
+            float glassT = h * .20f, glassB = h * .76f;
+            fill(withAlpha(accent, 0x38));
+            c.drawRoundRect(glassL, glassT, glassR, glassB,
+                    w * .07f, w * .07f, paint);
+            stroke(accent, Math.max(2f, w * .025f));
+            c.drawRoundRect(glassL, glassT, glassR, glassB,
+                    w * .07f, w * .07f, paint);
+            stroke(muted, Math.max(1.5f, w * .018f));
+            c.drawLine(glassL, h * .47f, glassR, h * .47f, paint);
+            c.drawLine(w * .37f, h * .81f, w * .63f, h * .81f, paint);
+
+            float ratio = Math.max(0f, Math.min(1f, descriptor.progress / 100f));
+            float shadeBottom = glassB - (glassB - glassT) * ratio;
+            fill(withAlpha(strong, 0x36));
+            c.drawRoundRect(glassL + w * .018f, glassT + h * .018f,
+                    glassR - w * .018f, Math.max(glassT + h * .04f, shadeBottom),
+                    w * .05f, w * .05f, paint);
+            stroke(accent, Math.max(3f, w * .045f));
+            c.drawLine(w * .29f, h * .26f, w * .29f, h * .74f, paint);
+            c.drawLine(w * .71f, h * .26f, w * .71f, h * .74f, paint);
+            fill(accent);
+            c.drawCircle(w * .29f, h * (.74f - .48f * ratio),
+                    Math.max(3f, w * .04f), paint);
+            c.drawCircle(w * .71f, h * (.74f - .48f * ratio),
+                    Math.max(3f, w * .04f), paint);
+        }
+
+        private void drawDesktops(android.graphics.Canvas c, float w, float h,
+                int accent, int muted) {
+            float gap = w * .07f, cw = w * .30f, ch = h * .27f;
+            float left = (w - cw * 2f - gap) * .5f, top = (h - ch * 2f - gap) * .5f;
+            for (int row = 0; row < 2; row++) {
+                for (int col = 0; col < 2; col++) {
+                    fill(row == 0 && col == 0 ? withAlpha(accent, 0xCC) : muted);
+                    float x = left + col * (cw + gap), y = top + row * (ch + gap);
+                    c.drawRoundRect(x, y, x + cw, y + ch, w * .04f, w * .04f, paint);
+                }
+            }
         }
     }
     /** Content shown to the right of the mode drawer: apps | layout | config. */
@@ -1280,22 +1671,22 @@ public final class MainActivity extends Activity {
 
     /**
      * Gap between the launcher icon strip and the OEM climate dock.
-     * Base 40dp + 5px, plus 48dp so the strip sits higher (half of the old
-     * top-chrome reserve) and centres in the freed band.
+     * Keep the strip immediately above Impulse's reserved 60px bottom bar.
+     * Overscan compensation below converts this display-space gap correctly.
      */
     private int launcherBottomGapPx() {
         float density = getResources().getDisplayMetrics().density;
-        return Math.round((40f + 48f) * density) + 5;
+        return Math.round(60f * density);
     }
 
     /**
      * Bottom offset for FPS / SKIP / toasts (CSS --hv-launcher-bottom).
      * Sits in the strip's lower padding above the OEM climate dock — same
-     * relationship as before (20dp into the strip), with the +48dp lift.
+     * relationship as before: 20dp above the Impulse reserve.
      */
     private int chromeBottomGapPx() {
         float density = getResources().getDisplayMetrics().density;
-        return Math.round(108f * density);
+        return Math.round(80f * density);
     }
 
     /**
@@ -1338,6 +1729,8 @@ public final class MainActivity extends Activity {
                 }
             }
         }
+        applyImpulseReserveBandGeometry();
+        alignQuickCardsToWidgetBoard();
         if (splashSkipBtn != null) {
             FrameLayout.LayoutParams lp =
                     (FrameLayout.LayoutParams) splashSkipBtn.getLayoutParams();
@@ -1353,14 +1746,14 @@ public final class MainActivity extends Activity {
 
     /**
      * Bottom band freeform slots must clear: strip height + bottom gap + pad.
-     * Strip is 140dp (icon + caption); gap includes the +48dp lift.
+     * Strip is 140dp (icon + caption) above the 60dp Impulse reserve.
      * APP+APP uses a native always-on-top FAB, so freeforms take the full
      * usable height (no dock / FAB pocket).
      */
     private int dockReservePx() {
         float density = getResources().getDisplayMetrics().density;
         if (SHELL_APPS.equals(shellMode)) return 0;
-        return Math.round((140f + 88f + 8f) * density);
+        return Math.round((140f + 60f + 8f) * density);
     }
 
     private void updateSlotAnchors() {
@@ -1390,6 +1783,27 @@ public final class MainActivity extends Activity {
     private float cssPx(int px) {
         float density = getResources().getDisplayMetrics().density;
         return px / (density <= 0f ? 1f : density);
+    }
+
+    /**
+     * Bounds in CSS viewport coordinates for a popup that must live between the
+     * actual MMI header and the first native dock target. The lower boundary is
+     * intentionally 12dp above the dock rather than a guessed dock reserve.
+     */
+    private String popupVerticalBoundsToCssFragment() {
+        Rect origin = pageOriginRect();
+        int headerBottomOnDisplay = Math.max(statusBarHeightPx(), widestTopInsetPx);
+        int popupTop = Math.max(0, headerBottomOnDisplay - origin.top);
+        int popupBottom = origin.height();
+        if (stripContainer != null && stripContainer.getHeight() > 0) {
+            int[] dockLocation = new int[2];
+            stripContainer.getLocationOnScreen(dockLocation);
+            int gap = Math.round(12f * getResources().getDisplayMetrics().density);
+            popupBottom = Math.max(popupTop, dockLocation[1] - origin.top - gap);
+        }
+        // This is deliberately a property fragment, not an object literal: it is
+        // inserted into the larger onAndroidShellLayout object below.
+        return "popupTop:" + cssPx(popupTop) + ",popupBottom:" + cssPx(popupBottom);
     }
 
     /**
@@ -1682,15 +2096,26 @@ public final class MainActivity extends Activity {
 
     /** Hide the bottom dock/drawer in APP+APP; show the native always-on-top FAB. */
     private void updateAppsOnlyChrome() {
+        applyImpulseReserveBandGeometry();
         if (SHELL_APPS.equals(shellMode)) {
             if (stripContainer != null) stripContainer.setVisibility(View.GONE);
             showAppsFabOverlay();
         } else {
             dismissAppsFabOverlay();
-            if (stripContainer != null && launcherRevealed) {
-                stripContainer.setVisibility(View.VISIBLE);
-            }
+            updateLauncherStripVisibility();
         }
+    }
+
+    /**
+     * The Studio is a web popup, not a replacement for the native dock. Keeping the rail
+     * visible preserves the user's way back to Apps while a Studio pane is open. Shell mode
+     * and boot reveal are the only visibility owners; indicator updates must not override them.
+     */
+    private void updateLauncherStripVisibility() {
+        if (stripContainer == null) return;
+        stripContainer.setVisibility(launcherRevealed && !SHELL_APPS.equals(shellMode)
+                ? View.VISIBLE : View.GONE);
+        applyImpulseReserveBandGeometry();
     }
 
     private void loadAppsFabPos() {
@@ -2867,6 +3292,54 @@ public final class MainActivity extends Activity {
         if (stripContainer == null) return;
         stripContainer.setPadding(pageSideInsetPx(false), stripContainer.getPaddingTop(),
                 pageSideInsetPx(true), stripContainer.getPaddingBottom());
+        alignQuickCardsToWidgetBoard();
+    }
+
+    /**
+     * Keep the first quick card on the same display-space x coordinate as the
+     * left widget board, even when the OEM navigation rail re-insets our window.
+     */
+    private void alignQuickCardsToWidgetBoard() {
+        if (quickCardsRow == null || stripContainer == null || contentHost == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        android.view.ViewGroup.LayoutParams rawHostLp = contentHost.getLayoutParams();
+        int hostLeft = 0;
+        if (rawHostLp instanceof android.widget.LinearLayout.LayoutParams) {
+            android.widget.LinearLayout.LayoutParams hostLp =
+                    (android.widget.LinearLayout.LayoutParams) rawHostLp;
+            int desiredHostLeft = DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
+                    ? 0 : Math.round(12 * density);
+            if (hostLp.leftMargin != desiredHostLeft) {
+                hostLp.leftMargin = desiredHostLeft;
+                contentHost.setLayoutParams(hostLp);
+            }
+            hostLeft = desiredHostLeft;
+        }
+        Rect origin = pageOriginRect();
+        int boardLeftInWindow = Math.max(0, leftFreeformBounds().left - origin.left);
+        int rowLeft = Math.max(0,
+                boardLeftInWindow - stripContainer.getPaddingLeft() - hostLeft);
+        if (quickCardsRow.getPaddingLeft() != rowLeft) {
+            quickCardsRow.setPadding(rowLeft, quickCardsRow.getPaddingTop(),
+                    quickCardsRow.getPaddingRight(), quickCardsRow.getPaddingBottom());
+        }
+    }
+
+    /**
+     * Draw only the part of the 60dp reserve that is still inside our window.
+     * When Impulse already applies bottom overscan, this shrinks to zero instead
+     * of creating a second black band above the real one.
+     */
+    private void applyImpulseReserveBandGeometry() {
+        if (impulseReserveBand == null) return;
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) impulseReserveBand.getLayoutParams();
+        if (lp == null) return;
+        int height = Math.max(0, launcherBottomGapPx() - overscanBottomPx());
+        if (lp.height != height) {
+            lp.height = height;
+            impulseReserveBand.setLayoutParams(lp);
+        }
+        impulseReserveBand.setVisibility(launcherRevealed && height > 0 ? View.VISIBLE : View.INVISIBLE);
     }
 
     private void notifyViewerShellLayout() {
@@ -2909,6 +3382,7 @@ public final class MainActivity extends Activity {
                 + ",safeTop:" + (cssPx(pageTopInsetPx()) + 22f)
                 + ",safeBottom:" + cssPx(dockReservePx())
                 + ",launcherBottom:" + launcherBottomCss
+                + "," + popupVerticalBoundsToCssFragment()
                 + ",uiMode:\"" + uiMode + "\""
                 + ",splitRatio:\"" + splitRatio + "\""
                 + "});}"
@@ -4115,7 +4589,7 @@ public final class MainActivity extends Activity {
         if (savedInstanceState == null) {
             // `--ez nosplash true` on the launch intent appends ?...&nosplash so a
             // cold start can be timed without the boot clip. See HavalSplash.
-            String url = VIEWER_URL;
+            String url = viewerUrl();
             if (getIntent() != null && getIntent().getBooleanExtra("nosplash", false)) {
                 url = url + "&nosplash";
             }
@@ -4339,7 +4813,7 @@ public final class MainActivity extends Activity {
             maybeRestoreAppsOnlySlots();
             return;
         }
-        if (stripContainer != null) stripContainer.setVisibility(desktopStudioOpen ? View.GONE : View.VISIBLE);
+        updateLauncherStripVisibility();
         if (launcherItems.isEmpty()) return;
 
         float density = getResources().getDisplayMetrics().density;
@@ -4689,7 +5163,8 @@ public final class MainActivity extends Activity {
         dockIconPx = iconSizePx;
         int marginBottomPx = compensatedBottomMarginPx(launcherBottomGapPx());
         int fadeLengthPx = Math.round(72 * density);
-        // Taller band for icon + two-line caption; +48dp lift centres the strip.
+        // Taller band for icon + two-line caption. Its bottom aligns with the
+        // top of the reserved Impulse bar via launcherBottomGapPx().
         int stripHeightPx = Math.round(148 * density);
 
         // Bottom icon strip — full width (media column sits above the dock band).
@@ -4708,6 +5183,21 @@ public final class MainActivity extends Activity {
         // (AppLauncherBridge.revealLauncher) so it lands with the car, not before.
         strip.setVisibility(View.INVISIBLE);
         stripContainer = strip;
+
+        View impulseBand = new View(this);
+        android.graphics.drawable.GradientDrawable impulseBandBg =
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        new int[] { 0x52000000, 0xA6000000 });
+        impulseBand.setBackground(impulseBandBg);
+        impulseBand.setClickable(false);
+        impulseBand.setFocusable(false);
+        impulseBand.setVisibility(View.INVISIBLE);
+        FrameLayout.LayoutParams impulseBandLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, launcherBottomGapPx());
+        impulseBandLp.gravity = android.view.Gravity.BOTTOM;
+        impulseBand.setLayoutParams(impulseBandLp);
+        impulseReserveBand = impulseBand;
 
         android.widget.LinearLayout stripRow = new android.widget.LinearLayout(this);
         this.stripRow = stripRow;
@@ -4744,7 +5234,10 @@ public final class MainActivity extends Activity {
         BounceHorizontalScrollView scrollView = new BounceHorizontalScrollView(this);
         scrollView.setHorizontalScrollBarEnabled(false);
         scrollView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
-        scrollView.setHorizontalFadingEdgeEnabled(true);
+        // Do not paint a left fade on the initial launcher item.  The first
+        // icon is fully visible at rest; the fade becomes useful only after
+        // the user has moved the row and that item has started leaving view.
+        scrollView.setHorizontalFadingEdgeEnabled(false);
         scrollView.setFadingEdgeLength(fadeLengthPx);
         scrollView.setBackgroundColor(0x00000000);
         // Clip icons to the scroll viewport so they never draw over the drawer.
@@ -4921,7 +5414,18 @@ public final class MainActivity extends Activity {
         // Icons live inside the same side band as the rest of the chrome.
         strip.setPadding(pageSideInsetPx(false), strip.getPaddingTop(),
                 pageSideInsetPx(true), strip.getPaddingBottom());
+        rootLayout.addView(impulseBand);
         rootLayout.addView(strip);
+        applyImpulseReserveBandGeometry();
+        // popupBottom is measured from this actual strip, so send one corrected
+        // geometry payload once Android has positioned it (including overscan).
+        strip.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or_, ob) -> {
+            if (l != ol || t != ot || r != or_ || b != ob) {
+                mainHandler.post(this::notifyViewerShellLayout);
+            }
+        });
+        scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) ->
+                scrollView.setHorizontalFadingEdgeEnabled(scrollX > 0));
         // 60s, not 30s: a cold start measured ~28s to the reveal on this unit
         // (15s clip + model load), and at 30s this backstop was beating the real
         // hand-off — the launcher popped in un-animated on every slow boot. This
@@ -4985,12 +5489,12 @@ public final class MainActivity extends Activity {
         // again returns to the glanceable Cards surface. Layout and settings
         // deliberately live in the Workspace card, not a second hidden menu.
         modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
-                dockGlyphApps(iconPx, dockGlyphColor(true)),
-                "Apps", v -> {
+                dockGlyphCards(iconPx, dockGlyphColor(false)),
+                "Menu", v -> {
                     toggleDockSurface();
                     selectStripMode(STRIP_APPS);
                 });
-        modeCollapsedBtn.setContentDescription("Show or hide app launcher");
+        modeCollapsedBtn.setContentDescription("Switch between app launcher and cards");
         modeCollapsedBtn.setOnLongClickListener(v -> {
             callViewerDock("openDesktopStudio");
             return true;
@@ -5166,7 +5670,7 @@ public final class MainActivity extends Activity {
 
     private void refreshAllDockPlates() {
         if (modeCollapsedBtn != null && modeCollapsedBtn.getVisibility() == View.VISIBLE) {
-            setModeCellSelected(modeCollapsedBtn, true);
+            setModeCellSelected(modeCollapsedBtn, false);
         }
         if (modeAppsBtn != null && modeAppsBtn.getVisibility() == View.VISIBLE) {
             setModeCellSelected(modeAppsBtn, STRIP_APPS.equals(stripMode));
@@ -5300,7 +5804,7 @@ public final class MainActivity extends Activity {
             setModeCellSelected(modeConfigBtn, STRIP_CONFIG.equals(stripMode));
         }
         if (modeCollapsedBtn != null && modeCollapsedBtn.getVisibility() == View.VISIBLE) {
-            setModeCellSelected(modeCollapsedBtn, true);
+            setModeCellSelected(modeCollapsedBtn, false);
         }
         if (modeSurfaceBtn != null && modeSurfaceBtn.getVisibility() == View.VISIBLE) {
             setModeCellSelected(modeSurfaceBtn, DOCK_SURFACE_CARDS.equals(dockSurfaceMode));
@@ -5320,7 +5824,7 @@ public final class MainActivity extends Activity {
         if (cell == modeConfigBtn) return dockGlyphConfig(iconPx, color);
         if (cell == modeSurfaceBtn) return DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
                 ? dockGlyphApps(iconPx, color) : dockGlyphCards(iconPx, color);
-        if (cell == modeCollapsedBtn) return glyphForStripMode(stripMode);
+        if (cell == modeCollapsedBtn) return dockGlyphCards(iconPx, color);
         return null;
     }
 
@@ -5441,7 +5945,11 @@ public final class MainActivity extends Activity {
         float density = getResources().getDisplayMetrics().density;
         int iconPx = dockIconPx > 0 ? dockIconPx
                 : Math.round(60 * getResources().getDisplayMetrics().density);
-        if (plate != null) plate.setBackground(makeDockPlateDrawable(selected, density));
+        if (plate != null) {
+            plate.setBackground(cell == modeCollapsedBtn
+                    ? makeFrostStateDrawable(selected, density)
+                    : makeDockPlateDrawable(selected, density));
+        }
         cell.setAlpha(dockUiLight ? 1f : (selected ? 1f : 0.78f));
         android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
         if (iv != null) {
@@ -5547,10 +6055,15 @@ public final class MainActivity extends Activity {
 
     private void applyDrawerCollapsedUi(boolean animate) {
         drawerExpanded = false;
+        // In Cards mode Workspace is the single navigation source (Apps +
+        // Organize). Do not leave a duplicate Apps icon or an empty drawer cell.
+        boolean showLauncherApps = !DOCK_SURFACE_CARDS.equals(dockSurfaceMode);
         if (modeCollapsedBtn != null) {
-            modeCollapsedBtn.setVisibility(View.VISIBLE);
-            setModeCellSelected(modeCollapsedBtn, true);
-            setModeCellLabelVisible(modeCollapsedBtn, true);
+            modeCollapsedBtn.setVisibility(showLauncherApps ? View.VISIBLE : View.GONE);
+            if (showLauncherApps) {
+                setModeCellSelected(modeCollapsedBtn, false);
+                setModeCellLabelVisible(modeCollapsedBtn, true);
+            }
         }
         if (modeAppsBtn != null) {
             modeAppsBtn.setVisibility(View.GONE);
@@ -5569,10 +6082,11 @@ public final class MainActivity extends Activity {
             setModeCellLabelVisible(modeSurfaceBtn, false);
         }
         if (modeDrawer != null && dockCellPx > 0) {
+            modeDrawer.setVisibility(showLauncherApps ? View.VISIBLE : View.GONE);
             android.widget.LinearLayout.LayoutParams lp =
                     (android.widget.LinearLayout.LayoutParams) modeDrawer.getLayoutParams();
             if (lp != null) {
-                final int target = dockCellPx;
+                final int target = showLauncherApps ? dockCellPx : 0;
                 if (animate && lp.width != target) {
                     android.animation.ValueAnimator anim =
                             android.animation.ValueAnimator.ofInt(lp.width, target);
@@ -5689,6 +6203,7 @@ public final class MainActivity extends Activity {
 
     private void refreshDockSurfaceUi(boolean animate) {
         boolean cards = DOCK_SURFACE_CARDS.equals(dockSurfaceMode);
+        alignQuickCardsToWidgetBoard();
         setModeCellSelected(layoutLauncherSurfaceChip, !cards);
         setModeCellSelected(layoutCardsSurfaceChip, cards);
         if (layoutLauncherSurfaceChip != null) layoutLauncherSurfaceChip.setSelected(!cards);
@@ -5707,6 +6222,7 @@ public final class MainActivity extends Activity {
         if (STRIP_APPS.equals(stripMode) && appsScrollView != null && cardsScrollView != null) {
             showStripContent(STRIP_APPS, animate);
         }
+        if (!drawerExpanded) applyDrawerCollapsedUi(false);
         refreshQuickCardsTheme();
         refreshDesktopIndicator();
     }
@@ -5729,8 +6245,8 @@ public final class MainActivity extends Activity {
                     : new int[] { 0xF2F7F9FB, 0xE9E9EFF4 };
         } else {
             fillColors = selected
-                    ? new int[] { withAlpha(dockAccentColor, 0x55), 0xB51A222D }
-                    : new int[] { 0xB51A222D, 0x9E0B1017 };
+                    ? new int[] { blendArgb(0xEB18232D, dockAccentColor, 0.08f), 0xE00E141B }
+                    : new int[] { 0xE01A222D, 0xD90E141B };
         }
         android.graphics.drawable.GradientDrawable fill = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, fillColors);
@@ -5751,18 +6267,24 @@ public final class MainActivity extends Activity {
     }
 
     private View buildQuickCardsRow(float density, int iconPx) {
-        BounceHorizontalScrollView scroll = new BounceHorizontalScrollView(this);
+        BounceHorizontalScrollView scroll = new BounceHorizontalScrollView(this, false);
         scroll.setHorizontalScrollBarEnabled(false);
         scroll.setFadingEdgeLength(Math.round(42 * density));
         scroll.setClipChildren(true);
         scroll.setClipToPadding(true);
         scroll.setBackgroundColor(0x00000000);
+        scroll.setHorizontalFadingEdgeEnabled(false);
+        scroll.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) ->
+                scroll.setHorizontalFadingEdgeEnabled(scrollX > 0));
 
         android.widget.LinearLayout row = new android.widget.LinearLayout(this);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPadding(Math.round(10 * density), Math.round(12 * density),
-                Math.round(24 * density), Math.round(12 * density));
+        // Cards sit directly on the top edge of the lower band. This keeps
+        // their top edge aligned with the widget board above while retaining
+        // the 60dp Impulse reserve below the band.
+        row.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        row.setPadding(Math.round(12 * density), Math.round(5 * density),
+                Math.round(24 * density), Math.round(6 * density));
         quickCardsRow = row;
         populateQuickCardsRow(row, density);
 
@@ -5777,8 +6299,15 @@ public final class MainActivity extends Activity {
         quickCardViews.clear();
         quickClimateValue = null;
         quickConsumptionValue = null;
+        quickCardValues.clear();
+        quickCardDetails.clear();
+        quickCardGraphics.clear();
+        quickMediaArt = null;
+        quickMediaHasArt = false;
         quickMediaTitle = null;
+        quickMediaArtist = null;
         quickMediaPlayPause = null;
+        quickMediaButtons.clear();
 
         // Cards mode starts with one predictable Workspace card. It exposes
         // both routes users need after hiding the launcher: get back to apps
@@ -5799,11 +6328,12 @@ public final class MainActivity extends Activity {
                     row.addView(media);
                     continue;
                 }
-                int widthDp = descriptor.value.length() > 28 ? 238 : 190;
-                View card = makeQuickTextCard(density, widthDp, descriptor.title, descriptor.value,
-                        descriptor.title + (descriptor.value.isEmpty() ? "" : ": " + descriptor.value),
+                View card = makeQuickVisualCard(density, descriptor,
                         v -> callViewerDock(descriptor.action));
                 card.setTag("bottomCard:" + descriptor.id);
+                android.widget.TextView valueView =
+                        (android.widget.TextView) card.findViewWithTag("quickValue");
+                if (valueView != null) quickCardValues.put(descriptor.id, valueView);
                 row.addView(card);
             }
             return;
@@ -5812,17 +6342,148 @@ public final class MainActivity extends Activity {
         View climate = makeQuickTextCard(density, 218, "CLIMATE",
                 "— °C  ·  Fan —  ·  AUTO —",
                 "Climate summary. Opens the climate page when available",
-                v -> callViewerDock("ac"));
+                v -> callViewerDock("openClimate"));
         quickClimateValue = (android.widget.TextView) climate.findViewWithTag("quickValue");
         row.addView(climate);
 
         View consumption = makeQuickTextCard(density, 196, "CONSUMPTION", "—",
-                "Consumption summary. Opens card selection",
-                v -> callViewerDock("addWidget"));
+                "Consumption summary. Opens the consumption view",
+                v -> callViewerDock("openConsumption"));
         quickConsumptionValue = (android.widget.TextView) consumption.findViewWithTag("quickValue");
         row.addView(consumption);
 
         row.addView(makeQuickMediaCard(density));
+    }
+
+    /**
+     * CoffeeOS-style glance card: a purpose-built mini graphic, a strong live
+     * readout and compact secondary metrics. Values still come from the web
+     * payload, so the card never invents vehicle telemetry.
+     */
+    private View makeQuickVisualCard(float density, BottomCardDescriptor descriptor,
+            View.OnClickListener click) {
+        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
+        card.setOrientation(android.widget.LinearLayout.VERTICAL);
+        card.setGravity(android.view.Gravity.TOP);
+        int padH = Math.round(13 * density);
+        card.setPadding(padH, Math.round(9 * density), padH, Math.round(9 * density));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(quickVisualCardWidthDp(descriptor.id) * density),
+                Math.round(124 * density));
+        lp.rightMargin = Math.round(10 * density);
+        card.setLayoutParams(lp);
+        card.setMinimumHeight(Math.round(112 * density));
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setContentDescription(descriptor.title
+                + (descriptor.value.isEmpty() ? "" : ": " + descriptor.value));
+        card.setOnClickListener(click);
+        card.setBackground(makeFrostStateDrawable(false, density));
+        card.setElevation(3f * density);
+        quickCardViews.add(card);
+
+        android.widget.LinearLayout header = new android.widget.LinearLayout(this);
+        header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        header.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.round(22 * density)));
+
+        android.widget.TextView heading = new android.widget.TextView(this);
+        heading.setTag("frostSecondary");
+        heading.setText(descriptor.title.toUpperCase(java.util.Locale.US));
+        heading.setTextSize(9.5f);
+        heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        heading.setLetterSpacing(0.10f);
+        heading.setMaxLines(1);
+        heading.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        heading.setTextColor(dockLabelColorMuted());
+        heading.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        header.addView(heading);
+
+        android.widget.TextView affordance = new android.widget.TextView(this);
+        affordance.setTag("frostSecondary");
+        affordance.setText("›");
+        affordance.setTextSize(18f);
+        affordance.setGravity(android.view.Gravity.CENTER);
+        affordance.setTextColor(dockLabelColorMuted());
+        header.addView(affordance, new android.widget.LinearLayout.LayoutParams(
+                Math.round(18 * density), android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+        card.addView(header);
+
+        android.widget.LinearLayout content = new android.widget.LinearLayout(this);
+        content.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        content.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        android.widget.LinearLayout.LayoutParams contentLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
+        contentLp.topMargin = Math.round(2 * density);
+        content.setLayoutParams(contentLp);
+
+        QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
+        android.widget.LinearLayout.LayoutParams graphicLp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(76 * density), android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+        graphicLp.rightMargin = Math.round(10 * density);
+        graphic.setLayoutParams(graphicLp);
+        content.addView(graphic);
+
+        android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
+        copy.setOrientation(android.widget.LinearLayout.VERTICAL);
+        copy.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        copy.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+
+        android.widget.TextView primary = new android.widget.TextView(this);
+        primary.setTag("quickValue");
+        primary.setText(descriptor.primary.isEmpty() ? descriptor.value : descriptor.primary);
+        primary.setTextSize("clock".equals(descriptor.id) ? 24f : 21f);
+        primary.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        primary.setTextColor(dockLabelColor());
+        primary.setMaxLines(1);
+        primary.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(primary);
+
+        android.widget.TextView detail = new android.widget.TextView(this);
+        detail.setTag("frostSecondary");
+        detail.setText(quickVisualDetail(descriptor));
+        detail.setTextSize(9.5f);
+        detail.setLetterSpacing(0.025f);
+        detail.setLineSpacing(0f, 1.02f);
+        detail.setMaxLines(2);
+        detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        detailLp.topMargin = Math.round(3 * density);
+        detail.setLayoutParams(detailLp);
+        copy.addView(detail);
+        content.addView(copy);
+        card.addView(content);
+
+        quickCardValues.put(descriptor.id, primary);
+        quickCardDetails.put(descriptor.id, detail);
+        quickCardGraphics.put(descriptor.id, graphic);
+        return card;
+    }
+
+    private String quickVisualDetail(BottomCardDescriptor descriptor) {
+        String metrics = descriptor.metricA;
+        if (!descriptor.metricB.isEmpty()) {
+            metrics += (metrics.isEmpty() ? "" : "  ·  ") + descriptor.metricB;
+        }
+        if (descriptor.secondary.isEmpty()) return metrics;
+        return descriptor.secondary + (metrics.isEmpty() ? "" : "\n" + metrics);
+    }
+
+    private int quickVisualCardWidthDp(String id) {
+        if ("navigation".equals(id)) return 286;
+        if ("roof".equals(id)) return 286;
+        if ("status".equals(id) || "tires".equals(id)) return 270;
+        if ("range".equals(id) || "consumption".equals(id)) return 258;
+        if ("clock".equals(id)) return 224;
+        return 238;
     }
 
     private View makeQuickWorkspaceCard(float density) {
@@ -5830,20 +6491,22 @@ public final class MainActivity extends Activity {
         card.setOrientation(android.widget.LinearLayout.VERTICAL);
         card.setGravity(android.view.Gravity.CENTER_VERTICAL);
         int pad = Math.round(14 * density);
-        card.setPadding(pad, Math.round(8 * density), pad, Math.round(8 * density));
+        card.setPadding(pad, Math.round(10 * density), pad, Math.round(9 * density));
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(226 * density), Math.round(74 * density));
+                Math.round(242 * density), Math.round(124 * density));
         lp.rightMargin = Math.round(10 * density);
         card.setLayoutParams(lp);
-        card.setContentDescription("Workspace: apps and layout manager");
-        card.setBackground(makeFrostStateDrawable(true, density));
+        card.setContentDescription("Workspace: app launcher and layout manager");
+        // Workspace is navigation, not a selected mode.  Keep the same neutral
+        // frost treatment as Climate, Consumption and Media cards.
+        card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
         quickCardViews.add(card);
 
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setText("WORKSPACE");
         heading.setTag("frostSecondary");
-        heading.setTextSize(9.5f);
+        heading.setTextSize(10.5f);
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         heading.setLetterSpacing(0.11f);
@@ -5856,9 +6519,9 @@ public final class MainActivity extends Activity {
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         actionsLp.topMargin = Math.round(3 * density);
         actions.setLayoutParams(actionsLp);
-        actions.addView(makeWorkspaceAction(density, "APPS", "Show app launcher",
+        actions.addView(makeWorkspaceAction(density, "APP\nLAUNCHER", "Show app launcher",
                 v -> chooseDockSurface(DOCK_SURFACE_LAUNCHER, true)));
-        actions.addView(makeWorkspaceAction(density, "ORGANIZE", "Open Desktop Studio",
+        actions.addView(makeWorkspaceAction(density, "LAYOUT\nMANAGER", "Open layout manager",
                 v -> callViewerDock("openDesktopStudio")));
         card.addView(actions);
         return card;
@@ -5870,7 +6533,9 @@ public final class MainActivity extends Activity {
         button.setText(label);
         button.setContentDescription(description);
         button.setGravity(android.view.Gravity.CENTER);
-        button.setTextSize(8.5f);
+        button.setTextSize(9.5f);
+        button.setMaxLines(2);
+        button.setLineSpacing(0f, 0.92f);
         button.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         button.setLetterSpacing(0.07f);
@@ -5878,6 +6543,15 @@ public final class MainActivity extends Activity {
         button.setFocusable(true);
         button.setOnClickListener(click);
         button.setTextColor(dockGlyphColor(true));
+        // Give each action a visual cue as well as a precise label.  A small
+        // icon above the two-line caption reads as an action, not a second
+        // mode selector.
+        Drawable actionGlyph = label.startsWith("APP")
+                ? dockGlyphSwitcher(Math.round(22 * density), dockGlyphColor(true))
+                : dockGlyphLayout(Math.round(22 * density), dockGlyphColor(true));
+        actionGlyph.setBounds(0, 0, Math.round(22 * density), Math.round(22 * density));
+        button.setCompoundDrawables(null, actionGlyph, null, null);
+        button.setCompoundDrawablePadding(Math.round(1 * density));
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
         bg.setCornerRadius(8f * density);
@@ -5885,7 +6559,7 @@ public final class MainActivity extends Activity {
         bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0x8A));
         button.setBackground(bg);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                0, Math.round(28 * density), 1f);
+                0, Math.round(62 * density), 1f);
         lp.rightMargin = Math.round(5 * density);
         button.setLayoutParams(lp);
         return button;
@@ -5897,12 +6571,12 @@ public final class MainActivity extends Activity {
         card.setOrientation(android.widget.LinearLayout.VERTICAL);
         card.setGravity(android.view.Gravity.CENTER_VERTICAL);
         int padH = Math.round(16 * density);
-        card.setPadding(padH, Math.round(8 * density), padH, Math.round(8 * density));
+        card.setPadding(padH, Math.round(10 * density), padH, Math.round(9 * density));
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(widthDp * density), Math.round(74 * density));
+                Math.round(widthDp * density), Math.round(124 * density));
         lp.rightMargin = Math.round(10 * density);
         card.setLayoutParams(lp);
-        card.setMinimumHeight(Math.round(60 * density));
+        card.setMinimumHeight(Math.round(112 * density));
         card.setClickable(true);
         card.setFocusable(true);
         card.setContentDescription(description);
@@ -5914,7 +6588,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setTag("frostSecondary");
         heading.setText(title);
-        heading.setTextSize(9.5f);
+        heading.setTextSize(10.5f);
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         heading.setLetterSpacing(0.11f);
@@ -5923,7 +6597,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView body = new android.widget.TextView(this);
         body.setTag("quickValue");
         body.setText(value);
-        body.setTextSize(14f);
+        body.setTextSize(18f);
         body.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         body.setMaxLines(1);
@@ -5941,16 +6615,37 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout card = new android.widget.LinearLayout(this);
         card.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         card.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        card.setPadding(Math.round(14 * density), Math.round(7 * density),
-                Math.round(8 * density), Math.round(7 * density));
+        card.setPadding(Math.round(12 * density), Math.round(9 * density),
+                Math.round(10 * density), Math.round(9 * density));
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(330 * density), Math.round(74 * density));
+                Math.round(348 * density), Math.round(124 * density));
         lp.rightMargin = Math.round(10 * density);
         card.setLayoutParams(lp);
         card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
         card.setContentDescription("Media quick controls");
         quickCardViews.add(card);
+
+        quickMediaArt = new android.widget.ImageView(this);
+        quickMediaArt.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        quickMediaArt.setBackground(makeDockPlateDrawable(false, density));
+        quickMediaArt.setPadding(Math.round(17 * density), Math.round(17 * density),
+                Math.round(17 * density), Math.round(17 * density));
+        quickMediaArt.setImageDrawable(systemDockIcon(android.R.drawable.ic_media_play,
+                dockAccentColor));
+        quickMediaArt.setClipToOutline(true);
+        quickMediaArt.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(),
+                        12f * getResources().getDisplayMetrics().density);
+            }
+        });
+        android.widget.LinearLayout.LayoutParams artLp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(78 * density), Math.round(78 * density));
+        artLp.rightMargin = Math.round(12 * density);
+        quickMediaArt.setLayoutParams(artLp);
+        card.addView(quickMediaArt);
 
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
         copy.setOrientation(android.widget.LinearLayout.VERTICAL);
@@ -5961,18 +6656,25 @@ public final class MainActivity extends Activity {
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setTag("frostSecondary");
         heading.setText("MEDIA");
-        heading.setTextSize(9.5f);
+        heading.setTextSize(10.5f);
         heading.setLetterSpacing(0.11f);
         copy.addView(heading);
         quickMediaTitle = new android.widget.TextView(this);
         quickMediaTitle.setTag("quickValue");
         quickMediaTitle.setText("Nothing playing");
-        quickMediaTitle.setTextSize(13f);
+        quickMediaTitle.setTextSize(15f);
         quickMediaTitle.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         quickMediaTitle.setMaxLines(1);
         quickMediaTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         copy.addView(quickMediaTitle);
+        quickMediaArtist = new android.widget.TextView(this);
+        quickMediaArtist.setTag("frostSecondary");
+        quickMediaArtist.setText("Choose a media app");
+        quickMediaArtist.setTextSize(9.5f);
+        quickMediaArtist.setMaxLines(1);
+        quickMediaArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(quickMediaArtist);
         copy.setClickable(true);
         copy.setFocusable(true);
         copy.setContentDescription("Open current media app");
@@ -5982,12 +6684,20 @@ public final class MainActivity extends Activity {
                         quickMediaTitle != null ? quickMediaTitle.getText().toString() : "Media");
             }
         });
-        card.addView(copy);
-
-        card.addView(makeQuickMediaButton(density, "‹", "Previous track", v -> mediaNowPlaying.prev()));
+        android.widget.LinearLayout controls = new android.widget.LinearLayout(this);
+        controls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        controls.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        android.widget.LinearLayout.LayoutParams controlsLp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                Math.round(36 * density));
+        controlsLp.topMargin = Math.round(3 * density);
+        controls.setLayoutParams(controlsLp);
+        controls.addView(makeQuickMediaButton(density, "‹", "Previous track", v -> mediaNowPlaying.prev()));
         quickMediaPlayPause = makeQuickMediaButton(density, "▶", "Play", v -> mediaNowPlaying.playPause());
-        card.addView(quickMediaPlayPause);
-        card.addView(makeQuickMediaButton(density, "›", "Next track", v -> mediaNowPlaying.next()));
+        controls.addView(quickMediaPlayPause);
+        controls.addView(makeQuickMediaButton(density, "›", "Next track", v -> mediaNowPlaying.next()));
+        copy.addView(controls);
+        card.addView(copy);
         return card;
     }
 
@@ -5995,19 +6705,40 @@ public final class MainActivity extends Activity {
             String description, View.OnClickListener click) {
         android.widget.TextView button = new android.widget.TextView(this);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(46 * density), Math.round(48 * density));
-        lp.leftMargin = Math.round(2 * density);
+                Math.round(42 * density), Math.round(34 * density));
+        lp.rightMargin = Math.round(4 * density);
         button.setLayoutParams(lp);
         button.setGravity(android.view.Gravity.CENTER);
         button.setText(text);
-        button.setTextSize(20f);
+        button.setTextSize(18f);
         button.setTag("frostAction");
         button.setContentDescription(description);
         button.setClickable(true);
         button.setFocusable(true);
         button.setBackground(makeDockPlateDrawable(false, density));
         button.setOnClickListener(click);
+        button.setEnabled(quickMediaAvailable);
+        button.setAlpha(quickMediaAvailable ? 1f : 0.35f);
+        quickMediaButtons.add(button);
         return button;
+    }
+
+    /** Hamburger affordance for the single launcher/cards control. */
+    private Drawable dockGlyphSwitcher(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setColor(color);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+        p.setStrokeWidth(Math.max(2f, sizePx * 0.085f));
+        float s = sizePx;
+        float left = s * 0.18f, right = s * 0.82f;
+        float y1 = s * 0.28f, y2 = s * 0.50f, y3 = s * 0.72f;
+        c.drawLine(left, y1, right, y1, p);
+        c.drawLine(left, y2, right, y2, p);
+        c.drawLine(left, y3, right, y3, p);
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
     private void updateQuickMediaCard(JSONObject payload) {
@@ -6015,11 +6746,42 @@ public final class MainActivity extends Activity {
         quickMediaPackage = payload.optString("packageName", "");
         quickMediaPlaying = payload.optBoolean("playing", false);
         boolean hasTrack = payload.optBoolean("hasTrack", false);
+        quickMediaAvailable = hasTrack && mediaNowPlaying != null;
+        for (android.widget.TextView button : quickMediaButtons) {
+            button.setEnabled(quickMediaAvailable);
+            button.setAlpha(quickMediaAvailable ? 1f : 0.35f);
+        }
         String title = payload.optString("title", "");
+        String artist = payload.optString("artist", "");
         String app = payload.optString("appLabel", "");
         String display = hasTrack && !title.isEmpty() ? title
                 : (!app.isEmpty() ? app : "Nothing playing");
         if (quickMediaTitle != null) quickMediaTitle.setText(display);
+        if (quickMediaArtist != null) {
+            quickMediaArtist.setText(!artist.isEmpty() ? artist
+                    : (!app.isEmpty() ? app : "Choose a media app"));
+        }
+        if (quickMediaArt != null) {
+            String artDataUrl = payload.optString("artDataUrl", "");
+            Bitmap art = null;
+            int comma = artDataUrl.indexOf(',');
+            if (comma >= 0 && comma + 1 < artDataUrl.length()) {
+                try {
+                    byte[] bytes = Base64.decode(artDataUrl.substring(comma + 1), Base64.DEFAULT);
+                    art = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                } catch (Exception ignored) {}
+            }
+            quickMediaHasArt = art != null;
+            if (quickMediaHasArt) {
+                quickMediaArt.setPadding(0, 0, 0, 0);
+                quickMediaArt.setImageBitmap(art);
+            } else {
+                int pad = Math.round(17 * getResources().getDisplayMetrics().density);
+                quickMediaArt.setPadding(pad, pad, pad, pad);
+                quickMediaArt.setImageDrawable(systemDockIcon(android.R.drawable.ic_media_play,
+                        dockAccentColor));
+            }
+        }
         if (quickMediaPlayPause != null) {
             quickMediaPlayPause.setText(quickMediaPlaying ? "Ⅱ" : "▶");
             quickMediaPlayPause.setContentDescription(quickMediaPlaying ? "Pause" : "Play");
@@ -6036,17 +6798,33 @@ public final class MainActivity extends Activity {
         if (quickMediaPlayPause != null) {
             quickMediaPlayPause.setBackground(makeDockPlateDrawable(false, density));
         }
+        if (quickMediaArt != null) {
+            quickMediaArt.setBackground(makeDockPlateDrawable(false, density));
+            if (!quickMediaHasArt) {
+                quickMediaArt.setImageDrawable(systemDockIcon(android.R.drawable.ic_media_play,
+                        dockAccentColor));
+            }
+        }
+        for (QuickCardGraphicView graphic : quickCardGraphics.values()) {
+            if (graphic != null) graphic.invalidate();
+        }
     }
 
     private void tintFrostText(View view) {
         if (view instanceof android.widget.TextView) {
             Object tag = view.getTag();
-            ((android.widget.TextView) view).setTextColor("frostSecondary".equals(tag)
-                    ? dockLabelColorMuted() : dockLabelColor());
+            boolean accent = "frostAccent".equals(tag) || "frostActionAccent".equals(tag);
+            ((android.widget.TextView) view).setTextColor(accent ? dockAccentColor
+                    : ("frostSecondary".equals(tag) ? dockLabelColorMuted() : dockLabelColor()));
             if ("frostAction".equals(tag)) {
                 view.setBackground(makeDockPlateDrawable(false,
                         getResources().getDisplayMetrics().density));
+            } else if ("frostActionAccent".equals(tag)) {
+                view.setBackground(makeDockPlateDrawable(false,
+                        getResources().getDisplayMetrics().density));
             }
+        } else if ("quickAccentRail".equals(view.getTag())) {
+            view.setBackgroundColor(withAlpha(dockAccentColor, 0xD8));
         }
         if (view instanceof android.view.ViewGroup) {
             android.view.ViewGroup group = (android.view.ViewGroup) view;
@@ -6911,9 +7689,7 @@ public final class MainActivity extends Activity {
             if (o.has("desktopCount")) desktopCount = Math.max(1, o.optInt("desktopCount", 1));
             if (o.has("desktopStudioOpen")) {
                 desktopStudioOpen = o.optBoolean("desktopStudioOpen", false);
-                if (stripContainer != null && launcherRevealed) {
-                    stripContainer.setVisibility(desktopStudioOpen ? View.GONE : View.VISIBLE);
-                }
+                updateLauncherStripVisibility();
             }
             if (o.has("activeDesktopIndex")) {
                 activeDesktopIndex = Math.max(0, o.optInt("activeDesktopIndex", 0));
@@ -6994,7 +7770,7 @@ public final class MainActivity extends Activity {
         }
 
         List<BottomCardDescriptor> next = new ArrayList<>();
-        int max = Math.min(rawCards.length(), 8);
+        int max = Math.min(rawCards.length(), 16);
         for (int i = 0; i < max; i++) {
             JSONObject raw = rawCards.optJSONObject(i);
             if (raw == null) continue;
@@ -7002,15 +7778,28 @@ public final class MainActivity extends Activity {
             String title = cleanBottomCardText(raw.optString("title", ""), 24);
             String value = cleanBottomCardText(raw.optString("value", ""), 48);
             String action = raw.optString("action", "").trim();
+            String primary = cleanBottomCardText(raw.optString("primary", ""), 32);
+            String secondary = cleanBottomCardText(raw.optString("secondary", ""), 48);
+            String metricA = cleanBottomCardText(raw.optString("metricA", ""), 32);
+            String metricB = cleanBottomCardText(raw.optString("metricB", ""), 32);
+            int progress = Math.max(0, Math.min(100, raw.optInt("progress", 0)));
             if (id.isEmpty() || title.isEmpty() || !BOTTOM_CARD_ACTIONS.contains(action)) continue;
-            next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value, action));
+            next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
+                    action, primary, secondary, metricA, metricB, progress));
         }
 
         int requested = root.has("bottomCardLimit")
                 ? root.optInt("bottomCardLimit", next.size()) : next.size();
         int nextLimit = Math.max(0, Math.min(requested, next.size()));
+        // Telemetry commonly changes only a card's value. Do not tear down the entire
+        // horizontal rail (and reset its scroll position) for that case.
         if (bottomCardsConfigured && bottomCardLimit == nextLimit
-                && sameBottomCards(bottomCards, next)) return;
+                && sameBottomCardStructure(bottomCards, next)) {
+            updateBottomCardValues(next);
+            bottomCards.clear();
+            bottomCards.addAll(next);
+            return;
+        }
 
         bottomCardsConfigured = true;
         bottomCardLimit = nextLimit;
@@ -7024,17 +7813,40 @@ public final class MainActivity extends Activity {
         return clean.length() > maxLength ? clean.substring(0, maxLength) : clean;
     }
 
-    private boolean sameBottomCards(List<BottomCardDescriptor> a, List<BottomCardDescriptor> b) {
+    private boolean sameBottomCardStructure(List<BottomCardDescriptor> a,
+            List<BottomCardDescriptor> b) {
         if (a.size() != b.size()) return false;
         for (int i = 0; i < a.size(); i++) {
             BottomCardDescriptor left = a.get(i);
             BottomCardDescriptor right = b.get(i);
             if (!left.id.equals(right.id) || !left.title.equals(right.title)
-                    || !left.value.equals(right.value) || !left.action.equals(right.action)) {
+                    || !left.action.equals(right.action)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private void updateBottomCardValues(List<BottomCardDescriptor> cards) {
+        for (BottomCardDescriptor card : cards) {
+            android.widget.TextView value = quickCardValues.get(card.id);
+            String primary = card.primary.isEmpty() ? card.value : card.primary;
+            if (value != null && !primary.equals(value.getText().toString())) {
+                value.setText(primary);
+                View parent = value.getParent() instanceof View ? (View) value.getParent() : null;
+                if (parent != null) {
+                    parent.setContentDescription(card.title
+                            + (card.value.isEmpty() ? "" : ": " + card.value));
+                }
+            }
+            android.widget.TextView detail = quickCardDetails.get(card.id);
+            String detailText = quickVisualDetail(card);
+            if (detail != null && !detailText.equals(detail.getText().toString())) {
+                detail.setText(detailText);
+            }
+            QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
+            if (graphic != null) graphic.setDescriptor(card);
+        }
     }
 
     private void rebuildQuickCardsRow() {
@@ -7065,8 +7877,12 @@ public final class MainActivity extends Activity {
             }
             climate = b.toString();
         }
-        if (quickClimateValue != null && o.has("climateSummary")) {
-            quickClimateValue.setText(climate.isEmpty() ? "— °C  ·  Fan —  ·  AUTO —" : climate);
+        if (quickClimateValue != null && (!climate.isEmpty() || o.has("climateSummary"))) {
+            String display = climate.isEmpty() ? "— °C  ·  Fan —  ·  AUTO —" : climate;
+            quickClimateValue.setText(display);
+            View parent = quickClimateValue.getParent() instanceof View
+                    ? (View) quickClimateValue.getParent() : null;
+            if (parent != null) parent.setContentDescription("Climate summary: " + display);
         }
 
         String consumption = cleanIndicator(o.optString("consumptionSummary", ""));
@@ -7080,8 +7896,12 @@ public final class MainActivity extends Activity {
                 && rawConsumption != JSONObject.NULL) {
             consumption = cleanIndicator(String.valueOf(rawConsumption));
         }
-        if (quickConsumptionValue != null && o.has("consumptionSummary")) {
-            quickConsumptionValue.setText(consumption.isEmpty() ? "—" : consumption);
+        if (quickConsumptionValue != null && (!consumption.isEmpty() || o.has("consumptionSummary"))) {
+            String display = consumption.isEmpty() ? "—" : consumption;
+            quickConsumptionValue.setText(display);
+            View parent = quickConsumptionValue.getParent() instanceof View
+                    ? (View) quickConsumptionValue.getParent() : null;
+            if (parent != null) parent.setContentDescription("Consumption summary: " + display);
         }
     }
 
