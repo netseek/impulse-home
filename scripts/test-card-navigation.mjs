@@ -36,7 +36,7 @@ includesAll(html, [
   "{ id: 'consumption', title: 'Consumption', action: 'openConsumption' }",
   "{ id: 'range', title: 'Range', action: 'openPower' }",
   "{ id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' }",
-  "{ id: 'tires', title: 'Tires', action: 'openDesktopStudio' }",
+  "{ id: 'tires', title: 'Tires', action: 'openTires' }",
   "{ id: 'clock', title: 'Clock', action: 'openDesktopStudio' }",
   "{ id: 'driveMode', title: 'Drive mode', action: 'cycleDriveMode' }",
   "{ id: 'powerMode', title: 'Power mode', action: 'cyclePowerMode' }",
@@ -45,12 +45,14 @@ includesAll(html, [
   "case 'openNavigation':",
   "case 'openClimate':",
   "case 'openConsumption':",
+  "case 'openTires':",
   "case 'cycleDriveMode':",
   "case 'cyclePowerMode':",
   "case 'cycleRegenMode':",
   "case 'openRoofControls':",
 ], 'command wiring');
 assert.ok(!html.includes("{ id: 'consumption', title: 'Consumption', action: 'addWidget' }"), 'Consumption must not open addWidget');
+assert.ok(!html.includes("{ id: 'tires', title: 'Tires', action: 'openDesktopStudio' }"), 'Tires must not open Desktop Studio');
 
 // CoffeeOS-style glance widgets remain page-owned cards: they are selectable
 // from the visual picker and render in both widget boards.

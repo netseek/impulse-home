@@ -93,7 +93,8 @@ public final class MainActivity extends Activity {
                     // Navigation-only commands implemented by the web shell. They do not
                     // invoke vehicle APIs from Android.
                     "openClimate", "openConsumption", "openNavigation", "openPower",
-                    "cycleDriveMode", "cyclePowerMode", "cycleRegenMode", "openRoofControls"
+                    "openTires", "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
+                    "openRoofControls"
             ));
 
     /** Names shared with Impulse's API gate. */
@@ -932,9 +933,13 @@ public final class MainActivity extends Activity {
         final String metricA;
         final String metricB;
         final int progress;
+        /** Dynamic Tires semantics; deliberately excluded from structural comparison. */
+        final String state;
+        final String[] wheelStates;
 
         BottomCardDescriptor(String id, String title, String value, String action,
-                String primary, String secondary, String metricA, String metricB, int progress) {
+                String primary, String secondary, String metricA, String metricB, int progress,
+                String state, String[] wheelStates) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -944,6 +949,8 @@ public final class MainActivity extends Activity {
             this.metricA = metricA;
             this.metricB = metricB;
             this.progress = Math.max(0, Math.min(100, progress));
+            this.state = state;
+            this.wheelStates = wheelStates;
         }
     }
 
@@ -953,6 +960,8 @@ public final class MainActivity extends Activity {
         private final android.graphics.Paint paint =
                 new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         private final android.graphics.RectF oval = new android.graphics.RectF();
+        private Bitmap tiresTopViewBitmap;
+        private boolean tiresTopViewDecodeAttempted;
 
         QuickCardGraphicView(Context context, BottomCardDescriptor descriptor) {
             super(context);
@@ -1107,8 +1116,51 @@ public final class MainActivity extends Activity {
 
         private void drawTires(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
+            Bitmap topView = getTiresTopViewBitmap();
+            if (topView != null) {
+                drawTiresRaster(c, w, h, topView, accent, muted, strong);
+                return;
+            }
+            drawTiresFallback(c, w, h, accent, muted, strong);
+        }
+
+        /** Lazy and failure-tolerant: a missing optional raster never blanks the card. */
+        private Bitmap getTiresTopViewBitmap() {
+            if (tiresTopViewDecodeAttempted) return tiresTopViewBitmap;
+            tiresTopViewDecodeAttempted = true;
+            try (InputStream stream = getAssets().open("www/assets/ui/tires-top-view-v1.png")) {
+                tiresTopViewBitmap = BitmapFactory.decodeStream(stream);
+            } catch (IOException | RuntimeException error) {
+                Log.w(TAG, "Optional Tires top-view asset unavailable; using vector fallback", error);
+                tiresTopViewBitmap = null;
+            }
+            return tiresTopViewBitmap;
+        }
+
+        private void drawTiresRaster(android.graphics.Canvas c, float w, float h, Bitmap topView,
+                int accent, int muted, int strong) {
+            float imageH = h * .88f;
+            float imageW = imageH * topView.getWidth() / Math.max(1f, topView.getHeight());
+            imageW = Math.min(imageW, w * .30f);
+            float left = (w - imageW) * .5f;
+            float top = (h - imageH) * .5f;
+            android.graphics.RectF destination = new android.graphics.RectF(
+                    left, top, left + imageW, top + imageH);
+
+            // A restrained halo separates the transparent silver vehicle in both themes.
+            fill(dockUiLight ? 0x1425303B : 0x1FFFFFFF);
+            c.drawRoundRect(left - w * .035f, top, left + imageW + w * .035f,
+                    top + imageH, imageW * .32f, imageW * .32f, paint);
+            paint.setAlpha(dockUiLight ? 238 : 255);
+            c.drawBitmap(topView, null, destination, paint);
+            paint.setAlpha(255);
+            drawTireReadouts(c, w, h, accent, muted);
+        }
+
+        private void drawTiresFallback(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
             // A compact top view: the tapered body reads as a vehicle even at
-            // launcher-card size, while each tyre remains a separate signal.
+            // launcher-card size. Readings stay outside the body by each corner.
             android.graphics.Path body = new android.graphics.Path();
             body.moveTo(w * .43f, h * .08f);
             body.quadTo(w * .50f, h * .03f, w * .57f, h * .08f);
@@ -1133,24 +1185,58 @@ public final class MainActivity extends Activity {
             c.drawLine(w * .39f, h * .43f, w * .61f, h * .43f, paint);
             c.drawLine(w * .38f, h * .76f, w * .62f, h * .76f, paint);
 
-            float[] xs = {w * .255f, w * .745f, w * .255f, w * .745f};
-            float[] ys = {h * .28f, h * .28f, h * .71f, h * .71f};
-            int active = descriptor.progress <= 0 ? 0
-                    : Math.min(4, Math.max(1, (descriptor.progress + 24) / 25));
+            drawTireReadouts(c, w, h, accent, muted);
+        }
+
+        /** Popup-like composition: vehicle centered, values beside the matching wheel. */
+        private void drawTireReadouts(android.graphics.Canvas c, float w, float h,
+                int accent, int muted) {
+            String[] readings = tireReadings(descriptor);
+            String[] labels = {"FL", "FR", "RL", "RR"};
+            float[] xs = {w * .29f, w * .71f, w * .29f, w * .71f};
+            float[] labelYs = {h * .20f, h * .20f, h * .64f, h * .64f};
+            float[] valueYs = {h * .42f, h * .42f, h * .86f, h * .86f};
             for (int i = 0; i < 4; i++) {
-                float tyreL = xs[i] - w * .055f;
-                float tyreR = xs[i] + w * .055f;
-                float tyreT = ys[i] - h * .095f;
-                float tyreB = ys[i] + h * .095f;
-                fill(withAlpha(strong, 0x32));
-                c.drawRoundRect(tyreL, tyreT, tyreR, tyreB,
-                        w * .04f, w * .04f, paint);
-                stroke(i < active ? accent : muted, Math.max(2.5f, w * .035f));
-                c.drawRoundRect(tyreL, tyreT, tyreR, tyreB,
-                        w * .04f, w * .04f, paint);
-                fill(i < active ? accent : muted);
-                c.drawCircle(xs[i], ys[i], Math.max(2f, w * .023f), paint);
+                String wheelState = descriptor.wheelStates != null
+                        && i < descriptor.wheelStates.length
+                        ? descriptor.wheelStates[i] : "unavailable";
+                int signalColor = tireSignalColor(wheelState, muted);
+                boolean left = i == 0 || i == 2;
+                paint.setTextAlign(left
+                        ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
+                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                        android.graphics.Typeface.NORMAL));
+                paint.setTextSize(Math.max(8f, Math.min(w, h) * .105f));
+                fill(withAlpha(signalColor, 0xB8));
+                c.drawText(labels[i], xs[i], labelYs[i], paint);
+                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                        android.graphics.Typeface.BOLD));
+                paint.setTextSize(Math.max(15f, Math.min(w, h) * .205f));
+                fill(signalColor);
+                c.drawText(readings[i], xs[i], valueYs[i], paint);
             }
+            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.NORMAL));
+            paint.setTextSize(Math.max(7f, Math.min(w, h) * .085f));
+            fill(withAlpha(muted, 0xC8));
+            String unit = descriptor.metricB.isEmpty() ? "" : " · " + descriptor.metricB;
+            c.drawText(descriptor.state.toUpperCase(java.util.Locale.US) + unit,
+                    w * .5f, h * .98f, paint);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+        }
+
+        private int tireSignalColor(String wheelState, int muted) {
+            if ("warning".equals(wheelState)) return 0xFFFFB342;
+            if ("unavailable".equals(wheelState) || "unavailable".equals(descriptor.state)) {
+                return withAlpha(muted, 0xA8);
+            }
+            // Demo is provenance, not a health state: normal readings use the
+            // same primary text color as live readings.
+            if ("demo".equals(descriptor.state)) return dockLabelColor();
+            if ("stale".equals(descriptor.state)) return 0xFFE3A642;
+            return dockLabelColor();
         }
 
         private void drawClock(android.graphics.Canvas c, float w, float h,
@@ -6375,8 +6461,7 @@ public final class MainActivity extends Activity {
         card.setMinimumHeight(Math.round(112 * density));
         card.setClickable(true);
         card.setFocusable(true);
-        card.setContentDescription(descriptor.title
-                + (descriptor.value.isEmpty() ? "" : ": " + descriptor.value));
+        card.setContentDescription(bottomCardAccessibilityDescription(descriptor));
         card.setOnClickListener(click);
         card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
@@ -6422,8 +6507,18 @@ public final class MainActivity extends Activity {
         content.setLayoutParams(contentLp);
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
+        boolean tiresCard = "tires".equals(descriptor.id);
+        if (tiresCard) {
+            graphic.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                    0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+            content.addView(graphic);
+            card.addView(content);
+            quickCardGraphics.put(descriptor.id, graphic);
+            return card;
+        }
         android.widget.LinearLayout.LayoutParams graphicLp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(76 * density), android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+                Math.round(76 * density),
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         graphicLp.rightMargin = Math.round(10 * density);
         graphic.setLayoutParams(graphicLp);
         content.addView(graphic);
@@ -6436,7 +6531,7 @@ public final class MainActivity extends Activity {
 
         android.widget.TextView primary = new android.widget.TextView(this);
         primary.setTag("quickValue");
-        primary.setText(descriptor.primary.isEmpty() ? descriptor.value : descriptor.primary);
+        primary.setText(quickVisualPrimary(descriptor));
         primary.setTextSize("clock".equals(descriptor.id) ? 24f : 21f);
         primary.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
@@ -6469,12 +6564,29 @@ public final class MainActivity extends Activity {
     }
 
     private String quickVisualDetail(BottomCardDescriptor descriptor) {
+        if ("tires".equals(descriptor.id)) {
+            String rear = labelTirePair("RL", "RR", descriptor.metricA);
+            if (descriptor.secondary.isEmpty()) return rear;
+            return rear + (rear.isEmpty() ? "" : "\n") + descriptor.secondary;
+        }
         String metrics = descriptor.metricA;
         if (!descriptor.metricB.isEmpty()) {
             metrics += (metrics.isEmpty() ? "" : "  ·  ") + descriptor.metricB;
         }
         if (descriptor.secondary.isEmpty()) return metrics;
         return descriptor.secondary + (metrics.isEmpty() ? "" : "\n" + metrics);
+    }
+
+    private String quickVisualPrimary(BottomCardDescriptor descriptor) {
+        String primary = descriptor.primary.isEmpty() ? descriptor.value : descriptor.primary;
+        return "tires".equals(descriptor.id) ? labelTirePair("FL", "FR", primary) : primary;
+    }
+
+    private String labelTirePair(String leftLabel, String rightLabel, String pair) {
+        if (pair == null || pair.isEmpty()) return "";
+        String[] values = pair.split("\\s*[·/]\\s*", 2);
+        if (values.length != 2) return pair;
+        return leftLabel + " " + values[0] + "   " + rightLabel + " " + values[1];
     }
 
     private int quickVisualCardWidthDp(String id) {
@@ -7784,8 +7896,15 @@ public final class MainActivity extends Activity {
             String metricB = cleanBottomCardText(raw.optString("metricB", ""), 32);
             int progress = Math.max(0, Math.min(100, raw.optInt("progress", 0)));
             if (id.isEmpty() || title.isEmpty() || !BOTTOM_CARD_ACTIONS.contains(action)) continue;
+            String state = "tires".equals(id)
+                    ? sanitizeTiresState(raw.optString("state",
+                            raw.optString("tireState", "unavailable"))) : "";
+            String[] wheelStates = "tires".equals(id)
+                    ? sanitizeWheelStates(raw.optString("wheelStates",
+                            raw.optString("tireWheelStates", "")))
+                    : new String[] {"unavailable", "unavailable", "unavailable", "unavailable"};
             next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
-                    action, primary, secondary, metricA, metricB, progress));
+                    action, primary, secondary, metricA, metricB, progress, state, wheelStates));
         }
 
         int requested = root.has("bottomCardLimit")
@@ -7813,6 +7932,34 @@ public final class MainActivity extends Activity {
         return clean.length() > maxLength ? clean.substring(0, maxLength) : clean;
     }
 
+    private String sanitizeTiresState(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US);
+        switch (normalized) {
+            case "live":
+            case "demo":
+            case "stale":
+            case "warning":
+            case "unavailable":
+                return normalized;
+            default:
+                return "unavailable";
+        }
+    }
+
+    private String[] sanitizeWheelStates(String value) {
+        String[] sanitized = {"unavailable", "unavailable", "unavailable", "unavailable"};
+        if (value == null || value.trim().isEmpty()) return sanitized;
+        String[] raw = value.split(",", -1);
+        for (int i = 0; i < sanitized.length && i < raw.length; i++) {
+            String state = raw[i].trim().toLowerCase(java.util.Locale.US);
+            if ("normal".equals(state) || "warning".equals(state)
+                    || "unavailable".equals(state)) {
+                sanitized[i] = state;
+            }
+        }
+        return sanitized;
+    }
+
     private boolean sameBottomCardStructure(List<BottomCardDescriptor> a,
             List<BottomCardDescriptor> b) {
         if (a.size() != b.size()) return false;
@@ -7830,14 +7977,9 @@ public final class MainActivity extends Activity {
     private void updateBottomCardValues(List<BottomCardDescriptor> cards) {
         for (BottomCardDescriptor card : cards) {
             android.widget.TextView value = quickCardValues.get(card.id);
-            String primary = card.primary.isEmpty() ? card.value : card.primary;
+            String primary = quickVisualPrimary(card);
             if (value != null && !primary.equals(value.getText().toString())) {
                 value.setText(primary);
-                View parent = value.getParent() instanceof View ? (View) value.getParent() : null;
-                if (parent != null) {
-                    parent.setContentDescription(card.title
-                            + (card.value.isEmpty() ? "" : ": " + card.value));
-                }
             }
             android.widget.TextView detail = quickCardDetails.get(card.id);
             String detailText = quickVisualDetail(card);
@@ -7846,7 +7988,65 @@ public final class MainActivity extends Activity {
             }
             QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
             if (graphic != null) graphic.setDescriptor(card);
+            updateBottomCardAccessibility(value != null ? value : graphic, card);
         }
+    }
+
+    private void updateBottomCardAccessibility(View child, BottomCardDescriptor descriptor) {
+        if (child == null) return;
+        View current = child;
+        while (current != null) {
+            Object tag = current.getTag();
+            if (tag instanceof String && ((String) tag).startsWith("bottomCard:")) {
+                current.setContentDescription(bottomCardAccessibilityDescription(descriptor));
+                return;
+            }
+            android.view.ViewParent parent = current.getParent();
+            current = parent instanceof View ? (View) parent : null;
+        }
+    }
+
+    private String bottomCardAccessibilityDescription(BottomCardDescriptor descriptor) {
+        if (!"tires".equals(descriptor.id)) {
+            return descriptor.title + (descriptor.value.isEmpty() ? "" : ": " + descriptor.value);
+        }
+        String[] readings = tireReadings(descriptor);
+        StringBuilder description = new StringBuilder("Tires. ");
+        description.append("Data state ").append(descriptor.state);
+        if (!descriptor.secondary.isEmpty()) {
+            description.append(". Source ").append(descriptor.secondary);
+        }
+        String[] positions = {"front left", "front right", "rear left", "rear right"};
+        for (int i = 0; i < positions.length; i++) {
+            description.append(". ").append(positions[i]).append(" ").append(readings[i]);
+            if (descriptor.wheelStates != null && i < descriptor.wheelStates.length) {
+                description.append(", ").append(descriptor.wheelStates[i]);
+            }
+        }
+        return description.toString();
+    }
+
+    private String[] tireReadings(BottomCardDescriptor descriptor) {
+        String[] readings = {"unavailable", "unavailable", "unavailable", "unavailable"};
+        String[] front = descriptor.primary.split("\\s*[·/]\\s*", -1);
+        String[] rear = descriptor.metricA.split("\\s*[·/]\\s*", -1);
+        if (front.length >= 2) {
+            readings[0] = front[0].isEmpty() ? "unavailable" : front[0];
+            readings[1] = front[1].isEmpty() ? "unavailable" : front[1];
+        }
+        if (rear.length >= 2) {
+            readings[2] = rear[0].isEmpty() ? "unavailable" : rear[0];
+            readings[3] = rear[1].isEmpty() ? "unavailable" : rear[1];
+        }
+        if (front.length < 2 || rear.length < 2) {
+            String[] legacy = descriptor.value.split("\\s*/\\s*", -1);
+            if (legacy.length >= 4) {
+                for (int i = 0; i < readings.length; i++) {
+                    readings[i] = legacy[i].isEmpty() ? "unavailable" : legacy[i];
+                }
+            }
+        }
+        return readings;
     }
 
     private void rebuildQuickCardsRow() {

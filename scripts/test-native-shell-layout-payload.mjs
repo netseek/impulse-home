@@ -25,7 +25,7 @@ if (!source.includes('applyImpulseReserveBandGeometry()')
 }
 if (!source.includes('alignQuickCardsToWidgetBoard()')
     || !source.includes('Math.round(5 * density)')
-    || !source.includes('DOCK_SURFACE_CARDS.equals(dockSurfaceMode)\n                    ? 0 : Math.round(12 * density)')) {
+    || !/DOCK_SURFACE_CARDS\.equals\(dockSurfaceMode\)\s*\?\s*0\s*:\s*Math\.round\(12 \* density\)/.test(source)) {
   throw new Error('Quick cards must align to the widget board and retain the requested 5dp offset.');
 }
 if (!html.includes('}, 0, 10);')
@@ -46,7 +46,7 @@ if (!source.includes('class QuickCardGraphicView extends View')
 }
 if (!source.includes('android.graphics.Path body = new android.graphics.Path()')
     || !source.includes('android.graphics.Path shell = new android.graphics.Path()')
-    || !source.includes('float[] xs = {w * .255f')) {
+    || !source.includes('float[] xs = {w * .29f')) {
   throw new Error('Vehicle top-view graphics for tyres and panoramic roof are missing.');
 }
 if (!source.includes('payload.optString("artDataUrl", "")')
