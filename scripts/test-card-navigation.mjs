@@ -42,7 +42,7 @@ includesAll(html, [
   // DRIVING popup, the icon keeps the per-mode quick change.
   "{ id: 'driveMode', title: 'Drive mode', action: 'openDriving', iconAction: 'cycleDriveMode' }",
   "{ id: 'powerMode', title: 'Power mode', action: 'openDriving', iconAction: 'cyclePowerMode' }",
-  "{ id: 'regen', title: 'Energy recovery', action: 'openDriving', iconAction: 'cycleRegenMode' }",
+  "{ id: 'regen', title: 'Energy recovery', action: 'openDriving', iconAction: 'cycleRegenMode',",
   "{ id: 'roof', title: 'Sunroof / shade', action: 'openRoofControls' }",
   "case 'openNavigation':",
   "case 'openClimate':",

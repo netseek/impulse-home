@@ -93,7 +93,7 @@ public final class MainActivity extends Activity {
                     // Navigation-only commands implemented by the web shell. They do not
                     // invoke vehicle APIs from Android.
                     "openClimate", "openConsumption", "openNavigation", "openPower",
-                    "openTires", "openDriving",
+                    "openTires", "openDriving", "openDrivingOnePedal",
                     // Retained for native shells installed before the three mode
                     // tiles were unified into one Driving controls card.
                     "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
@@ -139,6 +139,7 @@ public final class MainActivity extends Activity {
                     "car.ev_setting.power_model_config",
                     "car.drive_setting.steering_wheel_assist_mode",
                     "car.ev_setting.energy_recovery_level",
+                    "car.ev.setting.pedal_control_enable",
                     "car.drive_setting.esp_enable"
             ));
     private static final int FILE_CHOOSER_REQUEST = 1001;
@@ -945,10 +946,15 @@ public final class MainActivity extends Activity {
          * change that saves opening the popup for a one-step adjustment.
          */
         final String iconAction;
+        /** Command for a long press anywhere on the card; empty when unused. */
+        final String longAction;
+        /** Flattened glyph path (absolute M/L/C/Z on a 24x24 grid); may be empty. */
+        final String glyph;
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
-                String state, String[] wheelStates, String iconAction) {
+                String state, String[] wheelStates, String iconAction, String longAction,
+                String glyph) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -961,6 +967,8 @@ public final class MainActivity extends Activity {
             this.state = state;
             this.wheelStates = wheelStates;
             this.iconAction = iconAction == null ? "" : iconAction;
+            this.longAction = longAction == null ? "" : longAction;
+            this.glyph = glyph == null ? "" : glyph;
         }
     }
 
@@ -1281,24 +1289,12 @@ public final class MainActivity extends Activity {
          */
         private void drawDriveMode(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
-            float size = Math.min(w, h) * .62f;
-            float cx = w * .5f, cy = h * .44f;
-            android.graphics.Path glyph = new android.graphics.Path();
+            float size = Math.min(w, h) * .68f;
             String mode = descriptor.state == null ? "" : descriptor.state;
-            switch (mode) {
-                case "eco": ecoGlyph(glyph); break;
-                case "sport": boltGlyph(glyph); break;
-                case "snow": snowGlyph(glyph); break;
-                case "sand": duneGlyph(glyph); break;
-                case "mud": trackGlyph(glyph); break;
-                case "awd": awdGlyph(glyph); break;
-                default: wheelGlyph(glyph); break;
-            }
-            drawUnitPath(c, glyph, cx, cy, size,
-                    "unknown".equals(mode) || mode.isEmpty() ? muted : accent,
-                    Math.max(2f, size * .075f));
-            // Seven modes, one lit: position within the range, not a percentage.
-            drawStepDots(c, w, h, 7, descriptor.progress, accent, muted);
+            boolean known = !"unknown".equals(mode) && !mode.isEmpty();
+            drawGlyphPath(c, descriptor.glyph, w * .5f, h * .44f, size,
+                    known ? accent : muted, Math.max(2f, size * .085f));
+            drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
         }
 
         /**
@@ -1309,71 +1305,65 @@ public final class MainActivity extends Activity {
         private void drawPowerMode(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
             String mode = descriptor.state == null ? "" : descriptor.state;
-            boolean anyFuel = !"ev".equals(mode);
             boolean known = "hev".equals(mode) || "evp".equals(mode) || "ev".equals(mode);
-            float fill = "ev".equals(mode) ? 1f : ("evp".equals(mode) ? .66f : .34f);
+            String code = known ? mode.toUpperCase(java.util.Locale.US) : "--";
             int live = known ? accent : muted;
 
-            float bl = w * .14f, bt = h * .26f, br = w * .66f, bb = h * .62f;
-            stroke(muted, Math.max(2f, w * .038f));
-            c.drawRoundRect(bl, bt, br, bb, w * .07f, w * .07f, paint);
-            fill(muted);
-            c.drawRoundRect(br, h * .38f, br + w * .05f, h * .50f, w * .02f, w * .02f, paint);
-            if (known) {
-                float pad = w * .045f;
-                fill(withAlpha(live, 0x99));
-                c.drawRoundRect(bl + pad, bt + pad,
-                        bl + pad + (br - bl - pad * 2f) * fill, bb - pad,
-                        w * .035f, w * .035f, paint);
-            }
-            android.graphics.Path bolt = new android.graphics.Path();
-            boltGlyph(bolt);
-            drawUnitPath(c, bolt, w * .40f, h * .44f, h * .30f, live, Math.max(2f, w * .032f));
+            float cx = w * .5f, cy = h * .46f;
+            float boxW = w * .74f, boxH = h * .46f;
+            oval.set(cx - boxW * .5f, cy - boxH * .5f, cx + boxW * .5f, cy + boxH * .5f);
+            fill(withAlpha(live, known ? 0x22 : 0x14));
+            c.drawRoundRect(oval, boxH * .30f, boxH * .30f, paint);
+            stroke(live, Math.max(1.5f, w * .026f));
+            c.drawRoundRect(oval, boxH * .30f, boxH * .30f, paint);
 
-            // The drop is the combustion share: outlined while fuel is still in
-            // play, hollow and muted once the mode says electric only.
-            android.graphics.Path drop = new android.graphics.Path();
-            dropGlyph(drop);
-            drawUnitPath(c, drop, w * .84f, h * .43f, h * .34f,
-                    anyFuel && known ? strong : muted, Math.max(2f, w * .032f));
+            // Size to the box rather than to a constant: EVP is three glyphs
+            // where EV is two, and a fixed size clips one or floats the other.
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(live);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.NORMAL));
+            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            paint.setLetterSpacing(.06f);
+            float textSize = boxH * .62f;
+            paint.setTextSize(textSize);
+            float maxWidth = boxW * .78f;
+            float measured = paint.measureText(code);
+            if (measured > maxWidth) paint.setTextSize(textSize * maxWidth / measured);
+            android.graphics.Paint.FontMetrics fm = paint.getFontMetrics();
+            c.drawText(code, cx, cy - (fm.ascent + fm.descent) * .5f, paint);
+            paint.setLetterSpacing(0f);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+
             drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
         }
 
         /**
-         * Recovery is an ordinal level, so it reads as rising bars inside a
-         * regeneration arrow rather than as a percentage arc.
+         * Recovery is an ordinal level, so it is three rising bars and nothing
+         * else. One-pedal replaces the level rather than extending it, so it
+         * lights every bar and is named on the card's value line instead of
+         * being faked as a fourth step.
          */
         private void drawRegen(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
             String mode = descriptor.state == null ? "" : descriptor.state;
-            int level = "level1".equals(mode) ? 1 : ("level2".equals(mode) ? 2
-                    : ("level3".equals(mode) ? 3 : 0));
-            float cx = w * .50f, cy = h * .46f, r = Math.min(w, h) * .34f;
-            oval.set(cx - r, cy - r, cx + r, cy + r);
-            stroke(muted, Math.max(2f, w * .042f));
-            c.drawArc(oval, 120f, 300f, false, paint);
-            if (level > 0) {
-                stroke(accent, Math.max(2f, w * .042f));
-                c.drawArc(oval, 120f, 300f * level / 3f, false, paint);
-                // Arrowhead on the recovery direction, so the ring reads as flow
-                // returning to the pack rather than as a plain progress arc.
-                double a = Math.toRadians(120f + 300f * level / 3f);
-                float ax = cx + (float) Math.cos(a) * r, ay = cy + (float) Math.sin(a) * r;
-                android.graphics.Path head = new android.graphics.Path();
-                head.moveTo(ax - r * .30f, ay - r * .16f);
-                head.lineTo(ax, ay);
-                head.lineTo(ax - r * .10f, ay + r * .32f);
-                stroke(accent, Math.max(2f, w * .034f));
-                c.drawPath(head, paint);
-            }
-            float bw = w * .075f, gap = w * .045f;
-            float base = cy + r * .58f;
-            float left = cx - (bw * 3f + gap * 2f) * .5f;
+            boolean onePedal = "onepedal".equals(mode);
+            int level = onePedal ? 3 : ("level1".equals(mode) ? 1
+                    : ("level2".equals(mode) ? 2 : ("level3".equals(mode) ? 3 : 0)));
+            float bw = w * .17f, gap = w * .10f;
+            float base = h * .70f;
+            float left = w * .5f - (bw * 3f + gap * 2f) * .5f;
+            float tall = h * .46f;
             for (int i = 0; i < 3; i++) {
-                float bh = r * (.30f + i * .22f);
+                float bh = tall * (.40f + i * .30f);
+                float x = left + i * (bw + gap);
                 fill(i < level ? accent : muted);
-                c.drawRoundRect(left + i * (bw + gap), base - bh,
-                        left + i * (bw + gap) + bw, base, bw * .3f, bw * .3f, paint);
+                c.drawRoundRect(x, base - bh, x + bw, base, bw * .32f, bw * .32f, paint);
+            }
+            if (onePedal) {
+                // A tie under the bars: one control now covers all three levels.
+                stroke(accent, Math.max(1.5f, w * .026f));
+                c.drawLine(left, base + h * .10f, left + bw * 3f + gap * 2f, base + h * .10f, paint);
             }
             drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
         }
@@ -1397,102 +1387,45 @@ public final class MainActivity extends Activity {
             }
         }
 
-        /** Stroke a path authored in a -1..1 box at (cx, cy) scaled to `size`. */
-        private void drawUnitPath(android.graphics.Canvas c, android.graphics.Path unit,
+        /**
+         * Draw a flattened glyph path, centred at (cx, cy) and scaled from its
+         * 24x24 authoring grid to `size`.
+         *
+         * The command subset is guaranteed by scripts/build-drive-mode-glyphs.mjs
+         * (absolute M/L/C/Z, one space after every letter), which is what keeps
+         * this a tokenless split rather than an SVG parser on the head unit.
+         */
+        private void drawGlyphPath(android.graphics.Canvas c, String data,
                 float cx, float cy, float size, int color, float width) {
-            android.graphics.Matrix m = new android.graphics.Matrix();
-            m.setScale(size * .5f, size * .5f);
-            m.postTranslate(cx, cy);
-            android.graphics.Path out = new android.graphics.Path();
-            unit.transform(m, out);
-            stroke(color, width);
-            c.drawPath(out, paint);
-        }
-
-        private void wheelGlyph(android.graphics.Path p) {
-            p.addCircle(0f, 0f, 1f, android.graphics.Path.Direction.CW);
-            p.addCircle(0f, 0f, .32f, android.graphics.Path.Direction.CW);
-            p.moveTo(0f, -1f); p.lineTo(0f, -.32f);
-            p.moveTo(-.87f, .5f); p.lineTo(-.28f, .16f);
-            p.moveTo(.87f, .5f); p.lineTo(.28f, .16f);
-        }
-
-        private void ecoGlyph(android.graphics.Path p) {
-            p.moveTo(-.75f, .85f);
-            p.cubicTo(-.75f, -.35f, -.05f, -.95f, .85f, -.95f);
-            p.cubicTo(.85f, .25f, .15f, .85f, -.75f, .85f);
-            p.close();
-            p.moveTo(-.62f, .78f);
-            p.cubicTo(-.35f, .12f, .02f, -.28f, .48f, -.55f);
-        }
-
-        private void boltGlyph(android.graphics.Path p) {
-            p.moveTo(.28f, -1f);
-            p.lineTo(-.62f, .14f);
-            p.lineTo(-.06f, .14f);
-            p.lineTo(-.28f, 1f);
-            p.lineTo(.62f, -.16f);
-            p.lineTo(.06f, -.16f);
-            p.close();
-        }
-
-        private void snowGlyph(android.graphics.Path p) {
-            for (int i = 0; i < 3; i++) {
-                double a = Math.toRadians(90 + i * 60);
-                float x = (float) Math.cos(a), y = (float) Math.sin(a);
-                p.moveTo(-x, -y); p.lineTo(x, y);
-                // A barb at each tip is what makes it read as ice rather than a star.
-                double b1 = a + Math.toRadians(35), b2 = a - Math.toRadians(35);
-                p.moveTo(x, y);
-                p.lineTo(x - (float) Math.cos(b1) * .34f, y - (float) Math.sin(b1) * .34f);
-                p.moveTo(x, y);
-                p.lineTo(x - (float) Math.cos(b2) * .34f, y - (float) Math.sin(b2) * .34f);
-                p.moveTo(-x, -y);
-                p.lineTo(-x + (float) Math.cos(b1) * .34f, -y + (float) Math.sin(b1) * .34f);
-                p.moveTo(-x, -y);
-                p.lineTo(-x + (float) Math.cos(b2) * .34f, -y + (float) Math.sin(b2) * .34f);
-            }
-        }
-
-        private void duneGlyph(android.graphics.Path p) {
-            p.moveTo(-1f, .58f);
-            p.cubicTo(-.55f, -.05f, -.10f, -.05f, .12f, .34f);
-            p.cubicTo(.34f, .72f, .74f, .72f, 1f, .30f);
-            p.moveTo(-1f, -.12f);
-            p.cubicTo(-.68f, -.62f, -.34f, -.62f, -.08f, -.24f);
-            p.moveTo(.16f, -.50f);
-            p.cubicTo(.42f, -.92f, .74f, -.92f, 1f, -.56f);
-        }
-
-        private void trackGlyph(android.graphics.Path p) {
-            for (int side = 0; side < 2; side++) {
-                float x = side == 0 ? -.52f : .52f;
-                p.moveTo(x, -1f); p.lineTo(x, 1f);
-                for (int i = 0; i < 4; i++) {
-                    float y = -.72f + i * .48f;
-                    p.moveTo(x - .30f, y); p.lineTo(x + .30f, y);
+            if (data == null || data.isEmpty()) return;
+            android.graphics.Path path = new android.graphics.Path();
+            String[] parts = data.split(" ");
+            float[] n = new float[6];
+            int i = 0;
+            try {
+                while (i < parts.length) {
+                    String token = parts[i++];
+                    if (token.isEmpty()) continue;
+                    char command = token.charAt(0);
+                    if (command == 'Z') { path.close(); continue; }
+                    int count = command == 'C' ? 6 : 2;
+                    if (i + count > parts.length) return;
+                    for (int k = 0; k < count; k++) n[k] = Float.parseFloat(parts[i++]);
+                    if (command == 'M') path.moveTo(n[0], n[1]);
+                    else if (command == 'L') path.lineTo(n[0], n[1]);
+                    else if (command == 'C') path.cubicTo(n[0], n[1], n[2], n[3], n[4], n[5]);
+                    else return;
                 }
+            } catch (NumberFormatException error) {
+                return;   // A malformed glyph draws nothing; it never crashes the rail.
             }
-        }
-
-        private void awdGlyph(android.graphics.Path p) {
-            for (int i = 0; i < 4; i++) {
-                float x = (i % 2 == 0) ? -.62f : .62f;
-                float y = (i < 2) ? -.62f : .62f;
-                p.addRoundRect(new android.graphics.RectF(x - .18f, y - .34f, x + .18f, y + .34f),
-                        .12f, .12f, android.graphics.Path.Direction.CW);
-            }
-            p.moveTo(-.62f, -.42f); p.lineTo(.62f, -.42f);
-            p.moveTo(-.62f, .42f); p.lineTo(.62f, .42f);
-            p.moveTo(0f, -.42f); p.lineTo(0f, .42f);
-        }
-
-        private void dropGlyph(android.graphics.Path p) {
-            p.moveTo(0f, -1f);
-            p.cubicTo(.62f, -.22f, .82f, .18f, .52f, .60f);
-            p.cubicTo(.24f, 1f, -.24f, 1f, -.52f, .60f);
-            p.cubicTo(-.82f, .18f, -.62f, -.22f, 0f, -1f);
-            p.close();
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            float scale = size / 24f;
+            m.setScale(scale, scale);
+            m.postTranslate(cx - size * .5f, cy - size * .5f);
+            path.transform(m);
+            stroke(color, width);
+            c.drawPath(path, paint);
         }
 
         private void drawRoof(android.graphics.Canvas c, float w, float h,
@@ -6638,6 +6571,17 @@ public final class MainActivity extends Activity {
         card.setFocusable(true);
         card.setContentDescription(bottomCardAccessibilityDescription(descriptor));
         card.setOnClickListener(click);
+        if (!descriptor.longAction.isEmpty()) {
+            final String longCommand = descriptor.longAction;
+            // Returning true consumes the gesture, so the long press cannot also
+            // fire the card's ordinary click when the finger lifts.
+            card.setLongClickable(true);
+            card.setOnLongClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                callViewerDock(longCommand);
+                return true;
+            });
+        }
         card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
         quickCardViews.add(card);
@@ -6728,7 +6672,10 @@ public final class MainActivity extends Activity {
         detail.setTextSize(9.5f);
         detail.setLetterSpacing(0.025f);
         detail.setLineSpacing(0f, 1.02f);
-        detail.setMaxLines(2);
+        // The source badge is long and must never ellipsise into something that
+        // reads like a different claim ("DEMO · SIMULATED · NOT VEHICLE..." is
+        // not the same statement).
+        detail.setMaxLines(3);
         detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
@@ -8083,6 +8030,9 @@ public final class MainActivity extends Activity {
             // rather than reaching the dock unchecked.
             String iconAction = raw.optString("iconAction", "").trim();
             if (!BOTTOM_CARD_ACTIONS.contains(iconAction)) iconAction = "";
+            String longAction = raw.optString("longAction", "").trim();
+            if (!BOTTOM_CARD_ACTIONS.contains(longAction)) longAction = "";
+            String glyph = sanitizeGlyphPath(raw.optString("glyph", ""));
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
                             raw.optString("tireState", "unavailable")))
@@ -8094,7 +8044,7 @@ public final class MainActivity extends Activity {
                     : new String[] {"unavailable", "unavailable", "unavailable", "unavailable"};
             next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
                     action, primary, secondary, metricA, metricB, progress, state, wheelStates,
-                    iconAction));
+                    iconAction, longAction, glyph));
         }
 
         int requested = root.has("bottomCardLimit")
@@ -8122,6 +8072,24 @@ public final class MainActivity extends Activity {
         return clean.length() > maxLength ? clean.substring(0, maxLength) : clean;
     }
 
+    /**
+     * Glyph paths arrive from the web payload, so they are validated like any
+     * other untrusted string: the generator emits only absolute M/L/C/Z with
+     * spaces and numbers, and anything else is dropped rather than parsed.
+     */
+    private String sanitizeGlyphPath(String value) {
+        if (value == null) return "";
+        String trimmed = value.trim();
+        if (trimmed.isEmpty() || trimmed.length() > 4000) return "";
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            boolean ok = c == 'M' || c == 'L' || c == 'C' || c == 'Z' || c == ' '
+                    || c == '.' || c == '-' || (c >= '0' && c <= '9');
+            if (!ok) return "";
+        }
+        return trimmed;
+    }
+
     /** Rail cards that draw a driving mode glyph and accept an icon quick action. */
     private static final java.util.Set<String> DRIVING_CARD_IDS =
             new java.util.HashSet<>(java.util.Arrays.asList("driveMode", "powerMode", "regen"));
@@ -8147,6 +8115,7 @@ public final class MainActivity extends Activity {
             case "level1":
             case "level2":
             case "level3":
+            case "onepedal":
                 return normalized;
             default:
                 return "unknown";

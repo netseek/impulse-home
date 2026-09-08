@@ -58,9 +58,12 @@ const railTiles = [
 ];
 for (const [id, title, iconAction] of railTiles) {
   assert.match(catalog,
-    new RegExp(`\\{\\s*id:\\s*'${id}'\\s*,\\s*title:\\s*'${title}'\\s*,\\s*action:\\s*'openDriving'\\s*,\\s*iconAction:\\s*'${iconAction}'\\s*\\}`),
+    new RegExp(`id:\\s*'${id}'\\s*,\\s*title:\\s*'${title}'\\s*,\\s*action:\\s*'openDriving'\\s*,\\s*iconAction:\\s*'${iconAction}'`),
     `${id} must open the Driving popup and quick-cycle from its icon`);
 }
+// Recovery is the one tile with a third gesture: hold to reach one-pedal.
+assert.match(catalog, /id:\s*'regen'[\s\S]{0,160}longAction:\s*'openDrivingOnePedal'/,
+  'a long press on Energy recovery must reach the one-pedal control');
 assert.doesNotMatch(catalog, /id:\s*'driving'/,
   'the rail carries the three tiles, not a fourth combined card');
 assert.doesNotMatch(catalog,
@@ -111,6 +114,32 @@ for (const token of ["modes: { label: 'MODES'", 'wg.isModes', 'hv-modes-chip',
 }
 
 const view = blockFrom(html, '  _drivingWidgetView(item) {', 'driving view builder');
+// The drive icon cycles the three ROAD modes only. Stepping a driver into
+// Neve/Areia/Lama from a rail tap is a surprise, not a quick action.
+const roadCycle = blockFrom(html, '  _cycleDriveRoadMode() {', 'road cycle');
+includesAll(roadCycle, ["const road = ['2', '0', '1'];", "at < 0 ? '0'"], 'road-only drive cycle');
+const regenCycle = blockFrom(html, '  _cycleRegenMode() {', 'regen cycle');
+includesAll(regenCycle, ['CAR_MODE_ONE_PEDAL.stateKey', 'this._setOnePedal(false)'],
+  'a tap while one-pedal is on turns it off');
+// Enabling remembers the level; disabling writes it back. Nothing on the bus
+// reports a "previous" level, so the memory is explicitly ours.
+const setOnePedal = blockFrom(html, '  _setOnePedal(on) {', 'one pedal writer');
+includesAll(setOnePedal, [
+  'this._regenLevelBeforeOnePedal = level',
+  'if (!on && this._regenLevelBeforeOnePedal)',
+], 'one-pedal restores the previous recovery level');
+
+// One-pedal is evidenced, not invented: Impulse exposes this exact key for read
+// and write. Note the separators — car.ev.setting, not car.ev_setting.
+assert.match(html, /key: 'car\.ev\.setting\.pedal_control_enable'/, 'one-pedal key');
+assert.ok(native.includes('"car.ev.setting.pedal_control_enable"'),
+  'one-pedal must be on the native writable allow-list');
+includesAll(native, [
+  'String longAction = raw.optString("longAction", "").trim();',
+  'if (!BOTTOM_CARD_ACTIONS.contains(longAction)) longAction = "";',
+  'card.setOnLongClickListener(',
+], 'long press is gated like every other command');
+
 includesAll(view, [
   'CAR_MODE_GROUP_INDEX[name]',
   "group('drive', 'DRIVE MODE'",
@@ -202,10 +231,25 @@ includesAll(focusFields, [
   "type === 'driving' ? this._drivingWidgetView(entry.item)",
 ], 'focused Driving workspace');
 includesAll(view, [
-  'drivingGroups: [drive, power, regen, steer, esp]',
+  'drivingGroups: [drive, power, regen, onePedal, steer, esp]',
   'drivingSummary:',
   'drivingNote:',
 ], 'popup fields come from the card builder');
+
+// The widget shows every option, not a read-only hero: it was the one surface
+// where a mode could be seen but not changed.
+includesAll(view, ['drivingRows: rows', 'const chipRow =', 'const toggleChip ='],
+  'the widget renders the option groups');
+assert.ok(!view.includes('drivingShowQuick'), 'the hero chip strip is replaced by full rows');
+// Row height follows the chip lines a group needs; equal shares squeezed the
+// seven-option drive row into one line and the buttons overlapped.
+includesAll(view, ["linesClass: 'lines-' + Math.min(3, Math.ceil(chips.length / cols))"],
+  'rows claim height in proportion to their chip lines');
+// Booleans are one chip that lights, which is a row cheaper than ON/OFF pairs.
+includesAll(blockFrom(html, '  _drivingOnePedalModel(', 'one pedal model'),
+  ['on: on && (known || preview)', 'onToggle:'], 'one-pedal exposes a toggle');
+includesAll(blockFrom(html, '  _drivingEspModel(', 'esp model'),
+  ['on: on && (known || preview)', 'onToggle:'], 'ESP exposes a toggle');
 
 // ---------------------------------------------------------------------------
 // 6. Markup. The card renders on both widget boards, the popup renders the
@@ -219,14 +263,19 @@ const glanceStart = html.indexOf('<sc-if value="{{ wg.isDriving }}"');
 const glance = html.slice(glanceStart, html.indexOf('</sc-if>', glanceStart) + 8);
 includesAll(glance, [
   '{{ wg.drivingSource }}',
-  '{{ wg.drivingMode }}',
-  '{{ wg.drivingPower }}',
-  '{{ wg.drivingRegen }}',
-  'list="{{ wg.drivingRegenSteps }}"',
-  'd="{{ wg.drivingGlyph }}"',
+  'list="{{ wg.drivingRows }}"',
+  'list="{{ dr.chips }}"',
+  '{{ dr.label }}',
+  '{{ dc.label }}',
+  'class="hv-driving-row {{ dr.linesClass }}"',
   'disabled="{{ wg.drivingControlsDisabled }}"',
   'onClick="{{ wg.onDrivingOpen }}"',
-], 'Driving glance card');
+], 'Driving widget option grid');
+// One source badge per surface: the widget said DEMO in the header and again
+// in a foot line, and the foot also spent a row on an affordance the whole
+// card already has.
+assert.ok(!glance.includes('hv-driving-foot'),
+  'the widget carries one source badge, in its header');
 
 const popupStart = html.indexOf('<sc-if value="{{ focusedCardIsDriving }}"');
 assert.ok(popupStart >= 0, 'missing focused Driving popup');
@@ -254,6 +303,42 @@ const catalogueEntry = html.slice(html.indexOf("driving: { label: 'DRIVING'"),
   html.indexOf('\n', html.indexOf("driving: { label: 'DRIVING'")));
 for (const size of ['[1, 1]', '[1, 2]', '[2, 1]', '[2, 2]', '[3, 1]', '[3, 2]']) {
   assert.ok(catalogueEntry.includes(size), `Driving catalogue must offer ${size}`);
+}
+
+// ---------------------------------------------------------------------------
+// 6b. Glyphs are generated from a real icon set and shared by both surfaces.
+//
+//     Hand-drawn shapes kept colliding (tyre tread read as a barcode, a hub
+//     circle read as an eye) and the native copy drifted from the web one.
+//     Now one table feeds both, flattened to a subset the rail can parse.
+// ---------------------------------------------------------------------------
+assert.match(html, /Tabler Icons — Copyright \(c\) 2020-2024 Paweł Kuna — MIT License/,
+  'the vendored icon set must keep its licence notice');
+assert.match(html, /scripts\/build-drive-mode-glyphs\.mjs/, 'glyph table names its generator');
+const glyphTable = html.slice(html.indexOf('const CAR_DRIVE_MODE_GLYPHS = {'),
+  html.indexOf('};', html.indexOf('const CAR_DRIVE_MODE_GLYPHS = {')));
+for (const value of ['0', '1', '2', '3', '4', '5', '11']) {
+  assert.match(glyphTable, new RegExp("'" + value + "': 'M "), 'glyph for drive mode ' + value);
+}
+// Only the flattened subset, or the native parser cannot draw it.
+const paths = glyphTable.match(/'M [^']+'/g) || [];
+assert.ok(paths.length >= 7, 'every drive mode needs a glyph');
+for (const path of paths) {
+  assert.ok(!/[^MLCZ0-9eE.\-\s']/.test(path),
+    'glyphs must be flattened to absolute M/L/C/Z: ' + path.slice(0, 40));
+}
+// The rail draws the same art, so the path travels with the payload and is
+// validated on arrival like any other untrusted string.
+assert.match(html, /driveModeVisual\.glyph = CAR_DRIVE_MODE_GLYPHS\[drivingGroup\(0\)\.value\]/,
+  'the glyph must reach the rail payload');
+includesAll(native, [
+  'private String sanitizeGlyphPath(String value)',
+  'private void drawGlyphPath(',
+  'drawGlyphPath(c, descriptor.glyph,',
+], 'native glyph parser');
+for (const gone of ['ecoGlyph', 'boltGlyph', 'snowGlyph', 'duneGlyph', 'mudGlyph',
+  'awdGlyph', 'wheelGlyph', 'roadGlyph', 'drawUnitPath']) {
+  assert.ok(!native.includes(gone), 'hand-drawn glyph left behind: ' + gone);
 }
 
 // ---------------------------------------------------------------------------
@@ -293,6 +378,14 @@ includesAll(dockIndicators, [
   'CAR_DRIVE_MODE_CARD_STATES[drivingGroup(0).value]',
   'CAR_POWER_MODE_CARD_STATES[drivingGroup(1).value]',
 ], 'rail tiles share the card builder');
+// The graphic draws the code, so the value line spells the mode out.
+assert.match(html, /const CAR_POWER_MODE_LONG_LABELS = \{ '0': 'Hybrid EV', '1': 'Prioritary EV', '3': 'Full Electric' \};/,
+  'power modes need their spelled-out labels');
+includesAll(dockIndicators, ['CAR_POWER_MODE_LONG_LABELS[drivingGroup(1).value]'],
+  'the power tile shows the long label');
+// One-pedal replaces the level rather than extending it, so the tile names it.
+includesAll(dockIndicators, ["onePedalOn ? 'onepedal'", "regenVisual.primary = 'One pedal'"],
+  'the recovery tile reports one-pedal');
 assert.ok(!dockIndicators.includes('_modeCardVisual'),
   'the replaced per-mode quick-card builder must be gone');
 
@@ -309,7 +402,7 @@ includesAll(native, [
   'private String sanitizeDrivingState(String value)',
   'DRIVING_CARD_IDS',
   'private void drawStepDots(',
-  'private void drawUnitPath(',
+  'private void drawGlyphPath(',
 ], 'native rail graphics');
 // A tap on the graphic is a command, so it passes the same allow-list as a tap
 // on the card; an unknown one degrades to no icon action.

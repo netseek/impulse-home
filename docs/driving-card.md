@@ -16,8 +16,17 @@ popup.
 | Energy recovery | `car.ev_setting.energy_recovery_level` | Bridge-supported |
 | Steering assist | `car.drive_setting.steering_wheel_assist_mode` | Bridge-supported |
 | Stability control | `car.drive_setting.esp_enable` | Bridge-supported |
+| One-pedal driving | `car.ev.setting.pedal_control_enable` | Bridge-supported (Impulse read + write) |
 
-All five already existed in `CAR_MODE_GROUPS` / `CAR_MODE_ESP` and are written
+One-pedal is the only key this work added, and it is evidenced rather than
+invented: Impulse lists `car.ev.setting.pedal_control_enable` in **both**
+`ThemeBridgeImpl.getAvailableKeys()` (readable) and `CarDataWriteReceiver`
+(writable), and its `RegenScreen` toggles it with `"1"`/`"0"` on a long press —
+the same key, values and gesture used here. **Note the separators:** it is
+`car.ev.setting` with dots where its neighbours are `car.ev_setting` with an
+underscore. That is not a typo, and "fixing" it silently breaks the write.
+
+The other five already existed in `CAR_MODE_GROUPS` / `CAR_MODE_ESP` and are written
 through the same `_setCarMode` path the `modes` widget uses. **No telemetry
 contract was changed and no new key was invented.** The values and their labels
 are the ones Impulse's settings menu uses.
@@ -64,14 +73,70 @@ Writes are disabled — not silently dropped — when the vehicle is not `READY`
 the installed `TelemetryBridge` has no `setCarData`. Nothing reaches the bridge
 in that state.
 
+## Gestures
+
+Each rail tile carries up to three:
+
+| Gesture | What it does |
+| --- | --- |
+| tap the card body | opens the DRIVING popup |
+| tap the graphic | quick change for that one mode |
+| hold Energy recovery | opens the popup at the one-pedal control |
+
+The drive icon cycles **Eco → Normal → Sport only**. Stepping a driver into
+Neve/Areia/Lama from a rail tap is a surprise, not a quick action; the terrain
+modes are a deliberate choice and stay in the popup. From a terrain mode the
+cycle re-enters at Normal, and the three dots under the glyph light none —
+which is true, the toggle is not on any of its own positions.
+
+The recovery icon steps the level, unless one-pedal is on: then it turns
+one-pedal **off and restores the level selected before it was enabled**. That
+memory (`_regenLevelBeforeOnePedal`) is ours. Nothing on the bus reports a
+"previous" level, so when none was ever reported the level is left alone.
+
+## Glyphs come from a real icon set
+
+The mode glyphs are [Tabler Icons](https://github.com/tabler/tabler-icons)
+(MIT, © 2020-2024 Paweł Kuna) on the same 24x24 / 2px grid the cards already
+used: `leaf`, `road`, `bolt`, `snowflake`, `ripple`, `droplets`, `car-4wd`.
+
+They were hand-drawn first and it did not work. The shapes kept colliding with
+each other — tyre tread read as a barcode, a hub circle read as an eye, four
+wheels read as a window grid — and each fix was another guess. Worse, the web
+table and the native card each carried their own copy of every shape, so the
+two drifted.
+
+`scripts/build-drive-mode-glyphs.mjs` flattens each icon to absolute M/L/C/Z
+with a space after every command letter: relative commands resolved, shorthand
+expanded, and **elliptical arcs converted to cubics at build time** rather than
+on the head unit. That subset is why the rail card can draw the same art from a
+ten-line tokenless parser instead of an SVG engine, and why there is one table
+instead of two. The path travels in the rail payload and is validated on arrival
+like any other untrusted string (`sanitizeGlyphPath`).
+
+Re-run the script to change an icon; do not hand-edit the table.
+
 ## Layout
 
 `1x1`, `1x2`, `2x1`, `2x2`, `3x1`, `3x2`.
 
-- `2x1` / `3x1` put the hero and the POWER/REGEN cells side by side.
-- `h >= 2` adds the three road-mode chips (Eco / Normal / Sport) for direct
-  selection; the terrain modes stay in the popup, where there is room for them.
-- `1x1` drops to a compact hero plus the two cells.
+The widget is a **control surface, not a readout** — it shows the same option
+groups as the popup. It shipped once as a hero-plus-two-cells glance card, which
+made it the only surface where a mode could be seen but not changed; the retired
+MODES widget had this right, compacting its buttons all the way down to 1x1.
+
+- one row per group, and rows claim height in proportion to the chip lines they
+  need. Equal shares squeezed the seven-option drive row into one line's worth
+  of space and the buttons overlapped.
+- `2x1` / `3x1` run the groups as columns; five stacked rows do not fit a
+  one-row-tall slot.
+- `1x1` shows the three road drive modes, power and recovery. Seven buttons in
+  a 1x1 slot are unreadable.
+- one-pedal and ESP are booleans, so each is a single chip that lights when it
+  is on, sharing one row — a row cheaper than rendering ON and OFF pairs.
+- there is no foot line. The header badge is the source claim; repeating it
+  below, next to a "TAP TO OPEN" for an affordance the whole card already has,
+  spent height the controls wanted.
 
 Colours resolve through `--hv-widget-fg`, `--hv-accent`, `--hv-frost-edge`,
 `--hv-frost-inner` and `--hv-frost-fill-strong`, so the card works on both

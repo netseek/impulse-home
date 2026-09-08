@@ -4311,6 +4311,15 @@ window.HavalSplash = (function () {
        older MODES chips hard-code rgba(255,255,255,...) and are unreadable on
        the light board. Do not copy that pattern back in. */
     .hv-driving { height:100%; min-width:0; box-sizing:border-box; padding:14px; color:var(--hv-widget-fg,#edf5fa); overflow:hidden; cursor:pointer; }
+    .hv-driving-groups { height:calc(100% - 18px); min-height:0; display:grid; grid-auto-rows:minmax(0,1fr); gap:7px; align-content:stretch; }
+    .hv-driving-row { min-width:0; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); gap:3px; }
+    .hv-driving-row.lines-2 { grid-row:span 2; }
+    .hv-driving-row.lines-3 { grid-row:span 3; }
+    .hv-driving-row-head { display:flex; align-items:baseline; justify-content:space-between; gap:6px; font:7px/1.1 'Space Mono',monospace; letter-spacing:.1em; opacity:.5; }
+    .hv-driving-row-head span,.hv-driving-row-head em { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-style:normal; }
+    .hv-driving-row-head em { opacity:.85; }
+    .hv-driving-row-chips { min-height:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:minmax(0,1fr); gap:4px; }
+    .hv-driving-row-chips.cols-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .hv-driving-body { height:calc(100% - 30px); display:flex; flex-direction:column; justify-content:center; gap:12px; min-height:0; }
     .hv-driving-hero { display:flex; align-items:center; gap:12px; min-width:0; }
     .hv-driving-glyph { flex:0 0 auto; width:clamp(28px,5vw,50px); height:clamp(28px,5vw,50px); fill:none; stroke:var(--hv-accent); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
@@ -4343,6 +4352,19 @@ window.HavalSplash = (function () {
     .hv-driving-1x1 .hv-driving-cell { padding:6px 7px; }
     .hv-driving-1x1 .hv-driving-cell strong { font-size:11px; }
     .hv-driving-1x1 .hv-driving-foot { font-size:6px; }
+    .hv-driving-2x1 .hv-driving-groups,
+    .hv-driving-3x1 .hv-driving-groups { grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); grid-auto-rows:auto; align-content:center; column-gap:10px; }
+    .hv-driving-2x1 .hv-driving-row.lines-2,.hv-driving-2x1 .hv-driving-row.lines-3,
+    .hv-driving-3x1 .hv-driving-row.lines-2,.hv-driving-3x1 .hv-driving-row.lines-3 { grid-row:auto; }
+    .hv-driving-3x1 .hv-driving-row-chips { grid-auto-rows:minmax(26px,1fr); }
+    .hv-driving-1x1 .hv-driving-groups { gap:4px; }
+    .hv-driving-1x1 .hv-driving-row-head { font-size:6px; letter-spacing:.06em; }
+    .hv-driving-1x1 .hv-driving-chip { min-height:0; font-size:9px; padding:0 3px; border-radius:7px; }
+    .hv-driving-1x2 .hv-driving-chip,
+    .hv-driving-2x1 .hv-driving-chip,
+    .hv-driving-3x1 .hv-driving-chip { min-height:0; font-size:10px; }
+    .hv-driving-2x2 .hv-driving-chip,
+    .hv-driving-3x2 .hv-driving-chip { min-height:0; font-size:12px; }
     .hv-driving-2x1 .hv-driving-body,.hv-driving-3x1 .hv-driving-body { flex-direction:row; align-items:center; gap:14px; }
     .hv-driving-2x1 .hv-driving-hero,.hv-driving-3x1 .hv-driving-hero { flex:1 1 auto; min-width:0; }
     .hv-driving-2x1 .hv-driving-grid { flex:0 0 auto; width:47%; }
@@ -4850,7 +4872,7 @@ window.HavalSplash = (function () {
             <div class="hv-range-card {{ wg.rangeSizeClass }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-ring" style="--range-pct:{{ wg.rangePct }}%;"><strong>{{ wg.rangeSoc }}</strong><span>BATTERY</span></div><div class="hv-range-stats"><div class="hv-range-stat"><span>EV</span><strong>{{ wg.rangeEv }}</strong><small>KM</small></div><div class="hv-range-stat"><span>GAS</span><strong>{{ wg.rangeFuel }}</strong><small>KM</small></div></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isDriving }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-body"><div class="hv-driving-hero"><svg class="hv-driving-glyph" viewBox="0 0 24 24" role="img" aria-label="{{ wg.drivingMode }}"><path d="{{ wg.drivingGlyph }}"></path></svg><div class="hv-driving-name"><strong>{{ wg.drivingMode }}</strong><span>{{ wg.drivingModeKicker }}</span></div></div><div class="hv-driving-grid"><div class="hv-driving-cell"><span>POWER</span><strong>{{ wg.drivingPower }}</strong></div><div class="hv-driving-cell"><span>REGEN</span><strong>{{ wg.drivingRegen }}</strong><div class="hv-driving-steps"><sc-for list="{{ wg.drivingRegenSteps }}" as="rs" hint-placeholder-count="3"><i class="{{ rs.cls }}"></i></sc-for></div></div></div><sc-if value="{{ wg.drivingShowQuick }}" hint-placeholder-val="{{ false }}"><div class="hv-driving-quick"><sc-for list="{{ wg.drivingQuick }}" as="dq" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dq.cls }}" onClick="{{ dq.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}">{{ dq.label }}</button></sc-for></div></sc-if></div><div class="hv-driving-foot"><span>{{ wg.drivingFoot }}</span><span>{{ wg.drivingHint }}</span></div></div>
+            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}">{{ dc.label }}</button></sc-for></div></div></sc-for></div></div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
             <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
@@ -5055,7 +5077,7 @@ window.HavalSplash = (function () {
             <div class="hv-range-card {{ wg.rangeSizeClass }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-ring" style="--range-pct:{{ wg.rangePct }}%;"><strong>{{ wg.rangeSoc }}</strong><span>BATTERY</span></div><div class="hv-range-stats"><div class="hv-range-stat"><span>EV</span><strong>{{ wg.rangeEv }}</strong><small>KM</small></div><div class="hv-range-stat"><span>GAS</span><strong>{{ wg.rangeFuel }}</strong><small>KM</small></div></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isDriving }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-body"><div class="hv-driving-hero"><svg class="hv-driving-glyph" viewBox="0 0 24 24" role="img" aria-label="{{ wg.drivingMode }}"><path d="{{ wg.drivingGlyph }}"></path></svg><div class="hv-driving-name"><strong>{{ wg.drivingMode }}</strong><span>{{ wg.drivingModeKicker }}</span></div></div><div class="hv-driving-grid"><div class="hv-driving-cell"><span>POWER</span><strong>{{ wg.drivingPower }}</strong></div><div class="hv-driving-cell"><span>REGEN</span><strong>{{ wg.drivingRegen }}</strong><div class="hv-driving-steps"><sc-for list="{{ wg.drivingRegenSteps }}" as="rs" hint-placeholder-count="3"><i class="{{ rs.cls }}"></i></sc-for></div></div></div><sc-if value="{{ wg.drivingShowQuick }}" hint-placeholder-val="{{ false }}"><div class="hv-driving-quick"><sc-for list="{{ wg.drivingQuick }}" as="dq" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dq.cls }}" onClick="{{ dq.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}">{{ dq.label }}</button></sc-for></div></sc-if></div><div class="hv-driving-foot"><span>{{ wg.drivingFoot }}</span><span>{{ wg.drivingHint }}</span></div></div>
+            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}">{{ dc.label }}</button></sc-for></div></div></sc-for></div></div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
             <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
@@ -6231,7 +6253,8 @@ const H6_BOTTOM_CARD_CATALOG = [
   // and is the per-mode quick change.
   { id: 'driveMode', title: 'Drive mode', action: 'openDriving', iconAction: 'cycleDriveMode' },
   { id: 'powerMode', title: 'Power mode', action: 'openDriving', iconAction: 'cyclePowerMode' },
-  { id: 'regen', title: 'Energy recovery', action: 'openDriving', iconAction: 'cycleRegenMode' },
+  { id: 'regen', title: 'Energy recovery', action: 'openDriving', iconAction: 'cycleRegenMode',
+    longAction: 'openDrivingOnePedal' },
   { id: 'roof', title: 'Sunroof / shade', action: 'openRoofControls' },
 ];
 
@@ -6369,9 +6392,14 @@ const CAR_MODE_GROUPS = [
     ],
   },
 ];
+const CAR_MODE_ONE_PEDAL = {
+  stateKey: 'carOnePedal',
+  key: 'car.ev.setting.pedal_control_enable',
+};
 const CAR_MODE_STATE_BY_KEY = {};
 CAR_MODE_GROUPS.forEach((g) => { CAR_MODE_STATE_BY_KEY[g.key] = g.stateKey; });
 CAR_MODE_STATE_BY_KEY[CAR_MODE_ESP.key] = CAR_MODE_ESP.stateKey;
+CAR_MODE_STATE_BY_KEY[CAR_MODE_ONE_PEDAL.key] = CAR_MODE_ONE_PEDAL.stateKey;
 
 // DRIVING card. Coffee OS / Vehicle Center present drive mode, power mode and
 // energy recovery as one surface rather than three tiles, and the OEM audit in
@@ -6383,18 +6411,30 @@ const CAR_MODE_GROUP_INDEX = { drive: 0, power: 1, steer: 2, regen: 3 };
 /** A mode value older than this is reported as STALE, never as current. */
 const CAR_MODE_FRESH_MS = 120000;
 /**
- * Single-path 24x24 stroke glyphs keyed by the raw drive_mode CAN value.
- * One path per mode keeps the binding a plain string ({{ wg.drivingGlyph }}),
- * which is all the template engine can put into an SVG attribute.
+ * Drive-mode glyphs, shared by the widget, the popup and the native rail card.
+ *
+ * These are real icons rather than shapes drawn by hand: hand-drawn ones kept
+ * colliding with each other (tyre tread read as a barcode, a hub circle read as
+ * an eye) and every fix was a guess. Source is Tabler Icons, MIT, on the same
+ * 24x24 / 2px grid the cards already used:
+ *
+ *   Tabler Icons — Copyright (c) 2020-2024 Paweł Kuna — MIT License
+ *   https://github.com/tabler/tabler-icons
+ *
+ * Generated by scripts/build-drive-mode-glyphs.mjs, which flattens each icon to
+ * absolute M/L/C/Z with a space after every command letter. That is the whole
+ * reason the native card can draw the same art from a ten-line parser instead
+ * of carrying its own copy of every shape — the two used to drift, and the rail
+ * was the surface nobody looked at. Re-run the script; do not hand-edit.
  */
 const CAR_DRIVE_MODE_GLYPHS = {
-  '2': 'M6 18C6 10 12 5 19 5c0 8-5 13-13 13z M6 18c1.6-4.2 4.4-6.8 8-8.2',
-  '0': 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z M12 3v6.2 M4.3 15.4l5.3-2.8 M19.7 15.4l-5.3-2.8',
-  '1': 'M13.4 2 5 13.4h5.6L9.8 22l8.6-11.6h-5.6z',
-  '3': 'M12 2.5v19 M3.8 7.2l16.4 9.6 M20.2 7.2 3.8 16.8 M12 6.3 9.4 3.7 M12 6.3l2.6-2.6 M12 17.7l-2.6 2.6 M12 17.7l2.6 2.6',
-  '4': 'M2.5 16.6c3.2-4 6.4-4 9.6 0s6.4 4 9.4 0 M2.5 11.4c2.6-3.3 5.2-3.3 7.8 0 M13.8 8.4c2.6-3.1 5.2-3.1 7.7 0',
-  '5': 'M7.4 3v18 M16.6 3v18 M4.6 6.2h5.6 M4.6 10.2h5.6 M4.6 14.2h5.6 M4.6 18.2h5.6 M13.8 6.2h5.6 M13.8 10.2h5.6 M13.8 14.2h5.6 M13.8 18.2h5.6',
-  '11': 'M6.2 4.6v4.8 M17.8 4.6v4.8 M6.2 14.6v4.8 M17.8 14.6v4.8 M6.2 7h11.6 M6.2 17h11.6 M12 7v10',
+  '0': 'M 4 19 L 8 5 M 16 5 L 20 19 M 12 8 L 12 6 M 12 13 L 12 11 M 12 18 L 12 16',   // tabler road
+  '1': 'M 13 3 L 13 10 L 19 10 L 11 21 L 11 14 L 5 14 L 13 3',   // tabler bolt
+  '2': 'M 5 21 C 5.5 16.5 7.5 13 12 11 M 9 18 C 15.22 18 19.5 14.71 20 6 L 20 4 L 15.99 4 C 6.99 4 4 8 3.99 13 C 3.99 14 3.99 16 5.99 18 L 8.99 18 L 9 18',   // tabler leaf
+  '3': 'M 10 4 L 12 5 L 14 4 M 12 2 L 12 8.5 L 15 10.22 M 17.93 6.27 L 18.06 8.5 L 19.93 9.73 M 20.66 7 L 15.03 10.25 L 15.04 13.71 M 19.93 14.27 L 18.06 15.5 L 17.93 17.73 M 20.66 17 L 15.03 13.75 L 12.04 15.49 M 14 20 L 12 19 L 10 20 M 12 22 L 12 15.5 L 9 13.78 M 6.07 17.73 L 5.94 15.5 L 4.07 14.27 M 3.34 17 L 8.97 13.75 L 8.96 10.29 M 4.07 9.73 L 5.94 8.5 L 6.07 6.27 M 3.34 7 L 8.97 10.25 L 11.96 8.51',   // tabler snowflake
+  '4': 'M 3 7 C 6 5 9 5 12 7 C 15 9 18 9 21 7 M 3 17 C 6 15 9 15 12 17 C 15 19 18 19 21 17 M 3 12 C 6 10 9 10 12 12 C 15 14 18 14 21 12',   // tabler ripple
+  '5': 'M 4.07 20.3 C 5.19 21.24 6.81 21.24 7.93 20.3 C 9.04 19.36 9.32 17.76 8.6 16.5 L 6.5 13.28 C 6.39 13.11 6.2 13 6 13 C 5.8 13 5.61 13.11 5.5 13.28 L 3.4 16.5 C 2.67 17.76 2.96 19.36 4.07 20.3 M 16.07 20.3 C 17.19 21.24 18.81 21.24 19.93 20.3 C 21.04 19.36 21.32 17.76 20.6 16.5 L 18.5 13.28 C 18.39 13.11 18.2 13 18 13 C 17.8 13 17.61 13.11 17.5 13.28 L 15.4 16.5 C 14.67 17.76 14.96 19.36 16.07 20.3 M 10.07 10.3 C 11.19 11.24 12.81 11.24 13.93 10.3 C 15.04 9.36 15.32 7.76 14.6 6.5 L 12.5 3.28 C 12.39 3.11 12.2 3 12 3 C 11.8 3 11.61 3.11 11.5 3.28 L 9.4 6.5 C 8.67 7.76 8.96 9.36 10.07 10.3 L 10.07 10.3',   // tabler droplets
+  '11': 'M 5 5 C 5 3.9 5.9 3 7 3 C 8.1 3 9 3.9 9 5 L 9 7 C 9 8.1 8.1 9 7 9 C 5.9 9 5 8.1 5 7 L 5 5 M 5 17 C 5 15.9 5.9 15 7 15 C 8.1 15 9 15.9 9 17 L 9 19 C 9 20.1 8.1 21 7 21 C 5.9 21 5 20.1 5 19 L 5 17 M 15 5 C 15 3.9 15.9 3 17 3 C 18.1 3 19 3.9 19 5 L 19 7 C 19 8.1 18.1 9 17 9 C 15.9 9 15 8.1 15 7 L 15 5 M 15 17 C 15 15.9 15.9 15 17 15 C 18.1 15 19 15.9 19 17 L 19 19 C 19 20.1 18.1 21 17 21 C 15.9 21 15 20.1 15 19 L 15 17 M 9 18 L 15 18 M 9 6 L 15 6 M 12 6.5 L 12 6 L 12 18',   // tabler car-4wd
 };
 /**
  * Secondary line under each option in the popup. These describe the OEM concept
@@ -6412,12 +6452,14 @@ const CAR_DRIVE_MODE_CARD_STATES = {
   '3': 'snow', '4': 'sand', '5': 'mud', '11': 'awd',
 };
 const CAR_POWER_MODE_CARD_STATES = { '0': 'hev', '1': 'evp', '3': 'ev' };
+/** Spelled-out power modes for the rail card's value line. */
+const CAR_POWER_MODE_LONG_LABELS = { '0': 'Hybrid EV', '1': 'Prioritary EV', '3': 'Full Electric' };
 const CAR_MODE_OPTION_HINTS = {
   'car.drive_setting.drive_mode': {
     '2': 'ROAD', '0': 'ROAD', '1': 'ROAD',
     '3': 'TERRAIN', '4': 'TERRAIN', '5': 'TERRAIN', '11': 'TRACTION',
   },
-  'car.ev_setting.power_model_config': { '0': 'HYBRID', '1': 'EV PRIORITY', '3': 'ELECTRIC' },
+  'car.ev_setting.power_model_config': { '0': 'HYBRID EV', '1': 'PRIORITARY EV', '3': 'FULL ELECTRIC' },
   'car.ev_setting.energy_recovery_level': { '2': 'LEVEL 1', '0': 'LEVEL 2', '1': 'LEVEL 3' },
   'car.drive_setting.steering_wheel_assist_mode': { '2': 'LIGHT', '0': 'STANDARD', '1': 'FIRM' },
 };
@@ -6868,6 +6910,7 @@ class Component extends DCLogic {
     carEvMode: '',
     carSteerMode: '',
     carRegenMode: '',
+    carOnePedal: '',
     carEspEnable: '',
     appsFabOpen: false,
     splitRatio: BOOT_SHELL.splitRatio,
@@ -29496,6 +29539,42 @@ class Component extends DCLogic {
     };
   }
 
+  /**
+   * One-pedal driving. Boolean, and deliberately placed next to ENERGY RECOVERY
+   * because that is the setting it displaces.
+   */
+  _drivingOnePedalModel(controlsDisabled) {
+    const raw = String(this.state[CAR_MODE_ONE_PEDAL.stateKey] || '');
+    const hasSignal = !!(this._carSignalAt && this._carSignalAt[CAR_MODE_ONE_PEDAL.key]);
+    const preview = !this._androidApp || !!this._demoPreview;
+    const known = raw === '1' || raw === '0';
+    const on = raw === '1';
+    const pick = (value) => ({
+      label: value === '1' ? 'ONE PEDAL' : 'OFF',
+      hint: value === '1' ? 'LIFT TO STOP' : 'NORMAL COAST',
+      cls: (known || preview) && (value === '1') === on ? 'on' : '',
+      pressed: (known || preview) && (value === '1') === on,
+      disabled: !!controlsDisabled,
+      onClick: () => this._setOnePedal(value === '1'),
+    });
+    return {
+      key: CAR_MODE_ONE_PEDAL.key,
+      stateKey: CAR_MODE_ONE_PEDAL.stateKey,
+      label: 'ONE-PEDAL DRIVING',
+      colsClass: 'cols-2',
+      hasSignal: hasSignal,
+      index: known || preview ? (on ? 0 : 1) : -1,
+      value: raw,
+      optionLabel: known || preview ? (on ? 'On' : 'Off') : '—',
+      state: known || preview ? (on ? 'ON' : 'OFF') : 'UNAVAILABLE',
+      // The popup keeps explicit ON/OFF options; the widget renders the same
+      // group as a single chip, so both surfaces share one source of truth.
+      on: on && (known || preview),
+      onToggle: () => { if (!controlsDisabled) this._setOnePedal(!on); },
+      options: [pick('1'), pick('0')],
+    };
+  }
+
   /** ESP shares the popup's option chrome but is a boolean, not an enum. */
   _drivingEspModel(controlsDisabled) {
     const raw = String(this.state[CAR_MODE_ESP.stateKey] || '');
@@ -29518,6 +29597,11 @@ class Component extends DCLogic {
       colsClass: 'cols-3',
       hasSignal: hasSignal,
       state: known || preview ? (on ? 'ESP ON' : 'ESP OFF') : 'UNAVAILABLE',
+      on: on && (known || preview),
+      onToggle: () => {
+        if (controlsDisabled) return;
+        this._setCarMode(CAR_MODE_ESP.stateKey, CAR_MODE_ESP.key, on ? '0' : '1');
+      },
       options: [pick('1'), pick('0')],
     };
   }
@@ -29549,6 +29633,7 @@ class Component extends DCLogic {
     const regen = group('regen', 'ENERGY RECOVERY', 'cols-3');
     const steer = group('steer', 'STEERING ASSIST', 'cols-3');
     const esp = this._drivingEspModel(controlsDisabled);
+    const onePedal = this._drivingOnePedalModel(controlsDisabled);
     const primary = [drive, power, regen];
     const freshCount = primary.filter((g) => g.fresh).length;
     const signalCount = primary.filter((g) => g.hasSignal).length;
@@ -29556,35 +29641,74 @@ class Component extends DCLogic {
 
     let source = 'UNAVAILABLE · NO VEHICLE STATE';
     let sourceClass = 'unavailable';
-    let foot = 'MODE STATE NOT CONNECTED';
     if (demo) {
       source = 'DEMO · SIMULATED · NOT VEHICLE';
       sourceClass = 'demo';
-      foot = 'SIMULATED MODE SELECTION';
     } else if (browserPreview) {
       source = 'LOCAL PREVIEW · NOT A VEHICLE SETTING';
       sourceClass = 'preview';
-      foot = 'SELECTION IS LOCAL TO THIS BROWSER';
     } else if (controlsDisabled) {
       source = 'UNAVAILABLE · VEHICLE NOT READY';
       sourceClass = 'unavailable';
-      foot = 'MODE CONTROL NOT CONNECTED';
     } else if (pending) {
       source = 'PENDING · AWAITING VEHICLE STATE';
       sourceClass = 'pending';
-      foot = 'WRITE SENT · AWAITING ACKNOWLEDGEMENT';
     } else if (freshCount === primary.length) {
       source = 'VEHICLE · LIVE';
       sourceClass = 'live';
-      foot = 'DRIVE · POWER · RECOVERY';
     } else if (freshCount > 0) {
       source = 'PARTIAL · VEHICLE STATE';
       sourceClass = 'stale';
-      foot = freshCount + ' OF ' + primary.length + ' MODES REPORTED';
     } else if (signalCount > 0) {
       source = 'STALE · VEHICLE STATE';
       sourceClass = 'stale';
-      foot = 'MODE STATE OLDER THAN 2 MIN';
+    }
+
+    // One row per group. Which rows appear is the only thing size decides; how
+    // many chips fit on a line is left to CSS, so there is no per-size branch of
+    // the data to keep in step with the popup.
+    const compact = w === 1 && h === 1;
+    const roomy = w >= 2 && h >= 2;
+    const shortLabel = (group) => group.label.replace(' MODE', '')
+      .replace('-PEDAL DRIVING', ' PEDAL').replace('ENERGY ', '')
+      .replace(' ASSIST', '').replace('STABILITY CONTROL', 'ESP');
+    const chipRow = (group, chips) => {
+      const cols = chips.length === 2 ? 2 : 3;
+      return {
+        label: shortLabel(group),
+        state: group.state,
+        colsClass: 'cols-' + cols,
+        // Claim height in proportion to the chip lines actually needed.
+        linesClass: 'lines-' + Math.min(3, Math.ceil(chips.length / cols)),
+        chips: chips.map((opt) => ({
+          label: opt.label,
+          title: opt.hint ? opt.label + ' · ' + opt.hint : opt.label,
+          cls: opt.cls,
+          onClick: (ev) => { this._cardControlEvent(ev); opt.onClick(); },
+        })),
+      };
+    };
+    /** A boolean group as one chip that lights when it is on. */
+    const toggleChip = (group) => ({
+      label: shortLabel(group),
+      title: group.label + ' · ' + group.state,
+      cls: group.on ? 'on' : '',
+      onClick: (ev) => { this._cardControlEvent(ev); group.onToggle(); },
+    });
+    // At 1x1 the drive row shows the three road modes only — seven buttons in a
+    // widget slot are unreadable, and the terrain modes are a deliberate choice
+    // that belongs in the popup.
+    const driveChips = compact
+      ? drive.options.filter((_, i) => ['2', '0', '1'].indexOf(
+          CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.drive].options[i].value) >= 0)
+      : drive.options;
+    const rows = [chipRow(drive, driveChips), chipRow(power, power.options), chipRow(regen, regen.options)];
+    if (!compact) rows.push(chipRow(steer, steer.options));
+    if (!compact) {
+      rows.push({
+        label: 'ASSIST', state: '', colsClass: 'cols-2', linesClass: 'lines-1',
+        chips: [toggleChip(onePedal), toggleChip(esp)],
+      });
     }
 
     const resolved = primary.filter((g) => g.index >= 0).length;
@@ -29599,11 +29723,6 @@ class Component extends DCLogic {
         : (controlsDisabled
           ? 'Controls are disabled until the vehicle reports READY through the installed telemetry bridge. No command is sent while this card is disabled.'
           : 'Each option writes its vehicle value directly. The selection shown is the state the vehicle reported back, not the request.'));
-    // Only the three road modes fit a widget-width chip row; the terrain modes
-    // and everything secondary live in the popup.
-    const quick = drive.options.filter((_, i) => (
-      ['2', '0', '1'].indexOf(CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.drive].options[i].value) >= 0
-    ));
 
     return {
       drivingSizeClass: 'hv-driving-' + w + 'x' + h + (resolved ? '' : ' hv-driving-unavailable'),
@@ -29611,8 +29730,6 @@ class Component extends DCLogic {
       drivingSourceClass: sourceClass,
       drivingSummary: summary,
       drivingNote: note,
-      drivingFoot: foot,
-      drivingHint: controlsDisabled ? 'READ ONLY' : 'TAP TO OPEN',
       drivingMode: drive.optionLabel,
       drivingModeKicker: drive.index >= 0
         ? ((CAR_MODE_OPTION_HINTS[drive.key] || {})[drive.value] || 'DRIVE MODE') + ' MODE'
@@ -29621,14 +29738,10 @@ class Component extends DCLogic {
       drivingPower: power.optionLabel,
       drivingRegen: regen.optionLabel,
       drivingRegenSteps: [0, 1, 2].map((i) => ({ cls: regen.index >= 0 && i <= regen.index ? 'on' : '' })),
-      drivingQuick: quick.map((chip) => ({
-        label: chip.label,
-        cls: chip.cls,
-        onClick: (ev) => { this._cardControlEvent(ev); chip.onClick(); },
-      })),
-      drivingShowQuick: h >= 2,
+      drivingRows: rows,
+      drivingOnePedal: onePedal.state,
       drivingControlsDisabled: controlsDisabled,
-      drivingGroups: [drive, power, regen, steer, esp],
+      drivingGroups: [drive, power, regen, onePedal, steer, esp],
       onDrivingOpen: (ev) => {
         this._cardControlEvent(ev);
         if (this._widgetSuppressClick || this.state.widgetMenuId) return;
@@ -30037,13 +30150,16 @@ class Component extends DCLogic {
         } catch (e) {}
         break;
       case 'cycleDriveMode':
-        this._cycleCarMode(0);
+        this._cycleDriveRoadMode();
         break;
       case 'cyclePowerMode':
-        this._cycleCarMode(1);
+        this._cycleCarMode(CAR_MODE_GROUP_INDEX.power);
         break;
       case 'cycleRegenMode':
-        this._cycleCarMode(3);
+        this._cycleRegenMode();
+        break;
+      case 'openDrivingOnePedal':
+        this._openFocusedCard('driving');
         break;
       case 'openRoofControls':
         this._openRoofLevelPopup();
@@ -30098,8 +30214,10 @@ class Component extends DCLogic {
       return {
         primary: g.optionLabel,
         secondary: driving.drivingSource,
-        metricA: driving.drivingControlsDisabled ? 'VEHICLE NOT READY' : 'TAP ICON TO CHANGE',
-        metricB: g.label,
+        // "TAP ICON TO CHANGE" and the group name repeat the affordance and
+        // the card title; only a real hint earns a line here.
+        metricA: driving.drivingControlsDisabled ? 'VEHICLE NOT READY' : '',
+        metricB: '',
         progress: g.index >= 0 ? Math.round((g.index + 1) * 100 / g.options.length) : 0,
         // The native graphic draws the selected mode's own glyph, so the rail,
         // the widget and the popup all show one identity for one mode.
@@ -30107,8 +30225,29 @@ class Component extends DCLogic {
       };
     };
     const driveModeVisual = drivingVisual(0, CAR_DRIVE_MODE_CARD_STATES[drivingGroup(0).value] || 'unknown');
+    // The dots track the icon's own three-position cycle, not the seven-option
+    // list in the popup. A terrain mode is off that cycle and lights none.
+    const roadAt = ['2', '0', '1'].indexOf(drivingGroup(0).value);
+    driveModeVisual.progress = roadAt >= 0 ? Math.round((roadAt + 1) * 100 / 3) : 0;
+    driveModeVisual.glyph = CAR_DRIVE_MODE_GLYPHS[drivingGroup(0).value] || '';
+    // The graphic already draws HEV / EVP / EV, so the value line spells it out
+    // rather than repeating the code.
     const powerModeVisual = drivingVisual(1, CAR_POWER_MODE_CARD_STATES[drivingGroup(1).value] || 'unknown');
-    const regenVisual = drivingVisual(2, drivingGroup(2).index >= 0 ? 'level' + (drivingGroup(2).index + 1) : 'unknown');
+    powerModeVisual.primary = CAR_POWER_MODE_LONG_LABELS[drivingGroup(1).value] || powerModeVisual.primary;
+    // One-pedal replaces the recovery level rather than extending it, so the
+    // card names it instead of showing a level the driver did not select.
+    const onePedalOn = s.carOnePedal === '1';
+    const regenVisual = drivingVisual(2, onePedalOn ? 'onepedal'
+      : (drivingGroup(2).index >= 0 ? 'level' + (drivingGroup(2).index + 1) : 'unknown'));
+    if (onePedalOn) {
+      regenVisual.primary = 'One pedal';
+      regenVisual.metricA = driving.drivingControlsDisabled
+        ? 'VEHICLE NOT READY' : 'TAP ICON TO RESTORE LEVEL';
+      regenVisual.metricB = '';
+      regenVisual.progress = 100;
+    } else if (!driving.drivingControlsDisabled) {
+      regenVisual.metricA = 'HOLD FOR ONE-PEDAL';
+    }
     const roofSignal = this._carSignalAt && (this._carSignalAt[CAR_SIGNALS.sunroof]
       || this._carSignalAt[CAR_SIGNALS.curtain]);
     const roofDemo = !!this._demoPreview && !roofSignal;
@@ -30219,6 +30358,8 @@ class Component extends DCLogic {
         value: bottomValues[card.id] || '',
         action: card.action,
         iconAction: card.iconAction || '',
+        longAction: card.longAction || '',
+        glyph: '',
       }, bottomVisuals[card.id] || {}));
     const payload = {
       model: this._currentTrim().label,
@@ -30295,6 +30436,55 @@ class Component extends DCLogic {
       width: Math.max(0, (b.r || 0) - (b.l || 0)) + 'px',
       height: Math.max(0, (b.b || 0) - (b.t || 0)) + 'px',
     };
+  }
+
+  _cycleDriveRoadMode() {
+    const group = CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.drive];
+    const road = ['2', '0', '1']; // Eco, Normal, Sport
+    const current = String(this.state[group.stateKey] || '');
+    const at = road.indexOf(current);
+    const next = at < 0 ? '0' : road[(at + 1) % road.length];
+    this._setCarMode(group.stateKey, group.key, next);
+  }
+
+  /**
+   * Recovery quick action, with the one-pedal escape hatch.
+   *
+   * While one-pedal is on, a tap turns it back OFF and restores the recovery
+   * level that was selected before it was enabled — the level the driver last
+   * chose, not a guess. The remembered level is ours, held in
+   * `_regenLevelBeforeOnePedal`; nothing on the bus reports a "previous" value.
+   */
+  _cycleRegenMode() {
+    const group = CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.regen];
+    if (this.state[CAR_MODE_ONE_PEDAL.stateKey] === '1') {
+      this._setOnePedal(false);
+      return;
+    }
+    const current = String(this.state[group.stateKey] || '');
+    const at = group.options.findIndex((opt) => opt.value === current);
+    const next = group.options[(at >= 0 ? at + 1 : 0) % group.options.length];
+    this._setCarMode(group.stateKey, group.key, next.value);
+  }
+
+  /**
+   * Enable or disable one-pedal driving.
+   *
+   * Enabling remembers the recovery level first; disabling writes it back. The
+   * restore is a convenience this app provides — the vehicle is not asked what
+   * the level "was", so if nothing was ever reported there is nothing to
+   * restore and the level is left alone.
+   */
+  _setOnePedal(on) {
+    if (on) {
+      const level = String(this.state[CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.regen].stateKey] || '');
+      if (level) this._regenLevelBeforeOnePedal = level;
+    }
+    this._setCarMode(CAR_MODE_ONE_PEDAL.stateKey, CAR_MODE_ONE_PEDAL.key, on ? '1' : '0');
+    if (!on && this._regenLevelBeforeOnePedal) {
+      const group = CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.regen];
+      this._setCarMode(group.stateKey, group.key, this._regenLevelBeforeOnePedal);
+    }
   }
 
   _cycleCarMode(groupIndex) {
