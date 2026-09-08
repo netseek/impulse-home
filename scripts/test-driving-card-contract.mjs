@@ -362,6 +362,15 @@ includesAll(native, [
   'if (!BOTTOM_CARD_ACTIONS.contains(command) && !isDrivingSetCommand(command)) continue;',
   'if (!cardDescriptor.menu.isEmpty()) showQuickMenu(v, cardDescriptor);',
 ], 'the native menu only replays allow-shaped commands');
+// Each row is a pill with a centred label, the way Coffee OS draws them: it
+// reads as a set of choices rather than a dropdown, and every row gets a real
+// edge to aim at on a panel operated at arm's length.
+includesAll(native, [
+  'private android.graphics.drawable.Drawable makeQuickMenuItemBackground(',
+  'item.setGravity(android.view.Gravity.CENTER);',
+  'item.setBackground(makeQuickMenuItemBackground(row.selected, last, density));',
+  'states.addState(new int[] { android.R.attr.state_pressed }, pressed);',
+], 'menu rows are centred pills with a pressed state');
 
 // A chip tap used to ask for a full 3D frame via componentDidUpdate, and the
 // widget card is backdrop-blurred, so repainting the canvas under it read as

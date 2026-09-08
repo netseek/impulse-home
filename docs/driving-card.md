@@ -84,6 +84,15 @@ It is a native `PopupWindow`, because the rail card is native — the web side
 does not know where the card sits on screen. Anchored ABOVE the card, so the
 thumb that opened it is not covering the choices.
 
+Each row is a **pill with a centred label**, the way Coffee OS draws them: it
+reads as a set of choices rather than as a dropdown, and every row gets a real
+edge to aim at, which matters more here than on a phone — this is a 720px panel
+operated at arm's length. The selected row carries the accent like every other
+control on the card; the last row stays outlined rather than filled, so the way
+out does not compete with the modes. `makeQuickMenuItemBackground` also gives
+each row a pressed state, since a button that does not answer a touch on a
+head unit reads as a missed tap.
+
 **A menu row carries a value, and that makes it a wider door than anything else
 the dock accepts.** Every other command is a fixed allow-listed token, and
 `setCarData` is on the other side of this one. Three things keep it shut:

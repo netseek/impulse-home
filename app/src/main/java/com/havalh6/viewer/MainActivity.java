@@ -8422,32 +8422,33 @@ public final class MainActivity extends Activity {
             boolean last = row == descriptor.menu.get(descriptor.menu.size() - 1);
             android.widget.TextView item = new android.widget.TextView(this);
             item.setText(row.label);
-            item.setTextSize(row.selected ? 15f : 14.5f);
+            item.setTextSize(last ? 13f : 15f);
             item.setTypeface(android.graphics.Typeface.create(
                     row.selected ? "sans-serif-medium" : "sans-serif", android.graphics.Typeface.NORMAL));
-            item.setTextColor(row.selected ? dockAccentColor : dockLabelColor());
-            item.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            int ipad = Math.round(13 * density);
-            item.setPadding(ipad, Math.round(11 * density), ipad, Math.round(11 * density));
+            item.setTextColor(row.selected ? dockAccentColor
+                    : (last ? dockLabelColorMuted() : dockLabelColor()));
+            item.setGravity(android.view.Gravity.CENTER);
+            item.setBackground(makeQuickMenuItemBackground(row.selected, last, density));
+            int ipad = Math.round(12 * density);
+            item.setPadding(ipad, Math.round(12 * density), ipad, Math.round(12 * density));
             item.setClickable(true);
             item.setOnClickListener(v -> { dismissQuickMenu(); callViewerDock(command); });
             android.widget.LinearLayout.LayoutParams lp =
                     new android.widget.LinearLayout.LayoutParams(
-                            Math.round(196 * density),
+                            Math.round(200 * density),
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = Math.round(6 * density);
             item.setLayoutParams(lp);
             if (last) {
-                // The way out reads as a different kind of thing to a mode.
-                item.setTextColor(dockLabelColorMuted());
-                item.setTextSize(12.5f);
-                item.setCompoundDrawablePadding(Math.round(8 * density));
+                // Still a button, but the rule above it says this one leaves the
+                // menu rather than picking a mode.
                 android.view.View rule = new android.view.View(this);
                 android.widget.LinearLayout.LayoutParams rlp =
                         new android.widget.LinearLayout.LayoutParams(
                                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                                 Math.max(1, Math.round(density)));
-                rlp.topMargin = Math.round(5 * density);
-                rlp.bottomMargin = Math.round(5 * density);
+                rlp.topMargin = Math.round(2 * density);
+                rlp.bottomMargin = Math.round(8 * density);
                 rule.setLayoutParams(rlp);
                 rule.setBackgroundColor(dockUiLight ? 0x1A25303B : 0x1FFFFFFF);
                 list.addView(rule);
@@ -8467,6 +8468,40 @@ public final class MainActivity extends Activity {
         // measures DOWN from the anchor's bottom edge.
         int dy = -(list.getMeasuredHeight() + anchor.getHeight() + gap);
         quickMenuWindow.showAsDropDown(anchor, 0, dy);
+    }
+
+    /**
+     * A menu row's pill. Selected carries the accent the way every other control
+     * in this card does; the last row is the way out, so it stays outlined
+     * rather than filled and does not compete with the modes.
+     */
+    private android.graphics.drawable.Drawable makeQuickMenuItemBackground(
+            boolean selected, boolean muted, float density) {
+        float radius = 10f * density;
+        int stroke = Math.max(1, Math.round(density));
+        android.graphics.drawable.GradientDrawable rest =
+                new android.graphics.drawable.GradientDrawable();
+        rest.setCornerRadius(radius);
+        if (selected) {
+            rest.setColor(withAlpha(dockAccentColor, 0x2E));
+            rest.setStroke(stroke, dockAccentColor);
+        } else if (muted) {
+            rest.setColor(0x00000000);
+            rest.setStroke(stroke, dockUiLight ? 0x2225303B : 0x22FFFFFF);
+        } else {
+            rest.setColor(dockUiLight ? 0x0F25303B : 0x14FFFFFF);
+            rest.setStroke(stroke, dockUiLight ? 0x1A25303B : 0x1AFFFFFF);
+        }
+        android.graphics.drawable.GradientDrawable pressed =
+                new android.graphics.drawable.GradientDrawable();
+        pressed.setCornerRadius(radius);
+        pressed.setColor(withAlpha(dockAccentColor, 0x40));
+        pressed.setStroke(stroke, dockAccentColor);
+        android.graphics.drawable.StateListDrawable states =
+                new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[] { android.R.attr.state_pressed }, pressed);
+        states.addState(new int[0], rest);
+        return states;
     }
 
     private void dismissQuickMenu() {
