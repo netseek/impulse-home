@@ -167,7 +167,7 @@ all(nativeStatus, [
   'Math.min(imageW, w * .38f)', 'float left = w * .035f',
   'float top = -h * .019f', 'float textLeft = w * .43f',
 ], 'native enlarged status-card vehicle geometry');
-assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"codex-claude-driving-v1"/,
+assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"codex-claude-driving-v2"/,
   'native WebView bundle revision must expose mutually-exclusive popup door assets');
 
 console.log('status-card contracts: ok');

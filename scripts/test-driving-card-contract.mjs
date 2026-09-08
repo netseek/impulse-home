@@ -552,8 +552,15 @@ includesAll(dockIndicators, [
   'driveMode: driveModeVisual,',
   'powerMode: powerModeVisual,',
   'regen: regenVisual,',
+  'driveMode: driveModeVisual.secondary,',
+  'powerMode: powerModeVisual.secondary,',
+  'regen: regenVisual.secondary,',
   'secondary: driving.drivingSource,',
 ], 'native Driving quick cards');
+assert.ok(!dockIndicators.includes('driveMode: driveMode.secondary'),
+  'demo sources must use driveModeVisual, not the undefined driveMode');
+assert.ok(!dockIndicators.includes('regen: regenMode.secondary'),
+  'demo sources must use regenVisual, not the undefined regenMode');
 // All three tiles read from the one builder, so a mode cannot say one thing on
 // the rail and another in the popup.
 includesAll(dockIndicators, [
