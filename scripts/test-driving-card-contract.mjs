@@ -340,6 +340,29 @@ includesAll(view, ['onEdit: (ev) =>'], 'the widget menu still opens the popup');
 // One source badge per surface: the widget said DEMO in the header and again
 // in a foot line, and the foot also spent a row on an affordance the whole
 // card already has.
+// The rail card opens a quick menu of the modes, with the full page as its last
+// row. A menu row carries a VALUE, so it cannot be one of the fixed action
+// tokens -- which makes it a wider door than anything else the dock accepts,
+// with setCarData on the other side. It is minted from the live tables and
+// re-derived from them on arrival; the native side only ever replays a string
+// it was given.
+includesAll(html, ["const H6_DRIVING_SET_PREFIX = 'drivingSet:';",
+  'H6_DRIVING_MENU_GROUPS = { driveMode:',
+  'menu: this._drivingMenuRows(card.id),'], 'the rail ships its quick menu');
+const menuApply = blockFrom(html, '  _applyDrivingMenuCommand(command) {', 'menu write');
+includesAll(menuApply, [
+  'const index = CAR_MODE_GROUP_INDEX[name];',
+  "if (typeof index !== 'number') return;",
+  'group.options.some((opt) => opt.value === value)',
+], 'a menu write is re-validated, never trusted');
+includesAll(blockFrom(html, '  dockCommand(cmd) {', 'dock command'),
+  ['if (c.indexOf(H6_DRIVING_SET_PREFIX) === 0)'], 'and is routed before the fixed switch');
+includesAll(native, [
+  'private boolean isDrivingSetCommand(String command)',
+  'if (!BOTTOM_CARD_ACTIONS.contains(command) && !isDrivingSetCommand(command)) continue;',
+  'if (!cardDescriptor.menu.isEmpty()) showQuickMenu(v, cardDescriptor);',
+], 'the native menu only replays allow-shaped commands');
+
 // A chip tap used to ask for a full 3D frame via componentDidUpdate, and the
 // widget card is backdrop-blurred, so repainting the canvas under it read as
 // the card flashing. Mode state changes nothing the scene draws.

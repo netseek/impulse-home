@@ -6527,6 +6527,11 @@ const CAR_MODE_OPTION_HINTS = {
  */
 const H6_DRIVING_LEGACY_WIDGET_TYPES = { modes: 'driving' };
 
+/** Rail card id -> the CAR_MODE_GROUPS name its quick menu writes. */
+const H6_DRIVING_MENU_GROUPS = { driveMode: 'drive', powerMode: 'power', regen: 'regen' };
+/** Prefix for a quick-menu write. Everything after it is re-validated on arrival. */
+const H6_DRIVING_SET_PREFIX = 'drivingSet:';
+
 /**
  * Rail card id -> the focused workspace its body opens. A card absent from this
  * map has no popup (it launches an app, or opens the studio) and therefore no
@@ -30190,6 +30195,13 @@ class Component extends DCLogic {
    */
   dockCommand(cmd) {
     const c = String(cmd || '');
+    // Quick-menu writes carry a value, so they cannot be a fixed token in the
+    // switch below. They are validated against CAR_MODE_GROUPS on arrival
+    // rather than trusted for having reached us.
+    if (c.indexOf(H6_DRIVING_SET_PREFIX) === 0) {
+      this._applyDrivingMenuCommand(c);
+      return;
+    }
     switch (c) {
       case 'camera':
         this.toggleCameraRail();
@@ -30508,6 +30520,8 @@ class Component extends DCLogic {
         longAction: card.longAction || '',
         glyph: '',
         glyphText: '',
+        // Rows for the card's quick menu, empty for cards that have none.
+        menu: this._drivingMenuRows(card.id),
       }, bottomVisuals[card.id] || {}));
     const payload = {
       model: this._currentTrim().label,
@@ -30584,6 +30598,53 @@ class Component extends DCLogic {
       width: Math.max(0, (b.r || 0) - (b.l || 0)) + 'px',
       height: Math.max(0, (b.b || 0) - (b.t || 0)) + 'px',
     };
+  }
+
+  /**
+   * Rows for a rail card's quick menu, plus the way out to the full popup.
+   *
+   * Commands are minted from the live tables, so a row can only ever name a
+   * group and a value that exist. `_applyDrivingMenuCommand` re-derives both on
+   * receipt regardless — the native side is a courier, not a source of truth.
+   */
+  _drivingMenuRows(cardId) {
+    const name = H6_DRIVING_MENU_GROUPS[cardId];
+    if (!name) return [];
+    const group = CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX[name]];
+    const raw = String(this.state[group.stateKey] || '');
+    let at = group.options.findIndex((opt) => opt.value === raw);
+    // Same fallback the card itself draws — see _drivingGroupModel. On a real
+    // head unit an unreported mode marks nothing, which is the honest answer.
+    if (at < 0 && (!this._androidApp || this._demoPreview)) {
+      at = group.options.findIndex((opt) => opt.value === '0');
+    }
+    const rows = group.options.map((opt, i) => ({
+      label: opt.label,
+      command: H6_DRIVING_SET_PREFIX + name + ':' + opt.value,
+      selected: i === at,
+    }));
+    // Last, not first: the list is what the driver came for, and a settings row
+    // at the top is the one their thumb lands on by accident.
+    rows.push({ label: 'Open driving controls', command: 'openDriving', selected: false });
+    return rows;
+  }
+
+  /**
+   * Apply a quick-menu write. The string is treated as untrusted: the group name
+   * must be one we published and the value must exist in that group's options,
+   * or nothing is written.
+   */
+  _applyDrivingMenuCommand(command) {
+    const rest = String(command || '').slice(H6_DRIVING_SET_PREFIX.length);
+    const cut = rest.indexOf(':');
+    if (cut < 0) return;
+    const name = rest.slice(0, cut);
+    const value = rest.slice(cut + 1);
+    const index = CAR_MODE_GROUP_INDEX[name];
+    if (typeof index !== 'number') return;
+    const group = CAR_MODE_GROUPS[index];
+    if (!group || !group.options.some((opt) => opt.value === value)) return;
+    this._setCarMode(group.stateKey, group.key, value);
   }
 
   _cycleDriveRoadMode() {

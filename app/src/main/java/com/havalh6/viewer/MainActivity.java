@@ -927,6 +927,22 @@ public final class MainActivity extends Activity {
     private boolean dockFpsOn = false;
     private boolean dockXrayOn = false;
 
+    /**
+     * One row of a card's quick menu. `command` is minted by the web side and
+     * only replayed here — this class never composes one.
+     */
+    private static final class QuickMenuRow {
+        final String label;
+        final String command;
+        final boolean selected;
+
+        QuickMenuRow(String label, String command, boolean selected) {
+            this.label = label;
+            this.command = command;
+            this.selected = selected;
+        }
+    }
+
     private static final class BottomCardDescriptor {
         final String id;
         final String title;
@@ -952,11 +968,13 @@ public final class MainActivity extends Activity {
         final String glyph;
         /** Short code drawn in place of a glyph (AWD's "4x4"); may be empty. */
         final String glyphText;
+        /** Quick-menu rows; empty for a card whose body opens something directly. */
+        final java.util.List<QuickMenuRow> menu;
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
                 String state, String[] wheelStates, String iconAction, String longAction,
-                String glyph, String glyphText) {
+                String glyph, String glyphText, java.util.List<QuickMenuRow> menu) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -972,6 +990,7 @@ public final class MainActivity extends Activity {
             this.longAction = longAction == null ? "" : longAction;
             this.glyph = glyph == null ? "" : glyph;
             this.glyphText = glyphText == null ? "" : glyphText;
+            this.menu = menu == null ? java.util.Collections.emptyList() : menu;
         }
     }
 
@@ -6536,8 +6555,13 @@ public final class MainActivity extends Activity {
                     row.addView(media);
                     continue;
                 }
-                View card = makeQuickVisualCard(density, descriptor,
-                        v -> callViewerDock(descriptor.action));
+                final BottomCardDescriptor cardDescriptor = descriptor;
+                View card = makeQuickVisualCard(density, descriptor, v -> {
+                    // A card with a menu shows it; the menu's own last row is
+                    // what reaches the full page.
+                    if (!cardDescriptor.menu.isEmpty()) showQuickMenu(v, cardDescriptor);
+                    else callViewerDock(cardDescriptor.action);
+                });
                 card.setTag("bottomCard:" + descriptor.id);
                 android.widget.TextView valueView =
                         (android.widget.TextView) card.findViewWithTag("quickValue");
@@ -7060,6 +7084,7 @@ public final class MainActivity extends Activity {
                         dockAccentColor));
             }
         }
+        dismissQuickMenu();
         for (QuickCardGraphicView graphic : quickCardGraphics.values()) {
             if (graphic != null) graphic.invalidate();
         }
@@ -8048,6 +8073,7 @@ public final class MainActivity extends Activity {
             if (!BOTTOM_CARD_ACTIONS.contains(longAction)) longAction = "";
             String glyph = sanitizeGlyphPath(raw.optString("glyph", ""));
             String glyphText = cleanBottomCardText(raw.optString("glyphText", ""), 6);
+            java.util.List<QuickMenuRow> menu = parseQuickMenu(raw.optJSONArray("menu"));
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
                             raw.optString("tireState", "unavailable")))
@@ -8059,7 +8085,7 @@ public final class MainActivity extends Activity {
                     : new String[] {"unavailable", "unavailable", "unavailable", "unavailable"};
             next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
                     action, primary, secondary, metricA, metricB, progress, state, wheelStates,
-                    iconAction, longAction, glyph, glyphText));
+                    iconAction, longAction, glyph, glyphText, menu));
         }
 
         int requested = root.has("bottomCardLimit")
@@ -8104,6 +8130,48 @@ public final class MainActivity extends Activity {
         }
         return trimmed;
     }
+
+    /**
+     * Quick-menu rows from the payload.
+     *
+     * A row's command is either one of the fixed allow-listed actions or a
+     * driving write, which carries a value and so cannot be a fixed token. The
+     * shape is checked here and the value itself is re-derived from the mode
+     * tables on the web side — this end only proves it looks like a write, never
+     * that it is a legal one.
+     */
+    private java.util.List<QuickMenuRow> parseQuickMenu(JSONArray raw) {
+        if (raw == null || raw.length() == 0) return java.util.Collections.emptyList();
+        java.util.List<QuickMenuRow> rows = new ArrayList<>();
+        int max = Math.min(raw.length(), 12);
+        for (int i = 0; i < max; i++) {
+            JSONObject item = raw.optJSONObject(i);
+            if (item == null) continue;
+            String label = cleanBottomCardText(item.optString("label", ""), 28);
+            String command = item.optString("command", "").trim();
+            if (label.isEmpty() || command.isEmpty()) continue;
+            if (!BOTTOM_CARD_ACTIONS.contains(command) && !isDrivingSetCommand(command)) continue;
+            rows.add(new QuickMenuRow(label, command, item.optBoolean("selected", false)));
+        }
+        return rows;
+    }
+
+    /** `drivingSet:&lt;group&gt;:&lt;value&gt;`, letters/digits/underscore only. */
+    private boolean isDrivingSetCommand(String command) {
+        if (!command.startsWith(DRIVING_SET_PREFIX)) return false;
+        String rest = command.substring(DRIVING_SET_PREFIX.length());
+        int cut = rest.indexOf(':');
+        if (cut <= 0 || cut >= rest.length() - 1) return false;
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            boolean ok = c == ':' || c == '_' || (c >= '0' && c <= '9')
+                    || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    private static final String DRIVING_SET_PREFIX = "drivingSet:";
 
     /** Rail cards that draw a driving mode glyph and accept an icon quick action. */
     private static final java.util.Set<String> DRIVING_CARD_IDS =
@@ -8323,6 +8391,91 @@ public final class MainActivity extends Activity {
         if (size <= 0) size = dockToolGlyphPx > 0 ? dockToolGlyphPx : 48;
         iv.setImageDrawable(dockToolGlyph(cmd, size, state));
     }
+
+    /**
+     * The card's quick menu: the mode list, then a way through to the full page.
+     *
+     * Anchored above the card rather than centred, so the thumb that opened it
+     * is not covering the choices — the rail sits at the bottom of a 720px panel
+     * and a centred dialog would land under the hand.
+     */
+    private void showQuickMenu(View anchor, BottomCardDescriptor descriptor) {
+        dismissQuickMenu();
+        float density = getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout list = new android.widget.LinearLayout(this);
+        list.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Math.round(6 * density);
+        list.setPadding(pad, pad, pad, pad);
+        android.graphics.drawable.GradientDrawable panel =
+                new android.graphics.drawable.GradientDrawable();
+        panel.setCornerRadius(14f * density);
+        // Near-opaque on purpose: this sits over a widget board full of text,
+        // not over the scene, and a car UI has to be readable at a glance.
+        panel.setColor(dockUiLight ? 0xFCF7FAFC : 0xFA0B1016);
+        panel.setStroke(Math.max(1, Math.round(density)),
+                dockUiLight ? 0x2225303B : 0x26FFFFFF);
+        list.setBackground(panel);
+        list.setElevation(12f * density);
+
+        for (QuickMenuRow row : descriptor.menu) {
+            final String command = row.command;
+            boolean last = row == descriptor.menu.get(descriptor.menu.size() - 1);
+            android.widget.TextView item = new android.widget.TextView(this);
+            item.setText(row.label);
+            item.setTextSize(row.selected ? 15f : 14.5f);
+            item.setTypeface(android.graphics.Typeface.create(
+                    row.selected ? "sans-serif-medium" : "sans-serif", android.graphics.Typeface.NORMAL));
+            item.setTextColor(row.selected ? dockAccentColor : dockLabelColor());
+            item.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            int ipad = Math.round(13 * density);
+            item.setPadding(ipad, Math.round(11 * density), ipad, Math.round(11 * density));
+            item.setClickable(true);
+            item.setOnClickListener(v -> { dismissQuickMenu(); callViewerDock(command); });
+            android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(
+                            Math.round(196 * density),
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            item.setLayoutParams(lp);
+            if (last) {
+                // The way out reads as a different kind of thing to a mode.
+                item.setTextColor(dockLabelColorMuted());
+                item.setTextSize(12.5f);
+                item.setCompoundDrawablePadding(Math.round(8 * density));
+                android.view.View rule = new android.view.View(this);
+                android.widget.LinearLayout.LayoutParams rlp =
+                        new android.widget.LinearLayout.LayoutParams(
+                                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                                Math.max(1, Math.round(density)));
+                rlp.topMargin = Math.round(5 * density);
+                rlp.bottomMargin = Math.round(5 * density);
+                rule.setLayoutParams(rlp);
+                rule.setBackgroundColor(dockUiLight ? 0x1A25303B : 0x1FFFFFFF);
+                list.addView(rule);
+            }
+            list.addView(item);
+        }
+
+        quickMenuWindow = new android.widget.PopupWindow(list,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        quickMenuWindow.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+        quickMenuWindow.setOutsideTouchable(true);
+        list.measure(android.view.View.MeasureSpec.UNSPECIFIED,
+                android.view.View.MeasureSpec.UNSPECIFIED);
+        int gap = Math.round(8 * density);
+        // Offset by the measured height plus the anchor's own, because showAsDropDown
+        // measures DOWN from the anchor's bottom edge.
+        int dy = -(list.getMeasuredHeight() + anchor.getHeight() + gap);
+        quickMenuWindow.showAsDropDown(anchor, 0, dy);
+    }
+
+    private void dismissQuickMenu() {
+        if (quickMenuWindow == null) return;
+        try { quickMenuWindow.dismiss(); } catch (RuntimeException ignored) {}
+        quickMenuWindow = null;
+    }
+
+    private android.widget.PopupWindow quickMenuWindow;
 
     private void callViewerDock(String cmd) {
         if (webView == null || cmd == null) return;

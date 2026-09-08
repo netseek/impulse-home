@@ -73,6 +73,39 @@ Writes are disabled — not silently dropped — when the vehicle is not `READY`
 the installed `TelemetryBridge` has no `setCarData`. Nothing reaches the bridge
 in that state.
 
+## The rail card opens a quick menu
+
+Coffee OS pops a short list of the modes when you touch the card, with the full
+settings page one step further in. That beats what came before it: the icon's
+cycle is fine for three road modes and useless for seven, where a list is one
+tap to any of them. The last row, under a rule, is `Open driving controls`.
+
+It is a native `PopupWindow`, because the rail card is native — the web side
+does not know where the card sits on screen. Anchored ABOVE the card, so the
+thumb that opened it is not covering the choices.
+
+**A menu row carries a value, and that makes it a wider door than anything else
+the dock accepts.** Every other command is a fixed allow-listed token, and
+`setCarData` is on the other side of this one. Three things keep it shut:
+
+1. rows are minted in `_drivingMenuRows` from the live `CAR_MODE_GROUPS`, so a
+   row can only ever name a group and a value that exist;
+2. the native side is a courier. `parseQuickMenu` accepts a command only if it
+   is an allow-listed action or matches the `drivingSet:<group>:<value>` shape,
+   and it never composes one of its own;
+3. `_applyDrivingMenuCommand` re-derives the group and the value from those same
+   tables on arrival. Verified on the emulator: `drivingSet:drive:999`,
+   `drivingSet:bogus:0`, `drivingSet:drive` and `drivingSet:` all write nothing,
+   while `drivingSet:drive:1` writes.
+
+The menu resolves its selection the way the card does, demo fallback included.
+They were compared against different values at first and contradicted each other
+on screen — the card showing Normal while the menu marked nothing.
+
+The panel is near-opaque on purpose. It borrows none of the card's frost: it
+sits over a widget board full of text rather than over the scene, and at the
+card's alpha the two read through each other.
+
 ## Gestures
 
 Each rail tile carries up to three:
