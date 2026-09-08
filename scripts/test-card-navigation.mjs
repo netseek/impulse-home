@@ -38,15 +38,18 @@ includesAll(html, [
   "{ id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' }",
   "{ id: 'tires', title: 'Tires', action: 'openTires' }",
   "{ id: 'clock', title: 'Clock', action: 'openDesktopStudio' }",
-  "{ id: 'driveMode', title: 'Drive mode', action: 'cycleDriveMode' }",
-  "{ id: 'powerMode', title: 'Power mode', action: 'cyclePowerMode' }",
-  "{ id: 'regen', title: 'Energy recovery', action: 'cycleRegenMode' }",
+  // The three driving tiles share one destination: the card body opens the
+  // DRIVING popup, the icon keeps the per-mode quick change.
+  "{ id: 'driveMode', title: 'Drive mode', action: 'openDriving', iconAction: 'cycleDriveMode' }",
+  "{ id: 'powerMode', title: 'Power mode', action: 'openDriving', iconAction: 'cyclePowerMode' }",
+  "{ id: 'regen', title: 'Energy recovery', action: 'openDriving', iconAction: 'cycleRegenMode',",
   "case 'openNavigation':",
   "case 'openClimate':",
   "case 'openConsumption':",
   "case 'openRange':",
   "case 'openTires':",
   "case 'openVehicleStatus':",
+  "case 'openDriving':",
   "case 'cycleDriveMode':",
   "case 'cyclePowerMode':",
   "case 'cycleRegenMode':",
@@ -64,18 +67,21 @@ includesAll(html, [
   "clock: { label: 'CLOCK'",
   "navigation: { label: 'NAVIGATION'",
   "tires: { label: 'TIRES'",
+  "driving: { label: 'DRIVING'",
   "status: { label: 'STATUS'",
   "range: { label: 'RANGE'",
   'value="{{ wg.isProfile }}"',
   'value="{{ wg.isClock }}"',
   'value="{{ wg.isNavigation }}"',
   'value="{{ wg.isTires }}"',
+  'value="{{ wg.isDriving }}"',
   'value="{{ wg.isStatus }}"',
   'value="{{ wg.isRange }}"',
   "previewProfile: key === 'profile'",
   "previewClock: key === 'clock'",
   "previewNavigation: key === 'navigation'",
   "previewTires: key === 'tires'",
+  "previewDriving: key === 'driving'",
   "previewStatus: key === 'status'",
   "previewRange: key === 'range'",
 ], 'visual widget catalog');
@@ -96,11 +102,17 @@ includesAll(dockIndicators, [
   'Object.assign({',
   'bottomVisuals[card.id] || {}',
 ], 'graphic bottom-card payload');
-includesAll(method('_modeCardVisual'), [
-  "'DEMO · LOCAL PREVIEW'",
+// The unified Driving card carries the source vocabulary the audit requires:
+// a DEMO badge is never abbreviated, and an un-ready vehicle disables writes
+// rather than showing a plausible default.
+includesAll(method('_drivingWidgetView'), [
+  "'DEMO · SIMULATED · NOT VEHICLE'",
+  "'LOCAL PREVIEW · NOT A VEHICLE SETTING'",
+  "'UNAVAILABLE · VEHICLE NOT READY'",
+  "'PENDING · AWAITING VEHICLE STATE'",
   "'VEHICLE · LIVE'",
-  "'VEHICLE NOT READY'",
-], 'live-first mode card state');
+  "'STALE · VEHICLE STATE'",
+], 'live-first driving card state');
 includesAll(method('_setRoofLevelPopup'), [
   "classList.toggle('on'",
   "classList.toggle('lit'",
@@ -129,7 +141,7 @@ includesAll(method('_openFocusedCard'), ["action.kind === 'desktop'", 'd.id === 
 // Studio separates placement from bottom-bar management. The latter is one
 // ordered enabled-first list, and no longer lets a second display-limit value
 // hide cards that the user just enabled.
-includesAll(html, ['>Layout &amp; widgets</button>', '>Bottom bar</button>', 'aria-label="Help"', 'studioBottomCardItems', 'Create focused desktop'], 'studio flow');
+includesAll(html, ['>Layout &amp; widgets</button>', '>Bottom bar</button>', 'aria-label="Help"', 'studioBottomCardItems', 'Full area · car on right'], 'studio flow');
 const studioFields = method('_desktopRenderFields');
 includesAll(studioFields, ['studioIsLayout:', 'studioWidgetSummary:', 'studioBottomCardItems: H6_BOTTOM_CARD_CATALOG.slice().sort', 'leftDisabled: !enabled'], 'studio and bottom-bar ordering');
 assert.ok(!studioFields.includes('studioIsWidgets:'), 'Widgets should be merged into Layout & widgets');
@@ -137,8 +149,16 @@ assert.ok(!studioFields.includes('studioBottomLimitItems:'), 'enabled cards must
 
 // Creating a destination needs a usable large card in the layout it opens,
 // not only in the triple-layout template.
+// Any popup-backed card can choose its destination, and the focused desktop is
+// named after the workspace it hosts rather than a two-way ternary that called
+// everything past Climate 'Consumption'.
+includesAll(html, ['const H6_CARD_POPUP_TYPES = {', 'const canSetDestination = !!focusType;',
+  'this._setCardAction(focusType,'], 'destination chooser');
+assert.ok(!html.includes("['climate', 'consumption'].indexOf(card.id) >= 0"),
+  'the destination chooser must not be hardcoded to two cards');
 includesAll(method('_createFocusedCardDesktop'), [
   "w: 2, h: 2",
+  "this._widgetCatalog()[type]",
   "layout.appCar.left = { use: 'widgets'",
   "d.shellMode = 'appCar'",
   "desktopId: d.id",

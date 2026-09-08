@@ -93,7 +93,10 @@ public final class MainActivity extends Activity {
                     // Navigation-only commands implemented by the web shell. They do not
                     // invoke vehicle APIs from Android.
                     "openClimate", "openConsumption", "openNavigation", "openPower", "openRange",
-                    "openTires", "openVehicleStatus", "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
+                    "openTires", "openVehicleStatus", "openDriving", "openDrivingOnePedal",
+                    // Retained for native shells installed before the three mode
+                    // tiles were unified into one Driving controls card.
+                    "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
                     "openRoofControls"
             ));
 
@@ -136,6 +139,7 @@ public final class MainActivity extends Activity {
                     "car.ev_setting.power_model_config",
                     "car.drive_setting.steering_wheel_assist_mode",
                     "car.ev_setting.energy_recovery_level",
+                    "car.ev.setting.pedal_control_enable",
                     "car.drive_setting.esp_enable"
             ));
     private static final int FILE_CHOOSER_REQUEST = 1001;
@@ -146,7 +150,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-status-v14";
+    private static final String VIEWER_ASSET_REVISION = "codex-claude-driving-v1";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -898,6 +902,9 @@ public final class MainActivity extends Activity {
     /** Accent DEMO markers in web-configured card headers, keyed by card id. */
     private final java.util.Map<String, android.widget.TextView> quickCardDemoBadges =
             new java.util.HashMap<>();
+    /** Card root by id, so a mode change can repaint the wash without a rebuild. */
+    private final java.util.Map<String, View> quickCardHosts = new java.util.HashMap<>();
+    private final java.util.Map<String, Integer> lastDrivingWash = new java.util.HashMap<>();
     private android.widget.ImageView quickMediaArt;
     private boolean quickMediaHasArt;
     private android.widget.TextView quickMediaTitle;
@@ -933,6 +940,22 @@ public final class MainActivity extends Activity {
     private boolean dockFpsOn = false;
     private boolean dockXrayOn = false;
 
+    /**
+     * One row of a card's quick menu. `command` is minted by the web side and
+     * only replayed here — this class never composes one.
+     */
+    private static final class QuickMenuRow {
+        final String label;
+        final String command;
+        final boolean selected;
+
+        QuickMenuRow(String label, String command, boolean selected) {
+            this.label = label;
+            this.command = command;
+            this.selected = selected;
+        }
+    }
+
     private static final class BottomCardDescriptor {
         final String id;
         final String title;
@@ -949,10 +972,26 @@ public final class MainActivity extends Activity {
         /** Status opening order: FL, FR, RL, RR, tailgate. */
         final String[] openingStates;
         final boolean demo;
+        /**
+         * Command for a tap on the graphic alone, empty when the icon is not a
+         * control. The card body always runs {@link #action}; this is the quick
+         * change that saves opening the popup for a one-step adjustment.
+         */
+        final String iconAction;
+        /** Command for a long press anywhere on the card; empty when unused. */
+        final String longAction;
+        /** Flattened glyph path (absolute M/L/C/Z on a 24x24 grid); may be empty. */
+        final String glyph;
+        /** Short code drawn in place of a glyph (AWD's "4x4"); may be empty. */
+        final String glyphText;
+        /** Quick-menu rows; empty for a card whose body opens something directly. */
+        final java.util.List<QuickMenuRow> menu;
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
-                String state, String[] wheelStates, String[] openingStates, boolean demo) {
+                String state, String[] wheelStates, String[] openingStates, boolean demo,
+                String iconAction, String longAction, String glyph, String glyphText,
+                java.util.List<QuickMenuRow> menu) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -966,6 +1005,11 @@ public final class MainActivity extends Activity {
             this.wheelStates = wheelStates;
             this.openingStates = openingStates;
             this.demo = demo;
+            this.iconAction = iconAction == null ? "" : iconAction;
+            this.longAction = longAction == null ? "" : longAction;
+            this.glyph = glyph == null ? "" : glyph;
+            this.glyphText = glyphText == null ? "" : glyphText;
+            this.menu = menu == null ? java.util.Collections.emptyList() : menu;
         }
     }
 
@@ -1011,9 +1055,9 @@ public final class MainActivity extends Activity {
                 case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
                 case "clock": drawClock(canvas, w, h, accent, muted, strong); break;
                 case "desktops": drawDesktops(canvas, w, h, accent, muted); break;
-                case "driveMode": drawDriveMode(canvas, w, h, accent, muted); break;
-                case "powerMode": drawPowerMode(canvas, w, h, accent, muted); break;
-                case "regen": drawRegen(canvas, w, h, accent, muted); break;
+                case "driveMode": drawDriveMode(canvas, w, h, accent, muted, strong); break;
+                case "powerMode": drawPowerMode(canvas, w, h, accent, muted, strong); break;
+                case "regen": drawRegen(canvas, w, h, accent, muted, strong); break;
                 case "roof": drawRoof(canvas, w, h, accent, muted, strong); break;
                 default: drawRing(canvas, w, h, accent, muted, false); break;
             }
@@ -1400,65 +1444,166 @@ public final class MainActivity extends Activity {
             c.drawCircle(cx, cy, Math.max(3f, w * .045f), paint);
         }
 
+        /**
+         * The three driving rail cards draw the SELECTED mode's own glyph, not a
+         * generic gauge — the same identity the DRIVING widget and popup use, so
+         * one mode reads as one thing everywhere. `descriptor.state` carries which
+         * mode; an unknown value falls back to the neutral steering wheel rather
+         * than picking a mode we were not told about.
+         *
+         * Each glyph is drawn into a unit box and scaled once, so adding a mode is
+         * a path, not a new set of magic ratios.
+         */
         private void drawDriveMode(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            stroke(muted, Math.max(3f, w * .04f));
-            c.drawLine(w * .18f, h * .82f, w * .40f, h * .25f, paint);
-            c.drawLine(w * .82f, h * .82f, w * .60f, h * .25f, paint);
-            stroke(accent, Math.max(2f, w * .028f));
-            c.drawLine(w * .50f, h * .78f, w * .50f, h * .25f, paint);
-            fill(accent);
-            float y = h * (.78f - .52f * descriptor.progress / 100f);
-            c.drawCircle(w * .50f, y, Math.max(4f, w * .07f), paint);
-            stroke(accent, Math.max(2f, w * .028f));
-            c.drawLine(w * .46f, y + w * .05f, w * .50f, y + w * .10f, paint);
-            c.drawLine(w * .50f, y + w * .10f, w * .54f, y + w * .05f, paint);
-        }
-
-        private void drawPowerMode(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            float l = w * .16f, t = h * .28f, r = w * .82f, b = h * .72f;
-            stroke(muted, Math.max(3f, w * .04f));
-            c.drawRoundRect(l, t, r, b, w * .10f, w * .10f, paint);
-            fill(muted);
-            c.drawRoundRect(r, h * .43f, w * .90f, h * .57f, w * .03f, w * .03f, paint);
-            fill(withAlpha(accent, 0x88));
-            c.drawRoundRect(l + w * .08f, t + h * .10f,
-                    l + w * .08f + (r - l - w * .16f) * descriptor.progress / 100f,
-                    b - h * .10f, w * .04f, w * .04f, paint);
-            android.graphics.Path bolt = new android.graphics.Path();
-            bolt.moveTo(w * .57f, h * .15f);
-            bolt.lineTo(w * .40f, h * .52f);
-            bolt.lineTo(w * .53f, h * .52f);
-            bolt.lineTo(w * .45f, h * .86f);
-            bolt.lineTo(w * .70f, h * .43f);
-            bolt.lineTo(w * .56f, h * .43f);
-            bolt.close();
-            fill(accent);
-            c.drawPath(bolt, paint);
-        }
-
-        private void drawRegen(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            float cx = w * .48f, cy = h * .52f, r = Math.min(w, h) * .30f;
-            stroke(muted, Math.max(3f, w * .045f));
-            oval.set(cx - r, cy - r, cx + r, cy + r);
-            c.drawArc(oval, 35f, 285f, false, paint);
-            stroke(accent, Math.max(3f, w * .045f));
-            c.drawArc(oval, 35f, 185f * descriptor.progress / 100f, false, paint);
-            android.graphics.Path arrow = new android.graphics.Path();
-            arrow.moveTo(cx + r * .72f, cy - r * .80f);
-            arrow.lineTo(cx + r * 1.04f, cy - r * .37f);
-            arrow.lineTo(cx + r * .52f, cy - r * .40f);
-            stroke(accent, Math.max(2f, w * .035f));
-            c.drawPath(arrow, paint);
-            for (int i = 0; i < 3; i++) {
-                float x = w * (.25f + i * .18f);
-                float top = h * (.72f - (.13f + i * .07f));
-                fill(i < 2 ? accent : muted);
-                c.drawRoundRect(x, top, x + w * .09f, h * .75f,
-                        w * .025f, w * .025f, paint);
+                int accent, int muted, int strong) {
+            float size = Math.min(w, h) * .68f;
+            String mode = descriptor.state == null ? "" : descriptor.state;
+            boolean known = !"unknown".equals(mode) && !mode.isEmpty();
+            if (!descriptor.glyphText.isEmpty()) {
+                drawCodeBadge(c, descriptor.glyphText, w * .5f, h * .44f,
+                        w * .60f, h * .40f, known ? accent : muted, known);
+            } else {
+                drawGlyphPath(c, descriptor.glyph, w * .5f, h * .44f, size,
+                        known ? accent : muted, Math.max(2f, size * .085f));
             }
+            drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
+        }
+
+        /**
+         * Power mode is a hybrid split, so draw it as one: a battery that fills
+         * with the electric share and a fuel drop that fades as it stops being
+         * used. EV empties the drop entirely, HEV shows both.
+         */
+        private void drawPowerMode(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            String mode = descriptor.state == null ? "" : descriptor.state;
+            boolean known = "hev".equals(mode) || "evp".equals(mode) || "ev".equals(mode);
+            String code = known ? mode.toUpperCase(java.util.Locale.US) : "--";
+            drawCodeBadge(c, code, w * .5f, h * .46f, w * .74f, h * .46f,
+                    known ? accent : muted, known);
+            drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
+        }
+
+        /**
+         * A short code in a rounded box — the POWER card's HEV / EVP / EV, and
+         * AWD's 4x4. Some modes have no mark that survives 52px, and type is
+         * always legible where line art is not.
+         */
+        private void drawCodeBadge(android.graphics.Canvas c, String code,
+                float cx, float cy, float boxW, float boxH, int color, boolean known) {
+            oval.set(cx - boxW * .5f, cy - boxH * .5f, cx + boxW * .5f, cy + boxH * .5f);
+            fill(withAlpha(color, known ? 0x22 : 0x14));
+            c.drawRoundRect(oval, boxH * .30f, boxH * .30f, paint);
+            stroke(color, Math.max(1.5f, boxH * .042f));
+            c.drawRoundRect(oval, boxH * .30f, boxH * .30f, paint);
+
+            // Size to the box rather than to a constant: EVP is three glyphs
+            // where EV is two, and a fixed size clips one or floats the other.
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(color);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.NORMAL));
+            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            paint.setLetterSpacing(.06f);
+            float textSize = boxH * .62f;
+            paint.setTextSize(textSize);
+            float maxWidth = boxW * .78f;
+            float measured = paint.measureText(code);
+            if (measured > maxWidth) paint.setTextSize(textSize * maxWidth / measured);
+            android.graphics.Paint.FontMetrics fm = paint.getFontMetrics();
+            c.drawText(code, cx, cy - (fm.ascent + fm.descent) * .5f, paint);
+            paint.setLetterSpacing(0f);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+        }
+
+        /**
+         * Recovery is an ordinal level, so it is three rising bars and nothing
+         * else. One-pedal replaces the level rather than extending it, so it
+         * lights every bar and is named on the card's value line instead of
+         * being faked as a fourth step.
+         */
+        private void drawRegen(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            String mode = descriptor.state == null ? "" : descriptor.state;
+            boolean onePedal = "onepedal".equals(mode);
+            int level = onePedal ? 3 : ("level1".equals(mode) ? 1
+                    : ("level2".equals(mode) ? 2 : ("level3".equals(mode) ? 3 : 0)));
+            float bw = w * .17f, gap = w * .10f;
+            float base = h * .70f;
+            float left = w * .5f - (bw * 3f + gap * 2f) * .5f;
+            float tall = h * .46f;
+            for (int i = 0; i < 3; i++) {
+                float bh = tall * (.40f + i * .30f);
+                float x = left + i * (bw + gap);
+                fill(i < level ? accent : muted);
+                c.drawRoundRect(x, base - bh, x + bw, base, bw * .32f, bw * .32f, paint);
+            }
+            if (onePedal) {
+                // A tie under the bars: one control now covers all three levels.
+                stroke(accent, Math.max(1.5f, w * .026f));
+                c.drawLine(left, base + h * .10f, left + bw * 3f + gap * 2f, base + h * .10f, paint);
+            }
+            drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
+        }
+
+        /**
+         * Position within a fixed set of options. `progress` arrives as
+         * (index+1)/count, so recovering the index keeps the dots honest for any
+         * option count without a second payload field.
+         */
+        private void drawStepDots(android.graphics.Canvas c, float w, float h,
+                int count, int progress, int accent, int muted) {
+            if (count <= 1) return;
+            int index = progress <= 0 ? -1 : Math.round(count * progress / 100f) - 1;
+            float r = Math.max(1.5f, w * .022f);
+            float gap = r * 3.1f;
+            float y = h * .90f;
+            float left = w * .5f - (count - 1) * gap * .5f;
+            for (int i = 0; i < count; i++) {
+                fill(i == index ? accent : muted);
+                c.drawCircle(left + i * gap, y, i == index ? r * 1.35f : r, paint);
+            }
+        }
+
+        /**
+         * Draw a flattened glyph path, centred at (cx, cy) and scaled from its
+         * 24x24 authoring grid to `size`.
+         *
+         * The command subset is guaranteed by scripts/build-drive-mode-glyphs.mjs
+         * (absolute M/L/C/Z, one space after every letter), which is what keeps
+         * this a tokenless split rather than an SVG parser on the head unit.
+         */
+        private void drawGlyphPath(android.graphics.Canvas c, String data,
+                float cx, float cy, float size, int color, float width) {
+            if (data == null || data.isEmpty()) return;
+            android.graphics.Path path = new android.graphics.Path();
+            String[] parts = data.split(" ");
+            float[] n = new float[6];
+            int i = 0;
+            try {
+                while (i < parts.length) {
+                    String token = parts[i++];
+                    if (token.isEmpty()) continue;
+                    char command = token.charAt(0);
+                    if (command == 'Z') { path.close(); continue; }
+                    int count = command == 'C' ? 6 : 2;
+                    if (i + count > parts.length) return;
+                    for (int k = 0; k < count; k++) n[k] = Float.parseFloat(parts[i++]);
+                    if (command == 'M') path.moveTo(n[0], n[1]);
+                    else if (command == 'L') path.lineTo(n[0], n[1]);
+                    else if (command == 'C') path.cubicTo(n[0], n[1], n[2], n[3], n[4], n[5]);
+                    else return;
+                }
+            } catch (NumberFormatException error) {
+                return;   // A malformed glyph draws nothing; it never crashes the rail.
+            }
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            float scale = size / 24f;
+            m.setScale(scale, scale);
+            m.postTranslate(cx - size * .5f, cy - size * .5f);
+            path.transform(m);
+            stroke(color, width);
+            c.drawPath(path, paint);
         }
 
         private void drawRoof(android.graphics.Canvas c, float w, float h,
@@ -6454,7 +6599,41 @@ public final class MainActivity extends Activity {
         refreshDesktopIndicator();
     }
 
+    /**
+     * Mode hue for a driving card's wash, or 0 for no wash.
+     *
+     * Deliberately not the accent: the accent means "this is selected/live" all
+     * over these cards, and a card-wide fill in that colour would drown the
+     * signal. These are scene colours — green for eco, ice for snow — and they
+     * sit under everything at low alpha.
+     */
+    private int drivingWashColor(String state) {
+        if (state == null) return 0;
+        switch (state) {
+            case "eco": return 0xFF4FBF6A;
+            case "normal": return 0xFF4A7FB5;
+            case "sport": return 0xFFE0392C;
+            case "snow": return 0xFF6FB6E8;
+            case "sand": return 0xFFD9A650;
+            case "mud": return 0xFF9A7346;
+            case "awd": return 0xFF5C7A94;
+            case "hev": return 0xFF7C74D6;
+            case "evp": return 0xFF4F93DA;
+            case "ev": return 0xFF35B98F;
+            case "level1": return 0xFF6E7A93;
+            case "level2": return 0xFF4C86C4;
+            case "level3": return 0xFF3C63C0;
+            case "onepedal": return 0xFF7C4FD0;
+            default: return 0;
+        }
+    }
+
     private android.graphics.drawable.Drawable makeFrostLayer(boolean selected, float density) {
+        return makeFrostLayer(selected, density, 0);
+    }
+
+    private android.graphics.drawable.Drawable makeFrostLayer(
+            boolean selected, float density, int wash) {
         int inset = Math.max(1, Math.round(density));
         float radius = 16f * density;
         android.graphics.drawable.GradientDrawable rim = new android.graphics.drawable.GradientDrawable(
@@ -6475,21 +6654,56 @@ public final class MainActivity extends Activity {
                     ? new int[] { blendArgb(0xEB18232D, dockAccentColor, 0.08f), 0xE00E141B }
                     : new int[] { 0xE01A222D, 0xD90E141B };
         }
+        if (wash != 0) {
+            // Strongest at the top of the card and nearly gone by the bottom, so
+            // the readout keeps a clean ground to sit on.
+            float top = dockUiLight ? 0.22f : 0.34f;
+            float bottom = dockUiLight ? 0.02f : 0.04f;
+            fillColors = new int[] {
+                blendArgb(fillColors[0], wash, top),
+                blendArgb(fillColors[fillColors.length - 1], wash, bottom),
+            };
+        }
         android.graphics.drawable.GradientDrawable fill = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, fillColors);
         fill.setCornerRadius(Math.max(0f, radius - inset));
+        if (wash == 0) {
+            android.graphics.drawable.LayerDrawable plain =
+                    new android.graphics.drawable.LayerDrawable(new Drawable[] { rim, fill });
+            plain.setLayerInset(1, inset, inset, inset, inset);
+            return plain;
+        }
+
+        // A soft pool of light behind the graphic. This is the part that reads
+        // as imagery rather than as a coloured panel.
+        android.graphics.drawable.GradientDrawable glow =
+                new android.graphics.drawable.GradientDrawable();
+        glow.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        glow.setCornerRadius(Math.max(0f, radius - inset));
+        glow.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
+        glow.setGradientCenter(0.22f, 0.34f);
+        glow.setGradientRadius(118f * density);
+        glow.setColors(new int[] { withAlpha(wash, dockUiLight ? 0x5A : 0x86),
+                withAlpha(wash, dockUiLight ? 0x18 : 0x24), withAlpha(wash, 0) });
+
         android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
-                new Drawable[] { rim, fill });
+                new Drawable[] { rim, fill, glow });
         layers.setLayerInset(1, inset, inset, inset, inset);
+        layers.setLayerInset(2, inset, inset, inset, inset);
         return layers;
     }
 
     private android.graphics.drawable.Drawable makeFrostStateDrawable(
             boolean selected, float density) {
+        return makeFrostStateDrawable(selected, density, 0);
+    }
+
+    private android.graphics.drawable.Drawable makeFrostStateDrawable(
+            boolean selected, float density, int wash) {
         android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
-        states.addState(new int[] { android.R.attr.state_pressed }, makeFrostLayer(true, density));
-        states.addState(new int[] { android.R.attr.state_selected }, makeFrostLayer(true, density));
-        states.addState(new int[0], makeFrostLayer(selected, density));
+        states.addState(new int[] { android.R.attr.state_pressed }, makeFrostLayer(true, density, wash));
+        states.addState(new int[] { android.R.attr.state_selected }, makeFrostLayer(true, density, wash));
+        states.addState(new int[0], makeFrostLayer(selected, density, wash));
         return states;
     }
 
@@ -6524,6 +6738,8 @@ public final class MainActivity extends Activity {
     private void populateQuickCardsRow(android.widget.LinearLayout row, float density) {
         row.removeAllViews();
         quickCardViews.clear();
+        quickCardHosts.clear();
+        lastDrivingWash.clear();
         quickClimateValue = null;
         quickConsumptionValue = null;
         quickCardValues.clear();
@@ -6556,8 +6772,13 @@ public final class MainActivity extends Activity {
                     row.addView(media);
                     continue;
                 }
-                View card = makeQuickVisualCard(density, descriptor,
-                        v -> callViewerDock(descriptor.action));
+                final BottomCardDescriptor cardDescriptor = descriptor;
+                View card = makeQuickVisualCard(density, descriptor, v -> {
+                    // A card with a menu shows it; the menu's own last row is
+                    // what reaches the full page.
+                    if (!cardDescriptor.menu.isEmpty()) showQuickMenu(v, cardDescriptor);
+                    else callViewerDock(cardDescriptor.action);
+                });
                 card.setTag("bottomCard:" + descriptor.id);
                 android.widget.TextView valueView =
                         (android.widget.TextView) card.findViewWithTag("quickValue");
@@ -6605,9 +6826,23 @@ public final class MainActivity extends Activity {
         card.setFocusable(true);
         card.setContentDescription(bottomCardAccessibilityDescription(descriptor));
         card.setOnClickListener(click);
-        card.setBackground(makeFrostStateDrawable(false, density));
+        if (!descriptor.longAction.isEmpty()) {
+            final String longCommand = descriptor.longAction;
+            // Returning true consumes the gesture, so the long press cannot also
+            // fire the card's ordinary click when the finger lifts.
+            card.setLongClickable(true);
+            card.setOnLongClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                callViewerDock(longCommand);
+                return true;
+            });
+        }
+        card.setBackground(makeFrostStateDrawable(false, density,
+                drivingWashColor(descriptor.state)));
         card.setElevation(3f * density);
         quickCardViews.add(card);
+        quickCardHosts.put(descriptor.id, card);
+        lastDrivingWash.put(descriptor.id, drivingWashColor(descriptor.state));
 
         android.widget.LinearLayout header = new android.widget.LinearLayout(this);
         header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -6679,6 +6914,13 @@ public final class MainActivity extends Activity {
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         graphicLp.rightMargin = Math.round(10 * density);
         graphic.setLayoutParams(graphicLp);
+        if (!descriptor.iconAction.isEmpty()) {
+            final String iconCommand = descriptor.iconAction;
+            graphic.setClickable(true);
+            graphic.setFocusable(true);
+            graphic.setContentDescription(descriptor.title + ". Change to the next setting");
+            graphic.setOnClickListener(v -> callViewerDock(iconCommand));
+        }
         content.addView(graphic);
 
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
@@ -6704,7 +6946,10 @@ public final class MainActivity extends Activity {
         detail.setTextSize(9.5f);
         detail.setLetterSpacing(0.025f);
         detail.setLineSpacing(0f, 1.02f);
-        detail.setMaxLines(2);
+        // The source badge is long and must never ellipsise into something that
+        // reads like a different claim ("DEMO · SIMULATED · NOT VEHICLE..." is
+        // not the same statement).
+        detail.setMaxLines(3);
         detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
@@ -7058,11 +7303,28 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * The mode wash a card view is currently wearing.
+     *
+     * The theme pass only has the view, not the descriptor, and it rebuilds every
+     * background — so without this it repaints the driving cards flat on the next
+     * payload and the wash silently disappears.
+     */
+    private int washForCardView(View card) {
+        Object tag = card.getTag();
+        if (!(tag instanceof String)) return 0;
+        String id = (String) tag;
+        if (!id.startsWith("bottomCard:")) return 0;
+        Integer wash = lastDrivingWash.get(id.substring("bottomCard:".length()));
+        return wash == null ? 0 : wash;
+    }
+
     private void refreshQuickCardsTheme() {
         float density = getResources().getDisplayMetrics().density;
         for (View card : quickCardViews) {
             if (card == null) continue;
-            card.setBackground(makeFrostStateDrawable(card.isSelected(), density));
+            card.setBackground(makeFrostStateDrawable(card.isSelected(), density,
+                    washForCardView(card)));
             tintFrostText(card);
         }
         if (quickMediaPlayPause != null) {
@@ -7075,6 +7337,7 @@ public final class MainActivity extends Activity {
                         dockAccentColor));
             }
         }
+        dismissQuickMenu();
         for (QuickCardGraphicView graphic : quickCardGraphics.values()) {
             if (graphic != null) graphic.invalidate();
         }
@@ -7964,13 +8227,22 @@ public final class MainActivity extends Activity {
             if (o.has("activeDesktopIndex")) {
                 activeDesktopIndex = Math.max(0, o.optInt("activeDesktopIndex", 0));
             }
+            boolean accentChanged = false;
             if (o.has("accent")) {
                 String accent = o.optString("accent", "");
                 if (accent != null && accent.trim().startsWith("#")) {
-                    dockAccentColor = parseCssColor(accent.trim(), dockAccentColor);
+                    int next = parseCssColor(accent.trim(), dockAccentColor);
+                    accentChanged = next != dockAccentColor;
+                    dockAccentColor = next;
                 }
             }
             applyBottomCardsConfiguration(o);
+            // Icons and graphics bake the accent in when they are built, and
+            // refreshQuickCardsTheme only repaints backgrounds and text -- so an
+            // accent change has to rebuild the rail or tinted children keep the
+            // old colour. Rare enough to be free, and Sport now changes the
+            // accent often enough that a stale tint is visible.
+            if (accentChanged) rebuildQuickCardsRow();
             applyQuickCardIndicators(o);
             if (o.has("model")) {
                 String v = o.optString("model", dockModelLabel);
@@ -8055,10 +8327,22 @@ public final class MainActivity extends Activity {
             int progress = Math.max(0, Math.min(100, raw.optInt("progress", 0)));
             boolean demo = raw.optBoolean("demo", false);
             if (id.isEmpty() || title.isEmpty() || !BOTTOM_CARD_ACTIONS.contains(action)) continue;
+            // A tap on the graphic runs its own command, so it is allow-listed
+            // exactly like the card's; an unknown one degrades to "no icon action"
+            // rather than reaching the dock unchecked.
+            String iconAction = raw.optString("iconAction", "").trim();
+            if (!BOTTOM_CARD_ACTIONS.contains(iconAction)) iconAction = "";
+            String longAction = raw.optString("longAction", "").trim();
+            if (!BOTTOM_CARD_ACTIONS.contains(longAction)) longAction = "";
+            String glyph = sanitizeGlyphPath(raw.optString("glyph", ""));
+            String glyphText = cleanBottomCardText(raw.optString("glyphText", ""), 6);
+            java.util.List<QuickMenuRow> menu = parseQuickMenu(raw.optJSONArray("menu"));
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
                             raw.optString("tireState", "unavailable")))
-                    : ("status".equals(id) ? sanitizeStatusState(raw.optString("state", "unavailable")) : "");
+                    : ("status".equals(id) ? sanitizeStatusState(raw.optString("state", "unavailable"))
+                            : (DRIVING_CARD_IDS.contains(id)
+                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : ""));
             String[] wheelStates = "tires".equals(id)
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))
@@ -8068,7 +8352,7 @@ public final class MainActivity extends Activity {
                     : new String[] {"unknown", "unknown", "unknown", "unknown", "unknown"};
             next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
                     action, primary, secondary, metricA, metricB, progress, state, wheelStates,
-                    openingStates, demo));
+                    openingStates, demo, iconAction, longAction, glyph, glyphText, menu));
         }
 
         int requested = root.has("bottomCardLimit")
@@ -8094,6 +8378,98 @@ public final class MainActivity extends Activity {
     private String cleanBottomCardText(String value, int maxLength) {
         String clean = cleanIndicator(value);
         return clean.length() > maxLength ? clean.substring(0, maxLength) : clean;
+    }
+
+    /**
+     * Glyph paths arrive from the web payload, so they are validated like any
+     * other untrusted string: the generator emits only absolute M/L/C/Z with
+     * spaces and numbers, and anything else is dropped rather than parsed.
+     */
+    private String sanitizeGlyphPath(String value) {
+        if (value == null) return "";
+        String trimmed = value.trim();
+        if (trimmed.isEmpty() || trimmed.length() > 4000) return "";
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            boolean ok = c == 'M' || c == 'L' || c == 'C' || c == 'Z' || c == ' '
+                    || c == '.' || c == '-' || (c >= '0' && c <= '9');
+            if (!ok) return "";
+        }
+        return trimmed;
+    }
+
+    /**
+     * Quick-menu rows from the payload.
+     *
+     * A row's command is either one of the fixed allow-listed actions or a
+     * driving write, which carries a value and so cannot be a fixed token. The
+     * shape is checked here and the value itself is re-derived from the mode
+     * tables on the web side — this end only proves it looks like a write, never
+     * that it is a legal one.
+     */
+    private java.util.List<QuickMenuRow> parseQuickMenu(JSONArray raw) {
+        if (raw == null || raw.length() == 0) return java.util.Collections.emptyList();
+        java.util.List<QuickMenuRow> rows = new ArrayList<>();
+        int max = Math.min(raw.length(), 12);
+        for (int i = 0; i < max; i++) {
+            JSONObject item = raw.optJSONObject(i);
+            if (item == null) continue;
+            String label = cleanBottomCardText(item.optString("label", ""), 28);
+            String command = item.optString("command", "").trim();
+            if (label.isEmpty() || command.isEmpty()) continue;
+            if (!BOTTOM_CARD_ACTIONS.contains(command) && !isDrivingSetCommand(command)) continue;
+            rows.add(new QuickMenuRow(label, command, item.optBoolean("selected", false)));
+        }
+        return rows;
+    }
+
+    /** `drivingSet:&lt;group&gt;:&lt;value&gt;`, letters/digits/underscore only. */
+    private boolean isDrivingSetCommand(String command) {
+        if (!command.startsWith(DRIVING_SET_PREFIX)) return false;
+        String rest = command.substring(DRIVING_SET_PREFIX.length());
+        int cut = rest.indexOf(':');
+        if (cut <= 0 || cut >= rest.length() - 1) return false;
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            boolean ok = c == ':' || c == '_' || (c >= '0' && c <= '9')
+                    || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    private static final String DRIVING_SET_PREFIX = "drivingSet:";
+
+    /** Rail cards that draw a driving mode glyph and accept an icon quick action. */
+    private static final java.util.Set<String> DRIVING_CARD_IDS =
+            new java.util.HashSet<>(java.util.Arrays.asList("driveMode", "powerMode", "regen"));
+
+    /**
+     * Mode identity for the rail graphic. Mirrors CAR_DRIVE_MODE_CARD_STATES /
+     * CAR_POWER_MODE_CARD_STATES in index.html; an unrecognised value draws the
+     * neutral glyph rather than guessing at a mode.
+     */
+    private String sanitizeDrivingState(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US);
+        switch (normalized) {
+            case "eco":
+            case "normal":
+            case "sport":
+            case "snow":
+            case "sand":
+            case "mud":
+            case "awd":
+            case "hev":
+            case "evp":
+            case "ev":
+            case "level1":
+            case "level2":
+            case "level3":
+            case "onepedal":
+                return normalized;
+            default:
+                return "unknown";
+        }
     }
 
     private String sanitizeTiresState(String value) {
@@ -8177,6 +8553,15 @@ public final class MainActivity extends Activity {
             if (demoBadge != null) demoBadge.setVisibility(card.demo ? View.VISIBLE : View.GONE);
             QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
             if (graphic != null) graphic.setDescriptor(card);
+            // The rail is patched in place rather than rebuilt, so a mode change
+            // has to repaint the card's own background too.
+            View host = quickCardHosts.get(card.id);
+            int wash = drivingWashColor(card.state);
+            if (host != null && wash != lastDrivingWash.getOrDefault(card.id, -1)) {
+                lastDrivingWash.put(card.id, wash);
+                float density = getResources().getDisplayMetrics().density;
+                host.setBackground(makeFrostStateDrawable(false, density, wash));
+            }
             updateBottomCardAccessibility(value != null ? value : graphic, card);
         }
     }
@@ -8321,6 +8706,126 @@ public final class MainActivity extends Activity {
         if (size <= 0) size = dockToolGlyphPx > 0 ? dockToolGlyphPx : 48;
         iv.setImageDrawable(dockToolGlyph(cmd, size, state));
     }
+
+    /**
+     * The card's quick menu: the mode list, then a way through to the full page.
+     *
+     * Anchored above the card rather than centred, so the thumb that opened it
+     * is not covering the choices — the rail sits at the bottom of a 720px panel
+     * and a centred dialog would land under the hand.
+     */
+    private void showQuickMenu(View anchor, BottomCardDescriptor descriptor) {
+        dismissQuickMenu();
+        float density = getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout list = new android.widget.LinearLayout(this);
+        list.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Math.round(6 * density);
+        list.setPadding(pad, pad, pad, pad);
+        android.graphics.drawable.GradientDrawable panel =
+                new android.graphics.drawable.GradientDrawable();
+        panel.setCornerRadius(14f * density);
+        // Near-opaque on purpose: this sits over a widget board full of text,
+        // not over the scene, and a car UI has to be readable at a glance.
+        panel.setColor(dockUiLight ? 0xFCF7FAFC : 0xFA0B1016);
+        panel.setStroke(Math.max(1, Math.round(density)),
+                dockUiLight ? 0x2225303B : 0x26FFFFFF);
+        list.setBackground(panel);
+        list.setElevation(12f * density);
+
+        for (QuickMenuRow row : descriptor.menu) {
+            final String command = row.command;
+            boolean last = row == descriptor.menu.get(descriptor.menu.size() - 1);
+            android.widget.TextView item = new android.widget.TextView(this);
+            item.setText(row.label);
+            item.setTextSize(last ? 13f : 15f);
+            item.setTypeface(android.graphics.Typeface.create(
+                    row.selected ? "sans-serif-medium" : "sans-serif", android.graphics.Typeface.NORMAL));
+            item.setTextColor(row.selected ? dockAccentColor
+                    : (last ? dockLabelColorMuted() : dockLabelColor()));
+            item.setGravity(android.view.Gravity.CENTER);
+            item.setBackground(makeQuickMenuItemBackground(row.selected, last, density));
+            int ipad = Math.round(12 * density);
+            item.setPadding(ipad, Math.round(12 * density), ipad, Math.round(12 * density));
+            item.setClickable(true);
+            item.setOnClickListener(v -> { dismissQuickMenu(); callViewerDock(command); });
+            android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(
+                            Math.round(200 * density),
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = Math.round(6 * density);
+            item.setLayoutParams(lp);
+            if (last) {
+                // Still a button, but the rule above it says this one leaves the
+                // menu rather than picking a mode.
+                android.view.View rule = new android.view.View(this);
+                android.widget.LinearLayout.LayoutParams rlp =
+                        new android.widget.LinearLayout.LayoutParams(
+                                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                                Math.max(1, Math.round(density)));
+                rlp.topMargin = Math.round(2 * density);
+                rlp.bottomMargin = Math.round(8 * density);
+                rule.setLayoutParams(rlp);
+                rule.setBackgroundColor(dockUiLight ? 0x1A25303B : 0x1FFFFFFF);
+                list.addView(rule);
+            }
+            list.addView(item);
+        }
+
+        quickMenuWindow = new android.widget.PopupWindow(list,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        quickMenuWindow.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
+        quickMenuWindow.setOutsideTouchable(true);
+        list.measure(android.view.View.MeasureSpec.UNSPECIFIED,
+                android.view.View.MeasureSpec.UNSPECIFIED);
+        int gap = Math.round(8 * density);
+        // Offset by the measured height plus the anchor's own, because showAsDropDown
+        // measures DOWN from the anchor's bottom edge.
+        int dy = -(list.getMeasuredHeight() + anchor.getHeight() + gap);
+        quickMenuWindow.showAsDropDown(anchor, 0, dy);
+    }
+
+    /**
+     * A menu row's pill. Selected carries the accent the way every other control
+     * in this card does; the last row is the way out, so it stays outlined
+     * rather than filled and does not compete with the modes.
+     */
+    private android.graphics.drawable.Drawable makeQuickMenuItemBackground(
+            boolean selected, boolean muted, float density) {
+        float radius = 10f * density;
+        int stroke = Math.max(1, Math.round(density));
+        android.graphics.drawable.GradientDrawable rest =
+                new android.graphics.drawable.GradientDrawable();
+        rest.setCornerRadius(radius);
+        if (selected) {
+            rest.setColor(withAlpha(dockAccentColor, 0x2E));
+            rest.setStroke(stroke, dockAccentColor);
+        } else if (muted) {
+            rest.setColor(0x00000000);
+            rest.setStroke(stroke, dockUiLight ? 0x2225303B : 0x22FFFFFF);
+        } else {
+            rest.setColor(dockUiLight ? 0x0F25303B : 0x14FFFFFF);
+            rest.setStroke(stroke, dockUiLight ? 0x1A25303B : 0x1AFFFFFF);
+        }
+        android.graphics.drawable.GradientDrawable pressed =
+                new android.graphics.drawable.GradientDrawable();
+        pressed.setCornerRadius(radius);
+        pressed.setColor(withAlpha(dockAccentColor, 0x40));
+        pressed.setStroke(stroke, dockAccentColor);
+        android.graphics.drawable.StateListDrawable states =
+                new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[] { android.R.attr.state_pressed }, pressed);
+        states.addState(new int[0], rest);
+        return states;
+    }
+
+    private void dismissQuickMenu() {
+        if (quickMenuWindow == null) return;
+        try { quickMenuWindow.dismiss(); } catch (RuntimeException ignored) {}
+        quickMenuWindow = null;
+    }
+
+    private android.widget.PopupWindow quickMenuWindow;
 
     private void callViewerDock(String cmd) {
         if (webView == null || cmd == null) return;
