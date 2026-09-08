@@ -38,14 +38,15 @@ includesAll(html, [
   "{ id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' }",
   "{ id: 'tires', title: 'Tires', action: 'openTires' }",
   "{ id: 'clock', title: 'Clock', action: 'openDesktopStudio' }",
-  "{ id: 'driveMode', title: 'Drive mode', action: 'cycleDriveMode' }",
-  "{ id: 'powerMode', title: 'Power mode', action: 'cyclePowerMode' }",
-  "{ id: 'regen', title: 'Energy recovery', action: 'cycleRegenMode' }",
+  // Drive mode, power mode and energy recovery are one card now; the legacy
+  // cycle commands stay wired for native shells installed before the merge.
+  "{ id: 'driving', title: 'Driving controls', action: 'openDriving' }",
   "{ id: 'roof', title: 'Sunroof / shade', action: 'openRoofControls' }",
   "case 'openNavigation':",
   "case 'openClimate':",
   "case 'openConsumption':",
   "case 'openTires':",
+  "case 'openDriving':",
   "case 'cycleDriveMode':",
   "case 'cyclePowerMode':",
   "case 'cycleRegenMode':",
@@ -53,6 +54,10 @@ includesAll(html, [
 ], 'command wiring');
 assert.ok(!html.includes("{ id: 'consumption', title: 'Consumption', action: 'addWidget' }"), 'Consumption must not open addWidget');
 assert.ok(!html.includes("{ id: 'tires', title: 'Tires', action: 'openDesktopStudio' }"), 'Tires must not open Desktop Studio');
+for (const legacy of ['driveMode', 'powerMode', 'regen']) {
+  assert.ok(!html.includes("{ id: '" + legacy + "', title:"),
+    'legacy mode card ' + legacy + ' must be folded into the Driving card');
+}
 
 // CoffeeOS-style glance widgets remain page-owned cards: they are selectable
 // from the visual picker and render in both widget boards.
@@ -61,18 +66,21 @@ includesAll(html, [
   "clock: { label: 'CLOCK'",
   "navigation: { label: 'NAVIGATION'",
   "tires: { label: 'TIRES'",
+  "driving: { label: 'DRIVING'",
   "status: { label: 'STATUS'",
   "range: { label: 'RANGE'",
   'value="{{ wg.isProfile }}"',
   'value="{{ wg.isClock }}"',
   'value="{{ wg.isNavigation }}"',
   'value="{{ wg.isTires }}"',
+  'value="{{ wg.isDriving }}"',
   'value="{{ wg.isStatus }}"',
   'value="{{ wg.isRange }}"',
   "previewProfile: key === 'profile'",
   "previewClock: key === 'clock'",
   "previewNavigation: key === 'navigation'",
   "previewTires: key === 'tires'",
+  "previewDriving: key === 'driving'",
   "previewStatus: key === 'status'",
   "previewRange: key === 'range'",
 ], 'visual widget catalog');
@@ -93,11 +101,17 @@ includesAll(dockIndicators, [
   'Object.assign({',
   'bottomVisuals[card.id] || {}',
 ], 'graphic bottom-card payload');
-includesAll(method('_modeCardVisual'), [
-  "'DEMO · LOCAL PREVIEW'",
+// The unified Driving card carries the source vocabulary the audit requires:
+// a DEMO badge is never abbreviated, and an un-ready vehicle disables writes
+// rather than showing a plausible default.
+includesAll(method('_drivingWidgetView'), [
+  "'DEMO · SIMULATED · NOT VEHICLE'",
+  "'LOCAL PREVIEW · NOT A VEHICLE SETTING'",
+  "'UNAVAILABLE · VEHICLE NOT READY'",
+  "'PENDING · AWAITING VEHICLE STATE'",
   "'VEHICLE · LIVE'",
-  "'VEHICLE NOT READY'",
-], 'live-first mode card state');
+  "'STALE · VEHICLE STATE'",
+], 'live-first driving card state');
 includesAll(method('_setRoofLevelPopup'), [
   "classList.toggle('on'",
   "classList.toggle('lit'",

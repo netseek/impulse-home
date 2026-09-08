@@ -93,7 +93,10 @@ public final class MainActivity extends Activity {
                     // Navigation-only commands implemented by the web shell. They do not
                     // invoke vehicle APIs from Android.
                     "openClimate", "openConsumption", "openNavigation", "openPower",
-                    "openTires", "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
+                    "openTires", "openDriving",
+                    // Retained for native shells installed before the three mode
+                    // tiles were unified into one Driving controls card.
+                    "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
                     "openRoofControls"
             ));
 
