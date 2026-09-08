@@ -98,12 +98,21 @@ memory (`_regenLevelBeforeOnePedal`) is ours. Nothing on the bus reports a
 
 The mode glyphs are [Tabler Icons](https://github.com/tabler/tabler-icons)
 (MIT, © 2020-2024 Paweł Kuna) on the same 24x24 / 2px grid the cards already
-used: `leaf`, `road`, `bolt`, `snowflake`, `ripple`, `droplets`, `car-suv`.
+used: `leaf`, `road`, `bolt`, `snowflake`, `ripple`, `droplets`.
 
-`car-4wd` was the semantically exact icon for AWD, but its pill-shaped wheels
-read as blobs at 76dp beside six crisp abstract glyphs. The SUV silhouette
-carries the same "the whole car is driving" meaning with edges that survive
-the size.
+**AWD has no glyph — it is drawn as the boxed code `4×4`.** Three real icons
+were tried and each failed for a different reason: `car-4wd` is semantically
+exact but its pill-shaped wheels read as blobs at 52px, `car-suv` says "SUV"
+rather than "all four wheels are driven", and a bare `wheel` collides with
+both the Lama glyph and the steering control on the same screen. No icon set
+has a mark for this concept that survives the size, so it reuses the POWER
+card's treatment (`CAR_DRIVE_MODE_BADGES`, `drawCodeBadge`): type instead of
+line art, legible at any size, and the two identity-bearing cards now match.
+
+`CAR_REGEN_LEVEL_GLYPHS` is the other non-icon mark — three ascending bars for
+Baixo / Normal / Alto, the same low-mid-high shape the rail card draws. It
+carries the meaning the `LEVEL 1/2/3` line used to, now that the options are
+one line.
 
 They were hand-drawn first and it did not work. The shapes kept colliding with
 each other — tyre tread read as a barcode, a hub circle read as an eye, four
@@ -153,6 +162,27 @@ two ASSIST toggles silently fell back to the four-column default and clipped
 `ONE-PEDAL` to `O…`. The class was present in the markup and the container was
 the right width; only the rule was absent, which is a hard thing to spot by
 reading.
+
+## What the popup does not say twice
+
+Three lines were removed after review, all of them repeating something already
+on screen:
+
+- **The meta row** held the source badge and a summary (`ECO · HEV · RECOVERY
+  NORMAL`). Every group head already prints its own current value in bold, so
+  the summary was a third copy. The badge is required and stays — it moved up
+  beside the popup title, which is where a dialog's status belongs.
+- **The note under the controls** restated the badge in a sentence. It now
+  renders only when `controlsDisabled`, the one case where it says something
+  the badge cannot: *why* nothing on the card responds.
+- **The option's second line** (`ROAD`, `LEVEL 2`, `HYBRID EV`). The hints are
+  still in the group model and unused — bringing them back is re-adding one
+  `<small>` to the markup. Where a hint carried real meaning rather than a
+  restatement, a mark replaced it: recovery levels got their ascending bars.
+
+With those gone the popup is ~370px instead of the fixed 474, so it sizes to its
+content (`.hv-card-focus.fit`). Only Driving opts in; the other focused cards
+keep the fixed frame their layouts were built against.
 
 ## Layout
 

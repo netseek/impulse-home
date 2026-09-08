@@ -271,8 +271,31 @@ assert.equal(html.split('class="hv-driving {{ wg.drivingSizeClass }}"').length -
 assert.equal(html.split('class="hv-driving-chip-icon"').length - 1, 2,
   'both boards must render the chip icon');
 assert.match(html, /hasIcon: !!opt\.glyph/, 'chips take an optional leading icon');
-assert.match(html, /glyph: group\.key === 'car\.drive_setting\.drive_mode'/,
-  'drive options carry their glyph');
+includesAll(blockFrom(html, '  _drivingOptionGlyph(key, value) {', 'option glyph'), [
+  "key === 'car.drive_setting.drive_mode'",
+  "key === 'car.ev_setting.energy_recovery_level'",
+], 'options take their mark from one place');
+// Recovery levels lost their LEVEL 1/2/3 line when the second line went, so the
+// ascending bars carry that meaning instead.
+assert.match(html, /const CAR_REGEN_LEVEL_GLYPHS = \{/, 'recovery levels need their bars');
+for (const value of ['2', '0', '1']) {
+  assert.ok(new RegExp("'" + value + "': 'M ").test(
+    html.slice(html.indexOf('const CAR_REGEN_LEVEL_GLYPHS'),
+      html.indexOf('};', html.indexOf('const CAR_REGEN_LEVEL_GLYPHS')))),
+    'recovery level bar for ' + value);
+}
+// AWD is a code, not a picture: no icon set has a mark that says "all four
+// wheels are driven" and survives 52px, so it reuses the POWER card's boxed
+// treatment. It must therefore NOT be in the glyph table.
+assert.match(html, /const CAR_DRIVE_MODE_BADGES = \{ '11': '4×4' \};/, 'AWD code badge');
+assert.ok(!/'11': 'M /.test(html.slice(html.indexOf('const CAR_DRIVE_MODE_GLYPHS = {'),
+  html.indexOf('};', html.indexOf('const CAR_DRIVE_MODE_GLYPHS = {')))),
+  'AWD must not also carry a glyph path');
+includesAll(native, [
+  'private void drawCodeBadge(',
+  'if (!descriptor.glyphText.isEmpty())',
+  'String glyphText = cleanBottomCardText(raw.optString("glyphText", ""), 6);',
+], 'the rail draws the code badge');
 // A lit border is a weak way to say "on" for a toggle.
 assert.match(html, /state: group\.on \? 'ON' : 'OFF'/, 'toggles spell out their state');
 // The chip markup nests <sc-if> for the optional icon and state, so the block
@@ -309,9 +332,19 @@ assert.ok(!glance.includes('hv-driving-foot'),
 const popupStart = html.indexOf('<sc-if value="{{ focusedCardIsDriving }}"');
 assert.ok(popupStart >= 0, 'missing focused Driving popup');
 const popup = scIfBlock(html, popupStart);
+// The source badge sits beside the popup title now; the summary is gone
+// because every group head already prints its own value in bold, and the note
+// survives only where it explains why nothing responds.
+includesAll(html, [
+  'class="hv-card-focus-badge {{ focusedCardBadgeClass }}"',
+  'base.focusedCardBadge = view.drivingSource;',
+  'drivingShowNote: controlsDisabled,',
+], 'source badge moved to the header');
+assert.ok(!popup.includes('hv-driving-focus-meta'),
+  'the meta row repeated the badge and the group heads');
+assert.ok(!popup.includes('{{ dopt.hint }}'),
+  'the option second line is gone; the hint stays in the model to bring back');
 includesAll(popup, [
-  '{{ focusedDrivingSource }}',
-  '{{ focusedDrivingSummary }}',
   'list="{{ focusedDrivingGroups }}"',
   'list="{{ dg.options }}"',
   '{{ dopt.label }}',
@@ -348,12 +381,12 @@ assert.match(html, /Tabler Icons — Copyright \(c\) 2020-2024 Paweł Kuna — M
 assert.match(html, /scripts\/build-drive-mode-glyphs\.mjs/, 'glyph table names its generator');
 const glyphTable = html.slice(html.indexOf('const CAR_DRIVE_MODE_GLYPHS = {'),
   html.indexOf('};', html.indexOf('const CAR_DRIVE_MODE_GLYPHS = {')));
-for (const value of ['0', '1', '2', '3', '4', '5', '11']) {
+for (const value of ['0', '1', '2', '3', '4', '5']) {
   assert.match(glyphTable, new RegExp("'" + value + "': 'M "), 'glyph for drive mode ' + value);
 }
 // Only the flattened subset, or the native parser cannot draw it.
 const paths = glyphTable.match(/'M [^']+'/g) || [];
-assert.ok(paths.length >= 7, 'every drive mode needs a glyph');
+assert.ok(paths.length >= 6, 'every drive mode but AWD needs a glyph');
 for (const path of paths) {
   assert.ok(!/[^MLCZ0-9eE.\-\s']/.test(path),
     'glyphs must be flattened to absolute M/L/C/Z: ' + path.slice(0, 40));

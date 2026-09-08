@@ -950,11 +950,13 @@ public final class MainActivity extends Activity {
         final String longAction;
         /** Flattened glyph path (absolute M/L/C/Z on a 24x24 grid); may be empty. */
         final String glyph;
+        /** Short code drawn in place of a glyph (AWD's "4x4"); may be empty. */
+        final String glyphText;
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
                 String state, String[] wheelStates, String iconAction, String longAction,
-                String glyph) {
+                String glyph, String glyphText) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -969,6 +971,7 @@ public final class MainActivity extends Activity {
             this.iconAction = iconAction == null ? "" : iconAction;
             this.longAction = longAction == null ? "" : longAction;
             this.glyph = glyph == null ? "" : glyph;
+            this.glyphText = glyphText == null ? "" : glyphText;
         }
     }
 
@@ -1292,8 +1295,13 @@ public final class MainActivity extends Activity {
             float size = Math.min(w, h) * .68f;
             String mode = descriptor.state == null ? "" : descriptor.state;
             boolean known = !"unknown".equals(mode) && !mode.isEmpty();
-            drawGlyphPath(c, descriptor.glyph, w * .5f, h * .44f, size,
-                    known ? accent : muted, Math.max(2f, size * .085f));
+            if (!descriptor.glyphText.isEmpty()) {
+                drawCodeBadge(c, descriptor.glyphText, w * .5f, h * .44f,
+                        w * .60f, h * .40f, known ? accent : muted, known);
+            } else {
+                drawGlyphPath(c, descriptor.glyph, w * .5f, h * .44f, size,
+                        known ? accent : muted, Math.max(2f, size * .085f));
+            }
             drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
         }
 
@@ -1307,20 +1315,28 @@ public final class MainActivity extends Activity {
             String mode = descriptor.state == null ? "" : descriptor.state;
             boolean known = "hev".equals(mode) || "evp".equals(mode) || "ev".equals(mode);
             String code = known ? mode.toUpperCase(java.util.Locale.US) : "--";
-            int live = known ? accent : muted;
+            drawCodeBadge(c, code, w * .5f, h * .46f, w * .74f, h * .46f,
+                    known ? accent : muted, known);
+            drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
+        }
 
-            float cx = w * .5f, cy = h * .46f;
-            float boxW = w * .74f, boxH = h * .46f;
+        /**
+         * A short code in a rounded box — the POWER card's HEV / EVP / EV, and
+         * AWD's 4x4. Some modes have no mark that survives 52px, and type is
+         * always legible where line art is not.
+         */
+        private void drawCodeBadge(android.graphics.Canvas c, String code,
+                float cx, float cy, float boxW, float boxH, int color, boolean known) {
             oval.set(cx - boxW * .5f, cy - boxH * .5f, cx + boxW * .5f, cy + boxH * .5f);
-            fill(withAlpha(live, known ? 0x22 : 0x14));
+            fill(withAlpha(color, known ? 0x22 : 0x14));
             c.drawRoundRect(oval, boxH * .30f, boxH * .30f, paint);
-            stroke(live, Math.max(1.5f, w * .026f));
+            stroke(color, Math.max(1.5f, boxH * .042f));
             c.drawRoundRect(oval, boxH * .30f, boxH * .30f, paint);
 
             // Size to the box rather than to a constant: EVP is three glyphs
             // where EV is two, and a fixed size clips one or floats the other.
             paint.setStyle(android.graphics.Paint.Style.FILL);
-            paint.setColor(live);
+            paint.setColor(color);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL));
             paint.setTextAlign(android.graphics.Paint.Align.CENTER);
@@ -1334,8 +1350,6 @@ public final class MainActivity extends Activity {
             c.drawText(code, cx, cy - (fm.ascent + fm.descent) * .5f, paint);
             paint.setLetterSpacing(0f);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-
-            drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
         }
 
         /**
@@ -8033,6 +8047,7 @@ public final class MainActivity extends Activity {
             String longAction = raw.optString("longAction", "").trim();
             if (!BOTTOM_CARD_ACTIONS.contains(longAction)) longAction = "";
             String glyph = sanitizeGlyphPath(raw.optString("glyph", ""));
+            String glyphText = cleanBottomCardText(raw.optString("glyphText", ""), 6);
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
                             raw.optString("tireState", "unavailable")))
@@ -8044,7 +8059,7 @@ public final class MainActivity extends Activity {
                     : new String[] {"unavailable", "unavailable", "unavailable", "unavailable"};
             next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
                     action, primary, secondary, metricA, metricB, progress, state, wheelStates,
-                    iconAction, longAction, glyph));
+                    iconAction, longAction, glyph, glyphText));
         }
 
         int requested = root.has("bottomCardLimit")

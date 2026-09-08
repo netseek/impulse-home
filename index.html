@@ -4452,7 +4452,17 @@ window.HavalSplash = (function () {
     .hv-card-focus-backdrop.on { opacity:1; pointer-events:auto; }
     .hv-card-focus { position:absolute; z-index:85; left:50%; top:var(--hv-popup-top, 52px); bottom:var(--hv-popup-bottom-inset, 72px); width:min(760px,calc(100vw - 52px)); padding:16px; box-sizing:border-box; overflow:auto; color:var(--hv-widget-fg,#edf5fa); border:1px solid var(--hv-frost-edge,rgba(255,255,255,.18)); border-radius:22px; background:var(--hv-frost-bg,rgba(12,18,24,.88)); box-shadow:var(--hv-frost-shadow,0 18px 50px rgba(0,0,0,.38)); opacity:0; pointer-events:none; transform:translate(-50%,18px) scale(.985); transition:opacity .2s ease,transform .24s cubic-bezier(.2,.75,.2,1); }
     .hv-card-focus.on { opacity:1; pointer-events:auto; transform:translate(-50%,0) scale(1); }
-    .hv-card-focus-head { height:42px; display:flex; align-items:center; justify-content:space-between; font:9px/1 'Space Mono',monospace; letter-spacing:.15em; }
+    .hv-card-focus.fit { bottom:auto; max-height:calc(100% - var(--hv-popup-top, 52px) - var(--hv-popup-bottom-inset, 72px)); }
+    .hv-card-focus-head { height:42px; display:flex; align-items:center; gap:10px; font:9px/1 'Space Mono',monospace; letter-spacing:.15em; }
+    /* The close button holds the right edge whatever sits beside the title, so
+       the cards without a header badge look exactly as they did. */
+    .hv-card-focus-head button { margin-left:auto; }
+    .hv-card-focus-badge { display:none; }
+    .hv-card-focus-badge.on { display:inline-flex; align-items:center; min-height:24px; padding:0 9px; border:1px solid currentColor; border-radius:999px; font:7px/1 'Space Mono',monospace; letter-spacing:.08em; }
+    .hv-card-focus-badge.demo { color:#f0bd65; }
+    .hv-card-focus-badge.live { color:var(--hv-accent); }
+    .hv-card-focus-badge.pending { color:#f0bd65; }
+    .hv-card-focus-badge.stale,.hv-card-focus-badge.unavailable,.hv-card-focus-badge.preview { opacity:.6; }
     .hv-card-focus-head button { width:42px; height:42px; border:0; border-radius:12px; color:inherit; background:rgba(255,255,255,.07); font-size:21px; cursor:pointer; }
     .hv-card-focus .hv-climate,.hv-card-focus .hv-consumption { min-height:calc(100% - 42px); border-radius:16px; background:rgba(255,255,255,.035); }
     /* DRIVING popup. Same frame vocabulary as the Tires focus workspace: a
@@ -4460,14 +4470,7 @@ window.HavalSplash = (function () {
        controls. Options are buttons, not a cycle, so one tap writes the raw
        CAN value the vehicle expects. */
     .hv-driving-focus { min-height:calc(100% - 42px); padding:18px; box-sizing:border-box; border-radius:16px; background:var(--hv-frost-inner); }
-    .hv-driving-focus-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-    .hv-driving-focus-source { display:inline-flex; align-items:center; min-height:28px; padding:0 10px; border:1px solid var(--hv-frost-edge); border-radius:999px; font:7px/1 'Space Mono',monospace; letter-spacing:.08em; }
-    .hv-driving-focus-source.live { color:var(--hv-accent); border-color:currentColor; }
-    .hv-driving-focus-source.demo { color:#f0bd65; border-color:currentColor; }
-    .hv-driving-focus-source.pending { color:#f0bd65; }
-    .hv-driving-focus-source.stale,.hv-driving-focus-source.unavailable,.hv-driving-focus-source.preview { opacity:.62; }
-    .hv-driving-focus-summary { font:600 11px/1.2 'Space Grotesk',sans-serif; letter-spacing:.04em; text-align:right; }
-    .hv-driving-focus-groups { display:grid; grid-template-columns:1fr 1fr; column-gap:16px; row-gap:12px; margin-top:14px; align-content:start; }
+    .hv-driving-focus-groups { display:grid; grid-template-columns:1fr 1fr; column-gap:16px; row-gap:12px; margin-top:2px; align-content:start; }
     /* DRIVE is the only group with more than three options, so it keeps the
        full width and the other four pair up beside each other. */
     .hv-driving-focus-groups > .hv-driving-group:first-child { grid-column:1 / -1; }
@@ -4477,10 +4480,12 @@ window.HavalSplash = (function () {
     .hv-driving-options { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; margin-top:8px; }
     .hv-driving-options.cols-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
     .hv-driving-options.cols-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .hv-driving-option { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:3px; min-height:46px; padding:8px 10px; border:1px solid var(--hv-frost-edge); border-radius:13px; background:var(--hv-frost-inner); color:inherit; text-align:left; cursor:pointer; -webkit-appearance:none; appearance:none; }
+    .hv-driving-option { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:3px; min-height:42px; padding:8px 10px; border:1px solid var(--hv-frost-edge); border-radius:13px; background:var(--hv-frost-inner); color:inherit; text-align:left; cursor:pointer; -webkit-appearance:none; appearance:none; }
     .hv-driving-option strong { max-width:100%; font:600 13px/1 'Space Grotesk',sans-serif; letter-spacing:.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .hv-driving-option small { font:6px/1 'Space Mono',monospace; letter-spacing:.1em; opacity:.5; }
-    .hv-driving-option-icon { position:absolute; right:10px; top:10px; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; opacity:.7; }
+    .hv-driving-option-badge { position:absolute; right:10px; top:50%; transform:translateY(-50%); font-style:normal; font-weight:700; font-size:12px; letter-spacing:.04em; opacity:.85; }
+    .hv-driving-option.on .hv-driving-option-badge { opacity:1; }
+    .hv-driving-option-icon { position:absolute; right:10px; top:50%; margin-top:-8px; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; opacity:.7; }
     .hv-driving-option.on .hv-driving-option-icon { opacity:1; }
     .hv-driving-toggle { flex-direction:row; align-items:center; justify-content:space-between; gap:8px; }
     .hv-driving-toggle-copy { display:flex; flex-direction:column; gap:3px; min-width:0; }
@@ -4492,8 +4497,6 @@ window.HavalSplash = (function () {
     .hv-driving-note { margin-top:12px; font:7px/1.55 'Space Mono',monospace; letter-spacing:.06em; opacity:.5; }
     @media (max-width: 640px) {
       .hv-driving-focus { padding:12px; }
-      .hv-driving-focus-meta { align-items:flex-start; flex-direction:column; gap:7px; }
-      .hv-driving-focus-summary { text-align:left; }
       .hv-driving-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
       .hv-driving-focus-groups { grid-template-columns:minmax(0,1fr); }
     }
@@ -5461,7 +5464,7 @@ window.HavalSplash = (function () {
        CSS variables so it cannot cover the launcher/dock on Android. -->
   <div class="hv-card-focus-backdrop {{ focusedCardBackdropClass }}" onClick="{{ closeFocusedCard }}"></div>
   <section class="hv-card-focus {{ focusedCardPopupClass }}" role="dialog" aria-label="{{ focusedCardTitle }}">
-    <header class="hv-card-focus-head"><span>{{ focusedCardTitle }}</span><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
+    <header class="hv-card-focus-head"><span>{{ focusedCardTitle }}</span><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
     <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}">
       <div class="hv-climate hv-climate-2x2">
         <div class="hv-climate-head"><span>CLIMATE</span><small>{{ focusedClimateCurrent }}</small></div><div role="status" style="font:7px/1.25 'Space Mono',monospace;letter-spacing:.06em;color:#f0bd65;margin:-1px 0 3px;">{{ focusedClimateHelper }}</div>
@@ -5506,17 +5509,13 @@ window.HavalSplash = (function () {
     </sc-if>
     <sc-if value="{{ focusedCardIsDriving }}" hint-placeholder-val="{{ false }}">
       <div class="hv-driving-focus">
-        <div class="hv-driving-focus-meta">
-          <span class="hv-driving-focus-source {{ focusedDrivingSourceClass }}">{{ focusedDrivingSource }}</span>
-          <strong class="hv-driving-focus-summary">{{ focusedDrivingSummary }}</strong>
-        </div>
         <div class="hv-driving-focus-groups">
         <sc-for list="{{ focusedDrivingGroups }}" as="dg" hint-placeholder-count="4">
           <section class="hv-driving-group">
             <div class="hv-driving-group-head"><span>{{ dg.label }}</span><em>{{ dg.state }}</em></div>
             <div class="hv-driving-options {{ dg.colsClass }}">
               <sc-for list="{{ dg.options }}" as="dopt" hint-placeholder-count="3">
-                <button type="button" class="hv-driving-option {{ dopt.cls }}" onClick="{{ dopt.onClick }}" disabled="{{ dopt.disabled }}" aria-disabled="{{ dopt.disabled }}" aria-pressed="{{ dopt.pressed }}"><sc-if value="{{ dopt.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-option-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dopt.icon }}"></path></svg></sc-if><strong>{{ dopt.label }}</strong><small>{{ dopt.hint }}</small></button>
+                <button type="button" class="hv-driving-option {{ dopt.cls }}" onClick="{{ dopt.onClick }}" disabled="{{ dopt.disabled }}" aria-disabled="{{ dopt.disabled }}" aria-pressed="{{ dopt.pressed }}"><sc-if value="{{ dopt.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-option-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dopt.icon }}"></path></svg></sc-if><sc-if value="{{ dopt.hasBadge }}" hint-placeholder-val="{{ false }}"><em class="hv-driving-option-badge">{{ dopt.badge }}</em></sc-if><strong>{{ dopt.label }}</strong></button>
               </sc-for>
             </div>
           </section>
@@ -5525,12 +5524,12 @@ window.HavalSplash = (function () {
           <div class="hv-driving-group-head"><span>{{ focusedDrivingAssistLabel }}</span></div>
           <div class="hv-driving-options cols-2">
             <sc-for list="{{ focusedDrivingToggles }}" as="dtg" hint-placeholder-count="2">
-              <button type="button" class="hv-driving-option hv-driving-toggle {{ dtg.cls }}" onClick="{{ dtg.onClick }}" disabled="{{ dtg.disabled }}" aria-disabled="{{ dtg.disabled }}" aria-pressed="{{ dtg.pressed }}"><span class="hv-driving-toggle-copy"><strong>{{ dtg.label }}</strong><small>{{ dtg.hint }}</small></span><em>{{ dtg.state }}</em></button>
+              <button type="button" class="hv-driving-option hv-driving-toggle {{ dtg.cls }}" onClick="{{ dtg.onClick }}" disabled="{{ dtg.disabled }}" aria-disabled="{{ dtg.disabled }}" aria-pressed="{{ dtg.pressed }}"><span class="hv-driving-toggle-copy"><strong>{{ dtg.label }}</strong></span><em>{{ dtg.state }}</em></button>
             </sc-for>
           </div>
         </section>
         </div>
-        <div class="hv-driving-note">{{ focusedDrivingNote }}</div>
+        <sc-if value="{{ focusedDrivingShowNote }}" hint-placeholder-val="{{ false }}"><div class="hv-driving-note">{{ focusedDrivingNote }}</div></sc-if>
       </div>
     </sc-if>
   </section>
@@ -6474,7 +6473,6 @@ const CAR_DRIVE_MODE_GLYPHS = {
   '3': 'M 10 4 L 12 5 L 14 4 M 12 2 L 12 8.5 L 15 10.22 M 17.93 6.27 L 18.06 8.5 L 19.93 9.73 M 20.66 7 L 15.03 10.25 L 15.04 13.71 M 19.93 14.27 L 18.06 15.5 L 17.93 17.73 M 20.66 17 L 15.03 13.75 L 12.04 15.49 M 14 20 L 12 19 L 10 20 M 12 22 L 12 15.5 L 9 13.78 M 6.07 17.73 L 5.94 15.5 L 4.07 14.27 M 3.34 17 L 8.97 13.75 L 8.96 10.29 M 4.07 9.73 L 5.94 8.5 L 6.07 6.27 M 3.34 7 L 8.97 10.25 L 11.96 8.51',   // tabler snowflake
   '4': 'M 3 7 C 6 5 9 5 12 7 C 15 9 18 9 21 7 M 3 17 C 6 15 9 15 12 17 C 15 19 18 19 21 17 M 3 12 C 6 10 9 10 12 12 C 15 14 18 14 21 12',   // tabler ripple
   '5': 'M 4.07 20.3 C 5.19 21.24 6.81 21.24 7.93 20.3 C 9.04 19.36 9.32 17.76 8.6 16.5 L 6.5 13.28 C 6.39 13.11 6.2 13 6 13 C 5.8 13 5.61 13.11 5.5 13.28 L 3.4 16.5 C 2.67 17.76 2.96 19.36 4.07 20.3 M 16.07 20.3 C 17.19 21.24 18.81 21.24 19.93 20.3 C 21.04 19.36 21.32 17.76 20.6 16.5 L 18.5 13.28 C 18.39 13.11 18.2 13 18 13 C 17.8 13 17.61 13.11 17.5 13.28 L 15.4 16.5 C 14.67 17.76 14.96 19.36 16.07 20.3 M 10.07 10.3 C 11.19 11.24 12.81 11.24 13.93 10.3 C 15.04 9.36 15.32 7.76 14.6 6.5 L 12.5 3.28 C 12.39 3.11 12.2 3 12 3 C 11.8 3 11.61 3.11 11.5 3.28 L 9.4 6.5 C 8.67 7.76 8.96 9.36 10.07 10.3 L 10.07 10.3',   // tabler droplets
-  '11': 'M 5 17 C 5 18.1 5.9 19 7 19 C 8.1 19 9 18.1 9 17 C 9 15.9 8.1 15 7 15 C 5.9 15 5 15.9 5 17 M 16 17 C 16 18.1 16.9 19 18 19 C 19.1 19 20 18.1 20 17 C 20 15.9 19.1 15 18 15 C 16.9 15 16 15.9 16 17 M 5 9 L 7 5 L 14.44 5 C 15.36 5 16.16 5.62 16.38 6.52 L 17 9 L 20 9 C 21.1 9 22 9.9 22 11 L 22 14 M 10 9 L 10 5 M 2 7 L 2 11 M 22 14 C 21.06 12.74 19.57 12 18 12 C 16.43 12 14.94 12.74 14 14 L 11 14 C 10.06 12.74 8.57 12 7 12 C 5.42 12 3.94 12.74 3 14 M 5 12 L 5 9 L 18 9',   // tabler car-suv
 };
 /**
  * Secondary line under each option in the popup. These describe the OEM concept
@@ -6494,6 +6492,23 @@ const CAR_DRIVE_MODE_CARD_STATES = {
 const CAR_POWER_MODE_CARD_STATES = { '0': 'hev', '1': 'evp', '3': 'ev' };
 /** Spelled-out power modes for the rail card's value line. */
 const CAR_POWER_MODE_LONG_LABELS = { '0': 'Hybrid EV', '1': 'Prioritary EV', '3': 'Full Electric' };
+/**
+ * Drive modes drawn as a boxed code rather than a glyph. Same treatment as the
+ * POWER card's HEV / EVP / EV, so the two identity-bearing cards match.
+ */
+const CAR_DRIVE_MODE_BADGES = { '11': '4×4' };
+
+/**
+ * Energy-recovery levels as ascending bars — the same low/mid/high shape the
+ * rail card draws. With the option's second line gone these carry the "which
+ * level is this" meaning that the LEVEL 1/2/3 text used to.
+ */
+const CAR_REGEN_LEVEL_GLYPHS = {
+  '2': 'M 6 19 L 6 14',                                   // Baixo — one bar
+  '0': 'M 6 19 L 6 14 M 12 19 L 12 10',                   // Normal — two
+  '1': 'M 6 19 L 6 14 M 12 19 L 12 10 M 18 19 L 18 6',    // Alto — three
+};
+
 const CAR_MODE_OPTION_HINTS = {
   'car.drive_setting.drive_mode': {
     '2': 'ROAD', '0': 'ROAD', '1': 'ROAD',
@@ -29087,12 +29102,16 @@ class Component extends DCLogic {
   _focusedCardRenderFields(s) {
     const type = s.focusedCardType;
     const base = {
-      focusedCardPopupClass: type ? 'on' : '', focusedCardBackdropClass: type ? 'on' : '',
+      // Driving sizes to its content now that it fits; the others keep the
+      // fixed frame their layouts were built against.
+      focusedCardPopupClass: (type ? 'on' : '') + (type === 'driving' ? ' fit' : ''),
+      focusedCardBackdropClass: type ? 'on' : '',
       focusedCardTitle: type === 'consumption' ? 'CONSUMPTION'
         : (type === 'tires' ? 'TYRE PRESSURE'
           : (type === 'driving' ? 'DRIVING CONTROLS' : 'CLIMATE')),
       focusedCardIsClimate: type === 'climate', focusedCardIsConsumption: type === 'consumption',
       focusedCardIsTires: type === 'tires', focusedCardIsDriving: type === 'driving',
+      focusedCardBadge: '', focusedCardBadgeClass: '',
       closeFocusedCard: () => this._closeFocusedCard(),
     };
     if (!type) return base;
@@ -29104,6 +29123,12 @@ class Component extends DCLogic {
     Object.keys(view).forEach((key) => {
       if (key.indexOf(type) === 0) base['focused' + key.charAt(0).toUpperCase() + key.slice(1)] = view[key];
     });
+    // Driving shows its source beside the popup title rather than in a row of
+    // its own. Tires keeps its in-body pill, so it is not lifted here.
+    if (type === 'driving') {
+      base.focusedCardBadge = view.drivingSource;
+      base.focusedCardBadgeClass = 'on ' + view.drivingSourceClass;
+    }
     return base;
   }
 
@@ -29546,7 +29571,18 @@ class Component extends DCLogic {
    * group stays "—" — a plausible default here would be indistinguishable from
    * a vehicle reading.
    */
+  /**
+   * The mark an option carries, if any. Drive modes have their own glyph;
+   * recovery levels get the ascending bars; everything else is text alone.
+   */
+  _drivingOptionGlyph(key, value) {
+    if (key === 'car.drive_setting.drive_mode') return CAR_DRIVE_MODE_GLYPHS[value] || '';
+    if (key === 'car.ev_setting.energy_recovery_level') return CAR_REGEN_LEVEL_GLYPHS[value] || '';
+    return '';
+  }
+
   _drivingGroupModel(group, demoValue, label, colsClass, controlsDisabled) {
+    const optionGlyph = (key, value) => this._drivingOptionGlyph(key, value);
     const raw = String(this.state[group.stateKey] || '');
     const index = group.options.findIndex((opt) => opt.value === raw);
     const hasSignal = !!(this._carSignalAt && this._carSignalAt[group.key]);
@@ -29571,11 +29607,13 @@ class Component extends DCLogic {
       options: group.options.map((opt, i) => ({
         label: opt.label,
         hint: hints[opt.value] || '',
-        glyph: group.key === 'car.drive_setting.drive_mode'
-          ? (CAR_DRIVE_MODE_GLYPHS[opt.value] || '') : '',
-        hasIcon: group.key === 'car.drive_setting.drive_mode' && !!CAR_DRIVE_MODE_GLYPHS[opt.value],
-        icon: group.key === 'car.drive_setting.drive_mode'
-          ? (CAR_DRIVE_MODE_GLYPHS[opt.value] || '') : '',
+        glyph: optionGlyph(group.key, opt.value),
+        hasIcon: !!optionGlyph(group.key, opt.value),
+        icon: optionGlyph(group.key, opt.value),
+        badge: group.key === 'car.drive_setting.drive_mode'
+          ? (CAR_DRIVE_MODE_BADGES[opt.value] || '') : '',
+        hasBadge: group.key === 'car.drive_setting.drive_mode'
+          && !!CAR_DRIVE_MODE_BADGES[opt.value],
         cls: i === shown ? 'on' : '',
         pressed: i === shown,
         disabled: !!controlsDisabled,
@@ -29737,8 +29775,9 @@ class Component extends DCLogic {
           // carries each mode's own glyph next to the word.
           hasIcon: !!opt.glyph,
           icon: opt.glyph || '',
-          hasState: false,
-          state: '',
+          // AWD has no glyph; it wears its code where the icon would go.
+          hasState: !!opt.badge,
+          state: opt.badge || '',
           onClick: (ev) => { this._cardControlEvent(ev); opt.onClick(); },
         })),
       };
@@ -29791,6 +29830,9 @@ class Component extends DCLogic {
       drivingSourceClass: sourceClass,
       drivingSummary: summary,
       drivingNote: note,
+      // Only when the note explains something the badge cannot: why nothing on
+      // this card responds. Otherwise it was the badge again, in a sentence.
+      drivingShowNote: controlsDisabled,
       drivingMode: drive.optionLabel,
       drivingModeKicker: drive.index >= 0
         ? ((CAR_MODE_OPTION_HINTS[drive.key] || {})[drive.value] || 'DRIVE MODE') + ' MODE'
@@ -30301,6 +30343,7 @@ class Component extends DCLogic {
     const roadAt = ['2', '0', '1'].indexOf(drivingGroup(0).value);
     driveModeVisual.progress = roadAt >= 0 ? Math.round((roadAt + 1) * 100 / 3) : 0;
     driveModeVisual.glyph = CAR_DRIVE_MODE_GLYPHS[drivingGroup(0).value] || '';
+    driveModeVisual.glyphText = CAR_DRIVE_MODE_BADGES[drivingGroup(0).value] || '';
     // The graphic already draws HEV / EVP / EV, so the value line spells it out
     // rather than repeating the code.
     const powerModeVisual = drivingVisual(1, CAR_POWER_MODE_CARD_STATES[drivingGroup(1).value] || 'unknown');
@@ -30431,6 +30474,7 @@ class Component extends DCLogic {
         iconAction: card.iconAction || '',
         longAction: card.longAction || '',
         glyph: '',
+        glyphText: '',
       }, bottomVisuals[card.id] || {}));
     const payload = {
       model: this._currentTrim().label,
