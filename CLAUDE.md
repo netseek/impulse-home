@@ -115,6 +115,29 @@ explains it. Measure the specific change; do not reason from this table.
   the models roughly 3x on disk (HEV 11.3 -> 34.6 MB) in exchange for 4 MB of
   VRAM per 2048 map instead of 16 MB.
 
+## Card, widget, popup are three different surfaces
+
+Three things get called "the card" and a change verified on one can be broken
+on another. **See `docs/ui-surfaces.md` for the full contract.** The short form:
+
+| Term | Where | Drawn by |
+| --- | --- | --- |
+| **card** | the launcher rail along the bottom | **native Android**, not HTML |
+| **widget** | the reserved boards left/right of the car | the WebView |
+| **popup** | floating over everything | the WebView |
+
+Three traps worth knowing before you touch any of them:
+
+- **A card is painted natively.** `QuickCardGraphicView.onDraw` switches on the
+  card id and anything with no `case` falls through to a generic progress ring.
+  Adding an id to `H6_BOTTOM_CARD_CATALOG` without adding its `case` ships a
+  card that looks blank, and no web-side test or screenshot will catch it.
+- **Widget board markup is duplicated.** The left and right boards each carry a
+  full copy, so every `<sc-if value="{{ wg.isX }}">` block has to be added twice.
+- **A popup needs no second builder.** `_focusedCardRenderFields` re-exports any
+  widget-view key starting with the card type, prefixed with `focused`. Build the
+  popup's data in the widget view builder and let the prefixing carry it.
+
 ## Editing GLB assets
 
 Shipped car models are tuned for **load time**, not just appearance. Before

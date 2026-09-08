@@ -38,9 +38,11 @@ includesAll(html, [
   "{ id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' }",
   "{ id: 'tires', title: 'Tires', action: 'openTires' }",
   "{ id: 'clock', title: 'Clock', action: 'openDesktopStudio' }",
-  // Drive mode, power mode and energy recovery are one card now; the legacy
-  // cycle commands stay wired for native shells installed before the merge.
-  "{ id: 'driving', title: 'Driving controls', action: 'openDriving' }",
+  // The three driving tiles share one destination: the card body opens the
+  // DRIVING popup, the icon keeps the per-mode quick change.
+  "{ id: 'driveMode', title: 'Drive mode', action: 'openDriving', iconAction: 'cycleDriveMode' }",
+  "{ id: 'powerMode', title: 'Power mode', action: 'openDriving', iconAction: 'cyclePowerMode' }",
+  "{ id: 'regen', title: 'Energy recovery', action: 'openDriving', iconAction: 'cycleRegenMode' }",
   "{ id: 'roof', title: 'Sunroof / shade', action: 'openRoofControls' }",
   "case 'openNavigation':",
   "case 'openClimate':",
@@ -54,10 +56,6 @@ includesAll(html, [
 ], 'command wiring');
 assert.ok(!html.includes("{ id: 'consumption', title: 'Consumption', action: 'addWidget' }"), 'Consumption must not open addWidget');
 assert.ok(!html.includes("{ id: 'tires', title: 'Tires', action: 'openDesktopStudio' }"), 'Tires must not open Desktop Studio');
-for (const legacy of ['driveMode', 'powerMode', 'regen']) {
-  assert.ok(!html.includes("{ id: '" + legacy + "', title:"),
-    'legacy mode card ' + legacy + ' must be folded into the Driving card');
-}
 
 // CoffeeOS-style glance widgets remain page-owned cards: they are selectable
 // from the visual picker and render in both widget boards.

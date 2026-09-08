@@ -42,30 +42,35 @@ function includesAll(source, values, label) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. One card, not three. The bottom-bar catalog carries a single Driving entry
-//    and saved desktops that still name the old tiles are migrated, not dropped.
+// 1. Three rail tiles, one destination.
+//
+//    The rail stays glanceable with a small readout per mode, but every tile's
+//    BODY opens the same popup. Only the icon keeps a per-mode quick action, so
+//    a tap on the card can never change a setting the driver did not aim at.
 // ---------------------------------------------------------------------------
 const catalogStart = html.indexOf('const H6_BOTTOM_CARD_CATALOG');
 assert.ok(catalogStart >= 0, 'missing bottom-card catalog');
 const catalog = html.slice(catalogStart, html.indexOf('];', catalogStart) + 2);
-assert.match(catalog,
-  /\{\s*id:\s*['"]driving['"]\s*,\s*title:\s*['"]Driving controls['"]\s*,\s*action:\s*['"]openDriving['"]\s*\}/,
-  'Driving catalog action must be openDriving');
-for (const legacy of ['driveMode', 'powerMode', 'regen']) {
-  assert.doesNotMatch(catalog, new RegExp(`id:\\s*['"]${legacy}['"]`),
-    `${legacy} must be folded into the unified Driving card`);
+const railTiles = [
+  ['driveMode', 'Drive mode', 'cycleDriveMode'],
+  ['powerMode', 'Power mode', 'cyclePowerMode'],
+  ['regen', 'Energy recovery', 'cycleRegenMode'],
+];
+for (const [id, title, iconAction] of railTiles) {
+  assert.match(catalog,
+    new RegExp(`\\{\\s*id:\\s*'${id}'\\s*,\\s*title:\\s*'${title}'\\s*,\\s*action:\\s*'openDriving'\\s*,\\s*iconAction:\\s*'${iconAction}'\\s*\\}`),
+    `${id} must open the Driving popup and quick-cycle from its icon`);
 }
+assert.doesNotMatch(catalog, /id:\s*'driving'/,
+  'the rail carries the three tiles, not a fourth combined card');
 assert.doesNotMatch(catalog,
-  /id:\s*['"]driving['"][^}]*action:\s*['"]openDesktopStudio['"]/,
-  'Driving must not route to Desktop Studio');
+  /id:\s*'(driveMode|powerMode|regen)'[^}]*action:\s*'cycle/,
+  'a tap on the card body must open the popup, never cycle a mode');
 
-const normalize = blockFrom(html, '  _normalizeBottomCards(', 'bottom-card normaliser');
-includesAll(normalize, [
-  'H6_DRIVING_LEGACY_CARD_IDS',
-  "'driving'",
-], 'legacy bottom-card migration');
-assert.match(html, /const H6_DRIVING_LEGACY_CARD_IDS = \['driveMode', 'powerMode', 'regen'\];/,
-  'legacy id list must name all three replaced tiles');
+// The payload has to carry the icon's command, and it is allow-listed natively
+// exactly like the card's.
+const dockIndicatorsEarly = blockFrom(html, '  _syncDockIndicators(', 'dock indicator payload');
+includesAll(dockIndicatorsEarly, ["iconAction: card.iconAction || ''"], 'iconAction reaches the rail');
 
 // ---------------------------------------------------------------------------
 // 2. Command wiring: web command, native allow-list, focused workspace.
@@ -90,6 +95,21 @@ includesAll(nativeActions, ['"cycleDriveMode"', '"cyclePowerMode"', '"cycleRegen
 // ---------------------------------------------------------------------------
 assert.match(html, /const CAR_MODE_GROUP_INDEX = \{ drive: 0, power: 1, steer: 2, regen: 3 \};/,
   'group index must be declared by name');
+// The retired MODES widget is migrated, not dropped: a saved layout is the
+// user's arrangement and an unknown type would silently blank the slot.
+assert.match(html, /const H6_DRIVING_LEGACY_WIDGET_TYPES = \{ modes: 'driving' \};/,
+  'retired widget types must be named');
+includesAll(blockFrom(html, '  _migrateRetiredWidgetTypes(layout) {', 'widget migration'),
+  ['H6_DRIVING_LEGACY_WIDGET_TYPES[item.type]', 'item.type = next'], 'retype in place');
+includesAll(blockFrom(html, '  _parseWidgetLayout(raw) {', 'layout parser'),
+  ['this._migrateRetiredWidgetTypes(parsed)'], 'migration runs on every load');
+// MODES is gone: two widgets offering the same four groups, one of them unusable
+// on the light board, is the worse outcome.
+for (const token of ["modes: { label: 'MODES'", 'wg.isModes', 'hv-modes-chip',
+  '_modeWidgetView', '_modeStackRows', "previewModes: key === 'modes'"]) {
+  assert.ok(!html.includes(token), `retired MODES widget leftover: ${token}`);
+}
+
 const view = blockFrom(html, '  _drivingWidgetView(item) {', 'driving view builder');
 includesAll(view, [
   'CAR_MODE_GROUP_INDEX[name]',
@@ -261,10 +281,42 @@ for (const size of ['1x1', '2x1', '3x1', '1x2']) {
 const dockIndicators = blockFrom(html, '  _syncDockIndicators(', 'dock indicator payload');
 includesAll(dockIndicators, [
   "const driving = this._drivingWidgetView({ type: 'driving', w: 2, h: 1 });",
-  'driving: drivingVisual,',
+  'driveMode: driveModeVisual,',
+  'powerMode: powerModeVisual,',
+  'regen: regenVisual,',
   'secondary: driving.drivingSource,',
-], 'native Driving quick card');
+], 'native Driving quick cards');
+// All three tiles read from the one builder, so a mode cannot say one thing on
+// the rail and another in the popup.
+includesAll(dockIndicators, [
+  'const drivingGroup = (index) => driving.drivingGroups[index];',
+  'CAR_DRIVE_MODE_CARD_STATES[drivingGroup(0).value]',
+  'CAR_POWER_MODE_CARD_STATES[drivingGroup(1).value]',
+], 'rail tiles share the card builder');
 assert.ok(!dockIndicators.includes('_modeCardVisual'),
   'the replaced per-mode quick-card builder must be gone');
+
+// The native rail draws the selected mode's own glyph, so the state vocabulary
+// on both sides has to stay in step.
+for (const state of ['eco', 'normal', 'sport', 'snow', 'sand', 'mud', 'awd']) {
+  assert.ok(html.includes(`'${state}'`), `web drive-mode state ${state}`);
+  assert.ok(native.includes(`case "${state}":`), `native drive-mode state ${state}`);
+}
+for (const state of ['hev', 'evp', 'ev']) {
+  assert.ok(native.includes(`case "${state}":`), `native power-mode state ${state}`);
+}
+includesAll(native, [
+  'private String sanitizeDrivingState(String value)',
+  'DRIVING_CARD_IDS',
+  'private void drawStepDots(',
+  'private void drawUnitPath(',
+], 'native rail graphics');
+// A tap on the graphic is a command, so it passes the same allow-list as a tap
+// on the card; an unknown one degrades to no icon action.
+includesAll(native, [
+  'String iconAction = raw.optString("iconAction", "").trim();',
+  'if (!BOTTOM_CARD_ACTIONS.contains(iconAction)) iconAction = "";',
+  'graphic.setOnClickListener(v -> callViewerDock(iconCommand));',
+], 'icon quick action is gated');
 
 console.log('Driving card contracts: ok');

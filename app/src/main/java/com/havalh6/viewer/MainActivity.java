@@ -939,10 +939,16 @@ public final class MainActivity extends Activity {
         /** Dynamic Tires semantics; deliberately excluded from structural comparison. */
         final String state;
         final String[] wheelStates;
+        /**
+         * Command for a tap on the graphic alone, empty when the icon is not a
+         * control. The card body always runs {@link #action}; this is the quick
+         * change that saves opening the popup for a one-step adjustment.
+         */
+        final String iconAction;
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
-                String state, String[] wheelStates) {
+                String state, String[] wheelStates, String iconAction) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -954,6 +960,7 @@ public final class MainActivity extends Activity {
             this.progress = Math.max(0, Math.min(100, progress));
             this.state = state;
             this.wheelStates = wheelStates;
+            this.iconAction = iconAction == null ? "" : iconAction;
         }
     }
 
@@ -997,9 +1004,9 @@ public final class MainActivity extends Activity {
                 case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
                 case "clock": drawClock(canvas, w, h, accent, muted, strong); break;
                 case "desktops": drawDesktops(canvas, w, h, accent, muted); break;
-                case "driveMode": drawDriveMode(canvas, w, h, accent, muted); break;
-                case "powerMode": drawPowerMode(canvas, w, h, accent, muted); break;
-                case "regen": drawRegen(canvas, w, h, accent, muted); break;
+                case "driveMode": drawDriveMode(canvas, w, h, accent, muted, strong); break;
+                case "powerMode": drawPowerMode(canvas, w, h, accent, muted, strong); break;
+                case "regen": drawRegen(canvas, w, h, accent, muted, strong); break;
                 case "roof": drawRoof(canvas, w, h, accent, muted, strong); break;
                 default: drawRing(canvas, w, h, accent, muted, false); break;
             }
@@ -1262,65 +1269,230 @@ public final class MainActivity extends Activity {
             c.drawCircle(cx, cy, Math.max(3f, w * .045f), paint);
         }
 
+        /**
+         * The three driving rail cards draw the SELECTED mode's own glyph, not a
+         * generic gauge — the same identity the DRIVING widget and popup use, so
+         * one mode reads as one thing everywhere. `descriptor.state` carries which
+         * mode; an unknown value falls back to the neutral steering wheel rather
+         * than picking a mode we were not told about.
+         *
+         * Each glyph is drawn into a unit box and scaled once, so adding a mode is
+         * a path, not a new set of magic ratios.
+         */
         private void drawDriveMode(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            stroke(muted, Math.max(3f, w * .04f));
-            c.drawLine(w * .18f, h * .82f, w * .40f, h * .25f, paint);
-            c.drawLine(w * .82f, h * .82f, w * .60f, h * .25f, paint);
-            stroke(accent, Math.max(2f, w * .028f));
-            c.drawLine(w * .50f, h * .78f, w * .50f, h * .25f, paint);
-            fill(accent);
-            float y = h * (.78f - .52f * descriptor.progress / 100f);
-            c.drawCircle(w * .50f, y, Math.max(4f, w * .07f), paint);
-            stroke(accent, Math.max(2f, w * .028f));
-            c.drawLine(w * .46f, y + w * .05f, w * .50f, y + w * .10f, paint);
-            c.drawLine(w * .50f, y + w * .10f, w * .54f, y + w * .05f, paint);
-        }
-
-        private void drawPowerMode(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            float l = w * .16f, t = h * .28f, r = w * .82f, b = h * .72f;
-            stroke(muted, Math.max(3f, w * .04f));
-            c.drawRoundRect(l, t, r, b, w * .10f, w * .10f, paint);
-            fill(muted);
-            c.drawRoundRect(r, h * .43f, w * .90f, h * .57f, w * .03f, w * .03f, paint);
-            fill(withAlpha(accent, 0x88));
-            c.drawRoundRect(l + w * .08f, t + h * .10f,
-                    l + w * .08f + (r - l - w * .16f) * descriptor.progress / 100f,
-                    b - h * .10f, w * .04f, w * .04f, paint);
-            android.graphics.Path bolt = new android.graphics.Path();
-            bolt.moveTo(w * .57f, h * .15f);
-            bolt.lineTo(w * .40f, h * .52f);
-            bolt.lineTo(w * .53f, h * .52f);
-            bolt.lineTo(w * .45f, h * .86f);
-            bolt.lineTo(w * .70f, h * .43f);
-            bolt.lineTo(w * .56f, h * .43f);
-            bolt.close();
-            fill(accent);
-            c.drawPath(bolt, paint);
-        }
-
-        private void drawRegen(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            float cx = w * .48f, cy = h * .52f, r = Math.min(w, h) * .30f;
-            stroke(muted, Math.max(3f, w * .045f));
-            oval.set(cx - r, cy - r, cx + r, cy + r);
-            c.drawArc(oval, 35f, 285f, false, paint);
-            stroke(accent, Math.max(3f, w * .045f));
-            c.drawArc(oval, 35f, 185f * descriptor.progress / 100f, false, paint);
-            android.graphics.Path arrow = new android.graphics.Path();
-            arrow.moveTo(cx + r * .72f, cy - r * .80f);
-            arrow.lineTo(cx + r * 1.04f, cy - r * .37f);
-            arrow.lineTo(cx + r * .52f, cy - r * .40f);
-            stroke(accent, Math.max(2f, w * .035f));
-            c.drawPath(arrow, paint);
-            for (int i = 0; i < 3; i++) {
-                float x = w * (.25f + i * .18f);
-                float top = h * (.72f - (.13f + i * .07f));
-                fill(i < 2 ? accent : muted);
-                c.drawRoundRect(x, top, x + w * .09f, h * .75f,
-                        w * .025f, w * .025f, paint);
+                int accent, int muted, int strong) {
+            float size = Math.min(w, h) * .62f;
+            float cx = w * .5f, cy = h * .44f;
+            android.graphics.Path glyph = new android.graphics.Path();
+            String mode = descriptor.state == null ? "" : descriptor.state;
+            switch (mode) {
+                case "eco": ecoGlyph(glyph); break;
+                case "sport": boltGlyph(glyph); break;
+                case "snow": snowGlyph(glyph); break;
+                case "sand": duneGlyph(glyph); break;
+                case "mud": trackGlyph(glyph); break;
+                case "awd": awdGlyph(glyph); break;
+                default: wheelGlyph(glyph); break;
             }
+            drawUnitPath(c, glyph, cx, cy, size,
+                    "unknown".equals(mode) || mode.isEmpty() ? muted : accent,
+                    Math.max(2f, size * .075f));
+            // Seven modes, one lit: position within the range, not a percentage.
+            drawStepDots(c, w, h, 7, descriptor.progress, accent, muted);
+        }
+
+        /**
+         * Power mode is a hybrid split, so draw it as one: a battery that fills
+         * with the electric share and a fuel drop that fades as it stops being
+         * used. EV empties the drop entirely, HEV shows both.
+         */
+        private void drawPowerMode(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            String mode = descriptor.state == null ? "" : descriptor.state;
+            boolean anyFuel = !"ev".equals(mode);
+            boolean known = "hev".equals(mode) || "evp".equals(mode) || "ev".equals(mode);
+            float fill = "ev".equals(mode) ? 1f : ("evp".equals(mode) ? .66f : .34f);
+            int live = known ? accent : muted;
+
+            float bl = w * .14f, bt = h * .26f, br = w * .66f, bb = h * .62f;
+            stroke(muted, Math.max(2f, w * .038f));
+            c.drawRoundRect(bl, bt, br, bb, w * .07f, w * .07f, paint);
+            fill(muted);
+            c.drawRoundRect(br, h * .38f, br + w * .05f, h * .50f, w * .02f, w * .02f, paint);
+            if (known) {
+                float pad = w * .045f;
+                fill(withAlpha(live, 0x99));
+                c.drawRoundRect(bl + pad, bt + pad,
+                        bl + pad + (br - bl - pad * 2f) * fill, bb - pad,
+                        w * .035f, w * .035f, paint);
+            }
+            android.graphics.Path bolt = new android.graphics.Path();
+            boltGlyph(bolt);
+            drawUnitPath(c, bolt, w * .40f, h * .44f, h * .30f, live, Math.max(2f, w * .032f));
+
+            // The drop is the combustion share: outlined while fuel is still in
+            // play, hollow and muted once the mode says electric only.
+            android.graphics.Path drop = new android.graphics.Path();
+            dropGlyph(drop);
+            drawUnitPath(c, drop, w * .84f, h * .43f, h * .34f,
+                    anyFuel && known ? strong : muted, Math.max(2f, w * .032f));
+            drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
+        }
+
+        /**
+         * Recovery is an ordinal level, so it reads as rising bars inside a
+         * regeneration arrow rather than as a percentage arc.
+         */
+        private void drawRegen(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            String mode = descriptor.state == null ? "" : descriptor.state;
+            int level = "level1".equals(mode) ? 1 : ("level2".equals(mode) ? 2
+                    : ("level3".equals(mode) ? 3 : 0));
+            float cx = w * .50f, cy = h * .46f, r = Math.min(w, h) * .34f;
+            oval.set(cx - r, cy - r, cx + r, cy + r);
+            stroke(muted, Math.max(2f, w * .042f));
+            c.drawArc(oval, 120f, 300f, false, paint);
+            if (level > 0) {
+                stroke(accent, Math.max(2f, w * .042f));
+                c.drawArc(oval, 120f, 300f * level / 3f, false, paint);
+                // Arrowhead on the recovery direction, so the ring reads as flow
+                // returning to the pack rather than as a plain progress arc.
+                double a = Math.toRadians(120f + 300f * level / 3f);
+                float ax = cx + (float) Math.cos(a) * r, ay = cy + (float) Math.sin(a) * r;
+                android.graphics.Path head = new android.graphics.Path();
+                head.moveTo(ax - r * .30f, ay - r * .16f);
+                head.lineTo(ax, ay);
+                head.lineTo(ax - r * .10f, ay + r * .32f);
+                stroke(accent, Math.max(2f, w * .034f));
+                c.drawPath(head, paint);
+            }
+            float bw = w * .075f, gap = w * .045f;
+            float base = cy + r * .58f;
+            float left = cx - (bw * 3f + gap * 2f) * .5f;
+            for (int i = 0; i < 3; i++) {
+                float bh = r * (.30f + i * .22f);
+                fill(i < level ? accent : muted);
+                c.drawRoundRect(left + i * (bw + gap), base - bh,
+                        left + i * (bw + gap) + bw, base, bw * .3f, bw * .3f, paint);
+            }
+            drawStepDots(c, w, h, 3, descriptor.progress, accent, muted);
+        }
+
+        /**
+         * Position within a fixed set of options. `progress` arrives as
+         * (index+1)/count, so recovering the index keeps the dots honest for any
+         * option count without a second payload field.
+         */
+        private void drawStepDots(android.graphics.Canvas c, float w, float h,
+                int count, int progress, int accent, int muted) {
+            if (count <= 1) return;
+            int index = progress <= 0 ? -1 : Math.round(count * progress / 100f) - 1;
+            float r = Math.max(1.5f, w * .022f);
+            float gap = r * 3.1f;
+            float y = h * .90f;
+            float left = w * .5f - (count - 1) * gap * .5f;
+            for (int i = 0; i < count; i++) {
+                fill(i == index ? accent : muted);
+                c.drawCircle(left + i * gap, y, i == index ? r * 1.35f : r, paint);
+            }
+        }
+
+        /** Stroke a path authored in a -1..1 box at (cx, cy) scaled to `size`. */
+        private void drawUnitPath(android.graphics.Canvas c, android.graphics.Path unit,
+                float cx, float cy, float size, int color, float width) {
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            m.setScale(size * .5f, size * .5f);
+            m.postTranslate(cx, cy);
+            android.graphics.Path out = new android.graphics.Path();
+            unit.transform(m, out);
+            stroke(color, width);
+            c.drawPath(out, paint);
+        }
+
+        private void wheelGlyph(android.graphics.Path p) {
+            p.addCircle(0f, 0f, 1f, android.graphics.Path.Direction.CW);
+            p.addCircle(0f, 0f, .32f, android.graphics.Path.Direction.CW);
+            p.moveTo(0f, -1f); p.lineTo(0f, -.32f);
+            p.moveTo(-.87f, .5f); p.lineTo(-.28f, .16f);
+            p.moveTo(.87f, .5f); p.lineTo(.28f, .16f);
+        }
+
+        private void ecoGlyph(android.graphics.Path p) {
+            p.moveTo(-.75f, .85f);
+            p.cubicTo(-.75f, -.35f, -.05f, -.95f, .85f, -.95f);
+            p.cubicTo(.85f, .25f, .15f, .85f, -.75f, .85f);
+            p.close();
+            p.moveTo(-.62f, .78f);
+            p.cubicTo(-.35f, .12f, .02f, -.28f, .48f, -.55f);
+        }
+
+        private void boltGlyph(android.graphics.Path p) {
+            p.moveTo(.28f, -1f);
+            p.lineTo(-.62f, .14f);
+            p.lineTo(-.06f, .14f);
+            p.lineTo(-.28f, 1f);
+            p.lineTo(.62f, -.16f);
+            p.lineTo(.06f, -.16f);
+            p.close();
+        }
+
+        private void snowGlyph(android.graphics.Path p) {
+            for (int i = 0; i < 3; i++) {
+                double a = Math.toRadians(90 + i * 60);
+                float x = (float) Math.cos(a), y = (float) Math.sin(a);
+                p.moveTo(-x, -y); p.lineTo(x, y);
+                // A barb at each tip is what makes it read as ice rather than a star.
+                double b1 = a + Math.toRadians(35), b2 = a - Math.toRadians(35);
+                p.moveTo(x, y);
+                p.lineTo(x - (float) Math.cos(b1) * .34f, y - (float) Math.sin(b1) * .34f);
+                p.moveTo(x, y);
+                p.lineTo(x - (float) Math.cos(b2) * .34f, y - (float) Math.sin(b2) * .34f);
+                p.moveTo(-x, -y);
+                p.lineTo(-x + (float) Math.cos(b1) * .34f, -y + (float) Math.sin(b1) * .34f);
+                p.moveTo(-x, -y);
+                p.lineTo(-x + (float) Math.cos(b2) * .34f, -y + (float) Math.sin(b2) * .34f);
+            }
+        }
+
+        private void duneGlyph(android.graphics.Path p) {
+            p.moveTo(-1f, .58f);
+            p.cubicTo(-.55f, -.05f, -.10f, -.05f, .12f, .34f);
+            p.cubicTo(.34f, .72f, .74f, .72f, 1f, .30f);
+            p.moveTo(-1f, -.12f);
+            p.cubicTo(-.68f, -.62f, -.34f, -.62f, -.08f, -.24f);
+            p.moveTo(.16f, -.50f);
+            p.cubicTo(.42f, -.92f, .74f, -.92f, 1f, -.56f);
+        }
+
+        private void trackGlyph(android.graphics.Path p) {
+            for (int side = 0; side < 2; side++) {
+                float x = side == 0 ? -.52f : .52f;
+                p.moveTo(x, -1f); p.lineTo(x, 1f);
+                for (int i = 0; i < 4; i++) {
+                    float y = -.72f + i * .48f;
+                    p.moveTo(x - .30f, y); p.lineTo(x + .30f, y);
+                }
+            }
+        }
+
+        private void awdGlyph(android.graphics.Path p) {
+            for (int i = 0; i < 4; i++) {
+                float x = (i % 2 == 0) ? -.62f : .62f;
+                float y = (i < 2) ? -.62f : .62f;
+                p.addRoundRect(new android.graphics.RectF(x - .18f, y - .34f, x + .18f, y + .34f),
+                        .12f, .12f, android.graphics.Path.Direction.CW);
+            }
+            p.moveTo(-.62f, -.42f); p.lineTo(.62f, -.42f);
+            p.moveTo(-.62f, .42f); p.lineTo(.62f, .42f);
+            p.moveTo(0f, -.42f); p.lineTo(0f, .42f);
+        }
+
+        private void dropGlyph(android.graphics.Path p) {
+            p.moveTo(0f, -1f);
+            p.cubicTo(.62f, -.22f, .82f, .18f, .52f, .60f);
+            p.cubicTo(.24f, 1f, -.24f, 1f, -.52f, .60f);
+            p.cubicTo(-.82f, .18f, -.62f, -.22f, 0f, -1f);
+            p.close();
         }
 
         private void drawRoof(android.graphics.Canvas c, float w, float h,
@@ -6524,6 +6696,13 @@ public final class MainActivity extends Activity {
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         graphicLp.rightMargin = Math.round(10 * density);
         graphic.setLayoutParams(graphicLp);
+        if (!descriptor.iconAction.isEmpty()) {
+            final String iconCommand = descriptor.iconAction;
+            graphic.setClickable(true);
+            graphic.setFocusable(true);
+            graphic.setContentDescription(descriptor.title + ". Change to the next setting");
+            graphic.setOnClickListener(v -> callViewerDock(iconCommand));
+        }
         content.addView(graphic);
 
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
@@ -7899,15 +8078,23 @@ public final class MainActivity extends Activity {
             String metricB = cleanBottomCardText(raw.optString("metricB", ""), 32);
             int progress = Math.max(0, Math.min(100, raw.optInt("progress", 0)));
             if (id.isEmpty() || title.isEmpty() || !BOTTOM_CARD_ACTIONS.contains(action)) continue;
+            // A tap on the graphic runs its own command, so it is allow-listed
+            // exactly like the card's; an unknown one degrades to "no icon action"
+            // rather than reaching the dock unchecked.
+            String iconAction = raw.optString("iconAction", "").trim();
+            if (!BOTTOM_CARD_ACTIONS.contains(iconAction)) iconAction = "";
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
-                            raw.optString("tireState", "unavailable"))) : "";
+                            raw.optString("tireState", "unavailable")))
+                    : (DRIVING_CARD_IDS.contains(id)
+                            ? sanitizeDrivingState(raw.optString("state", "unknown")) : "");
             String[] wheelStates = "tires".equals(id)
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))
                     : new String[] {"unavailable", "unavailable", "unavailable", "unavailable"};
             next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
-                    action, primary, secondary, metricA, metricB, progress, state, wheelStates));
+                    action, primary, secondary, metricA, metricB, progress, state, wheelStates,
+                    iconAction));
         }
 
         int requested = root.has("bottomCardLimit")
@@ -7933,6 +8120,37 @@ public final class MainActivity extends Activity {
     private String cleanBottomCardText(String value, int maxLength) {
         String clean = cleanIndicator(value);
         return clean.length() > maxLength ? clean.substring(0, maxLength) : clean;
+    }
+
+    /** Rail cards that draw a driving mode glyph and accept an icon quick action. */
+    private static final java.util.Set<String> DRIVING_CARD_IDS =
+            new java.util.HashSet<>(java.util.Arrays.asList("driveMode", "powerMode", "regen"));
+
+    /**
+     * Mode identity for the rail graphic. Mirrors CAR_DRIVE_MODE_CARD_STATES /
+     * CAR_POWER_MODE_CARD_STATES in index.html; an unrecognised value draws the
+     * neutral glyph rather than guessing at a mode.
+     */
+    private String sanitizeDrivingState(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US);
+        switch (normalized) {
+            case "eco":
+            case "normal":
+            case "sport":
+            case "snow":
+            case "sand":
+            case "mud":
+            case "awd":
+            case "hev":
+            case "evp":
+            case "ev":
+            case "level1":
+            case "level2":
+            case "level3":
+                return normalized;
+            default:
+                return "unknown";
+        }
     }
 
     private String sanitizeTiresState(String value) {
