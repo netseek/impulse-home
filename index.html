@@ -4028,6 +4028,13 @@ window.HavalSplash = (function () {
       border-color: var(--hv-accent);
       box-shadow: inset 0 0 0 1px var(--hv-accent), 0 10px 30px rgba(0,0,0,.25);
     }
+    /* A card whose content is buttons gives feedback on the button, not on the
+       whole card — :active would otherwise fire on every ancestor of the press. */
+    .hv-widget-card.has-controls:active {
+      transform: none;
+      border-color: var(--hv-widget-border);
+      box-shadow: var(--hv-widget-shadow);
+    }
     .hv-widget-card.editing {
       border-color: var(--hv-accent);
       box-shadow: inset 0 0 0 1px var(--hv-accent), 0 0 0 5px rgba(99,217,231,.10), var(--hv-frost-shadow);
@@ -4315,9 +4322,10 @@ window.HavalSplash = (function () {
     .hv-driving-row { min-width:0; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); gap:3px; }
     .hv-driving-row.lines-2 { grid-row:span 2; }
     .hv-driving-row.lines-3 { grid-row:span 3; }
-    .hv-driving-row-head { display:flex; align-items:baseline; justify-content:space-between; gap:6px; font:7px/1.1 'Space Mono',monospace; letter-spacing:.1em; opacity:.5; }
-    .hv-driving-row-head span,.hv-driving-row-head em { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-style:normal; }
-    .hv-driving-row-head em { opacity:.85; }
+    .hv-driving-row-head { display:flex; align-items:baseline; justify-content:space-between; gap:6px; font:7px/1.1 'Space Mono',monospace; letter-spacing:.12em; }
+    .hv-driving-row-head > span,.hv-driving-row-head > em { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-style:normal; }
+    .hv-driving-row-head > span { opacity:.5; }
+    .hv-driving-row-head > em { font-weight:700; opacity:.82; }
     .hv-driving-row-chips { min-height:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:minmax(0,1fr); gap:4px; }
     .hv-driving-row-chips.cols-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .hv-driving-body { height:calc(100% - 30px); display:flex; flex-direction:column; justify-content:center; gap:12px; min-height:0; }
@@ -4338,9 +4346,15 @@ window.HavalSplash = (function () {
     .hv-driving-steps i:nth-child(3) { height:100%; }
     .hv-driving-steps i.on { background:var(--hv-accent); opacity:1; }
     .hv-driving-quick { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
-    .hv-driving-chip { display:flex; align-items:center; justify-content:center; min-height:29px; padding:0 7px; border:1px solid var(--hv-frost-edge); border-radius:9px; background:var(--hv-frost-inner); color:inherit; opacity:.6; font:600 11px/1 'Space Grotesk',system-ui,sans-serif; letter-spacing:.02em; cursor:pointer; -webkit-appearance:none; appearance:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .hv-driving-chip.on { opacity:1; color:var(--hv-accent); border-color:currentColor; background:var(--hv-frost-fill-strong); }
-    .hv-driving-chip[disabled] { cursor:default; opacity:.28; }
+    .hv-driving-chip { display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; min-height:29px; padding:0 8px; border:1px solid var(--hv-frost-edge); border-radius:11px; background:var(--hv-frost-inner); color:var(--hv-widget-muted,rgba(234,242,248,.62)); font:600 11px/1 'Space Grotesk',system-ui,sans-serif; letter-spacing:.02em; cursor:pointer; -webkit-appearance:none; appearance:none; }
+    .hv-driving-chip > span { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* The selected value, bold, right of the label — a toggle has to say which
+       way it is set without the reader decoding a fill. */
+    .hv-driving-chip > em { flex:0 0 auto; font-style:normal; font-weight:700; letter-spacing:.06em; opacity:.9; }
+    .hv-driving-chip-icon { flex:0 0 auto; width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+    .hv-driving-chip.on { color:var(--hv-accent); border-color:currentColor; background:var(--hv-frost-fill-strong); box-shadow:inset 0 0 0 1px currentColor; }
+    .hv-driving-chip:active { background:var(--hv-frost-fill-strong); }
+    .hv-driving-chip[disabled] { cursor:default; opacity:.32; box-shadow:none; }
     .hv-driving-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.05em; opacity:.52; }
     .hv-driving-foot > span { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .hv-driving-unavailable .hv-driving-name strong,
@@ -4365,6 +4379,9 @@ window.HavalSplash = (function () {
     .hv-driving-3x1 .hv-driving-chip { min-height:0; font-size:10px; }
     .hv-driving-2x2 .hv-driving-chip,
     .hv-driving-3x2 .hv-driving-chip { min-height:0; font-size:12px; }
+    .hv-driving-2x2 .hv-driving-chip-icon,
+    .hv-driving-3x2 .hv-driving-chip-icon { width:15px; height:15px; }
+    .hv-driving-1x1 .hv-driving-chip-icon { width:11px; height:11px; }
     .hv-driving-2x1 .hv-driving-body,.hv-driving-3x1 .hv-driving-body { flex-direction:row; align-items:center; gap:14px; }
     .hv-driving-2x1 .hv-driving-hero,.hv-driving-3x1 .hv-driving-hero { flex:1 1 auto; min-width:0; }
     .hv-driving-2x1 .hv-driving-grid { flex:0 0 auto; width:47%; }
@@ -4450,22 +4467,35 @@ window.HavalSplash = (function () {
     .hv-driving-focus-source.pending { color:#f0bd65; }
     .hv-driving-focus-source.stale,.hv-driving-focus-source.unavailable,.hv-driving-focus-source.preview { opacity:.62; }
     .hv-driving-focus-summary { font:600 11px/1.2 'Space Grotesk',sans-serif; letter-spacing:.04em; text-align:right; }
-    .hv-driving-group { margin-top:15px; }
+    .hv-driving-focus-groups { display:grid; grid-template-columns:1fr 1fr; column-gap:16px; row-gap:12px; margin-top:14px; align-content:start; }
+    /* DRIVE is the only group with more than three options, so it keeps the
+       full width and the other four pair up beside each other. */
+    .hv-driving-focus-groups > .hv-driving-group:first-child { grid-column:1 / -1; }
+    .hv-driving-group { min-width:0; }
     .hv-driving-group-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.12em; opacity:.55; }
     .hv-driving-group-head em { font-style:normal; opacity:.85; }
     .hv-driving-options { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; margin-top:8px; }
     .hv-driving-options.cols-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
-    .hv-driving-option { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:4px; min-height:50px; padding:9px 10px; border:1px solid var(--hv-frost-edge); border-radius:13px; background:var(--hv-frost-inner); color:inherit; text-align:left; cursor:pointer; -webkit-appearance:none; appearance:none; }
+    .hv-driving-options.cols-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .hv-driving-option { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:3px; min-height:46px; padding:8px 10px; border:1px solid var(--hv-frost-edge); border-radius:13px; background:var(--hv-frost-inner); color:inherit; text-align:left; cursor:pointer; -webkit-appearance:none; appearance:none; }
     .hv-driving-option strong { max-width:100%; font:600 13px/1 'Space Grotesk',sans-serif; letter-spacing:.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .hv-driving-option small { font:6px/1 'Space Mono',monospace; letter-spacing:.1em; opacity:.5; }
+    .hv-driving-option-icon { position:absolute; right:10px; top:10px; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; opacity:.7; }
+    .hv-driving-option.on .hv-driving-option-icon { opacity:1; }
+    .hv-driving-toggle { flex-direction:row; align-items:center; justify-content:space-between; gap:8px; }
+    .hv-driving-toggle-copy { display:flex; flex-direction:column; gap:3px; min-width:0; }
+    .hv-driving-toggle-copy > strong { max-width:100%; font:600 13px/1 'Space Grotesk',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-driving-toggle-copy > small { font:6px/1 'Space Mono',monospace; letter-spacing:.1em; opacity:.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-driving-toggle > em { flex:0 0 auto; font-style:normal; font-weight:700; font-size:12px; letter-spacing:.08em; }
     .hv-driving-option.on { color:var(--hv-accent); border-color:currentColor; background:var(--hv-frost-fill-strong); box-shadow:inset 0 0 0 1px currentColor; }
     .hv-driving-option[disabled] { cursor:default; opacity:.32; }
-    .hv-driving-note { margin-top:15px; font:7px/1.55 'Space Mono',monospace; letter-spacing:.06em; opacity:.5; }
+    .hv-driving-note { margin-top:12px; font:7px/1.55 'Space Mono',monospace; letter-spacing:.06em; opacity:.5; }
     @media (max-width: 640px) {
       .hv-driving-focus { padding:12px; }
       .hv-driving-focus-meta { align-items:flex-start; flex-direction:column; gap:7px; }
       .hv-driving-focus-summary { text-align:left; }
       .hv-driving-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .hv-driving-focus-groups { grid-template-columns:minmax(0,1fr); }
     }
     .hv-tires-focus { min-height:calc(100% - 42px); padding:18px; box-sizing:border-box; border-radius:16px; background:rgba(255,255,255,.035); overflow:hidden; }
     .hv-tires-focus-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -4872,7 +4902,7 @@ window.HavalSplash = (function () {
             <div class="hv-range-card {{ wg.rangeSizeClass }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-ring" style="--range-pct:{{ wg.rangePct }}%;"><strong>{{ wg.rangeSoc }}</strong><span>BATTERY</span></div><div class="hv-range-stats"><div class="hv-range-stat"><span>EV</span><strong>{{ wg.rangeEv }}</strong><small>KM</small></div><div class="hv-range-stat"><span>GAS</span><strong>{{ wg.rangeFuel }}</strong><small>KM</small></div></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isDriving }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}">{{ dc.label }}</button></sc-for></div></div></sc-for></div></div>
+            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
             <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
@@ -5077,7 +5107,7 @@ window.HavalSplash = (function () {
             <div class="hv-range-card {{ wg.rangeSizeClass }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-ring" style="--range-pct:{{ wg.rangePct }}%;"><strong>{{ wg.rangeSoc }}</strong><span>BATTERY</span></div><div class="hv-range-stats"><div class="hv-range-stat"><span>EV</span><strong>{{ wg.rangeEv }}</strong><small>KM</small></div><div class="hv-range-stat"><span>GAS</span><strong>{{ wg.rangeFuel }}</strong><small>KM</small></div></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isDriving }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}">{{ dc.label }}</button></sc-for></div></div></sc-for></div></div>
+            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
             <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
@@ -5480,16 +5510,26 @@ window.HavalSplash = (function () {
           <span class="hv-driving-focus-source {{ focusedDrivingSourceClass }}">{{ focusedDrivingSource }}</span>
           <strong class="hv-driving-focus-summary">{{ focusedDrivingSummary }}</strong>
         </div>
+        <div class="hv-driving-focus-groups">
         <sc-for list="{{ focusedDrivingGroups }}" as="dg" hint-placeholder-count="4">
           <section class="hv-driving-group">
             <div class="hv-driving-group-head"><span>{{ dg.label }}</span><em>{{ dg.state }}</em></div>
             <div class="hv-driving-options {{ dg.colsClass }}">
               <sc-for list="{{ dg.options }}" as="dopt" hint-placeholder-count="3">
-                <button type="button" class="hv-driving-option {{ dopt.cls }}" onClick="{{ dopt.onClick }}" disabled="{{ dopt.disabled }}" aria-disabled="{{ dopt.disabled }}" aria-pressed="{{ dopt.pressed }}"><strong>{{ dopt.label }}</strong><small>{{ dopt.hint }}</small></button>
+                <button type="button" class="hv-driving-option {{ dopt.cls }}" onClick="{{ dopt.onClick }}" disabled="{{ dopt.disabled }}" aria-disabled="{{ dopt.disabled }}" aria-pressed="{{ dopt.pressed }}"><sc-if value="{{ dopt.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-option-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dopt.icon }}"></path></svg></sc-if><strong>{{ dopt.label }}</strong><small>{{ dopt.hint }}</small></button>
               </sc-for>
             </div>
           </section>
         </sc-for>
+        <section class="hv-driving-group">
+          <div class="hv-driving-group-head"><span>{{ focusedDrivingAssistLabel }}</span></div>
+          <div class="hv-driving-options cols-2">
+            <sc-for list="{{ focusedDrivingToggles }}" as="dtg" hint-placeholder-count="2">
+              <button type="button" class="hv-driving-option hv-driving-toggle {{ dtg.cls }}" onClick="{{ dtg.onClick }}" disabled="{{ dtg.disabled }}" aria-disabled="{{ dtg.disabled }}" aria-pressed="{{ dtg.pressed }}"><span class="hv-driving-toggle-copy"><strong>{{ dtg.label }}</strong><small>{{ dtg.hint }}</small></span><em>{{ dtg.state }}</em></button>
+            </sc-for>
+          </div>
+        </section>
+        </div>
         <div class="hv-driving-note">{{ focusedDrivingNote }}</div>
       </div>
     </sc-if>
@@ -6434,7 +6474,7 @@ const CAR_DRIVE_MODE_GLYPHS = {
   '3': 'M 10 4 L 12 5 L 14 4 M 12 2 L 12 8.5 L 15 10.22 M 17.93 6.27 L 18.06 8.5 L 19.93 9.73 M 20.66 7 L 15.03 10.25 L 15.04 13.71 M 19.93 14.27 L 18.06 15.5 L 17.93 17.73 M 20.66 17 L 15.03 13.75 L 12.04 15.49 M 14 20 L 12 19 L 10 20 M 12 22 L 12 15.5 L 9 13.78 M 6.07 17.73 L 5.94 15.5 L 4.07 14.27 M 3.34 17 L 8.97 13.75 L 8.96 10.29 M 4.07 9.73 L 5.94 8.5 L 6.07 6.27 M 3.34 7 L 8.97 10.25 L 11.96 8.51',   // tabler snowflake
   '4': 'M 3 7 C 6 5 9 5 12 7 C 15 9 18 9 21 7 M 3 17 C 6 15 9 15 12 17 C 15 19 18 19 21 17 M 3 12 C 6 10 9 10 12 12 C 15 14 18 14 21 12',   // tabler ripple
   '5': 'M 4.07 20.3 C 5.19 21.24 6.81 21.24 7.93 20.3 C 9.04 19.36 9.32 17.76 8.6 16.5 L 6.5 13.28 C 6.39 13.11 6.2 13 6 13 C 5.8 13 5.61 13.11 5.5 13.28 L 3.4 16.5 C 2.67 17.76 2.96 19.36 4.07 20.3 M 16.07 20.3 C 17.19 21.24 18.81 21.24 19.93 20.3 C 21.04 19.36 21.32 17.76 20.6 16.5 L 18.5 13.28 C 18.39 13.11 18.2 13 18 13 C 17.8 13 17.61 13.11 17.5 13.28 L 15.4 16.5 C 14.67 17.76 14.96 19.36 16.07 20.3 M 10.07 10.3 C 11.19 11.24 12.81 11.24 13.93 10.3 C 15.04 9.36 15.32 7.76 14.6 6.5 L 12.5 3.28 C 12.39 3.11 12.2 3 12 3 C 11.8 3 11.61 3.11 11.5 3.28 L 9.4 6.5 C 8.67 7.76 8.96 9.36 10.07 10.3 L 10.07 10.3',   // tabler droplets
-  '11': 'M 5 5 C 5 3.9 5.9 3 7 3 C 8.1 3 9 3.9 9 5 L 9 7 C 9 8.1 8.1 9 7 9 C 5.9 9 5 8.1 5 7 L 5 5 M 5 17 C 5 15.9 5.9 15 7 15 C 8.1 15 9 15.9 9 17 L 9 19 C 9 20.1 8.1 21 7 21 C 5.9 21 5 20.1 5 19 L 5 17 M 15 5 C 15 3.9 15.9 3 17 3 C 18.1 3 19 3.9 19 5 L 19 7 C 19 8.1 18.1 9 17 9 C 15.9 9 15 8.1 15 7 L 15 5 M 15 17 C 15 15.9 15.9 15 17 15 C 18.1 15 19 15.9 19 17 L 19 19 C 19 20.1 18.1 21 17 21 C 15.9 21 15 20.1 15 19 L 15 17 M 9 18 L 15 18 M 9 6 L 15 6 M 12 6.5 L 12 6 L 12 18',   // tabler car-4wd
+  '11': 'M 5 17 C 5 18.1 5.9 19 7 19 C 8.1 19 9 18.1 9 17 C 9 15.9 8.1 15 7 15 C 5.9 15 5 15.9 5 17 M 16 17 C 16 18.1 16.9 19 18 19 C 19.1 19 20 18.1 20 17 C 20 15.9 19.1 15 18 15 C 16.9 15 16 15.9 16 17 M 5 9 L 7 5 L 14.44 5 C 15.36 5 16.16 5.62 16.38 6.52 L 17 9 L 20 9 C 21.1 9 22 9.9 22 11 L 22 14 M 10 9 L 10 5 M 2 7 L 2 11 M 22 14 C 21.06 12.74 19.57 12 18 12 C 16.43 12 14.94 12.74 14 14 L 11 14 C 10.06 12.74 8.57 12 7 12 C 5.42 12 3.94 12.74 3 14 M 5 12 L 5 9 L 18 9',   // tabler car-suv
 };
 /**
  * Secondary line under each option in the popup. These describe the OEM concept
@@ -29531,6 +29571,11 @@ class Component extends DCLogic {
       options: group.options.map((opt, i) => ({
         label: opt.label,
         hint: hints[opt.value] || '',
+        glyph: group.key === 'car.drive_setting.drive_mode'
+          ? (CAR_DRIVE_MODE_GLYPHS[opt.value] || '') : '',
+        hasIcon: group.key === 'car.drive_setting.drive_mode' && !!CAR_DRIVE_MODE_GLYPHS[opt.value],
+        icon: group.key === 'car.drive_setting.drive_mode'
+          ? (CAR_DRIVE_MODE_GLYPHS[opt.value] || '') : '',
         cls: i === shown ? 'on' : '',
         pressed: i === shown,
         disabled: !!controlsDisabled,
@@ -29570,6 +29615,7 @@ class Component extends DCLogic {
       // The popup keeps explicit ON/OFF options; the widget renders the same
       // group as a single chip, so both surfaces share one source of truth.
       on: on && (known || preview),
+      known: known || preview,
       onToggle: () => { if (!controlsDisabled) this._setOnePedal(!on); },
       options: [pick('1'), pick('0')],
     };
@@ -29598,6 +29644,7 @@ class Component extends DCLogic {
       hasSignal: hasSignal,
       state: known || preview ? (on ? 'ESP ON' : 'ESP OFF') : 'UNAVAILABLE',
       on: on && (known || preview),
+      known: known || preview,
       onToggle: () => {
         if (controlsDisabled) return;
         this._setCarMode(CAR_MODE_ESP.stateKey, CAR_MODE_ESP.key, on ? '0' : '1');
@@ -29684,6 +29731,14 @@ class Component extends DCLogic {
           label: opt.label,
           title: opt.hint ? opt.label + ' · ' + opt.hint : opt.label,
           cls: opt.cls,
+          pressed: !!opt.pressed,
+          // Three of these rows contain an option called "Normal" and two
+          // contain "Sport", so the drive row — the one with seven of them —
+          // carries each mode's own glyph next to the word.
+          hasIcon: !!opt.glyph,
+          icon: opt.glyph || '',
+          hasState: false,
+          state: '',
           onClick: (ev) => { this._cardControlEvent(ev); opt.onClick(); },
         })),
       };
@@ -29693,6 +29748,12 @@ class Component extends DCLogic {
       label: shortLabel(group),
       title: group.label + ' · ' + group.state,
       cls: group.on ? 'on' : '',
+      pressed: !!group.on,
+      hasIcon: false,
+      icon: '',
+      // A lit border is a weak way to say "on". Spell it out.
+      hasState: group.known,
+      state: group.on ? 'ON' : 'OFF',
       onClick: (ev) => { this._cardControlEvent(ev); group.onToggle(); },
     });
     // At 1x1 the drive row shows the three road modes only — seven buttons in a
@@ -29741,7 +29802,17 @@ class Component extends DCLogic {
       drivingRows: rows,
       drivingOnePedal: onePedal.state,
       drivingControlsDisabled: controlsDisabled,
-      drivingGroups: [drive, power, regen, onePedal, steer, esp],
+      drivingGroups: [drive, power, regen, steer],
+      drivingAssistLabel: 'ASSIST',
+      drivingToggles: [onePedal, esp].map((group) => ({
+        label: group.label.replace('-PEDAL DRIVING', '-PEDAL').replace('STABILITY CONTROL', 'ESP'),
+        hint: group.stateKey === CAR_MODE_ONE_PEDAL.stateKey ? 'LIFT TO STOP' : 'TRACTION AID',
+        cls: group.on ? 'on' : '',
+        pressed: !!group.on,
+        disabled: controlsDisabled,
+        state: group.known ? (group.on ? 'ON' : 'OFF') : '—',
+        onClick: () => group.onToggle(),
+      })),
       onDrivingOpen: (ev) => {
         this._cardControlEvent(ev);
         if (this._widgetSuppressClick || this.state.widgetMenuId) return;
@@ -30535,7 +30606,8 @@ class Component extends DCLogic {
           || item.type === 'driving') ? 'OPEN' : 'CONFIGURE'),
       showResize: this._widgetResizeSizes(item).length > 0,
       showMove: this._widgetCanMove(item, side),
-      cardClass: moving ? 'moving' : (menuOpen ? 'editing' : ''),
+      cardClass: (moving ? 'moving' : (menuOpen ? 'editing' : ''))
+        + (item.type === 'driving' ? ' has-controls' : ''),
       onHoldStart: (ev) => this._onWidgetHoldStart(side, item, ev),
       onHoldEnd: (ev) => this._onWidgetHoldEnd(side, item, ev),
       onHoldCancel: (ev) => this._onWidgetHoldCancel(side, item, ev),

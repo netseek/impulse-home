@@ -98,7 +98,12 @@ memory (`_regenLevelBeforeOnePedal`) is ours. Nothing on the bus reports a
 
 The mode glyphs are [Tabler Icons](https://github.com/tabler/tabler-icons)
 (MIT, © 2020-2024 Paweł Kuna) on the same 24x24 / 2px grid the cards already
-used: `leaf`, `road`, `bolt`, `snowflake`, `ripple`, `droplets`, `car-4wd`.
+used: `leaf`, `road`, `bolt`, `snowflake`, `ripple`, `droplets`, `car-suv`.
+
+`car-4wd` was the semantically exact icon for AWD, but its pill-shaped wheels
+read as blobs at 76dp beside six crisp abstract glyphs. The SUV silhouette
+carries the same "the whole car is driving" meaning with edges that survive
+the size.
 
 They were hand-drawn first and it did not work. The shapes kept colliding with
 each other — tyre tread read as a barcode, a hub circle read as an eye, four
@@ -115,6 +120,39 @@ instead of two. The path travels in the rail payload and is validated on arrival
 like any other untrusted string (`sanitizeGlyphPath`).
 
 Re-run the script to change an icon; do not hand-edit the table.
+
+## One visual language across the three surfaces
+
+The widget and the popup drew the same control two different ways: the popup's
+tiles read as buttons, the widget's dimmed flat chips read as labels. The
+popup's treatment won, and the widget chip is now that tile at a smaller size —
+same border, same fill, same accent ring when selected. An unselected chip is
+muted through **colour**, not opacity, because opacity also dims its icon.
+
+Three details that came out of using it:
+
+- **A press on a chip lit the whole widget.** `:active` applies to every
+  ancestor of the pressed element, and `.hv-widget-card:active` scales the card
+  and rings it in the accent — right for a card that is one tap target, wrong
+  for one full of buttons. `:has()` would be the tidy fix but the car runs
+  WebView 91, so the card marks itself `has-controls` and opts out. Feedback
+  lives on the chip instead.
+- **Three rows contain an option called "Normal" and two contain "Sport".** The
+  drive row — the one with seven options — carries each mode's own glyph beside
+  the word, and every row head prints its current value in bold on the right.
+- **A lit border is a weak way to say "on".** The two booleans spell it out:
+  `ONE-PEDAL  OFF`, `ESP  ON`.
+
+Booleans are one tile that lights rather than competing ON/OFF pairs, in the
+popup as well as the widget. That is what lets the popup fit on one page: the
+groups run in two columns with DRIVE spanning both, so ASSIST — the only way to
+reach one-pedal from there — is no longer below the fold.
+
+**Every options grid needs its `cols-N` rule.** `.cols-2` was missing, so the
+two ASSIST toggles silently fell back to the four-column default and clipped
+`ONE-PEDAL` to `O…`. The class was present in the markup and the container was
+the right width; only the rule was absent, which is a hard thing to spot by
+reading.
 
 ## Layout
 

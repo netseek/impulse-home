@@ -231,10 +231,17 @@ includesAll(focusFields, [
   "type === 'driving' ? this._drivingWidgetView(entry.item)",
 ], 'focused Driving workspace');
 includesAll(view, [
-  'drivingGroups: [drive, power, regen, onePedal, steer, esp]',
+  'drivingGroups: [drive, power, regen, steer]',
+  'drivingToggles: [onePedal, esp]',
   'drivingSummary:',
   'drivingNote:',
 ], 'popup fields come from the card builder');
+// The popup adopted the widget's boolean treatment: one tile that lights and
+// says which way it is set, rather than two competing ON/OFF tiles.
+const popupToggles = html.slice(html.indexOf('drivingToggles: [onePedal, esp]'),
+  html.indexOf('onDrivingOpen:', html.indexOf('drivingToggles: [onePedal, esp]')));
+includesAll(popupToggles, ["group.on ? 'ON' : 'OFF'", 'disabled: controlsDisabled'],
+  'popup toggles carry state and the write gate');
 
 // The widget shows every option, not a read-only hero: it was the one surface
 // where a mode could be seen but not changed.
@@ -259,14 +266,36 @@ assert.equal(html.split('<sc-if value="{{ wg.isDriving }}"').length - 1, 2,
   'the Driving card must render on both widget boards');
 assert.equal(html.split('class="hv-driving {{ wg.drivingSizeClass }}"').length - 1, 2,
   'both boards must size the Driving card from the item');
+// Three rows contain an option called "Normal" and two contain "Sport", so the
+// drive row carries each mode's own glyph beside the word.
+assert.equal(html.split('class="hv-driving-chip-icon"').length - 1, 2,
+  'both boards must render the chip icon');
+assert.match(html, /hasIcon: !!opt\.glyph/, 'chips take an optional leading icon');
+assert.match(html, /glyph: group\.key === 'car\.drive_setting\.drive_mode'/,
+  'drive options carry their glyph');
+// A lit border is a weak way to say "on" for a toggle.
+assert.match(html, /state: group\.on \? 'ON' : 'OFF'/, 'toggles spell out their state');
+// The chip markup nests <sc-if> for the optional icon and state, so the block
+// has to be balanced rather than cut at the first close tag.
+function scIfBlock(source, start) {
+  let depth = 0;
+  for (let i = start; i < source.length; i++) {
+    if (source.startsWith('<sc-if', i)) depth++;
+    else if (source.startsWith('</sc-if>', i)) {
+      depth--;
+      if (depth === 0) return source.slice(start, i + 8);
+    }
+  }
+  throw new Error('unbalanced sc-if');
+}
 const glanceStart = html.indexOf('<sc-if value="{{ wg.isDriving }}"');
-const glance = html.slice(glanceStart, html.indexOf('</sc-if>', glanceStart) + 8);
+const glance = scIfBlock(html, glanceStart);
 includesAll(glance, [
   '{{ wg.drivingSource }}',
   'list="{{ wg.drivingRows }}"',
   'list="{{ dr.chips }}"',
   '{{ dr.label }}',
-  '{{ dc.label }}',
+  '<span>{{ dc.label }}</span>',
   'class="hv-driving-row {{ dr.linesClass }}"',
   'disabled="{{ wg.drivingControlsDisabled }}"',
   'onClick="{{ wg.onDrivingOpen }}"',
@@ -279,7 +308,7 @@ assert.ok(!glance.includes('hv-driving-foot'),
 
 const popupStart = html.indexOf('<sc-if value="{{ focusedCardIsDriving }}"');
 assert.ok(popupStart >= 0, 'missing focused Driving popup');
-const popup = html.slice(popupStart, html.indexOf('</sc-if>', popupStart) + 8);
+const popup = scIfBlock(html, popupStart);
 includesAll(popup, [
   '{{ focusedDrivingSource }}',
   '{{ focusedDrivingSummary }}',
@@ -287,8 +316,10 @@ includesAll(popup, [
   'list="{{ dg.options }}"',
   '{{ dopt.label }}',
   'disabled="{{ dopt.disabled }}"',
-  '{{ focusedDrivingNote }}',
 ], 'focused Driving popup');
+// The note and the assist toggles sit outside the group loop.
+includesAll(html, ['{{ focusedDrivingNote }}', 'list="{{ focusedDrivingToggles }}"',
+  '{{ dtg.state }}'], 'popup note and assist toggles');
 
 includesAll(html, [
   "driving: { label: 'DRIVING'",
@@ -358,6 +389,32 @@ includesAll(css, [
 ], 'Driving card theme tokens');
 for (const size of ['1x1', '2x1', '3x1', '1x2']) {
   assert.ok(css.includes('.hv-driving-' + size), `missing ${size} card styling`);
+}
+
+// A press on a chip used to light the whole widget: :active applies to every
+// ancestor of the pressed element, and the card's own :active scales and rings
+// it. :has() would be tidier but the car runs WebView 91.
+assert.match(html, /item\.type === 'driving' \? ' has-controls' : ''/,
+  'a control-dense widget must mark its card');
+assert.match(html, /\.hv-widget-card\.has-controls:active \{[^}]*transform: none;/,
+  'the card must not take the press feedback for its own buttons');
+
+// The widget and the popup are one visual language: the chip is the popup's
+// option tile at a smaller size, muted through colour rather than opacity
+// (opacity also dims the icon).
+assert.ok(!/\.hv-driving-chip \{[^}]*opacity:\.6/.test(css),
+  'an unselected chip is muted by colour, not opacity');
+includesAll(css, [
+  '.hv-driving-chip.on { color:var(--hv-accent); border-color:currentColor;',
+  'box-shadow:inset 0 0 0 1px currentColor;',
+  '.hv-driving-chip-icon',
+], 'the widget chip follows the popup tile');
+
+// Every options grid needs its column rule; cols-2 was missing and the two
+// ASSIST toggles fell back to a four-column track, clipping "ONE-PEDAL" to "O…".
+for (const cols of ['cols-2', 'cols-3']) {
+  assert.ok(html.includes('.hv-driving-options.' + cols + ' { grid-template-columns:'),
+    'missing options column rule: ' + cols);
 }
 
 // ---------------------------------------------------------------------------
