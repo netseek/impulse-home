@@ -371,6 +371,20 @@ includesAll(native, [
   'item.setBackground(makeQuickMenuItemBackground(row.selected, last, density));',
   'states.addState(new int[] { android.R.attr.state_pressed }, pressed);',
 ], 'menu rows are centred pills with a pressed state');
+// Each driving card carries a soft wash in its mode's colour. Painted, not
+// shipped: no assets, no cold-start cost, both themes from one recipe, and no
+// redistribution question. The theme pass rebuilds every card background, so it
+// has to carry the wash or the cards repaint flat on the next payload.
+includesAll(native, [
+  'private int drivingWashColor(String state)',
+  'private int washForCardView(View card)',
+  'makeFrostStateDrawable(card.isSelected(), density,',
+  'RADIAL_GRADIENT',
+], 'the rail cards wear a mode wash that survives a theme sync');
+// The accent still owns selection and liveness everywhere on these cards; a
+// card-wide fill in that colour would drown the signal.
+assert.ok(!/case "eco": return dockAccentColor/.test(native),
+  'the wash must not be the configured accent');
 
 // A chip tap used to ask for a full 3D frame via componentDidUpdate, and the
 // widget card is backdrop-blurred, so repainting the canvas under it read as

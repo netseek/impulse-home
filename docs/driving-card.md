@@ -73,6 +73,36 @@ Writes are disabled — not silently dropped — when the vehicle is not `READY`
 the installed `TelemetryBridge` has no `setCarData`. Nothing reaches the bridge
 in that state.
 
+## The rail cards wear a soft wash
+
+Coffee OS fills these cards with per-mode artwork, which reads far warmer than a
+flat frost with line art on it. Ours is **painted, not shipped**: a gradient
+costs no assets, no download and no cold-start on a head unit that already takes
+~14s, works in both themes from one recipe, and cannot become a redistribution
+question the way lifted OEM art would. For scale, the OEM's own card images run
+268-574 KB each.
+
+`drivingWashColor` maps the card's state to a hue; `makeFrostLayer` blends it
+into the card's fill and adds a radial pool of light behind the graphic. Two
+things that had to be true:
+
+- **Tint the fill, do not veil it.** The first attempt laid a translucent layer
+  over a fill that is already 0xE0 opaque and it was invisible on screen. The
+  fill colours are blended toward the wash instead — strong at the top, nearly
+  gone by the bottom, so the readout keeps a clean ground.
+- **It is not the accent.** The accent means "selected" or "live" all over these
+  cards; a card-wide fill in that colour would drown the signal. These are scene
+  colours — green for eco, ice for snow, warm for sport — and the drive, power
+  and recovery families are pulled apart so three adjacent cards do not read as
+  one block.
+
+**`refreshQuickCardsTheme` rebuilds every card background**, so it has to carry
+the wash too. It does not have the descriptor, only the view, which is what
+`washForCardView` and `lastDrivingWash` are for. Getting this wrong is silent:
+the card paints correctly at build time and then goes flat on the next payload,
+which looks exactly like the wash never having worked at all. Two other repaints
+in that method were also clearing the maps that make it work.
+
 ## The rail card opens a quick menu
 
 Coffee OS pops a short list of the modes when you touch the card, with the full

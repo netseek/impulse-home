@@ -892,6 +892,9 @@ public final class MainActivity extends Activity {
             new java.util.HashMap<>();
     private final java.util.Map<String, QuickCardGraphicView> quickCardGraphics =
             new java.util.HashMap<>();
+    /** Card root by id, so a mode change can repaint the wash without a rebuild. */
+    private final java.util.Map<String, View> quickCardHosts = new java.util.HashMap<>();
+    private final java.util.Map<String, Integer> lastDrivingWash = new java.util.HashMap<>();
     private android.widget.ImageView quickMediaArt;
     private boolean quickMediaHasArt;
     private android.widget.TextView quickMediaTitle;
@@ -6454,7 +6457,41 @@ public final class MainActivity extends Activity {
         refreshDesktopIndicator();
     }
 
+    /**
+     * Mode hue for a driving card's wash, or 0 for no wash.
+     *
+     * Deliberately not the accent: the accent means "this is selected/live" all
+     * over these cards, and a card-wide fill in that colour would drown the
+     * signal. These are scene colours — green for eco, ice for snow — and they
+     * sit under everything at low alpha.
+     */
+    private int drivingWashColor(String state) {
+        if (state == null) return 0;
+        switch (state) {
+            case "eco": return 0xFF4FBF6A;
+            case "normal": return 0xFF4A7FB5;
+            case "sport": return 0xFFE0603F;
+            case "snow": return 0xFF6FB6E8;
+            case "sand": return 0xFFD9A650;
+            case "mud": return 0xFF9A7346;
+            case "awd": return 0xFF5C7A94;
+            case "hev": return 0xFF7C74D6;
+            case "evp": return 0xFF4F93DA;
+            case "ev": return 0xFF35B98F;
+            case "level1": return 0xFF6E7A93;
+            case "level2": return 0xFF4C86C4;
+            case "level3": return 0xFF3C63C0;
+            case "onepedal": return 0xFF7C4FD0;
+            default: return 0;
+        }
+    }
+
     private android.graphics.drawable.Drawable makeFrostLayer(boolean selected, float density) {
+        return makeFrostLayer(selected, density, 0);
+    }
+
+    private android.graphics.drawable.Drawable makeFrostLayer(
+            boolean selected, float density, int wash) {
         int inset = Math.max(1, Math.round(density));
         float radius = 16f * density;
         android.graphics.drawable.GradientDrawable rim = new android.graphics.drawable.GradientDrawable(
@@ -6475,21 +6512,56 @@ public final class MainActivity extends Activity {
                     ? new int[] { blendArgb(0xEB18232D, dockAccentColor, 0.08f), 0xE00E141B }
                     : new int[] { 0xE01A222D, 0xD90E141B };
         }
+        if (wash != 0) {
+            // Strongest at the top of the card and nearly gone by the bottom, so
+            // the readout keeps a clean ground to sit on.
+            float top = dockUiLight ? 0.22f : 0.34f;
+            float bottom = dockUiLight ? 0.02f : 0.04f;
+            fillColors = new int[] {
+                blendArgb(fillColors[0], wash, top),
+                blendArgb(fillColors[fillColors.length - 1], wash, bottom),
+            };
+        }
         android.graphics.drawable.GradientDrawable fill = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, fillColors);
         fill.setCornerRadius(Math.max(0f, radius - inset));
+        if (wash == 0) {
+            android.graphics.drawable.LayerDrawable plain =
+                    new android.graphics.drawable.LayerDrawable(new Drawable[] { rim, fill });
+            plain.setLayerInset(1, inset, inset, inset, inset);
+            return plain;
+        }
+
+        // A soft pool of light behind the graphic. This is the part that reads
+        // as imagery rather than as a coloured panel.
+        android.graphics.drawable.GradientDrawable glow =
+                new android.graphics.drawable.GradientDrawable();
+        glow.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        glow.setCornerRadius(Math.max(0f, radius - inset));
+        glow.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
+        glow.setGradientCenter(0.22f, 0.34f);
+        glow.setGradientRadius(118f * density);
+        glow.setColors(new int[] { withAlpha(wash, dockUiLight ? 0x5A : 0x86),
+                withAlpha(wash, dockUiLight ? 0x18 : 0x24), withAlpha(wash, 0) });
+
         android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
-                new Drawable[] { rim, fill });
+                new Drawable[] { rim, fill, glow });
         layers.setLayerInset(1, inset, inset, inset, inset);
+        layers.setLayerInset(2, inset, inset, inset, inset);
         return layers;
     }
 
     private android.graphics.drawable.Drawable makeFrostStateDrawable(
             boolean selected, float density) {
+        return makeFrostStateDrawable(selected, density, 0);
+    }
+
+    private android.graphics.drawable.Drawable makeFrostStateDrawable(
+            boolean selected, float density, int wash) {
         android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
-        states.addState(new int[] { android.R.attr.state_pressed }, makeFrostLayer(true, density));
-        states.addState(new int[] { android.R.attr.state_selected }, makeFrostLayer(true, density));
-        states.addState(new int[0], makeFrostLayer(selected, density));
+        states.addState(new int[] { android.R.attr.state_pressed }, makeFrostLayer(true, density, wash));
+        states.addState(new int[] { android.R.attr.state_selected }, makeFrostLayer(true, density, wash));
+        states.addState(new int[0], makeFrostLayer(selected, density, wash));
         return states;
     }
 
@@ -6524,6 +6596,8 @@ public final class MainActivity extends Activity {
     private void populateQuickCardsRow(android.widget.LinearLayout row, float density) {
         row.removeAllViews();
         quickCardViews.clear();
+        quickCardHosts.clear();
+        lastDrivingWash.clear();
         quickClimateValue = null;
         quickConsumptionValue = null;
         quickCardValues.clear();
@@ -6620,9 +6694,12 @@ public final class MainActivity extends Activity {
                 return true;
             });
         }
-        card.setBackground(makeFrostStateDrawable(false, density));
+        card.setBackground(makeFrostStateDrawable(false, density,
+                drivingWashColor(descriptor.state)));
         card.setElevation(3f * density);
         quickCardViews.add(card);
+        quickCardHosts.put(descriptor.id, card);
+        lastDrivingWash.put(descriptor.id, drivingWashColor(descriptor.state));
 
         android.widget.LinearLayout header = new android.widget.LinearLayout(this);
         header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -7067,11 +7144,28 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /**
+     * The mode wash a card view is currently wearing.
+     *
+     * The theme pass only has the view, not the descriptor, and it rebuilds every
+     * background — so without this it repaints the driving cards flat on the next
+     * payload and the wash silently disappears.
+     */
+    private int washForCardView(View card) {
+        Object tag = card.getTag();
+        if (!(tag instanceof String)) return 0;
+        String id = (String) tag;
+        if (!id.startsWith("bottomCard:")) return 0;
+        Integer wash = lastDrivingWash.get(id.substring("bottomCard:".length()));
+        return wash == null ? 0 : wash;
+    }
+
     private void refreshQuickCardsTheme() {
         float density = getResources().getDisplayMetrics().density;
         for (View card : quickCardViews) {
             if (card == null) continue;
-            card.setBackground(makeFrostStateDrawable(card.isSelected(), density));
+            card.setBackground(makeFrostStateDrawable(card.isSelected(), density,
+                    washForCardView(card)));
             tintFrostText(card);
         }
         if (quickMediaPlayPause != null) {
@@ -8261,6 +8355,15 @@ public final class MainActivity extends Activity {
             }
             QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
             if (graphic != null) graphic.setDescriptor(card);
+            // The rail is patched in place rather than rebuilt, so a mode change
+            // has to repaint the card's own background too.
+            View host = quickCardHosts.get(card.id);
+            int wash = drivingWashColor(card.state);
+            if (host != null && wash != lastDrivingWash.getOrDefault(card.id, -1)) {
+                lastDrivingWash.put(card.id, wash);
+                float density = getResources().getDisplayMetrics().density;
+                host.setBackground(makeFrostStateDrawable(false, density, wash));
+            }
             updateBottomCardAccessibility(value != null ? value : graphic, card);
         }
     }
