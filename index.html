@@ -6529,6 +6529,9 @@ const H6_DRIVING_LEGACY_WIDGET_TYPES = { modes: 'driving' };
 
 /** Rail card id -> the CAR_MODE_GROUPS name its quick menu writes. */
 const H6_DRIVING_MENU_GROUPS = { driveMode: 'drive', powerMode: 'power', regen: 'regen' };
+/** Drive-mode value for Sport, and the accent the interface borrows while it is on. */
+const CAR_DRIVE_MODE_SPORT = '1';
+const CAR_SPORT_ACCENT = '#e0392c';
 /** Prefix for a quick-menu write. Everything after it is re-validated on arrival. */
 const H6_DRIVING_SET_PREFIX = 'drivingSet:';
 
@@ -29179,7 +29182,7 @@ class Component extends DCLogic {
       return items;
     }, []);
     return {
-      accentColor: s.accentColor || '#2aa7b7',
+      accentColor: this._effectiveAccentColor(),
       desktopSwitcherDisplay: (!s.error && (!s.loading || this._viewerReady)
         && !s.desktopStudioOpen && !s.focusedCardType
         && !s.widgetPickerStep && !s.widgetPlaceType && !s.widgetPlaceMode) ? 'flex' : 'none',
@@ -30537,7 +30540,7 @@ class Component extends DCLogic {
       activeDesktopName: activeDesktopName,
       activeDesktopIndex: activeDesktopIndex,
       desktopCount: desktopCount,
-      accent: s.accentColor || '#2aa7b7',
+      accent: this._effectiveAccentColor(),
       desktopStudioOpen: !!s.desktopStudioOpen,
       bottomCards: bottomCards,
       // Compatibility field for native consumers: enabled count is the limit.
@@ -30645,6 +30648,19 @@ class Component extends DCLogic {
     const group = CAR_MODE_GROUPS[index];
     if (!group || !group.options.some((opt) => opt.value === value)) return;
     this._setCarMode(group.stateKey, group.key, value);
+  }
+
+  /**
+   * The accent to paint with right now.
+   *
+   * Sport borrows the interface for as long as it is selected. Nothing is
+   * persisted — `accentColor` in state is still whatever the user chose — so
+   * leaving Sport restores their colour without a write.
+   */
+  _effectiveAccentColor() {
+    const chosen = this.state.accentColor || '#2aa7b7';
+    return this.state[CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.drive].stateKey]
+      === CAR_DRIVE_MODE_SPORT ? CAR_SPORT_ACCENT : chosen;
   }
 
   _cycleDriveRoadMode() {

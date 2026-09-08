@@ -381,6 +381,20 @@ includesAll(native, [
   'makeFrostStateDrawable(card.isSelected(), density,',
   'RADIAL_GRADIENT',
 ], 'the rail cards wear a mode wash that survives a theme sync');
+// Sport is the one mode allowed to overrule the configured accent, and only for
+// display: state.accentColor is never written, so leaving Sport restores the
+// user's colour without a write.
+assert.match(html, /const CAR_SPORT_ACCENT = '#e0392c';/, 'sport accent');
+const effAccent = blockFrom(html, '  _effectiveAccentColor() {', 'effective accent');
+includesAll(effAccent, ['CAR_DRIVE_MODE_SPORT', 'CAR_SPORT_ACCENT'], 'sport borrows the accent');
+assert.ok(effAccent.indexOf('accentColor:') < 0,
+  'the sport accent must never be persisted over the user choice');
+includesAll(html, ['accentColor: this._effectiveAccentColor(),', 'accent: this._effectiveAccentColor(),'],
+  'both the page and the rail get the effective accent');
+// Accent-tinted icons bake their colour in at build time, so the rail has to be
+// rebuilt when it changes or they keep the old one.
+includesAll(native, ['if (accentChanged) rebuildQuickCardsRow();'],
+  'the rail rebuilds when the accent changes');
 // The accent still owns selection and liveness everywhere on these cards; a
 // card-wide fill in that colour would drown the signal.
 assert.ok(!/case "eco": return dockAccentColor/.test(native),

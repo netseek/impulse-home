@@ -6470,7 +6470,7 @@ public final class MainActivity extends Activity {
         switch (state) {
             case "eco": return 0xFF4FBF6A;
             case "normal": return 0xFF4A7FB5;
-            case "sport": return 0xFFE0603F;
+            case "sport": return 0xFFE0392C;
             case "snow": return 0xFF6FB6E8;
             case "sand": return 0xFFD9A650;
             case "mud": return 0xFF9A7346;
@@ -8068,13 +8068,22 @@ public final class MainActivity extends Activity {
             if (o.has("activeDesktopIndex")) {
                 activeDesktopIndex = Math.max(0, o.optInt("activeDesktopIndex", 0));
             }
+            boolean accentChanged = false;
             if (o.has("accent")) {
                 String accent = o.optString("accent", "");
                 if (accent != null && accent.trim().startsWith("#")) {
-                    dockAccentColor = parseCssColor(accent.trim(), dockAccentColor);
+                    int next = parseCssColor(accent.trim(), dockAccentColor);
+                    accentChanged = next != dockAccentColor;
+                    dockAccentColor = next;
                 }
             }
             applyBottomCardsConfiguration(o);
+            // Icons and graphics bake the accent in when they are built, and
+            // refreshQuickCardsTheme only repaints backgrounds and text -- so an
+            // accent change has to rebuild the rail or tinted children keep the
+            // old colour. Rare enough to be free, and Sport now changes the
+            // accent often enough that a stale tint is visible.
+            if (accentChanged) rebuildQuickCardsRow();
             applyQuickCardIndicators(o);
             if (o.has("model")) {
                 String v = o.optString("model", dockModelLabel);
