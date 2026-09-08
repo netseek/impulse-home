@@ -191,10 +191,20 @@ includesAll(tiresPayload, [
   'state: tires.tiresOverallState',
   'wheelStates: tires.tiresWheelStates',
 ], 'structured Tires native payload');
+includesAll(syncDock, [
+  'const isDemoBottomCard =',
+  'const bottomCardDemoSources =',
+  'demo: isDemoBottomCard(bottomCardDemoSources[card.id])',
+], 'bottom-card demo payload');
 
 includesAll(native, [
   'final String state;',
   'final String[] wheelStates;',
+  'final boolean demo;',
+  'raw.optBoolean("demo", false)',
+  'quickCardDemoBadges',
+  'demoBadge.setText("DEMO")',
+  'demoBadge.setTag("frostAccent")',
   'raw.optString("state",',
   'raw.optString("wheelStates",',
   'sanitizeTiresState(',
@@ -217,8 +227,13 @@ const nativeReadouts = blockFrom(native, '        private void drawTireReadouts(
 assert.match(nativeReadouts, /for\s*\(int\s+i\s*=\s*0;\s*i\s*<\s*4;\s*i\+\+\)/,
   'native renderer must draw exactly four state-driven readouts');
 includesAll(nativeReadouts, ['tireReadings(descriptor)', 'descriptor.wheelStates',
-  '"FL", "FR", "RL", "RR"'], 'native corner readouts');
+  'float[] valueYs'], 'native pressure-only readouts');
+assert.ok(!nativeReadouts.includes('"FL", "FR", "RL", "RR"'),
+  'native compact Tires card must not label pressures with wheel abbreviations');
 assert.ok(!nativeReadouts.includes('drawCircle'), 'native corner readouts must contain no dots');
+const nativeTiresRaster = blockFrom(native, '        private void drawTiresRaster(', 'drawTiresRaster()');
+assert.ok(!nativeTiresRaster.includes('drawRoundRect'),
+  'native compact Tires card must not add a rounded background behind the vehicle');
 const nativeTireColor = blockFrom(native, '        private int tireSignalColor(', 'tireSignalColor()');
 assert.match(nativeTireColor, /if\s*\("demo"\.equals\(descriptor\.state\)\)\s*return\s+dockLabelColor\(\);/,
   'normal demo readings must use the native primary text color');

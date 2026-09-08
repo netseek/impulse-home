@@ -34,25 +34,28 @@ includesAll(html, [
   "{ id: 'navigation', title: 'Navigation', action: 'openNavigation' }",
   "{ id: 'climate', title: 'Climate', action: 'openClimate' }",
   "{ id: 'consumption', title: 'Consumption', action: 'openConsumption' }",
-  "{ id: 'range', title: 'Range', action: 'openPower' }",
-  "{ id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' }",
+  "{ id: 'range', title: 'Range', action: 'openRange' }",
+  "{ id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' }",
   "{ id: 'tires', title: 'Tires', action: 'openTires' }",
   "{ id: 'clock', title: 'Clock', action: 'openDesktopStudio' }",
   "{ id: 'driveMode', title: 'Drive mode', action: 'cycleDriveMode' }",
   "{ id: 'powerMode', title: 'Power mode', action: 'cyclePowerMode' }",
   "{ id: 'regen', title: 'Energy recovery', action: 'cycleRegenMode' }",
-  "{ id: 'roof', title: 'Sunroof / shade', action: 'openRoofControls' }",
   "case 'openNavigation':",
   "case 'openClimate':",
   "case 'openConsumption':",
+  "case 'openRange':",
   "case 'openTires':",
+  "case 'openVehicleStatus':",
   "case 'cycleDriveMode':",
   "case 'cyclePowerMode':",
   "case 'cycleRegenMode':",
   "case 'openRoofControls':",
 ], 'command wiring');
+assert.ok(!html.includes("{ id: 'roof', title: 'Sunroof / shade', action: 'openRoofControls' }"), 'Roof is unified into Vehicle Status, not a competing card');
 assert.ok(!html.includes("{ id: 'consumption', title: 'Consumption', action: 'addWidget' }"), 'Consumption must not open addWidget');
 assert.ok(!html.includes("{ id: 'tires', title: 'Tires', action: 'openDesktopStudio' }"), 'Tires must not open Desktop Studio');
+assert.ok(!html.includes("{ id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' }"), 'Vehicle status must not open Desktop Studio');
 
 // CoffeeOS-style glance widgets remain page-owned cards: they are selectable
 // from the visual picker and render in both widget boards.
@@ -87,9 +90,9 @@ const dockIndicators = method('_syncDockIndicators');
 includesAll(dockIndicators, [
   'const bottomVisuals = {',
   'primary: navigation.navigationDistance',
-  "secondary: 'REMAINING SOC'",
-  "metricA: range.rangeEv + ' km EV'",
-  'progress: percent(range.rangePct, 0)',
+  'secondary: range.rangeSource',
+  "metricA: 'EV ' + range.rangeEv + ' ' + range.rangeUnit",
+  'progress: percent(range.rangeSoc, 0)',
   'Object.assign({',
   'bottomVisuals[card.id] || {}',
 ], 'graphic bottom-card payload');
@@ -103,10 +106,12 @@ includesAll(method('_setRoofLevelPopup'), [
   "classList.toggle('lit'",
 ], 'roof popup visibility');
 includesAll(html, [
-  'class="hv-hs-roof-car-stage"',
-  'class="hv-hs-roof-car-image"',
-  'src="./assets/ui/roof-top-view-v1.png"',
-  'class="hv-hs-roof-glass"',
+  'class="hv-hs-vehicle-stage"',
+  'class="hv-hs-vehicle-art"',
+  'src="./assets/ui/vehicle-status/base.png"',
+  'class="hv-vehicle-roof"',
+  'src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png"',
+  'src="./assets/ui/vehicle-status/roof-glass-front-v3.png"',
   'aria-label="Sunroof opening"',
   'aria-label="Sunshade opening"',
   "'--sun-level' : '--curtain-level'",

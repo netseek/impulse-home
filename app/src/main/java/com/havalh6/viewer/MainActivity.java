@@ -92,8 +92,8 @@ public final class MainActivity extends Activity {
                     "toggleCenterFill", "configureWallpaper", "closePanel",
                     // Navigation-only commands implemented by the web shell. They do not
                     // invoke vehicle APIs from Android.
-                    "openClimate", "openConsumption", "openNavigation", "openPower",
-                    "openTires", "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
+                    "openClimate", "openConsumption", "openNavigation", "openPower", "openRange",
+                    "openTires", "openVehicleStatus", "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
                     "openRoofControls"
             ));
 
@@ -141,8 +141,15 @@ public final class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final String ASSET_HOST = "appassets.androidplatform.net";
     private static final String ASSET_PREFIX = "/assets/";
+    /**
+     * Bump whenever the packaged WebView bundle changes. Android System WebView
+     * can retain an appassets response across a same-version debug reinstall,
+     * otherwise leaving the native shell paired with a previous index.html.
+     */
+    private static final String VIEWER_ASSET_REVISION = "vehicle-status-v14";
     private static final String VIEWER_URL =
-            "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android";
+            "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
+                    + VIEWER_ASSET_REVISION;
 
     /** Demo telemetry is an emulator concern; a real head unit must fail visibly, never fabricate. */
     private static boolean isProbablyEmulator() {
@@ -888,6 +895,9 @@ public final class MainActivity extends Activity {
             new java.util.HashMap<>();
     private final java.util.Map<String, QuickCardGraphicView> quickCardGraphics =
             new java.util.HashMap<>();
+    /** Accent DEMO markers in web-configured card headers, keyed by card id. */
+    private final java.util.Map<String, android.widget.TextView> quickCardDemoBadges =
+            new java.util.HashMap<>();
     private android.widget.ImageView quickMediaArt;
     private boolean quickMediaHasArt;
     private android.widget.TextView quickMediaTitle;
@@ -936,10 +946,13 @@ public final class MainActivity extends Activity {
         /** Dynamic Tires semantics; deliberately excluded from structural comparison. */
         final String state;
         final String[] wheelStates;
+        /** Status opening order: FL, FR, RL, RR, tailgate. */
+        final String[] openingStates;
+        final boolean demo;
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
-                String state, String[] wheelStates) {
+                String state, String[] wheelStates, String[] openingStates, boolean demo) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -951,6 +964,8 @@ public final class MainActivity extends Activity {
             this.progress = Math.max(0, Math.min(100, progress));
             this.state = state;
             this.wheelStates = wheelStates;
+            this.openingStates = openingStates;
+            this.demo = demo;
         }
     }
 
@@ -962,6 +977,8 @@ public final class MainActivity extends Activity {
         private final android.graphics.RectF oval = new android.graphics.RectF();
         private Bitmap tiresTopViewBitmap;
         private boolean tiresTopViewDecodeAttempted;
+        private final java.util.Map<String, Bitmap> statusVehicleBitmaps =
+                new java.util.HashMap<>();
 
         QuickCardGraphicView(Context context, BottomCardDescriptor descriptor) {
             super(context);
@@ -987,7 +1004,7 @@ public final class MainActivity extends Activity {
             int strong = dockUiLight ? 0xCC25303B : 0xE6FFFFFF;
             switch (descriptor.id) {
                 case "range": drawRing(canvas, w, h, accent, muted, true); break;
-                case "status": drawGauge(canvas, w, h, accent, muted, strong); break;
+                case "status": drawVehicleStatus(canvas, w, h, accent, muted, strong); break;
                 case "climate": drawClimate(canvas, w, h, accent, muted); break;
                 case "consumption": drawBars(canvas, w, h, accent, muted); break;
                 case "navigation": drawNavigation(canvas, w, h, accent, muted); break;
@@ -1053,6 +1070,141 @@ public final class MainActivity extends Activity {
                     cy + (float) Math.sin(a) * r, paint);
             fill(accent);
             c.drawCircle(cx, cy, Math.max(3f, w * .055f), paint);
+        }
+
+        /**
+         * Status deliberately shares the realistic top-view raster with Tires;
+         * opening strokes are placed beside their physical door/tailgate edge,
+         * never as generic dashboard dots.
+         */
+        private void drawVehicleStatus(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            Bitmap base = getStatusVehicleBitmap("base.png");
+            // The raster reserves transparent margins for the open-door states. Let the
+            // destination extend slightly past the view vertically (transparent pixels only)
+            // and widen it a touch so the vehicle remains legible at launcher-card size.
+            // Visible pixels occupy x=30..464 and y=14..654 of the 494x675 source canvas.
+            float imageH = h * 1.05f;
+            float imageW = base == null ? w * .25f
+                    : imageH * base.getWidth() / Math.max(1f, base.getHeight()) * 1.08f;
+            imageW = Math.min(imageW, w * .38f);
+            float left = w * .035f;
+            float top = -h * .019f;
+            android.graphics.RectF vehicleRect = new android.graphics.RectF(
+                    left, top, left + imageW, top + imageH);
+            if (base != null) {
+                paint.setAlpha(dockUiLight ? 238 : 255);
+                c.drawBitmap(base, null, vehicleRect, paint);
+                paint.setAlpha(255);
+            } else {
+                c.save();
+                c.translate(left - w * .37f, 0f);
+                drawStatusVehicleFallback(c, w, h, muted, strong);
+                c.restore();
+            }
+            String[] openings = descriptor.openingStates == null ? new String[0]
+                    : descriptor.openingStates;
+            // Darken only the matching door footprint before drawing an open panel.
+            // The repository's doorless base retains bright pillar/rocker pixels which
+            // otherwise resemble a second, closed door at compact card size.
+            String[] cavityAssets = {"door-fl-cavity-v1.png", "door-fr-cavity-v1.png",
+                    "door-rl-cavity-v1.png", "door-rr-cavity-v1.png"};
+            for (int i = 0; i < cavityAssets.length; i++) {
+                String opening = i < openings.length ? openings[i] : "unknown";
+                if (!"open".equals(opening)) continue;
+                Bitmap layer = getStatusVehicleBitmap(cavityAssets[i]);
+                if (layer != null) c.drawBitmap(layer, null, vehicleRect, paint);
+            }
+            String[] closedAssets = {"door-fl-closed-v4.png", "door-fr-closed-v4.png",
+                    "door-rl-closed-v4.png", "door-rr-closed-v4.png"};
+            for (int i = 0; i < closedAssets.length; i++) {
+                String opening = i < openings.length ? openings[i] : "unknown";
+                if ("open".equals(opening)) continue;
+                Bitmap layer = getStatusVehicleBitmap(closedAssets[i]);
+                if (layer != null) c.drawBitmap(layer, null, vehicleRect, paint);
+            }
+            String[] assets = {"door-fl-open-v3.png", "door-fr-open-v3.png",
+                    "door-rl-open-v3.png", "door-rr-open-v3.png", "tailgate-open-v2.png"};
+            android.graphics.ColorMatrix vividRed = new android.graphics.ColorMatrix();
+            vividRed.setSaturation(1.55f);
+            paint.setColorFilter(new android.graphics.ColorMatrixColorFilter(vividRed));
+            for (int i = 0; i < 5; i++) {
+                String opening = i < openings.length ? openings[i] : "unknown";
+                if (!"open".equals(opening)) continue;
+                Bitmap layer = getStatusVehicleBitmap(assets[i]);
+                if (layer != null) c.drawBitmap(layer, null, vehicleRect, paint);
+            }
+            paint.setColorFilter(null);
+            float textLeft = w * .43f;
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.NORMAL));
+            float primaryTextSize = Math.max(14f, Math.min(w, h) * .18f);
+            paint.setTextSize(primaryTextSize);
+            String primaryText = descriptor.primary.isEmpty()
+                    ? "Status unavailable" : descriptor.primary;
+            float primaryMaxWidth = w - textLeft - w * .03f;
+            float primaryWidth = paint.measureText(primaryText);
+            // Preserve the full phrase for accessibility/popup copy, but drop
+            // the redundant word "door" when a compact native card cannot fit it.
+            if (primaryWidth > primaryMaxWidth && primaryText.endsWith(" door open")) {
+                primaryText = primaryText.substring(0,
+                        primaryText.length() - " door open".length()) + " open";
+                primaryWidth = paint.measureText(primaryText);
+            }
+            if (primaryWidth > primaryMaxWidth && primaryWidth > 0f) {
+                paint.setTextSize(Math.max(13f,
+                        primaryTextSize * primaryMaxWidth / primaryWidth));
+            }
+            fill(hasOpenStatusOpening(openings) ? 0xFFFF5360 : strong);
+            c.drawText(primaryText, textLeft, h * .47f, paint);
+            paint.setTextSize(Math.max(7f, Math.min(w, h) * .075f));
+            fill(withAlpha(muted, 0xD8));
+            c.drawText(ellipsizeStatusText(descriptor.secondary, w - textLeft - w * .03f),
+                    textLeft, h * .67f, paint);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+        }
+
+        private String ellipsizeStatusText(String value, float maxWidth) {
+            if (value == null || value.isEmpty() || paint.measureText(value) <= maxWidth) {
+                return value == null ? "" : value;
+            }
+            String ellipsis = "…";
+            int end = value.length();
+            while (end > 0 && paint.measureText(value.substring(0, end) + ellipsis) > maxWidth) {
+                end--;
+            }
+            return value.substring(0, end) + ellipsis;
+        }
+
+        private Bitmap getStatusVehicleBitmap(String filename) {
+            if (statusVehicleBitmaps.containsKey(filename)) return statusVehicleBitmaps.get(filename);
+            Bitmap bitmap = null;
+            try (InputStream stream = getAssets().open(
+                    "www/assets/ui/vehicle-status/" + filename)) {
+                bitmap = BitmapFactory.decodeStream(stream);
+            } catch (IOException | RuntimeException error) {
+                Log.w(TAG, "Optional status vehicle asset unavailable: " + filename, error);
+            }
+            statusVehicleBitmaps.put(filename, bitmap);
+            return bitmap;
+        }
+
+        private boolean hasOpenStatusOpening(String[] openings) {
+            for (String opening : openings) if ("open".equals(opening)) return true;
+            return false;
+        }
+
+        private void drawStatusVehicleFallback(android.graphics.Canvas c, float w, float h,
+                int muted, int strong) {
+            android.graphics.Path body = new android.graphics.Path();
+            body.moveTo(w * .45f, h * .08f); body.quadTo(w * .50f, h * .03f, w * .55f, h * .08f);
+            body.lineTo(w * .63f, h * .25f); body.lineTo(w * .63f, h * .76f);
+            body.quadTo(w * .60f, h * .86f, w * .55f, h * .88f); body.lineTo(w * .45f, h * .88f);
+            body.quadTo(w * .40f, h * .86f, w * .37f, h * .76f); body.lineTo(w * .37f, h * .25f); body.close();
+            fill(withAlpha(muted, 0x30)); c.drawPath(body, paint);
+            stroke(strong, Math.max(1.5f, w * .018f)); c.drawPath(body, paint);
         }
 
         private void drawClimate(android.graphics.Canvas c, float w, float h,
@@ -1147,10 +1299,6 @@ public final class MainActivity extends Activity {
             android.graphics.RectF destination = new android.graphics.RectF(
                     left, top, left + imageW, top + imageH);
 
-            // A restrained halo separates the transparent silver vehicle in both themes.
-            fill(dockUiLight ? 0x1425303B : 0x1FFFFFFF);
-            c.drawRoundRect(left - w * .035f, top, left + imageW + w * .035f,
-                    top + imageH, imageW * .32f, imageW * .32f, paint);
             paint.setAlpha(dockUiLight ? 238 : 255);
             c.drawBitmap(topView, null, destination, paint);
             paint.setAlpha(255);
@@ -1188,14 +1336,12 @@ public final class MainActivity extends Activity {
             drawTireReadouts(c, w, h, accent, muted);
         }
 
-        /** Popup-like composition: vehicle centered, values beside the matching wheel. */
+        /** Compact composition: vehicle centered, pressure values beside each wheel. */
         private void drawTireReadouts(android.graphics.Canvas c, float w, float h,
                 int accent, int muted) {
             String[] readings = tireReadings(descriptor);
-            String[] labels = {"FL", "FR", "RL", "RR"};
             float[] xs = {w * .29f, w * .71f, w * .29f, w * .71f};
-            float[] labelYs = {h * .20f, h * .20f, h * .64f, h * .64f};
-            float[] valueYs = {h * .42f, h * .42f, h * .86f, h * .86f};
+            float[] valueYs = {h * .31f, h * .31f, h * .79f, h * .79f};
             for (int i = 0; i < 4; i++) {
                 String wheelState = descriptor.wheelStates != null
                         && i < descriptor.wheelStates.length
@@ -1204,11 +1350,6 @@ public final class MainActivity extends Activity {
                 boolean left = i == 0 || i == 2;
                 paint.setTextAlign(left
                         ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
-                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                        android.graphics.Typeface.NORMAL));
-                paint.setTextSize(Math.max(8f, Math.min(w, h) * .105f));
-                fill(withAlpha(signalColor, 0xB8));
-                c.drawText(labels[i], xs[i], labelYs[i], paint);
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.BOLD));
                 paint.setTextSize(Math.max(15f, Math.min(w, h) * .205f));
@@ -6388,6 +6529,7 @@ public final class MainActivity extends Activity {
         quickCardValues.clear();
         quickCardDetails.clear();
         quickCardGraphics.clear();
+        quickCardDemoBadges.clear();
         quickMediaArt = null;
         quickMediaHasArt = false;
         quickMediaTitle = null;
@@ -6474,6 +6616,22 @@ public final class MainActivity extends Activity {
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                 Math.round(22 * density)));
 
+        android.widget.TextView demoBadge = new android.widget.TextView(this);
+        demoBadge.setTag("frostAccent");
+        demoBadge.setText("DEMO");
+        demoBadge.setTextSize(8f);
+        demoBadge.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.BOLD));
+        demoBadge.setLetterSpacing(0.10f);
+        demoBadge.setVisibility(descriptor.demo ? View.VISIBLE : View.GONE);
+        android.widget.LinearLayout.LayoutParams demoBadgeLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        demoBadgeLp.rightMargin = Math.round(7 * density);
+        header.addView(demoBadge, demoBadgeLp);
+        quickCardDemoBadges.put(descriptor.id, demoBadge);
+
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setTag("frostSecondary");
         heading.setText(descriptor.title.toUpperCase(java.util.Locale.US));
@@ -6507,8 +6665,8 @@ public final class MainActivity extends Activity {
         content.setLayoutParams(contentLp);
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
-        boolean tiresCard = "tires".equals(descriptor.id);
-        if (tiresCard) {
+        boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id);
+        if (fullGraphicCard) {
             graphic.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
             content.addView(graphic);
@@ -7895,16 +8053,22 @@ public final class MainActivity extends Activity {
             String metricA = cleanBottomCardText(raw.optString("metricA", ""), 32);
             String metricB = cleanBottomCardText(raw.optString("metricB", ""), 32);
             int progress = Math.max(0, Math.min(100, raw.optInt("progress", 0)));
+            boolean demo = raw.optBoolean("demo", false);
             if (id.isEmpty() || title.isEmpty() || !BOTTOM_CARD_ACTIONS.contains(action)) continue;
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
-                            raw.optString("tireState", "unavailable"))) : "";
+                            raw.optString("tireState", "unavailable")))
+                    : ("status".equals(id) ? sanitizeStatusState(raw.optString("state", "unavailable")) : "");
             String[] wheelStates = "tires".equals(id)
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))
                     : new String[] {"unavailable", "unavailable", "unavailable", "unavailable"};
+            String[] openingStates = "status".equals(id)
+                    ? sanitizeOpeningStates(raw.optString("openingStates", ""))
+                    : new String[] {"unknown", "unknown", "unknown", "unknown", "unknown"};
             next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
-                    action, primary, secondary, metricA, metricB, progress, state, wheelStates));
+                    action, primary, secondary, metricA, metricB, progress, state, wheelStates,
+                    openingStates, demo));
         }
 
         int requested = root.has("bottomCardLimit")
@@ -7960,6 +8124,29 @@ public final class MainActivity extends Activity {
         return sanitized;
     }
 
+    private String sanitizeStatusState(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US);
+        switch (normalized) {
+            case "live": case "demo": case "partial": case "stale": case "unavailable":
+                return normalized;
+            default: return "unavailable";
+        }
+    }
+
+    /** Defensive parser for the web's physically ordered FL/FR/RL/RR/tailgate payload. */
+    private String[] sanitizeOpeningStates(String value) {
+        String[] sanitized = {"unknown", "unknown", "unknown", "unknown", "unknown"};
+        if (value == null || value.trim().isEmpty()) return sanitized;
+        String[] raw = value.split(",", -1);
+        for (int i = 0; i < sanitized.length && i < raw.length; i++) {
+            String state = raw[i].trim().toLowerCase(java.util.Locale.US);
+            if ("open".equals(state) || "closed".equals(state) || "unknown".equals(state)) {
+                sanitized[i] = state;
+            }
+        }
+        return sanitized;
+    }
+
     private boolean sameBottomCardStructure(List<BottomCardDescriptor> a,
             List<BottomCardDescriptor> b) {
         if (a.size() != b.size()) return false;
@@ -7986,6 +8173,8 @@ public final class MainActivity extends Activity {
             if (detail != null && !detailText.equals(detail.getText().toString())) {
                 detail.setText(detailText);
             }
+            android.widget.TextView demoBadge = quickCardDemoBadges.get(card.id);
+            if (demoBadge != null) demoBadge.setVisibility(card.demo ? View.VISIBLE : View.GONE);
             QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
             if (graphic != null) graphic.setDescriptor(card);
             updateBottomCardAccessibility(value != null ? value : graphic, card);
@@ -8007,6 +8196,20 @@ public final class MainActivity extends Activity {
     }
 
     private String bottomCardAccessibilityDescription(BottomCardDescriptor descriptor) {
+        if ("status".equals(descriptor.id)) {
+            StringBuilder description = new StringBuilder("Vehicle status. ");
+            description.append(descriptor.primary.isEmpty() ? "Status unavailable" : descriptor.primary);
+            if (!descriptor.secondary.isEmpty()) description.append(". Source ").append(descriptor.secondary);
+            String[] labels = {"driver door", "front passenger door", "rear left door",
+                    "rear right door", "tailgate"};
+            for (int i = 0; i < labels.length; i++) {
+                String state = descriptor.openingStates != null && i < descriptor.openingStates.length
+                        ? descriptor.openingStates[i] : "unknown";
+                description.append(". ").append(labels[i]).append(" ").append(state);
+            }
+            description.append(". Opens vehicle status details.");
+            return description.toString();
+        }
         if (!"tires".equals(descriptor.id)) {
             return descriptor.title + (descriptor.value.isEmpty() ? "" : ": " + descriptor.value);
         }

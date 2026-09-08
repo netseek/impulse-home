@@ -69,6 +69,11 @@ tasks.configureEach { task ->
     if (task.name.startsWith("merge") && task.name.endsWith("Assets")) {
         task.dependsOn(viewerAssets)
     }
+    // Gradle 9 may schedule the release lint model before generated WebView
+    // assets exist; keep the same source-sync edge as normal asset merging.
+    if (task.name == "generateReleaseLintVitalReportModel" || task.name.startsWith("lintVital")) {
+        task.dependsOn(viewerAssets)
+    }
 }
 
 // Android Studio sync asks for this Kotlin IDE model task even on Java-only

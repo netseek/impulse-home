@@ -3827,7 +3827,7 @@ window.HavalSplash = (function () {
       position: absolute;
       left: 50%; top: 50%;
       transform: translate(-50%, -50%);
-      width: min(720px, calc(100vw - 52px));
+      width: min(980px, calc(100vw - 52px));
       padding: 16px 18px 14px;
       border-radius: 22px;
       border: 1px solid rgba(255,255,255,.16);
@@ -3841,7 +3841,7 @@ window.HavalSplash = (function () {
       z-index: 86;
       display: none;
     }
-    .hv-hs-roof-pop.on { display: block; pointer-events: auto; }
+    .hv-hs-roof-pop.on { display:block; pointer-events:auto; box-shadow:0 0 0 100vmax rgba(2,6,10,.64),0 22px 64px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.14); }
     .hv-hs-roof-pop.light {
       --hv-widget-bg: rgba(248,250,252,.94);
       --hv-widget-fg: #1c2430;
@@ -3853,6 +3853,7 @@ window.HavalSplash = (function () {
         var(--hv-frost-fill-strong);
       box-shadow: 0 22px 64px rgba(20,28,40,.23), inset 0 1px 0 rgba(255,255,255,.72);
     }
+    .hv-hs-roof-pop.light.on { box-shadow:0 0 0 100vmax rgba(14,20,27,.50),0 22px 64px rgba(20,28,40,.23),inset 0 1px 0 rgba(255,255,255,.72); }
     .hv-hs-roof-head {
       display: flex;
       align-items: center;
@@ -4117,10 +4118,49 @@ window.HavalSplash = (function () {
       color: rgba(28,36,48,.56);
       text-shadow: 0 1px 2px rgba(255,255,255,.72);
     }
+    /* One pixel-aligned vehicle stack owns doors, glass, roof and seat state.
+       Every PNG is cropped from the same 494x675 source rectangle. */
+    .hv-hs-vehicle-stage { position:relative; display:flex; min-width:0; min-height:292px; flex-direction:column; align-items:center; justify-content:center; gap:5px; overflow:visible; }
+    .hv-hs-vehicle-meta { display:grid; width:100%; gap:2px; text-align:center; }
+    .hv-hs-vehicle-source,.hv-hs-vehicle-subtitle { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:7px/1.2 'Space Mono',monospace; letter-spacing:.08em; color:var(--hv-widget-muted,rgba(234,242,248,.55)); }
+    .hv-hs-vehicle-source.demo { color:#f0bd65; }
+    .hv-hs-vehicle-summary { font:600 16px/1 'Space Grotesk',sans-serif; letter-spacing:-.03em; color:var(--hv-widget-fg,#eaf2f8); }
+    .hv-hs-vehicle-summary.attention { color:#ff6671; }
+    .hv-hs-vehicle-art { position:relative; height:218px; aspect-ratio:494 / 675; flex:0 0 auto; transform:scale(1.07); transform-origin:50% 50%; filter:drop-shadow(0 10px 15px rgba(0,0,0,.30)); }
+    .hv-hs-vehicle-art > img,.hv-status-envelope > img,.hv-status-focus-envelope > img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; user-select:none; pointer-events:none; }
+    .hv-hs-vehicle-layer { z-index:2; opacity:0; transition:opacity .24s ease,clip-path .26s ease; }
+    .hv-hs-vehicle-layer.on { opacity:1; }
+    /* Closed panels are mutually exclusive with their matching open panel. Keep
+       them hidden by default; the synchronizer adds .on only for a closed or
+       unavailable door. The previous unconditional opacity made an open door
+       render on top of a second, closed copy in the unified popup. */
+    .hv-hs-vehicle-layer.closed-door { z-index:2; opacity:0; }
+    .hv-hs-vehicle-layer.closed-door.on { opacity:.98; }
+    .hv-hs-vehicle-layer.cavity { z-index:1; }
+    .hv-hs-vehicle-layer.cavity,.hv-hs-vehicle-layer.closed-door,.hv-hs-vehicle-layer.door { transition:none; }
+    .hv-hs-vehicle-layer.door,.hv-hs-vehicle-layer.tailgate { z-index:4; filter:saturate(1.62) contrast(1.18) brightness(1.04); }
+    .hv-hs-vehicle-layer.window { z-index:5; }
+    .hv-vehicle-roof { position:absolute; z-index:3; left:38.66%; top:42.67%; width:23.08%; height:26.08%; overflow:hidden; border-radius:12%; perspective:90px; pointer-events:none; }
+    .hv-vehicle-roof-cavity { position:absolute; z-index:1; left:2%; right:2%; top:1%; height:50%; border-radius:16% 16% 8% 8%; background:radial-gradient(ellipse at 50% 64%,rgba(54,66,72,.72),rgba(5,9,12,.98) 68%); box-shadow:inset 0 0 8px rgba(0,0,0,.88),0 0 0 1px rgba(173,193,204,.34); }
+    .hv-vehicle-roof-cavity::after { content:''; position:absolute; left:5%; right:5%; bottom:-1px; height:4px; border-radius:50%; background:linear-gradient(180deg,rgba(199,224,235,.72),rgba(2,5,7,.9)); box-shadow:0 2px 4px rgba(0,0,0,.9); opacity:var(--roof-lift-cue,0); transition:opacity .22s ease; }
+    .hv-vehicle-roof-curtain { position:absolute; z-index:2; inset:1% 2%; border-radius:10%; background:repeating-linear-gradient(90deg,rgba(245,247,241,.20) 0 1px,rgba(38,45,47,.15) 1px 3px),linear-gradient(180deg,#e4e6e0 0%,#c5cac3 46%,#8b9290 100%); box-shadow:inset 0 0 7px rgba(28,33,34,.56),inset 0 -2px 0 rgba(48,56,57,.72); clip-path:inset(var(--curtain-retract,0%) 0 0 0 round 10%); transform:translateY(var(--curtain-shift,0%)); transition:clip-path .34s cubic-bezier(.22,.72,.25,1),transform .34s cubic-bezier(.22,.72,.25,1); }
+    .hv-vehicle-roof-fixed { position:absolute!important; z-index:3; left:0!important; bottom:0!important; width:100%!important; height:52.85%!important; object-fit:fill!important; border-radius:10% 10% 16% 16%; pointer-events:none; }
+    .hv-vehicle-roof-glass { position:absolute!important; z-index:4; left:0!important; top:0!important; width:100%!important; height:52.85%!important; object-fit:fill!important; border-radius:16% 16% 10% 10%; transform-origin:50% 100%; transform:translateY(var(--roof-glass-slide,0%)) rotateX(var(--roof-glass-tilt,0deg)); transition:transform .34s cubic-bezier(.22,.72,.25,1),filter .28s ease; filter:brightness(var(--roof-glass-brightness,1)) drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
+    .hv-vehicle-roof-frame { position:absolute; z-index:5; inset:0; border:1px solid rgba(16,22,25,.86); border-radius:12%; box-shadow:inset 0 0 4px rgba(0,0,0,.64); }
+    .hv-hs-vehicle-belt,.hv-envelope-seatbelt { position:absolute; z-index:6; width:6%; aspect-ratio:1; height:auto; border:1px solid transparent; border-radius:50%; opacity:0; }
+    .hv-hs-vehicle-belt::before,.hv-envelope-seatbelt::before { content:''; position:absolute; left:24%; top:16%; width:20%; aspect-ratio:1; border-radius:50%; background:#fff; box-shadow:0 4px 0 -1px #fff; }
+    .hv-hs-vehicle-belt::after,.hv-envelope-seatbelt::after { content:''; position:absolute; left:49%; top:18%; width:2px; height:68%; transform:rotate(-38deg); background:#fff; box-shadow:0 0 4px rgba(255,255,255,.82); }
+    .hv-hs-vehicle-belt.unfastened,.hv-envelope-seatbelt.unfastened { opacity:1; border-color:rgba(255,116,124,.90); background:#e51f35; box-shadow:0 0 8px rgba(255,31,55,.92); animation:hv-seatbelt-alert .9s ease-in-out infinite; }
+    .hv-hs-vehicle-belt.fastened,.hv-envelope-seatbelt.fastened { opacity:0; }
+    .hv-hs-vehicle-belt.fl,.hv-envelope-seatbelt.fl { left:41%; top:45%; }.hv-hs-vehicle-belt.fr,.hv-envelope-seatbelt.fr { right:41%; top:45%; transform:scaleX(-1); }
+    .hv-hs-vehicle-belt.rl,.hv-envelope-seatbelt.rl { left:39.5%; top:59%; }.hv-hs-vehicle-belt.rc,.hv-envelope-seatbelt.rc { left:47%; top:59%; }.hv-hs-vehicle-belt.rr,.hv-envelope-seatbelt.rr { right:39.5%; top:59%; transform:scaleX(-1); }
+    .hv-hs-vehicle-stats { display:grid; width:100%; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+    .hv-hs-vehicle-stats span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:5px 3px; border-radius:6px; background:rgba(255,255,255,.055); color:var(--hv-widget-muted,rgba(234,242,248,.55)); text-align:center; font:6px/1.1 'Space Mono',monospace; letter-spacing:.05em; }
+    .hv-hs-vehicle-stats span.attention { color:#ff6671; }
     @media (max-width: 640px) {
       .hv-hs-roof-pop { width: calc(100vw - 28px); padding-inline: 12px; }
-      .hv-hs-roof-stack { grid-template-columns: minmax(120px,1fr) 150px minmax(120px,1fr); gap: 7px; }
-      .hv-hs-roof-car-image { transform: scale(.88); }
+      .hv-hs-roof-stack { grid-template-columns:minmax(120px,1fr) minmax(148px,.9fr) minmax(120px,1fr); gap:7px; }
+      .hv-hs-vehicle-art { height:190px; }
     }
 
     /* Coffee OS 3 shell: quiet scenic canvas, shallow frosted surfaces and a
@@ -4439,43 +4479,91 @@ window.HavalSplash = (function () {
     .hv-tires-unavailable .hv-tire-point strong { opacity:.45; }
     .hv-tires-2x1 .hv-tires-visual,.hv-tires-3x1 .hv-tires-visual { height:calc(100% - 24px); min-height:72px; }
 
-    .hv-status-body { height:calc(100% - 28px); display:flex; flex-direction:column; justify-content:center; gap:14px; }
-    .hv-status-hero { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; }
-    .hv-status-hero strong { font-size:clamp(30px,7vw,64px); line-height:.9; font-weight:360; letter-spacing:-.06em; font-variant-numeric:tabular-nums; }
-    .hv-status-hero small { margin-bottom:4px; font:8px/1.35 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; text-align:right; }
-    .hv-status-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-    .hv-status-cell { min-width:0; padding:8px 7px; border:1px solid var(--hv-widget-border); border-radius:12px; background:rgba(255,255,255,.04); }
-    .hv-status-cell span,.hv-status-cell small { display:block; font:7px/1.2 'Space Mono',monospace; letter-spacing:.06em; opacity:.5; }
-    .hv-status-cell strong { display:block; margin-top:5px; font-size:14px; font-weight:560; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-status { border:0; background:transparent; text-align:left; font:inherit; cursor:pointer; }
+    .hv-status:focus-visible { outline:2px solid var(--hv-accent); outline-offset:-4px; border-radius:16px; }
+    .hv-status-body { height:calc(100% - 25px); display:grid; grid-template-columns:minmax(82px,.78fr) minmax(0,1.22fr); align-items:center; gap:11px; }
+    .hv-status-visual { position:relative; align-self:stretch; min-height:88px; overflow:visible; }
+    /* The envelope always uses one vehicle. Openings are layered over it so a
+       partial roof/window state reads as a physical position, never a swapped
+       illustration. Red is reserved for a door or tailgate that is open. */
+    .hv-status-envelope { position:absolute; left:50%; top:50%; width:min(112px,68%); height:96%; transform:translate(-50%,-50%); filter:drop-shadow(0 8px 12px rgba(0,0,0,.30)); }
+    .hv-status-car { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+    /* The demo's open-door/tailgate pair is a single realistic vehicle render,
+       with the two physically open panels already painted signal red. */
+    .hv-status-realistic-state { display:none; position:absolute; inset:0; background-image:url('./assets/ui/vehicle-envelope-open-fl-tailgate-v8.png'); background-size:contain; background-position:center; background-repeat:no-repeat; }
+    /* The compact card and the focused popup use different envelope classes.
+       Apply the realistic-state isolation to either surface so a fallback
+       closed body or CSS door cannot appear beneath the physical open panel. */
+    .demo-realistic-state .hv-status-car { display:none; }.demo-realistic-state .hv-status-realistic-state { display:block; }
+    .demo-realistic-state .hv-envelope-door { display:none !important; }
+    /* Keep the focused surface a clean physical illustration. The roof hotspot
+       remains active and opens the canonical animated roof controller. */
+    .demo-realistic-state .hv-envelope-roof,
+    .demo-realistic-state .hv-envelope-window,
+    .demo-realistic-state .hv-envelope-seatbelt { display:none; }
+    .hv-envelope-roof { position:absolute; z-index:2; left:31.5%; top:35%; width:37%; height:34%; overflow:hidden; border:1px solid rgba(99,217,231,.62); border-radius:13% 13% 10% 10%; background:rgba(5,12,18,.10); box-shadow:inset 0 0 10px rgba(99,217,231,.18),0 0 7px rgba(99,217,231,.12); }
+    .hv-envelope-roof::before { content:''; position:absolute; inset:0; border-radius:inherit; background:linear-gradient(180deg,rgba(99,217,231,.34),rgba(99,217,231,.05)); opacity:.58; }
+    .hv-envelope-roof-lid { position:absolute; z-index:2; inset:0; border-radius:inherit; background:linear-gradient(180deg,rgba(99,217,231,.34),rgba(99,217,231,.05)); transform:translateY(var(--roof-slide,0%)); transition:transform .22s ease; }
+    .hv-envelope-roof-opening { display:none; }
+    .hv-envelope-shade { position:absolute; z-index:3; inset:0; border-radius:inherit; background:linear-gradient(180deg,rgba(225,230,233,.82),rgba(151,164,174,.74)); clip-path:inset(var(--shade-open,0%) 0 0 0 round 8px); transition:clip-path .22s ease; }
+    .hv-envelope-roof.unknown { opacity:.26; }
+    .hv-envelope-window { position:absolute; z-index:3; width:9%; height:19%; border:1px solid rgba(131,222,235,.34); border-radius:40%; background:rgba(11,24,32,.16); overflow:hidden; opacity:.1; }
+    .hv-envelope-window i { position:absolute; left:0; right:0; bottom:0; height:0; background:linear-gradient(180deg,rgba(5,10,14,.82),rgba(0,0,0,.96)); border-top:1px solid rgba(117,229,240,.92); transition:height .32s ease; }
+    .hv-envelope-window.open,.hv-envelope-window.partial { opacity:1; background:rgba(6,14,19,.78); box-shadow:0 0 0 1px rgba(93,219,234,.18); }
+    .hv-envelope-window.open i { height:100%; }.hv-envelope-window.partial i { height:55%; }
+    .hv-envelope-window.fl { left:16%; top:29%; transform:rotate(-8deg); }.hv-envelope-window.fr { right:16%; top:29%; transform:rotate(8deg); }
+    .hv-envelope-window.rl { left:15%; top:52%; transform:rotate(-5deg); }.hv-envelope-window.rr { right:15%; top:52%; transform:rotate(5deg); }
+    .hv-envelope-door { position:absolute; z-index:4; display:none; width:17%; height:23%; border:1px solid rgba(255,130,138,.92); background:linear-gradient(145deg,rgba(255,80,92,.78),rgba(128,16,29,.62)); box-shadow:0 0 10px rgba(255,62,79,.50); clip-path:polygon(5% 35%,92% 0,100% 72%,19% 100%); }
+    .hv-envelope-door.open { display:block; }.hv-envelope-door.fl { left:0; top:28%; transform:rotate(-24deg); transform-origin:100% 50%; }.hv-envelope-door.fr { right:0; top:28%; transform:rotate(24deg) scaleX(-1); transform-origin:0 50%; }.hv-envelope-door.rl { left:0; top:51%; transform:rotate(-17deg); transform-origin:100% 50%; }.hv-envelope-door.rr { right:0; top:51%; transform:rotate(17deg) scaleX(-1); transform-origin:0 50%; }
+    .hv-envelope-door.trunk { left:26%; bottom:1.5%; width:48%; height:10%; border-radius:12% 12% 42% 42%; transform:rotate(10deg); transform-origin:50% 0; }
+    .hv-envelope-seatbelt { position:absolute; z-index:6; width:6%; aspect-ratio:1; height:auto; border:1px solid transparent; border-radius:50%; opacity:0; }
+    .hv-envelope-seatbelt::before { content:''; position:absolute; left:24%; top:16%; width:20%; aspect-ratio:1; border-radius:50%; background:#fff; box-shadow:0 4px 0 -1px #fff; }
+    .hv-envelope-seatbelt::after { content:''; position:absolute; left:49%; top:18%; width:2px; height:68%; transform:rotate(-38deg); background:#fff; box-shadow:0 0 4px rgba(255,255,255,.82); }
+    .hv-envelope-seatbelt.unfastened { opacity:1; border-color:rgba(255,116,124,.90); background:#e51f35; box-shadow:0 0 8px rgba(255,31,55,.92); animation:hv-seatbelt-alert .9s ease-in-out infinite; }
+    .hv-envelope-seatbelt.fastened { opacity:0; }.hv-envelope-seatbelt.fl { left:41%; top:45%; }.hv-envelope-seatbelt.fr { right:41%; top:45%; transform:scaleX(-1); }.hv-envelope-seatbelt.rl { left:39.5%; top:59%; }.hv-envelope-seatbelt.rc { left:47%; top:59%; }.hv-envelope-seatbelt.rr { right:39.5%; top:59%; transform:scaleX(-1); }
+    @keyframes hv-seatbelt-alert { 50% { opacity:.28; } }
+    .hv-status-envelope { width:auto; height:96%; aspect-ratio:494 / 675; }
+    .hv-status-layer { z-index:2; opacity:1; transition:clip-path .26s ease; }
+    .hv-status-layer.cavity { z-index:1; }
+    .hv-status-layer.closed-door { z-index:2; opacity:.98; }
+    .hv-status-layer.door,.hv-status-layer.tailgate { z-index:4; filter:saturate(1.62) contrast(1.18) brightness(1.04); }
+    .hv-status-layer.window { z-index:5; }
+    .hv-status-opening { position:absolute; z-index:1; display:none; align-items:center; gap:4px; min-height:16px; padding:2px 5px; box-sizing:border-box; border:1px solid rgba(255,179,66,.72); border-radius:999px; background:rgba(39,27,10,.72); color:#ffc56a; box-shadow:0 2px 7px rgba(0,0,0,.22); font:600 6px/1 'Space Mono',monospace; letter-spacing:.07em; white-space:nowrap; }
+    .hv-status-opening.open { display:flex; }
+    .hv-status-opening i { width:4px; height:4px; border-radius:50%; background:currentColor; box-shadow:0 0 7px currentColor; }
+    .hv-status-opening.fl { left:0; top:25%; } .hv-status-opening.fr { right:0; top:25%; }
+    .hv-status-opening.rl { left:0; bottom:25%; } .hv-status-opening.rr { right:0; bottom:25%; }
+    .hv-status-opening.trunk { left:50%; bottom:0; transform:translateX(-50%); }
+    .hv-status-copy { min-width:0; display:flex; flex-direction:column; justify-content:center; gap:9px; }
+    .hv-status-summary { font-size:clamp(17px,2.9vw,29px); line-height:.95; font-weight:520; letter-spacing:-.035em; }
+    .hv-status-summary.attention { color:#ff6671; }
+    .hv-status-subtitle { font:7px/1.25 'Space Mono',monospace; letter-spacing:.07em; opacity:.58; }
+    .hv-status-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+    .hv-status-cell { min-width:0; padding:6px 6px 5px; border:1px solid var(--hv-widget-border); border-radius:10px; background:rgba(255,255,255,.04); }
+    .hv-status-cell span { display:block; font:6px/1 'Space Mono',monospace; letter-spacing:.06em; opacity:.5; }
+    .hv-status-cell strong { display:block; margin-top:4px; font-size:11px; line-height:1; font-weight:560; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .hv-status-cell strong.live { color:var(--hv-accent); }
-    .hv-status-1x1 .hv-status-body { gap:10px; }
-    .hv-status-1x1 .hv-status-hero strong { font-size:32px; }
-    .hv-status-1x1 .hv-status-grid { gap:4px; }
-    .hv-status-1x1 .hv-status-cell { padding:6px 4px; }
-    .hv-status-1x1 .hv-status-cell strong { font-size:11px; }
-    .hv-status-2x1 .hv-status-body,.hv-status-3x1 .hv-status-body { flex-direction:row; align-items:center; gap:18px; }
-    .hv-status-2x1 .hv-status-hero,.hv-status-3x1 .hv-status-hero { min-width:31%; }
-    .hv-status-2x1 .hv-status-grid,.hv-status-3x1 .hv-status-grid { flex:1; width:100%; }
+    .hv-status-1x1 .hv-status-body { display:flex; flex-direction:column; gap:2px; justify-content:center; }
+    .hv-status-1x1 .hv-status-visual { width:100%; height:66%; min-height:82px; }
+    .hv-status-1x1 .hv-status-car { width:min(108px,45%); }
+    .hv-status-1x1 .hv-status-copy { width:100%; align-items:center; gap:3px; text-align:center; }
+    .hv-status-1x1 .hv-status-summary { font-size:18px; }
+    .hv-status-1x1 .hv-status-subtitle { font-size:6px; }
+    .hv-status-1x1 .hv-status-grid { display:none; }
+    .hv-status-1x1 .hv-status-opening { transform:scale(.84); transform-origin:center; }
+    .hv-status-1x1 .hv-status-opening.trunk { transform:translateX(-50%) scale(.84); }
+    .hv-status-2x1 .hv-status-body,.hv-status-3x1 .hv-status-body { grid-template-columns:minmax(116px,.7fr) minmax(160px,1.3fr); }
+    .hv-status-2x2 .hv-status-body,.hv-status-3x2 .hv-status-body { grid-template-columns:minmax(150px,.85fr) minmax(190px,1.15fr); }
 
-    .hv-range-body { height:calc(100% - 26px); display:grid; grid-template-columns:minmax(88px,.72fr) minmax(120px,1.28fr); align-items:center; gap:14px; }
-    .hv-range-ring { --range-pct:0%; position:relative; width:min(122px,82%); aspect-ratio:1; margin:auto; display:grid; place-items:center; border-radius:50%; background:conic-gradient(var(--hv-accent) var(--range-pct),rgba(255,255,255,.10) 0); }
-    .hv-range-ring::after { content:''; position:absolute; inset:8px; border-radius:50%; background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:inset 0 1px 0 rgba(255,255,255,.08); }
-    .hv-range-ring strong,.hv-range-ring span { position:relative; z-index:1; }
-    .hv-range-ring strong { font-size:clamp(24px,5vw,45px); font-weight:420; line-height:.9; font-variant-numeric:tabular-nums; }
-    .hv-range-ring span { position:absolute; top:64%; font:7px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; }
-    .hv-range-stats { display:grid; gap:7px; }
-    .hv-range-stat { display:grid; grid-template-columns:34px 1fr auto; align-items:baseline; gap:7px; padding:9px 10px; border:1px solid var(--hv-widget-border); border-radius:12px; background:rgba(255,255,255,.04); }
-    .hv-range-stat span,.hv-range-stat small { font:7px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; }
-    .hv-range-stat strong { font-size:20px; line-height:1; font-weight:560; font-variant-numeric:tabular-nums; }
-    .hv-range-stat:first-child strong { color:var(--hv-accent); }
+    .hv-range-card { width:100%; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
+    .hv-range-body { height:calc(100% - 26px); display:grid; grid-template-columns:minmax(94px,.76fr) minmax(130px,1.24fr); align-items:center; gap:14px; }
+    .hv-range-total { min-width:0; }.hv-range-total span,.hv-range-soc span,.hv-range-legend span { display:block; font:7px/1 'Space Mono',monospace; letter-spacing:.09em; opacity:.56; }.hv-range-total strong { display:block; margin:5px 0 3px; font-size:clamp(32px,6vw,52px); font-weight:390; line-height:.82; letter-spacing:-.07em; font-variant-numeric:tabular-nums; white-space:nowrap; }.hv-range-total small { font:8px/1 'Space Mono',monospace; letter-spacing:.08em; color:var(--hv-readable-accent,var(--hv-accent)); }
+    .hv-range-detail { min-width:0; display:grid; gap:9px; }.hv-range-soc { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }.hv-range-soc strong { font-size:15px; font-weight:560; font-variant-numeric:tabular-nums; }.hv-range-split { height:10px; display:flex; overflow:hidden; border:1px solid var(--hv-widget-border); border-radius:999px; background:rgba(255,255,255,.07); box-shadow:inset 0 1px 2px rgba(0,0,0,.18); }.hv-range-split i { display:block; min-width:0; transition:width .28s ease; }.hv-range-split .ev { background:var(--hv-accent); box-shadow:0 0 12px rgba(99,217,231,.34); }.hv-range-split .fuel { background:rgba(237,245,250,.48); }
+    .hv-range-legend { display:grid; grid-template-columns:1fr 1fr; gap:8px; }.hv-range-legend > div { min-width:0; padding:7px 8px; border-radius:10px; background:rgba(255,255,255,.04); }.hv-range-legend strong { display:block; margin-top:4px; font-size:16px; line-height:1; font-weight:560; font-variant-numeric:tabular-nums; white-space:nowrap; }.hv-range-legend .ev strong { color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-legend small { margin-left:2px; font:7px/1 'Space Mono',monospace; opacity:.56; }
     .hv-range-card-1x1 { padding:10px; }
-    .hv-range-card-1x1 .hv-range-body { grid-template-columns:1fr; gap:4px; }
-    .hv-range-card-1x1 .hv-range-ring { width:72px; }
-    .hv-range-card-1x1 .hv-range-stats { grid-template-columns:1fr 1fr; gap:4px; }
-    .hv-range-card-1x1 .hv-range-stat { display:block; padding:6px; text-align:center; }
-    .hv-range-card-1x1 .hv-range-stat span { display:block; margin-bottom:3px; }
-    .hv-range-card-1x1 .hv-range-stat strong { font-size:13px; }
-    .hv-range-card-1x1 .hv-range-stat small { margin-left:2px; }
+    .hv-range-card-1x1 .hv-range-body { grid-template-columns:1fr; gap:7px; }.hv-range-card-1x1 .hv-range-total { display:grid; grid-template-columns:auto 1fr; align-items:baseline; column-gap:6px; }.hv-range-card-1x1 .hv-range-total span { grid-column:1 / -1; }.hv-range-card-1x1 .hv-range-total strong { margin:3px 0 0; font-size:31px; }.hv-range-card-1x1 .hv-range-total small { font-size:7px; }.hv-range-card-1x1 .hv-range-detail { gap:6px; }.hv-range-card-1x1 .hv-range-legend > div { padding:5px 6px; }.hv-range-card-1x1 .hv-range-legend strong { font-size:12px; }
+    .hv-range-card-2x2 { padding:18px; }.hv-range-card-2x2 .hv-range-body { grid-template-columns:minmax(170px,.76fr) minmax(270px,1.24fr); gap:26px; }.hv-range-card-2x2 .hv-range-total strong { margin:8px 0 5px; font-size:clamp(52px,7vw,76px); }.hv-range-card-2x2 .hv-range-detail { gap:14px; }.hv-range-card-2x2 .hv-range-soc strong { font-size:24px; }.hv-range-card-2x2 .hv-range-split { height:14px; }.hv-range-card-2x2 .hv-range-legend { gap:12px; }.hv-range-card-2x2 .hv-range-legend > div { padding:12px; border-radius:13px; }.hv-range-card-2x2 .hv-range-legend strong { margin-top:7px; font-size:26px; }
+    .hv-range-focus { min-height:calc(100% - 48px); padding:20px; border-radius:16px; background:linear-gradient(140deg,rgba(255,255,255,.065),rgba(255,255,255,.018)); }.hv-range-focus-hero { display:flex; align-items:end; justify-content:space-between; gap:20px; padding-bottom:18px; border-bottom:1px solid var(--hv-widget-border); }.hv-range-focus-kicker,.hv-range-focus-soc span,.hv-range-focus-cell span,.hv-range-focus-source { font:9px/1.2 'Space Mono',monospace; letter-spacing:.1em; opacity:.62; }.hv-range-focus-total strong { display:inline-block; margin-top:7px; font-size:clamp(54px,10vw,84px); font-weight:360; line-height:.8; letter-spacing:-.08em; font-variant-numeric:tabular-nums; }.hv-range-focus-total small { margin-left:7px; font:12px/1 'Space Mono',monospace; letter-spacing:.1em; color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-focus-soc { min-width:98px; padding:12px; border:1px solid var(--hv-widget-border); border-radius:13px; text-align:right; }.hv-range-focus-soc strong { display:block; margin-top:6px; font-size:25px; font-weight:530; font-variant-numeric:tabular-nums; }.hv-range-focus-split { margin:22px 0 10px; }.hv-range-focus-split .hv-range-split { height:18px; }.hv-range-focus-scale { display:flex; justify-content:space-between; font:8px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; }.hv-range-focus-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:22px; }.hv-range-focus-cell { padding:14px; border:1px solid var(--hv-widget-border); border-radius:14px; background:rgba(255,255,255,.035); }.hv-range-focus-cell strong { display:block; margin-top:8px; font-size:28px; line-height:.9; font-weight:470; font-variant-numeric:tabular-nums; }.hv-range-focus-cell.ev strong { color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-focus-cell small { margin-left:4px; font:9px/1 'Space Mono',monospace; opacity:.56; }.hv-range-focus-units { display:flex; gap:4px; margin:18px 0 -2px; }.hv-range-focus-units button { min-width:44px; min-height:30px; padding:0 9px; border:1px solid var(--hv-widget-border); border-radius:9px; color:inherit; background:rgba(255,255,255,.035); font:8px/1 'Space Mono',monospace; letter-spacing:.09em; cursor:pointer; }.hv-range-focus-units button.on { border-color:var(--hv-readable-accent,var(--hv-accent)); color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(99,217,231,.10); }.hv-range-focus-source { margin-top:18px; padding-top:14px; border-top:1px solid var(--hv-widget-border); }
 
     .hv-card-focus-backdrop { position:absolute; inset:0; z-index:84; opacity:0; pointer-events:none; background:rgba(2,6,10,.38); transition:opacity .2s ease; }
     .hv-card-focus-backdrop.on { opacity:1; pointer-events:auto; }
@@ -4516,6 +4604,38 @@ window.HavalSplash = (function () {
     .hv-tires-focus-wheel.normal > strong,
     .hv-tires-focus-wheel.normal .hv-tires-temperature strong { color:var(--hv-widget-fg); }
     .hv-tires-focus-wheel.unavailable { opacity:.5; }
+    .hv-status-focus { min-height:calc(100% - 42px); padding:18px; box-sizing:border-box; border-radius:16px; background:rgba(255,255,255,.035); }
+    .hv-status-focus-meta { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+    .hv-status-focus-meta > div { min-width:0; }
+    .hv-status-focus-source { display:inline-flex; min-height:28px; align-items:center; padding:0 10px; border:1px solid var(--hv-frost-edge); border-radius:999px; font:7px/1 'Space Mono',monospace; letter-spacing:.08em; }
+    .hv-status-focus-source.live { color:var(--hv-accent); border-color:currentColor; }
+    .hv-status-focus-source.demo { color:#f0bd65; border-color:currentColor; }
+    .hv-status-focus-source.partial,.hv-status-focus-source.stale,.hv-status-focus-source.unavailable { opacity:.68; }
+    .hv-status-focus-summary { display:block; margin-top:9px; font-size:clamp(23px,3vw,34px); line-height:.98; font-weight:520; letter-spacing:-.04em; }
+    .hv-status-focus-summary.attention { color:#ff6671; }
+    .hv-status-focus-subtitle { display:block; margin-top:6px; font:8px/1.35 'Space Mono',monospace; letter-spacing:.06em; opacity:.6; }
+    .hv-status-focus-stage { position:relative; min-height:310px; height:calc(100% - 98px); margin-top:16px; overflow:hidden; border:1px solid var(--hv-frost-edge); border-radius:18px; background:radial-gradient(circle at 50% 47%,rgba(99,217,231,.12),transparent 43%); }
+    .hv-status-focus-stage::before { content:''; position:absolute; left:50%; top:7%; bottom:7%; width:1px; background:currentColor; opacity:.07; }
+    .hv-status-focus-envelope { position:absolute; left:50%; top:50%; width:auto; height:96%; aspect-ratio:494 / 675; transform:translate(-50%,-50%); filter:drop-shadow(0 20px 22px rgba(0,0,0,.34)); }
+    .hv-status-focus-envelope .hv-status-car { filter:none; }
+    .hv-status-focus-opening { position:absolute; width:min(168px,24%); min-height:50px; padding:9px 11px; box-sizing:border-box; border:1px solid var(--hv-frost-edge); border-radius:13px; background:var(--hv-frost-fill); font:7px/1.2 'Space Mono',monospace; letter-spacing:.07em; }
+    .hv-status-focus-opening strong { display:block; margin-top:5px; font:600 13px/1 'Space Grotesk',sans-serif; letter-spacing:.02em; }
+    .hv-status-focus-opening.open { color:#ff6671; border-color:rgba(255,102,113,.72); }
+    .hv-status-focus-opening.unknown { opacity:.48; }
+    .hv-status-focus-opening.fl { left:3%; top:12%; } .hv-status-focus-opening.fr { right:3%; top:12%; }
+    .hv-status-focus-opening.rl { left:3%; bottom:12%; } .hv-status-focus-opening.rr { right:3%; bottom:12%; }
+    .hv-status-focus-opening.trunk { left:50%; bottom:5%; transform:translateX(-50%); text-align:center; }
+    .hv-status-focus-opening.fl::after,.hv-status-focus-opening.rl::after,.hv-status-focus-opening.fr::after,.hv-status-focus-opening.rr::after { content:''; position:absolute; top:50%; width:clamp(16px,6vw,60px); height:1px; background:currentColor; opacity:.2; }
+    .hv-status-focus-opening.fl::after,.hv-status-focus-opening.rl::after { left:100%; }.hv-status-focus-opening.fr::after,.hv-status-focus-opening.rr::after { right:100%; }
+    .hv-status-focus-attention { margin:15px 0 0; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:7px; }
+    .hv-status-focus-attention li { padding:6px 9px; border-radius:999px; background:rgba(255,255,255,.065); font:7px/1.2 'Space Mono',monospace; letter-spacing:.06em; }
+    .hv-status-focus-attention li.attention { color:#ff6671; background:rgba(255,80,92,.12); }
+    .hv-status-focus-systems { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:13px; }
+    .hv-status-focus-system { min-width:0; padding:8px 9px; border:1px solid var(--hv-frost-edge); border-radius:11px; background:rgba(255,255,255,.035); }
+    .hv-status-focus-system span,.hv-status-focus-system small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:6px/1.1 'Space Mono',monospace; letter-spacing:.06em; opacity:.58; }
+    .hv-status-focus-system strong { display:block; margin:5px 0 3px; font:600 11px/1 'Space Grotesk',sans-serif; letter-spacing:.02em; }
+    .hv-status-focus-system.open,.hv-status-focus-system.partial { border-color:rgba(99,217,231,.48); }.hv-status-focus-system.unfastened { border-color:rgba(255,83,96,.78); color:#ff6671; animation:hv-seatbelt-alert 1s steps(2,end) infinite; }.hv-status-focus-system.unknown { opacity:.52; }
+    .hv-envelope-roof-launcher { position:absolute; z-index:7; left:31.5%; top:35%; width:37%; height:34%; padding:0; border:0; border-radius:13% 13% 10% 10%; background:transparent; cursor:pointer; }.hv-envelope-roof-launcher:focus-visible { outline:2px solid var(--hv-accent); outline-offset:3px; }
     @media (max-width:620px) {
       .hv-tires-focus { padding:12px; }
       .hv-tires-focus-meta { align-items:flex-start; flex-direction:column; gap:7px; }
@@ -4524,6 +4644,7 @@ window.HavalSplash = (function () {
       .hv-tires-focus-car { width:30%; height:70%; }
       .hv-tires-focus-wheel { width:31%; padding:9px; }
       .hv-tires-focus-wheel > strong { font-size:30px; }
+      .hv-status-focus { padding:12px; }.hv-status-focus-meta { flex-direction:column; gap:8px; }.hv-status-focus-stage { min-height:390px; height:auto; }.hv-status-focus-envelope { width:32%; height:72%; }.hv-status-focus-opening { width:29%; padding:8px; }.hv-status-focus-opening.trunk { width:34%; }.hv-status-focus-systems { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
     .hv-studio-card-action { margin:10px 0 16px; padding:12px; border:1px solid var(--hv-frost-edge,rgba(255,255,255,.14)); border-radius:14px; }
     .hv-studio-card-action > strong { display:block; margin-bottom:8px; font-size:14px; }
@@ -4877,10 +4998,10 @@ window.HavalSplash = (function () {
             <div class="hv-tires {{ wg.tiresSizeClass }}" onClick="{{ wg.onTiresOpen }}"><div class="hv-glance-head"><span>TIRES</span><small>{{ wg.tiresSource }}</small></div><div class="hv-tires-visual"><img class="hv-tire-car" src="./assets/ui/tires-top-view-v1.png" alt=""><sc-for list="{{ wg.tiresWheels }}" as="tw" hint-placeholder-count="4"><div class="hv-tire-point {{ tw.cls }}"><small>{{ tw.short }}</small><strong>{{ tw.pressure }}</strong><em>{{ tw.pressureUnit }}</em></div></sc-for></div><div class="hv-tires-foot"><span>{{ wg.tiresFoot }}</span><span>{{ wg.tiresUnit }}</span></div></div>
           </sc-if>
           <sc-if value="{{ wg.isStatus }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-status {{ wg.statusSizeClass }}"><div class="hv-glance-head"><span>VEHICLE STATUS</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-hero"><strong>{{ wg.statusSpeed }}</strong><small>{{ wg.statusSpeedUnit }}<br>DRIVE OVERVIEW</small></div><div class="hv-status-grid"><div class="hv-status-cell"><span>BATTERY</span><strong class="{{ wg.statusLiveClass }}">{{ wg.statusSoc }}</strong></div><div class="hv-status-cell"><span>GEAR</span><strong>{{ wg.statusGear }}</strong></div><div class="hv-status-cell"><span>STATE</span><strong>{{ wg.statusReady }}</strong></div></div></div></div>
+            <button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>VEHICLE STATUS</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="3"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button>
           </sc-if>
           <sc-if value="{{ wg.isRange }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-range-card {{ wg.rangeSizeClass }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-ring" style="--range-pct:{{ wg.rangePct }}%;"><strong>{{ wg.rangeSoc }}</strong><span>BATTERY</span></div><div class="hv-range-stats"><div class="hv-range-stat"><span>EV</span><strong>{{ wg.rangeEv }}</strong><small>KM</small></div><div class="hv-range-stat"><span>GAS</span><strong>{{ wg.rangeFuel }}</strong><small>KM</small></div></div></div></div>
+            <button type="button" class="hv-range-card {{ wg.rangeSizeClass }}" onClick="{{ wg.onRangeOpen }}" aria-label="{{ wg.rangeAriaLabel }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-total"><span>{{ wg.rangeTotalLabel }}</span><strong>{{ wg.rangeTotal }}</strong><small>{{ wg.rangeUnit }}</small></div><div class="hv-range-detail"><div class="hv-range-soc"><span>BATTERY SOC</span><strong>{{ wg.rangeSoc }}</strong></div><div class="hv-range-split" aria-hidden="true"><i class="ev" style="width:{{ wg.rangeEvPct }}%;"></i><i class="fuel" style="width:{{ wg.rangeFuelPct }}%;"></i></div><div class="hv-range-legend"><div class="ev"><span>EV</span><strong>{{ wg.rangeEv }}<small>{{ wg.rangeUnit }}</small></strong></div><div><span>FUEL</span><strong>{{ wg.rangeFuel }}<small>{{ wg.rangeUnit }}</small></strong></div></div></div></div></button>
           </sc-if>
           <sc-if value="{{ wg.isModes }}" hint-placeholder-val="{{ false }}">
             <div class="hv-modes {{ wg.modeSizeClass }}" aria-label="{{ wg.modeSource }}">
@@ -5110,10 +5231,10 @@ window.HavalSplash = (function () {
             <div class="hv-tires {{ wg.tiresSizeClass }}" onClick="{{ wg.onTiresOpen }}"><div class="hv-glance-head"><span>TIRES</span><small>{{ wg.tiresSource }}</small></div><div class="hv-tires-visual"><img class="hv-tire-car" src="./assets/ui/tires-top-view-v1.png" alt=""><sc-for list="{{ wg.tiresWheels }}" as="tw" hint-placeholder-count="4"><div class="hv-tire-point {{ tw.cls }}"><small>{{ tw.short }}</small><strong>{{ tw.pressure }}</strong><em>{{ tw.pressureUnit }}</em></div></sc-for></div><div class="hv-tires-foot"><span>{{ wg.tiresFoot }}</span><span>{{ wg.tiresUnit }}</span></div></div>
           </sc-if>
           <sc-if value="{{ wg.isStatus }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-status {{ wg.statusSizeClass }}"><div class="hv-glance-head"><span>VEHICLE STATUS</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-hero"><strong>{{ wg.statusSpeed }}</strong><small>{{ wg.statusSpeedUnit }}<br>DRIVE OVERVIEW</small></div><div class="hv-status-grid"><div class="hv-status-cell"><span>BATTERY</span><strong class="{{ wg.statusLiveClass }}">{{ wg.statusSoc }}</strong></div><div class="hv-status-cell"><span>GEAR</span><strong>{{ wg.statusGear }}</strong></div><div class="hv-status-cell"><span>STATE</span><strong>{{ wg.statusReady }}</strong></div></div></div></div>
+            <button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>VEHICLE STATUS</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="3"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button>
           </sc-if>
           <sc-if value="{{ wg.isRange }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-range-card {{ wg.rangeSizeClass }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-ring" style="--range-pct:{{ wg.rangePct }}%;"><strong>{{ wg.rangeSoc }}</strong><span>BATTERY</span></div><div class="hv-range-stats"><div class="hv-range-stat"><span>EV</span><strong>{{ wg.rangeEv }}</strong><small>KM</small></div><div class="hv-range-stat"><span>GAS</span><strong>{{ wg.rangeFuel }}</strong><small>KM</small></div></div></div></div>
+            <button type="button" class="hv-range-card {{ wg.rangeSizeClass }}" onClick="{{ wg.onRangeOpen }}" aria-label="{{ wg.rangeAriaLabel }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-total"><span>{{ wg.rangeTotalLabel }}</span><strong>{{ wg.rangeTotal }}</strong><small>{{ wg.rangeUnit }}</small></div><div class="hv-range-detail"><div class="hv-range-soc"><span>BATTERY SOC</span><strong>{{ wg.rangeSoc }}</strong></div><div class="hv-range-split" aria-hidden="true"><i class="ev" style="width:{{ wg.rangeEvPct }}%;"></i><i class="fuel" style="width:{{ wg.rangeFuelPct }}%;"></i></div><div class="hv-range-legend"><div class="ev"><span>EV</span><strong>{{ wg.rangeEv }}<small>{{ wg.rangeUnit }}</small></strong></div><div><span>FUEL</span><strong>{{ wg.rangeFuel }}<small>{{ wg.rangeUnit }}</small></strong></div></div></div></div></button>
           </sc-if>
           <sc-if value="{{ wg.isModes }}" hint-placeholder-val="{{ false }}">
             <div class="hv-modes {{ wg.modeSizeClass }}" aria-label="{{ wg.modeSource }}">
@@ -5542,6 +5663,15 @@ window.HavalSplash = (function () {
             </article>
           </sc-for>
         </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ focusedCardIsRange }}" hint-placeholder-val="{{ false }}">
+      <div class="hv-range-focus"><div class="hv-range-focus-hero"><div class="hv-range-focus-total"><span class="hv-range-focus-kicker">{{ focusedRangeTotalLabel }}</span><strong>{{ focusedRangeTotal }}</strong><small>{{ focusedRangeUnit }}</small></div><div class="hv-range-focus-soc"><span>BATTERY SOC</span><strong>{{ focusedRangeSoc }}</strong></div></div><div class="hv-range-focus-split"><div class="hv-range-split" role="img" aria-label="EV {{ focusedRangeEv }} {{ focusedRangeUnit }}, fuel {{ focusedRangeFuel }} {{ focusedRangeUnit }}"><i class="ev" style="width:{{ focusedRangeEvPct }}%;"></i><i class="fuel" style="width:{{ focusedRangeFuelPct }}%;"></i></div></div><div class="hv-range-focus-scale"><span>EV</span><span>FUEL</span></div><div class="hv-range-focus-grid"><div class="hv-range-focus-cell ev"><span>EV ESTIMATE</span><strong>{{ focusedRangeEv }}<small>{{ focusedRangeUnit }}</small></strong></div><div class="hv-range-focus-cell"><span>FUEL ESTIMATE</span><strong>{{ focusedRangeFuel }}<small>{{ focusedRangeUnit }}</small></strong></div></div><div class="hv-range-focus-units" role="group" aria-label="Distance unit"><button type="button" class="{{ focusedRangeUnitKmClass }}" onClick="{{ focusedRangeSetKm }}" aria-pressed="{{ focusedRangeUnitKmPressed }}">KM</button><button type="button" class="{{ focusedRangeUnitMiClass }}" onClick="{{ focusedRangeSetMi }}" aria-pressed="{{ focusedRangeUnitMiPressed }}">MI</button></div><div class="hv-range-focus-source" role="status">{{ focusedRangeSource }}</div></div>
+    </sc-if>
+    <sc-if value="{{ focusedCardIsStatus }}" hint-placeholder-val="{{ false }}">
+      <div class="hv-status-focus">
+        <div class="hv-status-focus-meta"><div><span class="hv-status-focus-source {{ focusedStatusState }}" role="status">{{ focusedStatusSource }}</span><strong class="hv-status-focus-summary {{ focusedStatusSummaryClass }}">{{ focusedStatusSummary }}</strong><span class="hv-status-focus-subtitle">{{ focusedStatusSubtitle }}</span></div></div>
+        <div class="hv-status-focus-stage"><div class="hv-status-focus-envelope" style="{{ focusedStatusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt="Top view of vehicle"><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><button type="button" class="hv-envelope-roof-launcher" onClick="{{ focusedStatusOpenRoofControls }}" aria-label="Open sunroof and sunshade controls"></button><sc-for list="{{ focusedStatusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ focusedStatusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for></div></div>
       </div>
     </sc-if>
   </section>
@@ -6294,15 +6424,14 @@ const H6_BOTTOM_CARD_CATALOG = [
   { id: 'climate', title: 'Climate', action: 'openClimate' },
   { id: 'consumption', title: 'Consumption', action: 'openConsumption' },
   { id: 'media', title: 'Media', action: 'addWidget' },
-  { id: 'range', title: 'Range', action: 'openPower' },
-  { id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' },
+  { id: 'range', title: 'Range', action: 'openRange' },
+  { id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' },
   { id: 'tires', title: 'Tires', action: 'openTires' },
   { id: 'clock', title: 'Clock', action: 'openDesktopStudio' },
   { id: 'desktops', title: 'Desktops', action: 'openDesktopStudio' },
   { id: 'driveMode', title: 'Drive mode', action: 'cycleDriveMode' },
   { id: 'powerMode', title: 'Power mode', action: 'cyclePowerMode' },
   { id: 'regen', title: 'Energy recovery', action: 'cycleRegenMode' },
-  { id: 'roof', title: 'Sunroof / shade', action: 'openRoofControls' },
 ];
 
 /**
@@ -6451,6 +6580,24 @@ CAR_MODE_STATE_BY_KEY[CAR_MODE_ESP.key] = CAR_MODE_ESP.stateKey;
 // Slots 1-3 (fr, rl, rr) still follow the conventional order and are unconfirmed.
 // Slot 4 is unidentified — likely the bonnet; nothing is mapped to it.
 const CAR_DOOR_SLOTS = { fl: 0, fr: 1, rl: 2, rr: 3, trunk: 5 };
+
+// Demo-only inspection sequence. Repeating the secured phase between openings
+// makes it easy to compare each open asset against its matching closed panel.
+// This is presentation state only: live door telemetry and _carDoorSlots remain
+// authoritative and are never modified by the ticker below.
+const DEMO_DOOR_SEQUENCE = [
+  { key: 'closed', label: 'All doors closed', open: {} },
+  { key: 'fl', label: 'Driver door open', open: { fl: true } },
+  { key: 'closed', label: 'All doors closed', open: {} },
+  { key: 'fr', label: 'Passenger door open', open: { fr: true } },
+  { key: 'closed', label: 'All doors closed', open: {} },
+  { key: 'rl', label: 'Rear left door open', open: { rl: true } },
+  { key: 'closed', label: 'All doors closed', open: {} },
+  { key: 'rr', label: 'Rear right door open', open: { rr: true } },
+  { key: 'closed', label: 'All doors closed', open: {} },
+  { key: 'trunk', label: 'Tailgate open', open: { trunk: true } },
+];
+const DEMO_DOOR_INTERVAL_MS = 2500;
 
 // Slot values are NOT all binary. The powered tailgate reports travel states:
 // opening/closing cycle observed as -1 → 3 → 1 → 5 → 4 → -1 → 0.
@@ -6884,6 +7031,7 @@ class Component extends DCLogic {
     super(props);
     this.containerRef = React.createRef();
     this.outerRef = React.createRef();
+    try { this._rangeUnit = localStorage.getItem('h6_range_unit') === 'mi' ? 'mi' : 'km'; } catch (e) { this._rangeUnit = 'km'; }
     try {
       const tireDisplay = JSON.parse(localStorage.getItem(TIRE_DISPLAY_PREF_KEY) || '{}');
       if (['bar', 'kpa', 'psi'].includes(tireDisplay.pressure)) {
@@ -7084,6 +7232,8 @@ class Component extends DCLogic {
     this._widgetHold = null;
     this._widgetTouchActive = false;
     this._widgetSuppressClick = false;
+    this._demoDoorSequenceIndex = 0;
+    this._demoDoorTicker = 0;
     if (typeof document !== 'undefined') {
       document.addEventListener('click', (e) => this._onWidgetSuppressClick(e), true);
       document.addEventListener('click', (e) => this._onCameraPanelOutsideClick(e), true);
@@ -9976,9 +10126,16 @@ class Component extends DCLogic {
       }
     }
     if (!slots) {
+      // The timestamp is already recorded by _applyCarSignal. Clear any older
+      // parsed vector so a malformed fresh packet cannot masquerade as the
+      // previous vehicle state.
+      this._carDoorSlots = null;
       if (this._carTrace) console.warn('[CarSignal] door_status unparsed:', value);
       return;
     }
+    // Preserve the canonical parsed vector for status surfaces. Do not infer a
+    // missing/negative slot as closed: it remains explicitly unknown in UI.
+    this._carDoorSlots = slots.slice();
     // n > 0 not shut, n === 0 shut, n < 0 unknown → leave the mesh alone.
     const applySlot = (n, apply) => {
       if (n === undefined || !isFinite(n) || n < 0) return;
@@ -16696,7 +16853,7 @@ class Component extends DCLogic {
     roofPop.className = 'hv-hs-roof-pop';
     roofPop.innerHTML =
       '<div class="hv-hs-roof-head">' +
-        '<div><h4>SUNROOF / SUNSHADE</h4></div>' +
+        '<div><h4>VEHICLE STATUS / ROOF</h4></div>' +
         '<button type="button" class="hv-hs-roof-close" aria-label="Close roof controls" data-hs-roof-close>×</button>' +
       '</div>' +
       '<div class="hv-hs-roof-stack">' +
@@ -16709,12 +16866,35 @@ class Component extends DCLogic {
             '<button type="button" data-hs-roof-action="open" data-hs-roof-kind="sunroof">OPEN</button>' +
           '</div>' +
         '</section>' +
-        '<div class="hv-hs-roof-car-stage" aria-hidden="true">' +
-          '<div class="hv-hs-roof-car-image">' +
-            '<img src="./assets/ui/roof-top-view-v1.png" alt="" draggable="false" />' +
-            '<div class="hv-hs-roof-glass"><div class="hv-hs-roof-panel"></div><div class="hv-hs-roof-shade"></div></div>' +
-            '<div class="hv-hs-roof-car-label">PANORAMIC ROOF</div>' +
+        '<div class="hv-hs-vehicle-stage" aria-label="Vehicle opening and restraint status">' +
+          '<div class="hv-hs-vehicle-meta"><span class="hv-hs-vehicle-source" data-hs-vehicle-source>UNAVAILABLE</span><strong class="hv-hs-vehicle-summary" data-hs-vehicle-summary>Vehicle status</strong><small class="hv-hs-vehicle-subtitle" data-hs-vehicle-subtitle>Waiting for signals</small></div>' +
+          '<div class="hv-hs-vehicle-art" data-hs-vehicle-art aria-hidden="true">' +
+            '<img class="hv-hs-vehicle-base" src="./assets/ui/vehicle-status/base.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer cavity" data-hs-vehicle-cavity="fl" src="./assets/ui/vehicle-status/door-fl-cavity-v1.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer cavity" data-hs-vehicle-cavity="fr" src="./assets/ui/vehicle-status/door-fr-cavity-v1.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer cavity" data-hs-vehicle-cavity="rl" src="./assets/ui/vehicle-status/door-rl-cavity-v1.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer cavity" data-hs-vehicle-cavity="rr" src="./assets/ui/vehicle-status/door-rr-cavity-v1.png" alt="">' +
+            '<div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div>' +
+            '<img class="hv-hs-vehicle-layer closed-door" data-hs-vehicle-closed-door="fl" src="./assets/ui/vehicle-status/door-fl-closed-v4.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer closed-door" data-hs-vehicle-closed-door="fr" src="./assets/ui/vehicle-status/door-fr-closed-v4.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer closed-door" data-hs-vehicle-closed-door="rl" src="./assets/ui/vehicle-status/door-rl-closed-v4.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer closed-door" data-hs-vehicle-closed-door="rr" src="./assets/ui/vehicle-status/door-rr-closed-v4.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer door" data-hs-vehicle-layer="fl" src="./assets/ui/vehicle-status/door-fl-open-v3.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer door" data-hs-vehicle-layer="fr" src="./assets/ui/vehicle-status/door-fr-open-v3.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer door" data-hs-vehicle-layer="rl" src="./assets/ui/vehicle-status/door-rl-open-v3.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer door" data-hs-vehicle-layer="rr" src="./assets/ui/vehicle-status/door-rr-open-v3.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer tailgate" data-hs-vehicle-layer="trunk" src="./assets/ui/vehicle-status/tailgate-open-v2.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="fl-open" src="./assets/ui/vehicle-status/window-fl-open-v2.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="fl-partial" src="./assets/ui/vehicle-status/window-fl-partial-v2.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="fr-open" src="./assets/ui/vehicle-status/window-fr-open-v2.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="fr-partial" src="./assets/ui/vehicle-status/window-fr-partial-v2.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="rl-open" src="./assets/ui/vehicle-status/window-rl-open-v2.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="rl-partial" src="./assets/ui/vehicle-status/window-rl-partial-v2.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="rr-open" src="./assets/ui/vehicle-status/window-rr-open-v2.png" alt="">' +
+            '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="rr-partial" src="./assets/ui/vehicle-status/window-rr-partial-v2.png" alt="">' +
+            '<i class="hv-hs-vehicle-belt fl" data-hs-vehicle-belt="fl"></i><i class="hv-hs-vehicle-belt fr" data-hs-vehicle-belt="fr"></i><i class="hv-hs-vehicle-belt rl" data-hs-vehicle-belt="rl"></i><i class="hv-hs-vehicle-belt rc" data-hs-vehicle-belt="rc"></i><i class="hv-hs-vehicle-belt rr" data-hs-vehicle-belt="rr"></i>' +
           '</div>' +
+          '<div class="hv-hs-vehicle-stats"><span data-hs-vehicle-doors>DOORS</span><span data-hs-vehicle-glass>GLASS</span><span data-hs-vehicle-belts>BELTS</span></div>' +
         '</div>' +
         '<section class="hv-hs-roof-card" data-hs-roof-card="curtain" data-level="0">' +
           '<div class="hv-hs-roof-card-top"><span class="hv-hs-roof-name">SUNSHADE</span><span class="hv-hs-roof-value"><span data-hs-roof-cur-val>0%</span><span class="hv-hs-roof-state" data-hs-roof-cur-state>CLOSED</span></span></div>' +
@@ -16750,6 +16930,23 @@ class Component extends DCLogic {
     this._hsRoofCurState = curState;
     this._hsRoofSunCard = sunCard;
     this._hsRoofCurCard = curCard;
+    this._hsVehicleArt = roofPop.querySelector('[data-hs-vehicle-art]');
+    this._hsVehicleSource = roofPop.querySelector('[data-hs-vehicle-source]');
+    this._hsVehicleSummary = roofPop.querySelector('[data-hs-vehicle-summary]');
+    this._hsVehicleSubtitle = roofPop.querySelector('[data-hs-vehicle-subtitle]');
+    this._hsVehicleDoors = roofPop.querySelector('[data-hs-vehicle-doors]');
+    this._hsVehicleGlass = roofPop.querySelector('[data-hs-vehicle-glass]');
+    this._hsVehicleBelts = roofPop.querySelector('[data-hs-vehicle-belts]');
+    this._hsVehicleCavityEls = {};
+    roofPop.querySelectorAll('[data-hs-vehicle-cavity]').forEach((el) => { this._hsVehicleCavityEls[el.getAttribute('data-hs-vehicle-cavity')] = el; });
+    this._hsVehicleClosedDoorEls = {};
+    roofPop.querySelectorAll('[data-hs-vehicle-closed-door]').forEach((el) => { this._hsVehicleClosedDoorEls[el.getAttribute('data-hs-vehicle-closed-door')] = el; });
+    this._hsVehicleDoorEls = {};
+    roofPop.querySelectorAll('[data-hs-vehicle-layer]').forEach((el) => { this._hsVehicleDoorEls[el.getAttribute('data-hs-vehicle-layer')] = el; });
+    this._hsVehicleWindowEls = {};
+    roofPop.querySelectorAll('[data-hs-vehicle-window]').forEach((el) => { this._hsVehicleWindowEls[el.getAttribute('data-hs-vehicle-window')] = el; });
+    this._hsVehicleBeltEls = {};
+    roofPop.querySelectorAll('[data-hs-vehicle-belt]').forEach((el) => { this._hsVehicleBeltEls[el.getAttribute('data-hs-vehicle-belt')] = el; });
     const syncLevel = (kind, raw) => this._syncRoofLevelControl(kind, raw);
     sunSl.addEventListener('input', () => {
       const v = parseInt(sunSl.value, 10) || 0;
@@ -17252,6 +17449,9 @@ class Component extends DCLogic {
 
   _syncRoofLevelControl(kind, raw) {
     const level = this._vehicleOpeningLevel(raw);
+    const previous = this._hsRoofVisualLevels && this._hsRoofVisualLevels[kind];
+    if (!this._hsRoofVisualLevels) this._hsRoofVisualLevels = {};
+    this._hsRoofVisualLevels[kind] = level;
     const sunroof = kind === 'sunroof';
     const slider = sunroof ? this._hsRoofSunSl : this._hsRoofCurSl;
     const value = sunroof ? this._hsRoofSunVal : this._hsRoofCurVal;
@@ -17272,6 +17472,20 @@ class Component extends DCLogic {
       this._hsRoofPop.style.setProperty(sunroof ? '--sun-level' : '--curtain-level', level + '%');
       if (sunroof) this._hsRoofPop.style.setProperty('--sun-shift', (-level * .25) + '%');
     }
+    if (this._hsVehicleArt) {
+      if (sunroof) {
+        const lift = Math.min(1, level / 25);
+        const slide = Math.max(0, (level - 25) / 75);
+        this._hsVehicleArt.style.setProperty('--roof-glass-tilt', (-8 * lift * (1 - slide)).toFixed(2) + 'deg');
+        this._hsVehicleArt.style.setProperty('--roof-glass-slide', Math.round(slide * 92) + '%');
+        this._hsVehicleArt.style.setProperty('--roof-glass-brightness', (1 + lift * .06).toFixed(2));
+        this._hsVehicleArt.style.setProperty('--roof-lift-cue', (lift * (1 - slide)).toFixed(2));
+      } else {
+        this._hsVehicleArt.style.setProperty('--curtain-retract', level + '%');
+        this._hsVehicleArt.style.setProperty('--curtain-shift', Math.round(level * .72) + '%');
+      }
+      this._animateRoofVehicleTransition(kind, previous, level);
+    }
     if (this._hsRoofPop) {
       this._hsRoofPop.querySelectorAll('[data-hs-roof-kind="' + kind + '"][data-hs-roof-action]').forEach((button) => {
         const action = button.getAttribute('data-hs-roof-action');
@@ -17282,13 +17496,85 @@ class Component extends DCLogic {
     }
   }
 
+  _syncRoofVehicleStatus(snapshot) {
+    if (!this._hsVehicleArt) return;
+    const envelope = snapshot || this._statusEnvelopeSnapshot();
+    const doors = envelope.doors;
+    const openGlass = envelope.windows.filter((entry) => entry.state === 'open' || entry.state === 'partial').length;
+    const unfastened = envelope.seatBelts.filter((entry) => entry.state === 'unfastened').length;
+    if (this._hsVehicleSource) {
+      this._hsVehicleSource.textContent = doors.source;
+      this._hsVehicleSource.className = 'hv-hs-vehicle-source ' + (doors.demo ? 'demo' : doors.state);
+    }
+    if (this._hsVehicleSummary) {
+      this._hsVehicleSummary.textContent = envelope.summary;
+      this._hsVehicleSummary.className = 'hv-hs-vehicle-summary ' + (doors.open.length || unfastened ? 'attention' : '');
+    }
+    if (this._hsVehicleSubtitle) this._hsVehicleSubtitle.textContent = doors.subtitle;
+    Object.keys(this._hsVehicleCavityEls || {}).forEach((key) => {
+      const target = (doors.openings || []).find((entry) => entry.key === key);
+      this._hsVehicleCavityEls[key].classList.toggle('on', !!target && target.state === 'open');
+    });
+    Object.keys(this._hsVehicleDoorEls || {}).forEach((key) => {
+      const target = (doors.openings || []).find((entry) => entry.key === key);
+      const state = target ? target.state : 'unknown';
+      this._hsVehicleDoorEls[key].classList.toggle('on', state === 'open');
+    });
+    Object.keys(this._hsVehicleClosedDoorEls || {}).forEach((key) => {
+      const target = (doors.openings || []).find((entry) => entry.key === key);
+      this._hsVehicleClosedDoorEls[key].classList.toggle('on', !target || target.state !== 'open');
+    });
+    Object.keys(this._hsVehicleWindowEls || {}).forEach((key) => {
+      const parts = key.split('-');
+      const target = (envelope.windows || []).find((entry) => entry.key === parts[0]);
+      this._hsVehicleWindowEls[key].classList.toggle('on', !!target && target.state === parts[1]);
+    });
+    Object.keys(this._hsVehicleBeltEls || {}).forEach((key) => {
+      const target = (envelope.seatBelts || []).find((entry) => entry.key === key);
+      const state = target ? target.state : 'unknown';
+      this._hsVehicleBeltEls[key].className = 'hv-hs-vehicle-belt ' + key + ' ' + state;
+    });
+    if (this._hsVehicleDoors) this._hsVehicleDoors.textContent = doors.open.length + ' OPEN';
+    if (this._hsVehicleGlass) this._hsVehicleGlass.textContent = openGlass ? openGlass + ' GLASS' : (envelope.demo ? 'GLASS OK' : 'GLASS —');
+    if (this._hsVehicleBelts) {
+      this._hsVehicleBelts.textContent = unfastened ? 'BELTS !' : (envelope.demo ? 'BELTS OK' : 'BELTS —');
+      this._hsVehicleBelts.classList.toggle('attention', !!unfastened);
+    }
+  }
+
+  _animateRoofVehicleTransition(kind, previous, level) {
+    if (!this._hsVehicleArt || previous == null || Math.abs(level - previous) < 70) return;
+    const opening = level > previous;
+    if (kind === 'sunroof') {
+      const glass = this._hsVehicleArt.querySelector('.hv-vehicle-roof-glass');
+      if (!glass || typeof glass.animate !== 'function') return;
+      glass.getAnimations().forEach((animation) => animation.cancel());
+      const closed = { transform:'translateY(0%) rotateX(0deg)', filter:'brightness(1) drop-shadow(0 2px 3px rgba(0,0,0,.55))' };
+      const vent = { transform:'translateY(0%) rotateX(-8deg)', filter:'brightness(1.06) drop-shadow(0 4px 4px rgba(0,0,0,.82))' };
+      const open = { transform:'translateY(92%) rotateX(0deg)', filter:'brightness(1.06) drop-shadow(0 2px 3px rgba(0,0,0,.55))' };
+      glass.animate(opening ? [closed, Object.assign({ offset:.28 }, vent), open]
+        : [open, Object.assign({ offset:.72 }, vent), closed], {
+        duration:720, easing:'cubic-bezier(.22,.72,.25,1)'
+      });
+      return;
+    }
+    const curtain = this._hsVehicleArt.querySelector('.hv-vehicle-roof-curtain');
+    if (!curtain || typeof curtain.animate !== 'function') return;
+    curtain.getAnimations().forEach((animation) => animation.cancel());
+    const from = { clipPath:'inset(' + previous + '% 0 0 0 round 10%)', transform:'translateY(' + Math.round(previous * .72) + '%)' };
+    const to = { clipPath:'inset(' + level + '% 0 0 0 round 10%)', transform:'translateY(' + Math.round(level * .72) + '%)' };
+    curtain.animate([from, to], { duration:560, easing:'cubic-bezier(.22,.72,.25,1)' });
+  }
+
   _syncRoofLevelPopup() {
     const s = this.state || {};
+    const envelope = this._statusEnvelopeSnapshot();
     if (this._hsRoofPop) {
       this._hsRoofPop.classList.toggle('light', this._effectiveWidgetTheme(s) === 'light');
     }
-    this._syncRoofLevelControl('sunroof', s.sunroofOpen || 0);
-    this._syncRoofLevelControl('curtain', s.curtainOpen || 0);
+    this._syncRoofLevelControl('sunroof', envelope.sunroof.state === 'unknown' ? (s.sunroofOpen || 0) : envelope.sunroof.pct);
+    this._syncRoofLevelControl('curtain', envelope.curtain.state === 'unknown' ? (s.curtainOpen || 0) : envelope.curtain.pct);
+    this._syncRoofVehicleStatus(envelope);
   }
 
   _hitHotspotDot(e, radius) {
@@ -20901,6 +21187,7 @@ class Component extends DCLogic {
     // Everything applyShellLayout touches is model-optional: _applyFitCamera
     // and _setCarSceneVisible both no-op until the scene exists.
     window.__app = this;
+    this._ensureDemoDoorTicker();
     // Keep the legacy/native widget channel pointed at the active desktop.
     // The versioned store remains authoritative for all desktop snapshots.
     this._persistWidgets();
@@ -29093,15 +29380,16 @@ class Component extends DCLogic {
     const type = s.focusedCardType;
     const base = {
       focusedCardPopupClass: type ? 'on' : '', focusedCardBackdropClass: type ? 'on' : '',
-      focusedCardTitle: type === 'consumption' ? 'CONSUMPTION' : (type === 'tires' ? 'TYRE PRESSURE' : 'CLIMATE'),
+      focusedCardTitle: type === 'range' ? 'RANGE' : (type === 'consumption' ? 'CONSUMPTION' : (type === 'tires' ? 'TYRE PRESSURE' : (type === 'status' ? 'VEHICLE STATUS' : 'CLIMATE'))),
       focusedCardIsClimate: type === 'climate', focusedCardIsConsumption: type === 'consumption',
-      focusedCardIsTires: type === 'tires',
+      focusedCardIsTires: type === 'tires', focusedCardIsStatus: type === 'status', focusedCardIsRange: type === 'range',
       closeFocusedCard: () => this._closeFocusedCard(),
     };
     if (!type) return base;
     const entry = this._focusedCardEntry(type);
     const view = type === 'climate' ? this._climateWidgetView(entry.item, entry.side)
-      : (type === 'tires' ? this._tiresWidgetView(entry.item) : this._consumptionWidgetView(entry.item, entry.side));
+        : (type === 'tires' ? this._tiresWidgetView(entry.item)
+          : (type === 'status' ? this._statusWidgetView(entry.item) : (type === 'range' ? this._rangeWidgetView(entry.item) : this._consumptionWidgetView(entry.item, entry.side))));
     Object.keys(view).forEach((key) => {
       if (key.indexOf(type) === 0) base['focused' + key.charAt(0).toUpperCase() + key.slice(1)] = view[key];
     });
@@ -29536,27 +29824,219 @@ class Component extends DCLogic {
     };
   }
 
+  _ensureDemoDoorTicker() {
+    if (this._demoDoorTicker || !this._demoPreview || typeof setInterval !== 'function') return;
+    this._demoDoorTicker = setInterval(() => {
+      if (this._unmounted || !this._demoPreview) return;
+      const at = this._carSignalAt || {};
+      // Once the bridge has supplied a real vector, the snapshot remains live
+      // and the demo phase stops moving. Do not clear or alter telemetry here.
+      if (at[CAR_SIGNALS.doors]) return;
+      this._demoDoorSequenceIndex = (this._demoDoorSequenceIndex + 1) % DEMO_DOOR_SEQUENCE.length;
+      this.setState((state) => ({ widgetRev: (state.widgetRev || 0) + 1 }), () => {
+        if (this._unmounted) return;
+        this._syncRoofVehicleStatus(this._statusEnvelopeSnapshot());
+        this._syncDockIndicators();
+      });
+    }, DEMO_DOOR_INTERVAL_MS);
+  }
+
+  _statusDoorSnapshot(allowDemo = true) {
+    const now = Date.now();
+    const at = this._carSignalAt || {};
+    const observed = !!at[CAR_SIGNALS.doors];
+    const fresh = observed && now - at[CAR_SIGNALS.doors] <= 120000;
+    const demo = !!this._demoPreview && !observed && allowDemo;
+    const definitions = [
+      { key: 'fl', short: 'DRIVER', label: 'Driver door' },
+      { key: 'fr', short: 'PASS.', label: 'Front passenger door' },
+      { key: 'rl', short: 'REAR L', label: 'Rear left door' },
+      { key: 'rr', short: 'REAR R', label: 'Rear right door' },
+      { key: 'trunk', short: 'TAILGATE', label: 'Tailgate' },
+    ];
+    const demoPhase = DEMO_DOOR_SEQUENCE[
+      Math.max(0, Number(this._demoDoorSequenceIndex) || 0) % DEMO_DOOR_SEQUENCE.length
+    ] || DEMO_DOOR_SEQUENCE[0];
+    const demoOpen = demoPhase.open;
+    const slots = Array.isArray(this._carDoorSlots) ? this._carDoorSlots : [];
+    const openings = definitions.map((definition) => {
+      const raw = slots[CAR_DOOR_SLOTS[definition.key]];
+      const known = demo || (typeof raw === 'number' && isFinite(raw) && raw >= 0);
+      const open = demo ? demoOpen[definition.key] : known && raw > 0;
+      const state = known ? (open ? 'open' : 'closed') : 'unknown';
+      return Object.assign({}, definition, {
+        state,
+        open,
+        cls: definition.key + ' ' + state,
+        stateLabel: state === 'open' ? 'OPEN' : (state === 'closed' ? 'CLOSED' : 'UNKNOWN'),
+      });
+    });
+    const known = openings.filter((opening) => opening.state !== 'unknown');
+    const open = openings.filter((opening) => opening.open);
+    const unknown = openings.filter((opening) => opening.state === 'unknown');
+    let state = 'unavailable';
+    if (demo) state = 'demo';
+    else if (observed && known.length) state = fresh ? (unknown.length ? 'partial' : 'live') : 'stale';
+    let summary = 'Status unavailable';
+    if (open.length === 1) summary = open[0].key === 'trunk' ? 'Tailgate open' : open[0].label + ' open';
+    else if (open.length > 1) summary = open.length + ' openings';
+    else if (known.length === openings.length) summary = 'All closed';
+    else if (known.length) summary = 'Door status partial';
+    const source = demo ? 'DEMO · SIMULATED · NOT VEHICLE'
+      : (!observed ? 'UNAVAILABLE · NO DOOR SIGNAL'
+        : (!known.length ? 'UNAVAILABLE · DOOR VECTOR UNPARSEABLE'
+          : (!fresh ? 'VEHICLE · STALE · DOOR STATUS'
+            : (unknown.length ? 'VEHICLE · PARTIAL · DOOR STATUS' : 'VEHICLE · LIVE · DOOR STATUS'))));
+    const subtitle = demo ? demoPhase.label + ' · alternating demo · simulated'
+      : (state === 'live' ? 'Updated within 2 min'
+        : (state === 'partial' ? unknown.length + ' openings not reported'
+          : (state === 'stale' ? 'Vehicle data older than 2 min'
+            : 'No confirmed opening state')));
+    const attentionItems = open.map((opening) => ({ cls: 'attention', label: opening.label + ' open' }))
+      .concat(unknown.map((opening) => ({ cls: 'unknown', label: opening.label + ' unknown' })));
+    if (!attentionItems.length) attentionItems.push({ cls: '', label: state === 'live' ? 'No openings need attention' : subtitle });
+    return { observed, fresh, demo, state, openings, open, unknown, summary, source, subtitle, attentionItems };
+  }
+
+  /* One surface for every aperture that changes the vehicle envelope.  Window
+     and belt telemetry are deliberately unknown until the direct bridge ships
+     their signal contract: a last command is not proof that the glass moved,
+     and no belt warning is fabricated on a live vehicle. */
+  _statusEnvelopeSnapshot() {
+    const at = this._carSignalAt || {};
+    const now = Date.now();
+    const roofObserved = !!at[CAR_SIGNALS.sunroof] || !!at[CAR_SIGNALS.curtain];
+    const doors = this._statusDoorSnapshot(!roofObserved);
+    const demo = !!this._demoPreview && !doors.observed && !roofObserved;
+    const openingState = (pct) => pct <= 0 ? 'closed' : (pct >= 98 ? 'open' : 'partial');
+    const openingLabel = (state) => state === 'open' ? 'OPEN' : (state === 'partial' ? 'PART OPEN' : (state === 'closed' ? 'CLOSED' : 'UNKNOWN'));
+    const roofPart = (label, signal, pct, demoPct) => {
+      const observed = !!at[signal];
+      const fresh = observed && now - at[signal] <= 120000;
+      const level = demo && !observed ? demoPct : (observed ? pct : null);
+      const state = level == null ? 'unknown' : openingState(level);
+      return { label, state, stateLabel: openingLabel(state), pct: level == null ? 0 : Math.round(level),
+        source: demo && !observed ? 'DEMO' : (observed ? (fresh ? 'LIVE' : 'STALE') : 'UNAVAILABLE'),
+        cls: state + (fresh ? ' live' : '') };
+    };
+    const sunroof = roofPart('SUNROOF', CAR_SIGNALS.sunroof, this._vehicleOpeningLevel(this.state.sunroofOpen), 46);
+    const curtain = roofPart('SHADE', CAR_SIGNALS.curtain, this._vehicleOpeningLevel(this.state.curtainOpen), 25);
+    const windows = [
+      { key: 'fl', label: 'Driver glass', demoState: 'partial' }, { key: 'fr', label: 'Passenger glass', demoState: 'open' },
+      { key: 'rl', label: 'Rear left glass', demoState: 'closed' }, { key: 'rr', label: 'Rear right glass', demoState: 'closed' },
+    ].map((windowState) => {
+      const state = demo ? windowState.demoState : 'unknown';
+      return Object.assign({}, windowState, { state, stateLabel: openingLabel(state), source: demo ? 'DEMO' : 'UNAVAILABLE', cls: windowState.key + ' ' + state });
+    });
+    const seatBelts = [
+      { key: 'fl', label: 'Driver belt', demoState: 'unfastened' }, { key: 'fr', label: 'Passenger belt', demoState: 'fastened' },
+      { key: 'rl', label: 'Rear left belt', demoState: 'fastened' }, { key: 'rc', label: 'Rear center belt', demoState: 'fastened' },
+      { key: 'rr', label: 'Rear right belt', demoState: 'fastened' },
+    ].map((belt) => {
+      const state = demo ? belt.demoState : 'unknown';
+      return Object.assign({}, belt, { state, stateLabel: state === 'unfastened' ? 'UNFASTENED' : (state === 'fastened' ? 'FASTENED' : 'UNKNOWN'), source: demo ? 'DEMO' : 'UNAVAILABLE', cls: belt.key + ' ' + state });
+    });
+    const roof = { cls: (sunroof.state === 'unknown' && curtain.state === 'unknown' ? 'unknown' : 'known'),
+      style: '--roof-open:' + sunroof.pct + '%;--roof-slide:-' + Math.round(sunroof.pct * .55) + '%;--shade-open:' + curtain.pct + '%;' };
+    const roofAttention = [sunroof, curtain].filter((part) => part.state === 'open' || part.state === 'partial')
+      .map((part) => ({ cls: '', label: part.label + ' ' + part.stateLabel.toLowerCase() }));
+    const glassAttention = windows.filter((windowState) => windowState.state === 'open' || windowState.state === 'partial')
+      .map((windowState) => ({ cls: '', label: windowState.label + ' ' + windowState.stateLabel.toLowerCase() }));
+    const beltAttention = seatBelts.filter((belt) => belt.state === 'unfastened')
+      .map((belt) => ({ cls: 'attention', label: belt.label + ' unfastened' }));
+    const attentionItems = doors.open.map((opening) => ({ cls: 'attention', label: opening.label + ' open' }))
+      .concat(roofAttention, glassAttention, beltAttention);
+    if (!attentionItems.length) attentionItems.push({ cls: '', label: demo ? 'Demo vehicle secured' : 'Only verified vehicle signals are shown' });
+    const systems = [sunroof, curtain].concat(windows, seatBelts).map((part) => ({
+      label: part.label, stateLabel: part.stateLabel, source: part.source, cls: part.cls || part.state,
+    }));
+    let summary = doors.summary;
+    // Keep the alternating demo legible: its headline names the door phase while
+    // the GLASS/BELTS rows continue to expose their independent demo warnings.
+    // Live/unavailable surfaces retain the normal cross-system priority below.
+    if (!demo && !doors.open.length && beltAttention.length) summary = 'Seat belt attention';
+    else if (!demo && !doors.open.length && glassAttention.length) summary = glassAttention.length === 1 ? glassAttention[0].label : glassAttention.length + ' windows open';
+    else if (!demo && !doors.open.length && roofAttention.length) summary = roofAttention[0].label;
+    const realisticArt = demo && doors.open.some((opening) => opening.key === 'fl')
+      && doors.open.some((opening) => opening.key === 'trunk') ? 'demo-realistic-state' : '';
+    return { doors, demo, roof, sunroof, curtain, windows, seatBelts, systems, attentionItems, summary, realisticArt };
+  }
+
+  _statusVehicleImageLayers(envelope) {
+    const root = './assets/ui/vehicle-status/';
+    const layers = [];
+    (envelope.doors.openings || []).forEach((opening) => {
+      const tailgate = opening.key === 'trunk';
+      if (!tailgate && !opening.open) {
+        layers.push({ key: 'closed-' + opening.key, src: root + 'door-' + opening.key + '-closed-v4.png', cls: 'closed-door' });
+        return;
+      }
+      if (!opening.open) return;
+      const filename = tailgate ? 'tailgate-open-v2.png' : 'door-' + opening.key + '-open-v3.png';
+      if (!tailgate) layers.push({ key: 'cavity-' + opening.key, src: root + 'door-' + opening.key + '-cavity-v1.png', cls: 'cavity' });
+      layers.push({ key: opening.key, src: root + filename, cls: tailgate ? 'tailgate' : 'door' });
+    });
+    (envelope.windows || []).forEach((windowState) => {
+      if (windowState.state !== 'open' && windowState.state !== 'partial') return;
+      layers.push({ key: 'window-' + windowState.key, src: root + 'window-' + windowState.key + '-' + windowState.state + '-v2.png', cls: 'window' });
+    });
+    return layers;
+  }
+
+  _statusVehicleImageStyle(envelope) {
+    const sunroof = this._vehicleOpeningLevel(envelope.sunroof && envelope.sunroof.pct);
+    const curtain = this._vehicleOpeningLevel(envelope.curtain && envelope.curtain.pct);
+    const lift = Math.min(1, sunroof / 25);
+    const slide = Math.max(0, (sunroof - 25) / 75);
+    const tilt = (-8 * lift * (1 - slide)).toFixed(2);
+    const glassSlide = Math.round(slide * 92);
+    const brightness = (1 + lift * .06).toFixed(2);
+    const curtainShift = Math.round(curtain * .72);
+    return '--roof-glass-tilt:' + tilt + 'deg;--roof-glass-slide:' + glassSlide
+      + '%;--roof-glass-brightness:' + brightness + ';--curtain-retract:' + curtain
+      + '%;--curtain-shift:' + curtainShift + '%;--roof-lift-cue:' + (lift * (1 - slide)).toFixed(2) + ';';
+  }
+
   _statusWidgetView(item) {
-    const signalKeys = [CAR_SIGNALS.speed, CAR_SIGNALS.batterySoc,
-      CAR_SIGNALS.gear, CAR_SIGNALS.ready];
-    const hasVehicleSignal = signalKeys.some((key) => this._carSignalAt && this._carSignalAt[key]);
-    const demo = !!this._demoPreview && !hasVehicleSignal;
-    const speedLive = this._carSignalAt && this._carSignalAt[CAR_SIGNALS.speed];
-    const speed = speedLive && isFinite(this._carSpeedKmh) ? String(Math.round(this._carSpeedKmh)) : (demo ? '0' : '—');
+    const envelope = this._statusEnvelopeSnapshot();
+    const status = envelope.doors;
+    const at = this._carSignalAt || {};
+    const now = Date.now();
+    const metric = (label, signal, value, demoValue) => {
+      const fresh = at[signal] && now - at[signal] <= 120000;
+      return { label, value: fresh && value != null && value !== '' ? String(value) : (status.demo ? demoValue : '—'), cls: fresh ? 'live' : '' };
+    };
     const socRaw = this._powerLive && this._powerLive.soc;
-    const soc = socRaw ? String(socRaw).replace(/\s/g, '') + (String(socRaw).indexOf('%') >= 0 ? '' : '%') : (demo ? '78%' : '—');
-    const gear = this._carGear != null && isFinite(this._carGear) ? String(this._carGear) : (demo ? 'P' : '—');
-    const ready = this._carReady === true ? 'READY' : (this._carReady === false ? 'OFF' : (demo ? 'READY' : '—'));
-    const fresh = signalKeys.some((key) => this._carSignalAt && Date.now() - this._carSignalAt[key] <= 120000);
+    const soc = socRaw != null && String(socRaw).trim() !== ''
+      ? String(socRaw).replace(/\s/g, '') + (String(socRaw).indexOf('%') >= 0 ? '' : '%') : null;
+    const gear = this._carGear != null && isFinite(this._carGear) ? this._carGear : null;
+    const ready = this._carReady === true ? 'READY' : (this._carReady === false ? 'OFF' : null);
+    const metricState = (label, part, demoValue) => ({ label, value: part.state === 'unknown' ? (envelope.demo ? demoValue : '—') : part.stateLabel, cls: part.state === 'unknown' ? '' : 'live' });
+    const metrics = [metricState('SUNROOF', envelope.sunroof, 'PART OPEN'), metricState('GLASS', { state: envelope.windows.some((windowState) => windowState.state === 'open' || windowState.state === 'partial') ? 'open' : (envelope.demo ? 'closed' : 'unknown'), stateLabel: envelope.windows.filter((windowState) => windowState.state === 'open' || windowState.state === 'partial').length + ' OPEN' }, '2 OPEN'), metricState('BELTS', { state: envelope.seatBelts.some((belt) => belt.state === 'unfastened') ? 'unfastened' : (envelope.demo ? 'fastened' : 'unknown'), stateLabel: envelope.seatBelts.some((belt) => belt.state === 'unfastened') ? 'CHECK' : 'FASTENED' }, 'CHECK')];
     return {
       statusSizeClass: 'hv-status-' + (item.w || 1) + 'x' + (item.h || 1),
-      statusSource: demo ? 'DEMO · SIMULATED' : (fresh ? 'VEHICLE · LIVE SIGNALS' : (hasVehicleSignal ? 'STALE · VEHICLE SIGNALS' : 'UNAVAILABLE · NO SIGNAL')),
-      statusSpeed: speed,
-      statusSpeedUnit: speed === '—' ? 'SPEED UNAVAILABLE' : 'KM/H',
-      statusSoc: soc,
-      statusGear: gear,
-      statusReady: ready,
-      statusLiveClass: demo || speedLive ? 'live' : '',
+      statusSource: status.source,
+      statusState: status.state,
+      statusSummary: envelope.summary,
+      statusSummaryClass: status.open.length || envelope.seatBelts.some((belt) => belt.state === 'unfastened') ? 'attention' : '',
+      statusSubtitle: status.subtitle,
+      statusOpenings: status.openings,
+      statusRealisticArt: envelope.realisticArt,
+      statusRoof: envelope.roof,
+      statusImageLayers: this._statusVehicleImageLayers(envelope),
+      statusVehicleStyle: this._statusVehicleImageStyle(envelope),
+      statusWindows: envelope.windows,
+      statusSeatBelts: envelope.seatBelts,
+      statusSystems: envelope.systems,
+      statusMetrics: metrics,
+      statusAttentionItems: envelope.attentionItems,
+      statusAriaLabel: 'Vehicle status. ' + envelope.summary + '. ' + status.source + '. ' + envelope.systems.map((entry) => entry.label + ' ' + entry.stateLabel).join('. ') + '. Opens vehicle status details.',
+      statusOpenRoofControls: (ev) => { this._cardControlEvent(ev); this._openRoofLevelPopup(); },
+      onStatusOpen: (ev) => {
+        this._cardControlEvent(ev);
+        if (this._widgetSuppressClick || this.state.widgetMenuId) return;
+        this._openRoofLevelPopup();
+      },
     };
   }
 
@@ -29594,18 +30074,19 @@ class Component extends DCLogic {
   }
 
   _rangeWidgetView(item) {
-    const model = this._powerModel(this._graphNow || Date.now());
-    const ev = model.stats && model.stats[0] ? model.stats[0].value : '—';
-    const fuel = model.stats && model.stats[1] ? model.stats[1].value : '—';
-    return {
-      rangeSizeClass: 'hv-range-card-' + (item.w || 1) + 'x' + (item.h || 1),
-      rangeSource: this._powerSource(),
-      rangePct: model.socPct,
-      rangeSoc: model.socNum,
-      rangeEv: ev,
-      rangeFuel: fuel,
-    };
+    const range = this._rangeTelemetry(Date.now());
+    return { rangeSizeClass: 'hv-range-card-' + (item.w || 1) + 'x' + (item.h || 1), rangeSource: range.source, rangeTotalLabel: range.totalLabel, rangeTotal: range.total, rangeUnit: range.unit, rangeSoc: range.soc, rangeEv: range.ev, rangeFuel: range.fuel, rangeEvPct: range.evPct, rangeFuelPct: range.fuelPct, rangeUnitKmClass: range.unit === 'KM' ? 'on' : '', rangeUnitMiClass: range.unit === 'MI' ? 'on' : '', rangeUnitKmPressed: range.unit === 'KM', rangeUnitMiPressed: range.unit === 'MI', rangeAriaLabel: 'Range: ' + range.total + ' ' + range.unit + '. Battery ' + range.soc + '. EV ' + range.ev + ' ' + range.unit + '. Fuel ' + range.fuel + ' ' + range.unit + '. ' + range.source, onRangeOpen: (ev) => this._openRangeCard(ev), rangeSetKm: (ev) => this._setRangeDistanceUnit('km', ev), rangeSetMi: (ev) => this._setRangeDistanceUnit('mi', ev) };
   }
+
+  _rangeDistanceUnit() { return this._rangeUnit === 'mi' ? 'mi' : 'km'; }
+  _setRangeDistanceUnit(unit, ev) { this._cardControlEvent(ev); if (unit !== 'km' && unit !== 'mi') return; this._rangeUnit = unit; try { localStorage.setItem('h6_range_unit', unit); } catch (e) {} this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 })); }
+  _rangeTelemetry(now) {
+    const at = this._carSignalAt || {}, live = this._powerLive || {}, keys = [CAR_SIGNALS.batterySoc, CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange], stamp = (key) => Number(at[key]) || 0, known = keys.filter((key) => stamp(key)), demo = !!this._demoPreview && !known.length, fresh = (key) => stamp(key) && now - stamp(key) <= 120000, number = (key, raw) => (demo || stamp(key)) ? this._carNumber(raw) : NaN;
+    const socValue = demo ? 64 : number(CAR_SIGNALS.batterySoc, live.soc), evValue = demo ? 42 : number(CAR_SIGNALS.evRange, live.evRange), fuelValue = demo ? 510 : number(CAR_SIGNALS.fuelRange, live.fuelRange), valid = [{ key: CAR_SIGNALS.batterySoc, value: socValue }, { key: CAR_SIGNALS.evRange, value: evValue }, { key: CAR_SIGNALS.fuelRange, value: fuelValue }], available = valid.filter((entry) => isFinite(entry.value)), freshAvailable = available.filter((entry) => fresh(entry.key)), evKnown = isFinite(evValue), fuelKnown = isFinite(fuelValue), totalValue = (evKnown ? Math.max(0, evValue) : 0) + (fuelKnown ? Math.max(0, fuelValue) : 0), hasKnownRange = evKnown || fuelKnown, completeRange = evKnown && fuelKnown, unitKey = this._rangeDistanceUnit(), unit = unitKey.toUpperCase(), formatDistance = (km) => isFinite(km) ? String(Math.round(Math.max(0, km) * (unitKey === 'mi' ? .621371 : 1))) : '—', total = completeRange ? formatDistance(totalValue) : '—', evPct = hasKnownRange && totalValue > 0 && evKnown ? Math.round(Math.max(0, evValue) * 100 / totalValue) : 0, fuelPct = hasKnownRange && totalValue > 0 && fuelKnown ? Math.max(0, 100 - evPct) : 0;
+    let source = 'UNAVAILABLE · NO RANGE SIGNAL'; if (demo) source = 'DEMO · SIMULATED · NOT VEHICLE'; else if (!available.length && known.length) source = 'UNAVAILABLE · RANGE DATA INVALID'; else if (available.length < valid.length) source = freshAvailable.length ? 'PARTIAL · VEHICLE RANGE' : 'PARTIAL · STALE RANGE'; else if (freshAvailable.length === available.length) source = 'VEHICLE · LIVE RANGE'; else if (!freshAvailable.length) source = 'STALE · VEHICLE RANGE'; else source = 'PARTIAL · VEHICLE RANGE';
+    return { source, totalLabel: completeRange ? 'TOTAL RANGE' : (hasKnownRange ? 'TOTAL RANGE · PARTIAL' : 'TOTAL RANGE'), total, unit, soc: isFinite(socValue) ? String(Math.round(Math.max(0, Math.min(100, socValue)))) + '%' : '—', ev: evKnown ? formatDistance(evValue) : '—', fuel: fuelKnown ? formatDistance(fuelValue) : '—', evPct, fuelPct };
+  }
+  _openRangeCard(ev) { this._cardControlEvent(ev); if (this._widgetSuppressClick || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return; this._openFocusedCard('range'); }
 
   _widgetCatalog() {
     return {
@@ -29892,6 +30373,12 @@ class Component extends DCLogic {
       case 'openTires':
         this._openFocusedCard('tires');
         break;
+      case 'openVehicleStatus':
+        this._openRoofLevelPopup();
+        break;
+      case 'openRange':
+        this._openFocusedCard('range');
+        break;
       case 'openPower':
         try {
           if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
@@ -29983,8 +30470,7 @@ class Component extends DCLogic {
       consumption: consumptionSummary,
       media: s.mediaTitle || 'Now playing',
       range: range.rangeSoc + '% · EV ' + range.rangeEv + ' km · GAS ' + range.rangeFuel + ' km',
-      status: status.statusSpeed + (status.statusSpeed === '—' ? '' : ' km/h')
-        + ' · ' + status.statusGear + ' · ' + status.statusReady,
+      status: status.statusSummary + ' · ' + status.statusSource,
       tires: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / ')
         + (tires.tiresHasAnyPressure ? ' ' + tires.tiresUnit : ''),
       clock: clock.clockTime + ' · ' + clock.clockDate,
@@ -30021,18 +30507,20 @@ class Component extends DCLogic {
         progress: this._demoPreview ? 64 : (consumption.consumptionFuel === '—' ? 0 : 56),
       },
       range: {
-        primary: range.rangeSoc + '%',
-        secondary: 'REMAINING SOC',
-        metricA: range.rangeEv + ' km EV',
-        metricB: range.rangeFuel + ' km GAS',
-        progress: percent(range.rangePct, 0),
+        primary: range.rangeTotal + ' ' + range.rangeUnit,
+        secondary: range.rangeSource,
+        metricA: 'EV ' + range.rangeEv + ' ' + range.rangeUnit,
+        metricB: 'FUEL ' + range.rangeFuel + ' ' + range.rangeUnit,
+        progress: percent(range.rangeSoc, 0),
       },
       status: {
-        primary: status.statusSpeed + (status.statusSpeed === '—' ? '' : ' km/h'),
-        secondary: status.statusSoc === '—' ? status.statusSource : status.statusSoc + ' BATTERY',
-        metricA: 'GEAR ' + status.statusGear,
-        metricB: status.statusReady,
-        progress: percent(status.statusSoc, 0),
+        primary: status.statusSummary,
+        secondary: status.statusSource,
+        metricA: status.statusSubtitle,
+        metricB: status.statusOpenings.filter((opening) => opening.open).map((opening) => opening.short).join(' · ') || 'ALL CLOSED',
+        progress: status.statusOpenings.filter((opening) => opening.state !== 'unknown').length * 20,
+        state: status.statusState,
+        openingStates: status.statusOpenings.map((opening) => opening.state).join(','),
       },
       tires: {
         primary: tires.tireFrontLeft + ' · ' + tires.tireFrontRight,
@@ -30063,6 +30551,20 @@ class Component extends DCLogic {
       regen: regenMode,
       roof: roofVisual,
     };
+    const isDemoBottomCard = (value) => value === true
+      || /^DEMO\b/i.test(String(value == null ? '' : value).trim());
+    const bottomCardDemoSources = {
+      navigation: navigation.navigationSource,
+      climate: !!this._demoPreview,
+      consumption: consumption.consumptionSource,
+      range: range.rangeSource,
+      status: status.statusSource,
+      tires: tires.tiresOverallState === 'demo',
+      driveMode: driveMode.secondary,
+      powerMode: powerMode.secondary,
+      regen: regenMode.secondary,
+      roof: roofVisual.secondary,
+    };
     const bottomCards = this._normalizeBottomCards(this._desktopBottomCards)
       .map((id) => H6_BOTTOM_CARD_CATALOG.filter((card) => card.id === id)[0])
       .filter(Boolean)
@@ -30071,6 +30573,7 @@ class Component extends DCLogic {
         title: card.title,
         value: bottomValues[card.id] || '',
         action: card.action,
+        demo: isDemoBottomCard(bottomCardDemoSources[card.id]),
       }, bottomVisuals[card.id] || {}));
     const payload = {
       model: this._currentTrim().label,
@@ -30216,9 +30719,9 @@ class Component extends DCLogic {
       showRemove: menuOpen,
       menuOpen: menuOpen,
       showEdit: item.type === 'profile' || item.type === 'graphs' || item.type === 'climate'
-        || item.type === 'consumption' || item.type === 'tires',
+        || item.type === 'consumption' || item.type === 'tires' || item.type === 'status',
       editLabel: item.type === 'profile' ? 'CUSTOMIZE'
-        : ((item.type === 'climate' || item.type === 'consumption' || item.type === 'tires') ? 'OPEN' : 'CONFIGURE'),
+        : ((item.type === 'climate' || item.type === 'consumption' || item.type === 'tires' || item.type === 'status') ? 'OPEN' : 'CONFIGURE'),
       showResize: this._widgetResizeSizes(item).length > 0,
       showMove: this._widgetCanMove(item, side),
       cardClass: moving ? 'moving' : (menuOpen ? 'editing' : ''),
@@ -30266,7 +30769,7 @@ class Component extends DCLogic {
     if (item.type === 'consumption') Object.assign(view, this._consumptionWidgetView(item, side));
     if (item.type === 'profile') {
       view.onEdit = view.onProfileOpen;
-    } else if (item.type === 'climate' || item.type === 'consumption' || item.type === 'tires') {
+    } else if (item.type === 'climate' || item.type === 'consumption' || item.type === 'tires' || item.type === 'status') {
       view.onEdit = (ev) => {
         if (ev && ev.stopPropagation) ev.stopPropagation();
         this._focusedCardEntry(item.type);
@@ -31717,6 +32220,8 @@ class Component extends DCLogic {
     clearTimeout(this._desktopDotHoldTimer);
     clearTimeout(this._consumptionRefreshTimer);
     clearTimeout(this._tireFreshTimer);
+    clearInterval(this._demoDoorTicker);
+    this._demoDoorTicker = 0;
     clearInterval(this._widgetClockTimer);
     clearInterval(this._perfReportTimer);
     this._hdriRequestId = (this._hdriRequestId || 0) + 1;
