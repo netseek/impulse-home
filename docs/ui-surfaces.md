@@ -96,11 +96,22 @@ mode cannot read one way on the rail and another in the popup.
 
 ## Where a card opens: `_cardAction`
 
-`_cardAction(type)` stores the card's destination per desktop:
-`{kind:'popup'}` or `{kind:'desktop', desktopId}`. It is editable in
-Desktop Studio → Bottom bar → *Change*, but `canSetDestination` is currently
-hardcoded to `['climate', 'consumption']`, so no other card exposes the choice
-even though the mechanism handles any of them.
+`_cardAction(type)` stores, per desktop, where a card body goes:
+
+- `{kind:'popup'}` — the floating workspace, the default;
+- `{kind:'desktop', desktopId}` — switch to a desktop that hosts the card as a
+  full-area widget with the car on the right. `_createFocusedCardDesktop` builds
+  one on demand (`appCar` shell, 2x2 widget on the left).
+
+Editable in Desktop Studio → Bottom bar → *Change*. The destination is keyed on
+the **workspace** the card opens, not the card id (`H6_CARD_POPUP_TYPES`), so
+the three driving tiles share one setting instead of drifting apart.
+
+**There were two hardcoded `['climate', 'consumption']` gates**, one in the
+studio row and one inside `_setCardAction`. Removing only the first makes the
+chooser appear and then silently discard every write — it looks like a
+persistence bug and is not one. `H6_CARD_FOCUS_TYPES` is now derived from
+`H6_CARD_POPUP_TYPES` so the two cannot disagree again.
 
 ## The template engine wraps every `{{ value }}` in a span
 

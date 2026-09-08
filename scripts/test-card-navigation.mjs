@@ -136,7 +136,7 @@ includesAll(method('_openFocusedCard'), ["action.kind === 'desktop'", 'd.id === 
 // Studio separates placement from bottom-bar management. The latter is one
 // ordered enabled-first list, and no longer lets a second display-limit value
 // hide cards that the user just enabled.
-includesAll(html, ['>Layout &amp; widgets</button>', '>Bottom bar</button>', 'aria-label="Help"', 'studioBottomCardItems', 'Create focused desktop'], 'studio flow');
+includesAll(html, ['>Layout &amp; widgets</button>', '>Bottom bar</button>', 'aria-label="Help"', 'studioBottomCardItems', 'Full area · car on right'], 'studio flow');
 const studioFields = method('_desktopRenderFields');
 includesAll(studioFields, ['studioIsLayout:', 'studioWidgetSummary:', 'studioBottomCardItems: H6_BOTTOM_CARD_CATALOG.slice().sort', 'leftDisabled: !enabled'], 'studio and bottom-bar ordering');
 assert.ok(!studioFields.includes('studioIsWidgets:'), 'Widgets should be merged into Layout & widgets');
@@ -144,8 +144,16 @@ assert.ok(!studioFields.includes('studioBottomLimitItems:'), 'enabled cards must
 
 // Creating a destination needs a usable large card in the layout it opens,
 // not only in the triple-layout template.
+// Any popup-backed card can choose its destination, and the focused desktop is
+// named after the workspace it hosts rather than a two-way ternary that called
+// everything past Climate 'Consumption'.
+includesAll(html, ['const H6_CARD_POPUP_TYPES = {', 'const canSetDestination = !!focusType;',
+  'this._setCardAction(focusType,'], 'destination chooser');
+assert.ok(!html.includes("['climate', 'consumption'].indexOf(card.id) >= 0"),
+  'the destination chooser must not be hardcoded to two cards');
 includesAll(method('_createFocusedCardDesktop'), [
   "w: 2, h: 2",
+  "this._widgetCatalog()[type]",
   "layout.appCar.left = { use: 'widgets'",
   "d.shellMode = 'appCar'",
   "desktopId: d.id",

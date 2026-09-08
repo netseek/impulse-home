@@ -5547,7 +5547,7 @@ window.HavalSplash = (function () {
         <div class="hv-studio-note">Cards display in this order. Add, remove, or use arrows to move them.</div>
         <div class="hv-studio-card-list">
           <sc-for list="{{ studioBottomCardItems }}" as="bc" hint-placeholder-count="5">
-            <div class="hv-studio-bottom-card {{ bc.cls }}"><div class="hv-studio-card-row"><div><strong>{{ bc.label }}</strong><small>{{ bc.state }}</small></div><div class="hv-studio-row-actions"><button type="button" onClick="{{ bc.onToggle }}">{{ bc.toggleLabel }}</button><button type="button" onClick="{{ bc.onLeft }}" disabled="{{ bc.leftDisabled }}" aria-label="Move {{ bc.label }} left">‹</button><button type="button" onClick="{{ bc.onRight }}" disabled="{{ bc.rightDisabled }}" aria-label="Move {{ bc.label }} right">›</button></div></div><sc-if value="{{ bc.hasDestination }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-card-destination"><span>Opens: {{ bc.destinationLabel }}</span><button type="button" onClick="{{ bc.toggleDestination }}">{{ bc.destinationToggleLabel }}</button><sc-if value="{{ bc.destinationExpanded }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-chip-row"><button type="button" class="{{ bc.popupClass }}" onClick="{{ bc.openPopup }}">Popup</button><button type="button" onClick="{{ bc.createDesktop }}">Create focused desktop</button></div><sc-if value="{{ bc.hasDesktopTargets }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-chip-row"><sc-for list="{{ bc.desktopTargets }}" as="dt" hint-placeholder-count="3"><button type="button" class="{{ dt.cls }}" onClick="{{ dt.onClick }}">{{ dt.label }}</button></sc-for></div></sc-if></sc-if></div></sc-if></div>
+            <div class="hv-studio-bottom-card {{ bc.cls }}"><div class="hv-studio-card-row"><div><strong>{{ bc.label }}</strong><small>{{ bc.state }}</small></div><div class="hv-studio-row-actions"><button type="button" onClick="{{ bc.onToggle }}">{{ bc.toggleLabel }}</button><button type="button" onClick="{{ bc.onLeft }}" disabled="{{ bc.leftDisabled }}" aria-label="Move {{ bc.label }} left">‹</button><button type="button" onClick="{{ bc.onRight }}" disabled="{{ bc.rightDisabled }}" aria-label="Move {{ bc.label }} right">›</button></div></div><sc-if value="{{ bc.hasDestination }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-card-destination"><span>Opens: {{ bc.destinationLabel }}</span><button type="button" onClick="{{ bc.toggleDestination }}">{{ bc.destinationToggleLabel }}</button><sc-if value="{{ bc.destinationExpanded }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-chip-row"><button type="button" class="{{ bc.popupClass }}" onClick="{{ bc.openPopup }}">Popup</button><button type="button" onClick="{{ bc.createDesktop }}">Full area · car on right</button></div><sc-if value="{{ bc.hasDesktopTargets }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-chip-row"><sc-for list="{{ bc.desktopTargets }}" as="dt" hint-placeholder-count="3"><button type="button" class="{{ dt.cls }}" onClick="{{ dt.onClick }}">{{ dt.label }}</button></sc-for></div></sc-if></sc-if></div></sc-if></div>
           </sc-for>
         </div>
       </sc-if>
@@ -6427,6 +6427,30 @@ const CAR_MODE_OPTION_HINTS = {
  * layout loses a card on upgrade.
  */
 const H6_DRIVING_LEGACY_WIDGET_TYPES = { modes: 'driving' };
+
+/**
+ * Rail card id -> the focused workspace its body opens. A card absent from this
+ * map has no popup (it launches an app, or opens the studio) and therefore no
+ * destination to choose.
+ */
+const H6_CARD_POPUP_TYPES = {
+  climate: 'climate',
+  consumption: 'consumption',
+  tires: 'tires',
+  driveMode: 'driving',
+  powerMode: 'driving',
+  regen: 'driving',
+};
+
+/**
+ * The distinct workspaces those cards can point at. Derived from the map above
+ * so a new popup-backed card cannot be accepted by the studio and then silently
+ * rejected by the writer -- which is exactly what a second hardcoded
+ * ['climate', 'consumption'] list did.
+ */
+const H6_CARD_FOCUS_TYPES = Object.keys(H6_CARD_POPUP_TYPES)
+  .map((id) => H6_CARD_POPUP_TYPES[id])
+  .filter((type, i, all) => all.indexOf(type) === i);
 
 // door_status is a brace-wrapped per-opening vector, not a bitmask. Captured off
 // the car (Its_IntelligentVehicleControlService):
@@ -28670,7 +28694,7 @@ class Component extends DCLogic {
   }
 
   _setCardAction(type, action) {
-    if (['climate', 'consumption'].indexOf(type) < 0) return;
+    if (H6_CARD_FOCUS_TYPES.indexOf(type) < 0) return;
     this._cardActions = this._cardActions || {};
     this._cardActions[type] = action || { kind: 'popup' };
     this._persistActiveDesktop();
@@ -28711,7 +28735,13 @@ class Component extends DCLogic {
   _createFocusedCardDesktop(type) {
     if (!this._desktops || this._desktops.length >= H6_MAX_DESKTOPS) return;
     this._captureActiveDesktop();
-    const name = type === 'climate' ? 'Climate' : 'Consumption';
+    // Name the desktop after the workspace it hosts. This used to be a
+    // two-way ternary, so every card beyond Climate produced a desktop called
+    // 'Consumption'.
+    const catalogEntry = this._widgetCatalog()[type];
+    const name = catalogEntry && catalogEntry.label
+      ? catalogEntry.label.charAt(0) + catalogEntry.label.slice(1).toLowerCase()
+      : (type.charAt(0).toUpperCase() + type.slice(1));
     const layout = this._defaultWidgetLayout();
     const item = { id: 'w-' + type + '-' + Date.now().toString(36), type: type, x: 0, y: 0, w: 2, h: 2 };
     layout.triple.left = { use: 'widgets', items: [Object.assign({}, item)] };
@@ -29108,10 +29138,13 @@ class Component extends DCLogic {
       }).map((card) => {
         const enabled = bottomCards.indexOf(card.id) >= 0;
         const cardIndex = bottomCards.indexOf(card.id);
-        const action = this._cardAction(card.id);
+        // Destination is stored against the workspace the card opens, not the
+        // card id, so the three driving tiles cannot drift apart.
+        const focusType = H6_CARD_POPUP_TYPES[card.id] || '';
+        const action = this._cardAction(focusType || card.id);
         const target = action.kind === 'desktop' && action.desktopId
           ? list.filter((d) => d.id === action.desktopId)[0] : null;
-        const canSetDestination = ['climate', 'consumption'].indexOf(card.id) >= 0;
+        const canSetDestination = !!focusType;
         return {
           label: card.title,
           state: enabled ? ('Shown · position ' + (cardIndex + 1)) : 'Available to add',
@@ -29128,11 +29161,11 @@ class Component extends DCLogic {
           destinationExpanded: s.studioEditingCardAction === card.id,
           destinationToggleLabel: s.studioEditingCardAction === card.id ? 'Done' : 'Change',
           toggleDestination: () => this.setState({ studioEditingCardAction: s.studioEditingCardAction === card.id ? null : card.id }),
-          openPopup: () => { this._setCardAction(card.id, { kind: 'popup' }); this.setState({ studioEditingCardAction: null }); },
-          createDesktop: () => this._createFocusedCardDesktop(card.id),
+          openPopup: () => { this._setCardAction(focusType, { kind: 'popup' }); this.setState({ studioEditingCardAction: null }); },
+          createDesktop: () => this._createFocusedCardDesktop(focusType),
           desktopTargets: list.filter((d) => d.id !== current.id).map((d) => ({
             label: d.name, cls: action.kind === 'desktop' && action.desktopId === d.id ? 'on' : '',
-            onClick: () => { this._setCardAction(card.id, { kind: 'desktop', desktopId: d.id }); this.setState({ studioEditingCardAction: null }); },
+            onClick: () => { this._setCardAction(focusType, { kind: 'desktop', desktopId: d.id }); this.setState({ studioEditingCardAction: null }); },
           })),
           hasDesktopTargets: list.length > 1,
         };
