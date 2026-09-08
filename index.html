@@ -4317,7 +4317,7 @@ window.HavalSplash = (function () {
        Every colour here resolves through a theme token or currentColor: the
        older MODES chips hard-code rgba(255,255,255,...) and are unreadable on
        the light board. Do not copy that pattern back in. */
-    .hv-driving { height:100%; min-width:0; box-sizing:border-box; padding:14px; color:var(--hv-widget-fg,#edf5fa); overflow:hidden; cursor:pointer; }
+    .hv-driving { height:100%; min-width:0; box-sizing:border-box; padding:14px; color:var(--hv-widget-fg,#edf5fa); overflow:hidden; }
     .hv-driving-groups { height:calc(100% - 18px); min-height:0; display:grid; grid-auto-rows:minmax(0,1fr); gap:7px; align-content:stretch; }
     .hv-driving-row { min-width:0; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); gap:3px; }
     .hv-driving-row.lines-2 { grid-row:span 2; }
@@ -4452,7 +4452,11 @@ window.HavalSplash = (function () {
     .hv-card-focus-backdrop.on { opacity:1; pointer-events:auto; }
     .hv-card-focus { position:absolute; z-index:85; left:50%; top:var(--hv-popup-top, 52px); bottom:var(--hv-popup-bottom-inset, 72px); width:min(760px,calc(100vw - 52px)); padding:16px; box-sizing:border-box; overflow:auto; color:var(--hv-widget-fg,#edf5fa); border:1px solid var(--hv-frost-edge,rgba(255,255,255,.18)); border-radius:22px; background:var(--hv-frost-bg,rgba(12,18,24,.88)); box-shadow:var(--hv-frost-shadow,0 18px 50px rgba(0,0,0,.38)); opacity:0; pointer-events:none; transform:translate(-50%,18px) scale(.985); transition:opacity .2s ease,transform .24s cubic-bezier(.2,.75,.2,1); }
     .hv-card-focus.on { opacity:1; pointer-events:auto; transform:translate(-50%,0) scale(1); }
-    .hv-card-focus.fit { bottom:auto; max-height:calc(100% - var(--hv-popup-top, 52px) - var(--hv-popup-bottom-inset, 72px)); }
+    /* Centred on the band between the header and the dock: half the available
+       height below the top inset, then pulled back by half the popup's own.
+       Declared after .on so both transforms stay under its specificity. */
+    .hv-card-focus.fit { bottom:auto; max-height:calc(100% - var(--hv-popup-top, 52px) - var(--hv-popup-bottom-inset, 72px)); top:calc(var(--hv-popup-top, 52px) + (100% - var(--hv-popup-top, 52px) - var(--hv-popup-bottom-inset, 72px)) * .5); transform:translate(-50%,calc(-50% + 18px)) scale(.985); }
+    .hv-card-focus.fit.on { transform:translate(-50%,-50%) scale(1); }
     .hv-card-focus-head { height:42px; display:flex; align-items:center; gap:10px; font:9px/1 'Space Mono',monospace; letter-spacing:.15em; }
     /* The close button holds the right edge whatever sits beside the title, so
        the cards without a header badge look exactly as they did. */
@@ -4470,18 +4474,18 @@ window.HavalSplash = (function () {
        controls. Options are buttons, not a cycle, so one tap writes the raw
        CAN value the vehicle expects. */
     .hv-driving-focus { min-height:calc(100% - 42px); padding:18px; box-sizing:border-box; border-radius:16px; background:var(--hv-frost-inner); }
-    .hv-driving-focus-groups { display:grid; grid-template-columns:1fr 1fr; column-gap:16px; row-gap:12px; margin-top:2px; align-content:start; }
+    .hv-driving-focus-groups { display:grid; grid-template-columns:1fr 1fr; column-gap:18px; row-gap:16px; margin-top:4px; align-content:start; }
     /* DRIVE is the only group with more than three options, so it keeps the
        full width and the other four pair up beside each other. */
     .hv-driving-focus-groups > .hv-driving-group:first-child { grid-column:1 / -1; }
     .hv-driving-group { min-width:0; }
     .hv-driving-group-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.12em; opacity:.55; }
     .hv-driving-group-head em { font-style:normal; opacity:.85; }
-    .hv-driving-options { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; margin-top:8px; }
+    .hv-driving-options { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:9px; }
     .hv-driving-options.cols-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
     .hv-driving-options.cols-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .hv-driving-option { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:3px; min-height:42px; padding:8px 10px; border:1px solid var(--hv-frost-edge); border-radius:13px; background:var(--hv-frost-inner); color:inherit; text-align:left; cursor:pointer; -webkit-appearance:none; appearance:none; }
-    .hv-driving-option strong { max-width:100%; font:600 13px/1 'Space Grotesk',sans-serif; letter-spacing:.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-driving-option { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:3px; min-height:56px; padding:10px 12px; border:1px solid var(--hv-frost-edge); border-radius:13px; background:var(--hv-frost-inner); color:inherit; text-align:left; cursor:pointer; -webkit-appearance:none; appearance:none; }
+    .hv-driving-option strong { max-width:100%; font:600 14px/1 'Space Grotesk',sans-serif; letter-spacing:.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .hv-driving-option small { font:6px/1 'Space Mono',monospace; letter-spacing:.1em; opacity:.5; }
     .hv-driving-option-badge { position:absolute; right:10px; top:50%; transform:translateY(-50%); font-style:normal; font-weight:700; font-size:12px; letter-spacing:.04em; opacity:.85; }
     .hv-driving-option.on .hv-driving-option-badge { opacity:1; }
@@ -4905,7 +4909,7 @@ window.HavalSplash = (function () {
             <div class="hv-range-card {{ wg.rangeSizeClass }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-ring" style="--range-pct:{{ wg.rangePct }}%;"><strong>{{ wg.rangeSoc }}</strong><span>BATTERY</span></div><div class="hv-range-stats"><div class="hv-range-stat"><span>EV</span><strong>{{ wg.rangeEv }}</strong><small>KM</small></div><div class="hv-range-stat"><span>GAS</span><strong>{{ wg.rangeFuel }}</strong><small>KM</small></div></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isDriving }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
+            <div class="hv-driving {{ wg.drivingSizeClass }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
             <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
@@ -5110,7 +5114,7 @@ window.HavalSplash = (function () {
             <div class="hv-range-card {{ wg.rangeSizeClass }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-ring" style="--range-pct:{{ wg.rangePct }}%;"><strong>{{ wg.rangeSoc }}</strong><span>BATTERY</span></div><div class="hv-range-stats"><div class="hv-range-stat"><span>EV</span><strong>{{ wg.rangeEv }}</strong><small>KM</small></div><div class="hv-range-stat"><span>GAS</span><strong>{{ wg.rangeFuel }}</strong><small>KM</small></div></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isDriving }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-driving {{ wg.drivingSizeClass }}" onClick="{{ wg.onDrivingOpen }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
+            <div class="hv-driving {{ wg.drivingSizeClass }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span><em>{{ dr.state }}</em></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
             <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
@@ -7697,11 +7701,28 @@ class Component extends DCLogic {
     }
   }
 
+  /**
+   * setState for a change the 3D scene cannot show.
+   *
+   * Drive/power/recovery/steering/ESP/one-pedal are card state and nothing else
+   * — no geometry, no lighting, no camera. Without this every chip tap asked for
+   * a full scene render, and because the widget card is backdrop-blurred the
+   * repaint underneath read as the whole card flashing.
+   *
+   * The flag is consumed by the very next `componentDidUpdate`. If a batched
+   * update happened to also carry a scene-affecting change, that change's own
+   * setter has already requested its frame.
+   */
+  _uiOnlySetState(patch) {
+    this._uiOnlyStateWrite = true;
+    this.setState(patch);
+  }
+
   _applyCarMode(stateKey, value) {
     const next = String(value == null ? '' : value);
     if (this._modePending) delete this._modePending[stateKey];
     if (this.state[stateKey] === next) return;
-    this.setState({ [stateKey]: next });
+    this._uiOnlySetState({ [stateKey]: next });
   }
 
   _setCarMode(stateKey, canKey, value) {
@@ -7710,14 +7731,14 @@ class Component extends DCLogic {
     // mistaken for a car command. Android writes only while the car has
     // reported READY and through the shipped allow-listed bridge.
     if (!this._androidApp || this._demoPreview) {
-      if (this.state[stateKey] !== next) this.setState({ [stateKey]: next });
+      if (this.state[stateKey] !== next) this._uiOnlySetState({ [stateKey]: next });
       return;
     }
     if (!this._carReady || !window.TelemetryBridge
       || typeof window.TelemetryBridge.setCarData !== 'function') return;
     if (!this._modePending) this._modePending = {};
     this._modePending[stateKey] = { value: next, at: Date.now() };
-    if (this.state[stateKey] !== next) this.setState({ [stateKey]: next });
+    if (this.state[stateKey] !== next) this._uiOnlySetState({ [stateKey]: next });
     try {
       if (window.TelemetryBridge && typeof window.TelemetryBridge.setCarData === 'function') {
         window.TelemetryBridge.setCarData(canKey, next);
@@ -20624,7 +20645,12 @@ class Component extends DCLogic {
   // means the scene may look different — request a redraw under on-demand mode.
   componentDidUpdate() {
     this._setStateCount = (this._setStateCount || 0) + 1;
-    if (this.requestRender) this.requestRender(3);
+    // A write that touches nothing the scene draws does not get a frame. See
+    // _uiOnlySetState: the flag is consumed here so it can never leak into the
+    // next update.
+    const uiOnly = this._uiOnlyStateWrite;
+    this._uiOnlyStateWrite = false;
+    if (!uiOnly && this.requestRender) this.requestRender(3);
     this._syncBootHud();
     if (this._desktopReady) {
       const s = this.state;
@@ -29859,9 +29885,15 @@ class Component extends DCLogic {
         state: group.known ? (group.on ? 'ON' : 'OFF') : '—',
         onClick: () => group.onToggle(),
       })),
+      // Reached from the widget's long-press menu (OPEN) and from the rail
+      // card, never from a stray tap on the widget's own background.
       onDrivingOpen: (ev) => {
         this._cardControlEvent(ev);
         if (this._widgetSuppressClick || this.state.widgetMenuId) return;
+        this._openFocusedCard('driving');
+      },
+      onEdit: (ev) => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
         this._openFocusedCard('driving');
       },
     };

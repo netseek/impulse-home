@@ -330,11 +330,29 @@ includesAll(glance, [
   '<span>{{ dc.label }}</span>',
   'class="hv-driving-row {{ dr.linesClass }}"',
   'disabled="{{ wg.drivingControlsDisabled }}"',
-  'onClick="{{ wg.onDrivingOpen }}"',
 ], 'Driving widget option grid');
+// The widget is controls only. A background tap that opened the popup made the
+// whole card one big target sitting under a grid of small ones; the rail card
+// is the deliberate way in, with the long-press menu's OPEN as the escape hatch.
+assert.ok(!glance.includes('onClick="{{ wg.onDrivingOpen }}"'),
+  'the widget background must not open the popup');
+includesAll(view, ['onEdit: (ev) =>'], 'the widget menu still opens the popup');
 // One source badge per surface: the widget said DEMO in the header and again
 // in a foot line, and the foot also spent a row on an affordance the whole
 // card already has.
+// A chip tap used to ask for a full 3D frame via componentDidUpdate, and the
+// widget card is backdrop-blurred, so repainting the canvas under it read as
+// the card flashing. Mode state changes nothing the scene draws.
+includesAll(blockFrom(html, '  _uiOnlySetState(patch) {', 'ui-only setState'),
+  ['this._uiOnlyStateWrite = true;', 'this.setState(patch);'], 'UI-only writes are marked');
+includesAll(blockFrom(html, '  componentDidUpdate() {', 'did update'),
+  ['const uiOnly = this._uiOnlyStateWrite;', 'this._uiOnlyStateWrite = false;',
+   'if (!uiOnly && this.requestRender)'], 'and skip the scene frame');
+assert.equal(html.split('this._uiOnlySetState({').length - 1, 3,
+  'every mode write must go through the UI-only path');
+// The popup centres on the band the dock leaves rather than hugging the top.
+includesAll(html, ['.hv-card-focus.fit.on { transform:translate(-50%,-50%) scale(1); }'],
+  'the popup centres vertically');
 assert.ok(!glance.includes('hv-driving-foot'),
   'the widget carries one source badge, in its header');
 

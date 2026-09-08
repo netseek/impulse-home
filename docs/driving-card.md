@@ -191,9 +191,16 @@ on screen:
   `<small>` to the markup. Where a hint carried real meaning rather than a
   restatement, a mark replaced it: recovery levels got their ascending bars.
 
-With those gone the popup is ~370px instead of the fixed 474, so it sizes to its
-content (`.hv-card-focus.fit`). Only Driving opts in; the other focused cards
-keep the fixed frame their layouts were built against.
+With those gone the popup sizes to its content (`.hv-card-focus.fit`) rather
+than filling a fixed frame. Only Driving opts in; the other focused cards keep
+the frame their layouts were built against.
+
+It then **centres on the band the dock leaves** -- half the available height
+below `--hv-popup-top`, pulled back by half its own height -- instead of hugging
+the top with a gap underneath. The `.fit` transforms are declared after `.on` so
+both states stay under its specificity. Tiles took the reclaimed room back
+(56px), so the popup measures ~440px: taller than the trimmed version, still
+with zero overflow.
 
 ## Layout
 
