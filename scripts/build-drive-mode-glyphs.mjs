@@ -28,10 +28,22 @@ const ICONS = {
   '3': { name: 'snowflake', d: 'M10 4l2 1l2 -1 M12 2v6.5l3 1.72 M17.928 6.268l.134 2.232l1.866 1.232 M20.66 7l-5.629 3.25l.01 3.458 M19.928 14.268l-1.866 1.232l-.134 2.232 M20.66 17l-5.629 -3.25l-2.99 1.738 M14 20l-2 -1l-2 1 M12 22v-6.5l-3 -1.72 M6.072 17.732l-.134 -2.232l-1.866 -1.232 M3.34 17l5.629 -3.25l-.01 -3.458 M4.072 9.732l1.866 -1.232l.134 -2.232 M3.34 7l5.629 3.25l2.99 -1.738' },
   '4': { name: 'ripple', d: 'M3 7c3 -2 6 -2 9 0s6 2 9 0 M3 17c3 -2 6 -2 9 0s6 2 9 0 M3 12c3 -2 6 -2 9 0s6 2 9 0' },
   '5': { name: 'droplets', d: 'M4.072 20.3a2.999 2.999 0 0 0 3.856 0a3.002 3.002 0 0 0 .67 -3.798l-2.095 -3.227a.6 .6 0 0 0 -1.005 0l-2.098 3.227a3.003 3.003 0 0 0 .671 3.798 M16.072 20.3a2.999 2.999 0 0 0 3.856 0a3.002 3.002 0 0 0 .67 -3.798l-2.095 -3.227a.6 .6 0 0 0 -1.005 0l-2.098 3.227a3.003 3.003 0 0 0 .671 3.798 M10.072 10.3a2.999 2.999 0 0 0 3.856 0a3.002 3.002 0 0 0 .67 -3.798l-2.095 -3.227a.6 .6 0 0 0 -1.005 0l-2.098 3.227a3.003 3.003 0 0 0 .671 3.798l.001 0' },
-  // car-4wd was the semantically exact icon but its pill-shaped wheels read as
   // AWD has no entry: no icon set has a mark that says 'all four wheels are
   // driven' and survives 52px. It is drawn as the boxed code 4x4 instead, the
   // same treatment the POWER card gives HEV / EVP / EV. See CAR_DRIVE_MODE_BADGES.
+};
+
+/**
+ * Single-glyph marks, emitted as their own constants. Steering assist shows its
+ * wheel only on the selected option — the row is one of three that contain
+ * "Normal", so it needs a mark, but three copies of the same wheel would say
+ * nothing about which one is chosen.
+ */
+const SINGLE = {
+  CAR_STEER_GLYPH: {
+    name: 'steering-wheel',
+    d: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0 M10 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M12 14l0 7 M10 12l-6.75 -2 M14 12l6.75 -2',
+  },
 };
 
 /** Split path data into [command, ...numbers] tokens. */
@@ -222,3 +234,8 @@ for (const [value, icon] of Object.entries(ICONS)) {
 console.log('const CAR_DRIVE_MODE_GLYPHS = {');
 console.log(lines.join('\n'));
 console.log('};');
+for (const [name, icon] of Object.entries(SINGLE)) {
+  const flat = serialise(flatten(icon.d));
+  if (/[^MLCZ0-9eE.\-\s]/.test(flat)) throw new Error('unflattened command left in ' + icon.name);
+  console.log(`const ${name} = '${flat}';   // tabler ${icon.name}`);
+}

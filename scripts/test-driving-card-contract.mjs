@@ -271,10 +271,19 @@ assert.equal(html.split('class="hv-driving {{ wg.drivingSizeClass }}"').length -
 assert.equal(html.split('class="hv-driving-chip-icon"').length - 1, 2,
   'both boards must render the chip icon');
 assert.match(html, /hasIcon: !!opt\.glyph/, 'chips take an optional leading icon');
-includesAll(blockFrom(html, '  _drivingOptionGlyph(key, value) {', 'option glyph'), [
+includesAll(blockFrom(html, '  _drivingOptionGlyph(key, value, selected) {', 'option glyph'), [
   "key === 'car.drive_setting.drive_mode'",
   "key === 'car.ev_setting.energy_recovery_level'",
+  "key === 'car.drive_setting.steering_wheel_assist_mode'",
+  'return selected ? CAR_STEER_GLYPH',
 ], 'options take their mark from one place');
+// Steering wears its wheel on the SELECTED option only. Three copies of the
+// same wheel would tell the row apart from drive and recovery but say nothing
+// about which is chosen; effort bars would have been identical to the recovery
+// row sitting beside it.
+assert.match(html, /const CAR_STEER_GLYPH = 'M /, 'steering glyph must be generated, not hand-written');
+includesAll(html, ['optionGlyph(group.key, opt.value, i === shown)'],
+  'the steering mark has to know which option is selected');
 // Recovery levels lost their LEVEL 1/2/3 line when the second line went, so the
 // ascending bars carry that meaning instead.
 assert.match(html, /const CAR_REGEN_LEVEL_GLYPHS = \{/, 'recovery levels need their bars');

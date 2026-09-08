@@ -109,6 +109,17 @@ has a mark for this concept that survives the size, so it reuses the POWER
 card's treatment (`CAR_DRIVE_MODE_BADGES`, `drawCodeBadge`): type instead of
 line art, legible at any size, and the two identity-bearing cards now match.
 
+`CAR_STEER_GLYPH` is Tabler `steering-wheel`, and it appears on the
+**selected** steering option only. The row is one of three containing "Normal",
+so it needs something to tell it apart from drive and recovery — but three
+copies of the same wheel would do only that and say nothing about which option
+is chosen. One wheel does both. Effort bars were the obvious alternative and
+the wrong one: they would have been identical to the recovery row sitting
+directly beside it, making the two rows harder to tell apart rather than
+easier. It goes through the same flattener as everything else
+(`SINGLE` in the generator) because the wheel is built from arcs and is
+otherwise undrawable on the rail.
+
 `CAR_REGEN_LEVEL_GLYPHS` is the other non-icon mark — three ascending bars for
 Baixo / Normal / Alto, the same low-mid-high shape the rail card draws. It
 carries the meaning the `LEVEL 1/2/3` line used to, now that the options are

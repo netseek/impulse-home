@@ -6474,6 +6474,7 @@ const CAR_DRIVE_MODE_GLYPHS = {
   '4': 'M 3 7 C 6 5 9 5 12 7 C 15 9 18 9 21 7 M 3 17 C 6 15 9 15 12 17 C 15 19 18 19 21 17 M 3 12 C 6 10 9 10 12 12 C 15 14 18 14 21 12',   // tabler ripple
   '5': 'M 4.07 20.3 C 5.19 21.24 6.81 21.24 7.93 20.3 C 9.04 19.36 9.32 17.76 8.6 16.5 L 6.5 13.28 C 6.39 13.11 6.2 13 6 13 C 5.8 13 5.61 13.11 5.5 13.28 L 3.4 16.5 C 2.67 17.76 2.96 19.36 4.07 20.3 M 16.07 20.3 C 17.19 21.24 18.81 21.24 19.93 20.3 C 21.04 19.36 21.32 17.76 20.6 16.5 L 18.5 13.28 C 18.39 13.11 18.2 13 18 13 C 17.8 13 17.61 13.11 17.5 13.28 L 15.4 16.5 C 14.67 17.76 14.96 19.36 16.07 20.3 M 10.07 10.3 C 11.19 11.24 12.81 11.24 13.93 10.3 C 15.04 9.36 15.32 7.76 14.6 6.5 L 12.5 3.28 C 12.39 3.11 12.2 3 12 3 C 11.8 3 11.61 3.11 11.5 3.28 L 9.4 6.5 C 8.67 7.76 8.96 9.36 10.07 10.3 L 10.07 10.3',   // tabler droplets
 };
+const CAR_STEER_GLYPH = 'M 3 12 C 3 16.97 7.03 21 12 21 C 16.97 21 21 16.97 21 12 C 21 7.03 16.97 3 12 3 C 7.03 3 3 7.03 3 12 M 10 12 C 10 13.1 10.9 14 12 14 C 13.1 14 14 13.1 14 12 C 14 10.9 13.1 10 12 10 C 10.9 10 10 10.9 10 12 M 12 14 L 12 21 M 10 12 L 3.25 10 M 14 12 L 20.75 10';   // tabler steering-wheel
 /**
  * Secondary line under each option in the popup. These describe the OEM concept
  * the value maps to; they are labels, not extra telemetry, and must not imply
@@ -29575,14 +29576,17 @@ class Component extends DCLogic {
    * The mark an option carries, if any. Drive modes have their own glyph;
    * recovery levels get the ascending bars; everything else is text alone.
    */
-  _drivingOptionGlyph(key, value) {
+  _drivingOptionGlyph(key, value, selected) {
     if (key === 'car.drive_setting.drive_mode') return CAR_DRIVE_MODE_GLYPHS[value] || '';
     if (key === 'car.ev_setting.energy_recovery_level') return CAR_REGEN_LEVEL_GLYPHS[value] || '';
+    if (key === 'car.drive_setting.steering_wheel_assist_mode') {
+      return selected ? CAR_STEER_GLYPH : '';
+    }
     return '';
   }
 
   _drivingGroupModel(group, demoValue, label, colsClass, controlsDisabled) {
-    const optionGlyph = (key, value) => this._drivingOptionGlyph(key, value);
+    const optionGlyph = (key, value, selected) => this._drivingOptionGlyph(key, value, selected);
     const raw = String(this.state[group.stateKey] || '');
     const index = group.options.findIndex((opt) => opt.value === raw);
     const hasSignal = !!(this._carSignalAt && this._carSignalAt[group.key]);
@@ -29607,9 +29611,9 @@ class Component extends DCLogic {
       options: group.options.map((opt, i) => ({
         label: opt.label,
         hint: hints[opt.value] || '',
-        glyph: optionGlyph(group.key, opt.value),
-        hasIcon: !!optionGlyph(group.key, opt.value),
-        icon: optionGlyph(group.key, opt.value),
+        glyph: optionGlyph(group.key, opt.value, i === shown),
+        hasIcon: !!optionGlyph(group.key, opt.value, i === shown),
+        icon: optionGlyph(group.key, opt.value, i === shown),
         badge: group.key === 'car.drive_setting.drive_mode'
           ? (CAR_DRIVE_MODE_BADGES[opt.value] || '') : '',
         hasBadge: group.key === 'car.drive_setting.drive_mode'
