@@ -160,6 +160,9 @@ Three details that came out of using it:
 - **Three rows contain an option called "Normal" and two contain "Sport".** The
   drive row — the one with seven options — carries each mode's own glyph beside
   the word, and every row head prints its current value in bold on the right.
+- **The group head no longer repeats the selected value.** It earned its place
+  when the options were bare words; now every choice is a lit tile carrying its
+  own mark, so the value on the right was the same fact twice.
 - **A lit border is a weak way to say "on".** The two booleans spell it out:
   `ONE-PEDAL  OFF`, `ESP  ON`.
 

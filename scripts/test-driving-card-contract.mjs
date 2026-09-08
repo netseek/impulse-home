@@ -353,6 +353,12 @@ assert.equal(html.split('this._uiOnlySetState({').length - 1, 3,
 // The popup centres on the band the dock leaves rather than hugging the top.
 includesAll(html, ['.hv-card-focus.fit.on { transform:translate(-50%,-50%) scale(1); }'],
   'the popup centres vertically');
+// The head printed the value the selected tile already shows. The toggles keep
+// their ON/OFF: a two-state control has to say which way it is set, and a lit
+// border alone does not.
+assert.ok(!html.includes('{{ dr.state }}') && !html.includes('{{ dg.state }}'),
+  'a group head must not repeat the selected value');
+includesAll(html, ['{{ dtg.state }}'], 'toggles still name their state');
 assert.ok(!glance.includes('hv-driving-foot'),
   'the widget carries one source badge, in its header');
 
