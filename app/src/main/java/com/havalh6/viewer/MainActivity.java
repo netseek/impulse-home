@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v22-tyretheme";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v23-statuscard";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -1228,7 +1228,9 @@ public final class MainActivity extends Activity {
     private final class QuickCardGraphicView extends View {
         private BottomCardDescriptor descriptor;
         private final android.graphics.Paint paint =
-                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG
+                        | android.graphics.Paint.FILTER_BITMAP_FLAG
+                        | android.graphics.Paint.DITHER_FLAG);
         private final android.graphics.RectF oval = new android.graphics.RectF();
         private Bitmap tiresTopViewBitmap;
         private boolean tiresTopViewDecodeAttempted;
@@ -1340,10 +1342,10 @@ public final class MainActivity extends Activity {
             // destination extend slightly past the view vertically (transparent pixels only).
             // The vehicle is the card's visual anchor, with TPMS values flanking it.
             // Visible pixels occupy x=30..464 and y=14..654 of the 494x675 source canvas.
-            float imageH = h * 1.05f;
+            float imageH = h * 1.16f;
             float imageW = base == null ? w * .25f
                     : imageH * base.getWidth() / Math.max(1f, base.getHeight()) * 1.08f;
-            imageW = Math.min(imageW, w * .31f);
+            imageW = Math.min(imageW, w * .38f);
             float left = (w - imageW) * .5f;
             float top = -h * .019f;
             android.graphics.RectF vehicleRect = new android.graphics.RectF(
@@ -1409,14 +1411,11 @@ public final class MainActivity extends Activity {
                         && i < descriptor.wheelStates.length
                         ? descriptor.wheelStates[i] : "unavailable";
                 fill(tireSignalColor(wheelState, muted));
-                float direction = i == 0 || i == 2 ? 1f : -1f;
-                c.drawCircle(tireXs[i] + direction * Math.max(4f, w * .018f), tireYs[i],
-                        Math.max(2.5f, w * .011f), paint);
                 paint.setTextAlign(i == 0 || i == 2
                         ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.BOLD));
-                paint.setTextSize(Math.max(14f, Math.min(w, h) * .17f));
+                paint.setTextSize(Math.max(15f, Math.min(w, h) * .205f));
                 c.drawText(pressureReadings[i], tireXs[i],
                         tireYs[i] + paint.getTextSize() * .34f, paint);
             }

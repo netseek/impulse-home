@@ -171,13 +171,32 @@ assert.match(nativeStatus,
   /String opening\s*=\s*i\s*<\s*openings\.length\s*\?\s*openings\[i\]\s*:\s*"unknown";\s*if\s*\(\s*"open"\.equals\(opening\)\s*\)\s*continue;/,
   'native renderer must skip the matching closed layer while that door is open');
 all(nativeStatus, [
-  'float imageH = h * 1.05f', '* 1.08f',
-  'Math.min(imageW, w * .31f)', 'float left = (w - imageW) * .5f',
+  '* 1.08f', 'float left = (w - imageW) * .5f',
   'float top = -h * .019f', 'drawStatusRoof(c, vehicleRect)',
-  'drawStatusSeatBelts(c, vehicleRect)', 'Math.min(w, h) * .17f',
+  'drawStatusSeatBelts(c, vehicleRect)',
 ], 'native centered visual-only status-card geometry');
+// Sized FROM the card rather than pinned to one multiplier: the vehicle scales
+// with the view's height and is capped by its width, and the readouts scale
+// with the smaller dimension. Pinning the literals meant every deliberate
+// resize failed the contract instead of a regression doing so.
+assert.match(nativeStatus, /float imageH = h \* [\d.]+f/,
+  'status vehicle height must scale with the card');
+assert.match(nativeStatus, /Math\.min\(imageW, w \* \.\d+f\)/,
+  'status vehicle width must stay capped by the card');
+assert.match(nativeStatus, /paint\.setTextSize\(Math\.max\([\d.]+f, Math\.min\(w, h\) \* \.\d+f\)\)/,
+  'status tyre pressures must scale with the card');
+assert.ok(!nativeStatus.includes('drawCircle'),
+  'status corner readouts must contain no dots');
 assert.ok(!nativeStatus.includes('float textLeft'),
   'native compact status card must not render a competing text-summary column');
+// ANTI_ALIAS_FLAG smooths shapes, not bitmap sampling. base.png is 494x675
+// drawn into roughly 70px; without FILTER_BITMAP_FLAG that downscale samples
+// nearest-neighbour and the vehicle reads as jagged.
+// Matched on the three-flag construction, which is unique to the quick-card
+// canvas. A file-wide ANTI_ALIAS/FILTER_BITMAP search passed vacuously off an
+// unrelated paint that already had both flags, so it could never have failed.
+assert.match(native, /ANTI_ALIAS_FLAG\s*\|\s*android\.graphics\.Paint\.FILTER_BITMAP_FLAG\s*\|\s*android\.graphics\.Paint\.DITHER_FLAG/,
+  'the quick-card canvas must filter the rasters it downscales');
 all(native, [
   'seatBeltStates', 'sunroofLevel', 'curtainLevel',
   'sanitizeSeatBeltStates(', 'raw.optInt("sunroofLevel", 0)',
