@@ -1006,6 +1006,9 @@ window.HavalSplash = (function () {
       padding: 0;
       pointer-events: none;
       color: #eaf2f8;
+      --hv-power-ev: var(--hv-accent, #4fd6e8);
+      --hv-power-regen: #3ee08a;
+      --hv-power-engine: #f0bd65;
       transition: opacity 900ms ease;
       overflow: hidden;
     }
@@ -1848,18 +1851,21 @@ window.HavalSplash = (function () {
       grid-template-columns: minmax(0, 1fr) 168px;
       padding: 12px 14px;
     }
+    .hv-power-3x2 { grid-template-columns: minmax(0, 1fr) 188px; padding: 14px 16px; }
     .hv-power-1x1 .hv-power-stage,
     .hv-power-1x2 .hv-power-stage,
     .hv-power-2x1 .hv-power-stage,
     .hv-power-3x1 .hv-power-stage,
-    .hv-power-2x2 .hv-power-stage {
+    .hv-power-2x2 .hv-power-stage,
+    .hv-power-3x2 .hv-power-stage {
       grid-column: 1;
       grid-row: 1;
     }
     .hv-power-1x2 .hv-power-ranges { grid-column: 1; grid-row: 2; }
     .hv-power-2x1 .hv-power-ranges,
     .hv-power-3x1 .hv-power-ranges,
-    .hv-power-2x2 .hv-power-ranges {
+    .hv-power-2x2 .hv-power-ranges,
+    .hv-power-3x2 .hv-power-ranges {
       grid-column: 2;
       grid-row: 1;
     }
@@ -1871,6 +1877,11 @@ window.HavalSplash = (function () {
       align-items: center;
       justify-content: flex-end;
     }
+    .hv-power-source { position:absolute; top:5px; left:50%; transform:translateX(-50%); z-index:9; max-width:92%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; border-radius:5px; background:rgba(8,14,20,.82); font:6px/1 'Space Mono',monospace; letter-spacing:.08em; color:#f0bd65; }
+    .hv-power-source.live { color:var(--hv-power-ev); }
+    .hv-power-source.demo { color:#f0bd65; }
+    .hv-power-source.partial { color:#f0bd65; }
+    .hv-power-source.stale,.hv-power-source.unavailable { color:#b9c5cf; opacity:.78; }
     .hv-power-car {
       flex: 1 1 auto;
       min-height: 0;
@@ -1995,7 +2006,7 @@ window.HavalSplash = (function () {
     }
     .hv-power.ev .hv-power-floor,
     .hv-power.ice .hv-power-floor,
-    .hv-power.hybrid .hv-power-floor { color: #4fd6e8; }
+    .hv-power.hybrid .hv-power-floor { color: var(--hv-power-ev); }
     .hv-power.idle .hv-power-floor,
     .hv-power.regen .hv-power-floor,
     .hv-power.charge .hv-power-floor { color: #3ee08a; }
@@ -2125,6 +2136,11 @@ window.HavalSplash = (function () {
       text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
       pointer-events: none;
     }
+    .hv-power-mode-label { position:absolute; left:50%; bottom:4%; transform:translateX(-50%); z-index:6; display:flex; flex-direction:column; align-items:center; gap:3px; max-width:82%; text-align:center; pointer-events:none; text-shadow:0 1px 8px rgba(0,0,0,.8); }
+    .hv-power-mode-label strong { font-size:11px; font-weight:560; white-space:nowrap; }
+    .hv-power-mode-label small { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:6px/1 'Space Mono',monospace; letter-spacing:.06em; opacity:.62; }
+    .hv-power-1x1 .hv-power-mode-label,.hv-power-1x2 .hv-power-mode-label,.hv-power-2x1 .hv-power-mode-label,.hv-power-3x1 .hv-power-mode-label { left:50%; bottom:0; }
+    .hv-power.unavailable .hv-power-mode-label strong,.hv-power.stale .hv-power-mode-label strong { color:#c1ccd4; }
     .hv-power-1x1 .hv-power-floor-label,
     .hv-power-1x2 .hv-power-floor-label,
     .hv-power-2x1 .hv-power-floor-label,
@@ -2214,7 +2230,7 @@ window.HavalSplash = (function () {
       pointer-events: none;
       z-index: auto;
       overflow: hidden;
-      --flow: #4fd6e8;
+      --flow: var(--hv-power-ev);
     }
     .hv-power-lane::after {
       content: '';
@@ -2244,7 +2260,7 @@ window.HavalSplash = (function () {
     }
     .hv-power-lane.drive {
       opacity: .95;
-      --flow: #4fd6e8;
+      --flow: var(--hv-power-ev);
       background:
         linear-gradient(180deg,
           rgba(79, 214, 232, 0.04) 0%,
@@ -2255,7 +2271,7 @@ window.HavalSplash = (function () {
     }
     .hv-power-lane.regen {
       opacity: .95;
-      --flow: #3ee08a;
+      --flow: var(--hv-power-regen);
       background:
         linear-gradient(180deg,
           rgba(62, 224, 138, 0.04) 0%,
@@ -4745,6 +4761,44 @@ window.HavalSplash = (function () {
     .hv-range-card-2x2 { padding:18px; }.hv-range-card-2x2 .hv-range-body { grid-template-columns:minmax(170px,.76fr) minmax(270px,1.24fr); gap:26px; }.hv-range-card-2x2 .hv-range-total strong { margin:8px 0 5px; font-size:clamp(52px,7vw,76px); }.hv-range-card-2x2 .hv-range-detail { gap:14px; }.hv-range-card-2x2 .hv-range-soc strong { font-size:24px; }.hv-range-card-2x2 .hv-range-split { height:14px; }.hv-range-card-2x2 .hv-range-legend { gap:12px; }.hv-range-card-2x2 .hv-range-legend > div { padding:12px; border-radius:13px; }.hv-range-card-2x2 .hv-range-legend strong { margin-top:7px; font-size:26px; }
     .hv-range-focus { min-height:calc(100% - 48px); padding:20px; border-radius:16px; background:linear-gradient(140deg,rgba(255,255,255,.065),rgba(255,255,255,.018)); }.hv-range-focus-hero { display:flex; align-items:end; justify-content:space-between; gap:20px; padding-bottom:18px; border-bottom:1px solid var(--hv-widget-border); }.hv-range-focus-kicker,.hv-range-focus-soc span,.hv-range-focus-cell span,.hv-range-focus-source { font:9px/1.2 'Space Mono',monospace; letter-spacing:.1em; opacity:.62; }.hv-range-focus-total strong { display:inline-block; margin-top:7px; font-size:clamp(54px,10vw,84px); font-weight:360; line-height:.8; letter-spacing:-.08em; font-variant-numeric:tabular-nums; }.hv-range-focus-total small { margin-left:7px; font:12px/1 'Space Mono',monospace; letter-spacing:.1em; color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-focus-soc { min-width:98px; padding:12px; border:1px solid var(--hv-widget-border); border-radius:13px; text-align:right; }.hv-range-focus-soc strong { display:block; margin-top:6px; font-size:25px; font-weight:530; font-variant-numeric:tabular-nums; }.hv-range-focus-split { margin:22px 0 10px; }.hv-range-focus-split .hv-range-split { height:18px; }.hv-range-focus-scale { display:flex; justify-content:space-between; font:8px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; }.hv-range-focus-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:22px; }.hv-range-focus-cell { padding:14px; border:1px solid var(--hv-widget-border); border-radius:14px; background:rgba(255,255,255,.035); }.hv-range-focus-cell strong { display:block; margin-top:8px; font-size:28px; line-height:.9; font-weight:470; font-variant-numeric:tabular-nums; }.hv-range-focus-cell.ev strong { color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-focus-cell small { margin-left:4px; font:9px/1 'Space Mono',monospace; opacity:.56; }.hv-range-focus-units { display:flex; gap:4px; margin:18px 0 -2px; }.hv-range-focus-units button { min-width:44px; min-height:30px; padding:0 9px; border:1px solid var(--hv-widget-border); border-radius:9px; color:inherit; background:rgba(255,255,255,.035); font:8px/1 'Space Mono',monospace; letter-spacing:.09em; cursor:pointer; }.hv-range-focus-units button.on { border-color:var(--hv-readable-accent,var(--hv-accent)); color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(99,217,231,.10); }.hv-range-focus-source { margin-top:18px; padding-top:14px; border-top:1px solid var(--hv-widget-border); }
 
+    .hv-power-focus { min-height:calc(100% - 42px); padding:18px; box-sizing:border-box; border-radius:16px; background:var(--hv-frost-inner); --hv-power-ev:var(--hv-accent,#4fd6e8); --hv-power-regen:#3ee08a; --hv-power-engine:#f0bd65; }
+    .hv-power-focus-head { display:flex; align-items:end; justify-content:space-between; gap:18px; padding-bottom:16px; border-bottom:1px solid var(--hv-widget-border); }
+    .hv-power-focus-head span,.hv-power-focus-stat span,.hv-power-focus-source,.hv-power-focus-legend span { font:8px/1.2 'Space Mono',monospace; letter-spacing:.1em; opacity:.62; }
+    .hv-power-focus-head strong { display:block; margin-top:7px; font-size:clamp(27px,5vw,46px); line-height:.9; font-weight:430; letter-spacing:-.06em; }
+    .hv-power-focus-head small { display:block; margin-top:9px; font:8px/1.2 'Space Mono',monospace; letter-spacing:.08em; opacity:.62; }
+    .hv-power-focus-soc { min-width:84px; padding:11px 13px; border:1px solid var(--hv-widget-border); border-radius:13px; text-align:right; }
+    .hv-power-focus-soc strong { display:block; margin-top:7px; font-size:25px; font-weight:530; font-variant-numeric:tabular-nums; }
+    .hv-power-focus-map { position:relative; min-height:184px; margin:16px 0; border:1px solid var(--hv-widget-border); border-radius:14px; background:radial-gradient(ellipse at center,rgba(255,255,255,.07),rgba(255,255,255,.018) 58%,transparent 70%); overflow:hidden; }
+    .hv-power-focus-node { position:absolute; z-index:2; display:flex; align-items:center; justify-content:center; min-width:86px; min-height:42px; padding:0 9px; box-sizing:border-box; border:1px solid rgba(255,255,255,.26); border-radius:10px; background:rgba(8,14,20,.52); color:#eef5fa; font:8px/1.15 'Space Mono',monospace; letter-spacing:.08em; text-align:center; }
+    .hv-power-focus-node.battery { left:6%; top:50%; transform:translateY(-50%); border-color:var(--hv-power-ev); color:var(--hv-power-ev); }
+    .hv-power-focus-node.engine { left:39%; top:12%; border-color:var(--hv-power-engine); color:var(--hv-power-engine); }
+    .hv-power-focus-node.engine:not(.on),.hv-power-focus-line.engine-drive:not(.on) { opacity:.18; }
+    .hv-power-focus-node.motor { right:7%; top:50%; transform:translateY(-50%); border-color:var(--hv-power-ev); color:var(--hv-power-ev); }
+    .hv-power-focus-wheel { position:absolute; z-index:2; bottom:14%; width:26px; height:26px; border:2px solid currentColor; border-radius:50%; color:rgba(238,245,250,.65); }
+    .hv-power-focus-wheel.fl { left:41%; }.hv-power-focus-wheel.fr { left:48%; }.hv-power-focus-wheel.rl { right:15%; }.hv-power-focus-wheel.rr { right:8%; }
+    .hv-power-focus-line { position:absolute; z-index:1; height:2px; transform-origin:left center; background:var(--hv-power-ev); box-shadow:0 0 8px currentColor; color:var(--hv-power-ev); }
+    .hv-power-focus-line.battery-drive { left:22%; top:50%; width:22%; }
+    .hv-power-focus-line.engine-drive { left:47%; top:27%; width:17%; transform:rotate(31deg); background:var(--hv-power-engine); color:var(--hv-power-engine); }
+    .hv-power-focus-line.motor-wheel { left:64%; top:50%; width:21%; }
+    .hv-power-focus-line.regen { background:var(--hv-power-regen); color:var(--hv-power-regen); }
+    .hv-power-focus-map.drive .hv-power-focus-line::after,.hv-power-focus-map.regen .hv-power-focus-line::after { content:'›'; position:absolute; right:-2px; top:-9px; font:18px/1 sans-serif; animation:hv-power-focus-flow .7s linear infinite; }
+    .hv-power-focus-map.regen .hv-power-focus-line { transform:scaleX(-1); transform-origin:center; }
+    .hv-power-focus-map.regen .battery-drive,.hv-power-focus-map.regen .motor-wheel { transform:scaleX(-1); }
+    .hv-power-focus-map.regen .engine-drive { opacity:.22; }
+    .hv-power-focus-map.unavailable .hv-power-focus-line,.hv-power-focus-map.stale .hv-power-focus-line { opacity:.2; box-shadow:none; }
+    @keyframes hv-power-focus-flow { from { opacity:.15; transform:translateX(-5px); } 50% { opacity:1; } to { opacity:.15; transform:translateX(4px); } }
+    .hv-power-focus-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    .hv-power-focus-stat { min-width:0; padding:11px; border:1px solid var(--hv-widget-border); border-radius:11px; background:rgba(255,255,255,.035); }
+    .hv-power-focus-stat strong { display:block; margin-top:8px; font-size:22px; line-height:.9; font-weight:500; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .hv-power-focus-stat small { margin-left:3px; font:8px/1 'Space Mono',monospace; opacity:.56; }
+    .hv-power-focus-legend { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:16px; }
+    .hv-power-focus-legend div { min-width:0; display:flex; align-items:center; gap:6px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.04em; }
+    .hv-power-focus-legend i { width:8px; height:8px; flex:none; border-radius:50%; background:var(--hv-power-ev); box-shadow:0 0 8px currentColor; }
+    .hv-power-focus-legend .regen i { background:var(--hv-power-regen); }.hv-power-focus-legend .engine i { background:var(--hv-power-engine); }.hv-power-focus-legend .neutral i { background:#c0cbd4; }
+    .hv-power-focus-source { margin-top:16px; padding-top:13px; border-top:1px solid var(--hv-widget-border); }
+    .hv-power-focus-note { margin-top:9px; font:8px/1.45 'Space Mono',monospace; opacity:.58; }
+    @media (max-width:560px) { .hv-power-focus-stats { grid-template-columns:1fr 1fr 1fr; }.hv-power-focus-legend { grid-template-columns:1fr 1fr; }.hv-power-focus-node { min-width:68px; font-size:7px; } }
+
     .hv-card-focus-backdrop { position:absolute; inset:0; z-index:84; opacity:0; pointer-events:none; background:rgba(2,6,10,.38); transition:opacity .2s ease; }
     .hv-card-focus-backdrop.on { opacity:1; pointer-events:auto; }
     .hv-card-focus { position:absolute; z-index:85; left:50%; top:var(--hv-popup-top, 52px); bottom:var(--hv-popup-bottom-inset, 72px); width:min(760px,calc(100vw - 52px)); padding:16px; box-sizing:border-box; overflow:auto; color:var(--hv-widget-fg,#edf5fa); border:1px solid var(--hv-frost-edge,rgba(255,255,255,.18)); border-radius:22px; background:var(--hv-frost-bg,rgba(12,18,24,.88)); box-shadow:var(--hv-frost-shadow,0 18px 50px rgba(0,0,0,.38)); opacity:0; pointer-events:none; transform:translate(-50%,18px) scale(.985); transition:opacity .2s ease,transform .24s cubic-bezier(.2,.75,.2,1); }
@@ -5308,8 +5362,8 @@ window.HavalSplash = (function () {
             </div>
           </sc-if>
           <sc-if value="{{ wg.isPower }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-power {{ wg.powerSizeClass }} {{ wg.powerTone }}" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}">
-              <div role="status" style="position:absolute;top:5px;left:50%;transform:translateX(-50%);z-index:9;white-space:nowrap;padding:3px 5px;border-radius:5px;background:rgba(8,14,20,.82);font:6px/1 'Space Mono',monospace;letter-spacing:.08em;color:#f0bd65;">{{ wg.powerSource }}</div>
+            <div class="hv-power {{ wg.powerSizeClass }} {{ wg.powerTone }}" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}" role="button" aria-label="{{ wg.powerAriaLabel }}">
+              <div class="hv-power-source {{ wg.powerSourceClass }}" role="status">{{ wg.powerSource }}</div>
               <div class="hv-power-stage">
                 <div class="hv-power-car">
                   <div class="hv-power-car-frame">
@@ -5352,10 +5406,11 @@ window.HavalSplash = (function () {
                     <span class="hv-power-ring-num">{{ wg.socNum }}</span>
                     <span class="hv-power-ring-unit">%</span>
                   </div>
+                  <div class="hv-power-mode-label"><strong>{{ wg.powerState }}</strong><small>{{ wg.powerFlowSummary }}</small></div>
                   </div>
                 </div>
               </div>
-              <sc-if value="{{ wg.showPowerRanges }}" hint-placeholder-val="{{ false }}">
+              <sc-if value="{{ wg.showPowerStats }}" hint-placeholder-val="{{ false }}">
                 <div class="hv-power-ranges">
                   <sc-for list="{{ wg.powerStats }}" as="st" hint-placeholder-count="2">
                     <div class="hv-power-stat">
@@ -5512,8 +5567,8 @@ window.HavalSplash = (function () {
             </div>
           </sc-if>
           <sc-if value="{{ wg.isPower }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-power {{ wg.powerSizeClass }} {{ wg.powerTone }}" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}">
-              <div role="status" style="position:absolute;top:5px;left:50%;transform:translateX(-50%);z-index:9;white-space:nowrap;padding:3px 5px;border-radius:5px;background:rgba(8,14,20,.82);font:6px/1 'Space Mono',monospace;letter-spacing:.08em;color:#f0bd65;">{{ wg.powerSource }}</div>
+            <div class="hv-power {{ wg.powerSizeClass }} {{ wg.powerTone }}" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}" role="button" aria-label="{{ wg.powerAriaLabel }}">
+              <div class="hv-power-source {{ wg.powerSourceClass }}" role="status">{{ wg.powerSource }}</div>
               <div class="hv-power-stage">
                 <div class="hv-power-car">
                   <div class="hv-power-car-frame">
@@ -5556,10 +5611,11 @@ window.HavalSplash = (function () {
                     <span class="hv-power-ring-num">{{ wg.socNum }}</span>
                     <span class="hv-power-ring-unit">%</span>
                   </div>
+                  <div class="hv-power-mode-label"><strong>{{ wg.powerState }}</strong><small>{{ wg.powerFlowSummary }}</small></div>
                   </div>
                 </div>
               </div>
-              <sc-if value="{{ wg.showPowerRanges }}" hint-placeholder-val="{{ false }}">
+              <sc-if value="{{ wg.showPowerStats }}" hint-placeholder-val="{{ false }}">
                 <div class="hv-power-ranges">
                   <sc-for list="{{ wg.powerStats }}" as="st" hint-placeholder-count="2">
                     <div class="hv-power-stat">
@@ -5865,6 +5921,19 @@ window.HavalSplash = (function () {
     </sc-if>
     <sc-if value="{{ focusedCardIsRange }}" hint-placeholder-val="{{ false }}">
       <div class="hv-range-focus"><div class="hv-range-focus-hero"><div class="hv-range-focus-total"><span class="hv-range-focus-kicker">{{ focusedRangeTotalLabel }}</span><strong>{{ focusedRangeTotal }}</strong><small>{{ focusedRangeUnit }}</small></div><div class="hv-range-focus-soc"><span>BATTERY SOC</span><strong>{{ focusedRangeSoc }}</strong></div></div><div class="hv-range-focus-split"><div class="hv-range-split" role="img" aria-label="EV {{ focusedRangeEv }} {{ focusedRangeUnit }}, fuel {{ focusedRangeFuel }} {{ focusedRangeUnit }}"><i class="ev" style="width:{{ focusedRangeEvPct }}%;"></i><i class="fuel" style="width:{{ focusedRangeFuelPct }}%;"></i></div></div><div class="hv-range-focus-scale"><span>EV</span><span>FUEL</span></div><div class="hv-range-focus-grid"><div class="hv-range-focus-cell ev"><span>EV ESTIMATE</span><strong>{{ focusedRangeEv }}<small>{{ focusedRangeUnit }}</small></strong></div><div class="hv-range-focus-cell"><span>FUEL ESTIMATE</span><strong>{{ focusedRangeFuel }}<small>{{ focusedRangeUnit }}</small></strong></div></div><div class="hv-range-focus-units" role="group" aria-label="Distance unit"><button type="button" class="{{ focusedRangeUnitKmClass }}" onClick="{{ focusedRangeSetKm }}" aria-pressed="{{ focusedRangeUnitKmPressed }}">KM</button><button type="button" class="{{ focusedRangeUnitMiClass }}" onClick="{{ focusedRangeSetMi }}" aria-pressed="{{ focusedRangeUnitMiPressed }}">MI</button></div><div class="hv-range-focus-source" role="status">{{ focusedRangeSource }}</div></div>
+    </sc-if>
+    <sc-if value="{{ focusedCardIsPower }}" hint-placeholder-val="{{ false }}">
+      <div class="hv-power-focus">
+        <div class="hv-power-focus-head"><div><span>LIVE PROPULSION / ENERGY FLOW</span><strong>{{ focusedPowerState }}</strong><small>{{ focusedPowerFlowSummary }}</small></div><div class="hv-power-focus-soc"><span>SOC</span><strong>{{ focusedPowerSocNum }}%</strong></div></div>
+        <div class="hv-power-focus-map {{ focusedPowerFocusTone }}" role="img" aria-label="{{ focusedPowerAriaLabel }}">
+          <div class="hv-power-focus-node battery">BATTERY</div><div class="hv-power-focus-node engine {{ focusedPowerEngineClass }}">ENGINE</div><div class="hv-power-focus-node motor">E-MOTOR</div>
+          <div class="hv-power-focus-line battery-drive"></div><div class="hv-power-focus-line engine-drive {{ focusedPowerEngineClass }}"></div><div class="hv-power-focus-line motor-wheel"></div>
+          <i class="hv-power-focus-wheel fl"></i><i class="hv-power-focus-wheel fr"></i><i class="hv-power-focus-wheel rl"></i><i class="hv-power-focus-wheel rr"></i>
+        </div>
+        <div class="hv-power-focus-stats"><sc-for list="{{ focusedPowerStats }}" as="pst" hint-placeholder-count="3"><div class="hv-power-focus-stat"><span>{{ pst.kicker }}</span><strong>{{ pst.value }}<small>{{ pst.unit }}</small></strong></div></sc-for></div>
+        <div class="hv-power-focus-legend" aria-label="Power flow legend"><div><i></i><span>EV FLOW</span></div><div class="regen"><i></i><span>REGEN</span></div><div class="engine"><i></i><span>ENGINE</span></div><div class="neutral"><i></i><span>NEUTRAL / UNAVAILABLE</span></div></div>
+        <div class="hv-power-focus-source" role="status">{{ focusedPowerSource }}</div><div class="hv-power-focus-note">{{ focusedPowerNote }}</div>
+      </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsStatus }}" hint-placeholder-val="{{ false }}">
       <div class="hv-status-focus">
@@ -6702,6 +6771,7 @@ const H6_BOTTOM_CARD_CATALOG = [
   { id: 'consumption', title: 'Consumption', action: 'openConsumption' },
   { id: 'media', title: 'Media', action: 'openMediaApp', longAction: 'openMedia' },
   { id: 'range', title: 'Range', action: 'openRange' },
+  { id: 'power', title: 'Power flow', action: 'openPower' },
   { id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' },
   { id: 'tires', title: 'Tires', action: 'openTires' },
   { id: 'clock', title: 'Clock', action: 'openClockSettings' },
@@ -6963,6 +7033,7 @@ const H6_CARD_POPUP_TYPES = {
   consumption: 'consumption',
   tires: 'tires',
   range: 'range',
+  power: 'power',
   status: 'status',
   driveMode: 'driving',
   powerMode: 'driving',
@@ -7608,7 +7679,7 @@ class Component extends DCLogic {
     // runs before those, so _tickCamCycle resolves the list lazily.
     this._camCycleKeys = null;
     this._powerLive = { soc: '', evRange: '', fuelRange: '', fuelLevel: '',
-                        cycleEv: '', evInst: '', flow: '' };
+                        voltage: '', current: '', cycleEv: '', evInst: '', flow: '' };
     this._tirePressuresRaw = '';
     this._tireTemperaturesRaw = '';
     this._tireWarningsRaw = {};
@@ -7621,6 +7692,9 @@ class Component extends DCLogic {
     this._graphBusFuelTrip = false;
     this._powerCardCache = null;
     this._powerCardCacheAt = 0;
+    this._powerRefreshTimer = 0;
+    this._powerFreshTimer = 0;
+    this._powerRefreshPending = false;
     this._wireCarTelemetry();
     this._graphV = 0;
     this._graphI = 0;
@@ -8060,7 +8134,10 @@ class Component extends DCLogic {
       return;
     }
     if (key === CAR_SIGNALS.batteryVoltage || key === CAR_SIGNALS.batteryCurrent) {
+      if (key === CAR_SIGNALS.batteryVoltage) this._powerLive.voltage = String(value);
+      else this._powerLive.current = String(value);
       this._applyGraphSignal(key, value);
+      this._queuePowerRefresh();
       return;
     }
     if (key === CAR_SIGNALS.fuelInst) {
@@ -8092,7 +8169,7 @@ class Component extends DCLogic {
       this._refreshTireTelemetry();
       return;
     }
-    if (key === CAR_SIGNALS.batterySoc) { this._powerLive.soc = String(value); return; }
+    if (key === CAR_SIGNALS.batterySoc) { this._powerLive.soc = String(value); this._queuePowerRefresh(); return; }
     if (key === CAR_SIGNALS.evRange) { this._powerLive.evRange = String(value); return; }
     if (key === CAR_SIGNALS.fuelRange) { this._powerLive.fuelRange = String(value); return; }
     if (key === CAR_SIGNALS.fuelLevel) { this._powerLive.fuelLevel = String(value); return; }
@@ -8107,7 +8184,7 @@ class Component extends DCLogic {
       if (this._graphAcceptKpi(n, 0, 40)) this._setGraphValue('fuelCycle', n);
       return;
     }
-    if (key === CAR_SIGNALS.powerFlow) { this._powerLive.flow = String(value); return; }
+    if (key === CAR_SIGNALS.powerFlow) { this._powerLive.flow = String(value); this._queuePowerRefresh(); return; }
     if (key === CAR_SIGNALS.fuelTrip) {
       const n = this._parseFuelAvg(value);
       if (this._graphAcceptKpi(n, 0, 40)) {
@@ -8254,18 +8331,61 @@ class Component extends DCLogic {
     return CAR_POWER_DEMO_PACKED[i];
   }
 
-  _powerSource() {
-    const keys = [CAR_SIGNALS.powerFlow, CAR_SIGNALS.batterySoc,
-      CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange, CAR_SIGNALS.batteryVoltage,
-      CAR_SIGNALS.batteryCurrent];
+  _queuePowerRefresh() {
+    if (this._unmounted || this._powerRefreshPending) return;
+    this._powerRefreshPending = true;
+    clearTimeout(this._powerRefreshTimer);
+    // Power flow can arrive at bus cadence. Update DOM and React no more than
+    // four times a second; the 3D renderer remains on-demand and is not used
+    // as a telemetry ticker for this card.
+    this._powerRefreshTimer = setTimeout(() => {
+      this._powerRefreshTimer = 0;
+      this._powerRefreshPending = false;
+      if (this._unmounted) return;
+      this._updatePowerCards(performance.now());
+      this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }),
+        () => this._syncDockIndicators());
+    }, 250);
+    clearTimeout(this._powerFreshTimer);
+    this._powerFreshTimer = setTimeout(() => {
+      this._powerFreshTimer = 0;
+      if (!this._unmounted) {
+        this._updatePowerCards(performance.now());
+        this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }),
+          () => this._syncDockIndicators());
+      }
+    }, 120050);
+  }
+
+  _powerStatus(now) {
     const at = this._carSignalAt || {};
-    const now = Date.now();
-    const fresh = keys.some((key) => at[key] && now - at[key] <= 120000);
-    const known = keys.some((key) => at[key]);
-    const demo = this._demoPreview && !this._graphAnyLive && !(this._busCount > 0);
-    return demo ? 'DEMO · SIMULATED · NOT VEHICLE'
-      : (fresh ? 'VEHICLE · recent power signal'
-        : (known ? 'STALE · power signal' : 'UNAVAILABLE · no power signal'));
+    const keys = [CAR_SIGNALS.powerFlow, CAR_SIGNALS.batterySoc,
+      CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent];
+    const fresh = (key) => !!at[key] && now - at[key] <= 120000;
+    const known = keys.some((key) => !!at[key]);
+    const flowFresh = fresh(CAR_SIGNALS.powerFlow)
+      && !!this._powerFromPacked(this._powerLive && this._powerLive.flow);
+    const voltageFresh = fresh(CAR_SIGNALS.batteryVoltage)
+      && isFinite(this._carNumber(this._powerLive && this._powerLive.voltage));
+    const currentFresh = fresh(CAR_SIGNALS.batteryCurrent)
+      && isFinite(this._carNumber(this._powerLive && this._powerLive.current));
+    const demo = !!this._demoPreview && !known && !(this._busCount > 0);
+    if (demo) return { key: 'demo', source: 'DEMO · SIMULATED · NOT VEHICLE',
+      flowFresh: false, voltageFresh: false, currentFresh: false };
+    if (!known) return { key: 'unavailable', source: 'UNAVAILABLE · NO POWER SIGNAL',
+      flowFresh, voltageFresh, currentFresh };
+    if (!keys.some(fresh)) return { key: 'stale', source: 'STALE · POWER SIGNAL',
+      flowFresh, voltageFresh, currentFresh };
+    if (flowFresh && voltageFresh && currentFresh) {
+      return { key: 'live', source: 'LIVE · VEHICLE POWER FLOW',
+        flowFresh, voltageFresh, currentFresh };
+    }
+    return { key: 'partial', source: 'PARTIAL · VEHICLE POWER SIGNALS',
+      flowFresh, voltageFresh, currentFresh };
+  }
+
+  _powerSource(now) {
+    return this._powerStatus(now || Date.now()).source;
   }
 
   /** Same packed flow the 2D POWER card and the x-ray powertrain FX share. */
@@ -8289,14 +8409,17 @@ class Component extends DCLogic {
    * on a stationary car).
    */
   _powerKwNow(now) {
-    const demo = this._demoPreview && !this._graphAnyLive && !(this._busCount > 0);
-    let kw = this._graphDisplay.evPowerKw != null
-      ? this._graphDisplay.evPowerKw
-      : (this._graphValues.evPowerKw || (demo ? this._graphDemoValue('evPowerKw', now) : 0));
-    const flow = this._powerFlowRaw(now);
-    const speed = this._carSpeedKmh;
-    if (!demo && flow.tone !== 'charge' && isFinite(speed) && speed < 0.5) kw = 0;
-    return this._carNumber(kw) || 0;
+    const status = this._powerStatus(Date.now());
+    const demo = status.key === 'demo';
+    const voltage = this._carNumber(this._powerLive && this._powerLive.voltage);
+    const current = this._carNumber(this._powerLive && this._powerLive.current);
+    let kw = status.voltageFresh && status.currentFresh
+      ? voltage * current / 1000
+      : (demo ? this._graphDemoValue('evPowerKw', now) : NaN);
+    // Flow direction is never inferred from V×I; this signed value is only a
+    // measured/derived pack readout and the packed flow remains authoritative
+    // for propulsion, regen, engine and charging labels.
+    return isFinite(kw) ? kw : NaN;
   }
 
   _powerFmtNum(raw, digits) {
@@ -8309,52 +8432,72 @@ class Component extends DCLogic {
 
   _powerModel(now) {
     const live = this._powerLive || {};
-    const demo = this._demoPreview && !this._graphAnyLive && !(this._busCount > 0);
-    const flow = this._powerFlowRaw(now);
-    let kwRaw = this._graphDisplay.evPowerKw != null
-      ? this._graphDisplay.evPowerKw
-      : (this._graphValues.evPowerKw || (demo ? this._graphDemoValue('evPowerKw', now) : 0));
-    // Parked / stopped: force a clean 0 kW readout (pack V×I noise otherwise).
-    const speedKmh = this._carSpeedKmh;
-    const stopped = !demo && flow.tone !== 'charge' && isFinite(speedKmh) && speedKmh < 0.5;
-    if (stopped) kwRaw = 0;
-    const regenKw = kwRaw < -0.4;
+    const stamp = now || Date.now();
+    const status = this._powerStatus(Date.now());
+    const demo = status.key === 'demo';
+    const flow = demo ? this._powerFromPacked(this._powerDemoPacked(stamp))
+      : this._powerFromPacked(live.flow);
+    const visibleFlow = flow || CAR_POWER_IDLE;
+    const kwRaw = this._powerKwNow(stamp);
+    const voltage = status.voltageFresh ? this._carNumber(live.voltage)
+      : (demo ? 360 : NaN);
+    const current = status.currentFresh ? this._carNumber(live.current)
+      : (demo && isFinite(kwRaw) ? kwRaw * 1000 / 360 : NaN);
+    const regenKw = isFinite(kwRaw) && kwRaw < -0.4;
     let kwClass = '';
-    if (regenKw || flow.tone === 'regen' || flow.tone === 'charge') kwClass = 'regen';
-    else if (kwRaw > 0.4 || flow.tone === 'ev' || flow.tone === 'ice' || flow.tone === 'hybrid' || flow.tone === 'idle') kwClass = 'ev';
+    if (regenKw || visibleFlow.tone === 'regen' || visibleFlow.tone === 'charge') kwClass = 'regen';
+    else if (flow && ((isFinite(kwRaw) && kwRaw > 0.4) || visibleFlow.tone === 'ev'
+      || visibleFlow.tone === 'ice' || visibleFlow.tone === 'hybrid' || visibleFlow.tone === 'idle')) kwClass = 'ev';
     const socRaw = this._carNumber(live.soc);
-    const socPct = this._powerSocPct(now);
+    const socPct = this._powerSocPct(stamp);
     const socNum = isFinite(socRaw) || demo ? String(socPct) : '—';
-    const battTone = (flow.tone === 'regen' || flow.tone === 'charge')
-      ? (flow.tone === 'charge' ? 'charge' : 'regen')
-      : (flow.batt ? 'ev' : '');
+    const battTone = (visibleFlow.tone === 'regen' || visibleFlow.tone === 'charge')
+      ? (visibleFlow.tone === 'charge' ? 'charge' : 'regen')
+      : (visibleFlow.batt ? 'ev' : '');
+    const state = flow ? flow.label : (status.key === 'demo' ? 'Demo flow' : 'Power flow unavailable');
+    const flowSummary = flow && flow.tone === 'regen' ? 'WHEELS → MOTOR → BATTERY'
+      : (flow && flow.tone === 'charge' ? 'CHARGE → BATTERY'
+        : (flow && flow.tone === 'hybrid' ? 'BATTERY + ENGINE → WHEELS'
+          : (flow && flow.tone === 'ice' ? 'ENGINE → WHEELS' :
+            (flow && flow.tone === 'ev' ? 'BATTERY → MOTOR → WHEELS' : 'NO FLOW'))));
+    const fmtSigned = (n) => isFinite(n) ? ((n > 0 ? '+' : '') + this._powerFmtNum(n, 1)) : '—';
+    const stats = [
+      { kicker: 'PACK POWER', value: fmtSigned(kwRaw), unit: 'kW' },
+      { kicker: 'VOLTAGE', value: this._powerFmtNum(voltage, 0), unit: 'V' },
+      { kicker: 'CURRENT', value: fmtSigned(current), unit: 'A' },
+    ];
     return {
-      tone: flow.tone,
-      state: flow.label,
-      kw: this._graphFormat('evPowerKw', kwRaw),
+      tone: flow ? flow.tone : 'unavailable',
+      state: state,
+      stateKey: status.key,
+      flowSummary: flowSummary,
+      kw: fmtSigned(kwRaw),
       kwClass: kwClass,
       socPct: socPct,
       socNum: socNum,
-      iceClass: flow.ice ? 'on' : '',
-      iceSrc: this._powerMotorSrc('ice', flow.ice),
-      frontClass: this._powerMotorClass(flow.front),
-      frontSrc: this._powerMotorSrc('front', flow.front),
-      rearClass: this._powerMotorClass(flow.rear),
-      rearSrc: this._powerMotorSrc('rear', flow.rear),
-      battClass: (flow.batt ? 'on ' : '') + battTone,
-      frontFlow: this._powerFlowClass(flow.front),
-      rearFlow: this._powerFlowClass(flow.rear),
-      stats: [
-        { kicker: 'EV', value: demo && live.evRange === '' ? '42' : this._powerFmtNum(live.evRange, 0), unit: 'km' },
-        { kicker: 'GAS', value: demo && live.fuelRange === '' ? '510' : this._powerFmtNum(live.fuelRange, 0), unit: 'km' },
-      ],
+      voltage: this._powerFmtNum(voltage, 0),
+      current: fmtSigned(current),
+      iceClass: visibleFlow.ice ? 'on' : '',
+      iceSrc: this._powerMotorSrc('ice', visibleFlow.ice),
+      frontClass: this._powerMotorClass(visibleFlow.front),
+      frontSrc: this._powerMotorSrc('front', visibleFlow.front),
+      rearClass: this._powerMotorClass(visibleFlow.rear),
+      rearSrc: this._powerMotorSrc('rear', visibleFlow.rear),
+      battClass: (visibleFlow.batt ? 'on ' : '') + battTone,
+      frontFlow: this._powerFlowClass(visibleFlow.front),
+      rearFlow: this._powerFlowClass(visibleFlow.rear),
+      stats: stats,
+      source: status.source,
+      sourceClass: status.key,
+      ariaLabel: 'Power flow. ' + state + '. ' + flowSummary + '. ' + status.source
+        + '. Pack power ' + fmtSigned(kwRaw) + ' kW. Battery state of charge ' + socNum + ' percent.',
     };
   }
 
   _powerWidgetView(item) {
     const w = Number(item.w) || 2;
     const h = Number(item.h) || 1;
-    const model = this._powerModel(this._graphNow || 0);
+    const model = this._powerModel(this._graphNow || performance.now());
     const size = w + 'x' + h;
     return {
       isPower: true,
@@ -8375,10 +8518,27 @@ class Component extends DCLogic {
       battParaClass: 'hv-power-batt-para' + (model.socPct <= 10 ? ' low' : ''),
       frontFlow: model.frontFlow,
       rearFlow: model.rearFlow,
-      showPowerRanges: w >= 2 || h >= 2,
+      showPowerStats: w >= 2 || h >= 2,
       powerStats: model.stats,
-      powerSource: this._powerSource(),
-      onPowerTap: () => this._launchEnergyAssistant(),
+      powerSource: model.source,
+      powerSourceClass: model.sourceClass,
+      powerState: model.state,
+      powerStateKey: model.stateKey,
+      powerTone: model.tone,
+      powerFocusTone: model.tone,
+      powerEngineClass: model.iceClass ? 'on' : 'off',
+      powerSocNum: model.socNum,
+      powerFlowSummary: model.flowSummary,
+      powerKw: model.kw,
+      powerVoltage: model.voltage,
+      powerCurrent: model.current,
+      powerAriaLabel: model.ariaLabel,
+      powerNote: 'PACK POWER = battery voltage × battery current ÷ 1000. Flow direction, engine contribution and regeneration are read only from haval.power.flow.',
+      onPowerTap: (ev) => {
+        this._cardControlEvent(ev);
+        if (this._widgetSuppressClick || this.state.widgetMenuId) return;
+        this._openFocusedCard('power');
+      },
     };
   }
 
@@ -8427,6 +8587,12 @@ class Component extends DCLogic {
       const el = cards[i];
       const size = el.getAttribute('data-power-size') || '2x1';
       el.className = 'hv-power hv-power-' + size + ' ' + model.tone;
+      el.setAttribute('aria-label', model.ariaLabel);
+      const source = el.querySelector('.hv-power-source');
+      if (source) {
+        source.className = 'hv-power-source ' + model.sourceClass;
+        source.textContent = model.source;
+      }
       const ice = el.querySelector('.hv-power-ice');
       if (ice) {
         ice.className = 'hv-power-ice' + (model.iceClass ? (' ' + model.iceClass) : '');
@@ -8458,6 +8624,10 @@ class Component extends DCLogic {
       }
       const socNum = el.querySelector('.hv-power-ring-num');
       if (socNum) socNum.textContent = model.socNum;
+      const modeLabel = el.querySelector('.hv-power-mode-label strong');
+      if (modeLabel) modeLabel.textContent = model.state;
+      const flowLabel = el.querySelector('.hv-power-mode-label small');
+      if (flowLabel) flowLabel.textContent = model.flowSummary;
       const frontLane = el.querySelector('.hv-power-lane.front');
       if (frontLane) frontLane.className = 'hv-power-lane front' + (model.frontFlow ? (' ' + model.frontFlow) : '');
       const rearLane = el.querySelector('.hv-power-lane.rear');
@@ -29851,11 +30021,12 @@ class Component extends DCLogic {
           : (type === 'tires' ? 'TYRE PRESSURE'
             : (type === 'status' ? 'VEHICLE STATUS'
               : (type === 'driving' ? 'DRIVING CONTROLS'
-                : (type === 'media' ? 'MEDIA' : 'CLIMATE'))))),
+                : (type === 'media' ? 'MEDIA'
+                  : (type === 'power' ? 'POWER FLOW' : 'CLIMATE')))))),
       focusedCardIsClimate: type === 'climate', focusedCardIsConsumption: type === 'consumption',
       focusedCardIsTires: type === 'tires', focusedCardIsStatus: type === 'status',
       focusedCardIsRange: type === 'range', focusedCardIsDriving: type === 'driving',
-      focusedCardIsMedia: type === 'media',
+      focusedCardIsMedia: type === 'media', focusedCardIsPower: type === 'power',
       focusedCardBadge: '', focusedCardBadgeClass: '',
       closeFocusedCard: () => this._closeFocusedCard(),
     };
@@ -29867,7 +30038,8 @@ class Component extends DCLogic {
             : (type === 'range' ? this._rangeWidgetView(entry.item)
               : (type === 'driving' ? this._drivingWidgetView(entry.item)
                 : (type === 'media' ? this._mediaWidgetView(entry.item)
-                  : this._consumptionWidgetView(entry.item, entry.side))))));
+                  : (type === 'power' ? this._powerWidgetView(entry.item)
+                    : this._consumptionWidgetView(entry.item, entry.side)))))));
     Object.keys(view).forEach((key) => {
       if (key.indexOf(type) === 0) base['focused' + key.charAt(0).toUpperCase() + key.slice(1)] = view[key];
     });
@@ -29876,6 +30048,9 @@ class Component extends DCLogic {
     if (type === 'driving') {
       base.focusedCardBadge = view.drivingSource;
       base.focusedCardBadgeClass = 'on ' + view.drivingSourceClass;
+    } else if (type === 'power') {
+      base.focusedCardBadge = view.powerSource;
+      base.focusedCardBadgeClass = 'on ' + view.powerSourceClass;
     }
     // Media states its source beside the popup title for the same reason: a
     // dialog's status belongs in its header, not in a row of its own.
@@ -31098,7 +31273,7 @@ class Component extends DCLogic {
       driving: { label: 'DRIVING', title: 'Drive, power & recovery', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [2, 2], [3, 1], [3, 2]] },
       status: { label: 'STATUS', title: 'Vehicle overview', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1], [3, 2]] },
       range: { label: 'RANGE', title: 'Battery & range', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1], [3, 2]] },
-      power: { label: 'POWER', title: 'Fluxo', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [3, 1], [2, 2]] },
+  power: { label: 'POWER', title: 'Energy flow', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [3, 1], [2, 2], [3, 2]] },
       graphs: { label: 'GRAPHS', title: 'Power charts', hint: '', sizes: [[1, 1], [2, 1], [3, 1], [2, 2], [3, 2]] },
       climate: { label: 'CLIMATE', title: 'Dual-zone comfort', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1]] },
       consumption: { label: 'CONSUMPTION', title: 'Energy & fuel', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1]] },
@@ -31428,11 +31603,7 @@ class Component extends DCLogic {
         else this._openFocusedCard('media');
         break;
       case 'openPower':
-        try {
-          if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
-            window.AppLauncherBridge.launchAppInPopup(CAR_POWER_PACKAGE);
-          }
-        } catch (e) {}
+        this._openFocusedCard('power');
         break;
       case 'openNavigation':
         try {
@@ -31486,6 +31657,7 @@ class Component extends DCLogic {
       : (this._demoPreview ? 'DEMO · ' + consumption.consumptionFuel + ' L/100' : 'No current vehicle data');
     const navigation = this._navigationWidgetView({ type: 'navigation', w: 2, h: 1 });
     const range = this._rangeWidgetView({ type: 'range', w: 2, h: 1 });
+    const power = this._powerWidgetView({ type: 'power', w: 2, h: 1 });
     const status = this._statusWidgetView({ type: 'status', w: 2, h: 1 });
     const tires = this._tiresWidgetView({ type: 'tires', w: 2, h: 1 });
     const clock = this._clockWidgetView({ type: 'clock', w: 1, h: 1 });
@@ -31563,7 +31735,8 @@ class Component extends DCLogic {
       consumption: consumptionSummary,
       media: media.mediaTitle,
       range: range.rangeSoc + '% · EV ' + range.rangeEv + ' km · GAS ' + range.rangeFuel + ' km',
-      status: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / '),
+      power: power.powerState + ' · ' + power.powerKw + ' kW',
+      status: status.statusSummary + ' · ' + status.statusSource,
       tires: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / ')
         + (tires.tiresHasAnyPressure ? ' ' + tires.tiresUnit : ''),
       clock: clock.clockTime + ' · ' + clock.clockDate,
@@ -31605,6 +31778,14 @@ class Component extends DCLogic {
         metricA: 'EV ' + range.rangeEv + ' ' + range.rangeUnit,
         metricB: 'FUEL ' + range.rangeFuel + ' ' + range.rangeUnit,
         progress: percent(range.rangeSoc, 0),
+      },
+      power: {
+        primary: power.powerState,
+        secondary: power.powerSource,
+        metricA: power.powerKw + ' kW',
+        metricB: power.powerFlowSummary,
+        progress: power.socPct,
+        state: power.powerTone,
       },
       status: {
         primary: status.statusSummary,
@@ -31661,6 +31842,7 @@ class Component extends DCLogic {
       climate: !!this._demoPreview,
       consumption: consumption.consumptionSource,
       range: range.rangeSource,
+      power: power.powerSource,
       status: status.statusSource,
       tires: tires.tiresOverallState === 'demo',
       driveMode: driveModeVisual.secondary,
@@ -31912,10 +32094,11 @@ class Component extends DCLogic {
       menuOpen: menuOpen,
       showEdit: item.type === 'profile' || item.type === 'graphs' || item.type === 'climate'
         || item.type === 'consumption' || item.type === 'tires' || item.type === 'status'
-        || item.type === 'driving' || item.type === 'media',
+        || item.type === 'driving' || item.type === 'media' || item.type === 'power',
       editLabel: item.type === 'profile' ? 'CUSTOMIZE'
         : ((item.type === 'climate' || item.type === 'consumption' || item.type === 'tires'
-          || item.type === 'status' || item.type === 'driving' || item.type === 'media') ? 'OPEN' : 'CONFIGURE'),
+          || item.type === 'status' || item.type === 'driving' || item.type === 'media'
+          || item.type === 'power') ? 'OPEN' : 'CONFIGURE'),
       showResize: this._widgetResizeSizes(item).length > 0,
       showMove: this._widgetCanMove(item, side),
       cardClass: (moving ? 'moving' : (menuOpen ? 'editing' : ''))
@@ -31964,7 +32147,7 @@ class Component extends DCLogic {
     if (item.type === 'consumption') Object.assign(view, this._consumptionWidgetView(item, side));
     if (item.type === 'profile') {
       view.onEdit = view.onProfileOpen;
-    } else if (item.type === 'climate' || item.type === 'consumption' || item.type === 'tires' || item.type === 'status') {
+    } else if (item.type === 'climate' || item.type === 'consumption' || item.type === 'tires' || item.type === 'status' || item.type === 'power') {
       view.onEdit = (ev) => {
         if (ev && ev.stopPropagation) ev.stopPropagation();
         this._focusedCardEntry(item.type);
