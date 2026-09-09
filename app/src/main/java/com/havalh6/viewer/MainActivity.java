@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v19-glass";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v20-tpms";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -1016,6 +1016,18 @@ public final class MainActivity extends Activity {
         final String[] wheelStates;
         String clockFace = "panorama";
         String clockFormat = "24h";
+        /**
+         * Four "/"-separated corner pressures, FL/FR/RL/RR, already formatted
+         * and unit-converted by the page. Empty when the card carries none.
+         * <p>
+         * The Status card needs its own field because {@link #tireReadings} used
+         * to recover pressures by splitting {@link #primary} and {@link #metricA}
+         * on the separator -- which works for the Tires card, whose payload puts
+         * "2.5 / 2.5" there, and silently fails for Status, whose payload puts
+         * summary prose in the same slots. That is why the Status card read
+         * "unavailable" on all four corners while TPMS was live.
+         */
+        String tirePressures = "";
         /** Status opening order: FL, FR, RL, RR, tailgate. */
         final String[] openingStates;
         /** Status restraint order: driver, front passenger, rear left/centre/right. */
@@ -9093,6 +9105,7 @@ public final class MainActivity extends Activity {
                     action, primary, secondary, metricA, metricB, progress, state, wheelStates,
                     openingStates, seatBeltStates, sunroofLevel, curtainLevel, demo,
                     iconAction, longAction, glyph, glyphText, menu);
+            descriptor.tirePressures = cleanBottomCardText(raw.optString("tirePressures", ""), 48);
             if ("clock".equals(id)) {
                 String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
                 descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
@@ -9405,6 +9418,17 @@ public final class MainActivity extends Activity {
 
     private String[] tireReadings(BottomCardDescriptor descriptor) {
         String[] readings = {"unavailable", "unavailable", "unavailable", "unavailable"};
+        // An explicit payload wins over recovering numbers from display prose.
+        if (!descriptor.tirePressures.isEmpty()) {
+            String[] corners = descriptor.tirePressures.split("\s*/\s*", -1);
+            if (corners.length >= 4) {
+                for (int i = 0; i < readings.length; i++) {
+                    String corner = corners[i].trim();
+                    readings[i] = corner.isEmpty() ? "unavailable" : corner;
+                }
+                return readings;
+            }
+        }
         String[] front = descriptor.primary.split("\\s*[·/]\\s*", -1);
         String[] rear = descriptor.metricA.split("\\s*[·/]\\s*", -1);
         if (front.length >= 2) {

@@ -93,15 +93,28 @@ includesAll(html, [
 ], 'Tires primary text colors');
 
 // Unit changes are presentation-only: bar / °C remain the canonical signal values.
+// Both formatters delegate to truncateTo, so it has to come along for the ride.
+const truncateHelper = methodBody(html, 'function truncateTo(', 'truncateTo()');
 const pressureFormatter = Function('bar', 'unit',
-  methodBody(html, 'function formatTirePressure(', 'formatTirePressure()'));
+  `const truncateTo = (value, decimals) => {${truncateHelper}};`
+  + methodBody(html, 'function formatTirePressure(', 'formatTirePressure()'));
 const temperatureFormatter = Function('celsius', 'unit',
-  methodBody(html, 'function formatTireTemperature(', 'formatTireTemperature()'));
+  `const truncateTo = (value, decimals) => {${truncateHelper}};`
+  + methodBody(html, 'function formatTireTemperature(', 'formatTireTemperature()'));
 assert.equal(pressureFormatter(2.4, 'bar'), '2.4');
 assert.equal(pressureFormatter(2.4, 'kpa'), '240');
 assert.equal(pressureFormatter(2.4, 'psi'), '34.8');
 assert.equal(temperatureFormatter(29, 'c'), '29');
 assert.equal(temperatureFormatter(29, 'f'), '84');
+
+// Readouts TRUNCATE, never round: a rounded pressure claims more air than the
+// wheel holds, and that is the one direction a tyre warning must not err in.
+// 2.48922 bar is the frame captured off the car.
+assert.equal(pressureFormatter(2.48922, 'bar'), '2.4');
+assert.equal(pressureFormatter(2.28335, 'bar'), '2.2');
+assert.equal(pressureFormatter(2.99, 'bar'), '2.9');
+assert.equal(temperatureFormatter(23.8, 'c'), '23');
+assert.equal(pressureFormatter(NaN, 'bar'), '—');
 includesAll(html, [
   "const TIRE_DISPLAY_PREF_KEY = 'h6_tire_display_v1';",
   "const units = ['bar', 'kpa', 'psi'];",

@@ -191,8 +191,18 @@ assert.match(html, /\.hv-status-1x1 \.hv-status-copy[^}]*display:none/,
   'compact web status cards must remove the competing text-summary column');
 assert.match(html, /\.hv-status-card-tire\.front-left \{ left:-62%/,
   'compact web tire pressures must sit outside the vehicle');
-assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-52%/,
+// Asserts the INTENT -- the readout hangs off the bodywork -- not one offset,
+// so tuning the composition does not fail the contract. A positive left would
+// put the number on top of the car, which is the thing worth catching.
+assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-\d+%/,
   'popup tire pressures must sit outside the vehicle');
+// The popup readout is the big, unboxed composition the Tires popup uses: a
+// plate behind each number fought the vehicle render and forced the value
+// small. Pressure scales with the panel; nothing draws a card behind it.
+assert.match(html, /\.hv-hs-vehicle-tire strong \{ font:\d+ clamp\(/,
+  'popup tire pressure must scale with the panel');
+assert.ok(!/\.hv-hs-vehicle-tire \{[^}]*background:/.test(html),
+  'popup tire readouts must not sit on a plate');
 // Pins that the revision is BUMPED, not that it holds one literal: the WebView
 // caches the packaged bundle across a same-version reinstall, so every change to
 // index.html needs a new value here. Pinning the exact string made the assertion

@@ -4244,12 +4244,12 @@ window.HavalSplash = (function () {
     .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail-label.vent,.hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail-label.half { left:34%; }
     .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail-label.full { left:auto; right:4%; bottom:0; }
     .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-presets button { min-height:27px; }
-    .hv-hs-vehicle-tire { position:absolute; z-index:7; display:grid; min-width:68px; gap:3px; padding:6px 8px; border:1px solid rgba(99,217,231,.44); border-radius:9px; background:rgba(7,13,18,.86); color:#dff8fb; text-align:center; box-shadow:0 4px 11px rgba(0,0,0,.30); font-style:normal; }
-    .hv-hs-vehicle-tire strong { font:600 16px/.95 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; }
-    .hv-hs-vehicle-tire small { font:500 7px/1 'Space Mono',monospace; letter-spacing:.04em; color:rgba(223,248,251,.68); }
-    .hv-hs-vehicle-tire.warning { border-color:#ff6671; color:#ff6671; }
+    .hv-hs-vehicle-tire { position:absolute; z-index:7; display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 5px; color:#e8fbfe; font-style:normal; font-variant-numeric:tabular-nums; text-shadow:0 1px 6px rgba(0,0,0,.55); }
+    .hv-hs-vehicle-tire strong { font:560 clamp(17px,3.2vw,29px)/.92 'Space Grotesk',sans-serif; }
+    .hv-hs-vehicle-tire small { font:500 8px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.62; }
+    .hv-hs-vehicle-tire.warning strong { color:#ff8d82; }
     .hv-hs-vehicle-tire.unavailable { opacity:.42; }
-    .hv-hs-vehicle-tire.fl { left:-52%; top:22%; }.hv-hs-vehicle-tire.fr { right:-52%; top:22%; }.hv-hs-vehicle-tire.rl { left:-52%; bottom:18%; }.hv-hs-vehicle-tire.rr { right:-52%; bottom:18%; }
+    .hv-hs-vehicle-tire.fl { left:-58%; top:19%; justify-content:flex-end; text-align:right; }.hv-hs-vehicle-tire.fr { right:-58%; top:19%; justify-content:flex-start; text-align:left; }.hv-hs-vehicle-tire.rl { left:-58%; bottom:15%; justify-content:flex-end; text-align:right; }.hv-hs-vehicle-tire.rr { right:-58%; bottom:15%; justify-content:flex-start; text-align:left; }
     @media (max-width: 640px) {
       .hv-hs-roof-pop { width: calc(100vw - 28px); padding-inline: 12px; }
       .hv-hs-roof-stack { grid-template-columns:minmax(150px,.9fr) minmax(180px,1.1fr) minmax(160px,1fr); gap:7px; }
@@ -6718,16 +6718,31 @@ const CAR_BUS_LIVE_MS = 20000;
 const TIRE_DISPLAY_PREF_KEY = 'h6_tire_display_v1';
 
 // Vehicle telemetry remains canonical (bar / °C); these helpers only format UI text.
+/**
+ * Tyre readouts TRUNCATE toward zero; they do not round.
+ *
+ * A rounded pressure reads high: 2.48922 bar shown as "2.5" claims more air
+ * than the wheel holds, and the number a driver acts on for an underinflated
+ * tyre should never be the flattering one. Truncating also stops the readout
+ * flickering between two values while a pressure sits on a boundary.
+ */
+function truncateTo(value, decimals) {
+  const scale = Math.pow(10, decimals);
+  const truncated = Math.trunc(Number(value) * scale) / scale;
+  // -0 formats as "-0"; a tyre reading never wants that sign.
+  return (truncated === 0 ? 0 : truncated).toFixed(decimals);
+}
+
 function formatTirePressure(bar, unit) {
   if (!isFinite(bar)) return '—';
-  if (unit === 'kpa') return String(Math.round(Number(bar) * 100));
-  if (unit === 'psi') return (Number(bar) * 14.5037738).toFixed(1);
-  return Number(bar).toFixed(1);
+  if (unit === 'kpa') return truncateTo(Number(bar) * 100, 0);
+  if (unit === 'psi') return truncateTo(Number(bar) * 14.5037738, 1);
+  return truncateTo(Number(bar), 1);
 }
 
 function formatTireTemperature(celsius, unit) {
   if (!isFinite(celsius)) return '—';
-  return String(Math.round(unit === 'f' ? Number(celsius) * 9 / 5 + 32 : Number(celsius)));
+  return truncateTo(unit === 'f' ? Number(celsius) * 9 / 5 + 32 : Number(celsius), 0);
 }
 
 // Badge canvas resolution, in pixels per metre of plate. Constant across the
@@ -32089,6 +32104,10 @@ class Component extends DCLogic {
         sunroofLevel: status.statusSunroofPct,
         curtainLevel: status.statusCurtainPct,
         wheelStates: status.statusTires.map((wheel) => wheel.state).join(','),
+        // Explicit corner pressures. The native card cannot recover these from
+        // primary/metricA the way the Tires card's renderer does -- those slots
+        // carry the status summary and subtitle here, not "2.5 / 2.5".
+        tirePressures: status.statusTires.map((wheel) => wheel.pressure).join('/'),
       },
       tires: {
         primary: tires.tireFrontLeft + ' · ' + tires.tireFrontRight,
