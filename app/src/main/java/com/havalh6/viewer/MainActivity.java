@@ -9420,7 +9420,7 @@ public final class MainActivity extends Activity {
         String[] readings = {"unavailable", "unavailable", "unavailable", "unavailable"};
         // An explicit payload wins over recovering numbers from display prose.
         if (!descriptor.tirePressures.isEmpty()) {
-            String[] corners = descriptor.tirePressures.split("\s*/\s*", -1);
+            String[] corners = descriptor.tirePressures.split("\\s*/\\s*", -1);
             if (corners.length >= 4) {
                 for (int i = 0; i < readings.length; i++) {
                     String corner = corners[i].trim();
