@@ -2229,33 +2229,35 @@ public final class MainActivity extends Activity {
 
     private Rect leftFreeformBounds() {
         Rect d = usableDisplayRect();
-        int dock = dockReservePx();
+        int top = slotBandTopPx();
+        int bottom = slotBandBottomPx();
         if (SHELL_APPS.equals(shellMode)) {
             int inset = Math.max(6, Math.round(d.width() * 0.004f));
             int gap = Math.max(6, Math.round(d.width() * 0.004f));
             int mid = splitDividerX(d);
-            return clampSlot(new Rect(d.left + inset, d.top,
-                    mid - gap / 2, d.bottom - dock), d);
+            return clampSlot(new Rect(d.left + inset, top,
+                    mid - gap / 2, bottom), d);
         }
         if (SHELL_APP_CAR.equals(shellMode)) {
             return clampSlot(new Rect(
                     d.left + Math.round(d.width() * 0.016f),
-                    d.top,
+                    top,
                     d.left + Math.round(d.width() * 0.54f),
-                    d.bottom - dock), d);
+                    bottom), d);
         }
         return clampSlot(scaleToUsable(LEFT_POPUP_BOUNDS, d), d);
     }
 
     private Rect rightFreeformBounds() {
         Rect d = usableDisplayRect();
-        int dock = dockReservePx();
+        int top = slotBandTopPx();
+        int bottom = slotBandBottomPx();
         if (SHELL_APPS.equals(shellMode)) {
             int inset = Math.max(6, Math.round(d.width() * 0.004f));
             int gap = Math.max(6, Math.round(d.width() * 0.004f));
             int mid = splitDividerX(d);
-            return clampSlot(new Rect(mid + gap / 2, d.top,
-                    d.right - inset, d.bottom - dock), d);
+            return clampSlot(new Rect(mid + gap / 2, top,
+                    d.right - inset, bottom), d);
         }
         return clampSlot(scaleToUsable(RIGHT_APP_BOUNDS, d), d);
     }
@@ -2318,15 +2320,25 @@ public final class MainActivity extends Activity {
     /** Panel the slot constants were authored against (the MMI is exactly this). */
     private static final Rect SLOT_REFERENCE = new Rect(0, 0, 1920, 720);
 
-    /** Map a constant authored in full-panel pixels onto the usable area. */
+    /**
+     * Map a constant authored in full-panel pixels onto the usable area.
+     * <p>
+     * X still follows the OEM's side band — that is where the nav rail actually
+     * is. Y deliberately does NOT. Scaling the authored height into whatever the
+     * OEM bars leave both pushed the boards down by the header height and
+     * squashed them ~8% (measured on the car: board top 152 against the
+     * emulator's 52), and {@link #usableDisplayRect()}'s bottom cannot be
+     * trusted for it anyway — see {@link #slotBandBottomPx()}. The panel is
+     * exactly {@link #SLOT_REFERENCE}, so an authored Y already IS a display
+     * coordinate; {@link #clampSlot} holds it inside the fixed band.
+     */
     private Rect scaleToUsable(Rect reference, Rect usable) {
         float sx = usable.width() / (float) SLOT_REFERENCE.width();
-        float sy = usable.height() / (float) SLOT_REFERENCE.height();
         return new Rect(
                 usable.left + Math.round(reference.left * sx),
-                usable.top + Math.round(reference.top * sy),
+                reference.top,
                 usable.left + Math.round(reference.right * sx),
-                usable.top + Math.round(reference.bottom * sy));
+                reference.bottom);
     }
 
     /**
@@ -2366,9 +2378,9 @@ public final class MainActivity extends Activity {
     }
 
     private Rect clampSlot(Rect r, Rect usable) {
-        int top = Math.max(r.top, usable.top + chromeReservePx());
-        int bottom = Math.min(r.bottom, usable.bottom - dockReservePx());
-        if (bottom - top < 200) bottom = Math.min(usable.bottom, top + 200);
+        int top = Math.max(r.top, slotBandTopPx());
+        int bottom = Math.min(r.bottom, slotBandBottomPx());
+        if (bottom - top < 200) bottom = top + 200;
         // Symmetric side band: the rail's width is kept clear on both edges.
         int rail = navRailReservePx();
         android.graphics.Point real = new android.graphics.Point();
@@ -2465,14 +2477,74 @@ public final class MainActivity extends Activity {
 
     /**
      * Bottom band freeform slots must clear: strip height + bottom gap + pad.
-     * Strip is 140dp (icon + caption) above the 60dp Impulse reserve.
+     * Strip is {@link #LAUNCHER_STRIP_HEIGHT_DP} above the 60dp Impulse reserve.
      * APP+APP uses a native always-on-top FAB, so freeforms take the full
      * usable height (no dock / FAB pocket).
+     * <p>
+     * This used to hardcode 140dp for a strip that is really 148dp, and spend
+     * the remaining 8dp as the gap — so on the car the widget boards' bottom
+     * (512) landed exactly on the quick-card strip's top (512), with nothing
+     * between them. Derive it from the strip's own constant instead.
      */
     private int dockReservePx() {
-        float density = getResources().getDisplayMetrics().density;
         if (SHELL_APPS.equals(shellMode)) return 0;
-        return Math.round((140f + 60f + 8f) * density);
+        float density = getResources().getDisplayMetrics().density;
+        return launcherStripHeightPx() + launcherBottomGapPx()
+                + Math.round(SLOT_DOCK_GAP_DP * density);
+    }
+
+    /**
+     * Height of the native dock strip — launcher icons or quick cards. Shared
+     * with the strip's own layout params so {@link #dockReservePx()} cannot
+     * drift from the view it is reserving for.
+     */
+    private static final float LAUNCHER_STRIP_HEIGHT_DP = 148f;
+    /** Breathing room between the widget boards and the dock strip. */
+    private static final float SLOT_DOCK_GAP_DP = 16f;
+
+    private int launcherStripHeightPx() {
+        return Math.round(LAUNCHER_STRIP_HEIGHT_DP * getResources().getDisplayMetrics().density);
+    }
+
+    /**
+     * Panel height in DISPLAY pixels. Never the window's: Impulse shortens our
+     * window from the bottom (measured: mFrame [0,0][1920,700] on a 1920x720
+     * panel), and a band measured against that moves whenever it changes.
+     */
+    private int panelHeightPx() {
+        android.graphics.Point real = new android.graphics.Point();
+        try {
+            getWindowManager().getDefaultDisplay().getRealSize(real);
+        } catch (Exception ignored) {}
+        if (real.y > 0) return real.y;
+        return getResources().getDisplayMetrics().heightPixels;
+    }
+
+    /**
+     * Vertical band the widget boards and freeform slots live in, in DISPLAY
+     * pixels — a fixed frame on the panel, not a fraction of whatever the OEM
+     * bars leave.
+     * <p>
+     * The old derivation came from {@link #usableDisplayRect()}, which mixes the
+     * real display height with insets read off our own window. The 20px the OEM
+     * keeps at the bottom is invisible to those insets (the window is already
+     * short by exactly that much), so every slot bottom sat 20px low; and the
+     * 60px header was subtracted AND scaled, dropping the boards 100px and
+     * squashing them. Anchoring both edges to the panel makes the car and the
+     * emulator lay out identically and leaves nothing for overscan to move.
+     * <p>
+     * {@link #slotBandTopPx()} is the MINIMUM clearance, not the design top:
+     * APP+CAR and APP+APP
+     * deliberately fill the height under the OEM header, while the widget-board
+     * modes carry their own larger authored top ({@link #LEFT_POPUP_BOUNDS})
+     * through {@link #clampSlot}.
+     */
+    private int slotBandTopPx() {
+        return Math.max(statusBarHeightPx(), widestTopInsetPx) + chromeReservePx();
+    }
+
+    private int slotBandBottomPx() {
+        return Math.max(slotBandTopPx() + 200, panelHeightPx() - dockReservePx());
     }
 
     private void updateSlotAnchors() {
@@ -4099,7 +4171,10 @@ public final class MainActivity extends Activity {
                 + ",safeLeft:" + cssPx(pageSideInsetPx(false))
                 + ",safeRight:" + cssPx(pageSideInsetPx(true))
                 + ",safeTop:" + (cssPx(pageTopInsetPx()) + 22f)
-                + ",safeBottom:" + cssPx(dockReservePx())
+                // Overscan-compensated: the page anchors this with CSS bottom:,
+                // which is relative to a window Impulse has already shortened,
+                // while the reserve itself is measured on the panel.
+                + ",safeBottom:" + cssPx(compensatedBottomMarginPx(dockReservePx()))
                 + ",launcherBottom:" + launcherBottomCss
                 + "," + popupVerticalBoundsToCssFragment()
                 + ",uiMode:\"" + uiMode + "\""
@@ -5884,7 +5959,7 @@ public final class MainActivity extends Activity {
         int fadeLengthPx = Math.round(72 * density);
         // Taller band for icon + two-line caption. Its bottom aligns with the
         // top of the reserved Impulse bar via launcherBottomGapPx().
-        int stripHeightPx = Math.round(148 * density);
+        int stripHeightPx = launcherStripHeightPx();
 
         // Bottom icon strip — full width (media column sits above the dock band).
         // bottomMargin is overscan-compensated so Impulse wm overscan does not

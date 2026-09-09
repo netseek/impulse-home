@@ -296,10 +296,21 @@ assert.equal(popupBlocks.length, 1, 'the popup is one shared frame, so it carrie
 
 // Both boards must render the SAME card, not two that drift.
 const boardCopies = html.split('<sc-if value="{{ wg.isMedia }}"').slice(1)
-  .map((chunk) => chunk.slice(0, chunk.indexOf('</sc-if>\r\n          <sc-if') + 1)
-    .replace(/\s+/g, ' ').trim());
+  // The delimiter must not care about line endings: this file is checked out
+  // with LF on some machines and CRLF on others, and a hardcoded \r\n sliced
+  // every board copy down to nothing -- which still passed the equality check
+  // below (both were empty) and then failed every disabled-flag assertion.
+  .map((chunk) => {
+    // Ten spaces exactly: the card nests its own sc-ifs at deeper indentation,
+    // so any looser indent match lands on an inner one and cuts the card short.
+    const end = chunk.search(/<\/sc-if>\r?\n {10}<sc-if/);
+    return chunk.slice(0, end < 0 ? chunk.length : end + '</sc-if>'.length)
+      .replace(/\s+/g, ' ').trim();
+  });
 assert.equal(boardCopies[0], boardCopies[1],
   'the two board copies of the media widget have drifted apart');
+assert.ok(boardCopies.length === 2 && boardCopies.every((copy) => copy.length > 400),
+  'both board copies of the media widget must be found, not sliced to nothing');
 
 // Every control the widget offers must carry the disabled flag.
 for (const field of ['wg.mediaPrev', 'wg.mediaNext', 'wg.mediaPlayPause']) {

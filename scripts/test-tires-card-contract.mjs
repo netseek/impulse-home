@@ -104,48 +104,64 @@ includesAll(html, [
   "localStorage.setItem(TIRE_DISPLAY_PREF_KEY",
 ], 'persisted Tires display preference');
 
-// Known vehicle keys are deliberately explicit. Snapshot replay must include
-// both four-value arrays and every observed warning source.
+// Known vehicle keys are deliberately explicit, and they have to be keys the
+// car actually publishes. `car.tpms.pressures` / `car.tpms.temperatures` were
+// asserted here for a long time and exist nowhere: not in Impulse's
+// CarConstants, not in a snapshot off the vehicle. The single real key is the
+// interleaved car.basic.tpms_status vector.
 const signals = blockFrom(html, 'const CAR_SIGNALS', 'CAR_SIGNALS');
 includesAll(signals, [
-  "tirePressures: 'car.tpms.pressures'",
-  "tireTemperatures: 'car.tpms.temperatures'",
+  "tireStatus: 'car.basic.tpms_status'",
   "'car.basic.tirepress_warning'",
   "'car.basic.tiretemp_warning'",
   "'car.basic.tpms_warning'",
   "'car.ipk_light.tpms_warning'",
 ], 'TPMS signal catalog');
+// Matches the property, not the prose: the catalog comment names the dead keys
+// on purpose, so that the next person does not reintroduce them.
+assert.ok(!/^\s*tirePressures\s*:/m.test(signals) && !/^\s*tireTemperatures\s*:/m.test(signals),
+  'TPMS catalog must not resurrect the keys the vehicle never publishes');
 
 const replayKeys = blockFrom(html, '  _carSignalKeys(', '_carSignalKeys()');
 includesAll(replayKeys, [
-  'CAR_SIGNALS.tirePressures',
-  'CAR_SIGNALS.tireTemperatures',
+  'CAR_SIGNALS.tireStatus',
   '.concat(CAR_SIGNALS.tireWarnings)',
 ], 'TPMS snapshot replay');
 
 const applySignal = blockFrom(html, '  _applyCarSignal(', '_applyCarSignal()');
 includesAll(applySignal, [
-  'key === CAR_SIGNALS.tirePressures',
-  'key === CAR_SIGNALS.tireTemperatures',
+  'key === CAR_SIGNALS.tireStatus',
   'CAR_SIGNALS.tireWarnings.indexOf(key)',
 ], 'TPMS live update handling');
 
 // This helper is intentionally pure, so the contract can verify representative
 // real-bus payloads instead of merely matching implementation text.
-const parserBody = methodBody(html, '  _parseTireSignalArray(', '_parseTireSignalArray()');
-assert.match(parserBody, /parts\.length\s*!==\s*4/, 'TPMS arrays must contain exactly four positions');
-assert.match(parserBody, /\/\s*100/, 'vehicle pressure must convert from kPa to bar');
-const parseTireSignalArray = Function('value', 'kind', parserBody);
-assert.deepEqual(parseTireSignalArray('240,250,230,220', 'pressure'), [2.4, 2.5, 2.3, 2.2],
-  'valid kPa array converts to bar in FL, FR, RL, RR order');
-assert.deepEqual(parseTireSignalArray('[31,32,33,34]', 'temperature'), [31, 32, 33, 34],
-  'valid temperature array preserves all four positions');
-assert.deepEqual(parseTireSignalArray('240,250,230', 'pressure'), [null, null, null, null],
-  'short arrays are wholly unavailable, never partially live');
-assert.deepEqual(parseTireSignalArray('240,250,230,220,210', 'pressure'), [null, null, null, null],
-  'long arrays are wholly unavailable, never mis-positioned');
-assert.deepEqual(parseTireSignalArray('240,bad,,220', 'pressure'), [2.4, null, null, 2.2],
-  'invalid or missing individual values remain unavailable');
+const parserBody = methodBody(html, '  _parseTpmsStatus(', '_parseTpmsStatus()');
+assert.match(parserBody, /parts\.length\s*<\s*8/, 'tpms_status carries eight interleaved positions');
+const parseTpmsStatus = Function('value', parserBody);
+const round2 = (list) => list.map((n) => (n === null ? null : Math.round(n * 100) / 100));
+
+// The exact frame captured off the car (bar, Celsius).
+assert.deepEqual(
+  round2(parseTpmsStatus('{2.48922,24.0,2.48922,24.0,2.28335,23.0,2.48922,24.0}').pressuresBar),
+  [2.49, 2.49, 2.28, 2.49], 'vehicle tpms_status pressures parse in FL, FR, RL, RR order');
+assert.deepEqual(
+  parseTpmsStatus('{2.48922,24.0,2.48922,24.0,2.28335,23.0,2.48922,24.0}').temperaturesC,
+  [24, 24, 23, 24], 'vehicle tpms_status temperatures parse in FL, FR, RL, RR order');
+
+// The unit is sniffed from disjoint physical ranges, so the same corner reads
+// the same pressure however the vehicle scales it.
+assert.deepEqual(round2(parseTpmsStatus('240,24,250,24,230,23,220,24').pressuresBar),
+  [2.4, 2.5, 2.3, 2.2], 'a kPa frame converts to bar');
+assert.deepEqual(round2(parseTpmsStatus('36,24,36,24,33,23,36,24').pressuresBar),
+  [2.48, 2.48, 2.28, 2.48], 'a psi frame converts to bar');
+
+assert.deepEqual(parseTpmsStatus('2.4,24,2.5,24,2.3,23').pressuresBar, [null, null, null, null],
+  'short vectors are wholly unavailable, never partially live');
+assert.deepEqual(round2(parseTpmsStatus('2.4,24,bad,24,,23,2.2,24').pressuresBar),
+  [2.4, null, null, 2.2], 'invalid or missing individual values remain unavailable');
+assert.deepEqual(parseTpmsStatus('0,24,900,24,0,23,0,24').pressuresBar, [null, null, null, null],
+  'out-of-range pressures stay unavailable rather than becoming a plausible number');
 
 // Source, state, and age are part of the user-visible safety contract. Demo
 // values are allowed only when explicitly labelled as simulated/non-vehicle.
@@ -169,7 +185,9 @@ includesAll(tiresView, [
   'const warning = hasPressure &&',
   'const overallWarning = warningSignal || anyPressureWarning;',
   'TPMS WARNING · POSITION NOT REPORTED',
-  '120000',
+  // Freshness is bus liveness, not per-key age: a seated tyre publishes once
+  // and never again, so a per-key window aged the card out on a healthy bus.
+  "this._carSignalFreshness(tpmsKeys) === 'live'",
   "'normal'",
   "'warning'",
   "'unavailable'",
@@ -191,6 +209,11 @@ includesAll(tiresPayload, [
   'state: tires.tiresOverallState',
   'wheelStates: tires.tiresWheelStates',
 ], 'structured Tires native payload');
+includesAll(syncDock, [
+  'const isDemoBottomCard =',
+  'const bottomCardDemoSources =',
+  'demo: isDemoBottomCard(bottomCardDemoSources[card.id])',
+], 'bottom-card demo payload');
 includesAll(syncDock, [
   'const isDemoBottomCard =',
   'const bottomCardDemoSources =',

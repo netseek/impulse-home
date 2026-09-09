@@ -6125,6 +6125,13 @@ window.HavalSplash = (function () {
             <button type="button" class="{{ da.cls }}" style="{{ da.style }}" onClick="{{ da.onClick }}" title="{{ da.title }}"></button>
           </sc-for>
         </div>
+        <div class="hv-studio-label">CENTRE OF SCREEN</div>
+        <div class="hv-studio-chip-row">
+          <button type="button" class="{{ studioFillCarClass }}" onClick="{{ studioFillCar }}" title="3D car only">3D car</button>
+          <button type="button" class="{{ studioFillWallClass }}" onClick="{{ studioFillWallpaper }}" title="Wallpaper only">Wallpaper</button>
+          <button type="button" class="{{ studioFillMixedClass }}" onClick="{{ studioFillMixed }}" title="3D car over the wallpaper">Both</button>
+        </div>
+        <div class="hv-studio-note">{{ studioFillNote }}</div>
         <button type="button" class="hv-studio-wide" onClick="{{ studioOpenWallpaper }}">Choose wallpaper <span>Daily Bing rotation or a saved image</span></button>
       </sc-if>
       <sc-if value="{{ studioIsCards }}" hint-placeholder-val="{{ false }}">
@@ -6668,22 +6675,38 @@ const CAR_SIGNALS = {
   // Impulse publishes it to the cluster themes alongside fuel_mode_remain_odometer
   // and its dashboard card prints the pair as "31.9 L - 210 km".
   fuelLevel: 'car.basic.remain_fuel_percentage',
-  // TPMS arrays are emitted as four comma-delimited values in FL, FR, RL, RR
-  // order. Pressure values are kPa on the companion property and are converted
-  // to bar only at the presentation boundary below.
-  tirePressures: 'car.tpms.pressures',
-  tireTemperatures: 'car.tpms.temperatures',
+  // TPMS. `car.tpms.pressures` / `car.tpms.temperatures` were never real — no
+  // such key exists in Impulse's CarConstants and nothing on the bus ever
+  // published them, which is why the TIRES card read PRESSURE UNAVAILABLE on a
+  // car whose TPMS works. The one real key is a single interleaved vector,
+  // captured off the car:
+  //   car.basic.tpms_status = {2.48922,24.0,2.48922,24.0,2.28335,23.0,2.48922,24.0}
+  // i.e. (pressure, temperature) per corner in FL, FR, RL, RR order, pressure
+  // in bar and temperature in Celsius.
+  tireStatus: 'car.basic.tpms_status',
+  tireUnits: 'car.basic.tpms_units',
   tireWarnings: [
     'car.basic.tirepress_warning',
     'car.basic.tiretemp_warning',
     'car.basic.tpms_warning',
     'car.ipk_light.tpms_warning',
   ],
+  // Per-window state vector, {fl,fr,rl,rr}. Present on the bus all along; the
+  // OEM-APK audit concluded it was not and the viewer never subscribed it.
+  windows: 'car.basic.window_status',
+  doorLock: 'car.basic.door_lock_status',
   cycleEv: 'car.ev_info.cycle_energy_consume_info',
   cycleFuel: 'car.ev_info.cycle_fuel_consume_info',
   // Derived by Impulse PowerFlowMapper. Packed v1|state|ice|front|rear.
   powerFlow: 'haval.power.flow',
 };
+/**
+ * How long after the last bus frame of ANY kind the vehicle data is still
+ * treated as current. Impulse republishes `car.basic.battery_voltage` about ten
+ * times a second while the head unit is awake, so this only has to outlast a
+ * brief gap, not a parked car's silence on any individual key.
+ */
+const CAR_BUS_LIVE_MS = 20000;
 const TIRE_DISPLAY_PREF_KEY = 'h6_tire_display_v1';
 
 // Vehicle telemetry remains canonical (bar / °C); these helpers only format UI text.
@@ -8098,7 +8121,8 @@ class Component extends DCLogic {
             CAR_SIGNALS.batterySoc,
             CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange, CAR_SIGNALS.cycleEv,
             CAR_SIGNALS.fuelLevel,
-            CAR_SIGNALS.tirePressures, CAR_SIGNALS.tireTemperatures,
+            CAR_SIGNALS.tireStatus, CAR_SIGNALS.tireUnits,
+            CAR_SIGNALS.windows, CAR_SIGNALS.doorLock,
             CAR_SIGNALS.cycleFuel, CAR_SIGNALS.powerFlow,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
@@ -8107,23 +8131,37 @@ class Component extends DCLogic {
       .concat(Object.keys(CAR_MODE_STATE_BY_KEY));
   }
 
-  _parseTireSignalArray(value, kind) {
+  /**
+   * `car.basic.tpms_status` — one brace-wrapped vector of EIGHT values,
+   * (pressure, temperature) per corner in FL, FR, RL, RR order. Captured on the
+   * car: `{2.48922,24.0,2.48922,24.0,2.28335,23.0,2.48922,24.0}`.
+   *
+   * The pressure unit is sniffed rather than taken from `car.basic.tpms_units`,
+   * whose encoding is only observed at one value (1) and so cannot be mapped
+   * yet. The three candidate ranges do not overlap for any pressure a tyre can
+   * physically hold, so this cannot silently pick the wrong one: bar 1.0-5.0,
+   * psi 15-72, kPa 100-500. Anything else is left null — an unreadable corner
+   * must read UNAVAILABLE, never a plausible-looking number.
+   */
+  _parseTpmsStatus(value) {
     const source = String(value == null ? '' : value).trim().replace(/^\s*[\[{]\s*|\s*[\]}]\s*$/g, '');
     const parts = source.split(',');
-    const result = [null, null, null, null];
-    if (parts.length !== 4) return result;
+    const pressuresBar = [null, null, null, null];
+    const temperaturesC = [null, null, null, null];
+    if (parts.length < 8) return { pressuresBar, temperaturesC };
     for (let i = 0; i < 4; i++) {
-      if (i >= parts.length || String(parts[i]).trim() === '') continue;
-      const parsed = Number(String(parts[i]).trim());
-      if (!isFinite(parsed)) continue;
-      if (kind === 'pressure') {
-        if (parsed < 50 || parsed > 500) continue;
-        result[i] = parsed / 100;
-      } else if (parsed >= -50 && parsed <= 150) {
-        result[i] = parsed;
+      const pressure = Number(String(parts[i * 2]).trim());
+      if (isFinite(pressure)) {
+        if (pressure >= 1 && pressure <= 5) pressuresBar[i] = pressure;
+        else if (pressure >= 15 && pressure <= 72) pressuresBar[i] = pressure / 14.5037738;
+        else if (pressure >= 100 && pressure <= 500) pressuresBar[i] = pressure / 100;
+      }
+      const temperature = Number(String(parts[i * 2 + 1]).trim());
+      if (isFinite(temperature) && temperature >= -50 && temperature <= 150) {
+        temperaturesC[i] = temperature;
       }
     }
-    return result;
+    return { pressuresBar, temperaturesC };
   }
 
   _refreshTireTelemetry() {
@@ -8154,10 +8192,41 @@ class Component extends DCLogic {
     });
   }
 
+  /**
+   * Freshness of a group of LATCHED signals: doors, sunroof, tyre pressure,
+   * drive mode. Returns 'live', 'stale' (we hold a value but the bus has gone
+   * quiet) or 'absent'.
+   *
+   * The old test was per key — "did THIS key change in the last two minutes" —
+   * which is the wrong question for a latched value. A shut door, a seated tyre
+   * and a drive mode the driver has not touched are all published once and then
+   * never again, so every one of these cards went STALE two minutes after boot
+   * on a perfectly healthy bus. Measured parked: 30 s of traffic carried only
+   * `car.basic.battery_voltage` (290 frames) and `car.ev_info.cur_charge_current`
+   * (19). Nothing else changed, because nothing else had.
+   *
+   * What actually goes stale is the BUS. Impulse republishes battery voltage
+   * about ten times a second for as long as the head unit is awake, so "have we
+   * heard anything at all recently" is the honest liveness test, and a key we
+   * hold a value for is live exactly while the bus is.
+   */
+  _carBusLive() {
+    return !!this._carBusAt && Date.now() - this._carBusAt <= CAR_BUS_LIVE_MS;
+  }
+
+  _carSignalFreshness(keys) {
+    const at = this._carSignalAt || {};
+    const list = Array.isArray(keys) ? keys : [keys];
+    const known = list.some((key) => !!at[key]);
+    if (!known) return 'absent';
+    return this._carBusLive() ? 'live' : 'stale';
+  }
+
   _applyCarSignal(key, value) {
     if (this._carTrace) console.log('[CarSignal]', key, '=', value);
     if (!this._carSignalAt) this._carSignalAt = {};
     this._carSignalAt[key] = Date.now();
+    this._carBusAt = this._carSignalAt[key];
     // Drive-time bus load, surfaced through window.__perf() -> TelemetryBridge
     // .reportPerf -> logcat. The bus is almost silent parked, so this question
     // can only be answered from a moving car; this makes that answer fall out
@@ -8212,18 +8281,18 @@ class Component extends DCLogic {
       // Impulse cluster ignores this key and derives kWh/100 from pack kW × speed.
       return;
     }
-    if (key === CAR_SIGNALS.tirePressures) {
+    if (key === CAR_SIGNALS.tireStatus) {
+      const tpms = this._parseTpmsStatus(value);
       this._tireTpmsObserved = true;
       this._tirePressuresRaw = String(value == null ? '' : value);
-      this._tirePressuresBar = this._parseTireSignalArray(value, 'pressure');
+      this._tireTemperaturesRaw = this._tirePressuresRaw;
+      this._tirePressuresBar = tpms.pressuresBar;
+      this._tireTemperaturesC = tpms.temperaturesC;
       this._refreshTireTelemetry();
       return;
     }
-    if (key === CAR_SIGNALS.tireTemperatures) {
-      this._tireTpmsObserved = true;
-      this._tireTemperaturesRaw = String(value == null ? '' : value);
-      this._tireTemperaturesC = this._parseTireSignalArray(value, 'temperature');
-      this._refreshTireTelemetry();
+    if (key === CAR_SIGNALS.tireUnits) {
+      this._tireUnitsRaw = String(value == null ? '' : value);
       return;
     }
     if (CAR_SIGNALS.tireWarnings.indexOf(key) >= 0) {
@@ -29823,8 +29892,22 @@ class Component extends DCLogic {
     });
   }
 
+  /**
+   * Appearance -> "Choose wallpaper".
+   *
+   * This used to force centerFill to 'wallpaper' unconditionally, which threw
+   * away a 'mixed' (car over wallpaper) selection every time the user opened
+   * the picker from Appearance -- the car vanished and the only control that
+   * could bring it back lived in the config dock's LAYOUT section, nowhere
+   * near the button that had just hidden it. Only promote 'car', which has no
+   * wallpaper to configure; anything already showing one keeps its mode.
+   */
   _openWallpaperFromStudio() {
     this._closeDesktopStudio();
+    if (this._centerFillUsesWallpaper()) {
+      this.openWallpaperPopup();
+      return;
+    }
     this._setCenterFill('wallpaper', () => this.openWallpaperPopup());
   }
 
@@ -30382,6 +30465,17 @@ class Component extends DCLogic {
       studioThemeDarkClass: s.widgetThemeMode === 'dark' ? 'on' : '',
       studioThemeLightClass: s.widgetThemeMode === 'light' ? 'on' : '',
       studioThemeAutoClass: s.widgetThemeMode === 'auto' ? 'on' : '',
+      studioFillCarClass: this._normalizeCenterFill(s.centerFill) === 'car' ? 'on' : '',
+      studioFillWallClass: this._normalizeCenterFill(s.centerFill) === 'wallpaper' ? 'on' : '',
+      studioFillMixedClass: this._normalizeCenterFill(s.centerFill) === 'mixed' ? 'on' : '',
+      studioFillCar: () => this._setCenterFill('car'),
+      studioFillWallpaper: () => this._setCenterFill('wallpaper'),
+      studioFillMixed: () => this._setCenterFill('mixed'),
+      studioFillNote: this._normalizeCenterFill(s.centerFill) === 'mixed'
+        ? 'The car renders over the wallpaper on a transparent canvas.'
+        : (this._normalizeCenterFill(s.centerFill) === 'wallpaper'
+          ? 'The 3D car is hidden while the wallpaper fills the middle.'
+          : 'The 3D car fills the middle; no wallpaper is fetched.'),
       studioThemeDark: () => this.setWidgetThemeMode('dark'),
       studioThemeLight: () => this.setWidgetThemeMode('light'),
       studioThemeAuto: () => this.setWidgetThemeMode('auto'),
@@ -30585,10 +30679,8 @@ class Component extends DCLogic {
       Object.prototype.hasOwnProperty.call(this._tireWarningsRaw || {}, key)
         && this._carBool(this._tireWarningsRaw[key])
     ));
-    const tpmsKeys = [CAR_SIGNALS.tirePressures, CAR_SIGNALS.tireTemperatures].concat(CAR_SIGNALS.tireWarnings);
-    const fresh = observed && tpmsKeys.some((key) => (
-      this._carSignalAt && this._carSignalAt[key] && Date.now() - this._carSignalAt[key] <= 120000
-    ));
+    const tpmsKeys = [CAR_SIGNALS.tireStatus].concat(CAR_SIGNALS.tireWarnings);
+    const fresh = observed && this._carSignalFreshness(tpmsKeys) === 'live';
     const wheels = positions.map((position, index) => {
       const pressure = typeof pressures[index] === 'number' && isFinite(pressures[index])
         ? Number(pressures[index]) : null;
