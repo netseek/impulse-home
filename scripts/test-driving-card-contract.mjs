@@ -18,9 +18,13 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const html = readFileSync(resolve(root, 'index.html'), 'utf8');
+// Line endings are normalised on read. index.html and MainActivity.java are
+// stored LF and checked out CRLF on Windows, so a source contract that
+// hardcodes either one passes or fails depending on which command last
+// rewrote the file. Two of these tests had already broken that way.
+const html = readFileSync(resolve(root, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const native = readFileSync(
-  resolve(root, 'app/src/main/java/com/havalh6/viewer/MainActivity.java'), 'utf8');
+  resolve(root, 'app/src/main/java/com/havalh6/viewer/MainActivity.java'), 'utf8').replace(/\r\n/g, '\n');
 
 function blockFrom(source, token, label = token) {
   const start = source.indexOf(token);

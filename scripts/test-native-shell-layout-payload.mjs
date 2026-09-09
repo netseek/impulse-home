@@ -6,9 +6,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Line endings are normalised on read. index.html and MainActivity.java are
+// stored LF and checked out CRLF on Windows, so a source contract that
+// hardcodes either one passes or fails depending on which command last
+// rewrote the file. Two of these tests had already broken that way.
 const source = fs.readFileSync(
-  path.join(root, 'app/src/main/java/com/havalh6/viewer/MainActivity.java'), 'utf8');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  path.join(root, 'app/src/main/java/com/havalh6/viewer/MainActivity.java'), 'utf8').replace(/\r\n/g, '\n');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 
 if (!source.includes('popupVerticalBoundsToCssFragment()')) {
   throw new Error('Shell-layout popup geometry must be emitted as a property fragment.');
