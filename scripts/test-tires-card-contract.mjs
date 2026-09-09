@@ -39,14 +39,14 @@ function includesAll(source, values, label) {
   }
 }
 
-// The Tires quick card owns a dedicated focused view; it must not route to the
-// generic Desktop Studio configuration flow.
+// Tires remains a reusable data/focused view, but its launcher card is merged
+// into Vehicle Status so the rail never shows two competing vehicle cards.
 const catalogStart = html.indexOf('const H6_BOTTOM_CARD_CATALOG');
 assert.ok(catalogStart >= 0, 'missing bottom-card catalog');
 const catalog = html.slice(catalogStart, html.indexOf('];', catalogStart) + 2);
-assert.match(catalog,
-  /\{\s*id:\s*['"]tires['"]\s*,\s*title:\s*['"]Tires['"]\s*,\s*action:\s*['"]openTires['"]\s*\}/,
-  'Tires catalog action must be openTires');
+assert.doesNotMatch(catalog,
+  /\{\s*id:\s*['"]tires['"]\s*,\s*title:\s*['"]Tires['"]/,
+  'Tires must be merged into the Vehicle Status rail card');
 assert.doesNotMatch(catalog,
   /id:\s*['"]tires['"][^}]*action:\s*['"]openDesktopStudio['"]/,
   'Tires must not route to Desktop Studio');

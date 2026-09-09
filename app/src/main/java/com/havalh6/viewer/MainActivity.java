@@ -161,7 +161,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "codex-claude-driving-v2";
+    private static final String VIEWER_ASSET_REVISION = "unified-vehicle-console-v16";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -1348,6 +1348,31 @@ public final class MainActivity extends Activity {
                 if (layer != null) c.drawBitmap(layer, null, vehicleRect, paint);
             }
             paint.setColorFilter(null);
+            // Status and Tires share TPMS health. Four compact signals sit at
+            // the physical wheel positions without competing with the door art.
+            float[] tireXs = {vehicleRect.left + vehicleRect.width() * .28f,
+                    vehicleRect.left + vehicleRect.width() * .72f,
+                    vehicleRect.left + vehicleRect.width() * .28f,
+                    vehicleRect.left + vehicleRect.width() * .72f};
+            float[] tireYs = {vehicleRect.top + vehicleRect.height() * .27f,
+                    vehicleRect.top + vehicleRect.height() * .27f,
+                    vehicleRect.top + vehicleRect.height() * .72f,
+                    vehicleRect.top + vehicleRect.height() * .72f};
+            String[] pressureReadings = tireReadings(descriptor);
+            for (int i = 0; i < 4; i++) {
+                String wheelState = descriptor.wheelStates != null
+                        && i < descriptor.wheelStates.length
+                        ? descriptor.wheelStates[i] : "unavailable";
+                fill(tireSignalColor(wheelState, muted));
+                c.drawCircle(tireXs[i], tireYs[i], Math.max(2.2f, w * .012f), paint);
+                paint.setTextAlign(i == 0 || i == 2
+                        ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
+                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                        android.graphics.Typeface.BOLD));
+                paint.setTextSize(Math.max(7f, Math.min(w, h) * .072f));
+                c.drawText(pressureReadings[i], tireXs[i] + (i == 0 || i == 2 ? -3f : 3f),
+                        tireYs[i] + paint.getTextSize() * .34f, paint);
+            }
             float textLeft = w * .43f;
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
@@ -8800,7 +8825,7 @@ public final class MainActivity extends Activity {
                     : ("status".equals(id) ? sanitizeStatusState(raw.optString("state", "unavailable"))
                             : (DRIVING_CARD_IDS.contains(id)
                                     ? sanitizeDrivingState(raw.optString("state", "unknown")) : ""));
-            String[] wheelStates = "tires".equals(id)
+            String[] wheelStates = ("tires".equals(id) || "status".equals(id))
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))
                     : new String[] {"unavailable", "unavailable", "unavailable", "unavailable"};

@@ -36,7 +36,6 @@ includesAll(html, [
   "{ id: 'consumption', title: 'Consumption', action: 'openConsumption' }",
   "{ id: 'range', title: 'Range', action: 'openRange' }",
   "{ id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' }",
-  "{ id: 'tires', title: 'Tires', action: 'openTires' }",
   "{ id: 'clock', title: 'Clock', action: 'openDesktopStudio' }",
   // The three driving tiles share one destination: the card body opens the
   // DRIVING popup, the icon keeps the per-mode quick change.
@@ -56,8 +55,9 @@ includesAll(html, [
   "case 'openRoofControls':",
 ], 'command wiring');
 assert.ok(!html.includes("{ id: 'roof', title: 'Sunroof / shade', action: 'openRoofControls' }"), 'Roof is unified into Vehicle Status, not a competing card');
+assert.ok(!html.includes("{ id: 'tires', title: 'Tires', action: 'openTires' }"), 'Tires is unified into Vehicle Status, not a competing rail card');
+includesAll(method('_normalizeBottomCards'), ["id === 'tires' ? 'status' : id", 'seen[key]'], 'legacy Tires card migration');
 assert.ok(!html.includes("{ id: 'consumption', title: 'Consumption', action: 'addWidget' }"), 'Consumption must not open addWidget');
-assert.ok(!html.includes("{ id: 'tires', title: 'Tires', action: 'openDesktopStudio' }"), 'Tires must not open Desktop Studio');
 assert.ok(!html.includes("{ id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' }"), 'Vehicle status must not open Desktop Studio');
 
 // CoffeeOS-style glance widgets remain page-owned cards: they are selectable
