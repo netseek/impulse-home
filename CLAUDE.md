@@ -616,6 +616,32 @@ Metrics that have actively lied here, all of which looked reasonable:
 - **`cmp index.html <packaged asset>`** always differs: the build strips
   comments (21152 lines becomes 18991). It is not a staleness test.
 
+## The card contract tests pin literals, and that makes them lie twice
+
+`scripts/test-*-card-contract.mjs` are the local gate and worth keeping, but
+several assertions pin an exact value rather than the property that matters.
+Both failure modes turned up in a single session:
+
+- **They fail on deliberate change.** An exact `VIEWER_ASSET_REVISION` string,
+  an exact `left:-52%`, exact `imageH = h * 1.05f` and `w * .31f` multipliers.
+  Every intentional retune failed the contract, which trains you to edit the
+  test until it passes -- the opposite of what a gate is for. Assert the shape
+  instead: the revision parses and has increased, the offset is negative, the
+  size derives from `w` / `h`.
+- **They pass vacuously.** An assertion that the quick-card canvas sets
+  `FILTER_BITMAP_FLAG` searched the whole file and matched an unrelated paint
+  that already had it, so it could never have failed. Scope the match to the
+  block or class it is about.
+
+**Negative-control every assertion you add**: mutate the source to break it and
+confirm it then fails. Two checks written that session did not bite, and the
+first control run was itself mis-scoped and reported a false failure. It costs
+one `node -e`, and it is the only thing separating a gate from decoration.
+
+These tests read source text, and `MainActivity.java` and `CLAUDE.md` both have
+**mixed line endings** -- a patch keyed to one will silently fail to match a
+region written with the other. Try LF and CRLF before concluding the text moved.
+
 And two ways to invalidate your own experiment:
 
 - **Setting `.visible = false` on wheel meshes does nothing.**
