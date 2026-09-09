@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v23-statuscard";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v24-statusbig";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -1342,10 +1342,10 @@ public final class MainActivity extends Activity {
             // destination extend slightly past the view vertically (transparent pixels only).
             // The vehicle is the card's visual anchor, with TPMS values flanking it.
             // Visible pixels occupy x=30..464 and y=14..654 of the 494x675 source canvas.
-            float imageH = h * 1.16f;
+            float imageH = h * 1.34f;
             float imageW = base == null ? w * .25f
                     : imageH * base.getWidth() / Math.max(1f, base.getHeight()) * 1.08f;
-            imageW = Math.min(imageW, w * .38f);
+            imageW = Math.min(imageW, w * .42f);
             float left = (w - imageW) * .5f;
             float top = -h * .019f;
             android.graphics.RectF vehicleRect = new android.graphics.RectF(
@@ -1398,13 +1398,16 @@ public final class MainActivity extends Activity {
 
             // Status and Tires share TPMS health. Large values stay completely
             // outside the vehicle so the door, roof and restraint art remains clear.
-            float sideGap = Math.max(12f, w * .055f);
+            float sideGap = Math.max(10f, w * .048f);
             float[] tireXs = {vehicleRect.left - sideGap, vehicleRect.right + sideGap,
                     vehicleRect.left - sideGap, vehicleRect.right + sideGap};
-            float[] tireYs = {vehicleRect.top + vehicleRect.height() * .27f,
-                    vehicleRect.top + vehicleRect.height() * .27f,
-                    vehicleRect.top + vehicleRect.height() * .72f,
-                    vehicleRect.top + vehicleRect.height() * .72f};
+            // Vertically anchored to the VIEW, not to vehicleRect. The raster is
+            // deliberately taller than the card -- its transparent margins carry
+            // the open-door states -- so a readout keyed to it rides that
+            // overflow off the bottom: at imageH 1.34x the lower baseline
+            // computed to 83.4 in an 81px view. X still tracks the vehicle,
+            // which is the whole point of flanking it.
+            float[] tireYs = {h * .29f, h * .29f, h * .78f, h * .78f};
             String[] pressureReadings = tireReadings(descriptor);
             for (int i = 0; i < 4; i++) {
                 String wheelState = descriptor.wheelStates != null
@@ -1415,7 +1418,7 @@ public final class MainActivity extends Activity {
                         ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.BOLD));
-                paint.setTextSize(Math.max(15f, Math.min(w, h) * .205f));
+                paint.setTextSize(Math.max(16f, Math.min(w, h) * .245f));
                 c.drawText(pressureReadings[i], tireXs[i],
                         tireYs[i] + paint.getTextSize() * .34f, paint);
             }
