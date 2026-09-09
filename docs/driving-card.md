@@ -103,6 +103,25 @@ the card paints correctly at build time and then goes flat on the next payload,
 which looks exactly like the wash never having worked at all. Two other repaints
 in that method were also clearing the maps that make it work.
 
+## Sport borrows the interface
+
+Sport is the one mode allowed to overrule the configured accent: while it is
+selected, `_effectiveAccentColor()` returns `#e0392c` and the whole interface —
+widget chips, popup selection, rail glyphs, the tyre readout — goes red.
+
+**It is a display override and nothing else.** `state.accentColor` is never
+written, so the user's colour is still theirs and comes straight back the moment
+Sport is left. It also fires only on an explicitly selected Sport, never on the
+demo fallback: a preview default is not a reason to repaint the car's interface.
+
+The accent reaches the rail through the payload, and that surfaced a latent bug
+worth knowing about. **Accent-tinted native children bake their colour in when
+they are built**, and `refreshQuickCardsTheme` only repaints backgrounds and
+text — so the workspace icons kept the red after leaving Sport. Changing the
+accent now rebuilds the rail. That bug predates this feature (any accent change
+in Desktop Studio hit it); Sport just changes the accent often enough to make it
+obvious.
+
 ## The rail card opens a quick menu
 
 Coffee OS pops a short list of the modes when you touch the card, with the full
