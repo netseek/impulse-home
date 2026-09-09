@@ -36,7 +36,7 @@ includesAll(html, [
   "{ id: 'consumption', title: 'Consumption', action: 'openConsumption' }",
   "{ id: 'range', title: 'Range', action: 'openRange' }",
   "{ id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' }",
-  "{ id: 'clock', title: 'Clock', action: 'openDesktopStudio' }",
+  "{ id: 'clock', title: 'Clock', action: 'openClockSettings' }",
   // The three driving tiles share one destination: the card body opens the
   // DRIVING popup, the icon keeps the per-mode quick change.
   "{ id: 'driveMode', title: 'Drive mode', action: 'openDriving', iconAction: 'cycleDriveMode' }",
@@ -137,6 +137,21 @@ includesAll(method('_desktopSnapshot'), ['cardActions:', 'cardFocus:'], 'desktop
 includesAll(method('_normalizeDesktop'), ['base.cardActions', 'base.cardFocus'], 'desktop migration');
 includesAll(method('_setCardAction'), ["this._cardActions[type] = action", 'this._persistActiveDesktop()'], 'action persistence');
 includesAll(method('_openFocusedCard'), ["action.kind === 'desktop'", 'd.id === action.desktopId', "this._setCardAction(type, { kind: 'popup' })"], 'deleted target fallback');
+includesAll(method('_rangeTelemetry'), [
+  'CAR_SIGNALS.batterySoc, CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange',
+  "'DEMO · SIMULATED · NOT VEHICLE'",
+  "'PARTIAL · VEHICLE RANGE'",
+  "'STALE · VEHICLE RANGE'",
+  "'UNAVAILABLE · NO RANGE SIGNAL'",
+  'completeRange = evKnown && fuelKnown',
+  "this._rangeDistanceUnit()",
+  "unitKey === 'mi' ? .621371 : 1",
+  'formatDistance = (km)',
+], 'range telemetry semantics');
+includesAll(method('_focusedCardRenderFields'), ["type === 'range'", 'focusedCardIsRange', 'this._rangeWidgetView(entry.item)'], 'focused range popup');
+includesAll(method('_openRangeCard'), ["this._openFocusedCard('range')", 'this.state.widgetPlaceMode'], 'range widget interaction');
+includesAll(method('_setRangeDistanceUnit'), ["localStorage.setItem('h6_range_unit', unit)", 'widgetRev'], 'range unit preference');
+includesAll(html, ['aria-label="Distance unit"', '>KM</button>', '>MI</button>'], 'range unit controls');
 
 // Studio separates placement from bottom-bar management. The latter is one
 // ordered enabled-first list, and no longer lets a second display-limit value
