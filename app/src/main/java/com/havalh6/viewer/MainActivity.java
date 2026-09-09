@@ -85,10 +85,15 @@ public final class MainActivity extends Activity {
             "br.com.redesurftank.havalshisuku.ACTION_SET_TASK_BOUNDS";
 
     /** Commands exposed to data-driven bottom cards. Keep this deliberately narrow. */
-    /** Cover art on the MEDIA rail tile: the card's full height, less its padding. */
-    private static final int MEDIA_ART_DP = 106;
+    /** MEDIA rail tile geometry. The artwork is square and bleeds to three edges. */
+    private static final int MEDIA_CARD_W_DP = 380;
+    private static final int MEDIA_CARD_H_DP = 124;
+    /** The card's own corner radius, from makeFrostLayer. */
+    private static final float MEDIA_CARD_RADIUS_DP = 16f;
     /** Inset for the placeholder glyph when the source published no artwork. */
-    private static final int MEDIA_ART_GLYPH_PAD_DP = 26;
+    private static final int MEDIA_ART_GLYPH_PAD_DP = 32;
+    private static final int MEDIA_BTN_DP = 40;
+    private static final int MEDIA_BTN_PRIMARY_DP = 48;
 
     private static final java.util.Set<String> BOTTOM_CARD_ACTIONS =
             new java.util.HashSet<>(java.util.Arrays.asList(
@@ -915,8 +920,8 @@ public final class MainActivity extends Activity {
     private boolean quickMediaHasArt;
     private android.widget.TextView quickMediaTitle;
     private android.widget.TextView quickMediaArtist;
-    private android.widget.TextView quickMediaPlayPause;
-    private final java.util.List<android.widget.TextView> quickMediaButtons = new java.util.ArrayList<>();
+    private android.widget.ImageView quickMediaPlayPause;
+    private final java.util.List<android.widget.ImageView> quickMediaButtons = new java.util.ArrayList<>();
     private boolean quickMediaAvailable;
     private android.widget.ImageView quickMediaAppIcon;
     private android.widget.TextView quickMediaAppName;
@@ -7179,10 +7184,12 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout card = new android.widget.LinearLayout(this);
         card.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         card.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        card.setPadding(Math.round(12 * density), Math.round(9 * density),
-                Math.round(10 * density), Math.round(9 * density));
+        // Only the frost rim's own inset, so the artwork can bleed to the
+        // card's top, left and bottom edges without covering the rim itself.
+        int rim = Math.max(1, Math.round(density));
+        card.setPadding(rim, rim, rim, rim);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(348 * density), Math.round(124 * density));
+                Math.round(MEDIA_CARD_W_DP * density), Math.round(MEDIA_CARD_H_DP * density));
         lp.rightMargin = Math.round(10 * density);
         card.setLayoutParams(lp);
         card.setBackground(makeFrostStateDrawable(false, density));
@@ -7225,25 +7232,33 @@ public final class MainActivity extends Activity {
                 Math.round(MEDIA_ART_GLYPH_PAD_DP * density),
                 Math.round(MEDIA_ART_GLYPH_PAD_DP * density),
                 Math.round(MEDIA_ART_GLYPH_PAD_DP * density));
-        quickMediaArt.setImageDrawable(systemDockIcon(android.R.drawable.ic_media_play,
-                dockAccentColor));
+        quickMediaArt.setImageDrawable(mediaArtPlaceholder(density));
         quickMediaArt.setClipToOutline(true);
+        // Rounded into the card's own corners on the left, hard-cut on the
+        // right. An Outline can only clip a UNIFORM round rect on this
+        // platform (Outline.canClip is false for a path before API 30), so the
+        // outline is pushed one radius past the right edge instead: the
+        // rounding happens outside the view, and the view's bounds do the cut.
         quickMediaArt.setOutlineProvider(new android.view.ViewOutlineProvider() {
             @Override
             public void getOutline(View view, android.graphics.Outline outline) {
-                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(),
-                        12f * getResources().getDisplayMetrics().density);
+                float d = getResources().getDisplayMetrics().density;
+                float r = (MEDIA_CARD_RADIUS_DP * d) - Math.max(1f, d);
+                outline.setRoundRect(0, 0, view.getWidth() + Math.round(r),
+                        view.getHeight(), r);
             }
         });
+        int artSide = Math.round(MEDIA_CARD_H_DP * density) - 2 * rim;
         android.widget.LinearLayout.LayoutParams artLp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(MEDIA_ART_DP * density), Math.round(MEDIA_ART_DP * density));
-        artLp.rightMargin = Math.round(11 * density);
+                artSide, android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         quickMediaArt.setLayoutParams(artLp);
         card.addView(quickMediaArt);
 
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
         copy.setOrientation(android.widget.LinearLayout.VERTICAL);
         copy.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        copy.setPadding(Math.round(13 * density), Math.round(8 * density),
+                Math.round(11 * density), Math.round(8 * density));
         android.widget.LinearLayout.LayoutParams copyLp = new android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
         copy.setLayoutParams(copyLp);
@@ -7293,10 +7308,13 @@ public final class MainActivity extends Activity {
                 Math.round(36 * density));
         controlsLp.topMargin = Math.round(3 * density);
         controls.setLayoutParams(controlsLp);
-        controls.addView(makeQuickMediaButton(density, "‹", "Previous track", v -> mediaNowPlaying.prev()));
-        quickMediaPlayPause = makeQuickMediaButton(density, "▶", "Play", v -> mediaNowPlaying.playPause());
+        controls.addView(makeQuickMediaButton(density, false, "prev", "Previous track",
+                v -> mediaNowPlaying.prev()));
+        quickMediaPlayPause = makeQuickMediaButton(density, true, "play", "Play",
+                v -> mediaNowPlaying.playPause());
         controls.addView(quickMediaPlayPause);
-        controls.addView(makeQuickMediaButton(density, "›", "Next track", v -> mediaNowPlaying.next()));
+        controls.addView(makeQuickMediaButton(density, false, "next", "Next track",
+                v -> mediaNowPlaying.next()));
         copy.addView(controls);
         card.addView(copy);
         return card;
@@ -7363,26 +7381,141 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private android.widget.TextView makeQuickMediaButton(float density, String text,
-            String description, View.OnClickListener click) {
-        android.widget.TextView button = new android.widget.TextView(this);
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(42 * density), Math.round(34 * density));
-        lp.rightMargin = Math.round(4 * density);
+    /**
+     * One transport button.
+     *
+     * These used to be TextViews carrying "‹", "▶", "›" and "Ⅱ" — a typographic
+     * quote, a geometric-shape arrow and a Roman numeral, three different fonts
+     * at three different optical weights, in rectangles. The play button even
+     * changed width when it flipped to pause. They are drawn now, on the same
+     * 24x24 grid as the widget's icons, so the set matches itself and matches
+     * the other two surfaces.
+     */
+    private android.widget.ImageView makeQuickMediaButton(float density, boolean primary,
+            String glyph, String description, View.OnClickListener click) {
+        int size = Math.round((primary ? MEDIA_BTN_PRIMARY_DP : MEDIA_BTN_DP) * density);
+        android.widget.ImageView button = new android.widget.ImageView(this);
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(size, size);
+        lp.rightMargin = Math.round(8 * density);
         button.setLayoutParams(lp);
-        button.setGravity(android.view.Gravity.CENTER);
-        button.setText(text);
-        button.setTextSize(18f);
-        button.setTag("frostAction");
+        button.setScaleType(android.widget.ImageView.ScaleType.CENTER);
+        button.setTag(primary ? "mediaBtnPrimary" : "mediaBtn");
         button.setContentDescription(description);
         button.setClickable(true);
         button.setFocusable(true);
-        button.setBackground(makeDockPlateDrawable(false, density));
+        button.setImageDrawable(mediaGlyph(density, primary, glyph));
+        button.setBackground(makeMediaButtonBackground(density, primary, size));
         button.setOnClickListener(click);
         button.setEnabled(quickMediaAvailable);
         button.setAlpha(quickMediaAvailable ? 1f : 0.35f);
         quickMediaButtons.add(button);
         return button;
+    }
+
+    /**
+     * A circle, outlined for prev/next and accent-filled for play/pause.
+     *
+     * The pressed state is not decoration: a button that does not answer a
+     * touch on a head unit reads as a missed tap.
+     */
+    private android.graphics.drawable.Drawable makeMediaButtonBackground(
+            float density, boolean primary, int size) {
+        android.graphics.drawable.StateListDrawable states =
+                new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[] { android.R.attr.state_pressed },
+                mediaButtonFace(density, primary, true));
+        states.addState(new int[0], mediaButtonFace(density, primary, false));
+        return states;
+    }
+
+    private android.graphics.drawable.Drawable mediaButtonFace(
+            float density, boolean primary, boolean pressed) {
+        android.graphics.drawable.GradientDrawable face =
+                new android.graphics.drawable.GradientDrawable();
+        face.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        if (primary) {
+            face.setColor(withAlpha(dockAccentColor, pressed ? 0xC0 : 0xFF));
+            face.setStroke(Math.max(1, Math.round(density)), dockAccentColor);
+        } else {
+            face.setColor(dockUiLight
+                    ? (pressed ? 0x2418222C : 0x0F18222C)
+                    : (pressed ? 0x2EFFFFFF : 0x14FFFFFF));
+            face.setStroke(Math.max(1, Math.round(density)),
+                    dockUiLight ? 0x338A99A8 : 0x2EFFFFFF);
+        }
+        return face;
+    }
+
+    /**
+     * The mark shown when the source published no artwork.
+     *
+     * A disc, not a play triangle: the system's ic_media_play filled the whole
+     * art panel and read as an enormous play button sitting next to the real
+     * one. Same shape the widget and the popup draw.
+     */
+    private android.graphics.drawable.Drawable mediaArtPlaceholder(float density) {
+        int box = Math.max(16, Math.round(48 * density));
+        Bitmap bmp = Bitmap.createBitmap(box, box, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeWidth(Math.max(1.5f, box * 0.062f));
+        p.setColor(withAlpha(dockLabelColor(), 0x66));
+        float mid = box / 2f;
+        c.drawCircle(mid, mid, box * 0.375f, p);
+        p.setStyle(android.graphics.Paint.Style.FILL);
+        c.drawCircle(mid, mid, box * 0.10f, p);
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
+    }
+
+    /**
+     * Transport glyphs, on the same 24x24 grid as the widget's SVG icons.
+     *
+     * Rectangles and triangles only, so there is nothing here a font could
+     * substitute differently from one glyph to the next.
+     */
+    private android.graphics.drawable.Drawable mediaGlyph(
+            float density, boolean primary, String kind) {
+        int box = Math.round((primary ? MEDIA_BTN_PRIMARY_DP : MEDIA_BTN_DP) * 0.46f * density);
+        box = Math.max(8, box);
+        Bitmap bmp = Bitmap.createBitmap(box, box, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setStyle(android.graphics.Paint.Style.FILL);
+        // Dark on the accent fill, the card's own foreground on an outlined ring.
+        p.setColor(primary ? 0xFF06131A : dockLabelColor());
+        final float u = box / 24f;
+        if ("prev".equals(kind)) {
+            c.drawRect(6 * u, 6 * u, 8 * u, 18 * u, p);
+            android.graphics.Path tri = new android.graphics.Path();
+            tri.moveTo(18 * u, 6 * u);
+            tri.lineTo(18 * u, 18 * u);
+            tri.lineTo(9.5f * u, 12 * u);
+            tri.close();
+            c.drawPath(tri, p);
+        } else if ("next".equals(kind)) {
+            c.drawRect(16 * u, 6 * u, 18 * u, 18 * u, p);
+            android.graphics.Path tri = new android.graphics.Path();
+            tri.moveTo(6 * u, 6 * u);
+            tri.lineTo(6 * u, 18 * u);
+            tri.lineTo(14.5f * u, 12 * u);
+            tri.close();
+            c.drawPath(tri, p);
+        } else if ("pause".equals(kind)) {
+            c.drawRect(6 * u, 5 * u, 10 * u, 19 * u, p);
+            c.drawRect(14 * u, 5 * u, 18 * u, 19 * u, p);
+        } else {
+            android.graphics.Path tri = new android.graphics.Path();
+            tri.moveTo(8 * u, 5 * u);
+            tri.lineTo(8 * u, 19 * u);
+            tri.lineTo(19 * u, 12 * u);
+            tri.close();
+            c.drawPath(tri, p);
+        }
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
     /** Hamburger affordance for the single launcher/cards control. */
@@ -7411,7 +7544,7 @@ public final class MainActivity extends Activity {
         quickMediaCanLaunch = payload.optBoolean("canLaunch", false);
         boolean hasTrack = payload.optBoolean("hasTrack", false);
         quickMediaAvailable = hasTrack && mediaNowPlaying != null;
-        for (android.widget.TextView button : quickMediaButtons) {
+        for (android.widget.ImageView button : quickMediaButtons) {
             button.setEnabled(quickMediaAvailable);
             button.setAlpha(quickMediaAvailable ? 1f : 0.35f);
         }
@@ -7435,14 +7568,16 @@ public final class MainActivity extends Activity {
                 quickMediaArt.setPadding(0, 0, 0, 0);
                 quickMediaArt.setImageBitmap(art);
             } else {
-                int pad = Math.round(MEDIA_ART_GLYPH_PAD_DP * getResources().getDisplayMetrics().density);
+                float d = getResources().getDisplayMetrics().density;
+                int pad = Math.round(MEDIA_ART_GLYPH_PAD_DP * d);
                 quickMediaArt.setPadding(pad, pad, pad, pad);
-                quickMediaArt.setImageDrawable(systemDockIcon(android.R.drawable.ic_media_play,
-                        dockAccentColor));
+                quickMediaArt.setImageDrawable(mediaArtPlaceholder(d));
             }
         }
         if (quickMediaPlayPause != null) {
-            quickMediaPlayPause.setText(quickMediaPlaying ? "Ⅱ" : "▶");
+            float d = getResources().getDisplayMetrics().density;
+            quickMediaPlayPause.setImageDrawable(
+                    mediaGlyph(d, true, quickMediaPlaying ? "pause" : "play"));
             quickMediaPlayPause.setContentDescription(quickMediaPlaying ? "Pause" : "Play");
         }
         applyQuickMediaAppChip(payload.optString("appIcon", ""), app);
@@ -7472,14 +7607,29 @@ public final class MainActivity extends Activity {
                     washForCardView(card)));
             tintFrostText(card);
         }
+        // Both the ring colours and the glyph tint are baked in at build time,
+        // so a theme change has to redraw them or the transport keeps the
+        // previous theme's contrast. Same trap as the driving wash.
+        for (android.widget.ImageView button : quickMediaButtons) {
+            if (button == null) continue;
+            boolean primary = "mediaBtnPrimary".equals(button.getTag());
+            int size = Math.round((primary ? MEDIA_BTN_PRIMARY_DP : MEDIA_BTN_DP) * density);
+            button.setBackground(makeMediaButtonBackground(density, primary, size));
+            if (!primary) {
+                button.setImageDrawable(mediaGlyph(density, false,
+                        "Previous track".contentEquals(
+                                button.getContentDescription() == null ? "" : button.getContentDescription())
+                                ? "prev" : "next"));
+            }
+        }
         if (quickMediaPlayPause != null) {
-            quickMediaPlayPause.setBackground(makeDockPlateDrawable(false, density));
+            quickMediaPlayPause.setImageDrawable(
+                    mediaGlyph(density, true, quickMediaPlaying ? "pause" : "play"));
         }
         if (quickMediaArt != null) {
             quickMediaArt.setBackground(makeDockPlateDrawable(false, density));
             if (!quickMediaHasArt) {
-                quickMediaArt.setImageDrawable(systemDockIcon(android.R.drawable.ic_media_play,
-                        dockAccentColor));
+                quickMediaArt.setImageDrawable(mediaArtPlaceholder(density));
             }
         }
         dismissQuickMenu();

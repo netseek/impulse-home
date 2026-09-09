@@ -99,7 +99,41 @@ surface too.
 What it borrowed back from the generic card is the part that was missing: a body
 that runs a command, and a long press.
 
-Two things that bit here, both invisible on a dark screen:
+### The artwork bleeds to three edges
+
+The tile is `380x124` dp with only the frost rim's 1px inset for padding, so the
+square artwork reaches the card's top, left and bottom edges and stops flat on
+the right. The copy column owns the padding the card gave up.
+
+**An Outline can only clip a UNIFORM round rect on this platform** —
+`Outline.canClip()` is false for a path before API 30, and the car is Android 9,
+so per-corner radii are not available. The outline is pushed one radius past the
+right edge instead: the rounding happens outside the view and the view's own
+bounds make the hard cut. The radius is the card's own 16dp less the rim inset,
+so the artwork sits inside the frost rim rather than over it.
+
+### The transport is drawn, not typed
+
+The three buttons were `TextView`s carrying `‹`, `▶`, `›` and `Ⅱ` — a typographic
+quote, a geometric-shape arrow and a Roman numeral. Three different fonts at
+three different optical weights and baselines, in rectangles, and the play
+button visibly changed width when it flipped to pause.
+
+They are `ImageView`s now, with the glyphs drawn from rectangles and triangles
+on the same 24x24 grid as the widget's SVG icons, on circles: an outlined ring
+for prev/next at 40dp and an accent-filled circle for play/pause at 48dp. The
+set matches itself and matches the other two surfaces. Each carries a pressed
+state, because a button that does not answer a touch on a head unit reads as a
+missed tap.
+
+**Both the ring colours and the glyph tint are baked in at build time**, so
+`refreshQuickCardsTheme` redraws them — the same trap the driving wash has.
+
+The empty-artwork mark is the widget's disc, not the system's `ic_media_play`:
+that filled the whole art panel and read as an enormous play button sitting
+next to the real one.
+
+Two more things that bit here, both invisible on a dark screen:
 
 - **The app chip wore a dock plate**, whose light fill swallowed its label.
   It does not need a ground of its own — it sits beside a heading that is
