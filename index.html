@@ -2976,180 +2976,352 @@ window.HavalSplash = (function () {
     button.on .hv-layout-glyph {
       --on: #0b1016;
     }
-    .hv-media-rail {
+    /* ── MEDIA ───────────────────────────────────────────────────────────────
+       One visual language for the widget and the popup. Two layout families,
+       picked by slot shape rather than by a per-size branch of the data:
+
+         cover — art behind the copy. Square and tall slots (1x1, 1x2, 2x2, 3x2).
+         split — art beside the copy. Short wide slots (2x1, 3x1), where a
+                 full-bleed image leaves the title nowhere to go.
+
+       Colour rule: the copy only goes white-on-scrim when there IS art under
+       it. With no art the card is an ordinary themed frost surface, so the
+       light board reads instead of painting white text on near-white. */
+    /* ── MEDIA ───────────────────────────────────────────────────────────────
+       One visual language for the widget and the popup. Two layout families,
+       picked by slot shape rather than by a per-size branch of the data:
+
+         cover — art behind the copy. Square and tall slots (1x1, 1x2, 2x2, 3x2).
+         split — art beside the copy. Short wide slots (2x1, 3x1), where a
+                 full-bleed image leaves the title nowhere to go.
+
+       The artwork is the card. In `cover` it fills the slot; in `split` it is a
+       full-height square bled to the card's own edges, so neither layout spends
+       margin on a cover the driver is meant to recognise at a glance.
+
+       Colour rule: the copy only goes white-on-scrim when there IS art under
+       it. With no art the card is an ordinary themed frost surface, so the
+       light board reads instead of painting white text on near-white. */
+    .hv-media {
       position: absolute;
       inset: 0;
-      width: auto;
-      height: auto;
-      z-index: 0;
       box-sizing: border-box;
       display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: 0;
       overflow: hidden;
       background: transparent;
-      border: none;
-      border-radius: 0;
-      box-shadow: none;
-      color: #eaf2f8;
+      color: var(--hv-widget-fg);
       user-select: none;
       pointer-events: auto;
-      cursor: default;
+      --hv-media-pad: 12px;
+      --hv-media-btn: 42px;
+      --hv-media-title: 15px;
     }
-    .hv-media-rail.can-open { cursor: pointer; }
-    .hv-media-art-wrap {
-      position: absolute;
-      inset: 0;
-      width: auto;
-      height: auto;
-      margin: 0;
-      border-radius: 0;
+    .hv-media.can-open { cursor: pointer; }
+    .hv-media.cover { flex-direction: column; justify-content: flex-end; }
+    .hv-media.split { flex-direction: row; align-items: stretch; }
+
+    /* Art. In `cover` it fills the card behind everything; in `split` it is a
+       full-height square on the leading edge, flush with the card's border. */
+    .hv-media-art {
+      position: relative;
+      flex: 0 0 auto;
       overflow: hidden;
-      background: rgba(255,255,255,.04);
-      border: none;
+      background: var(--hv-frost-inner, rgba(255,255,255,.075));
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 0;
     }
-    .hv-media-art-wrap img {
-      width: 100%;
+    .hv-media.cover > .hv-media-art { position: absolute; inset: 0; z-index: 0; }
+    /* Full height, but never more than a third of the card: a narrow board
+       makes a "2x1" only ~400px wide, and a square art there leaves the copy
+       column too thin to hold a title. */
+    .hv-media.split > .hv-media-art {
+      width: auto;
+      aspect-ratio: 1 / 1;
       height: 100%;
-      object-fit: cover;
-      display: block;
+      max-width: 36%;
     }
-    .hv-media-source {
+    .hv-media-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* Placeholder mark, shown whenever the source published no artwork. It is a
+       disc, not a play triangle: a play glyph here would read as a button. */
+    .hv-media-art svg { width: 44%; height: 44%; opacity: .5; color: var(--hv-widget-fg); }
+    /* ...but not in `cover`, where the art layer IS the card: a placeholder there
+       lands squarely on the title and the progress bar. With no artwork the
+       cover card is simply a themed card with copy on it, which is the truth. */
+    .hv-media.cover.no-art > .hv-media-art > svg { display: none; }
+
+    /* Who is playing. The source app's own icon and label, published by
+       MediaNowPlaying — never inferred from the package name. */
+    .hv-media-app {
       position: absolute;
-      top: 14px;
-      left: 18px;
-      right: 18px;
-      z-index: 2;
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      opacity: .7;
-      margin: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      text-shadow: 0 1px 8px rgba(0,0,0,.55);
+      z-index: 3;
+      top: 8px;
+      right: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 62%;
+      min-height: 22px;
+      padding: 0 8px 0 5px;
+      border-radius: 999px;
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.16));
+      background: var(--hv-frost-inner, rgba(255,255,255,.075));
       pointer-events: none;
     }
-    .hv-media-chrome {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      padding: 28px 14px 12px;
-      background: linear-gradient(
-        to top,
-        rgba(8, 12, 18, 0.92) 0%,
-        rgba(8, 12, 18, 0.72) 42%,
-        rgba(8, 12, 18, 0.28) 78%,
-        rgba(8, 12, 18, 0) 100%
-      );
-      box-shadow: 0 -28px 48px rgba(0, 0, 0, 0.45);
+    /* Over an arbitrary album cover the pill needs its own ground, whatever the
+       board theme is doing. */
+    .hv-media.cover.has-art > .hv-media-app {
+      border-color: rgba(255,255,255,.22);
+      background: rgba(6,10,15,.62);
+      color: #f2f6fa;
     }
-    .hv-media-title {
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: .02em;
-      line-height: 1.2;
-      text-align: left;
+    .hv-media-app img {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      display: block;
+      flex: 0 0 auto;
+    }
+    .hv-media-app-name {
+      font-family: 'Space Mono', monospace;
+      font-size: 7px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      text-shadow: 0 1px 10px rgba(0,0,0,.5);
+      opacity: .86;
+    }
+
+    /* Copy and controls. Column in `cover`, a row of columns in `split`. */
+    .hv-media-body {
+      position: relative;
+      z-index: 1;
+      min-width: 0;
+      display: flex;
+      flex: 1 1 auto;
+    }
+    .hv-media.cover > .hv-media-body {
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 30px var(--hv-media-pad) var(--hv-media-pad);
+    }
+    .hv-media.split > .hv-media-body {
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+      padding: var(--hv-media-pad);
+    }
+    /* The scrim is the only thing that makes white copy legible over an
+       arbitrary album cover, so it is tied to has-art, not to the theme. */
+    .hv-media.cover.has-art > .hv-media-body {
+      /* The ramp has to reach near-opaque well before the copy starts, because
+         the copy climbs as the slot shrinks: on a 1x1 the source line sits
+         halfway up the card, over whatever the cover has there. */
+      background: linear-gradient(to top,
+        rgba(6,10,15,.95) 0%, rgba(6,10,15,.90) 34%, rgba(6,10,15,.62) 62%,
+        rgba(6,10,15,.22) 84%, rgba(6,10,15,0) 100%);
+      color: #f2f6fa;
+    }
+
+    .hv-media-chrome {
+      min-width: 0;
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 3px;
+    }
+    .hv-media.split .hv-media-chrome { justify-content: center; }
+
+    .hv-media-source {
+      font-family: 'Space Mono', monospace;
+      font-size: 7px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--hv-widget-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 0 0 1px;
+    }
+    .hv-media-source.live { color: var(--hv-accent, #2aa7b7); }
+    .hv-media.cover.has-art .hv-media-source { color: rgba(242,246,250,.72); }
+    .hv-media.cover.has-art .hv-media-source.live { color: #fff; }
+    .hv-media-source.unavailable, .hv-media-source.idle { opacity: .75; }
+    .hv-media-title {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: var(--hv-media-title);
+      font-weight: 600;
+      letter-spacing: .01em;
+      line-height: 1.18;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .hv-media-artist {
       font-family: 'Space Mono', monospace;
-      font-size: 11px;
-      letter-spacing: .06em;
-      opacity: .7;
-      text-align: left;
-      margin-top: 4px;
+      font-size: 9px;
+      letter-spacing: .05em;
+      opacity: .74;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      text-shadow: 0 1px 8px rgba(0,0,0,.45);
     }
     .hv-media-progress {
-      height: 4px;
-      margin: 8px 0 6px;
-      background: rgba(255,255,255,.22);
-      border-radius: 4px;
+      height: 3px;
+      margin: 6px 0 0;
+      background: var(--hv-frost-edge, rgba(255,255,255,.16));
+      border-radius: 3px;
       overflow: hidden;
     }
     .hv-media-progress > span {
       display: block;
       height: 100%;
-      background: #4fd6e8;
-      border-radius: 4px;
       width: 0;
-      box-shadow: 0 0 8px rgba(79,214,232,.45);
+      border-radius: 3px;
+      background: var(--hv-accent, #2aa7b7);
     }
     .hv-media-times {
       display: flex;
       justify-content: space-between;
       font-family: 'Space Mono', monospace;
-      font-size: 10px;
-      letter-spacing: .08em;
-      opacity: .65;
-      margin: 0 0 8px;
+      font-size: 8px;
+      letter-spacing: .06em;
+      opacity: .68;
+      margin: 3px 0 0;
     }
     .hv-media-transport {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 18px;
-      margin-top: 0;
-      padding-bottom: 2px;
+      flex: 0 0 auto;
+      gap: 10px;
     }
+    .hv-media.cover > .hv-media-body > .hv-media-transport { margin-top: 8px; }
+    /* On a short wide slot the buttons get their own column on the trailing
+       edge, so the copy takes the middle instead of the card running out of
+       things to say halfway across. */
+    .hv-media.split > .hv-media-body > .hv-media-transport { gap: 8px; }
     .hv-media-transport button {
-      width: 52px;
-      height: 52px;
+      width: var(--hv-media-btn);
+      height: var(--hv-media-btn);
+      flex: 0 0 auto;
       border-radius: 50%;
-      border: 1px solid rgba(79,214,232,.35);
-      background: rgba(16, 21, 28, 0.55);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      color: #eaf2f8;
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.16));
+      background: var(--hv-frost-inner, rgba(255,255,255,.075));
+      color: inherit;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       padding: 0;
-      box-shadow: 0 6px 18px rgba(0,0,0,.35);
       pointer-events: auto;
     }
+    .hv-media-transport button svg { width: 46%; height: 46%; display: block; }
     .hv-media-transport button.hv-media-play {
-      width: 60px;
-      height: 60px;
-      background: rgba(79,214,232,.22);
-      border-color: #4fd6e8;
-      color: #4fd6e8;
-      box-shadow: 0 8px 22px rgba(0,0,0,.4), 0 0 16px rgba(79,214,232,.2);
+      width: calc(var(--hv-media-btn) + 8px);
+      height: calc(var(--hv-media-btn) + 8px);
+      background: var(--hv-accent, #2aa7b7);
+      border-color: var(--hv-accent, #2aa7b7);
+      color: #06131a;
     }
-    .hv-media-transport button:active { transform: scale(0.96); }
-    .hv-media-1x2 .hv-media-source {
-      top: 12px;
-      left: 12px;
-      right: 12px;
+    .hv-media-transport button:active { transform: scale(.94); }
+    /* A disabled transport must LOOK unavailable, not merely refuse the tap. */
+    .hv-media-transport button[disabled] { cursor: default; opacity: .32; }
+    .hv-media-transport button[disabled]:active { transform: none; }
+    /* Opacity alone is not enough on the play button: a saturated accent at 32%
+       still reads brighter than the two inert rings beside it, so a card with
+       no track looked as though play was the one thing that would work. */
+    .hv-media-transport button.hv-media-play[disabled] {
+      background: var(--hv-frost-inner, rgba(255,255,255,.075));
+      border-color: var(--hv-frost-edge, rgba(255,255,255,.16));
+      color: inherit;
     }
-    .hv-media-1x2 .hv-media-chrome { padding: 22px 12px 10px; }
-    .hv-media-1x2 .hv-media-title { font-size: 14px; }
-    .hv-media-1x2 .hv-media-transport { gap: 10px; }
-    .hv-media-1x2 .hv-media-transport button {
-      width: 44px;
-      height: 44px;
+
+    /* Per-size trim. Only spacing and type scale change; the data does not. */
+    .hv-media-1x1 { --hv-media-pad: 9px; --hv-media-btn: 40px; --hv-media-title: 12px; }
+    .hv-media-1x1 > .hv-media-body { padding-top: 20px; gap: 2px; }
+    .hv-media-1x1 > .hv-media-app { top: 6px; right: 6px; padding: 0 5px; }
+    .hv-media-1x1.cover.has-art > .hv-media-body,
+    .hv-media-1x2.cover.has-art > .hv-media-body {
+      background: linear-gradient(to top,
+        rgba(6,10,15,.95) 0%, rgba(6,10,15,.92) 52%, rgba(6,10,15,.62) 78%, rgba(6,10,15,0) 100%);
     }
-    .hv-media-1x2 .hv-media-transport button.hv-media-play {
-      width: 52px;
-      height: 52px;
+    .hv-media-1x2 { --hv-media-pad: 10px; --hv-media-btn: 34px; --hv-media-title: 13px; }
+    .hv-media-2x1 { --hv-media-pad: 11px; --hv-media-btn: 34px; --hv-media-title: 14px; }
+    .hv-media-3x1 { --hv-media-pad: 12px; --hv-media-btn: 40px; --hv-media-title: 17px; }
+    .hv-media-2x2 { --hv-media-btn: 44px; --hv-media-title: 17px; }
+    .hv-media-3x2 { --hv-media-btn: 48px; --hv-media-title: 20px; }
+    .hv-media-3x2 .hv-media-artist, .hv-media-2x2 .hv-media-artist { font-size: 10px; }
+
+    /* ── MEDIA popup ─────────────────────────────────────────────────────────
+       The same parts at the size a dialog can afford: art large enough to be
+       the cover it is, the metadata the source actually published, and the
+       three transport commands the bridge actually exposes. There is no seek
+       control because MediaBridge has no seek — the bar is a readout. */
+    .hv-media-focus { display: flex; flex-direction: column; gap: 12px; min-width: 0; --hv-media-btn: 52px; }
+    .hv-media-focus-main { display: flex; gap: 16px; align-items: stretch; min-width: 0; }
+    .hv-media-focus-art {
+      flex: 0 0 auto;
+      width: 168px;
+      height: 168px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.16));
+      background: var(--hv-frost-inner, rgba(255,255,255,.075));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hv-media-focus-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .hv-media-focus-art svg { width: 40%; height: 40%; opacity: .45; }
+    .hv-media-focus-copy { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+    /* Two lines, then a real ellipsis. A video title runs long and `overflow:
+       hidden` alone just guillotines the second line mid-word. */
+    .hv-media-focus-copy > .hv-media-title {
+      font-size: 22px;
+      white-space: normal;
+      line-height: 1.2;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+    .hv-media-focus-copy > .hv-media-artist { font-size: 11px; }
+    .hv-media-focus-album {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      opacity: .6;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* The app pill sits in the dialog's flow rather than pinned to a corner:
+       there is no artwork behind the copy here for it to label. */
+    .hv-media-focus .hv-media-app { position: static; align-self: flex-start; margin-bottom: 2px; max-width: 100%; }
+    .hv-media-focus .hv-media-transport { justify-content: center; gap: 16px; margin-top: 10px; }
+    .hv-media-focus-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .hv-media-focus-app {
+      min-height: 30px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.16));
+      background: transparent;
+      color: inherit;
+      font: 8px/1 'Space Mono', monospace;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .hv-media-focus-app[disabled] { opacity: .34; cursor: default; }
+    .hv-media-focus-note {
+      font: 7px/1.45 'Space Mono', monospace;
+      letter-spacing: .05em;
+      opacity: .72;
+      margin: 0;
     }
     .hv-chrome {
       position: absolute;
@@ -4543,6 +4715,9 @@ window.HavalSplash = (function () {
        Declared after .on so both transforms stay under its specificity. */
     .hv-card-focus.fit { bottom:auto; max-height:calc(100% - var(--hv-popup-top, 52px) - var(--hv-popup-bottom-inset, 72px)); top:calc(var(--hv-popup-top, 52px) + (100% - var(--hv-popup-top, 52px) - var(--hv-popup-bottom-inset, 72px)) * .5); transform:translate(-50%,calc(-50% + 18px)) scale(.985); }
     .hv-card-focus.fit.on { transform:translate(-50%,-50%) scale(1); }
+    /* Media carries less than the other workspaces — art, four lines and three
+       buttons — so the shared 760px frame left a third of the dialog empty. */
+    .hv-card-focus.narrow { width:min(560px,calc(100vw - 52px)); }
     .hv-card-focus-head { height:42px; display:flex; align-items:center; gap:10px; font:9px/1 'Space Mono',monospace; letter-spacing:.15em; }
     /* The close button holds the right edge whatever sits beside the title, so
        the cards without a header badge look exactly as they did. */
@@ -4782,8 +4957,6 @@ window.HavalSplash = (function () {
     .hv-consumption-periods button:disabled { opacity:.4; cursor:not-allowed; }
     .hv-climate-notice { margin:8px 0; font-size:12px; line-height:1.4; }
     #hv-root.hv-widgets-light .hv-consumption-head small.demo { color:#815015; }
-    .hv-media-chrome { color:#f4f7fb; }
-    #hv-root.hv-widgets-light .hv-media-chrome { color:#f4f7fb; }
     #hv-root button:focus-visible { outline:3px solid var(--hv-readable-accent); outline-offset:3px; }
     @media (prefers-reduced-motion:reduce) {
       .hv-widget-card,.hv-desktop-studio,.hv-card-focus,.hv-wallpaper-pop { transition:none; }
@@ -4986,33 +5159,32 @@ window.HavalSplash = (function () {
             <div class="hv-navigation {{ wg.navigationSizeClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><small>{{ wg.navigationSource }}</small></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-turn"><svg viewBox="0 0 24 24"><path d="M7 18V11a4 4 0 0 1 4-4h7"></path><path d="m15 4 3 3-3 3"></path></svg></div><div class="hv-navigation-copy"><strong>{{ wg.navigationDistance }}</strong><span>{{ wg.navigationHint }}</span></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-media-rail {{ wg.mediaSizeClass }} {{ mediaOpenClass }}" style="opacity: {{ mediaRailOpacity }};" onClick="{{ mediaOpenApp }}">
-              <div class="hv-media-art-wrap">
-                <sc-if value="{{ mediaHasArt }}" hint-placeholder-val="{{ false }}">
-                  <img src="{{ mediaArt }}" alt="">
-                </sc-if>
+            <div class="hv-media {{ wg.mediaSizeClass }} {{ wg.mediaLayoutClass }} {{ wg.mediaArtClass }} {{ wg.mediaOpenClass }}" onClick="{{ wg.onMediaOpen }}">
+              <div class="hv-media-art">
+                <sc-if value="{{ wg.mediaHasArt }}" hint-placeholder-val="{{ false }}"><img src="{{ wg.mediaArt }}" alt=""></sc-if>
+                <sc-if value="{{ wg.mediaShowArtPlaceholder }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.4"></circle></svg></sc-if>
               </div>
-              <div class="hv-media-source">{{ mediaSourceLabel }}</div>
-              <div class="hv-media-chrome">
-                <div class="hv-media-title">{{ mediaTitle }}</div>
-                <div class="hv-media-artist">{{ mediaArtist }}</div>
-                <div class="hv-media-progress"><span id="hv-media-progress-fill" style="width: {{ mediaProgressWidth }};"></span></div>
-                <div class="hv-media-times"><span id="hv-media-time-cur">{{ mediaTimeCur }}</span><span id="hv-media-time-dur">{{ mediaTimeDur }}</span></div>
-                <div class="hv-media-transport" style="pointer-events: {{ mediaTransportEvents }}; opacity: {{ mediaTransportOpacity }};">
-                  <button type="button" onClick="{{ mediaPrev }}" title="Previous" disabled="{{ mediaControlsDisabled }}" aria-disabled="{{ mediaControlsDisabled }}">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg>
+              <sc-if value="{{ wg.mediaShowApp }}" hint-placeholder-val="{{ false }}">
+                <div class="hv-media-app">
+                  <sc-if value="{{ wg.mediaHasAppIcon }}" hint-placeholder-val="{{ false }}"><img src="{{ wg.mediaAppIcon }}" alt=""></sc-if>
+                  <sc-if value="{{ wg.mediaShowAppName }}" hint-placeholder-val="{{ true }}"><span class="hv-media-app-name">{{ wg.mediaAppLabel }}</span></sc-if>
+                </div>
+              </sc-if>
+              <div class="hv-media-body">
+                <div class="hv-media-chrome">
+                  <div class="hv-media-source {{ wg.mediaSourceClass }}" role="status">{{ wg.mediaSource }}</div>
+                  <div class="hv-media-title">{{ wg.mediaTitle }}</div>
+                  <sc-if value="{{ wg.mediaShowArtist }}" hint-placeholder-val="{{ true }}"><div class="hv-media-artist">{{ wg.mediaArtist }}</div></sc-if>
+                  <sc-if value="{{ wg.mediaShowProgress }}" hint-placeholder-val="{{ true }}"><div class="hv-media-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ wg.mediaProgressPct }}"><span style="width: {{ wg.mediaProgressWidth }};"></span></div></sc-if>
+                  <sc-if value="{{ wg.mediaShowTimes }}" hint-placeholder-val="{{ true }}"><div class="hv-media-times"><span class="hv-media-time-cur">{{ wg.mediaTimeCur }}</span><span class="hv-media-time-dur">{{ wg.mediaTimeDur }}</span></div></sc-if>
+                </div>
+                <div class="hv-media-transport">
+                  <sc-if value="{{ wg.mediaShowSkip }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ wg.mediaPrev }}" aria-label="Previous track" title="Previous track" disabled="{{ wg.mediaControlsDisabled }}" aria-disabled="{{ wg.mediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg></button></sc-if>
+                  <button type="button" class="hv-media-play" onClick="{{ wg.mediaPlayPause }}" aria-label="{{ wg.mediaPlayLabel }}" title="{{ wg.mediaPlayLabel }}" disabled="{{ wg.mediaControlsDisabled }}" aria-disabled="{{ wg.mediaControlsDisabled }}">
+                    <sc-if value="{{ wg.mediaPlaying }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"></path></svg></sc-if>
+                    <sc-if value="{{ wg.mediaShowPlay }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"></path></svg></sc-if>
                   </button>
-                  <button type="button" class="hv-media-play" onClick="{{ mediaPlayPause }}" title="Play/Pause" disabled="{{ mediaControlsDisabled }}" aria-disabled="{{ mediaControlsDisabled }}">
-                    <sc-if value="{{ mediaPlaying }}" hint-placeholder-val="{{ false }}">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"></path></svg>
-                    </sc-if>
-                    <sc-if value="{{ mediaShowPlay }}" hint-placeholder-val="{{ true }}">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"></path></svg>
-                    </sc-if>
-                  </button>
-                  <button type="button" onClick="{{ mediaNext }}" title="Next" disabled="{{ mediaControlsDisabled }}" aria-disabled="{{ mediaControlsDisabled }}">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg>
-                  </button>
+                  <sc-if value="{{ wg.mediaShowSkip }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ wg.mediaNext }}" aria-label="Next track" title="Next track" disabled="{{ wg.mediaControlsDisabled }}" aria-disabled="{{ wg.mediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg></button></sc-if>
                 </div>
               </div>
             </div>
@@ -5191,33 +5363,32 @@ window.HavalSplash = (function () {
             <div class="hv-navigation {{ wg.navigationSizeClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><small>{{ wg.navigationSource }}</small></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-turn"><svg viewBox="0 0 24 24"><path d="M7 18V11a4 4 0 0 1 4-4h7"></path><path d="m15 4 3 3-3 3"></path></svg></div><div class="hv-navigation-copy"><strong>{{ wg.navigationDistance }}</strong><span>{{ wg.navigationHint }}</span></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-media-rail {{ wg.mediaSizeClass }} {{ mediaOpenClass }}" style="opacity: {{ mediaRailOpacity }};" onClick="{{ mediaOpenApp }}">
-              <div class="hv-media-art-wrap">
-                <sc-if value="{{ mediaHasArt }}" hint-placeholder-val="{{ false }}">
-                  <img src="{{ mediaArt }}" alt="">
-                </sc-if>
+            <div class="hv-media {{ wg.mediaSizeClass }} {{ wg.mediaLayoutClass }} {{ wg.mediaArtClass }} {{ wg.mediaOpenClass }}" onClick="{{ wg.onMediaOpen }}">
+              <div class="hv-media-art">
+                <sc-if value="{{ wg.mediaHasArt }}" hint-placeholder-val="{{ false }}"><img src="{{ wg.mediaArt }}" alt=""></sc-if>
+                <sc-if value="{{ wg.mediaShowArtPlaceholder }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.4"></circle></svg></sc-if>
               </div>
-              <div class="hv-media-source">{{ mediaSourceLabel }}</div>
-              <div class="hv-media-chrome">
-                <div class="hv-media-title">{{ mediaTitle }}</div>
-                <div class="hv-media-artist">{{ mediaArtist }}</div>
-                <div class="hv-media-progress"><span style="width: {{ mediaProgressWidth }};"></span></div>
-                <div class="hv-media-times"><span>{{ mediaTimeCur }}</span><span>{{ mediaTimeDur }}</span></div>
-                <div class="hv-media-transport" style="pointer-events: {{ mediaTransportEvents }}; opacity: {{ mediaTransportOpacity }};">
-                  <button type="button" onClick="{{ mediaPrev }}" title="Previous" disabled="{{ mediaControlsDisabled }}" aria-disabled="{{ mediaControlsDisabled }}">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg>
+              <sc-if value="{{ wg.mediaShowApp }}" hint-placeholder-val="{{ false }}">
+                <div class="hv-media-app">
+                  <sc-if value="{{ wg.mediaHasAppIcon }}" hint-placeholder-val="{{ false }}"><img src="{{ wg.mediaAppIcon }}" alt=""></sc-if>
+                  <sc-if value="{{ wg.mediaShowAppName }}" hint-placeholder-val="{{ true }}"><span class="hv-media-app-name">{{ wg.mediaAppLabel }}</span></sc-if>
+                </div>
+              </sc-if>
+              <div class="hv-media-body">
+                <div class="hv-media-chrome">
+                  <div class="hv-media-source {{ wg.mediaSourceClass }}" role="status">{{ wg.mediaSource }}</div>
+                  <div class="hv-media-title">{{ wg.mediaTitle }}</div>
+                  <sc-if value="{{ wg.mediaShowArtist }}" hint-placeholder-val="{{ true }}"><div class="hv-media-artist">{{ wg.mediaArtist }}</div></sc-if>
+                  <sc-if value="{{ wg.mediaShowProgress }}" hint-placeholder-val="{{ true }}"><div class="hv-media-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ wg.mediaProgressPct }}"><span style="width: {{ wg.mediaProgressWidth }};"></span></div></sc-if>
+                  <sc-if value="{{ wg.mediaShowTimes }}" hint-placeholder-val="{{ true }}"><div class="hv-media-times"><span class="hv-media-time-cur">{{ wg.mediaTimeCur }}</span><span class="hv-media-time-dur">{{ wg.mediaTimeDur }}</span></div></sc-if>
+                </div>
+                <div class="hv-media-transport">
+                  <sc-if value="{{ wg.mediaShowSkip }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ wg.mediaPrev }}" aria-label="Previous track" title="Previous track" disabled="{{ wg.mediaControlsDisabled }}" aria-disabled="{{ wg.mediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg></button></sc-if>
+                  <button type="button" class="hv-media-play" onClick="{{ wg.mediaPlayPause }}" aria-label="{{ wg.mediaPlayLabel }}" title="{{ wg.mediaPlayLabel }}" disabled="{{ wg.mediaControlsDisabled }}" aria-disabled="{{ wg.mediaControlsDisabled }}">
+                    <sc-if value="{{ wg.mediaPlaying }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"></path></svg></sc-if>
+                    <sc-if value="{{ wg.mediaShowPlay }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"></path></svg></sc-if>
                   </button>
-                  <button type="button" class="hv-media-play" onClick="{{ mediaPlayPause }}" title="Play/Pause" disabled="{{ mediaControlsDisabled }}" aria-disabled="{{ mediaControlsDisabled }}">
-                    <sc-if value="{{ mediaPlaying }}" hint-placeholder-val="{{ false }}">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"></path></svg>
-                    </sc-if>
-                    <sc-if value="{{ mediaShowPlay }}" hint-placeholder-val="{{ true }}">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7L8 5z"></path></svg>
-                    </sc-if>
-                  </button>
-                  <button type="button" onClick="{{ mediaNext }}" title="Next" disabled="{{ mediaControlsDisabled }}" aria-disabled="{{ mediaControlsDisabled }}">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg>
-                  </button>
+                  <sc-if value="{{ wg.mediaShowSkip }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ wg.mediaNext }}" aria-label="Next track" title="Next track" disabled="{{ wg.mediaControlsDisabled }}" aria-disabled="{{ wg.mediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg></button></sc-if>
                 </div>
               </div>
             </div>
@@ -5661,6 +5832,41 @@ window.HavalSplash = (function () {
         </section>
         </div>
         <sc-if value="{{ focusedDrivingShowNote }}" hint-placeholder-val="{{ false }}"><div class="hv-driving-note">{{ focusedDrivingNote }}</div></sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ focusedCardIsMedia }}" hint-placeholder-val="{{ false }}">
+      <div class="hv-media-focus {{ focusedMediaArtClass }}">
+        <div class="hv-media-focus-main">
+          <div class="hv-media-focus-art">
+            <sc-if value="{{ focusedMediaHasArt }}" hint-placeholder-val="{{ false }}"><img src="{{ focusedMediaArt }}" alt=""></sc-if>
+            <sc-if value="{{ focusedMediaShowArtPlaceholder }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.4"></circle></svg></sc-if>
+          </div>
+          <div class="hv-media-focus-copy">
+            <sc-if value="{{ focusedMediaShowApp }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-media-app">
+                <sc-if value="{{ focusedMediaHasAppIcon }}" hint-placeholder-val="{{ false }}"><img src="{{ focusedMediaAppIcon }}" alt=""></sc-if>
+                <span class="hv-media-app-name">{{ focusedMediaAppLabel }}</span>
+              </div>
+            </sc-if>
+            <div class="hv-media-title">{{ focusedMediaTitle }}</div>
+            <sc-if value="{{ focusedMediaShowArtist }}" hint-placeholder-val="{{ true }}"><div class="hv-media-artist">{{ focusedMediaArtist }}</div></sc-if>
+            <sc-if value="{{ focusedMediaShowAlbum }}" hint-placeholder-val="{{ true }}"><div class="hv-media-focus-album">{{ focusedMediaAlbum }}</div></sc-if>
+            <sc-if value="{{ focusedMediaShowProgress }}" hint-placeholder-val="{{ true }}"><div class="hv-media-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ focusedMediaProgressPct }}"><span style="width: {{ focusedMediaProgressWidth }};"></span></div></sc-if>
+            <sc-if value="{{ focusedMediaShowTimes }}" hint-placeholder-val="{{ true }}"><div class="hv-media-times"><span class="hv-media-time-cur">{{ focusedMediaTimeCur }}</span><span class="hv-media-time-dur">{{ focusedMediaTimeDur }}</span></div></sc-if>
+          </div>
+        </div>
+        <div class="hv-media-transport">
+          <button type="button" onClick="{{ focusedMediaPrev }}" aria-label="Previous track" title="Previous track" disabled="{{ focusedMediaControlsDisabled }}" aria-disabled="{{ focusedMediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg></button>
+          <button type="button" class="hv-media-play" onClick="{{ focusedMediaPlayPause }}" aria-label="{{ focusedMediaPlayLabel }}" title="{{ focusedMediaPlayLabel }}" disabled="{{ focusedMediaControlsDisabled }}" aria-disabled="{{ focusedMediaControlsDisabled }}">
+            <sc-if value="{{ focusedMediaPlaying }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"></path></svg></sc-if>
+            <sc-if value="{{ focusedMediaShowPlay }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"></path></svg></sc-if>
+          </button>
+          <button type="button" onClick="{{ focusedMediaNext }}" aria-label="Next track" title="Next track" disabled="{{ focusedMediaControlsDisabled }}" aria-disabled="{{ focusedMediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg></button>
+        </div>
+        <div class="hv-media-focus-foot">
+          <p class="hv-media-focus-note">{{ focusedMediaNote }}</p>
+          <button type="button" class="hv-media-focus-app" onClick="{{ focusedMediaOpenApp }}" disabled="{{ focusedMediaOpenDisabled }}" aria-disabled="{{ focusedMediaOpenDisabled }}">{{ focusedMediaOpenLabel }}</button>
+        </div>
       </div>
     </sc-if>
   </section>
@@ -6412,7 +6618,7 @@ const H6_BOTTOM_CARD_CATALOG = [
   { id: 'navigation', title: 'Navigation', action: 'openNavigation' },
   { id: 'climate', title: 'Climate', action: 'openClimate' },
   { id: 'consumption', title: 'Consumption', action: 'openConsumption' },
-  { id: 'media', title: 'Media', action: 'addWidget' },
+  { id: 'media', title: 'Media', action: 'openMediaApp', longAction: 'openMedia' },
   { id: 'range', title: 'Range', action: 'openRange' },
   { id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' },
   { id: 'tires', title: 'Tires', action: 'openTires' },
@@ -6671,6 +6877,7 @@ const H6_DRIVING_SET_PREFIX = 'drivingSet:';
  */
 const H6_CARD_POPUP_TYPES = {
   climate: 'climate',
+  media: 'media',
   consumption: 'consumption',
   tires: 'tires',
   range: 'range',
@@ -7089,6 +7296,8 @@ class Component extends DCLogic {
     mediaPackageName: '',
     mediaArt: '',
     mediaHasTrack: false,
+    mediaAppIcon: '',
+    mediaCanLaunch: false,
     shellMode: BOOT_SHELL.mode,
     centerFill: readUrlCenterFill() || 'car', // 'car' | 'wallpaper' | 'mixed' (experimental)
     wallpaperAuto: true,
@@ -10869,7 +11078,6 @@ class Component extends DCLogic {
       // Config panel docks over the left widget board (see configDock*).
       toolbarRight: (s.panelOpen ? 286 : 26) + 'px',
       configPanelRight: '26px',
-      mediaRailDisplay: 'none',
       shellHudDisplay: 'none',
       // Multi-page chrome (apps / car / AC) parked — main screen only for now.
       pageBtnsDisplay: 'none',
@@ -10909,34 +11117,6 @@ class Component extends DCLogic {
       setLaunchSideRight: () => this._setLaunchSide('right'),
       ...this._desktopRenderFields(s),
       ...this._widgetRenderFields(s),
-      mediaRailOpacity: s.mediaHasTrack ? '1' : '0.92',
-      mediaHasArt: !!(s.mediaArt && s.mediaHasTrack),
-      mediaTitle: s.mediaHasTrack
-        ? (s.mediaTitle || 'Unknown')
-        : (s.mediaNeedsListener ? 'Notification access required' : 'Nothing playing'),
-      mediaArtist: s.mediaHasTrack
-        ? (s.mediaArtist || '')
-        : (s.mediaNeedsListener ? 'Enable H6 3D in Notification access' : ''),
-      mediaAppLabel: s.mediaAppLabel || 'MEDIA',
-      mediaSourceLabel: s.mediaHasTrack
-        ? ((s.mediaAppLabel || 'MEDIA') + ' · NOW PLAYING')
-        : (s.mediaNeedsListener ? 'MEDIA ACCESS REQUIRED' : 'MEDIA · NO TRACK'),
-      mediaArt: s.mediaArt || '',
-      mediaPlaying: !!s.mediaPlaying,
-      mediaShowPlay: !s.mediaPlaying,
-      mediaProgressWidth: (s.mediaDurationMs > 0)
-        ? Math.min(100, Math.max(0, ((this._mediaPositionMs != null ? this._mediaPositionMs : s.mediaPositionMs) / s.mediaDurationMs) * 100)) + '%'
-        : '0%',
-      mediaTimeCur: this._fmtMediaTime(this._mediaPositionMs != null ? this._mediaPositionMs : s.mediaPositionMs),
-      mediaTimeDur: this._fmtMediaTime(s.mediaDurationMs),
-      mediaTransportEvents: s.mediaHasTrack && window.MediaBridge ? 'auto' : 'none',
-      mediaTransportOpacity: s.mediaHasTrack && window.MediaBridge ? '1' : '0.35',
-      mediaControlsDisabled: !(s.mediaHasTrack && window.MediaBridge),
-      mediaPrev: (ev) => this._mediaTransport('prev', ev),
-      mediaPlayPause: (ev) => this._mediaTransport('playPause', ev),
-      mediaNext: (ev) => this._mediaTransport('next', ev),
-      mediaOpenClass: s.mediaPackageName ? 'can-open' : '',
-      mediaOpenApp: (ev) => this._openMediaApp(ev),
       timeDayIconDisplay:   s.timeMode === 'day'   ? 'block' : 'none',
       timeNightIconDisplay: s.timeMode === 'night' ? 'block' : 'none',
       timeAutoIconDisplay:  s.timeMode === 'auto'  ? 'block' : 'none',
@@ -29425,16 +29605,19 @@ class Component extends DCLogic {
     const base = {
       // Driving sizes to its content now that it fits; the others keep the
       // fixed frame their layouts were built against.
-      focusedCardPopupClass: (type ? 'on' : '') + (type === 'driving' ? ' fit' : ''),
+      focusedCardPopupClass: (type ? 'on' : '') + (type === 'driving' || type === 'media' ? ' fit' : '')
+        + (type === 'media' ? ' narrow' : ''),
       focusedCardBackdropClass: type ? 'on' : '',
       focusedCardTitle: type === 'range' ? 'RANGE'
         : (type === 'consumption' ? 'CONSUMPTION'
           : (type === 'tires' ? 'TYRE PRESSURE'
             : (type === 'status' ? 'VEHICLE STATUS'
-              : (type === 'driving' ? 'DRIVING CONTROLS' : 'CLIMATE')))),
+              : (type === 'driving' ? 'DRIVING CONTROLS'
+                : (type === 'media' ? 'MEDIA' : 'CLIMATE'))))),
       focusedCardIsClimate: type === 'climate', focusedCardIsConsumption: type === 'consumption',
       focusedCardIsTires: type === 'tires', focusedCardIsStatus: type === 'status',
       focusedCardIsRange: type === 'range', focusedCardIsDriving: type === 'driving',
+      focusedCardIsMedia: type === 'media',
       focusedCardBadge: '', focusedCardBadgeClass: '',
       closeFocusedCard: () => this._closeFocusedCard(),
     };
@@ -29445,7 +29628,8 @@ class Component extends DCLogic {
           : (type === 'status' ? this._statusWidgetView(entry.item)
             : (type === 'range' ? this._rangeWidgetView(entry.item)
               : (type === 'driving' ? this._drivingWidgetView(entry.item)
-                : this._consumptionWidgetView(entry.item, entry.side)))));
+                : (type === 'media' ? this._mediaWidgetView(entry.item)
+                  : this._consumptionWidgetView(entry.item, entry.side))))));
     Object.keys(view).forEach((key) => {
       if (key.indexOf(type) === 0) base['focused' + key.charAt(0).toUpperCase() + key.slice(1)] = view[key];
     });
@@ -29454,6 +29638,12 @@ class Component extends DCLogic {
     if (type === 'driving') {
       base.focusedCardBadge = view.drivingSource;
       base.focusedCardBadgeClass = 'on ' + view.drivingSourceClass;
+    }
+    // Media states its source beside the popup title for the same reason: a
+    // dialog's status belongs in its header, not in a row of its own.
+    if (type === 'media') {
+      base.focusedCardBadge = view.mediaSource;
+      base.focusedCardBadgeClass = 'on ' + view.mediaSourceClass;
     }
     return base;
   }
@@ -30194,6 +30384,153 @@ class Component extends DCLogic {
   }
 
   /**
+   * MEDIA card + widget + popup.
+   *
+   * One builder for all three surfaces, the way DRIVING does it:
+   * `_focusedCardRenderFields` re-exports every key starting with the card type,
+   * so `mediaTitle` reaches the popup markup as `focusedMediaTitle` with no
+   * second code path to keep in sync, and `_syncDockIndicators` reads the same
+   * object for the rail tile.
+   *
+   * Nothing here is simulated. Every field traces to a key MediaNowPlaying
+   * actually publishes (title / artist / album / durationMs / positionMs /
+   * playing / appLabel / packageName / hasTrack / artDataUrl / needsListener),
+   * and the only commands offered are the three MediaBridge exposes. There is
+   * deliberately no seek, shuffle, repeat or queue: the bridge has none of them,
+   * and a control that cannot reach the player is worse than no control.
+   *
+   * There is also no DEMO state. Media is never synthesised, so the badge never
+   * has a demo form to abbreviate — the idle strings from
+   * docs/widget-data-audit.md are the contract and are used verbatim.
+   */
+  _mediaWidgetView(item) {
+    const s = this.state;
+    const w = Number(item && item.w) || 2;
+    const h = Number(item && item.h) || 1;
+    const bridge = !!window.MediaBridge;
+    const hasTrack = !!s.mediaHasTrack;
+    const needsListener = !!s.mediaNeedsListener;
+    const controlsDisabled = !(hasTrack && bridge);
+    const hasArt = !!(s.mediaArt && hasTrack);
+
+    // Source vocabulary. The two idle strings are fixed by the widget data
+    // audit; the browser case is the third truthful state that used to be
+    // reported as "no track", which implies we looked and there was none.
+    let source = 'MEDIA · NO TRACK';
+    let sourceClass = 'idle';
+    if (needsListener) {
+      source = 'MEDIA ACCESS REQUIRED';
+      sourceClass = 'unavailable';
+    } else if (!bridge) {
+      source = 'MEDIA UNAVAILABLE · NO MEDIA BRIDGE';
+      sourceClass = 'unavailable';
+    } else if (hasTrack) {
+      // `playing` is published per update, so PAUSED is a reading, not a guess.
+      // The old card said NOW PLAYING over a paused session.
+      source = (s.mediaAppLabel || 'MEDIA').toUpperCase()
+        + (s.mediaPlaying ? ' · NOW PLAYING' : ' · PAUSED');
+      sourceClass = s.mediaPlaying ? 'live' : 'idle';
+    }
+
+    const title = hasTrack
+      ? (s.mediaTitle || 'Unknown track')
+      : (needsListener ? 'Notification access required'
+        : (bridge ? 'Nothing playing' : 'Media is a head-unit feature'));
+    const artist = hasTrack
+      ? (s.mediaArtist || '')
+      : (needsListener ? 'Enable H6 3D in Notification access'
+        : (bridge ? '' : 'No MediaBridge in this shell'));
+
+    const durationMs = Number(s.mediaDurationMs) || 0;
+    const positionMs = this._mediaPositionMs != null ? this._mediaPositionMs : (Number(s.mediaPositionMs) || 0);
+    const progressPct = durationMs > 0
+      ? Math.min(100, Math.max(0, Math.round((positionMs / durationMs) * 100))) : 0;
+    // A source that publishes no duration (live radio, some browsers) has no
+    // progress to show. An empty bar there reads as "stuck at zero".
+    const hasProgress = hasTrack && durationMs > 0;
+
+    // Slot shape picks the layout, not a per-size branch of the data: short and
+    // wide puts the art beside the copy, everything else puts it behind.
+    const wide = h === 1 && w >= 2;
+    const compact = w === 1 && h === 1;
+
+    // A projection source (CarPlay, Android Auto) publishes a package like any
+    // other player, so opening it is the same call — but only when the package
+    // has a launcher entry, which the native side reports rather than us
+    // assuming. Without it the tap would be a silent no-op.
+    const canLaunch = !!(hasTrack && s.mediaPackageName && s.mediaCanLaunch);
+    const openApp = (ev) => this._openMediaApp(ev);
+    return {
+      mediaSizeClass: 'hv-media-' + w + 'x' + h,
+      mediaLayoutClass: wide ? 'split' : 'cover',
+      mediaArtClass: hasArt ? 'has-art' : 'no-art',
+      mediaSource: source,
+      mediaSourceClass: sourceClass,
+      mediaTitle: title,
+      mediaArtist: artist,
+      mediaAlbum: s.mediaAlbum || '',
+      mediaAppLabel: s.mediaAppLabel || 'MEDIA',
+      mediaArt: s.mediaArt || '',
+      mediaHasArt: hasArt,
+      // The source app names itself in the corner: its own icon and label,
+      // both published by MediaNowPlaying rather than guessed from the
+      // package name.
+      mediaAppIcon: s.mediaAppIcon || '',
+      mediaHasAppIcon: !!(hasTrack && s.mediaAppIcon),
+      mediaShowApp: hasTrack && !!(s.mediaAppLabel || s.mediaAppIcon),
+      // At 1x1 the pill is the icon alone: the name would eat most of the
+      // slot width and the icon already identifies the player.
+      mediaShowAppName: !compact && !!s.mediaAppLabel,
+      mediaShowArtPlaceholder: !hasArt,
+      // At 1x1 the artist is what gives way: the title and the app chip already
+      // identify the track, and the tile has 176px to spend on five lines.
+      mediaShowArtist: !!artist && !compact,
+      mediaShowAlbum: !!(hasTrack && s.mediaAlbum),
+      mediaShowProgress: hasProgress,
+      mediaShowTimes: hasProgress && !compact,
+      // Prev/next need a precise tap. At 1x1 there is room for one control and
+      // play/pause is the one worth having.
+      mediaShowSkip: !compact,
+      mediaProgressWidth: (hasProgress ? progressPct : 0) + '%',
+      mediaProgressPct: progressPct,
+      mediaTimeCur: this._fmtMediaTime(positionMs),
+      mediaTimeDur: this._fmtMediaTime(durationMs),
+      mediaPlaying: !!s.mediaPlaying,
+      mediaShowPlay: !s.mediaPlaying,
+      mediaPlayLabel: s.mediaPlaying ? 'Pause' : 'Play',
+      mediaControlsDisabled: controlsDisabled,
+      mediaPrev: (ev) => this._mediaTransport('prev', ev),
+      mediaPlayPause: (ev) => this._mediaTransport('playPause', ev),
+      mediaNext: (ev) => this._mediaTransport('next', ev),
+      mediaNote: controlsDisabled
+        ? (needsListener
+          ? 'Transport is disabled until H6 3D is granted Notification access. Nothing is sent to a player while it is.'
+          : (bridge
+            ? 'Transport is disabled while no player reports an active track. Nothing is sent to a player while it is.'
+            : 'This shell has no MediaBridge, so no transport command can reach a player.'))
+        : 'Play, pause and skip are sent to the session that published this track.',
+      mediaOpenLabel: canLaunch ? ('OPEN ' + (s.mediaAppLabel || 'APP')) : 'NO APP TO OPEN',
+      mediaCanLaunch: canLaunch,
+      mediaOpenDisabled: !canLaunch,
+      mediaOpenApp: openApp,
+      // The body opens the PLAYER, not the popup: the thing a driver wants from
+      // a now-playing card is the app it is playing from. The MEDIA popup is
+      // one long press away, on the widget's own menu and on the rail card.
+      mediaOpenClass: canLaunch ? 'can-open' : '',
+      onMediaOpen: (ev) => {
+        this._cardControlEvent(ev);
+        if (this._widgetSuppressClick || this.state.widgetMenuId) return;
+        if (!canLaunch) { this._openFocusedCard('media'); return; }
+        this._openMediaApp(ev);
+      },
+      onEdit: (ev) => {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        this._openFocusedCard('media');
+      },
+    };
+  }
+
+  /**
    * DRIVING card + popup.
    *
    * The card is a glance: the selected drive mode as the anchor, power mode and
@@ -30467,7 +30804,7 @@ class Component extends DCLogic {
       profile: { label: 'PROFILE', title: 'Vehicle & theme', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1], [3, 2]] },
       clock: { label: 'CLOCK', title: 'Time & date', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1], [3, 2]] },
       navigation: { label: 'NAVIGATION', title: 'Route preview', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2]] },
-      media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2], [1, 2]] },
+      media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [2, 2], [3, 1], [3, 2]] },
       tires: { label: 'TIRES', title: 'Tire pressure', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2]] },
       driving: { label: 'DRIVING', title: 'Drive, power & recovery', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [2, 2], [3, 1], [3, 2]] },
       status: { label: 'STATUS', title: 'Vehicle overview', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1], [3, 2]] },
@@ -30789,6 +31126,15 @@ class Component extends DCLogic {
       case 'openDriving':
         this._openFocusedCard('driving');
         break;
+      case 'openMedia':
+        this._openFocusedCard('media');
+        break;
+      case 'openMediaApp':
+        // Falls back to the popup when there is nothing to open, so the
+        // gesture always answers instead of doing nothing.
+        if (this.state.mediaCanLaunch && this.state.mediaPackageName) this._openMediaApp(null);
+        else this._openFocusedCard('media');
+        break;
       case 'openPower':
         try {
           if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
@@ -30851,6 +31197,7 @@ class Component extends DCLogic {
     const status = this._statusWidgetView({ type: 'status', w: 2, h: 1 });
     const tires = this._tiresWidgetView({ type: 'tires', w: 2, h: 1 });
     const clock = this._clockWidgetView({ type: 'clock', w: 1, h: 1 });
+    const media = this._mediaWidgetView({ type: 'media', w: 2, h: 1 });
     const activeDesktopIndex = Math.max(0, this._desktopIndex || 0);
     const desktopCount = Math.max(1, this._desktops ? this._desktops.length : 1);
     const activeDesktopName = this._desktops && this._desktops[activeDesktopIndex]
@@ -30922,7 +31269,7 @@ class Component extends DCLogic {
       navigation: navigation.navigationDistance + ' · ' + navigation.navigationHint,
       climate: climateSummary,
       consumption: consumptionSummary,
-      media: s.mediaTitle || 'Now playing',
+      media: media.mediaTitle,
       range: range.rangeSoc + '% · EV ' + range.rangeEv + ' km · GAS ' + range.rangeFuel + ' km',
       status: status.statusSummary + ' · ' + status.statusSource,
       tires: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / ')
@@ -30999,6 +31346,13 @@ class Component extends DCLogic {
         metricA: 'WORKSPACE',
         metricB: '',
         progress: Math.round((activeDesktopIndex + 1) * 100 / desktopCount),
+      },
+      media: {
+        primary: media.mediaTitle,
+        secondary: media.mediaSource,
+        metricA: media.mediaArtist,
+        metricB: media.mediaControlsDisabled ? 'TRANSPORT UNAVAILABLE' : '',
+        progress: media.mediaProgressPct,
       },
       driveMode: driveModeVisual,
       powerMode: powerModeVisual,
@@ -31255,7 +31609,6 @@ class Component extends DCLogic {
       isHint: item.type === 'hint',
       isStub: item.type !== 'profile' && item.type !== 'clock' && item.type !== 'navigation' && item.type !== 'media' && item.type !== 'tires' && item.type !== 'status' && item.type !== 'range' && item.type !== 'graphs' && item.type !== 'power'
         && item.type !== 'climate' && item.type !== 'consumption' && item.type !== 'driving' && item.type !== 'hint',
-      mediaSizeClass: item.type === 'media' ? ('hv-media-' + (item.w || 2) + 'x' + (item.h || 1)) : '',
       graphSizeClass: '',
       graphShowBars: false,
       graphGridStyle: '',
@@ -31264,14 +31617,17 @@ class Component extends DCLogic {
       menuOpen: menuOpen,
       showEdit: item.type === 'profile' || item.type === 'graphs' || item.type === 'climate'
         || item.type === 'consumption' || item.type === 'tires' || item.type === 'status'
-        || item.type === 'driving',
+        || item.type === 'driving' || item.type === 'media',
       editLabel: item.type === 'profile' ? 'CUSTOMIZE'
         : ((item.type === 'climate' || item.type === 'consumption' || item.type === 'tires'
-          || item.type === 'status' || item.type === 'driving') ? 'OPEN' : 'CONFIGURE'),
+          || item.type === 'status' || item.type === 'driving' || item.type === 'media') ? 'OPEN' : 'CONFIGURE'),
       showResize: this._widgetResizeSizes(item).length > 0,
       showMove: this._widgetCanMove(item, side),
       cardClass: (moving ? 'moving' : (menuOpen ? 'editing' : ''))
-        + (item.type === 'driving' ? ' has-controls' : ''),
+        + (item.type === 'driving' ? ' has-controls' : '')
+        // Media is the other card that is mostly buttons. Its own clause, so
+        // neither card's contract test is asserting on the other's wiring.
+        + (item.type === 'media' ? ' has-controls' : ''),
       onHoldStart: (ev) => this._onWidgetHoldStart(side, item, ev),
       onHoldEnd: (ev) => this._onWidgetHoldEnd(side, item, ev),
       onHoldCancel: (ev) => this._onWidgetHoldCancel(side, item, ev),
@@ -31304,6 +31660,7 @@ class Component extends DCLogic {
     if (item.type === 'navigation') Object.assign(view, this._navigationWidgetView(item));
     if (item.type === 'tires') Object.assign(view, this._tiresWidgetView(item));
     if (item.type === 'driving') Object.assign(view, this._drivingWidgetView(item));
+    if (item.type === 'media') Object.assign(view, this._mediaWidgetView(item));
     if (item.type === 'status') Object.assign(view, this._statusWidgetView(item));
     if (item.type === 'range') Object.assign(view, this._rangeWidgetView(item));
     if (item.type === 'graphs') Object.assign(view, this._graphWidgetView(item, side));
@@ -32309,10 +32666,7 @@ class Component extends DCLogic {
   }
 
   _openMediaApp(ev) {
-    if (this._widgetSuppressClick) return;
-    if (this.state.widgetMenuId || this.state.widgetPlaceType) return;
-    const t = ev && ev.target;
-    if (t && t.closest && t.closest('.hv-media-transport')) return;
+    if (ev && ev.stopPropagation) ev.stopPropagation();
     const pkg = this.state.mediaPackageName;
     if (!pkg) return;
     try {
@@ -32354,6 +32708,11 @@ class Component extends DCLogic {
       mediaPositionMs: Number(p.positionMs) || 0,
       mediaAppLabel: p.appLabel || (p.needsListener ? 'ENABLE MEDIA ACCESS' : 'MEDIA'),
       mediaPackageName: p.packageName || '',
+      mediaAppIcon: p.appIcon || '',
+      // Whether the source package can be brought to the front at all. A
+      // projection track can name a package with no launcher entry, and the
+      // native launch is a silent no-op there.
+      mediaCanLaunch: !!p.canLaunch,
       mediaNeedsListener: !!p.needsListener,
       // Apply metadata first; attach art on the next frame if present.
       mediaArt: '',
@@ -32384,7 +32743,7 @@ class Component extends DCLogic {
     const width = (dur > 0 ? Math.min(100, Math.max(0, (pos / dur) * 100)) : 0) + '%';
     const time = this._fmtMediaTime(pos);
     document.querySelectorAll('.hv-media-progress > span').forEach((el) => { el.style.width = width; });
-    document.querySelectorAll('.hv-media-times span:first-child').forEach((el) => { el.textContent = time; });
+    document.querySelectorAll('.hv-media-time-cur').forEach((el) => { el.textContent = time; });
   }
 
   _finishLoading(extra) {

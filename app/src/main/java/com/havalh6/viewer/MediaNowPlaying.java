@@ -53,6 +53,8 @@ final class MediaNowPlaying {
     /** Cover art is upscaled to fill a ~620x370 card, so keep it well above that. */
     private static final int ART_MAX_PX = 720;
     private static final int ART_JPEG_QUALITY = 88;
+    /** The source app's own icon, drawn beside its name on the card. */
+    private static final int APP_ICON_PX = 96;
     private static final Pattern YT_ID = Pattern.compile(
             "(?:(?:youtube(?:-nocookie)?\\.com/(?:watch\\?(?:.*&)?v=|embed/|shorts/|live/|v/)|youtu\\.be/|ytimg\\.com/vi(?:_webp)?/))([A-Za-z0-9_-]{11})");
     private static final Pattern YT_ID_BARE = Pattern.compile("^[A-Za-z0-9_-]{11}$");
@@ -70,6 +72,7 @@ final class MediaNowPlaying {
     private ComponentName listenerComponent;
     private Callback callback;
     private Context appContext;
+    private final java.util.Map<String, String> appIconCache = new java.util.HashMap<>();
     private Runnable positionTick;
     private Runnable accessRetry;
     private String lastArtKey = "";
@@ -396,6 +399,54 @@ final class MediaNowPlaying {
         emit();
     }
 
+    /**
+     * The source app's launcher icon, as a data URL.
+     *
+     * Cached per package: a cover changes per track, an app icon does not, and
+     * re-encoding a PNG on every metadata update would put it on the emit path.
+     */
+    private String appIconDataUrl(String pkg) {
+        if (appContext == null || pkg == null || pkg.isEmpty()) return "";
+        String cached = appIconCache.get(pkg);
+        if (cached != null) return cached;
+        String encoded = "";
+        try {
+            android.graphics.drawable.Drawable icon =
+                    appContext.getPackageManager().getApplicationIcon(pkg);
+            if (icon != null) {
+                int size = APP_ICON_PX;
+                Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+                android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+                icon.setBounds(0, 0, size, size);
+                icon.draw(canvas);
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
+                bmp.recycle();
+                encoded = "data:image/png;base64,"
+                        + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+            }
+        } catch (Exception ignored) {}
+        if (appIconCache.size() >= 8) appIconCache.clear();
+        appIconCache.put(pkg, encoded);
+        return encoded;
+    }
+
+    /**
+     * Whether this package can be brought to the front at all.
+     *
+     * A projection source can publish a track from a package with no launcher
+     * entry, and launchAppFullscreen returns silently when there is no launch
+     * intent — so the card has to know, or it offers a tap that does nothing.
+     */
+    private boolean canLaunch(String pkg) {
+        if (appContext == null || pkg == null || pkg.isEmpty()) return false;
+        try {
+            return appContext.getPackageManager().getLaunchIntentForPackage(pkg) != null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static String appLabel(Context ctx, String pkg) {
         if (ctx == null || pkg.isEmpty()) return pkg;
         try {
@@ -461,7 +512,9 @@ final class MediaNowPlaying {
         String art = artDataUrl(winner);
         String signature = winner.source + "|" + winner.packageName + "|" + winner.title + "|"
                 + winner.artist + "|" + winner.album + "|" + winner.durationMs + "|"
-                + winner.playing + "|" + winner.appLabel + "|" + lastArtKey + "|" + art.length();
+                + winner.playing + "|" + winner.appLabel + "|" + lastArtKey + "|" + art.length()
+                + "|" + canLaunch(winner.packageName)
+                + "|" + appIconDataUrl(winner.packageName).length();
         if (!changed(signature)) return;
 
         JSONObject o = emptyPayload(false);
@@ -476,6 +529,8 @@ final class MediaNowPlaying {
             o.put("packageName", winner.packageName);
             o.put("hasTrack", !winner.title.isEmpty() || !winner.artist.isEmpty());
             o.put("artDataUrl", art);
+            o.put("appIcon", appIconDataUrl(winner.packageName));
+            o.put("canLaunch", canLaunch(winner.packageName));
             o.put("needsListener", false);
         } catch (Exception e) {
             Log.w(TAG, "emit failed", e);
@@ -512,6 +567,8 @@ final class MediaNowPlaying {
             o.put("appLabel", needsListener ? "ENABLE MEDIA ACCESS" : "");
             o.put("packageName", "");
             o.put("artDataUrl", "");
+            o.put("appIcon", "");
+            o.put("canLaunch", false);
             o.put("hasTrack", false);
             o.put("needsListener", needsListener);
         } catch (Exception ignored) {}

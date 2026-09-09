@@ -85,6 +85,11 @@ public final class MainActivity extends Activity {
             "br.com.redesurftank.havalshisuku.ACTION_SET_TASK_BOUNDS";
 
     /** Commands exposed to data-driven bottom cards. Keep this deliberately narrow. */
+    /** Cover art on the MEDIA rail tile: the card's full height, less its padding. */
+    private static final int MEDIA_ART_DP = 106;
+    /** Inset for the placeholder glyph when the source published no artwork. */
+    private static final int MEDIA_ART_GLYPH_PAD_DP = 26;
+
     private static final java.util.Set<String> BOTTOM_CARD_ACTIONS =
             new java.util.HashSet<>(java.util.Arrays.asList(
                     "ac", "addWidget", "openDesktopStudio", "previousDesktop", "nextDesktop",
@@ -94,6 +99,7 @@ public final class MainActivity extends Activity {
                     // invoke vehicle APIs from Android.
                     "openClimate", "openConsumption", "openNavigation", "openPower", "openRange",
                     "openTires", "openVehicleStatus", "openDriving", "openDrivingOnePedal",
+                    "openMedia", "openMediaApp",
                     // Retained for native shells installed before the three mode
                     // tiles were unified into one Driving controls card.
                     "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
@@ -912,6 +918,19 @@ public final class MainActivity extends Activity {
     private android.widget.TextView quickMediaPlayPause;
     private final java.util.List<android.widget.TextView> quickMediaButtons = new java.util.ArrayList<>();
     private boolean quickMediaAvailable;
+    private android.widget.ImageView quickMediaAppIcon;
+    private android.widget.TextView quickMediaAppName;
+    private View quickMediaAppRow;
+    private boolean quickMediaCanLaunch;
+    /**
+     * The last now-playing payload, replayed after the rail is rebuilt.
+     *
+     * populateQuickCardsRow drops every media view and builds fresh ones, and
+     * an accent change rebuilds the whole rail — so without this the card
+     * reverts to "Nothing playing" with its transport greyed out and stays
+     * that way until the player happens to publish an update.
+     */
+    private JSONObject lastMediaPayload;
     private String quickMediaPackage = "";
     private boolean quickMediaPlaying;
     private String dockSurfaceMode = DOCK_SURFACE_LAUNCHER;
@@ -6751,6 +6770,9 @@ public final class MainActivity extends Activity {
         quickMediaTitle = null;
         quickMediaArtist = null;
         quickMediaPlayPause = null;
+        quickMediaAppIcon = null;
+        quickMediaAppName = null;
+        quickMediaAppRow = null;
         quickMediaButtons.clear();
 
         // Cards mode starts with one predictable Workspace card. It exposes
@@ -6767,8 +6789,9 @@ public final class MainActivity extends Activity {
                 // Keep its transport surface when users reorder/select it instead
                 // of reducing it to a generic navigation tile.
                 if ("media".equals(descriptor.id)) {
-                    View media = makeQuickMediaCard(density);
+                    View media = makeQuickMediaCard(density, descriptor);
                     media.setTag("bottomCard:" + descriptor.id);
+                    quickCardHosts.put(descriptor.id, media);
                     row.addView(media);
                     continue;
                 }
@@ -6785,6 +6808,7 @@ public final class MainActivity extends Activity {
                 if (valueView != null) quickCardValues.put(descriptor.id, valueView);
                 row.addView(card);
             }
+            replayMediaPayload();
             return;
         }
 
@@ -6801,7 +6825,19 @@ public final class MainActivity extends Activity {
         quickConsumptionValue = (android.widget.TextView) consumption.findViewWithTag("quickValue");
         row.addView(consumption);
 
-        row.addView(makeQuickMediaCard(density));
+        row.addView(makeQuickMediaCard(density, null));
+        replayMediaPayload();
+    }
+
+    /**
+     * Re-apply the last now-playing payload to freshly built media views.
+     *
+     * Same class of bug as the driving wash that refreshQuickCardsTheme has to
+     * carry: state baked into a card at build time disappears the next time the
+     * rail is rebuilt, and it disappears silently.
+     */
+    private void replayMediaPayload() {
+        if (lastMediaPayload != null) updateQuickMediaCard(lastMediaPayload);
     }
 
     /**
@@ -7126,7 +7162,20 @@ public final class MainActivity extends Activity {
         return card;
     }
 
-    private View makeQuickMediaCard(float density) {
+    /**
+     * MEDIA rail card.
+     *
+     * This is the one rail tile that is NOT makeQuickVisualCard, and it stays
+     * that way deliberately: it is the only card whose useful action is a
+     * command rather than a reading, and folding it into the generic card
+     * would cost the three transport buttons to gain a shape it does not want.
+     * MediaCenter, the OEM reference, puts transport on its rail surface too.
+     *
+     * What it borrows from the generic card is the part that was missing: the
+     * body runs the descriptor's allow-listed action, so a tap anywhere that
+     * is not a control opens the MEDIA popup like every other card.
+     */
+    private View makeQuickMediaCard(float density, BottomCardDescriptor descriptor) {
         android.widget.LinearLayout card = new android.widget.LinearLayout(this);
         card.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         card.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -7138,14 +7187,44 @@ public final class MainActivity extends Activity {
         card.setLayoutParams(lp);
         card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
-        card.setContentDescription("Media quick controls");
+        card.setContentDescription(descriptor != null
+                ? bottomCardAccessibilityDescription(descriptor)
+                : "Media quick controls");
+        // The body opens the PLAYER — that is what a now-playing card is for,
+        // projection sources included. It is clickable unconditionally, so a
+        // card with nothing to open still consumes its own touch instead of
+        // letting it fall through to the 3D canvas underneath.
+        card.setClickable(true);
+        card.setFocusable(true);
+        final String bodyCommand = descriptor != null ? descriptor.action : "";
+        card.setOnClickListener(v -> {
+            if (quickMediaCanLaunch && quickMediaPackage != null && !quickMediaPackage.isEmpty()) {
+                launchAppForPackage(quickMediaPackage,
+                        quickMediaTitle != null ? quickMediaTitle.getText().toString() : "Media");
+            } else if (!bodyCommand.isEmpty()) {
+                // Nothing to open: fall back to the card's own command so the
+                // tap answers rather than doing nothing.
+                callViewerDock(bodyCommand);
+            }
+        });
+        if (descriptor != null && !descriptor.longAction.isEmpty()) {
+            final String longCommand = descriptor.longAction;
+            card.setLongClickable(true);
+            card.setOnLongClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                callViewerDock(longCommand);
+                return true;
+            });
+        }
         quickCardViews.add(card);
 
         quickMediaArt = new android.widget.ImageView(this);
         quickMediaArt.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
         quickMediaArt.setBackground(makeDockPlateDrawable(false, density));
-        quickMediaArt.setPadding(Math.round(17 * density), Math.round(17 * density),
-                Math.round(17 * density), Math.round(17 * density));
+        quickMediaArt.setPadding(Math.round(MEDIA_ART_GLYPH_PAD_DP * density),
+                Math.round(MEDIA_ART_GLYPH_PAD_DP * density),
+                Math.round(MEDIA_ART_GLYPH_PAD_DP * density),
+                Math.round(MEDIA_ART_GLYPH_PAD_DP * density));
         quickMediaArt.setImageDrawable(systemDockIcon(android.R.drawable.ic_media_play,
                 dockAccentColor));
         quickMediaArt.setClipToOutline(true);
@@ -7157,8 +7236,8 @@ public final class MainActivity extends Activity {
             }
         });
         android.widget.LinearLayout.LayoutParams artLp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(78 * density), Math.round(78 * density));
-        artLp.rightMargin = Math.round(12 * density);
+                Math.round(MEDIA_ART_DP * density), Math.round(MEDIA_ART_DP * density));
+        artLp.rightMargin = Math.round(11 * density);
         quickMediaArt.setLayoutParams(artLp);
         card.addView(quickMediaArt);
 
@@ -7168,12 +7247,27 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout.LayoutParams copyLp = new android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
         copy.setLayoutParams(copyLp);
+        // Heading row: the card's own name on the left, and on the right the
+        // app that published the track — its real icon and label, both from the
+        // now-playing payload rather than guessed from the package name.
+        android.widget.LinearLayout headRow = new android.widget.LinearLayout(this);
+        headRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        headRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        headRow.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setTag("frostSecondary");
         heading.setText("MEDIA");
         heading.setTextSize(10.5f);
         heading.setLetterSpacing(0.11f);
-        copy.addView(heading);
+        heading.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        headRow.addView(heading);
+
+        quickMediaAppRow = makeQuickMediaAppChip(density);
+        headRow.addView(quickMediaAppRow);
+        copy.addView(headRow);
         quickMediaTitle = new android.widget.TextView(this);
         quickMediaTitle.setTag("quickValue");
         quickMediaTitle.setText("Nothing playing");
@@ -7190,15 +7284,7 @@ public final class MainActivity extends Activity {
         quickMediaArtist.setMaxLines(1);
         quickMediaArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
         copy.addView(quickMediaArtist);
-        copy.setClickable(true);
-        copy.setFocusable(true);
-        copy.setContentDescription("Open current media app");
-        copy.setOnClickListener(v -> {
-            if (quickMediaPackage != null && !quickMediaPackage.isEmpty()) {
-                launchAppForPackage(quickMediaPackage,
-                        quickMediaTitle != null ? quickMediaTitle.getText().toString() : "Media");
-            }
-        });
+
         android.widget.LinearLayout controls = new android.widget.LinearLayout(this);
         controls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         controls.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
@@ -7214,6 +7300,67 @@ public final class MainActivity extends Activity {
         copy.addView(controls);
         card.addView(copy);
         return card;
+    }
+
+    /**
+     * The source app's icon and name, on the card's top right.
+     *
+     * Hidden outright when the payload carries neither, because an empty pill
+     * on an idle card reads as a control that has stopped working.
+     */
+    private View makeQuickMediaAppChip(float density) {
+        android.widget.LinearLayout chip = new android.widget.LinearLayout(this);
+        chip.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        chip.setPadding(0, 0, 0, 0);
+        chip.setVisibility(View.GONE);
+
+        quickMediaAppIcon = new android.widget.ImageView(this);
+        quickMediaAppIcon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        android.widget.LinearLayout.LayoutParams iconLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        Math.round(15 * density), Math.round(15 * density));
+        iconLp.rightMargin = Math.round(5 * density);
+        quickMediaAppIcon.setLayoutParams(iconLp);
+        chip.addView(quickMediaAppIcon);
+
+        quickMediaAppName = new android.widget.TextView(this);
+        quickMediaAppName.setTag("frostSecondary");
+        quickMediaAppName.setTextSize(8.5f);
+        quickMediaAppName.setLetterSpacing(0.09f);
+        quickMediaAppName.setMaxLines(1);
+        quickMediaAppName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        quickMediaAppName.setMaxWidth(Math.round(96 * density));
+        chip.addView(quickMediaAppName);
+        return chip;
+    }
+
+    private void applyQuickMediaAppChip(String iconDataUrl, String label) {
+        if (quickMediaAppRow == null) return;
+        Bitmap icon = decodeDataUrlBitmap(iconDataUrl);
+        boolean show = icon != null || (label != null && !label.isEmpty());
+        quickMediaAppRow.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show) return;
+        if (quickMediaAppIcon != null) {
+            quickMediaAppIcon.setVisibility(icon != null ? View.VISIBLE : View.GONE);
+            if (icon != null) quickMediaAppIcon.setImageBitmap(icon);
+        }
+        if (quickMediaAppName != null) {
+            quickMediaAppName.setText(label == null ? "" : label.toUpperCase(java.util.Locale.US));
+        }
+    }
+
+    /** Shared decode for the base64 payloads the media bridge sends. */
+    private static Bitmap decodeDataUrlBitmap(String dataUrl) {
+        if (dataUrl == null) return null;
+        int comma = dataUrl.indexOf(',');
+        if (comma < 0 || comma + 1 >= dataUrl.length()) return null;
+        try {
+            byte[] bytes = Base64.decode(dataUrl.substring(comma + 1), Base64.DEFAULT);
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private android.widget.TextView makeQuickMediaButton(float density, String text,
@@ -7258,8 +7405,10 @@ public final class MainActivity extends Activity {
 
     private void updateQuickMediaCard(JSONObject payload) {
         if (payload == null) return;
+        lastMediaPayload = payload;
         quickMediaPackage = payload.optString("packageName", "");
         quickMediaPlaying = payload.optBoolean("playing", false);
+        quickMediaCanLaunch = payload.optBoolean("canLaunch", false);
         boolean hasTrack = payload.optBoolean("hasTrack", false);
         quickMediaAvailable = hasTrack && mediaNowPlaying != null;
         for (android.widget.TextView button : quickMediaButtons) {
@@ -7273,25 +7422,20 @@ public final class MainActivity extends Activity {
                 : (!app.isEmpty() ? app : "Nothing playing");
         if (quickMediaTitle != null) quickMediaTitle.setText(display);
         if (quickMediaArtist != null) {
+            String album = payload.optString("album", "");
             quickMediaArtist.setText(!artist.isEmpty() ? artist
-                    : (!app.isEmpty() ? app : "Choose a media app"));
+                    : (hasTrack ? album : "Choose a media app"));
+            quickMediaArtist.setVisibility(
+                    quickMediaArtist.getText().length() == 0 ? View.INVISIBLE : View.VISIBLE);
         }
         if (quickMediaArt != null) {
-            String artDataUrl = payload.optString("artDataUrl", "");
-            Bitmap art = null;
-            int comma = artDataUrl.indexOf(',');
-            if (comma >= 0 && comma + 1 < artDataUrl.length()) {
-                try {
-                    byte[] bytes = Base64.decode(artDataUrl.substring(comma + 1), Base64.DEFAULT);
-                    art = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                } catch (Exception ignored) {}
-            }
+            Bitmap art = decodeDataUrlBitmap(payload.optString("artDataUrl", ""));
             quickMediaHasArt = art != null;
             if (quickMediaHasArt) {
                 quickMediaArt.setPadding(0, 0, 0, 0);
                 quickMediaArt.setImageBitmap(art);
             } else {
-                int pad = Math.round(17 * getResources().getDisplayMetrics().density);
+                int pad = Math.round(MEDIA_ART_GLYPH_PAD_DP * getResources().getDisplayMetrics().density);
                 quickMediaArt.setPadding(pad, pad, pad, pad);
                 quickMediaArt.setImageDrawable(systemDockIcon(android.R.drawable.ic_media_play,
                         dockAccentColor));
@@ -7301,6 +7445,7 @@ public final class MainActivity extends Activity {
             quickMediaPlayPause.setText(quickMediaPlaying ? "Ⅱ" : "▶");
             quickMediaPlayPause.setContentDescription(quickMediaPlaying ? "Pause" : "Play");
         }
+        applyQuickMediaAppChip(payload.optString("appIcon", ""), app);
     }
 
     /**
