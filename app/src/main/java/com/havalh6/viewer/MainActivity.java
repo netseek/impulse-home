@@ -1056,7 +1056,7 @@ public final class MainActivity extends Activity {
      * rather than presented as data.
      */
     private final class QuickMediaBarsView extends View {
-        private static final int BARS = 16;
+        private static final int BARS = 24;
         /** 15 Hz, not 60: this redraws on a panel that is already short of frames. */
         private static final long FRAME_MS = 66;
 
@@ -1133,7 +1133,7 @@ public final class MainActivity extends Activity {
             float d = getResources().getDisplayMetrics().density;
 
             float barW = 3f * d;
-            float gap = 4f * d;
+            float gap = 5f * d;
             float span = BARS * barW + (BARS - 1) * gap;
             float right = w - 9f * d;
             float left = right - span;
@@ -7450,9 +7450,12 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout controls = new android.widget.LinearLayout(this);
         controls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         controls.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        // WRAP_CONTENT, not a fixed height. This row was pinned to 36dp from
+        // when the buttons were 34dp rectangles; the 48dp play circle overflowed
+        // it and the row clipped the top and bottom off every button.
         android.widget.LinearLayout.LayoutParams controlsLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                Math.round(36 * density));
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
         controlsLp.topMargin = Math.round(3 * density);
         controls.setLayoutParams(controlsLp);
         controls.addView(makeQuickMediaButton(density, false, "prev", "Previous track",
