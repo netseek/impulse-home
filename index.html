@@ -10774,6 +10774,10 @@ class Component extends DCLogic {
       if (this._carTrace) console.warn('[CarSignal] window_status unknown state:', value);
       return;
     }
+    const corners = ['fl', 'fr', 'rl', 'rr'];
+    const states = {};
+    corners.forEach((corner, i) => { states[corner] = slots[i] === 0 ? 'open' : 'closed'; });
+    this._carWindowStates = states;
     this._setWindowsOpen(slots.some((n) => n === 0) ? 100 : 0);
   }
 
@@ -30806,7 +30810,7 @@ class Component extends DCLogic {
     const now = Date.now();
     const at = this._carSignalAt || {};
     const observed = !!at[CAR_SIGNALS.doors];
-    const fresh = observed && now - at[CAR_SIGNALS.doors] <= 120000;
+    const fresh = this._carSignalFreshness(CAR_SIGNALS.doors) === 'live';
     const demo = !!this._demoPreview && !observed && allowDemo;
     const definitions = [
       { key: 'fl', short: 'DRIVER', label: 'Driver door' },
@@ -30867,13 +30871,15 @@ class Component extends DCLogic {
     const at = this._carSignalAt || {};
     const now = Date.now();
     const roofObserved = !!at[CAR_SIGNALS.sunroof] || !!at[CAR_SIGNALS.curtain];
+    const windowsObserved = !!at[CAR_SIGNALS.windows] && !!this._carWindowStates;
+    const windowsFresh = this._carSignalFreshness(CAR_SIGNALS.windows) === 'live';
     const doors = this._statusDoorSnapshot(!roofObserved);
-    const demo = !!this._demoPreview && !doors.observed && !roofObserved;
+    const demo = !!this._demoPreview && !doors.observed && !roofObserved && !windowsObserved;
     const openingState = (pct) => pct <= 0 ? 'closed' : (pct >= 98 ? 'open' : 'partial');
     const openingLabel = (state) => state === 'open' ? 'OPEN' : (state === 'partial' ? 'PART OPEN' : (state === 'closed' ? 'CLOSED' : 'UNKNOWN'));
     const roofPart = (label, signal, pct, demoPct) => {
       const observed = !!at[signal];
-      const fresh = observed && now - at[signal] <= 120000;
+      const fresh = this._carSignalFreshness(signal) === 'live';
       const level = demo && !observed ? demoPct : (observed ? pct : null);
       const state = level == null ? 'unknown' : openingState(level);
       return { label, state, stateLabel: openingLabel(state), pct: level == null ? 0 : Math.round(level),
@@ -30887,8 +30893,14 @@ class Component extends DCLogic {
       { key: 'fl', label: 'Driver glass', demoState: 'partial' }, { key: 'fr', label: 'Passenger glass', demoState: 'open' },
       { key: 'rl', label: 'Rear left glass', demoState: 'closed' }, { key: 'rr', label: 'Rear right glass', demoState: 'closed' },
     ].map((windowState) => {
-      const state = demo ? (demoWindows[windowState.key] || windowState.demoState) : 'unknown';
-      return Object.assign({}, windowState, { state, stateLabel: openingLabel(state), source: demo ? 'DEMO' : 'UNAVAILABLE', cls: windowState.key + ' ' + state });
+      // car.basic.window_status is a binary state per corner, so a window is
+      // only ever open or closed here -- never 'partial'. The vehicle does not
+      // report travel, and inventing a percentage from a state would be a
+      // number it never sent.
+      const live = windowsObserved ? (this._carWindowStates || {})[windowState.key] : null;
+      const state = live || (demo ? (demoWindows[windowState.key] || windowState.demoState) : 'unknown');
+      const source = live ? (windowsFresh ? 'LIVE' : 'STALE') : (demo ? 'DEMO' : 'UNAVAILABLE');
+      return Object.assign({}, windowState, { state, stateLabel: openingLabel(state), source, cls: windowState.key + ' ' + state });
     });
     const seatBelts = [
       { key: 'fl', label: 'Driver belt', demoState: 'unfastened' }, { key: 'fr', label: 'Passenger belt', demoState: 'fastened' },
@@ -31428,10 +31440,8 @@ class Component extends DCLogic {
   _statusWidgetView(item) {
     const envelope = this._statusEnvelopeSnapshot();
     const status = envelope.doors;
-    const at = this._carSignalAt || {};
-    const now = Date.now();
     const metric = (label, signal, value, demoValue) => {
-      const fresh = at[signal] && now - at[signal] <= 120000;
+      const fresh = this._carSignalFreshness(signal) === 'live';
       return { label, value: fresh && value != null && value !== '' ? String(value) : (status.demo ? demoValue : '—'), cls: fresh ? 'live' : '' };
     };
     const socRaw = this._powerLive && this._powerLive.soc;
