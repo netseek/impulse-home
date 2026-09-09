@@ -6142,21 +6142,6 @@ window.HavalSplash = (function () {
             <div class="hv-studio-bottom-card {{ bc.cls }}"><div class="hv-studio-card-row"><div><strong>{{ bc.label }}</strong><small>{{ bc.state }}</small></div><div class="hv-studio-row-actions"><button type="button" onClick="{{ bc.onToggle }}">{{ bc.toggleLabel }}</button><button type="button" onClick="{{ bc.onLeft }}" disabled="{{ bc.leftDisabled }}" aria-label="Move {{ bc.label }} left">‹</button><button type="button" onClick="{{ bc.onRight }}" disabled="{{ bc.rightDisabled }}" aria-label="Move {{ bc.label }} right">›</button></div></div><sc-if value="{{ bc.isClock }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-clock-row"><span>Face: {{ bc.clockFaceLabel }}</span><button type="button" onClick="{{ bc.onCustomizeClock }}">Customize</button></div></sc-if><sc-if value="{{ bc.hasDestination }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-card-destination"><span>Opens: {{ bc.destinationLabel }}</span><button type="button" onClick="{{ bc.toggleDestination }}">{{ bc.destinationToggleLabel }}</button><sc-if value="{{ bc.destinationExpanded }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-chip-row"><button type="button" class="{{ bc.popupClass }}" onClick="{{ bc.openPopup }}">Popup</button><button type="button" onClick="{{ bc.createDesktop }}">Full area · car on right</button></div><sc-if value="{{ bc.hasDesktopTargets }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-chip-row"><sc-for list="{{ bc.desktopTargets }}" as="dt" hint-placeholder-count="3"><button type="button" class="{{ dt.cls }}" onClick="{{ dt.onClick }}">{{ dt.label }}</button></sc-for></div></sc-if></sc-if></div></sc-if></div>
           </sc-for>
         </div>
-        <sc-if value="{{ hasClockBottomCard }}" hint-placeholder-val="{{ false }}">
-          <div class="hv-studio-label">CLOCK FACE</div>
-          <div class="hv-studio-chip-row">
-            <button type="button" class="{{ clockFacePanoramaClass }}" onClick="{{ setClockFacePanorama }}">Panorama</button>
-            <button type="button" class="{{ clockFaceMeridianClass }}" onClick="{{ setClockFaceMeridian }}">Meridian</button>
-            <button type="button" class="{{ clockFaceSplitClass }}" onClick="{{ setClockFaceSplit }}">Split</button>
-            <button type="button" class="{{ clockFaceDateSpineClass }}" onClick="{{ setClockFaceDateSpine }}">Date spine</button>
-          </div>
-          <div class="hv-studio-label">TIME FORMAT</div>
-          <div class="hv-studio-chip-row">
-            <button type="button" class="{{ clockFormat24Class }}" onClick="{{ setClockFormat24 }}">24 hour</button>
-            <button type="button" class="{{ clockFormat12Class }}" onClick="{{ setClockFormat12 }}">12 hour</button>
-          </div>
-          <div class="hv-studio-note">The clock fills the card and keeps this choice for {{ desktopName }}.</div>
-        </sc-if>
       </sc-if>
       <sc-if value="{{ studioIsHelp }}" hint-placeholder-val="{{ false }}">
         <div class="hv-studio-copy"><strong>What changed.</strong><span>Desktop Studio is now split by the decision you are making.</span></div>
@@ -29709,8 +29694,8 @@ class Component extends DCLogic {
     // v1/v2 desktops had no scoped clock objects. Accept their occasional
     // experimental flat keys without letting an unknown value escape the new
     // Twin/Panorama fallbacks.
-    base.widgetClock = this._normalizeWidgetClock(d.widgetClock || { style: d.clockStyle, hourFormat: d.clockHourFormat });
-    base.bottomClock = this._normalizeBottomClock(d.bottomClock || { face: d.clockFace, hourFormat: d.clockHourFormat });
+    base.widgetClock = this._normalizeWidgetClock(d.widgetClock || { style: d.clockStyle, hourFormat: d.clockHourFormat || (d.clockFormat === '12h' ? '12' : '24') });
+    base.bottomClock = this._normalizeBottomClock(d.bottomClock || { face: d.clockFace, hourFormat: d.clockHourFormat || (d.clockFormat === '12h' ? '12' : '24') });
     base.widgetLayout = this._parseWidgetLayout(d.widgetLayout || base.widgetLayout);
     return base;
   }
@@ -29894,6 +29879,34 @@ class Component extends DCLogic {
       this._syncDockIndicators();
       if (window.H6ClockRuntime) window.H6ClockRuntime.syncVisibility();
     });
+  }
+
+  _clockConfigurationFields(s) {
+    const widget = s.clockConfigScope === 'widget';
+    const scope = widget ? 'widget' : 'bottom';
+    const config = widget ? this._normalizeWidgetClock(this._widgetClockConfig) : this._normalizeBottomClock(this._bottomClockConfig);
+    const names = widget ? ['twin', 'atelier', 'signal', 'datebook'] : ['panorama', 'meridian', 'split', 'date-spine'];
+    const hints = widget ? ['Time and dial', 'Analog focus', 'Digital focus', 'Date focus'] : ['Wide time', 'Dial and stacked time', 'Paired digit plates', 'Date band'];
+    return {
+      clockScopeWidgetClass: widget ? 'on' : '', clockScopeBottomClass: widget ? '' : 'on',
+      clockScopeWidgetSelected: widget, clockScopeBottomSelected: !widget,
+      clockScopeWidget: () => this._setClockConfigScope('widget'), clockScopeBottom: () => this._setClockConfigScope('bottom'),
+      clockGalleryLabel: widget ? 'Widget style' : 'Bottom card face',
+      clockGalleryItems: names.map((name, i) => ({
+        label: name.charAt(0).toUpperCase() + name.slice(1).replace('-', ' '), hint: hints[i],
+        cls: (widget ? config.style : config.face) === name ? 'on' : '', checked: (widget ? config.style : config.face) === name,
+        surface: widget ? 'widget' : 'rail', size: '2x1', widgetStyle: widget ? name : 'twin', railFace: widget ? 'panorama' : name,
+        hourFormat: config.hourFormat, dialMarks: config.dialMarks || 'index', splitPlates: config.splitPlates || 'frost',
+        spineFormat: config.dateSpineFormat || 'month-name', dateWording: config.dateWording || 'short',
+        onClick: () => this._setClockConfig(scope, widget ? 'style' : 'face', name),
+      })),
+      clockFormatItems: ['system', '24', '12'].map((format, i) => ({label: ['Device', '24 hour', '12 hour'][i],
+        cls: config.hourFormat === format ? 'on' : '', checked: config.hourFormat === format,
+        onClick: () => this._setClockConfig(scope, 'hourFormat', format)})),
+      clockShowDetail: false, clockDetailItems: [],
+      clockDeviceZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Device time zone',
+      clockUndo: () => this._undoClockConfig(),
+    };
   }
 
   _setClockConfigScope(scope) {
@@ -30423,6 +30436,8 @@ class Component extends DCLogic {
       studioTabCardsClass: tab === 'cards' ? 'on' : '',
       studioTabHelpClass: tab === 'help' ? 'on' : '',
       studioIsDesktop: tab === 'desktop',
+      studioIsClock: tab === 'clock',
+      ...this._clockConfigurationFields(s),
       studioIsLayout: tab === 'layout' || tab === 'widgets',
       studioIsAppearance: tab === 'appearance',
       studioIsCards: tab === 'cards',
@@ -30482,6 +30497,9 @@ class Component extends DCLogic {
         const canSetDestination = !!focusType;
         return {
           label: card.title,
+          isClock: card.id === 'clock',
+          clockFaceLabel: this._normalizeBottomClock(this._bottomClockConfig).face,
+          onCustomizeClock: () => this._openClockSettings('bottom'),
           state: enabled ? ('Shown · position ' + (cardIndex + 1)) : 'Available to add',
           toggleLabel: enabled ? 'Remove' : 'Add',
           cls: enabled ? 'on' : '',
@@ -31868,7 +31886,7 @@ class Component extends DCLogic {
         this._openDesktopStudio('desktop');
         break;
       case 'openClockSettings':
-        this._openDesktopStudio('cards');
+        this._openClockSettings('bottom');
         break;
       case 'toggleDockMode':
         this._setDockMode(this.state.dockMode === 'launcher' ? 'cards' : 'launcher');
@@ -32125,8 +32143,9 @@ class Component extends DCLogic {
         metricA: clock.clockZone,
         metricB: '',
         progress: percent(clock.clockTime.split(':')[1], 0),
-        clockFace: s.clockFace || 'panorama',
-        clockFormat: s.clockFormat || '24h',
+        clockFace: this._normalizeBottomClock(this._bottomClockConfig).face,
+        clockFormat: this._normalizeBottomClock(this._bottomClockConfig).hourFormat === '12' ? '12h'
+          : (this._normalizeBottomClock(this._bottomClockConfig).hourFormat === '24' ? '24h' : 'system'),
       },
       desktops: {
         primary: activeDesktopName,

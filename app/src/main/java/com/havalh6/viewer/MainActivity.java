@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v24-statusbig";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v25-clock-config";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -1772,7 +1772,9 @@ public final class MainActivity extends Activity {
             java.util.Calendar now = java.util.Calendar.getInstance();
             int minute = now.get(java.util.Calendar.MINUTE);
             int hour24 = now.get(java.util.Calendar.HOUR_OF_DAY);
-            boolean twelve = "12h".equals(descriptor.clockFormat);
+            boolean twelve = "12h".equals(descriptor.clockFormat)
+                    || ("system".equals(descriptor.clockFormat)
+                    && !android.text.format.DateFormat.is24HourFormat(MainActivity.this));
             int hour = twelve ? (hour24 % 12 == 0 ? 12 : hour24 % 12) : hour24;
             String hh = String.format(java.util.Locale.US, "%02d", hour);
             String mm = String.format(java.util.Locale.US, "%02d", minute);
@@ -9111,7 +9113,8 @@ public final class MainActivity extends Activity {
             if ("clock".equals(id)) {
                 String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
                 descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
-                descriptor.clockFormat = "12h".equals(raw.optString("clockFormat", "24h")) ? "12h" : "24h";
+                String format = raw.optString("clockFormat", "system");
+                descriptor.clockFormat = "12h".equals(format) ? "12h" : ("24h".equals(format) ? "24h" : "system");
             }
             next.add(descriptor);
         }
