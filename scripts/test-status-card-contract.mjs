@@ -199,7 +199,7 @@ assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-\d+%/,
 // The popup readout is the big, unboxed composition the Tires popup uses: a
 // plate behind each number fought the vehicle render and forced the value
 // small. Pressure scales with the panel; nothing draws a card behind it.
-assert.match(html, /\.hv-hs-vehicle-tire strong \{ font:\d+ clamp\(/,
+assert.match(html, /\.hv-hs-vehicle-tire strong \{[^}]*font:[^;}]*clamp\(/,
   'popup tire pressure must scale with the panel');
 assert.ok(!/\.hv-hs-vehicle-tire \{[^}]*background:/.test(html),
   'popup tire readouts must not sit on a plate');
