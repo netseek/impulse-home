@@ -6015,6 +6015,21 @@ window.HavalSplash = (function () {
             <div class="hv-studio-bottom-card {{ bc.cls }}"><div class="hv-studio-card-row"><div><strong>{{ bc.label }}</strong><small>{{ bc.state }}</small></div><div class="hv-studio-row-actions"><button type="button" onClick="{{ bc.onToggle }}">{{ bc.toggleLabel }}</button><button type="button" onClick="{{ bc.onLeft }}" disabled="{{ bc.leftDisabled }}" aria-label="Move {{ bc.label }} left">‹</button><button type="button" onClick="{{ bc.onRight }}" disabled="{{ bc.rightDisabled }}" aria-label="Move {{ bc.label }} right">›</button></div></div><sc-if value="{{ bc.hasDestination }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-card-destination"><span>Opens: {{ bc.destinationLabel }}</span><button type="button" onClick="{{ bc.toggleDestination }}">{{ bc.destinationToggleLabel }}</button><sc-if value="{{ bc.destinationExpanded }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-chip-row"><button type="button" class="{{ bc.popupClass }}" onClick="{{ bc.openPopup }}">Popup</button><button type="button" onClick="{{ bc.createDesktop }}">Full area · car on right</button></div><sc-if value="{{ bc.hasDesktopTargets }}" hint-placeholder-val="{{ false }}"><div class="hv-studio-chip-row"><sc-for list="{{ bc.desktopTargets }}" as="dt" hint-placeholder-count="3"><button type="button" class="{{ dt.cls }}" onClick="{{ dt.onClick }}">{{ dt.label }}</button></sc-for></div></sc-if></sc-if></div></sc-if></div>
           </sc-for>
         </div>
+        <sc-if value="{{ hasClockBottomCard }}" hint-placeholder-val="{{ false }}">
+          <div class="hv-studio-label">CLOCK FACE</div>
+          <div class="hv-studio-chip-row">
+            <button type="button" class="{{ clockFacePanoramaClass }}" onClick="{{ setClockFacePanorama }}">Panorama</button>
+            <button type="button" class="{{ clockFaceMeridianClass }}" onClick="{{ setClockFaceMeridian }}">Meridian</button>
+            <button type="button" class="{{ clockFaceSplitClass }}" onClick="{{ setClockFaceSplit }}">Split</button>
+            <button type="button" class="{{ clockFaceDateSpineClass }}" onClick="{{ setClockFaceDateSpine }}">Date spine</button>
+          </div>
+          <div class="hv-studio-label">TIME FORMAT</div>
+          <div class="hv-studio-chip-row">
+            <button type="button" class="{{ clockFormat24Class }}" onClick="{{ setClockFormat24 }}">24 hour</button>
+            <button type="button" class="{{ clockFormat12Class }}" onClick="{{ setClockFormat12 }}">12 hour</button>
+          </div>
+          <div class="hv-studio-note">The clock fills the card and keeps this choice for {{ desktopName }}.</div>
+        </sc-if>
       </sc-if>
       <sc-if value="{{ studioIsHelp }}" hint-placeholder-val="{{ false }}">
         <div class="hv-studio-copy"><strong>What changed.</strong><span>Desktop Studio is now split by the decision you are making.</span></div>
@@ -6660,7 +6675,7 @@ const CAR_POWER_DEMO_PACKED = [
 ];
 const CAR_WIDGET_HOLD_MS = 500;
 const H6_DESKTOPS_KEY = 'h6_desktops_v1';
-const H6_DESKTOPS_VERSION = 2;
+const H6_DESKTOPS_VERSION = 3;
 const H6_MAX_DESKTOPS = 6;
 const H6_DESKTOP_ACCENTS = [
   { key: 'cyan', color: '#2aa7b7' },
@@ -6688,7 +6703,8 @@ const H6_BOTTOM_CARD_CATALOG = [
   { id: 'media', title: 'Media', action: 'openMediaApp', longAction: 'openMedia' },
   { id: 'range', title: 'Range', action: 'openRange' },
   { id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' },
-  { id: 'clock', title: 'Clock', action: 'openDesktopStudio' },
+  { id: 'tires', title: 'Tires', action: 'openTires' },
+  { id: 'clock', title: 'Clock', action: 'openClockSettings' },
   { id: 'desktops', title: 'Desktops', action: 'openDesktopStudio' },
   // Three rail tiles, one destination. `action` fires on the card body and
   // opens the shared DRIVING popup; `iconAction` fires on the graphic alone
@@ -7411,6 +7427,8 @@ class Component extends DCLogic {
     desktopStudioTab: 'desktop',
     studioEditingCardAction: null,
     dockMode: 'launcher',
+    clockFace: 'panorama',
+    clockFormat: '24h',
     accentKey: 'cyan',
     accentColor: '#2aa7b7',
     // Long-press editor for a launcher tile. appEditPkg null = closed; the
@@ -29246,7 +29264,7 @@ class Component extends DCLogic {
   }
 
   _defaultBottomCards() {
-    return ['climate', 'consumption', 'media'];
+    return ['clock', 'status', 'range', 'media'];
   }
 
   _normalizeBottomCards(raw) {
@@ -29280,6 +29298,8 @@ class Component extends DCLogic {
       accentKey: accent.key,
       accentColor: accent.color,
       dockMode: s.dockMode === 'cards' ? 'cards' : 'launcher',
+      clockFace: ['panorama', 'meridian', 'split', 'date-spine'].indexOf(s.clockFace) >= 0 ? s.clockFace : 'panorama',
+      clockFormat: s.clockFormat === '12h' ? '12h' : '24h',
       slotGrid: this._cloneDesktopValue(this._desktopGrid || this._defaultDesktopGrid(), this._defaultDesktopGrid()),
       bottomCards: this._normalizeBottomCards(this._desktopBottomCards),
       // Retained for older saved desktops; cards now always show every enabled item.
@@ -29305,6 +29325,8 @@ class Component extends DCLogic {
     base.accentKey = accent.key;
     base.accentColor = accent.color;
     base.dockMode = d.dockMode === 'cards' ? 'cards' : 'launcher';
+    base.clockFace = ['panorama', 'meridian', 'split', 'date-spine'].indexOf(d.clockFace) >= 0 ? d.clockFace : 'panorama';
+    base.clockFormat = d.clockFormat === '12h' ? '12h' : '24h';
     base.slotGrid = this._normalizeDesktopGrid(d.slotGrid);
     base.bottomCards = this._normalizeBottomCards(d.bottomCards);
     // Older payloads may contain a display limit. The enabled list is now the
@@ -29321,9 +29343,15 @@ class Component extends DCLogic {
     try { store = JSON.parse(localStorage.getItem(H6_DESKTOPS_KEY) || 'null'); } catch (e) { store = null; }
     let desktops = [];
     let active = 0;
-    if (store && (store.version === 1 || store.version === H6_DESKTOPS_VERSION) && Array.isArray(store.desktops)) {
+    if (store && (store.version === 1 || store.version === 2 || store.version === H6_DESKTOPS_VERSION) && Array.isArray(store.desktops)) {
       for (let i = 0; i < store.desktops.length && desktops.length < H6_MAX_DESKTOPS; i++) {
         desktops.push(this._normalizeDesktop(store.desktops[i], 'Desktop ' + (i + 1)));
+      }
+      if (store.version < H6_DESKTOPS_VERSION) {
+        desktops.forEach((desktop) => {
+          if (desktop.bottomCards.indexOf('clock') < 0) desktop.bottomCards = ['clock'].concat(desktop.bottomCards).slice(0, H6_BOTTOM_CARD_CATALOG.length);
+          desktop.dockMode = 'cards';
+        });
       }
       active = Math.max(0, Math.min(desktops.length - 1, parseInt(store.activeIndex, 10) || 0));
     }
@@ -29370,6 +29398,8 @@ class Component extends DCLogic {
       accentKey: current.accentKey,
       accentColor: current.accentColor,
       dockMode: current.dockMode,
+      clockFace: current.clockFace,
+      clockFormat: current.clockFormat,
     });
     this._desktopReady = true;
     this._saveDesktopStore();
@@ -29432,6 +29462,8 @@ class Component extends DCLogic {
       accentKey: d.accentKey,
       accentColor: d.accentColor,
       dockMode: d.dockMode,
+      clockFace: d.clockFace,
+      clockFormat: d.clockFormat,
       leftSlotUse: (left && left.use) || 'app',
       rightSlotUse: (right && right.use) || 'app',
       widgetMenuId: null,
@@ -29662,6 +29694,24 @@ class Component extends DCLogic {
     this._desktopBottomCards = next;
     this._bottomCardLimit = next.length;
     this.setState((s) => ({ desktopRev: (s.desktopRev || 0) + 1 }), () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
+  _setClockFace(face) {
+    const allowed = ['panorama', 'meridian', 'split', 'date-spine'];
+    if (allowed.indexOf(face) < 0 || this.state.clockFace === face) return;
+    this.setState({ clockFace: face, desktopRev: (this.state.desktopRev || 0) + 1 }, () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
+  _setClockFormat(format) {
+    const next = format === '12h' ? '12h' : '24h';
+    if (this.state.clockFormat === next) return;
+    this.setState({ clockFormat: next, desktopRev: (this.state.desktopRev || 0) + 1 }, () => {
       this._persistActiveDesktop();
       this._syncDockIndicators();
     });
@@ -29982,6 +30032,19 @@ class Component extends DCLogic {
           hasDesktopTargets: list.length > 1,
         };
       }),
+      hasClockBottomCard: bottomCards.indexOf('clock') >= 0,
+      clockFacePanoramaClass: (s.clockFace || 'panorama') === 'panorama' ? 'on' : '',
+      clockFaceMeridianClass: s.clockFace === 'meridian' ? 'on' : '',
+      clockFaceSplitClass: s.clockFace === 'split' ? 'on' : '',
+      clockFaceDateSpineClass: s.clockFace === 'date-spine' ? 'on' : '',
+      setClockFacePanorama: () => this._setClockFace('panorama'),
+      setClockFaceMeridian: () => this._setClockFace('meridian'),
+      setClockFaceSplit: () => this._setClockFace('split'),
+      setClockFaceDateSpine: () => this._setClockFace('date-spine'),
+      clockFormat24Class: (s.clockFormat || '24h') === '24h' ? 'on' : '',
+      clockFormat12Class: s.clockFormat === '12h' ? 'on' : '',
+      setClockFormat24: () => this._setClockFormat('24h'),
+      setClockFormat12: () => this._setClockFormat('12h'),
       studioThemeDarkClass: s.widgetThemeMode === 'dark' ? 'on' : '',
       studioThemeLightClass: s.widgetThemeMode === 'light' ? 'on' : '',
       studioThemeAutoClass: s.widgetThemeMode === 'auto' ? 'on' : '',
@@ -31324,6 +31387,9 @@ class Component extends DCLogic {
       case 'openDesktopStudio':
         this._openDesktopStudio('desktop');
         break;
+      case 'openClockSettings':
+        this._openDesktopStudio('cards');
+        break;
       case 'toggleDockMode':
         this._setDockMode(this.state.dockMode === 'launcher' ? 'cards' : 'launcher');
         break;
@@ -31566,6 +31632,8 @@ class Component extends DCLogic {
         metricA: clock.clockZone,
         metricB: '',
         progress: percent(clock.clockTime.split(':')[1], 0),
+        clockFace: s.clockFace || 'panorama',
+        clockFormat: s.clockFormat || '24h',
       },
       desktops: {
         primary: activeDesktopName,

@@ -97,7 +97,7 @@ public final class MainActivity extends Activity {
 
     private static final java.util.Set<String> BOTTOM_CARD_ACTIONS =
             new java.util.HashSet<>(java.util.Arrays.asList(
-                    "ac", "addWidget", "openDesktopStudio", "previousDesktop", "nextDesktop",
+                    "ac", "addWidget", "openDesktopStudio", "openClockSettings", "previousDesktop", "nextDesktop",
                     "toggleDockMode", "showLauncher", "showCards", "cycleWidgetTheme",
                     "toggleCenterFill", "configureWallpaper", "closePanel",
                     // Navigation-only commands implemented by the web shell. They do not
@@ -161,7 +161,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "unified-vehicle-console-v16";
+    private static final String VIEWER_ASSET_REVISION = "unified-vehicle-console-v17";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -994,6 +994,8 @@ public final class MainActivity extends Activity {
         /** Dynamic Tires semantics; deliberately excluded from structural comparison. */
         final String state;
         final String[] wheelStates;
+        String clockFace = "panorama";
+        String clockFormat = "24h";
         /** Status opening order: FL, FR, RL, RR, tailgate. */
         final String[] openingStates;
         final boolean demo;
@@ -1620,22 +1622,60 @@ public final class MainActivity extends Activity {
 
         private void drawClock(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
-            float cx = w * .5f, cy = h * .5f, r = Math.min(w, h) * .34f;
-            stroke(muted, Math.max(2f, w * .03f));
-            c.drawCircle(cx, cy, r, paint);
             java.util.Calendar now = java.util.Calendar.getInstance();
-            float minute = now.get(java.util.Calendar.MINUTE);
-            float hour = now.get(java.util.Calendar.HOUR) + minute / 60f;
-            float ma = (float) Math.toRadians(minute * 6f - 90f);
-            float ha = (float) Math.toRadians(hour * 30f - 90f);
-            stroke(accent, Math.max(2f, w * .035f));
-            c.drawLine(cx, cy, cx + (float) Math.cos(ma) * r * .72f,
-                    cy + (float) Math.sin(ma) * r * .72f, paint);
-            stroke(strong, Math.max(3f, w * .045f));
-            c.drawLine(cx, cy, cx + (float) Math.cos(ha) * r * .48f,
-                    cy + (float) Math.sin(ha) * r * .48f, paint);
-            fill(accent);
-            c.drawCircle(cx, cy, Math.max(3f, w * .045f), paint);
+            int minute = now.get(java.util.Calendar.MINUTE);
+            int hour24 = now.get(java.util.Calendar.HOUR_OF_DAY);
+            boolean twelve = "12h".equals(descriptor.clockFormat);
+            int hour = twelve ? (hour24 % 12 == 0 ? 12 : hour24 % 12) : hour24;
+            String hh = String.format(java.util.Locale.US, "%02d", hour);
+            String mm = String.format(java.util.Locale.US, "%02d", minute);
+            String day = String.format(java.util.Locale.US, "%02d", now.get(java.util.Calendar.DAY_OF_MONTH));
+            String month = new java.text.DateFormatSymbols().getShortMonths()[now.get(java.util.Calendar.MONTH)].toUpperCase(java.util.Locale.US);
+            String date = day + " " + month;
+            String face = descriptor.clockFace == null ? "panorama" : descriptor.clockFace;
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+            if ("meridian".equals(face)) {
+                float cx = w * .33f, cy = h * .50f, r = Math.min(w, h) * .38f;
+                stroke(muted, Math.max(2f, w * .018f));
+                c.drawCircle(cx, cy, r, paint);
+                for (int i = 0; i < 12; i++) {
+                    double a = Math.toRadians(i * 30 - 90);
+                    c.drawLine(cx + (float)Math.cos(a) * r * .84f, cy + (float)Math.sin(a) * r * .84f,
+                            cx + (float)Math.cos(a) * r * .96f, cy + (float)Math.sin(a) * r * .96f, paint);
+                }
+                float ma = (float)Math.toRadians(minute * 6 - 90);
+                float ha = (float)Math.toRadians((hour24 % 12 + minute / 60f) * 30 - 90);
+                stroke(accent, Math.max(2f, w * .028f));
+                c.drawLine(cx, cy, cx + (float)Math.cos(ma) * r * .78f, cy + (float)Math.sin(ma) * r * .78f, paint);
+                stroke(strong, Math.max(3f, w * .038f));
+                c.drawLine(cx, cy, cx + (float)Math.cos(ha) * r * .55f, cy + (float)Math.sin(ha) * r * .55f, paint);
+                fill(accent); c.drawCircle(cx, cy, Math.max(3f, w * .035f), paint);
+                paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+                paint.setTextSize(Math.max(18f, h * .22f)); fill(strong); c.drawText(hh, w * .57f, h * .43f, paint);
+                paint.setTextSize(Math.max(18f, h * .22f)); fill(accent); c.drawText(mm, w * .57f, h * .68f, paint);
+                paint.setTextSize(Math.max(7f, h * .08f)); fill(muted); c.drawText(date, w * .57f, h * .90f, paint);
+            } else if ("split".equals(face)) {
+                float gap = w * .045f, boxW = (w - gap) * .5f;
+                fill(withAlpha(muted, 0x22)); c.drawRoundRect(0, h * .12f, boxW, h * .84f, 10f, 10f, paint);
+                c.drawRoundRect(boxW + gap, h * .12f, w, h * .84f, 10f, 10f, paint);
+                paint.setTextAlign(android.graphics.Paint.Align.CENTER); paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+                paint.setTextSize(Math.max(28f, h * .48f)); fill(strong); c.drawText(hh, boxW * .5f, h * .62f, paint); c.drawText(mm, boxW + gap + boxW * .5f, h * .62f, paint);
+                paint.setTextSize(Math.max(7f, h * .08f)); fill(muted); c.drawText(date, w * .5f, h * .94f, paint);
+            } else if ("date-spine".equals(face)) {
+                float spine = w * .24f;
+                fill(withAlpha(accent, 0x28)); c.drawRoundRect(0, 0, spine, h, 9f, 9f, paint);
+                paint.setTextAlign(android.graphics.Paint.Align.CENTER); paint.setTextSize(Math.max(10f, h * .13f)); fill(accent); c.drawText(day, spine * .5f, h * .45f, paint);
+                paint.setTextSize(Math.max(7f, h * .08f)); fill(muted); c.drawText(month, spine * .5f, h * .64f, paint);
+                paint.setTextAlign(android.graphics.Paint.Align.LEFT); paint.setTextSize(Math.max(26f, h * .43f)); fill(strong); c.drawText(hh + ":" + mm, spine + w * .07f, h * .60f, paint);
+                paint.setTextSize(Math.max(7f, h * .08f)); fill(muted); c.drawText(twelve ? (hour24 >= 12 ? "PM" : "AM") : "LOCAL TIME", spine + w * .07f, h * .83f, paint);
+            } else {
+                paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+                paint.setTextSize(Math.max(34f, h * .58f)); fill(strong); c.drawText(hh + ":" + mm, w * .02f, h * .62f, paint);
+                paint.setTextSize(Math.max(8f, h * .10f)); fill(accent); c.drawText(date + (twelve ? (hour24 >= 12 ? "  PM" : "  AM") : "  LOCAL"), w * .03f, h * .90f, paint);
+                stroke(accent, Math.max(2f, w * .012f)); c.drawLine(w * .02f, h * .72f, w * .98f, h * .72f, paint);
+            }
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
         }
 
         /**
@@ -7113,7 +7153,8 @@ public final class MainActivity extends Activity {
         content.setLayoutParams(contentLp);
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
-        boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id);
+        boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id)
+                || "clock".equals(descriptor.id);
         if (fullGraphicCard) {
             graphic.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
@@ -8832,9 +8873,15 @@ public final class MainActivity extends Activity {
             String[] openingStates = "status".equals(id)
                     ? sanitizeOpeningStates(raw.optString("openingStates", ""))
                     : new String[] {"unknown", "unknown", "unknown", "unknown", "unknown"};
-            next.add(new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
+            BottomCardDescriptor descriptor = new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
                     action, primary, secondary, metricA, metricB, progress, state, wheelStates,
-                    openingStates, demo, iconAction, longAction, glyph, glyphText, menu));
+                    openingStates, demo, iconAction, longAction, glyph, glyphText, menu);
+            if ("clock".equals(id)) {
+                String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
+                descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
+                descriptor.clockFormat = "12h".equals(raw.optString("clockFormat", "24h")) ? "12h" : "24h";
+            }
+            next.add(descriptor);
         }
 
         int requested = root.has("bottomCardLimit")

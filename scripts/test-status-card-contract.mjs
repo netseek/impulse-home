@@ -172,7 +172,7 @@ all(nativeStatus, [
   'Math.min(imageW, w * .38f)', 'float left = w * .035f',
   'float top = -h * .019f', 'float textLeft = w * .43f',
 ], 'native enlarged status-card vehicle geometry');
-assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"unified-vehicle-console-v16"/,
+assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"unified-vehicle-console-v17"/,
   'native WebView bundle revision must expose the unified vehicle console');
 
 console.log('status-card contracts: ok');
