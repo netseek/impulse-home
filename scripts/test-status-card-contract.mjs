@@ -145,7 +145,6 @@ all(native, [
   'getStatusVehicleBitmap("base.png")', '"door-rl-open-v3.png"',
   '"door-rr-open-v3.png"', '"tailgate-open-v2.png"', '"door-fl-closed-v4.png"',
   'vividRed.setSaturation(1.55f)',
-  'primaryTextSize * primaryMaxWidth / primaryWidth',
   'demoBadge.setTag("frostAccent")', 'demoBadge.setText("DEMO")',
   'demoBadge.setTextSize(8f)', 'demoBadge.setLetterSpacing(0.10f)',
   'demoBadgeLp.rightMargin = Math.round(7 * density)',
@@ -169,9 +168,27 @@ assert.match(nativeStatus,
   'native renderer must skip the matching closed layer while that door is open');
 all(nativeStatus, [
   'float imageH = h * 1.05f', '* 1.08f',
-  'Math.min(imageW, w * .38f)', 'float left = w * .035f',
-  'float top = -h * .019f', 'float textLeft = w * .43f',
-], 'native enlarged status-card vehicle geometry');
+  'Math.min(imageW, w * .31f)', 'float left = (w - imageW) * .5f',
+  'float top = -h * .019f', 'drawStatusRoof(c, vehicleRect)',
+  'drawStatusSeatBelts(c, vehicleRect)', 'Math.min(w, h) * .17f',
+], 'native centered visual-only status-card geometry');
+assert.ok(!nativeStatus.includes('float textLeft'),
+  'native compact status card must not render a competing text-summary column');
+all(native, [
+  'seatBeltStates', 'sunroofLevel', 'curtainLevel',
+  'sanitizeSeatBeltStates(', 'raw.optInt("sunroofLevel", 0)',
+  'raw.optInt("curtainLevel", 0)',
+], 'native status descriptor must receive restraint and roof position state');
+assert.match(html, /seatBeltStates:\s*status\.statusSeatBelts\.map/,
+  'web status bridge must forward individual restraint states');
+assert.match(html, /sunroofLevel:\s*status\.statusSunroofPct/,
+  'web status bridge must forward sunroof position');
+assert.match(html, /\.hv-status-1x1 \.hv-status-copy[^}]*display:none/,
+  'compact web status cards must remove the competing text-summary column');
+assert.match(html, /\.hv-status-card-tire\.front-left \{ left:-62%/,
+  'compact web tire pressures must sit outside the vehicle');
+assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-52%/,
+  'popup tire pressures must sit outside the vehicle');
 assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"unified-vehicle-console-v17"/,
   'native WebView bundle revision must expose the unified vehicle console');
 

@@ -998,6 +998,10 @@ public final class MainActivity extends Activity {
         String clockFormat = "24h";
         /** Status opening order: FL, FR, RL, RR, tailgate. */
         final String[] openingStates;
+        /** Status restraint order: driver, front passenger, rear left/centre/right. */
+        final String[] seatBeltStates;
+        final int sunroofLevel;
+        final int curtainLevel;
         final boolean demo;
         /**
          * Command for a tap on the graphic alone, empty when the icon is not a
@@ -1016,7 +1020,8 @@ public final class MainActivity extends Activity {
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
-                String state, String[] wheelStates, String[] openingStates, boolean demo,
+                String state, String[] wheelStates, String[] openingStates,
+                String[] seatBeltStates, int sunroofLevel, int curtainLevel, boolean demo,
                 String iconAction, String longAction, String glyph, String glyphText,
                 java.util.List<QuickMenuRow> menu) {
             this.id = id;
@@ -1031,6 +1036,9 @@ public final class MainActivity extends Activity {
             this.state = state;
             this.wheelStates = wheelStates;
             this.openingStates = openingStates;
+            this.seatBeltStates = seatBeltStates;
+            this.sunroofLevel = Math.max(0, Math.min(100, sunroofLevel));
+            this.curtainLevel = Math.max(0, Math.min(100, curtainLevel));
             this.demo = demo;
             this.iconAction = iconAction == null ? "" : iconAction;
             this.longAction = longAction == null ? "" : longAction;
@@ -1297,14 +1305,14 @@ public final class MainActivity extends Activity {
                 int accent, int muted, int strong) {
             Bitmap base = getStatusVehicleBitmap("base.png");
             // The raster reserves transparent margins for the open-door states. Let the
-            // destination extend slightly past the view vertically (transparent pixels only)
-            // and widen it a touch so the vehicle remains legible at launcher-card size.
+            // destination extend slightly past the view vertically (transparent pixels only).
+            // The vehicle is the card's visual anchor, with TPMS values flanking it.
             // Visible pixels occupy x=30..464 and y=14..654 of the 494x675 source canvas.
             float imageH = h * 1.05f;
             float imageW = base == null ? w * .25f
                     : imageH * base.getWidth() / Math.max(1f, base.getHeight()) * 1.08f;
-            imageW = Math.min(imageW, w * .38f);
-            float left = w * .035f;
+            imageW = Math.min(imageW, w * .31f);
+            float left = (w - imageW) * .5f;
             float top = -h * .019f;
             android.graphics.RectF vehicleRect = new android.graphics.RectF(
                     left, top, left + imageW, top + imageH);
@@ -1351,12 +1359,14 @@ public final class MainActivity extends Activity {
                 if (layer != null) c.drawBitmap(layer, null, vehicleRect, paint);
             }
             paint.setColorFilter(null);
-            // Status and Tires share TPMS health. Four compact signals sit at
-            // the physical wheel positions without competing with the door art.
-            float[] tireXs = {vehicleRect.left + vehicleRect.width() * .28f,
-                    vehicleRect.left + vehicleRect.width() * .72f,
-                    vehicleRect.left + vehicleRect.width() * .28f,
-                    vehicleRect.left + vehicleRect.width() * .72f};
+            drawStatusRoof(c, vehicleRect);
+            drawStatusSeatBelts(c, vehicleRect);
+
+            // Status and Tires share TPMS health. Large values stay completely
+            // outside the vehicle so the door, roof and restraint art remains clear.
+            float sideGap = Math.max(12f, w * .055f);
+            float[] tireXs = {vehicleRect.left - sideGap, vehicleRect.right + sideGap,
+                    vehicleRect.left - sideGap, vehicleRect.right + sideGap};
             float[] tireYs = {vehicleRect.top + vehicleRect.height() * .27f,
                     vehicleRect.top + vehicleRect.height() * .27f,
                     vehicleRect.top + vehicleRect.height() * .72f,
@@ -1367,44 +1377,66 @@ public final class MainActivity extends Activity {
                         && i < descriptor.wheelStates.length
                         ? descriptor.wheelStates[i] : "unavailable";
                 fill(tireSignalColor(wheelState, muted));
-                c.drawCircle(tireXs[i], tireYs[i], Math.max(2.2f, w * .012f), paint);
+                float direction = i == 0 || i == 2 ? 1f : -1f;
+                c.drawCircle(tireXs[i] + direction * Math.max(4f, w * .018f), tireYs[i],
+                        Math.max(2.5f, w * .011f), paint);
                 paint.setTextAlign(i == 0 || i == 2
                         ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.BOLD));
-                paint.setTextSize(Math.max(7f, Math.min(w, h) * .072f));
-                c.drawText(pressureReadings[i], tireXs[i] + (i == 0 || i == 2 ? -3f : 3f),
+                paint.setTextSize(Math.max(14f, Math.min(w, h) * .17f));
+                c.drawText(pressureReadings[i], tireXs[i],
                         tireYs[i] + paint.getTextSize() * .34f, paint);
             }
-            float textLeft = w * .43f;
-            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                    android.graphics.Typeface.NORMAL));
-            float primaryTextSize = Math.max(14f, Math.min(w, h) * .18f);
-            paint.setTextSize(primaryTextSize);
-            String primaryText = descriptor.primary.isEmpty()
-                    ? "Status unavailable" : descriptor.primary;
-            float primaryMaxWidth = w - textLeft - w * .03f;
-            float primaryWidth = paint.measureText(primaryText);
-            // Preserve the full phrase for accessibility/popup copy, but drop
-            // the redundant word "door" when a compact native card cannot fit it.
-            if (primaryWidth > primaryMaxWidth && primaryText.endsWith(" door open")) {
-                primaryText = primaryText.substring(0,
-                        primaryText.length() - " door open".length()) + " open";
-                primaryWidth = paint.measureText(primaryText);
-            }
-            if (primaryWidth > primaryMaxWidth && primaryWidth > 0f) {
-                paint.setTextSize(Math.max(13f,
-                        primaryTextSize * primaryMaxWidth / primaryWidth));
-            }
-            fill(hasOpenStatusOpening(openings) ? 0xFFFF5360 : strong);
-            c.drawText(primaryText, textLeft, h * .47f, paint);
-            paint.setTextSize(Math.max(7f, Math.min(w, h) * .075f));
-            fill(withAlpha(muted, 0xD8));
-            c.drawText(ellipsizeStatusText(descriptor.secondary, w - textLeft - w * .03f),
-                    textLeft, h * .67f, paint);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
+        }
+
+        private void drawStatusRoof(android.graphics.Canvas c, android.graphics.RectF vehicleRect) {
+            float left = vehicleRect.left + vehicleRect.width() * .405f;
+            float right = vehicleRect.left + vehicleRect.width() * .595f;
+            float top = vehicleRect.top + vehicleRect.height() * .405f;
+            float bottom = vehicleRect.top + vehicleRect.height() * .665f;
+            float radius = Math.max(2f, vehicleRect.width() * .035f);
+            fill(0xA90A1116);
+            c.drawRoundRect(left, top, right, bottom, radius, radius, paint);
+
+            // The opaque shade retreats towards the rear as it opens; the dark,
+            // semi-transparent glass remains visible above the interior.
+            float shadeVisible = 1f - descriptor.curtainLevel / 100f;
+            if (shadeVisible > .01f) {
+                float shadeBottom = top + (bottom - top) * shadeVisible;
+                fill(0xE2A3AAAC);
+                c.drawRoundRect(left + 1f, top + 1f, right - 1f, shadeBottom,
+                        radius, radius, paint);
+            }
+            float glassShift = (bottom - top) * .43f * descriptor.sunroofLevel / 100f;
+            fill(0x6B05090C);
+            c.drawRoundRect(left + 1f, top + 1f + glassShift, right - 1f,
+                    top + (bottom - top) * .51f + glassShift, radius, radius, paint);
+            stroke(0xCC05080A, Math.max(1f, vehicleRect.width() * .012f));
+            c.drawRoundRect(left, top, right, bottom, radius, radius, paint);
+            c.drawLine(left, top + (bottom - top) * .52f, right,
+                    top + (bottom - top) * .52f, paint);
+        }
+
+        private void drawStatusSeatBelts(android.graphics.Canvas c,
+                android.graphics.RectF vehicleRect) {
+            String[] states = descriptor.seatBeltStates == null
+                    ? new String[0] : descriptor.seatBeltStates;
+            float[] xs = {.455f, .545f, .445f, .5f, .555f};
+            float[] ys = {.49f, .49f, .60f, .60f, .60f};
+            for (int i = 0; i < 5 && i < states.length; i++) {
+                if (!"unfastened".equals(states[i])) continue;
+                float x = vehicleRect.left + vehicleRect.width() * xs[i];
+                float y = vehicleRect.top + vehicleRect.height() * ys[i];
+                float radius = Math.max(2.7f, vehicleRect.width() * .04f);
+                fill(0xFFE51F35);
+                c.drawCircle(x, y, radius, paint);
+                stroke(0xFFFFFFFF, Math.max(1f, radius * .30f));
+                c.drawLine(x - radius * .35f, y - radius * .45f,
+                        x + radius * .35f, y + radius * .45f, paint);
+            }
         }
 
         private String ellipsizeStatusText(String value, float maxWidth) {
@@ -8955,9 +8987,17 @@ public final class MainActivity extends Activity {
             String[] openingStates = "status".equals(id)
                     ? sanitizeOpeningStates(raw.optString("openingStates", ""))
                     : new String[] {"unknown", "unknown", "unknown", "unknown", "unknown"};
+            String[] seatBeltStates = "status".equals(id)
+                    ? sanitizeSeatBeltStates(raw.optString("seatBeltStates", ""))
+                    : new String[] {"unknown", "unknown", "unknown", "unknown", "unknown"};
+            int sunroofLevel = "status".equals(id)
+                    ? Math.max(0, Math.min(100, raw.optInt("sunroofLevel", 0))) : 0;
+            int curtainLevel = "status".equals(id)
+                    ? Math.max(0, Math.min(100, raw.optInt("curtainLevel", 0))) : 0;
             BottomCardDescriptor descriptor = new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
                     action, primary, secondary, metricA, metricB, progress, state, wheelStates,
-                    openingStates, demo, iconAction, longAction, glyph, glyphText, menu);
+                    openingStates, seatBeltStates, sunroofLevel, curtainLevel, demo,
+                    iconAction, longAction, glyph, glyphText, menu);
             if ("clock".equals(id)) {
                 String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
                 descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
@@ -9148,6 +9188,20 @@ public final class MainActivity extends Activity {
         for (int i = 0; i < sanitized.length && i < raw.length; i++) {
             String state = raw[i].trim().toLowerCase(java.util.Locale.US);
             if ("open".equals(state) || "closed".equals(state) || "unknown".equals(state)) {
+                sanitized[i] = state;
+            }
+        }
+        return sanitized;
+    }
+
+    private String[] sanitizeSeatBeltStates(String value) {
+        String[] sanitized = {"unknown", "unknown", "unknown", "unknown", "unknown"};
+        if (value == null || value.trim().isEmpty()) return sanitized;
+        String[] raw = value.split(",", -1);
+        for (int i = 0; i < sanitized.length && i < raw.length; i++) {
+            String state = raw[i].trim().toLowerCase(java.util.Locale.US);
+            if ("fastened".equals(state) || "unfastened".equals(state)
+                    || "unknown".equals(state)) {
                 sanitized[i] = state;
             }
         }
