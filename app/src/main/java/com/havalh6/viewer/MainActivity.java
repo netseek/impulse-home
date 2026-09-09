@@ -1053,6 +1053,7 @@ public final class MainActivity extends Activity {
                 case "consumption": drawBars(canvas, w, h, accent, muted); break;
                 case "navigation": drawNavigation(canvas, w, h, accent, muted); break;
                 case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
+                case "power": drawPower(canvas, w, h, accent, muted, strong); break;
                 case "clock": drawClock(canvas, w, h, accent, muted, strong); break;
                 case "desktops": drawDesktops(canvas, w, h, accent, muted); break;
                 case "driveMode": drawDriveMode(canvas, w, h, accent, muted, strong); break;
@@ -1318,6 +1319,86 @@ public final class MainActivity extends Activity {
                 return;
             }
             drawTiresFallback(c, w, h, accent, muted, strong);
+        }
+
+        /**
+         * Compact propulsion map for the native rail.  It intentionally uses
+         * the same vocabulary as the web Power family, but stays vector-only:
+         * no extracted OEM art and no animation loop in the native dock.
+         */
+        private void drawPower(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            String state = descriptor.state == null ? "unavailable" : descriptor.state;
+            boolean known = !"unavailable".equals(state) && !"stale".equals(state);
+            boolean regen = "regen".equals(state);
+            boolean activeFlow = "ev".equals(state) || "hybrid".equals(state)
+                    || "ice".equals(state) || regen || "charge".equals(state);
+            int flow = regen || "charge".equals(state) ? 0xFF3EE08A
+                    : (activeFlow ? accent : muted);
+            float cy = h * .50f;
+            float batteryL = w * .08f, batteryR = w * .31f;
+            float motorL = w * .61f, motorR = w * .84f;
+            float nodeT = h * .32f, nodeB = h * .68f;
+
+            fill(withAlpha(flow, known ? 0x22 : 0x12));
+            c.drawRoundRect(batteryL, nodeT, batteryR, nodeB, w * .045f, w * .045f, paint);
+            stroke(flow, Math.max(1.5f, w * .026f));
+            c.drawRoundRect(batteryL, nodeT, batteryR, nodeB, w * .045f, w * .045f, paint);
+            fill(withAlpha(flow, known ? 0xA8 : 0x38));
+            float fillR = batteryL + (batteryR - batteryL) * descriptor.progress / 100f;
+            c.drawRoundRect(batteryL + w * .025f, nodeT + h * .07f,
+                    Math.max(batteryL + w * .025f, fillR - w * .025f), nodeB - h * .07f,
+                    w * .025f, w * .025f, paint);
+            fill(flow);
+            c.drawRect(batteryR, cy - h * .07f, batteryR + w * .025f, cy + h * .07f, paint);
+
+            float motorCx = (motorL + motorR) * .5f;
+            stroke(flow, Math.max(1.5f, w * .026f));
+            c.drawCircle(motorCx, cy, w * .105f, paint);
+            c.drawCircle(motorCx, cy, w * .04f, paint);
+
+            int engine = "hybrid".equals(state) || "ice".equals(state) || "idle".equals(state)
+                    ? 0xFFF0BD65 : muted;
+            fill(withAlpha(engine, known ? 0x2A : 0x12));
+            c.drawRoundRect(w * .42f, h * .10f, w * .58f, h * .27f,
+                    w * .025f, w * .025f, paint);
+            stroke(engine, Math.max(1.3f, w * .022f));
+            c.drawRoundRect(w * .42f, h * .10f, w * .58f, h * .27f,
+                    w * .025f, w * .025f, paint);
+
+            if (activeFlow) {
+                stroke(withAlpha(flow, known ? 0xD8 : 0x38), Math.max(1.4f, w * .024f));
+                if (regen) {
+                    c.drawLine(motorL, cy, batteryR + w * .02f, cy, paint);
+                } else {
+                    c.drawLine(batteryR + w * .02f, cy, motorL, cy, paint);
+                }
+            }
+            if ("hybrid".equals(state) || "ice".equals(state)) {
+                stroke(0xFFF0BD65, Math.max(1.3f, w * .022f));
+                c.drawLine(w * .50f, h * .27f, motorCx, cy - w * .10f, paint);
+            }
+            if (known) {
+                android.graphics.Path arrow = new android.graphics.Path();
+                float ax = regen ? batteryR + w * .06f : motorL - w * .03f;
+                arrow.moveTo(ax, cy - h * .07f);
+                arrow.lineTo(ax + (regen ? -w * .06f : w * .06f), cy);
+                arrow.lineTo(ax, cy + h * .07f);
+                stroke(flow, Math.max(1.4f, w * .024f));
+                c.drawPath(arrow, paint);
+            }
+
+            stroke(withAlpha(strong, known ? 0xA0 : 0x48), Math.max(1.2f, w * .02f));
+            c.drawCircle(w * .67f, h * .84f, w * .045f, paint);
+            c.drawCircle(w * .78f, h * .84f, w * .045f, paint);
+            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.NORMAL));
+            paint.setTextSize(Math.max(7f, Math.min(w, h) * .085f));
+            fill(withAlpha(known ? strong : muted, 0xD8));
+            c.drawText(state.toUpperCase(java.util.Locale.US), w * .5f, h * .98f, paint);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
         }
 
         /** Lazy and failure-tolerant: a missing optional raster never blanks the card. */
@@ -8341,8 +8422,9 @@ public final class MainActivity extends Activity {
                     ? sanitizeTiresState(raw.optString("state",
                             raw.optString("tireState", "unavailable")))
                     : ("status".equals(id) ? sanitizeStatusState(raw.optString("state", "unavailable"))
+                            : ("power".equals(id) ? sanitizePowerState(raw.optString("state", "unavailable"))
                             : (DRIVING_CARD_IDS.contains(id)
-                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : ""));
+                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : "")));
             String[] wheelStates = "tires".equals(id)
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))
@@ -8486,6 +8568,26 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private String sanitizePowerState(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US);
+        switch (normalized) {
+            case "live":
+            case "partial":
+            case "stale":
+            case "unavailable":
+            case "demo":
+            case "ev":
+            case "hybrid":
+            case "ice":
+            case "regen":
+            case "charge":
+            case "idle":
+                return normalized;
+            default:
+                return "unavailable";
+        }
+    }
+
     private String[] sanitizeWheelStates(String value) {
         String[] sanitized = {"unavailable", "unavailable", "unavailable", "unavailable"};
         if (value == null || value.trim().isEmpty()) return sanitized;
@@ -8581,6 +8683,15 @@ public final class MainActivity extends Activity {
     }
 
     private String bottomCardAccessibilityDescription(BottomCardDescriptor descriptor) {
+        if ("power".equals(descriptor.id)) {
+            StringBuilder description = new StringBuilder("Power flow. ");
+            description.append(descriptor.primary.isEmpty() ? "Power flow unavailable" : descriptor.primary);
+            if (!descriptor.metricA.isEmpty()) description.append(". ").append(descriptor.metricA);
+            if (!descriptor.metricB.isEmpty()) description.append(". ").append(descriptor.metricB);
+            if (!descriptor.secondary.isEmpty()) description.append(". Source ").append(descriptor.secondary);
+            description.append(". Opens power flow details.");
+            return description.toString();
+        }
         if ("status".equals(descriptor.id)) {
             StringBuilder description = new StringBuilder("Vehicle status. ");
             description.append(descriptor.primary.isEmpty() ? "Status unavailable" : descriptor.primary);
