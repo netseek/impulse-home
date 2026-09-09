@@ -106,6 +106,16 @@ explains it. Measure the specific change; do not reason from this table.
 - **Tier switches call `_onResize()`**, which reallocates every render target.
   They are debounced (90 ms to enter motion, 220 ms to refine) for that reason.
   Do not switch resolution per frame.
+- **The blur-sprite capture is expensive and debounced.**
+  `_generateBlurredWheelTexture` measured **62 ms/call on the emulator** (so
+  likely 150-250 ms on the MMI) and the wheel colour / roughness / metalness
+  sliders used to call it per `input` event. It now goes through
+  `_requestBlurCapture`, a trailing debounce (`_wheelSpinTune.captureDebounceMs`,
+  200 ms) — same "cheap work immediate, expensive refresh deferred, final one
+  guaranteed" shape as `_requestTweenShadow` / `_settleTweenShadow`. The
+  material change itself is still immediate. Anything that must be exact right
+  now (rim swap, wheel size, HDRI, night mode, `__wheelSpin` arc retune) still
+  calls the capture directly, and that call cancels any queued trailing one.
 - **`shadowMap.autoUpdate` is off.** Shadows refresh only on explicit
   `needsUpdate`. During body tweens that is throttled to every 3rd frame with a
   guaranteed final update — see `_requestTweenShadow` / `_settleTweenShadow`.
@@ -688,6 +698,70 @@ capture shader, not in the placement:
   means not rotating the lighting at all — capture flat-lit and composite a
   static lighting layer over the spinning one.
 
+### Two-layer sprite — NOT YET MEASURED ON ANY DEVICE
+
+The paragraph above is now implemented, on branch `feat/wheel-sprite-two-layer`.
+**Nothing in this subsection has been verified on the car or on the emulator** —
+it was written without device access. Treat every claim here as a design
+intention until `__wheelSpin()` and a screenshot say otherwise, and do not copy
+any number out of it.
+
+The rim is captured twice, from the same camera inside the same visibility
+block: once lit (`_rtSource`, unchanged) and once with every rim material
+swapped for an unlit `MeshBasicMaterial` carrying only colour + map
+(`_rtSourceFlat`). Both are smeared over the same arc into `_rtBlurred` /
+`_rtBlurredFlat`. The sprite shader (injected into the disc's existing
+`MeshBasicMaterial` via `onBeforeCompile`, so three's tone mapping, encoding,
+opacity fade and PREMULTIPLIED_ALPHA handling stay exactly as they shipped)
+then composites:
+
+- **rotating layer** — the albedo smear, sampled at plain `vUv`. The disc mesh
+  is still rolled by `_applyWheelTransforms` exactly as before, so this half of
+  the sprite is unchanged.
+- **static layer** — `lit / flat`, sampled at a uv COUNTER-rotated by `uRoll`,
+  so it stands still in the world while the albedo turns under it.
+
+Both smears are premultiplied by the same coverage, so coverage cancels in the
+ratio and there is **no un-premultiplying anywhere** — the trap above still
+holds. The divisor is floored against alpha, the ratio clamped at both ends,
+and the product clamped back under alpha.
+
+Why `MeshBasicMaterial` and not "zero `envMapIntensity` / drop the lights": the
+scene is IBL-lit, so killing the environment leaves the rim nearly black, the
+flat layer would carry almost nothing, and almost the whole picture would end
+up in the static layer — i.e. the wheel would stop reading as turning at all.
+(r137 only feeds `scene.environment` to `MeshStandardMaterial`, so a bare
+`MeshBasic` picks up no IBL either.)
+
+`uLobeTex` is **kept but gated off** whenever the two-layer path is live. It
+exists to divide lighting out of a rotating layer that no longer carries any,
+and applying it to only the lit half would corrupt the ratio. It is still the
+correction for the `twoLayer:false` fallback, so both paths stay coherent and
+never fight; `__wheelSpin().lobeCorrectionOn` reports which is in force.
+
+Known limits of the split, by construction:
+
+- A rim's real shading is a function of the surface normal, which DOES rotate.
+  Treating the whole lit/flat ratio as static is an approximation, exact only
+  for a body of revolution. `lightMix` dials it back if it reads as too static.
+- A chrome rim's albedo is nearly featureless, so its rotating layer is carried
+  almost entirely by the spoke-gap alpha. That is still the strongest motion
+  cue, but this is the case to look at first if the spin stops reading.
+- The lighting is still baked: it does not respond to the camera orbiting, and
+  all four wheels wear the FL rim's capture.
+- The static layer is placed using a basis measured from the disc's own world
+  matrix against the capture camera's (`__wheelSpin().lightBasisM`). The disc's
+  quaternion is `setFromUnitVectors(+Z, axle)` and the camera is placed down the
+  axle with up = world +Y, and those two frames are **not** the same — expect
+  `lightBasisMirrored: true`. `lightBasis: 0` puts the static layer back in raw
+  capture space, which makes the composite at roll 0 identical to the
+  single-layer sprite; `lightRotDeg` dials the azimuth by eye.
+
+Everything is live from devtools with no rebuild: `__wheelSpin({twoLayer:false})`
+is the A/B, and `lightMix`, `ratioMin/Max/Floor`, `lightBasis`, `lightRotDeg`
+are the knobs. `twoLayer`, `lightBasis` and `lightRotDeg` re-capture; the rest
+take effect next frame.
+
 ## Do not set `needsUpdate` on a render target's texture
 
 `_rtSource` / `_rtBlurred` are `WebGLRenderTarget`s. Setting `.texture
@@ -722,6 +796,28 @@ Impulse is the sibling repo at `StudioProjects/haval-app-tool-multimidia`
 (package `br.com.redesurftank.havalshisuku`). Its theme bridge is the reference
 for which car keys are actually readable, so reach for it before concluding a
 signal does not exist — this one was written off as missing more than once.
+
+**Better than reading the bridge: ask the car.** Impulse replays its whole cache
+on request, so the definitive list of ~170 live keys is one command away:
+
+```bash
+adb shell am broadcast -a com.haval.vehicle.REQUEST_SNAPSHOT -p br.com.redesurftank.havalshisuku --es requester probe
+adb logcat -d | grep CarSignal
+```
+
+Two keys the viewer had invented (`car.tpms.pressures`, `car.tpms.temperatures`)
+and one it had been told did not exist (`car.basic.window_status`) were both
+settled this way in a minute. See `docs/oem-apk-can-reference.md` for the
+capture, and for why a **per-key** freshness window is the wrong staleness test
+on this bus.
+
+**And check that the installed Impulse has the command receivers before
+debugging a command that does nothing** — `sendBroadcast` to a package with no
+matching receiver fails silently:
+
+```bash
+adb shell dumpsys package br.com.redesurftank.havalshisuku | grep -i Receiver
+```
 
 ## Media visualisers
 
