@@ -95,16 +95,21 @@ assert.doesNotMatch(snapshot, /const\s+demoOpen\s*=\s*\{\s*fl\s*:\s*true\s*,\s*t
 
 all(html, ['this._carDoorSlots = slots.slice()', 'this._carDoorSlots = null;', 'CAR_DOOR_SLOTS.trunk'], 'canonical parsed door vector retention');
 const statusView = block(html, '  _statusWidgetView(');
-all(statusView, ['statusAriaLabel', 'onStatusOpen', 'statusMetrics', 'statusRoof', 'statusWindows', 'statusSeatBelts', 'this._openRoofLevelPopup()'], 'widget accessibility and opening');
+all(statusView, ['statusAriaLabel', 'onStatusOpen', 'statusMetrics', 'statusRoof', 'statusWindows', 'statusSeatBelts', 'statusTires', 'statusWindowControls', 'statusSunroofInput', 'statusCurtainInput', 'this._openRoofLevelPopup()'], 'widget accessibility, unified data, and opening');
 assert.match(statusView, /statusOpenRoofControls: .*_openRoofLevelPopup\(\)/, 'roof area must reuse the canonical roof popup');
-assert.ok(!statusView.includes('statusSunroofInput'), 'status must not duplicate canonical roof slider handlers');
+assert.match(statusView, /statusSunroofInput: roofInput\('sunroof'\)/, 'large status surface must reuse the canonical sunroof range handler');
+assert.match(statusView, /statusCurtainInput: roofInput\('curtain'\)/, 'large status surface must reuse the canonical sunshade range handler');
 assert.match(html, /case 'openVehicleStatus':\s*this\._openRoofLevelPopup\(\)/, 'status action must use the canonical roof popup directly');
 const popupMarkup = html.slice(html.indexOf('roofPop.innerHTML ='), html.indexOf('// Keep this control surface'));
 assert.equal((popupMarkup.match(/vehicle-status\/base\.png/g) || []).length, 1, 'popup must contain exactly one base car');
 assert.ok(!popupMarkup.includes('roof-top-view-v1.png'), 'popup must not contain a second roof-only car');
 assert.ok(!popupMarkup.includes('hv-hs-unified'), 'popup must not retain the old two-panel/two-car layout');
+all(popupMarkup, ['hv-vehicle-window-panel', 'data-hs-window-key="fl"', 'data-hs-window-key="fr"', 'data-hs-window-key="rl"', 'data-hs-window-key="rr"', 'data-hs-window-all="close"', 'data-hs-window-all="open"'], 'left-side window console');
+assert.equal((popupMarkup.match(/data-hs-vehicle-tire=/g) || []).length, 4, 'popup must render all four tire positions around the one car');
+assert.equal((popupMarkup.match(/data-hs-vehicle-tire="[^"]+"><strong>—<\/strong><small>—<\/small>/g) || []).length, 4,
+  'popup tire positions must show pressure over temperature without redundant corner initials');
 const envelope = block(html, '  _statusEnvelopeSnapshot(');
-all(envelope, ['CAR_SIGNALS.sunroof', 'CAR_SIGNALS.curtain', "'unfastened'", "'fastened'", "'unknown'", 'DEMO'], 'envelope telemetry and seatbelt semantics');
+all(envelope, ['CAR_SIGNALS.sunroof', 'CAR_SIGNALS.curtain', "'unfastened'", "'fastened'", "'unknown'", 'DEMO', 'this._tiresWidgetView', 'tires.wheels'], 'envelope telemetry, seatbelt, and tire semantics');
 assert.match(envelope, /if \(!demo && !doors\.open\.length && beltAttention\.length\)/,
   'alternating demo headline must keep naming its door phase');
 assert.match(envelope, /key: 'rc', label: 'Rear center belt'/, 'seat map must contain two front and three rear belts');
@@ -167,7 +172,7 @@ all(nativeStatus, [
   'Math.min(imageW, w * .38f)', 'float left = w * .035f',
   'float top = -h * .019f', 'float textLeft = w * .43f',
 ], 'native enlarged status-card vehicle geometry');
-assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"codex-claude-driving-v2"/,
-  'native WebView bundle revision must expose mutually-exclusive popup door assets');
+assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"unified-vehicle-console-v16"/,
+  'native WebView bundle revision must expose the unified vehicle console');
 
 console.log('status-card contracts: ok');

@@ -3747,10 +3747,11 @@ window.HavalSplash = (function () {
     }
     .hv-hs-roof-stack {
       display: grid;
-      grid-template-columns: minmax(150px, 1fr) minmax(200px, 1.35fr) minmax(150px, 1fr);
+      grid-template-columns: minmax(184px,.88fr) minmax(270px,1.35fr) minmax(218px,1fr);
+      grid-template-rows: repeat(2,minmax(0,1fr));
       align-items: stretch;
-      gap: 12px;
-      min-height: 292px;
+      gap: 10px 12px;
+      min-height: 310px;
     }
     .hv-hs-roof-card {
       display: flex;
@@ -4018,12 +4019,50 @@ window.HavalSplash = (function () {
     .hv-hs-vehicle-belt.fastened,.hv-envelope-seatbelt.fastened { opacity:0; }
     .hv-hs-vehicle-belt.fl,.hv-envelope-seatbelt.fl { left:41%; top:45%; }.hv-hs-vehicle-belt.fr,.hv-envelope-seatbelt.fr { right:41%; top:45%; transform:scaleX(-1); }
     .hv-hs-vehicle-belt.rl,.hv-envelope-seatbelt.rl { left:39.5%; top:59%; }.hv-hs-vehicle-belt.rc,.hv-envelope-seatbelt.rc { left:47%; top:59%; }.hv-hs-vehicle-belt.rr,.hv-envelope-seatbelt.rr { right:39.5%; top:59%; transform:scaleX(-1); }
-    .hv-hs-vehicle-stats { display:grid; width:100%; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+    .hv-hs-vehicle-stats { display:grid; width:100%; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
     .hv-hs-vehicle-stats span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:5px 3px; border-radius:6px; background:rgba(255,255,255,.055); color:var(--hv-widget-muted,rgba(234,242,248,.55)); text-align:center; font:6px/1.1 'Space Mono',monospace; letter-spacing:.05em; }
     .hv-hs-vehicle-stats span.attention { color:#ff6671; }
+    /* Unified vehicle console: windows left, the one physical vehicle in the
+       middle, and both roof mechanisms stacked compactly at right. */
+    .hv-vehicle-window-panel { grid-column:1; grid-row:1 / 3; display:flex; min-width:0; flex-direction:column; padding:11px; border:1px solid rgba(255,255,255,.10); border-radius:15px; background:linear-gradient(135deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); }
+    .hv-hs-roof-pop.light .hv-vehicle-window-panel { border-color:rgba(20,28,40,.13); background:linear-gradient(135deg,rgba(255,255,255,.70),rgba(228,234,239,.48)); }
+    .hv-vehicle-window-head { display:grid; gap:4px; margin-bottom:10px; }
+    .hv-vehicle-window-head strong,.hv-vehicle-roof-all-label { font:600 8px/1 'Space Mono',monospace; letter-spacing:.12em; color:var(--hv-widget-fg,#eaf2f8); }
+    .hv-vehicle-window-head span { font:6px/1.25 'Space Mono',monospace; letter-spacing:.05em; color:var(--hv-widget-muted,rgba(234,242,248,.55)); }
+    .hv-vehicle-window-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .hv-vehicle-window-button,.hv-vehicle-window-all button { min-width:0; min-height:48px; padding:7px; border:1px solid rgba(255,255,255,.12); border-radius:10px; background:rgba(255,255,255,.045); color:var(--hv-widget-fg,#eaf2f8); cursor:pointer; }
+    .hv-vehicle-window-button strong,.hv-vehicle-window-button span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .hv-vehicle-window-button strong { font:600 9px/1 'Space Grotesk',sans-serif; }
+    .hv-vehicle-window-button span { margin-top:6px; font:6px/1 'Space Mono',monospace; letter-spacing:.07em; color:var(--hv-widget-muted,rgba(234,242,248,.55)); }
+    .hv-vehicle-window-button.open,.hv-vehicle-window-button.partial { border-color:rgba(99,217,231,.60); background:rgba(99,217,231,.13); }
+    .hv-vehicle-window-button.open span,.hv-vehicle-window-button.partial span { color:var(--hv-accent,#2aa7b7); }
+    .hv-vehicle-window-button:disabled { cursor:default; opacity:.48; }
+    .hv-vehicle-window-all { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:auto; padding-top:12px; }
+    .hv-vehicle-window-all button { min-height:34px; font:7px/1 'Space Mono',monospace; letter-spacing:.07em; }
+    .hv-vehicle-window-all button:last-child { border-color:rgba(99,217,231,.55); color:var(--hv-accent,#2aa7b7); }
+    .hv-hs-roof-stack > .hv-hs-roof-card { grid-column:3; min-height:0; padding:8px 10px; }
+    .hv-hs-roof-stack > .hv-hs-roof-card[data-hs-roof-card="sunroof"] { grid-row:1; }
+    .hv-hs-roof-stack > .hv-hs-roof-card[data-hs-roof-card="curtain"] { grid-row:2; }
+    .hv-hs-roof-stack > .hv-hs-vehicle-stage { grid-column:2; grid-row:1 / 3; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-card-top { width:100%; flex-direction:row; justify-content:space-between; text-align:left; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-value { align-items:flex-end; font-size:15px; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail { min-height:44px; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail::before { left:7%; right:7%; top:50%; bottom:auto; width:auto; height:3px; transform:translateY(-50%); background:linear-gradient(90deg,var(--hv-accent,#2aa7b7) 0 var(--level,0%),rgba(255,255,255,.15) var(--level,0%) 100%); }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail::after { left:var(--thumb-position-horizontal,8%); top:50%; width:28px; height:22px; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-range { width:86%; height:32px; transform:none; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail-label { top:auto; bottom:0; width:auto; font-size:5px; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail-label.vent,.hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail-label.half { left:34%; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-rail-label.full { left:auto; right:4%; bottom:0; }
+    .hv-hs-roof-stack > .hv-hs-roof-card .hv-hs-roof-presets button { min-height:27px; }
+    .hv-hs-vehicle-tire { position:absolute; z-index:7; display:grid; min-width:52px; gap:2px; padding:5px 6px; border:1px solid rgba(99,217,231,.44); border-radius:8px; background:rgba(7,13,18,.84); color:#dff8fb; text-align:center; box-shadow:0 3px 8px rgba(0,0,0,.25); font-style:normal; }
+    .hv-hs-vehicle-tire strong { font:600 12px/.95 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; }
+    .hv-hs-vehicle-tire small { font:500 6px/1 'Space Mono',monospace; letter-spacing:.04em; color:rgba(223,248,251,.68); }
+    .hv-hs-vehicle-tire.warning { border-color:#ff6671; color:#ff6671; }
+    .hv-hs-vehicle-tire.unavailable { opacity:.42; }
+    .hv-hs-vehicle-tire.fl { left:4%; top:22%; }.hv-hs-vehicle-tire.fr { right:4%; top:22%; }.hv-hs-vehicle-tire.rl { left:4%; bottom:18%; }.hv-hs-vehicle-tire.rr { right:4%; bottom:18%; }
     @media (max-width: 640px) {
       .hv-hs-roof-pop { width: calc(100vw - 28px); padding-inline: 12px; }
-      .hv-hs-roof-stack { grid-template-columns:minmax(120px,1fr) minmax(148px,.9fr) minmax(120px,1fr); gap:7px; }
+      .hv-hs-roof-stack { grid-template-columns:minmax(150px,.9fr) minmax(180px,1.1fr) minmax(160px,1fr); gap:7px; }
       .hv-hs-vehicle-art { height:190px; }
     }
 
@@ -4507,7 +4546,7 @@ window.HavalSplash = (function () {
     .hv-status-summary { font-size:clamp(17px,2.9vw,29px); line-height:.95; font-weight:520; letter-spacing:-.035em; }
     .hv-status-summary.attention { color:#ff6671; }
     .hv-status-subtitle { font:7px/1.25 'Space Mono',monospace; letter-spacing:.07em; opacity:.58; }
-    .hv-status-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+    .hv-status-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
     .hv-status-cell { min-width:0; padding:6px 6px 5px; border:1px solid var(--hv-widget-border); border-radius:10px; background:rgba(255,255,255,.04); }
     .hv-status-cell span { display:block; font:6px/1 'Space Mono',monospace; letter-spacing:.06em; opacity:.5; }
     .hv-status-cell strong { display:block; margin-top:4px; font-size:11px; line-height:1; font-weight:560; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -4652,6 +4691,30 @@ window.HavalSplash = (function () {
     .hv-status-focus-system span,.hv-status-focus-system small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:6px/1.1 'Space Mono',monospace; letter-spacing:.06em; opacity:.58; }
     .hv-status-focus-system strong { display:block; margin:5px 0 3px; font:600 11px/1 'Space Grotesk',sans-serif; letter-spacing:.02em; }
     .hv-status-focus-system.open,.hv-status-focus-system.partial { border-color:rgba(99,217,231,.48); }.hv-status-focus-system.unfastened { border-color:rgba(255,83,96,.78); color:#ff6671; animation:hv-seatbelt-alert 1s steps(2,end) infinite; }.hv-status-focus-system.unknown { opacity:.52; }
+    .hv-status-focus-console { display:grid; grid-template-columns:minmax(150px,.78fr) minmax(250px,1.28fr) minmax(190px,.94fr); gap:12px; min-height:310px; height:calc(100% - 98px); margin-top:16px; }
+    .hv-status-focus-console .hv-status-focus-stage { min-height:310px; height:100%; margin:0; }
+    .hv-status-focus-controls { display:flex; min-width:0; flex-direction:column; gap:9px; padding:11px; border:1px solid var(--hv-frost-edge); border-radius:16px; background:rgba(255,255,255,.035); }
+    .hv-status-focus-controls > strong { font:600 8px/1 'Space Mono',monospace; letter-spacing:.11em; }
+    .hv-status-focus-window-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .hv-status-focus-window-grid button,.hv-status-focus-actions button,.hv-status-focus-roof-card button { min-width:0; min-height:34px; padding:6px; border:1px solid var(--hv-frost-edge); border-radius:9px; background:rgba(255,255,255,.04); color:inherit; font:7px/1.15 'Space Mono',monospace; cursor:pointer; }
+    .hv-status-focus-window-grid button span { display:block; margin-top:4px; opacity:.58; font-size:6px; }
+    .hv-status-focus-window-grid button.open,.hv-status-focus-window-grid button.partial { border-color:var(--hv-accent); color:var(--hv-accent); background:rgba(99,217,231,.10); }
+    .hv-status-focus-window-grid button:disabled { opacity:.45; cursor:default; }
+    .hv-status-focus-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:auto; }
+    .hv-status-focus-roof-card { display:grid; gap:7px; padding:9px; border:1px solid var(--hv-frost-edge); border-radius:11px; background:rgba(255,255,255,.03); }
+    .hv-status-focus-roof-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; font:7px/1 'Space Mono',monospace; letter-spacing:.08em; }
+    .hv-status-focus-roof-head strong { font:600 14px/1 'Space Grotesk',sans-serif; letter-spacing:0; }
+    .hv-status-focus-roof-card input[type=range] { width:100%; accent-color:var(--hv-accent); }
+    .hv-status-focus-roof-buttons { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .hv-status-tire { position:absolute; z-index:8; display:grid; min-width:52px; gap:2px; padding:5px 6px; border:1px solid rgba(99,217,231,.48); border-radius:8px; background:var(--hv-frost-fill-strong); text-align:center; font-style:normal; }
+    .hv-status-tire strong { font:600 13px/.95 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; }
+    .hv-status-tire small { font:500 6px/1 'Space Mono',monospace; letter-spacing:.04em; opacity:.62; }
+    .hv-status-tire.warning { border-color:#ff6671; color:#ff6671; }.hv-status-tire.unavailable { opacity:.42; }
+    .hv-status-tire.front-left { left:4%; top:19%; }.hv-status-tire.front-right { right:4%; top:19%; }.hv-status-tire.rear-left { left:4%; bottom:16%; }.hv-status-tire.rear-right { right:4%; bottom:16%; }
+    .hv-status-card-tire { position:absolute; z-index:8; display:grid; min-width:31px; gap:1px; padding:2px 3px; border-radius:5px; background:var(--hv-frost-fill-strong); text-align:center; font-style:normal; }
+    .hv-status-card-tire strong { font:600 8px/.95 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; }.hv-status-card-tire small { font:500 4px/1 'Space Mono',monospace; opacity:.58; }
+    .hv-status-card-tire.warning { color:#ff6671; }.hv-status-card-tire.unavailable { opacity:.36; }
+    .hv-status-card-tire.front-left { left:0; top:18%; }.hv-status-card-tire.front-right { right:0; top:18%; }.hv-status-card-tire.rear-left { left:0; bottom:15%; }.hv-status-card-tire.rear-right { right:0; bottom:15%; }
     .hv-envelope-roof-launcher { position:absolute; z-index:7; left:31.5%; top:35%; width:37%; height:34%; padding:0; border:0; border-radius:13% 13% 10% 10%; background:transparent; cursor:pointer; }.hv-envelope-roof-launcher:focus-visible { outline:2px solid var(--hv-accent); outline-offset:3px; }
     @media (max-width:620px) {
       .hv-tires-focus { padding:12px; }
@@ -4661,7 +4724,7 @@ window.HavalSplash = (function () {
       .hv-tires-focus-car { width:30%; height:70%; }
       .hv-tires-focus-wheel { width:31%; padding:9px; }
       .hv-tires-focus-wheel > strong { font-size:30px; }
-      .hv-status-focus { padding:12px; }.hv-status-focus-meta { flex-direction:column; gap:8px; }.hv-status-focus-stage { min-height:390px; height:auto; }.hv-status-focus-envelope { width:32%; height:72%; }.hv-status-focus-opening { width:29%; padding:8px; }.hv-status-focus-opening.trunk { width:34%; }.hv-status-focus-systems { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .hv-status-focus { padding:12px; }.hv-status-focus-meta { flex-direction:column; gap:8px; }.hv-status-focus-console { grid-template-columns:145px minmax(180px,1fr) 170px; min-height:390px; height:auto; }.hv-status-focus-stage { min-height:390px; height:auto; }.hv-status-focus-envelope { width:32%; height:72%; }.hv-status-focus-opening { width:29%; padding:8px; }.hv-status-focus-opening.trunk { width:34%; }.hv-status-focus-systems { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
     .hv-studio-card-action { margin:10px 0 16px; padding:12px; border:1px solid var(--hv-frost-edge,rgba(255,255,255,.14)); border-radius:14px; }
     .hv-studio-card-action > strong { display:block; margin-bottom:8px; font-size:14px; }
@@ -5021,7 +5084,7 @@ window.HavalSplash = (function () {
             <div class="hv-tires {{ wg.tiresSizeClass }}" onClick="{{ wg.onTiresOpen }}"><div class="hv-glance-head"><span>TIRES</span><small>{{ wg.tiresSource }}</small></div><div class="hv-tires-visual"><img class="hv-tire-car" src="./assets/ui/tires-top-view-v1.png" alt=""><sc-for list="{{ wg.tiresWheels }}" as="tw" hint-placeholder-count="4"><div class="hv-tire-point {{ tw.cls }}"><small>{{ tw.short }}</small><strong>{{ tw.pressure }}</strong><em>{{ tw.pressureUnit }}</em></div></sc-for></div><div class="hv-tires-foot"><span>{{ wg.tiresFoot }}</span><span>{{ wg.tiresUnit }}</span></div></div>
           </sc-if>
           <sc-if value="{{ wg.isStatus }}" hint-placeholder-val="{{ false }}">
-            <button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>VEHICLE STATUS</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="3"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button>
+            <button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>VEHICLE STATUS</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-card-tire {{ st.cls }}"><strong>{{ st.pressure }}</strong><small>{{ st.temperature }}{{ st.temperatureUnit }}</small></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="4"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button>
           </sc-if>
           <sc-if value="{{ wg.isRange }}" hint-placeholder-val="{{ false }}">
             <button type="button" class="hv-range-card {{ wg.rangeSizeClass }}" onClick="{{ wg.onRangeOpen }}" aria-label="{{ wg.rangeAriaLabel }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-total"><span>{{ wg.rangeTotalLabel }}</span><strong>{{ wg.rangeTotal }}</strong><small>{{ wg.rangeUnit }}</small></div><div class="hv-range-detail"><div class="hv-range-soc"><span>BATTERY SOC</span><strong>{{ wg.rangeSoc }}</strong></div><div class="hv-range-split" aria-hidden="true"><i class="ev" style="width:{{ wg.rangeEvPct }}%;"></i><i class="fuel" style="width:{{ wg.rangeFuelPct }}%;"></i></div><div class="hv-range-legend"><div class="ev"><span>EV</span><strong>{{ wg.rangeEv }}<small>{{ wg.rangeUnit }}</small></strong></div><div><span>FUEL</span><strong>{{ wg.rangeFuel }}<small>{{ wg.rangeUnit }}</small></strong></div></div></div></div></button>
@@ -5226,7 +5289,7 @@ window.HavalSplash = (function () {
             <div class="hv-tires {{ wg.tiresSizeClass }}" onClick="{{ wg.onTiresOpen }}"><div class="hv-glance-head"><span>TIRES</span><small>{{ wg.tiresSource }}</small></div><div class="hv-tires-visual"><img class="hv-tire-car" src="./assets/ui/tires-top-view-v1.png" alt=""><sc-for list="{{ wg.tiresWheels }}" as="tw" hint-placeholder-count="4"><div class="hv-tire-point {{ tw.cls }}"><small>{{ tw.short }}</small><strong>{{ tw.pressure }}</strong><em>{{ tw.pressureUnit }}</em></div></sc-for></div><div class="hv-tires-foot"><span>{{ wg.tiresFoot }}</span><span>{{ wg.tiresUnit }}</span></div></div>
           </sc-if>
           <sc-if value="{{ wg.isStatus }}" hint-placeholder-val="{{ false }}">
-            <button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>VEHICLE STATUS</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="3"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button>
+            <button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>VEHICLE STATUS</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-card-tire {{ st.cls }}"><strong>{{ st.pressure }}</strong><small>{{ st.temperature }}{{ st.temperatureUnit }}</small></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="4"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button>
           </sc-if>
           <sc-if value="{{ wg.isRange }}" hint-placeholder-val="{{ false }}">
             <button type="button" class="hv-range-card {{ wg.rangeSizeClass }}" onClick="{{ wg.onRangeOpen }}" aria-label="{{ wg.rangeAriaLabel }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-total"><span>{{ wg.rangeTotalLabel }}</span><strong>{{ wg.rangeTotal }}</strong><small>{{ wg.rangeUnit }}</small></div><div class="hv-range-detail"><div class="hv-range-soc"><span>BATTERY SOC</span><strong>{{ wg.rangeSoc }}</strong></div><div class="hv-range-split" aria-hidden="true"><i class="ev" style="width:{{ wg.rangeEvPct }}%;"></i><i class="fuel" style="width:{{ wg.rangeFuelPct }}%;"></i></div><div class="hv-range-legend"><div class="ev"><span>EV</span><strong>{{ wg.rangeEv }}<small>{{ wg.rangeUnit }}</small></strong></div><div><span>FUEL</span><strong>{{ wg.rangeFuel }}<small>{{ wg.rangeUnit }}</small></strong></div></div></div></div></button>
@@ -5635,7 +5698,11 @@ window.HavalSplash = (function () {
     <sc-if value="{{ focusedCardIsStatus }}" hint-placeholder-val="{{ false }}">
       <div class="hv-status-focus">
         <div class="hv-status-focus-meta"><div><span class="hv-status-focus-source {{ focusedStatusState }}" role="status">{{ focusedStatusSource }}</span><strong class="hv-status-focus-summary {{ focusedStatusSummaryClass }}">{{ focusedStatusSummary }}</strong><span class="hv-status-focus-subtitle">{{ focusedStatusSubtitle }}</span></div></div>
-        <div class="hv-status-focus-stage"><div class="hv-status-focus-envelope" style="{{ focusedStatusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt="Top view of vehicle"><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><button type="button" class="hv-envelope-roof-launcher" onClick="{{ focusedStatusOpenRoofControls }}" aria-label="Open sunroof and sunshade controls"></button><sc-for list="{{ focusedStatusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ focusedStatusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for></div></div>
+        <div class="hv-status-focus-console">
+          <section class="hv-status-focus-controls" aria-label="Window status and controls"><strong>WINDOWS</strong><div class="hv-status-focus-window-grid"><sc-for list="{{ focusedStatusWindowControls }}" as="sw" hint-placeholder-count="4"><button type="button" class="{{ sw.cls }}" onClick="{{ sw.onClick }}" disabled="{{ sw.disabled }}" aria-disabled="{{ sw.disabled }}" aria-pressed="{{ sw.pressed }}">{{ sw.short }}<span>{{ sw.stateLabel }}</span></button></sc-for></div><div class="hv-status-focus-actions"><button type="button" onClick="{{ focusedStatusWindowCloseAll }}">CLOSE ALL</button><button type="button" onClick="{{ focusedStatusWindowOpenAll }}">OPEN ALL</button></div></section>
+          <div class="hv-status-focus-stage"><div class="hv-status-focus-envelope" style="{{ focusedStatusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt="Top view of vehicle"><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ focusedStatusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ focusedStatusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for></div><sc-for list="{{ focusedStatusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-tire {{ st.cls }}"><strong>{{ st.pressure }} {{ st.pressureUnit }}</strong><small>{{ st.temperature }} {{ st.temperatureUnit }}</small></i></sc-for></div>
+          <aside class="hv-status-focus-controls" aria-label="Sunroof and sunshade controls"><strong>ROOF</strong><section class="hv-status-focus-roof-card"><div class="hv-status-focus-roof-head"><span>SUNROOF</span><strong>{{ focusedStatusSunroofPct }}%</strong></div><input type="range" min="0" max="100" step="1" value="{{ focusedStatusSunroofPct }}" onInput="{{ focusedStatusSunroofInput }}" onChange="{{ focusedStatusSunroofInput }}" aria-label="Sunroof opening"><div class="hv-status-focus-roof-buttons"><button type="button" onClick="{{ focusedStatusSunroofClose }}">CLOSE</button><button type="button" onClick="{{ focusedStatusSunroofOpen }}">OPEN</button></div></section><section class="hv-status-focus-roof-card"><div class="hv-status-focus-roof-head"><span>SUNSHADE</span><strong>{{ focusedStatusCurtainPct }}%</strong></div><input type="range" min="0" max="100" step="1" value="{{ focusedStatusCurtainPct }}" onInput="{{ focusedStatusCurtainInput }}" onChange="{{ focusedStatusCurtainInput }}" aria-label="Sunshade opening"><div class="hv-status-focus-roof-buttons"><button type="button" onClick="{{ focusedStatusCurtainClose }}">CLOSE</button><button type="button" onClick="{{ focusedStatusCurtainOpen }}">OPEN</button></div></section><div class="hv-status-focus-actions"><button type="button" onClick="{{ focusedStatusRoofCloseAll }}">CLOSE ALL</button><button type="button" onClick="{{ focusedStatusRoofOpenAll }}">OPEN ALL</button></div></aside>
+        </div>
       </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsDriving }}" hint-placeholder-val="{{ false }}">
@@ -6415,7 +6482,6 @@ const H6_BOTTOM_CARD_CATALOG = [
   { id: 'media', title: 'Media', action: 'addWidget' },
   { id: 'range', title: 'Range', action: 'openRange' },
   { id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' },
-  { id: 'tires', title: 'Tires', action: 'openTires' },
   { id: 'clock', title: 'Clock', action: 'openDesktopStudio' },
   { id: 'desktops', title: 'Desktops', action: 'openDesktopStudio' },
   // Three rail tiles, one destination. `action` fires on the card body and
@@ -16886,10 +16952,20 @@ class Component extends DCLogic {
     roofPop.className = 'hv-hs-roof-pop';
     roofPop.innerHTML =
       '<div class="hv-hs-roof-head">' +
-        '<div><h4>VEHICLE STATUS / ROOF</h4></div>' +
+        '<div><h4>VEHICLE STATUS</h4></div>' +
         '<button type="button" class="hv-hs-roof-close" aria-label="Close roof controls" data-hs-roof-close>×</button>' +
       '</div>' +
       '<div class="hv-hs-roof-stack">' +
+        '<section class="hv-vehicle-window-panel" aria-label="Window status and controls">' +
+          '<div class="hv-vehicle-window-head"><strong>WINDOWS</strong><span data-hs-window-help>INDIVIDUAL · DEMO PREVIEW</span></div>' +
+          '<div class="hv-vehicle-window-grid">' +
+            '<button type="button" class="hv-vehicle-window-button" data-hs-window-key="fl"><strong>FRONT LEFT</strong><span data-hs-window-state="fl">UNKNOWN</span></button>' +
+            '<button type="button" class="hv-vehicle-window-button" data-hs-window-key="fr"><strong>FRONT RIGHT</strong><span data-hs-window-state="fr">UNKNOWN</span></button>' +
+            '<button type="button" class="hv-vehicle-window-button" data-hs-window-key="rl"><strong>REAR LEFT</strong><span data-hs-window-state="rl">UNKNOWN</span></button>' +
+            '<button type="button" class="hv-vehicle-window-button" data-hs-window-key="rr"><strong>REAR RIGHT</strong><span data-hs-window-state="rr">UNKNOWN</span></button>' +
+          '</div>' +
+          '<div class="hv-vehicle-window-all"><button type="button" data-hs-window-all="close">CLOSE ALL</button><button type="button" data-hs-window-all="open">OPEN ALL</button></div>' +
+        '</section>' +
         '<section class="hv-hs-roof-card" data-hs-roof-card="sunroof" data-level="0">' +
           '<div class="hv-hs-roof-card-top"><span class="hv-hs-roof-name">SUNROOF</span><span class="hv-hs-roof-value"><span data-hs-roof-sun-val>0%</span><span class="hv-hs-roof-state" data-hs-roof-sun-state>CLOSED</span></span></div>' +
           '<div class="hv-hs-roof-rail"><span class="hv-hs-roof-rail-label vent">VENTILATION</span><span class="hv-hs-roof-rail-label full">FULLY OPEN</span><input aria-label="Sunroof opening" class="hv-hs-roof-range" type="range" min="0" max="100" step="1" data-hs-roof-sun /></div>' +
@@ -16926,8 +17002,9 @@ class Component extends DCLogic {
             '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="rr-open" src="./assets/ui/vehicle-status/window-rr-open-v2.png" alt="">' +
             '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="rr-partial" src="./assets/ui/vehicle-status/window-rr-partial-v2.png" alt="">' +
             '<i class="hv-hs-vehicle-belt fl" data-hs-vehicle-belt="fl"></i><i class="hv-hs-vehicle-belt fr" data-hs-vehicle-belt="fr"></i><i class="hv-hs-vehicle-belt rl" data-hs-vehicle-belt="rl"></i><i class="hv-hs-vehicle-belt rc" data-hs-vehicle-belt="rc"></i><i class="hv-hs-vehicle-belt rr" data-hs-vehicle-belt="rr"></i>' +
+            '<i class="hv-hs-vehicle-tire fl" data-hs-vehicle-tire="front-left"><strong>—</strong><small>—</small></i><i class="hv-hs-vehicle-tire fr" data-hs-vehicle-tire="front-right"><strong>—</strong><small>—</small></i><i class="hv-hs-vehicle-tire rl" data-hs-vehicle-tire="rear-left"><strong>—</strong><small>—</small></i><i class="hv-hs-vehicle-tire rr" data-hs-vehicle-tire="rear-right"><strong>—</strong><small>—</small></i>' +
           '</div>' +
-          '<div class="hv-hs-vehicle-stats"><span data-hs-vehicle-doors>DOORS</span><span data-hs-vehicle-glass>GLASS</span><span data-hs-vehicle-belts>BELTS</span></div>' +
+          '<div class="hv-hs-vehicle-stats"><span data-hs-vehicle-doors>DOORS</span><span data-hs-vehicle-glass>GLASS</span><span data-hs-vehicle-belts>BELTS</span><span data-hs-vehicle-tires>TIRES</span></div>' +
         '</div>' +
         '<section class="hv-hs-roof-card" data-hs-roof-card="curtain" data-level="0">' +
           '<div class="hv-hs-roof-card-top"><span class="hv-hs-roof-name">SUNSHADE</span><span class="hv-hs-roof-value"><span data-hs-roof-cur-val>0%</span><span class="hv-hs-roof-state" data-hs-roof-cur-state>CLOSED</span></span></div>' +
@@ -16939,9 +17016,9 @@ class Component extends DCLogic {
           '</div>' +
         '</section>' +
       '</div>' +
-      '<div class="hv-hs-roof-footer">' +
-        '<button type="button" data-hs-roof-close-all>CLOSE ALL</button>' +
-        '<button type="button" data-hs-roof-open-all>OPEN ALL</button>' +
+      '<div class="hv-hs-roof-footer" aria-label="All roof controls">' +
+        '<button type="button" data-hs-roof-close-all>CLOSE ROOF + SHADE</button>' +
+        '<button type="button" data-hs-roof-open-all>OPEN ROOF + SHADE</button>' +
       '</div>';
     // Keep this control surface outside the 3D canvas stacking context so a
     // Card-triggered popup stays above widgets and application panes.
@@ -16970,6 +17047,14 @@ class Component extends DCLogic {
     this._hsVehicleDoors = roofPop.querySelector('[data-hs-vehicle-doors]');
     this._hsVehicleGlass = roofPop.querySelector('[data-hs-vehicle-glass]');
     this._hsVehicleBelts = roofPop.querySelector('[data-hs-vehicle-belts]');
+    this._hsVehicleTires = roofPop.querySelector('[data-hs-vehicle-tires]');
+    this._hsWindowHelp = roofPop.querySelector('[data-hs-window-help]');
+    this._hsWindowButtons = {};
+    roofPop.querySelectorAll('[data-hs-window-key]').forEach((el) => { this._hsWindowButtons[el.getAttribute('data-hs-window-key')] = el; });
+    this._hsWindowStateEls = {};
+    roofPop.querySelectorAll('[data-hs-window-state]').forEach((el) => { this._hsWindowStateEls[el.getAttribute('data-hs-window-state')] = el; });
+    this._hsVehicleTireEls = {};
+    roofPop.querySelectorAll('[data-hs-vehicle-tire]').forEach((el) => { this._hsVehicleTireEls[el.getAttribute('data-hs-vehicle-tire')] = el; });
     this._hsVehicleCavityEls = {};
     roofPop.querySelectorAll('[data-hs-vehicle-cavity]').forEach((el) => { this._hsVehicleCavityEls[el.getAttribute('data-hs-vehicle-cavity')] = el; });
     this._hsVehicleClosedDoorEls = {};
@@ -16980,6 +17065,18 @@ class Component extends DCLogic {
     roofPop.querySelectorAll('[data-hs-vehicle-window]').forEach((el) => { this._hsVehicleWindowEls[el.getAttribute('data-hs-vehicle-window')] = el; });
     this._hsVehicleBeltEls = {};
     roofPop.querySelectorAll('[data-hs-vehicle-belt]').forEach((el) => { this._hsVehicleBeltEls[el.getAttribute('data-hs-vehicle-belt')] = el; });
+    roofPop.querySelectorAll('[data-hs-window-key]').forEach((button) => {
+      button.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this._toggleStatusWindow(button.getAttribute('data-hs-window-key'), ev);
+      });
+    });
+    roofPop.querySelectorAll('[data-hs-window-all]').forEach((button) => {
+      button.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this._setAllStatusWindows(button.getAttribute('data-hs-window-all'), ev);
+      });
+    });
     const syncLevel = (kind, raw) => this._syncRoofLevelControl(kind, raw);
     sunSl.addEventListener('input', () => {
       const v = parseInt(sunSl.value, 10) || 0;
@@ -17500,6 +17597,7 @@ class Component extends DCLogic {
       card.setAttribute('data-level', String(level));
       card.style.setProperty('--level', level + '%');
       card.style.setProperty('--thumb-position', (8 + level * .84) + '%');
+      card.style.setProperty('--thumb-position-horizontal', (7 + level * .86) + '%');
     }
     if (this._hsRoofPop) {
       this._hsRoofPop.style.setProperty(sunroof ? '--sun-level' : '--curtain-level', level + '%');
@@ -17562,6 +17660,17 @@ class Component extends DCLogic {
       const target = (envelope.windows || []).find((entry) => entry.key === parts[0]);
       this._hsVehicleWindowEls[key].classList.toggle('on', !!target && target.state === parts[1]);
     });
+    Object.keys(this._hsWindowButtons || {}).forEach((key) => {
+      const target = (envelope.windows || []).find((entry) => entry.key === key);
+      const state = target ? target.state : 'unknown';
+      const button = this._hsWindowButtons[key];
+      button.className = 'hv-vehicle-window-button ' + state;
+      button.disabled = !envelope.demo;
+      button.setAttribute('aria-pressed', state === 'open' || state === 'partial' ? 'true' : 'false');
+      if (this._hsWindowStateEls && this._hsWindowStateEls[key]) this._hsWindowStateEls[key].textContent = target ? target.stateLabel : 'UNKNOWN';
+    });
+    if (this._hsWindowHelp) this._hsWindowHelp.textContent = envelope.demo
+      ? 'TAP EACH WINDOW · SIMULATED' : 'INDIVIDUAL STATUS · ALL CONTROL';
     Object.keys(this._hsVehicleBeltEls || {}).forEach((key) => {
       const target = (envelope.seatBelts || []).find((entry) => entry.key === key);
       const state = target ? target.state : 'unknown';
@@ -17573,6 +17682,49 @@ class Component extends DCLogic {
       this._hsVehicleBelts.textContent = unfastened ? 'BELTS !' : (envelope.demo ? 'BELTS OK' : 'BELTS —');
       this._hsVehicleBelts.classList.toggle('attention', !!unfastened);
     }
+    const tireWheels = envelope.tires && envelope.tires.wheels || [];
+    Object.keys(this._hsVehicleTireEls || {}).forEach((key) => {
+      const target = tireWheels.find((wheel) => wheel.key === key);
+      const el = this._hsVehicleTireEls[key];
+      const pressure = el.querySelector('strong');
+      const temperature = el.querySelector('small');
+      if (pressure) pressure.textContent = (target ? target.pressure : '—') + (target && target.pressureUnit ? ' ' + target.pressureUnit : '');
+      if (temperature) temperature.textContent = target && target.hasTemperature
+        ? target.temperature + ' ' + target.temperatureUnit : 'TEMP —';
+      el.className = 'hv-hs-vehicle-tire ' + ({'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'}[key] || '') + ' ' + (target ? target.state : 'unavailable');
+    });
+    if (this._hsVehicleTires) {
+      this._hsVehicleTires.textContent = envelope.tires && envelope.tires.warning ? 'TIRES !' : (tireWheels.some((wheel) => wheel.pressure !== '—') ? 'TIRES OK' : 'TIRES —');
+      this._hsVehicleTires.classList.toggle('attention', !!(envelope.tires && envelope.tires.warning));
+    }
+  }
+
+  _refreshUnifiedStatus() {
+    this.setState((state) => ({ widgetRev: (state.widgetRev || 0) + 1 }), () => {
+      const envelope = this._statusEnvelopeSnapshot();
+      this._syncRoofVehicleStatus(envelope);
+      this._syncDockIndicators();
+    });
+  }
+
+  _toggleStatusWindow(key, ev) {
+    this._cardControlEvent(ev);
+    if (!this._demoPreview || !['fl','fr','rl','rr'].includes(key)) return;
+    const current = Object.assign({ fl:'partial', fr:'open', rl:'closed', rr:'closed' }, this._demoWindowStates || {});
+    current[key] = current[key] === 'closed' ? 'open' : 'closed';
+    this._demoWindowStates = current;
+    this._refreshUnifiedStatus();
+  }
+
+  _setAllStatusWindows(action, ev) {
+    this._cardControlEvent(ev);
+    if (action !== 'open' && action !== 'close') return;
+    if (this._demoPreview) {
+      const state = action === 'open' ? 'open' : 'closed';
+      this._demoWindowStates = { fl:state, fr:state, rl:state, rr:state };
+    }
+    this._runVehicleOpeningAction('windows', action);
+    this._refreshUnifiedStatus();
   }
 
   _animateRoofVehicleTransition(kind, previous, level) {
@@ -28887,12 +29039,15 @@ class Component extends DCLogic {
   _normalizeBottomCards(raw) {
     const allowed = H6_BOTTOM_CARD_CATALOG.map((card) => card.id);
     const seen = {};
-    const next = Array.isArray(raw) ? raw.filter((id) => {
+    // v15 merged the old Tires rail card into Vehicle status. Migrate saved
+    // desktops losslessly and deduplicate when both cards used to be enabled.
+    const source = Array.isArray(raw) ? raw.map((id) => id === 'tires' ? 'status' : id) : [];
+    const next = source.filter((id) => {
       const key = String(id || '');
       if (seen[key] || allowed.indexOf(key) < 0) return false;
       seen[key] = true;
       return true;
-    }) : [];
+    });
     return next.length ? next.slice(0, allowed.length) : this._defaultBottomCards();
   }
 
@@ -29986,11 +30141,12 @@ class Component extends DCLogic {
     };
     const sunroof = roofPart('SUNROOF', CAR_SIGNALS.sunroof, this._vehicleOpeningLevel(this.state.sunroofOpen), 46);
     const curtain = roofPart('SHADE', CAR_SIGNALS.curtain, this._vehicleOpeningLevel(this.state.curtainOpen), 25);
+    const demoWindows = Object.assign({ fl: 'partial', fr: 'open', rl: 'closed', rr: 'closed' }, this._demoWindowStates || {});
     const windows = [
       { key: 'fl', label: 'Driver glass', demoState: 'partial' }, { key: 'fr', label: 'Passenger glass', demoState: 'open' },
       { key: 'rl', label: 'Rear left glass', demoState: 'closed' }, { key: 'rr', label: 'Rear right glass', demoState: 'closed' },
     ].map((windowState) => {
-      const state = demo ? windowState.demoState : 'unknown';
+      const state = demo ? (demoWindows[windowState.key] || windowState.demoState) : 'unknown';
       return Object.assign({}, windowState, { state, stateLabel: openingLabel(state), source: demo ? 'DEMO' : 'UNAVAILABLE', cls: windowState.key + ' ' + state });
     });
     const seatBelts = [
@@ -30009,12 +30165,22 @@ class Component extends DCLogic {
       .map((windowState) => ({ cls: '', label: windowState.label + ' ' + windowState.stateLabel.toLowerCase() }));
     const beltAttention = seatBelts.filter((belt) => belt.state === 'unfastened')
       .map((belt) => ({ cls: 'attention', label: belt.label + ' unfastened' }));
+    const tireView = this._tiresWidgetView({ type:'tires', w:2, h:1 });
+    const tires = {
+      wheels: tireView.tiresWheels,
+      warning: tireView.tiresWarning,
+      state: tireView.tiresOverallState,
+      source: tireView.tiresSource,
+      summary: tireView.tiresSummary,
+      unit: tireView.tiresPressureUnit,
+    };
+    const tireAttention = tires.warning ? [{ cls:'attention', label:'Tyre pressure needs attention' }] : [];
     const attentionItems = doors.open.map((opening) => ({ cls: 'attention', label: opening.label + ' open' }))
-      .concat(roofAttention, glassAttention, beltAttention);
+      .concat(roofAttention, glassAttention, beltAttention, tireAttention);
     if (!attentionItems.length) attentionItems.push({ cls: '', label: demo ? 'Demo vehicle secured' : 'Only verified vehicle signals are shown' });
     const systems = [sunroof, curtain].concat(windows, seatBelts).map((part) => ({
       label: part.label, stateLabel: part.stateLabel, source: part.source, cls: part.cls || part.state,
-    }));
+    })).concat([{ label:'TYRES', stateLabel:tires.warning ? 'CHECK' : (tires.wheels.some((wheel) => wheel.pressure !== '—') ? 'NORMAL' : 'UNKNOWN'), source:tires.source, cls:tires.warning ? 'warning' : tires.state }]);
     let summary = doors.summary;
     // Keep the alternating demo legible: its headline names the door phase while
     // the GLASS/BELTS rows continue to expose their independent demo warnings.
@@ -30024,7 +30190,7 @@ class Component extends DCLogic {
     else if (!demo && !doors.open.length && roofAttention.length) summary = roofAttention[0].label;
     const realisticArt = demo && doors.open.some((opening) => opening.key === 'fl')
       && doors.open.some((opening) => opening.key === 'trunk') ? 'demo-realistic-state' : '';
-    return { doors, demo, roof, sunroof, curtain, windows, seatBelts, systems, attentionItems, summary, realisticArt };
+    return { doors, demo, roof, sunroof, curtain, windows, seatBelts, tires, systems, attentionItems, summary, realisticArt };
   }
 
   _statusVehicleImageLayers(envelope) {
@@ -30386,7 +30552,20 @@ class Component extends DCLogic {
     const gear = this._carGear != null && isFinite(this._carGear) ? this._carGear : null;
     const ready = this._carReady === true ? 'READY' : (this._carReady === false ? 'OFF' : null);
     const metricState = (label, part, demoValue) => ({ label, value: part.state === 'unknown' ? (envelope.demo ? demoValue : '—') : part.stateLabel, cls: part.state === 'unknown' ? '' : 'live' });
-    const metrics = [metricState('SUNROOF', envelope.sunroof, 'PART OPEN'), metricState('GLASS', { state: envelope.windows.some((windowState) => windowState.state === 'open' || windowState.state === 'partial') ? 'open' : (envelope.demo ? 'closed' : 'unknown'), stateLabel: envelope.windows.filter((windowState) => windowState.state === 'open' || windowState.state === 'partial').length + ' OPEN' }, '2 OPEN'), metricState('BELTS', { state: envelope.seatBelts.some((belt) => belt.state === 'unfastened') ? 'unfastened' : (envelope.demo ? 'fastened' : 'unknown'), stateLabel: envelope.seatBelts.some((belt) => belt.state === 'unfastened') ? 'CHECK' : 'FASTENED' }, 'CHECK')];
+    const tireKnown = envelope.tires.wheels.some((wheel) => wheel.pressure !== '—');
+    const metrics = [metricState('SUNROOF', envelope.sunroof, 'PART OPEN'), metricState('GLASS', { state: envelope.windows.some((windowState) => windowState.state === 'open' || windowState.state === 'partial') ? 'open' : (envelope.demo ? 'closed' : 'unknown'), stateLabel: envelope.windows.filter((windowState) => windowState.state === 'open' || windowState.state === 'partial').length + ' OPEN' }, '2 OPEN'), metricState('BELTS', { state: envelope.seatBelts.some((belt) => belt.state === 'unfastened') ? 'unfastened' : (envelope.demo ? 'fastened' : 'unknown'), stateLabel: envelope.seatBelts.some((belt) => belt.state === 'unfastened') ? 'CHECK' : 'FASTENED' }, 'CHECK'), { label:'TIRES', value:envelope.tires.warning ? 'CHECK' : (tireKnown ? 'OK' : '—'), cls:tireKnown ? 'live' : '' }];
+    const shortWindow = { fl:'FRONT L', fr:'FRONT R', rl:'REAR L', rr:'REAR R' };
+    const statusWindowControls = envelope.windows.map((windowState) => ({
+      key:windowState.key,
+      short:shortWindow[windowState.key],
+      stateLabel:windowState.stateLabel,
+      cls:windowState.cls,
+      pressed:windowState.state === 'open' || windowState.state === 'partial',
+      disabled:!envelope.demo,
+      onClick:(ev) => this._toggleStatusWindow(windowState.key, ev),
+    }));
+    const roofAction = (kind, action) => (ev) => { this._cardControlEvent(ev); this._runVehicleOpeningAction(kind, action); this._refreshUnifiedStatus(); };
+    const roofInput = (kind) => (ev) => { this._cardControlEvent(ev); this._onVehicleOpeningRange(kind, ev); this._refreshUnifiedStatus(); };
     return {
       statusSizeClass: 'hv-status-' + (item.w || 1) + 'x' + (item.h || 1),
       statusSource: status.source,
@@ -30400,7 +30579,21 @@ class Component extends DCLogic {
       statusImageLayers: this._statusVehicleImageLayers(envelope),
       statusVehicleStyle: this._statusVehicleImageStyle(envelope),
       statusWindows: envelope.windows,
+      statusWindowControls: statusWindowControls,
+      statusWindowCloseAll: (ev) => this._setAllStatusWindows('close', ev),
+      statusWindowOpenAll: (ev) => this._setAllStatusWindows('open', ev),
       statusSeatBelts: envelope.seatBelts,
+      statusTires: envelope.tires.wheels.map((wheel) => Object.assign({}, wheel, { cls:wheel.key + ' ' + wheel.state })),
+      statusSunroofPct: envelope.sunroof.pct,
+      statusCurtainPct: envelope.curtain.pct,
+      statusSunroofInput: roofInput('sunroof'),
+      statusCurtainInput: roofInput('curtain'),
+      statusSunroofClose: roofAction('sunroof','close'),
+      statusSunroofOpen: roofAction('sunroof','open'),
+      statusCurtainClose: roofAction('curtain','close'),
+      statusCurtainOpen: roofAction('curtain','open'),
+      statusRoofCloseAll: (ev) => { this._cardControlEvent(ev); this._runVehicleOpeningAction('sunroof','close'); this._runVehicleOpeningAction('curtain','close'); this._refreshUnifiedStatus(); },
+      statusRoofOpenAll: (ev) => { this._cardControlEvent(ev); this._runVehicleOpeningAction('curtain','open'); this._runVehicleOpeningAction('sunroof','open'); this._refreshUnifiedStatus(); },
       statusSystems: envelope.systems,
       statusMetrics: metrics,
       statusAttentionItems: envelope.attentionItems,
@@ -30924,7 +31117,7 @@ class Component extends DCLogic {
       consumption: consumptionSummary,
       media: s.mediaTitle || 'Now playing',
       range: range.rangeSoc + '% · EV ' + range.rangeEv + ' km · GAS ' + range.rangeFuel + ' km',
-      status: status.statusSummary + ' · ' + status.statusSource,
+      status: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / '),
       tires: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / ')
         + (tires.tiresHasAnyPressure ? ' ' + tires.tiresUnit : ''),
       clock: clock.clockTime + ' · ' + clock.clockDate,
@@ -30975,6 +31168,7 @@ class Component extends DCLogic {
         progress: status.statusOpenings.filter((opening) => opening.state !== 'unknown').length * 20,
         state: status.statusState,
         openingStates: status.statusOpenings.map((opening) => opening.state).join(','),
+        wheelStates: status.statusTires.map((wheel) => wheel.state).join(','),
       },
       tires: {
         primary: tires.tireFrontLeft + ' · ' + tires.tireFrontRight,
