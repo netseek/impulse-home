@@ -927,6 +927,7 @@ public final class MainActivity extends Activity {
     private android.widget.TextView quickMediaAppName;
     private View quickMediaAppRow;
     private boolean quickMediaCanLaunch;
+    private QuickMediaBarsView quickMediaBars;
     /**
      * The last now-playing payload, replayed after the rail is rebuilt.
      *
@@ -1038,6 +1039,150 @@ public final class MainActivity extends Activity {
     }
 
     /** Compact, data-driven illustrations used by the CoffeeOS-style rail cards. */
+    /**
+     * Ambient bars behind the MEDIA tile's copy.
+     *
+     * <p><b>These do not follow the audio, and cannot.</b> The viewer has no
+     * audio input of any kind — no AnalyserNode, no native capture — which is
+     * the same limitation CLAUDE.md records for the web media visualisers.
+     * Real spectrum would need android.media.audiofx.Visualizer on session 0,
+     * which means RECORD_AUDIO, and the MMI is Android 9 so AudioPlaybackCapture
+     * (API 29+) is not available either.
+     *
+     * <p>What they ARE driven by is the one thing the payload actually reports:
+     * whether a track is playing. They move while it plays and settle when it
+     * pauses. That makes them a playing indicator wearing an equaliser's shape,
+     * not a readout — which is why they are kept faint and behind the copy
+     * rather than presented as data.
+     */
+    private final class QuickMediaBarsView extends View {
+        private static final int BARS = 16;
+        /** 15 Hz, not 60: this redraws on a panel that is already short of frames. */
+        private static final long FRAME_MS = 66;
+
+        private final android.graphics.Paint paint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF bar = new android.graphics.RectF();
+        private final float[] level = new float[BARS];
+        private boolean playing;
+        private boolean visible = true;
+        private long startedAt;
+        private int tint;
+
+        private final Runnable frame = new Runnable() {
+            @Override
+            public void run() {
+                if (!playing || !visible || !isAttachedToWindow()) return;
+                invalidate();
+                postDelayed(this, FRAME_MS);
+            }
+        };
+
+        QuickMediaBarsView(Context context) {
+            super(context);
+            setWillNotDraw(false);
+            setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            retint();
+        }
+
+        void retint() {
+            tint = dockAccentColor;
+            invalidate();
+        }
+
+        /**
+         * The rail is hidden whenever the dock is in launcher mode, and the tile
+         * can be scrolled off its row. Neither stops isAttachedToWindow() being
+         * true, so without this the bars would keep redrawing off screen for as
+         * long as something was playing.
+         */
+        @Override
+        public void onVisibilityAggregated(boolean isVisible) {
+            super.onVisibilityAggregated(isVisible);
+            if (visible == isVisible) return;
+            visible = isVisible;
+            removeCallbacks(frame);
+            if (visible && playing) { startedAt = android.os.SystemClock.uptimeMillis(); post(frame); }
+        }
+
+        void setPlaying(boolean next) {
+            if (playing == next) return;
+            playing = next;
+            removeCallbacks(frame);
+            if (playing && visible) {
+                startedAt = android.os.SystemClock.uptimeMillis();
+                post(frame);
+            } else {
+                // One last frame so the bars settle rather than freeze mid-swing.
+                invalidate();
+            }
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            removeCallbacks(frame);
+            super.onDetachedFromWindow();
+        }
+
+        @Override
+        protected void onDraw(android.graphics.Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            if (w <= 0f || h <= 0f) return;
+            float d = getResources().getDisplayMetrics().density;
+
+            float barW = 3f * d;
+            float gap = 4f * d;
+            float span = BARS * barW + (BARS - 1) * gap;
+            float right = w - 9f * d;
+            float left = right - span;
+            if (left < 0f) return;
+            float floor = h - 10f * d;
+            float ceiling = h * 0.24f;
+            float travel = floor - ceiling;
+            if (travel <= 0f) return;
+
+            float seconds = playing
+                    ? (android.os.SystemClock.uptimeMillis() - startedAt) / 1000f : 0f;
+            for (int i = 0; i < BARS; i++) {
+                float target;
+                if (playing) {
+                    // Three incommensurate rates per bar, so the row never reads
+                    // as one sine wave marching across it.
+                    double a = Math.sin(seconds * 2.7 + i * 0.9);
+                    double b = Math.sin(seconds * 1.3 + i * 2.1);
+                    double c = Math.sin(seconds * 4.1 + i * 0.4);
+                    target = (float) (0.46 + 0.26 * a + 0.18 * b + 0.10 * c);
+                } else {
+                    target = 0.10f;
+                }
+                if (target < 0.06f) target = 0.06f;
+                if (target > 1f) target = 1f;
+                // Ease toward the target so a pause settles instead of snapping.
+                level[i] += (target - level[i]) * (playing ? 0.55f : 0.22f);
+
+                float x = left + i * (barW + gap);
+                float top = floor - travel * level[i];
+                bar.set(x, top, x + barW, floor);
+                // Faint at the leading edge, a little stronger at the trailing
+                // one, so the field fades out under the title instead of
+                // competing with it.
+                float lead = (float) i / (BARS - 1);
+                int alpha = Math.round(0x10 + 0x2A * lead);
+                paint.setColor(withAlpha(tint, alpha));
+                canvas.drawRoundRect(bar, barW * 0.5f, barW * 0.5f, paint);
+            }
+            if (!playing) {
+                boolean settled = true;
+                for (int i = 0; i < BARS; i++) {
+                    if (Math.abs(level[i] - 0.10f) > 0.01f) { settled = false; break; }
+                }
+                if (!settled) postDelayed(frame, FRAME_MS);
+            }
+        }
+    }
+
     private final class QuickCardGraphicView extends View {
         private BottomCardDescriptor descriptor;
         private final android.graphics.Paint paint =
@@ -6778,6 +6923,8 @@ public final class MainActivity extends Activity {
         quickMediaAppIcon = null;
         quickMediaAppName = null;
         quickMediaAppRow = null;
+        if (quickMediaBars != null) quickMediaBars.setPlaying(false);
+        quickMediaBars = null;
         quickMediaButtons.clear();
 
         // Cards mode starts with one predictable Workspace card. It exposes
@@ -7259,9 +7406,9 @@ public final class MainActivity extends Activity {
         copy.setGravity(android.view.Gravity.CENTER_VERTICAL);
         copy.setPadding(Math.round(13 * density), Math.round(8 * density),
                 Math.round(11 * density), Math.round(8 * density));
-        android.widget.LinearLayout.LayoutParams copyLp = new android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
-        copy.setLayoutParams(copyLp);
+        copy.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
         // Heading row: the card's own name on the left, and on the right the
         // app that published the track — its real icon and label, both from the
         // now-playing payload rather than guessed from the package name.
@@ -7316,7 +7463,17 @@ public final class MainActivity extends Activity {
         controls.addView(makeQuickMediaButton(density, false, "next", "Next track",
                 v -> mediaNowPlaying.next()));
         copy.addView(controls);
-        card.addView(copy);
+        // The right half stacks: ambient bars behind, copy in front. A
+        // LinearLayout cannot overlap its children, so this needs a frame.
+        android.widget.FrameLayout right = new android.widget.FrameLayout(this);
+        right.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+        quickMediaBars = new QuickMediaBarsView(this);
+        right.addView(quickMediaBars, new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+        right.addView(copy);
+        card.addView(right);
         return card;
     }
 
@@ -7542,6 +7699,7 @@ public final class MainActivity extends Activity {
         quickMediaPackage = payload.optString("packageName", "");
         quickMediaPlaying = payload.optBoolean("playing", false);
         quickMediaCanLaunch = payload.optBoolean("canLaunch", false);
+        if (quickMediaBars != null) quickMediaBars.setPlaying(quickMediaPlaying);
         boolean hasTrack = payload.optBoolean("hasTrack", false);
         quickMediaAvailable = hasTrack && mediaNowPlaying != null;
         for (android.widget.ImageView button : quickMediaButtons) {
@@ -7626,6 +7784,7 @@ public final class MainActivity extends Activity {
             quickMediaPlayPause.setImageDrawable(
                     mediaGlyph(density, true, quickMediaPlaying ? "pause" : "play"));
         }
+        if (quickMediaBars != null) quickMediaBars.retint();
         if (quickMediaArt != null) {
             quickMediaArt.setBackground(makeDockPlateDrawable(false, density));
             if (!quickMediaHasArt) {
