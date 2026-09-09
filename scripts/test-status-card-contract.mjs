@@ -193,7 +193,14 @@ assert.match(html, /\.hv-status-card-tire\.front-left \{ left:-62%/,
   'compact web tire pressures must sit outside the vehicle');
 assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-52%/,
   'popup tire pressures must sit outside the vehicle');
-assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"unified-vehicle-console-v17"/,
-  'native WebView bundle revision must expose the unified vehicle console');
+// Pins that the revision is BUMPED, not that it holds one literal: the WebView
+// caches the packaged bundle across a same-version reinstall, so every change to
+// index.html needs a new value here. Pinning the exact string made the assertion
+// fail on the next legitimate bump instead of on a forgotten one.
+assert.match(native, /VIEWER_ASSET_REVISION\s*=\s*"vehicle-console-v(\d+)[^"]*"/,
+  'native WebView bundle revision must be a vehicle-console revision');
+const assetRevision = Number(/VIEWER_ASSET_REVISION\s*=\s*"vehicle-console-v(\d+)/.exec(native)[1]);
+assert.ok(assetRevision >= 18,
+  `bundle revision must be at or past the unified vehicle console (got v${assetRevision})`);
 
 console.log('status-card contracts: ok');

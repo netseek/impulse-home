@@ -127,6 +127,10 @@ public final class MainActivity extends Activity {
     private static final java.util.Set<String> VEHICLE_COMMANDS_WITHOUT_VALUE =
             new java.util.HashSet<>(java.util.Arrays.asList(
                     "toggle_doors_all",
+                    "toggle_door_fl",
+                    "toggle_door_fr",
+                    "toggle_door_rl",
+                    "toggle_door_rr",
                     "toggle_windows",
                     "toggle_trunk",
                     "toggle_sunroof",
@@ -144,14 +148,30 @@ public final class MainActivity extends Activity {
                     "set_sunroof_level",
                     "set_curtain_level"
             ));
+    /**
+     * Mirror of Impulse's {@code CarDataWriteReceiver.WRITABLE_CAR_KEYS}. A key
+     * missing here is rejected before the broadcast is even sent, so this list
+     * being the shorter of the two is silently a feature gate: drive/EV/steer/
+     * regen/ESP worked and everything else looked like "the bridge is broken".
+     * Keep the two in sync -- Impulse's copy is the authority, and it rejects
+     * anything not on its own list regardless of what we send.
+     */
     private static final java.util.Set<String> WRITABLE_CAR_KEYS =
             new java.util.HashSet<>(java.util.Arrays.asList(
                     "car.drive_setting.drive_mode",
-                    "car.ev_setting.power_model_config",
                     "car.drive_setting.steering_wheel_assist_mode",
+                    "car.drive_setting.esp_enable",
+                    "car.ev_setting.power_model_config",
+                    "car.ev_setting.power_reserve_config",
+                    "car.ev_setting.charge_soc_target_config",
                     "car.ev_setting.energy_recovery_level",
                     "car.ev.setting.pedal_control_enable",
-                    "car.drive_setting.esp_enable"
+                    "car.hvac.power_mode",
+                    "car.hvac.fan_speed",
+                    "car.hvac.driver_temperature",
+                    "car.hvac.cycle_mode",
+                    "car.hvac.auto_enable",
+                    "car.hvac.anion_enable"
             ));
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final String ASSET_HOST = "appassets.androidplatform.net";
@@ -161,7 +181,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "unified-vehicle-console-v17";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v18-windows";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;

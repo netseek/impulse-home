@@ -6693,6 +6693,14 @@ const CAR_SIGNALS = {
   ],
   // Per-window state vector, {fl,fr,rl,rr}. Present on the bus all along; the
   // OEM-APK audit concluded it was not and the viewer never subscribed it.
+  //
+  // Polarity CONFIRMED on the car by lowering the driver's window and raising it
+  // again: all shut is {1,1,1,1} and driver-down is {0,1,1,1}. So 1 = CLOSED and
+  // 0 = open -- the inverse of door_status, where 0 is shut. Slot order matches
+  // door_status (slot 0 = front left). Anything other than 0 or 1 is a state we
+  // have not observed and leaves the glass where it is, the same way
+  // _applyCarDoors treats a negative door slot: a travel state must not be
+  // guessed at.
   windows: 'car.basic.window_status',
   doorLock: 'car.basic.door_lock_status',
   cycleEv: 'car.ev_info.cycle_energy_consume_info',
@@ -8236,6 +8244,7 @@ class Component extends DCLogic {
     // Auto day/night follows headlights — ignore MMI theme (`isNight`).
     if (key === CAR_SIGNALS.night) return;
     if (key === CAR_SIGNALS.doors)  { this._applyCarDoors(value); return; }
+    if (key === CAR_SIGNALS.windows) { this._applyCarWindows(value); return; }
     if (key === CAR_SIGNALS.speed)  { this._applyCarSpeed(value); return; }
     if (key === CAR_SIGNALS.sunroof) { this._applyCarSunroof(value); return; }
     if (key === CAR_SIGNALS.curtain) { this._applyCarOpening('_setCurtainOpen', value, CAR_SUNSHADE_MAX); return; }
@@ -10740,6 +10749,34 @@ class Component extends DCLogic {
    * fallback, a plain integer bitmask — the shape the other publisher build
    * uses. Anything else is left alone rather than slamming every door shut.
    */
+  /**
+   * `car.basic.window_status` -- `{fl,fr,rl,rr}`, 1 = closed, 0 = open. See the
+   * CAR_SIGNALS entry for how that polarity was pinned on the car.
+   *
+   * The rig animates all four windows together off a single `windowsOpen`
+   * percentage, so this reports the glass as open when ANY corner is down.
+   * Per-corner state is deliberately not synthesised into a percentage: the
+   * signal is a state, not a travel position, and a "25% open" invented from one
+   * corner being down would be a plausible-looking number the vehicle never
+   * said.
+   */
+  _applyCarWindows(value) {
+    const raw = String(value == null ? '' : value).trim();
+    const slots = raw.replace(/^\{|\}$/g, '').split(',')
+      .map((s) => parseInt(String(s).trim(), 10));
+    if (slots.length !== 4 || slots.some((n) => !isFinite(n))) {
+      if (this._carTrace) console.warn('[CarSignal] window_status unparsed:', value);
+      return;
+    }
+    // Only 0 and 1 are understood. A slot carrying anything else is a state we
+    // have not observed, so the whole frame is left alone rather than half read.
+    if (slots.some((n) => n !== 0 && n !== 1)) {
+      if (this._carTrace) console.warn('[CarSignal] window_status unknown state:', value);
+      return;
+    }
+    this._setWindowsOpen(slots.some((n) => n === 0) ? 100 : 0);
+  }
+
   _applyCarDoors(value) {
     const raw = String(value).trim();
     let slots = null;

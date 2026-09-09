@@ -819,6 +819,21 @@ matching receiver fails silently:
 adb shell dumpsys package br.com.redesurftank.havalshisuku | grep -i Receiver
 ```
 
+A working install lists `.broadcastReceivers.VehicleCommandReceiver` (windows /
+sunroof / curtain / doors) and `.broadcastReceivers.CarDataWriteReceiver` (mode
+writes). Measured 2026-09-09: the car had NEITHER, so every command and every
+mode write was broadcast into the void. The classes were committed in Impulse
+all along; only `VehicleCommandReceiver` was declared in its manifest. Fixed
+upstream in `6d053976` on `feature/new-screen-enhancements-v8`.
+
+**Installing that fix needs the release keystore.** Impulse on the car is signed
+`7e00ad11...`; a plain `assembleDebug` is signed with the Android debug key
+(`6a44a729...`) and Android will not upgrade across signers. Installing a debug
+build means uninstalling first, which wipes Impulse's settings -- bottom bar,
+cluster themes, overscan, Shizuku grant. Build `assembleRelease` with
+`SIGNING_STORE_PASSWORD` / `SIGNING_KEY_ALIAS` / `SIGNING_KEY_PASSWORD` and
+`app/release.keystore` in place, then `adb install -r`.
+
 ## Media visualisers
 
 They have **no audio input**. `_graphVizLevel` derives its level from EV power
