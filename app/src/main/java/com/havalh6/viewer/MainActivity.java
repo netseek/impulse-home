@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v21-tyrefit";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v22-tyretheme";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
