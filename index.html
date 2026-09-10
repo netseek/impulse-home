@@ -3874,6 +3874,14 @@ window.HavalSplash = (function () {
       pointer-events: none;
     }
     .hv-hs.flip .hv-hs-menu { left: auto; right: 24px; align-items: flex-end; }
+    /* Roof: always open to the LEFT of the dot (same 24px gap) so the panel
+       does not sit on top of the sunroof the controls are about. */
+    .hv-hs[data-hs-id="roof"] .hv-hs-menu,
+    .hv-hs[data-hs-id="roof"].flip .hv-hs-menu {
+      left: auto;
+      right: 24px;
+      align-items: flex-end;
+    }
     .hv-hs.open .hv-hs-menu { display: flex; pointer-events: auto; }
     .hv-hs-menu button {
       font-family: 'Space Mono', monospace;
@@ -3918,6 +3926,10 @@ window.HavalSplash = (function () {
       border-color: rgba(20,28,40,.16);
     }
     .hv-hs.flip .hv-hs-menu.hv-hs-quick-menu { align-items: stretch; }
+    .hv-hs[data-hs-id="roof"] .hv-hs-menu.hv-hs-quick-menu,
+    .hv-hs[data-hs-id="roof"].flip .hv-hs-menu.hv-hs-quick-menu {
+      align-items: stretch;
+    }
 
     /* Roof hotspot: fat-thumb horizontal sliders with open/close toggle.
        Class names are deliberately distinct from .hv-hs-roof-range / .hv-hs-roof-rail
@@ -4600,93 +4612,55 @@ window.HavalSplash = (function () {
     .hv-desktop-switcher {
       position: absolute;
       z-index: 74;
-      /* Always-on strip over the Android status bar, anchored at ~1/3 width
-         so it sits in the header band rather than over widget boards. Auto-hide
-         drops only the frost pill — arrows, name and dots stay — so idle
-         colour must contrast the scene (inline labelColor), not the frost fill. */
-      top: max(0px, calc((var(--hv-safe-top, 28px) - 34px) / 2));
-      left: 33.333%;
+      /* Always-frost pill, visually in the MMI header. Android's StatusBar
+         window owns y=0..60 and would swallow taps; a native overlay matching
+         this rect (AppLauncherBridge.reportDesktopSwitcherHit) sits above it
+         and forwards presses into the WebView. Horizontal sizes: original × 0.7 × 1.1. */
+      top: max(0px, calc((var(--hv-safe-top, 28px) - 42px) / 2 - 8px));
+      left: calc(33.333% + 105px);
       transform: translateX(-50%);
-      height: 34px;
+      height: 37px;
       padding: 0;
       align-items: center;
-      gap: 2px;
-      border: 1px solid transparent;
-      border-radius: 14px;
-      background: transparent !important;
-      background-image: none !important;
-      box-shadow: none !important;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
+      gap: 1px;
+      border: 1px solid var(--hv-frost-edge);
+      border-radius: 15px;
       color: var(--hv-widget-fg, #edf5fa);
       user-select: none;
       touch-action: pan-y;
-      transition: background-color .22s ease, background-image .22s ease, border-color .22s ease, box-shadow .22s ease, color .28s ease, -webkit-backdrop-filter .22s ease, backdrop-filter .22s ease;
+      pointer-events: auto;
     }
-    .hv-desktop-switcher.expanded {
-      border-color: var(--hv-frost-edge);
-      background-color: var(--hv-frost-fill) !important;
-      background-image: var(--hv-frost-noise) !important;
-      box-shadow: inset 0 1px 0 var(--hv-frost-inner), var(--hv-frost-shadow) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(1.18);
-      backdrop-filter: blur(14px) saturate(1.18);
-      color: var(--hv-widget-fg, #edf5fa);
-    }
-    .hv-desktop-switcher button { color: inherit; border: 0; background: transparent; cursor: pointer; }
-    /* Wide side hit pads — easy to tap on a 1920 panel without hunting the
-       chevron. Outer ends stay pill-rounded; inner edges are square so the
-       pair reads as one segmented control around the name/dots. */
+    .hv-desktop-switcher button { color: inherit; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
     .hv-desktop-arrow {
       position: relative;
-      width: 132px; height: 34px; border-radius: 0 !important;
+      width: 102px; height: 37px; border-radius: 0 !important;
       flex: 0 0 auto;
       display: flex; align-items: center; justify-content: center;
       font: 300 22px/1 system-ui;
       padding-top: 1px;
-      background: rgba(128,140,155,.04) !important;
+      background: rgba(255,255,255,.04) !important;
       transition: background .15s ease, transform .12s ease;
     }
     .hv-desktop-switcher > .hv-desktop-arrow:first-child {
-      border-radius: 12px 0 0 12px !important;
+      border-radius: 13px 0 0 13px !important;
     }
     .hv-desktop-switcher > .hv-desktop-arrow:last-child {
-      border-radius: 0 12px 12px 0 !important;
-    }
-    .hv-desktop-switcher.scene-night .hv-desktop-arrow {
-      background: rgba(255,255,255,.03) !important;
-    }
-    .hv-desktop-switcher.scene-day .hv-desktop-arrow {
-      background: rgba(20,28,36,.03) !important;
-    }
-    .hv-desktop-switcher.expanded .hv-desktop-arrow {
-      background: rgba(255,255,255,.04) !important;
+      border-radius: 0 13px 13px 0 !important;
     }
     .hv-desktop-arrow:active { background: rgba(255,255,255,.10) !important; transform: scale(.97); }
     .hv-desktop-current {
-      min-width: 120px; height: 34px; padding: 0 8px;
-      display: flex; align-items: center; justify-content: center; gap: 7px;
+      min-width: 92px; height: 37px; padding: 0 7px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
     }
     .hv-desktop-name {
-      max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       font-weight: 650; font-size: 15px; line-height: 1; letter-spacing: .015em;
     }
     .hv-desktop-count { font: 10px/1 'Space Mono', monospace; opacity: .52; display: block; }
-    .hv-desktop-dots { display: flex; align-items: center; justify-content: center; height: 34px; gap: 0; }
-    .hv-desktop-dot { position: relative; width: 18px; height: 34px; padding: 0; }
-    .hv-desktop-dot::after { content: ''; position: absolute; width: 6px; height: 6px; border-radius: 6px; background: currentColor; opacity: .28; left: 50%; top: 50%; transform: translate(-50%,-50%); transition: width .2s ease, opacity .2s ease, background .2s ease; }
-    .hv-desktop-dot.on::after { width: 18px; opacity: 1; background: var(--hv-accent); }
-    /* Idle (no frost): soft shadow keeps glyphs readable on mixed wallpapers.
-       Shadow polarity follows scene day/night, same as the idle text colour. */
-    .hv-desktop-switcher.scene-night:not(.expanded) .hv-desktop-name,
-    .hv-desktop-switcher.scene-night:not(.expanded) .hv-desktop-count,
-    .hv-desktop-switcher.scene-night:not(.expanded) .hv-desktop-arrow {
-      text-shadow: 0 1px 2px rgba(0,0,0,.45), 0 0 6px rgba(0,0,0,.22);
-    }
-    .hv-desktop-switcher.scene-day:not(.expanded) .hv-desktop-name,
-    .hv-desktop-switcher.scene-day:not(.expanded) .hv-desktop-count,
-    .hv-desktop-switcher.scene-day:not(.expanded) .hv-desktop-arrow {
-      text-shadow: 0 1px 2px rgba(255,255,255,.4), 0 0 5px rgba(255,255,255,.18);
-    }
+    .hv-desktop-dots { display: flex; align-items: center; justify-content: center; height: 37px; gap: 0; }
+    .hv-desktop-dot { position: relative; width: 14px; height: 37px; padding: 0; }
+    .hv-desktop-dot::after { content: ''; position: absolute; width: 5px; height: 5px; border-radius: 5px; background: currentColor; opacity: .28; left: 50%; top: 50%; transform: translate(-50%,-50%); transition: width .2s ease, opacity .2s ease, background .2s ease; }
+    .hv-desktop-dot.on::after { width: 14px; opacity: 1; background: var(--hv-accent); }
     /* Keep a small system-gesture margin on both outer edges. These invisible
        gutters are intentionally inset: the Android back/home gesture must
        remain available even when a widget fills an entire board. */
@@ -7586,6 +7560,11 @@ const SUNROOF_TILT_PCT = 25;          // == transitionThreshold in the transform
 // position in discrete jumps; at the manual rate the model finishes each jump in
 // a fraction of a second and then sits still, which reads as stepping. A slower
 // slew keeps it travelling between updates.
+//
+// Measured on the MMI 2026-09-10 (car.basic.sunshade_status, 10% steps):
+//   open  0→100 ≈ 10.8 s   close 100→0 ≈ 11.4 s   ≈ 1.1 s / 10%
+// At 60 fps, full travel in ~11 s needs step ≈ 1/(11*60) ≈ 0.0015.
+// 0.006 was ~2.8 s and read as the shade racing ahead of the hardware.
 // Daytime running lamps are not published. driving_ready_state is used as a
 // SUFFICIENT condition for them, which the captures support:
 //   ready=1 with lamps lit .... 4 of 4 captures  (no counter-example)
@@ -7598,7 +7577,7 @@ const SUNROOF_TILT_PCT = 25;          // == transitionThreshold in the transform
 // cannot yet be falsified; revisit if one ever is.
 const CAR_DRL_FOLLOWS_READY = true;
 
-const CAR_OPENING_STEP = 0.006;
+const CAR_OPENING_STEP = 0.0015;
 const MANUAL_OPENING_STEP = 0.02;
 const WINDOW_OPENING_STEP = 0.025;
 // Opening tweens were authored as a fixed progress tick per frame at 60 Hz.
@@ -11230,6 +11209,24 @@ class Component extends DCLogic {
       return;
     }
     const pct = Math.max(0, Math.min(100, (n / max) * 100));
+    // Full open/close from the UI aims at 0 or 100 at car pace. The bus only
+    // reports every 10%, and adopting each step as the new target used to yank
+    // the model BACKWARD after the optimistic tween had already raced ahead
+    // (measured on the car: close raced to ~0.64 with MANUAL_OPENING_STEP, then
+    // sunshade=90 set target=0.9 and the shade opened again). While a travel
+    // goal is active, ignore intermediates and only clear when the bus arrives.
+    const travelKey = setter === '_setCurtainOpen' ? '_curtainTravelGoal'
+      : (setter === '_setSunroofOpen' ? '_sunroofTravelGoal' : null);
+    if (travelKey && this[travelKey] != null) {
+      if (setter === '_setCurtainOpen') this._curtainStep = CAR_OPENING_STEP;
+      else this._sunroofStep = CAR_OPENING_STEP;
+      if (Math.abs(pct - this[travelKey]) < 0.5) {
+        this[travelKey] = null;
+        this[setter](pct);
+      }
+      this._syncEventCamera();
+      return;
+    }
     // Ease at the car rate, not the manual-slider rate — see CAR_OPENING_STEP.
     if (setter === '_setSunroofOpen') this._sunroofStep = CAR_OPENING_STEP;
     else if (setter === '_setCurtainOpen') this._curtainStep = CAR_OPENING_STEP;
@@ -18832,13 +18829,33 @@ class Component extends DCLogic {
     const level = this._vehicleOpeningLevel(raw);
     if (kind === 'windows') this._setWindowsOpen(level);
     else if (kind === 'sunroof') {
+      this._sunroofTravelGoal = null;
       this._sunroofStep = MANUAL_OPENING_STEP;
       this._setSunroofOpen(level);
     } else if (kind === 'curtain') {
+      this._curtainTravelGoal = null;
       this._curtainStep = MANUAL_OPENING_STEP;
       this._setCurtainOpen(level);
     }
     return level;
+  }
+
+  /**
+   * Full open/close for roof shade / sunroof. Use the measured car pace and pin
+   * the target at the endpoint so 10% bus steps cannot reverse the tween.
+   */
+  _beginCarRoofTravel(kind, level) {
+    const pct = this._vehicleOpeningLevel(level);
+    if (kind === 'sunroof') {
+      this._sunroofStep = CAR_OPENING_STEP;
+      this._sunroofTravelGoal = pct;
+      this._setSunroofOpen(pct);
+    } else if (kind === 'curtain') {
+      this._curtainStep = CAR_OPENING_STEP;
+      this._curtainTravelGoal = pct;
+      this._setCurtainOpen(pct);
+    }
+    return pct;
   }
 
   _clearVehicleOpeningLevel(kind) {
@@ -18890,7 +18907,9 @@ class Component extends DCLogic {
     const command = this._vehicleOpeningCommand(kind);
     if (!command || (action !== 'open' && action !== 'close')) return;
     this._clearVehicleOpeningLevel(kind);
-    this._applyVehicleOpeningLevel(kind, action === 'open' ? 100 : 0);
+    const level = action === 'open' ? 100 : 0;
+    if (kind === 'curtain' || kind === 'sunroof') this._beginCarRoofTravel(kind, level);
+    else this._applyVehicleOpeningLevel(kind, level);
     this._sendCarCommand(command[action], '', { skipLocal: true });
   }
 
@@ -18915,7 +18934,10 @@ class Component extends DCLogic {
       return true;
     }
     if (actions[cmd]) {
-      this._applyVehicleOpeningLevel(actions[cmd][0], actions[cmd][1] === 'open' ? 100 : 0);
+      const kind = actions[cmd][0];
+      const level = actions[cmd][1] === 'open' ? 100 : 0;
+      if (kind === 'curtain' || kind === 'sunroof') this._beginCarRoofTravel(kind, level);
+      else this._applyVehicleOpeningLevel(kind, level);
       return true;
     }
     const local = {
@@ -22633,6 +22655,8 @@ class Component extends DCLogic {
     if (this._introWaitingForLoader && !this.state.loading && !this.state.error) {
       this._trySplashHandOff();
     }
+    const self = this;
+    requestAnimationFrame(function () { self._reportDesktopSwitcherHit(); });
   }
 
   // Step the device pixel ratio toward smoothness/crispness based on sustained
@@ -30185,6 +30209,8 @@ class Component extends DCLogic {
     if (this.state.loading && !this._shellChromeRevealed) {
       this._pendingShellPatch = patch;
       this._applyFitCamera();
+      const selfEarly = this;
+      requestAnimationFrame(function () { selfEarly._reportDesktopSwitcherHit(); });
       return;
     }
     this._pendingShellPatch = null;
@@ -30193,6 +30219,8 @@ class Component extends DCLogic {
     this._syncCarSceneForShell();
     this._syncWallpaperLayer();
     this._syncCenterFillIndicator();
+    const self = this;
+    requestAnimationFrame(function () { self._reportDesktopSwitcherHit(); });
   }
 
   _setShellMode(mode) {
@@ -31214,15 +31242,25 @@ class Component extends DCLogic {
   }
 
   _revealDesktopIndicator() {
-    clearTimeout(this._desktopIndicatorTimer);
-    this._desktopIndicatorTimer = setTimeout(() => {
-      if (!this._unmounted && this.state.desktopIndicatorExpanded) {
-        this.setState({ desktopIndicatorExpanded: false });
-      }
-    }, 2800);
-    if (!this.state.desktopIndicatorExpanded) {
-      this.setState({ desktopIndicatorExpanded: true });
-    }
+    // Frost background stays on; no expand/collapse timer.
+  }
+
+  _reportDesktopSwitcherHit() {
+    const B = window.AppLauncherBridge;
+    if (!B || typeof B.reportDesktopSwitcherHit !== 'function') return;
+    const el = document.querySelector('.hv-desktop-switcher');
+    const r = el ? el.getBoundingClientRect() : null;
+    const vis = !!(r && r.width > 1 && r.height > 1
+      && el && window.getComputedStyle(el).display !== 'none');
+    const key = vis
+      ? ([Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join(','))
+      : 'off';
+    if (key === this._desktopHitSig) return;
+    this._desktopHitSig = key;
+    try {
+      if (vis) B.reportDesktopSwitcherHit(r.left, r.top, r.width, r.height, true);
+      else B.reportDesktopSwitcherHit(0, 0, 0, 0, false);
+    } catch (e) {}
   }
 
   _onDesktopGestureStart(ev) {
@@ -31400,8 +31438,7 @@ class Component extends DCLogic {
       desktopSwitcherDisplay: (!s.error && (!s.loading || this._viewerReady)
         && !s.desktopStudioOpen && !s.focusedCardType
         && !s.widgetPickerStep && !s.widgetPlaceType && !s.widgetPlaceMode) ? 'flex' : 'none',
-      desktopSwitcherClass: (s.desktopIndicatorExpanded ? 'expanded' : '')
-        + (s.nightMode ? ' scene-night' : ' scene-day'),
+      desktopSwitcherClass: (s.nightMode ? 'scene-night' : 'scene-day'),
       revealDesktopIndicator: () => this._revealDesktopIndicator(),
       desktopSwipeEdgesDisplay: (!s.error && !s.desktopStudioOpen && !s.widgetPickerStep
         && !s.widgetPlaceType && (s.shellMode || 'triple') !== 'appsOnly') ? 'block' : 'none',
@@ -31409,13 +31446,8 @@ class Component extends DCLogic {
       desktopSwipeMove: (ev) => this._onDesktopGestureMove(ev),
       desktopSwipeEnd: (ev) => this._onDesktopGestureEnd(ev),
       desktopSwipeCancel: () => this._onDesktopGestureCancel(),
-      // The virtual-desktop control is navigation, not a widget. Keep it over
-      // the Android status bar at ~1/3 width so it has one stable location
-      // across all desktop layouts. Idle (no frost pill) uses the same
-      // scene-contrast colour as chrome labels — inverse brightness to day/night.
-      desktopSwitcherStyle: s.desktopIndicatorExpanded
-        ? ''
-        : ('color:' + (s.nightMode ? '#c8daea' : '#2b3037') + ';'),
+      // Frost pill is always on; no idle colour override.
+      desktopSwitcherStyle: '',
       desktopName: current.name,
       desktopCountLabel: (index + 1) + ' / ' + Math.max(1, list.length),
       desktopDots: list.map((d, i) => ({
