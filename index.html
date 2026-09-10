@@ -19375,9 +19375,19 @@ class Component extends DCLogic {
     };
     putMirror('mirrorsL', 'fl');
     putMirror('mirrorsR', 'fr');
+    // Sit slightly outside the housing (outboard + a touch up) so the chip
+    // is not glued to the glass / stem.
+    const nudgeMirror = (id, lateral) => {
+      const a = anchors[id];
+      if (!a) return;
+      a.z += lateral * 0.16;
+      a.y += 0.05;
+    };
+    nudgeMirror('mirrorsL', 1);
+    nudgeMirror('mirrorsR', -1);
     if (!anchors.mirrorsL || !anchors.mirrorsR) {
       const side = (sign) => this._hsBBoxAnchorLocal(model, (_min, _max, c, sz, pt) => {
-        pt.set(c.x - sz.x * 0.02, c.y + sz.y * 0.22, c.z + sign * sz.z * 0.52);
+        pt.set(c.x - sz.x * 0.02, c.y + sz.y * 0.24, c.z + sign * sz.z * 0.58);
       });
       if (!anchors.mirrorsL) { const a = side(1); if (a) anchors.mirrorsL = a; }
       if (!anchors.mirrorsR) { const a = side(-1); if (a) anchors.mirrorsR = a; }
@@ -19435,6 +19445,15 @@ class Component extends DCLogic {
     if (!this._hsScreen) this._hsScreen = {};
     const screen = this._hsScreen;
     Object.keys(screen).forEach((k) => { delete screen[k]; });
+    // Project first, then optionally nudge the windows/mirrors pair into a
+    // horizontal stack so they do not sit on top of each other on a side view.
+    const placed = [];
+    let carX = layerRect.width * 0.5;
+    if (this._fitCenter) {
+      scratch.alt.copy(this._fitCenter);
+      scratch.ndc.copy(scratch.alt).project(this.camera);
+      carX = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
+    }
     Object.keys(this._hsEls || {}).forEach((id) => {
       const el = this._hsEls[id];
       const anchor = this._hsResolveAnchor(id, anchors, scratch.alt);
@@ -19452,27 +19471,44 @@ class Component extends DCLogic {
         return;
       }
       el.classList.add('on');
-      const x = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
-      const y = (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top);
-      screen[id] = {
-        x: rect.left + (scratch.ndc.x * 0.5 + 0.5) * rect.width,
-        y: rect.top + (-scratch.ndc.y * 0.5 + 0.5) * rect.height,
-      };
+      let x = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
+      let y = (-scratch.ndc.y * 0.5 + 0.5) * rect.height + (rect.top - layerRect.top);
+      placed.push({ id, el, x, y, world: scratch.v.clone() });
+    });
+
+    const win = placed.find((p) => p.id === 'windows');
+    const mir = placed.find((p) => p.id === 'mirrors');
+    if (win && mir) {
+      const dist = Math.hypot(mir.x - win.x, mir.y - win.y);
+      if (dist < 52) {
+        const midY = (win.y + mir.y) * 0.5;
+        const gap = 42;
+        const leftFlank = ((win.x + mir.x) * 0.5) < carX;
+        // Mirror stays outboard (toward the screen edge); windows sits inward.
+        if (leftFlank) {
+          mir.x = Math.min(win.x, mir.x) - 2;
+          win.x = mir.x + gap;
+        } else {
+          mir.x = Math.max(win.x, mir.x) + 2;
+          win.x = mir.x - gap;
+        }
+        win.y = midY;
+        mir.y = midY;
+      }
+    }
+
+    placed.forEach((p) => {
+      const { id, el } = p;
+      const x = p.x;
+      const y = p.y;
+      // Hit-test uses viewport client coords.
+      screen[id] = { x: layerRect.left + x, y: layerRect.top + y };
       el.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
-      scratch.anchorFwd.copy(scratch.v).sub(this.camera.position).normalize();
+      scratch.anchorFwd.copy(p.world).sub(this.camera.position).normalize();
       const facing = scratch.camFwd.dot(scratch.anchorFwd);
       el.classList.toggle('far', facing < 0.12);
-      // Open the menu away from the car body (toward the screen edge / widgets),
-      // not across the silhouette. Fall back to a right-third flip if we have
-      // no fit centre yet.
-      let flip = x > layerRect.width * 0.62;
-      if (this._fitCenter) {
-        scratch.alt.copy(this._fitCenter);
-        scratch.ndc.copy(scratch.alt).project(this.camera);
-        const carX = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
-        flip = x < carX;
-      }
-      el.classList.toggle('flip', flip);
+      // Open the menu away from the car body (toward the screen edge / widgets).
+      el.classList.toggle('flip', x < carX);
       const s = this.state || {};
       let active = false;
       if (id === 'roof') active = (s.sunroofOpen || 0) > 2 || (s.curtainOpen || 0) > 2;
