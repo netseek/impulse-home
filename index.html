@@ -4219,11 +4219,22 @@ window.HavalSplash = (function () {
     .hv-vehicle-window-head { display:grid; gap:4px; margin-bottom:10px; }
     .hv-vehicle-window-head strong,.hv-vehicle-roof-all-label { font:600 8px/1 'Space Mono',monospace; letter-spacing:.12em; color:var(--hv-widget-fg,#eaf2f8); }
     .hv-vehicle-window-head span { font:6px/1.25 'Space Mono',monospace; letter-spacing:.05em; color:var(--hv-widget-muted,rgba(234,242,248,.55)); }
-    .hv-vehicle-window-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    /* The panel spans two rows of the popup grid and had a large dead gap under
+       the 2x2; the grid now takes that height so each button is a tall target. */
+    .hv-vehicle-window-grid { display:grid; flex:1 1 auto; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:7px; min-height:0; margin-bottom:9px; }
     .hv-vehicle-window-button,.hv-vehicle-window-all button { min-width:0; min-height:48px; padding:7px; border:1px solid rgba(255,255,255,.12); border-radius:10px; background:rgba(255,255,255,.045); color:var(--hv-widget-fg,#eaf2f8); cursor:pointer; }
+    /* Fill the row rather than sitting at min-height, and read as a control:
+       the state line grows and a fill bar shows shut / part / open at a glance. */
+    .hv-vehicle-window-button { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-end; height:100%; overflow:hidden; transition:border-color .18s ease, background .18s ease; }
+    .hv-vehicle-window-button::after { content:''; position:absolute; left:0; right:0; bottom:0; height:0; background:linear-gradient(180deg,rgba(99,217,231,.30),rgba(99,217,231,.10)); transition:height .22s ease; pointer-events:none; }
+    .hv-vehicle-window-button.partial::after { height:45%; }
+    .hv-vehicle-window-button.open::after { height:100%; }
+    .hv-vehicle-window-button:active:not(:disabled) { border-color:rgba(99,217,231,.75); }
     .hv-vehicle-window-button strong,.hv-vehicle-window-button span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .hv-vehicle-window-button strong { font:600 9px/1 'Space Grotesk',sans-serif; }
-    .hv-vehicle-window-button span { margin-top:6px; font:6px/1 'Space Mono',monospace; letter-spacing:.07em; color:var(--hv-widget-muted,rgba(234,242,248,.55)); }
+    .hv-vehicle-window-button strong,.hv-vehicle-window-button span { position:relative; z-index:1; }
+    .hv-vehicle-window-button strong { margin-bottom:auto; }
+    .hv-vehicle-window-button span { margin-top:6px; font:8px/1 'Space Mono',monospace; letter-spacing:.07em; color:var(--hv-widget-muted,rgba(234,242,248,.55)); }
     .hv-vehicle-window-button.open,.hv-vehicle-window-button.partial { border-color:rgba(99,217,231,.60); background:rgba(99,217,231,.13); }
     .hv-vehicle-window-button.open span,.hv-vehicle-window-button.partial span { color:var(--hv-accent,#2aa7b7); }
     .hv-vehicle-window-button:disabled { cursor:default; opacity:.48; }
@@ -6694,13 +6705,20 @@ const CAR_SIGNALS = {
   // Per-window state vector, {fl,fr,rl,rr}. Present on the bus all along; the
   // OEM-APK audit concluded it was not and the viewer never subscribed it.
   //
-  // Polarity CONFIRMED on the car by lowering the driver's window and raising it
-  // again: all shut is {1,1,1,1} and driver-down is {0,1,1,1}. So 1 = CLOSED and
-  // 0 = open -- the inverse of door_status, where 0 is shut. Slot order matches
-  // door_status (slot 0 = front left). Anything other than 0 or 1 is a state we
-  // have not observed and leaves the glass where it is, the same way
-  // _applyCarDoors treats a negative door slot: a travel state must not be
-  // guessed at.
+  // Vocabulary, re-measured on the car 2026-09-09 by parking the driver's window
+  // at each position and by sampling a full 2.5s travel every 500ms:
+  //
+  //   0 = MOVING (transient)   1 = closed   2 = fully open   3 = partially open
+  //
+  // Slot order matches door_status (slot 0 = front left), confirmed because only
+  // slot 0 moved while the driver's window did.
+  //
+  // An earlier session recorded "driver-down is {0,1,1,1}, so 0 = open". That
+  // sampled the glass mid-travel and mistook the transient for the resting
+  // state; a window left fully open actually reports 2. Impulse made the same
+  // mistake in the other direction and wrote 0 to open a window, which did
+  // nothing at all for months. Do not re-derive this from a single sample: take
+  // the reading only once the glass has stopped, or watch the series.
   windows: 'car.basic.window_status',
   doorLock: 'car.basic.door_lock_status',
   cycleEv: 'car.ev_info.cycle_energy_consume_info',
@@ -10765,15 +10783,20 @@ class Component extends DCLogic {
    * uses. Anything else is left alone rather than slamming every door shut.
    */
   /**
-   * `car.basic.window_status` -- `{fl,fr,rl,rr}`, 1 = closed, 0 = open. See the
-   * CAR_SIGNALS entry for how that polarity was pinned on the car.
+   * `car.basic.window_status` -- `{fl,fr,rl,rr}` carrying
+   * 0 = moving, 1 = closed, 2 = fully open, 3 = partially open.
+   * See the CAR_SIGNALS entry for how that was measured.
+   *
+   * 0 is a TRANSIENT, seen only while the glass travels, so a slot reading 0
+   * keeps whatever that corner was last known to be rather than inventing a
+   * state. The previous version understood only 0 and 1 and discarded any frame
+   * containing anything else - which meant a genuinely open window (2) or a
+   * partly open one (3) updated neither the panel nor the rig.
    *
    * The rig animates all four windows together off a single `windowsOpen`
-   * percentage, so this reports the glass as open when ANY corner is down.
-   * Per-corner state is deliberately not synthesised into a percentage: the
-   * signal is a state, not a travel position, and a "25% open" invented from one
-   * corner being down would be a plausible-looking number the vehicle never
-   * said.
+   * percentage, so that is driven from the most-open corner. Partial is rendered
+   * at PARTIAL_PCT rather than a synthesised position: the signal says "not shut
+   * and not fully down" and nothing more, so any exact number would be invented.
    */
   _applyCarWindows(value) {
     const raw = String(value == null ? '' : value).trim();
@@ -10783,17 +10806,24 @@ class Component extends DCLogic {
       if (this._carTrace) console.warn('[CarSignal] window_status unparsed:', value);
       return;
     }
-    // Only 0 and 1 are understood. A slot carrying anything else is a state we
-    // have not observed, so the whole frame is left alone rather than half read.
-    if (slots.some((n) => n !== 0 && n !== 1)) {
-      if (this._carTrace) console.warn('[CarSignal] window_status unknown state:', value);
-      return;
-    }
+    const PARTIAL_PCT = 45;
     const corners = ['fl', 'fr', 'rl', 'rr'];
+    const prev = this._carWindowStates || {};
     const states = {};
-    corners.forEach((corner, i) => { states[corner] = slots[i] === 0 ? 'open' : 'closed'; });
+    corners.forEach((corner, i) => {
+      const slot = slots[i];
+      if (slot === 1) states[corner] = 'closed';
+      else if (slot === 2) states[corner] = 'open';
+      else if (slot === 3) states[corner] = 'partial';
+      else if (slot === 0) states[corner] = prev[corner] || 'moving';
+      else {
+        if (this._carTrace) console.warn('[CarSignal] window_status unknown slot:', slot, value);
+        states[corner] = prev[corner] || 'unknown';
+      }
+    });
     this._carWindowStates = states;
-    this._setWindowsOpen(slots.some((n) => n === 0) ? 100 : 0);
+    const pct = (state) => (state === 'open' ? 100 : state === 'partial' ? PARTIAL_PCT : 0);
+    this._setWindowsOpen(Math.max.apply(null, corners.map((c) => pct(states[c]))));
   }
 
   _applyCarDoors(value) {
@@ -18251,12 +18281,13 @@ class Component extends DCLogic {
       const state = target ? target.state : 'unknown';
       const button = this._hsWindowButtons[key];
       button.className = 'hv-vehicle-window-button ' + state;
-      button.disabled = !envelope.demo;
+      // Live per-window toggles; only an unknown corner is inert.
+      button.disabled = !envelope.demo && (state === 'unknown' || state === 'moving');
       button.setAttribute('aria-pressed', state === 'open' || state === 'partial' ? 'true' : 'false');
       if (this._hsWindowStateEls && this._hsWindowStateEls[key]) this._hsWindowStateEls[key].textContent = target ? target.stateLabel : 'UNKNOWN';
     });
     if (this._hsWindowHelp) this._hsWindowHelp.textContent = envelope.demo
-      ? 'TAP EACH WINDOW · SIMULATED' : 'INDIVIDUAL STATUS · ALL CONTROL';
+      ? 'TAP EACH WINDOW · SIMULATED' : 'TAP EACH WINDOW · OPEN OR SHUT';
     Object.keys(this._hsVehicleBeltEls || {}).forEach((key) => {
       const target = (envelope.seatBelts || []).find((entry) => entry.key === key);
       const state = target ? target.state : 'unknown';
@@ -18293,13 +18324,29 @@ class Component extends DCLogic {
     });
   }
 
+  /**
+   * Live on the car, simulated in demo preview.
+   *
+   * There is no per-window level: the car takes only "closed" or "fully open"
+   * per corner and cannot be halted mid-travel (measured - see
+   * ServiceManager.setWindowsLevel in Impulse). So a corner reading partial or
+   * open closes, and a closed one opens. The panel does not repaint optimistically;
+   * window_status arrives within ~500ms and is the only thing that moves the label,
+   * so the button can never claim a position the glass did not reach.
+   */
   _toggleStatusWindow(key, ev) {
     this._cardControlEvent(ev);
-    if (!this._demoPreview || !['fl','fr','rl','rr'].includes(key)) return;
-    const current = Object.assign({ fl:'partial', fr:'open', rl:'closed', rr:'closed' }, this._demoWindowStates || {});
-    current[key] = current[key] === 'closed' ? 'open' : 'closed';
-    this._demoWindowStates = current;
-    this._refreshUnifiedStatus();
+    if (!['fl','fr','rl','rr'].includes(key)) return;
+    if (this._demoPreview) {
+      const current = Object.assign({ fl:'partial', fr:'open', rl:'closed', rr:'closed' }, this._demoWindowStates || {});
+      current[key] = current[key] === 'closed' ? 'open' : 'closed';
+      this._demoWindowStates = current;
+      this._refreshUnifiedStatus();
+      return;
+    }
+    // skipLocal: there is no per-corner local animation, and window_status is the
+    // only thing that should move the label - see the doc comment above.
+    this._sendCarCommand('toggle_window_' + key, null, { skipLocal: true });
   }
 
   _setAllStatusWindows(action, ev) {
@@ -30908,10 +30955,11 @@ class Component extends DCLogic {
       { key: 'fl', label: 'Driver glass', demoState: 'partial' }, { key: 'fr', label: 'Passenger glass', demoState: 'open' },
       { key: 'rl', label: 'Rear left glass', demoState: 'closed' }, { key: 'rr', label: 'Rear right glass', demoState: 'closed' },
     ].map((windowState) => {
-      // car.basic.window_status is a binary state per corner, so a window is
-      // only ever open or closed here -- never 'partial'. The vehicle does not
-      // report travel, and inventing a percentage from a state would be a
-      // number it never sent.
+      // car.basic.window_status carries 1 closed / 2 fully open / 3 partially
+      // open per corner, so 'partial' IS a state the vehicle reports (measured
+      // 2026-09-09; an earlier note here claimed the signal was binary). What it
+      // still does not report is travel POSITION, so no percentage is invented
+      // from it.
       const live = windowsObserved ? (this._carWindowStates || {})[windowState.key] : null;
       const state = live || (demo ? (demoWindows[windowState.key] || windowState.demoState) : 'unknown');
       const source = live ? (windowsFresh ? 'LIVE' : 'STALE') : (demo ? 'DEMO' : 'UNAVAILABLE');
