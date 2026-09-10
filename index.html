@@ -10821,9 +10821,23 @@ class Component extends DCLogic {
         states[corner] = prev[corner] || 'unknown';
       }
     });
+    const changed = corners.some((c) => (prev[c] || null) !== states[c]);
     this._carWindowStates = states;
     const pct = (state) => (state === 'open' ? 100 : state === 'partial' ? PARTIAL_PCT : 0);
-    this._setWindowsOpen(Math.max.apply(null, corners.map((c) => pct(states[c]))));
+    const byCorner = {};
+    corners.forEach((c) => { byCorner[c] = pct(states[c]); });
+    this._setWindowCornerTargets(byCorner);
+    // Aggregate stays for everything that still reads a single number (the
+    // CLOSE/OPEN WINDOWS label, saved settings), but the rig is driven per
+    // corner above.
+    this._setWindowsOpen(Math.max.apply(null, corners.map((c) => byCorner[c])));
+    // The roof popup and the Status card paint imperatively and were only
+    // synced when the popup opened, so a window moving while either was on
+    // screen left a stale label. Repaint on change only - this is a bus signal,
+    // and a repaint per frame would be the hot-signal mistake all over again.
+    if (changed) {
+      try { this._syncRoofVehicleStatus(this._statusEnvelopeSnapshot()); } catch (e) {}
+    }
   }
 
   _applyCarDoors(value) {
@@ -12626,9 +12640,34 @@ class Component extends DCLogic {
     this._applyWindowsTransform();
   }
 
+  /**
+   * Per-corner, because the car reports per-corner. `_windowsProgress` stays as
+   * the aggregate the rest of the app reads, but each pane is driven from
+   * `_windowProgress[key]` so one window down does not drop all four - which is
+   * exactly what it used to do, since a single number cannot express {2,1,1,1}.
+   *
+   * A corner with no entry falls back to the aggregate, so a body whose profile
+   * names fewer panes still animates rather than freezing.
+   */
   _applyWindowsTransform(progress) {
-    const p = progress !== undefined ? progress : (this._windowsProgress || 0);
-    (this._windows || []).forEach((w) => { w.node.position.y = w.y0 - w.drop * p; });
+    const agg = progress !== undefined ? progress : (this._windowsProgress || 0);
+    const per = this._windowProgress || null;
+    (this._windows || []).forEach((w) => {
+      const p = per && typeof per[w.key] === 'number' ? per[w.key] : agg;
+      w.node.position.y = w.y0 - w.drop * p;
+    });
+  }
+
+  /** Targets for each corner, 0..1. Missing corners inherit the aggregate. */
+  _setWindowCornerTargets(pctByCorner) {
+    if (!this._windowTargets) this._windowTargets = {};
+    if (!this._windowProgress) this._windowProgress = {};
+    Object.keys(pctByCorner || {}).forEach((k) => {
+      const v = Math.max(0, Math.min(100, pctByCorner[k])) / 100;
+      this._windowTargets[k] = v;
+      if (typeof this._windowProgress[k] !== 'number') this._windowProgress[k] = v;
+    });
+    if (this.requestRender) this.requestRender(4);
   }
 
   _setWindowsOpen(pct) {
@@ -23132,20 +23171,37 @@ class Component extends DCLogic {
           this._requestTweenShadow();
         }
 
-        // Smooth window drop
-        if (this._windows && this._windows.length
-            && this._windowsProgress !== this._windowsTarget) {
+        // Smooth window drop, per corner
+        if (this._windows && this._windows.length) {
           const step = openingStep(WINDOW_OPENING_STEP, delta);
-          if (this._windowsProgress < this._windowsTarget) {
-            this._windowsProgress = Math.min(this._windowsTarget, this._windowsProgress + step);
-          } else {
-            this._windowsProgress = Math.max(this._windowsTarget, this._windowsProgress - step);
+          let moved = false;
+          if (this._windowsProgress !== this._windowsTarget) {
+            if (this._windowsProgress < this._windowsTarget) {
+              this._windowsProgress = Math.min(this._windowsTarget, this._windowsProgress + step);
+            } else {
+              this._windowsProgress = Math.max(this._windowsTarget, this._windowsProgress - step);
+            }
+            moved = true;
           }
-          this._applyWindowsTransform();
-          needRender = true;
-          this._postFxDirty = true;
-          tweenActive = true;
-          this._requestTweenShadow();
+          const tgt = this._windowTargets;
+          if (tgt) {
+            if (!this._windowProgress) this._windowProgress = {};
+            const prog = this._windowProgress;
+            Object.keys(tgt).forEach((k) => {
+              const to = tgt[k];
+              const from = typeof prog[k] === 'number' ? prog[k] : 0;
+              if (from === to) return;
+              prog[k] = from < to ? Math.min(to, from + step) : Math.max(to, from - step);
+              moved = true;
+            });
+          }
+          if (moved) {
+            this._applyWindowsTransform();
+            needRender = true;
+            this._postFxDirty = true;
+            tweenActive = true;
+            this._requestTweenShadow();
+          }
         }
 
         // Smooth sunroof animation
@@ -31522,7 +31578,12 @@ class Component extends DCLogic {
       stateLabel:windowState.stateLabel,
       cls:windowState.cls,
       pressed:windowState.state === 'open' || windowState.state === 'partial',
-      disabled:!envelope.demo,
+      // Live per-window toggles, matching the roof popup's grid. Only a corner
+      // whose state is unreadable is inert: 'moving' means the car is mid-travel
+      // and ignores commands anyway. This used to be `!envelope.demo`, which left
+      // the expanded Status card's buttons dead on the car while the popup's
+      // worked - two surfaces, one of them missed.
+      disabled:!envelope.demo && (windowState.state === 'unknown' || windowState.state === 'moving'),
       onClick:(ev) => this._toggleStatusWindow(windowState.key, ev),
     }));
     const roofAction = (kind, action) => (ev) => { this._cardControlEvent(ev); this._runVehicleOpeningAction(kind, action); this._refreshUnifiedStatus(); };
