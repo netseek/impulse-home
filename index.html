@@ -15586,6 +15586,7 @@ class Component extends DCLogic {
       return mats.some(m => m && /tire|tyre/i.test(m.name || ''));
     };
     this._tireWheels = this._allWheels.filter(isTire);
+    this._xrayTireBandSizeCache = null;
     this._rimWheels = this._allWheels.filter(m => !isTire(m));
 
     // Get vertex count helper
@@ -18803,6 +18804,7 @@ class Component extends DCLogic {
     if (this._hsLayer && this._hsLayer.parentNode) this._hsLayer.parentNode.removeChild(this._hsLayer);
     this._hsLayer = null;
     this._disposeXrayWheelGlows();
+    this._disposeXrayTireBands();
     this._camFabEl = null;
     this._camFabBtn = null;
     this._camFabAnchor = null;
@@ -19728,6 +19730,7 @@ class Component extends DCLogic {
   }
 
   _syncXrayWheelGlows(now) {
+    this._syncXrayTireBands(now);
     const want = !!(this.state.powertrainOn && this._powertrainRig && this._powertrainRig.visible
                     && this._powertrainFxTune().motorGlowOn);
     if (!want) {
@@ -19781,10 +19784,328 @@ class Component extends DCLogic {
     applyAxle(glows.rear, awd ? (flow.rear || 0) : 0, fit.rear, fit.rearTrack);
   }
 
+  // ?????? X-ray tyre contact bands ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  //
+  // An open cylinder (no caps) per corner, sized to the tyre, with a repeating
+  // arrow texture. Only the ground-contact arc is lit ??? the rest of the shell
+  // fades out by world Y. Colour and spin follow the same packed flow the
+  // POWER card uses: blue with the tyre while that axle is driving, green
+  // against it while regen, hidden when idle.
+
+  _xrayTireBandTexture() {
+    const THREE = this.THREE;
+    const tune = this._powertrainFxTune();
+    const n = Math.max(4, Math.round(tune.tireBandArrows || 12));
+    if (this._xrayTireBandTex && this._xrayTireBandTexN === n) return this._xrayTireBandTex;
+    if (this._xrayTireBandTex) this._xrayTireBandTex.dispose();
+    const W = 512;
+    const H = 64;
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+    const slot = W / n;
+    const padY = 6;
+    for (let i = 0; i < n; i++) {
+      const x0 = i * slot;
+      ctx.beginPath();
+      ctx.moveTo(x0 + slot * 0.96, padY);
+      ctx.lineTo(x0 + slot * 0.22, H * 0.5);
+      ctx.lineTo(x0 + slot * 0.96, H - padY);
+      ctx.lineTo(x0 + slot * 0.68, H * 0.5);
+      ctx.closePath();
+      const grd = ctx.createLinearGradient(x0 + slot, 0, x0, 0);
+      grd.addColorStop(0.00, 'rgba(255,255,255,0.20)');
+      grd.addColorStop(0.40, 'rgba(255,255,255,1.00)');
+      grd.addColorStop(1.00, 'rgba(255,255,255,0.08)');
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    if (tex.colorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+    this._xrayTireBandTex = tex;
+    this._xrayTireBandTexN = n;
+    return tex;
+  }
+
+  _xrayTireBandMeasure(tire) {
+    const THREE = this.THREE;
+    if (!tire || !tire.geometry || !tire._pivot || !tire._rollAxis || !tire._initWorld) return null;
+    const geo = tire.geometry;
+    const pos = geo.attributes && geo.attributes.position;
+    if (!pos) return null;
+    const cache = this._xrayTireBandSizeCache || (this._xrayTireBandSizeCache = new Map());
+    const sig = geo.uuid + '|' + pos.count + '|' + (tire._origLocalPos ? tire._origLocalPos.length : 0);
+    const hit = cache.get(tire.uuid);
+    if (hit && hit.sig === sig) return hit;
+    const inv = tire._initWorld.clone().invert();
+    const localPivot = tire._pivot.clone().applyMatrix4(inv);
+    const axisEnd = tire._pivot.clone().add(tire._rollAxis).applyMatrix4(inv);
+    const localAxis = axisEnd.sub(localPivot);
+    if (localAxis.lengthSq() < 1e-10) return null;
+    localAxis.normalize();
+    // Radius / width in the rest-pose WORLD frame, so a mirrored (negative
+    // scale) rear tyre still yields a positive cylinder. The band mesh is
+    // parented to the car root, not the spinning tyre.
+    const v = new THREE.Vector3();
+    const rel = new THREE.Vector3();
+    const src = tire._origLocalPos;
+    const axis = tire._rollAxis;
+    const pivot = tire._pivot;
+    let minA = Infinity, maxA = -Infinity, maxR = 0;
+    const step = Math.max(1, Math.floor(pos.count / 8000));
+    for (let i = 0; i < pos.count; i += step) {
+      if (src) v.set(src[i * 3], src[i * 3 + 1], src[i * 3 + 2]);
+      else v.fromBufferAttribute(pos, i);
+      v.applyMatrix4(tire._initWorld);
+      rel.copy(v).sub(pivot);
+      const axial = rel.dot(axis);
+      const radial = rel.addScaledVector(axis, -axial).length();
+      if (axial < minA) minA = axial;
+      if (axial > maxA) maxA = axial;
+      if (radial > maxR) maxR = radial;
+    }
+    if (!(maxR > 1e-4) || !isFinite(minA) || !isFinite(maxA)) return null;
+    const out = {
+      sig: sig,
+      radius: maxR,
+      width: Math.max(0.08, maxA - minA),
+      localPivot: localPivot,
+      localAxis: localAxis,
+    };
+    cache.set(tire.uuid, out);
+    return out;
+  }
+
+  _xrayTireBandCornerTire(side) {
+    const tires = (this._tireWheels || []).filter((m) => m && m._wheelSide === side);
+    if (tires.length) return tires[0];
+    const clusters = {
+      fl: this._frontLeftWheels, fr: this._frontRightWheels,
+      rl: this._rearLeftWheels, rr: this._rearRightWheels,
+    };
+    const arr = clusters[side] || [];
+    return arr.find((m) => m && m._pivot && m._rollAxis) || null;
+  }
+
+  _ensureXrayTireBands() {
+    if (this._xrayTireBands) return this._xrayTireBands;
+    const THREE = this.THREE;
+    const model = this.model;
+    if (!THREE || !model) return null;
+    const tex = this._xrayTireBandTexture();
+    const group = new THREE.Group();
+    group.name = 'XrayTireBands';
+    const bands = ['fl', 'fr', 'rl', 'rr'].map((side) => {
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          map: { value: tex },
+          color: { value: new THREE.Color('#6ecfff') },
+          color2: { value: new THREE.Color('#ff5a12') },
+          opacity: { value: 0 },
+          uOffset: { value: 0 },
+          uDir: { value: 1 },
+          uIce: { value: 0 },
+          uGroundY: { value: 0 },
+          uBandH: { value: 0.12 },
+        },
+        vertexShader: [
+          'varying vec2 vUv;',
+          'varying float vWorldY;',
+          'void main() {',
+          '  vUv = uv;',
+          '  vec4 worldPos = modelMatrix * vec4(position, 1.0);',
+          '  vWorldY = worldPos.y;',
+          '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+          '}',
+        ].join('\n'),
+        fragmentShader: [
+          'uniform sampler2D map;',
+          'uniform vec3 color;',
+          'uniform vec3 color2;',
+          'uniform float opacity;',
+          'uniform float uOffset;',
+          'uniform float uDir;',
+          'uniform float uIce;',
+          'uniform float uGroundY;',
+          'uniform float uBandH;',
+          'varying vec2 vUv;',
+          'varying float vWorldY;',
+          'void main() {',
+          '  float x = vUv.x + uOffset;',
+          '  if (uDir < 0.0) x = 1.0 - x;',
+          '  vec2 uv = vec2(x, vUv.y);',
+          '  vec4 texel = texture2D(map, uv);',
+          '  float h = clamp((vWorldY - uGroundY) / max(uBandH, 1e-4), 0.0, 1.0);',
+          '  float contact = smoothstep(0.28, 0.82, h);',
+          '  float edge = 1.0 - abs(vUv.y - 0.5) * 2.0;',
+          '  edge = smoothstep(0.0, 0.22, edge);',
+          '  float arrow = texel.r;',
+          '  float a = opacity * contact * edge * (0.62 + 0.38 * arrow);',
+          '  vec3 col = mix(color, color2, uIce * (0.78 - 0.62 * arrow));',
+          '  gl_FragColor = vec4(col * (0.70 + 0.30 * texel.rgb), a);',
+          '}',
+        ].join('\n'),
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+        fog: false,
+      });
+      setAdditiveKeepAlpha(THREE, mat);
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+      mesh.name = 'XrayTireBand';
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 20;
+      mesh.visible = false;
+      group.add(mesh);
+      return { side: side, mesh: mesh, mat: mat, geoKey: '' };
+    });
+    model.add(group);
+    this._xrayTireBands = { group: group, bands: bands };
+    return this._xrayTireBands;
+  }
+
+  _disposeXrayTireBands() {
+    const pack = this._xrayTireBands;
+    if (!pack) return;
+    pack.bands.forEach((b) => {
+      if (b.mesh.parent) b.mesh.parent.remove(b.mesh);
+      if (b.mesh.geometry) b.mesh.geometry.dispose();
+      if (b.mat) b.mat.dispose();
+    });
+    if (pack.group.parent) pack.group.parent.remove(pack.group);
+    if (this._xrayTireBandTex) {
+      this._xrayTireBandTex.dispose();
+      this._xrayTireBandTex = null;
+      this._xrayTireBandTexN = 0;
+    }
+    this._xrayTireBandSizeCache = null;
+    this._xrayTireBands = null;
+  }
+
+  _syncXrayTireBands(now) {
+    const tune = this._powertrainFxTune();
+    const want = !!(this.state.powertrainOn && this._powertrainRig && this._powertrainRig.visible
+                    && tune.tireBandOn);
+    if (!want) {
+      if (this._xrayTireBands) {
+        this._xrayTireBands.bands.forEach((b) => { b.mesh.visible = false; });
+      }
+      return;
+    }
+    const THREE = this.THREE;
+    const model = this.model;
+    if (!THREE || !model) return;
+    if (this._xrayTireBands && this._xrayTireBands.group.parent !== model) {
+      if (this._xrayTireBands.group.parent) {
+        this._xrayTireBands.group.parent.remove(this._xrayTireBands.group);
+      }
+      model.add(this._xrayTireBands.group);
+    }
+    const pack = this._ensureXrayTireBands();
+    if (!pack) return;
+
+    const tex = this._xrayTireBandTexture();
+    const flow = this._powerFlowRaw(now);
+    const manifest = this._powertrainManifest;
+    const packKey = this._powertrainPackKey || this._currentTrim().pack;
+    const batt = manifest && (manifest.batteries || {})[packKey];
+    const awd = !!(batt && batt.awd);
+    const G = this._powertrainGlowTones();
+    const t = this._powertrainFxT || 0;
+    const moving = Math.abs(this._currentMotionSpeed()) > 0.002;
+    const uvFlip = (typeof tune.tireBandUvFlip === 'number') ? tune.tireBandUvFlip : 1;
+
+    if (!this._xrayTireBandScratch) {
+      this._xrayTireBandScratch = {
+        center: new THREE.Vector3(),
+        axle: new THREE.Vector3(),
+        yAxis: new THREE.Vector3(0, 1, 0),
+        worldQuat: new THREE.Quaternion(),
+        parentQuat: new THREE.Quaternion(),
+        parentInv: new THREE.Matrix4(),
+        modelScale: new THREE.Vector3(),
+      };
+    }
+    const S = this._xrayTireBandScratch;
+    if (typeof model.updateWorldMatrix === 'function') model.updateWorldMatrix(true, false);
+    else model.updateMatrixWorld(true);
+    S.parentInv.copy(model.matrixWorld).invert();
+    model.getWorldQuaternion(S.parentQuat);
+    model.getWorldScale(S.modelScale);
+    const modelScale = Math.max(
+      Math.abs(S.modelScale.x), Math.abs(S.modelScale.y), Math.abs(S.modelScale.z), 1e-6);
+
+    pack.bands.forEach((b) => {
+      const tire = this._xrayTireBandCornerTire(b.side);
+      const axleDir = (b.side === 'fl' || b.side === 'fr') ? (flow.front || 0)
+        : (awd ? (flow.rear || 0) : 0);
+      const on = !!tire && axleDir !== 0;
+      b.mesh.visible = on;
+      if (!on) return;
+
+      const size = this._xrayTireBandMeasure(tire);
+      if (!size) { b.mesh.visible = false; return; }
+      if (typeof tire.updateWorldMatrix === 'function') tire.updateWorldMatrix(true, false);
+      else tire.updateMatrixWorld(true);
+      const worldRadius = size.radius + (tune.tireBandProud || 0);
+      const radius = worldRadius / modelScale;
+      const width = size.width / modelScale;
+      const geoKey = radius.toFixed(4) + '|' + width.toFixed(4);
+      if (b.geoKey !== geoKey) {
+        if (b.mesh.geometry) b.mesh.geometry.dispose();
+        b.mesh.geometry = new THREE.CylinderGeometry(radius, radius, width, 48, 1, true);
+        b.geoKey = geoKey;
+      }
+
+      S.center.copy(size.localPivot).applyMatrix4(tire.matrixWorld);
+      S.axle.copy(size.localPivot).add(size.localAxis).applyMatrix4(tire.matrixWorld).sub(S.center);
+      if (S.axle.lengthSq() < 1e-10) { b.mesh.visible = false; return; }
+      S.axle.normalize();
+      S.worldQuat.setFromUnitVectors(S.yAxis, S.axle);
+      b.mesh.position.copy(S.center).applyMatrix4(S.parentInv);
+      b.mesh.quaternion.copy(S.parentQuat).invert().multiply(S.worldQuat);
+
+      const regen = axleDir < 0;
+      const front = (b.side === 'fl' || b.side === 'fr');
+      const iceDrive = !regen && !!flow.ice && front;
+      const tone = regen ? G.regen : G.drive;
+      const gain = regen ? tune.regenMax : tune.driveMax;
+      b.mat.uniforms.map.value = tex;
+      b.mat.uniforms.color.value.copy(tone.color);
+      if (b.mat.uniforms.color2) {
+        b.mat.uniforms.color2.value.copy((G.ice && G.ice.color) || tone.color);
+      }
+      if (b.mat.uniforms.uIce) b.mat.uniforms.uIce.value = iceDrive ? 1 : 0;
+      b.mat.uniforms.opacity.value = (tune.tireBandOpacity || 0.9) * gain;
+      b.mat.uniforms.uGroundY.value = S.center.y - worldRadius;
+      b.mat.uniforms.uBandH.value = worldRadius * (tune.tireBandContact || 0.42);
+
+      // Left/right axles already point opposite, so an extra side flip made
+      // the car's right pair scroll backwards. Regen mirrors the chevrons
+      // (uDir) and runs the offset the other way.
+      const dirSign = axleDir < 0 ? -1 : 1;
+      if (b.mat.uniforms.uDir) b.mat.uniforms.uDir.value = dirSign;
+      const rollUv = (tire._rollAngle || 0) / (Math.PI * 2);
+      const flowUv = t * (tune.beadSpeed || 0.40);
+      const uv = ((moving ? rollUv : flowUv) * dirSign * uvFlip);
+      b.mat.uniforms.uOffset.value = uv - Math.floor(uv);
+    });
+  }
+
   _getGlassMeshes() {
     const meshes = [];
     this.scene && this.scene.traverse(c => {
       if (!c.isMesh || !c.visible) return;
+      if (c.name === 'XrayTireBand') return;
       const mat = Array.isArray(c.material) ? c.material[0] : c.material;
       if (mat && mat.transparent) meshes.push(c);
     });
@@ -23466,6 +23787,9 @@ class Component extends DCLogic {
           if ('wheelGlowRadius' in patch || 'wheelGlowY' in patch) {
             this._rebuildPowertrainWheelGlows();
           }
+          if ('tireBandArrows' in patch) {
+            this._xrayTireBandTexture();
+          }
           if ('wheelBoxOn' in patch || 'wheelBoxLen' in patch
               || 'wheelBoxWide' in patch) {
             this._rebuildPowertrainBadges();
@@ -23478,8 +23802,15 @@ class Component extends DCLogic {
             this._rebuildPowertrainBadges();
           }
           if ('socTextX' in patch || 'socTextZ' in patch || 'socTextLen' in patch
-              || 'socTextWide' in patch || 'socTextEdgePx' in patch) {
+              || 'socTextWide' in patch || 'socTextEdgePx' in patch
+              || 'socTextColor' in patch || 'socTextGlowColor' in patch
+              || 'socTextGlowPx' in patch || 'socTextGlowPasses' in patch
+              || 'socTextEdgeColor' in patch || 'socTextWeight' in patch
+              || 'socTextShadowX' in patch || 'socTextShadowY' in patch
+              || 'socTextOpacity' in patch) {
             this._rebuildPowertrainSocText();
+            this._updatePowertrainSocText(
+              this._powerSocPct(performance.now()), !!this._powertrainPlugged);
           }
           if ('bloomOn' in patch || 'bloomStrength' in patch) {
             const want = !!(this._powertrainFxTune().bloomOn && this.state.powertrainOn);
@@ -24202,8 +24533,9 @@ class Component extends DCLogic {
         // Same idea for the charge %: which side is nearest depends on where
         // the camera is now, so it cannot be decided when the flow changes.
         if (this.state.powertrainOn) this._syncSocTextNearSide();
-        // Wheel-floor glows track live flow while x-ray is up.
-        if (this.state.powertrainOn || this._xrayWheelGlows) {
+        // Tyre contact bands (and the unused floor glows) track live flow
+        // while x-ray is up.
+        if (this.state.powertrainOn || this._xrayWheelGlows || this._xrayTireBands) {
           this._syncXrayWheelGlows(performance.now());
         }
         // Forced frames after UI changes / async loads (componentDidUpdate, etc.)
@@ -24566,6 +24898,12 @@ class Component extends DCLogic {
       }
       this.model.add(this._xrayWheelGlows.group);
     }
+    if (this._xrayTireBands && this._xrayTireBands.group.parent !== this.model) {
+      if (this._xrayTireBands.group.parent) {
+        this._xrayTireBands.group.parent.remove(this._xrayTireBands.group);
+      }
+      this.model.add(this._xrayTireBands.group);
+    }
   }
 
   _powertrainTuning() {
@@ -24837,6 +25175,7 @@ class Component extends DCLogic {
     const box = new THREE.Box3();
     model.traverse((c) => {
       if (!c.isMesh || this._isCarFloorMesh(c)) return;
+      if (c.name === 'XrayTireBand') return;
       if (rig.getObjectById(c.id)) return;   // never measure ourselves
       const b = new THREE.Box3().setFromObject(c);
       if (!b.isEmpty()) box.union(b.applyMatrix4(toLocal));
@@ -24925,6 +25264,9 @@ class Component extends DCLogic {
       // wheel mesh lists above — ghosting them kills the spin sprite in x-ray.
       [...(this._blurredDiscs || []), ...(this._backingDiscs || [])].forEach((d) => {
         if (d && d.id !== undefined) keepSolid.add(d.id);
+      });
+      ((this._xrayTireBands && this._xrayTireBands.bands) || []).forEach((b) => {
+        if (b && b.mesh && b.mesh.id !== undefined) keepSolid.add(b.mesh.id);
       });
       const saved = [];
       model.traverse((c) => {
@@ -25231,6 +25573,17 @@ class Component extends DCLogic {
         // than as anything about the powertrain, so both are off.
         wheelGlowOn: 0,
         motorGlowOn: 0,
+        // Open cylinder on each tyre: arrows on the tread, faded toward the
+        // CROWN (top of the tyre). Blue while that axle is driving, blue+orange
+        // when the engine is in the mix, green while regen (chevrons mirrored).
+        // while regen (chevrons mirrored + offset reversed), hidden when idle.
+        tireBandOn: 1,
+        tireBandProud: 0.022,
+        tireBandContact: 0.95,
+        tireBandOpacity: 1.0,
+        tireBandArrows: 8,
+        tireBandIdleHz: 0.40,
+        tireBandUvFlip: 1,
         // Route the emissive x-ray parts through the app's bloom composer, so
         // the light actually BLEEDS instead of stopping at the surface. This is
         // the only thing here that costs real frame time: CLAUDE.md measures
@@ -25492,21 +25845,19 @@ class Component extends DCLogic {
         // 400 rather than bold: the packaged range is 400-600, and asking for
         // 700 gets a synthesised bold, not a real one.
         socTextFamily: "'Space Grotesk', system-ui, sans-serif",
-        socTextWeight: '400',
-        // Grey rather than the ring's green. NOTE this needs the opacity below
-        // to carry it: measured, #aab4bd at 50% over the 236 floor composites
-        // to (218,222,225) -- under 20 levels of separation. At 0.85 it lands
-        // near (185,192,198), which reads.
-        socTextColor: '#aab4bd',
-        socTextGlowPx: 14,
-        socTextGlowPasses: 3,
-        socTextOpacity: 0.85,
-        // Thin semi-transparent white rim round the glyphs. Drawn with the
-        // shadow OFF, after the glow passes: with the shadow still set it
-        // would just add another glow pass in white and fatten the halo
-        // instead of drawing an edge. Thin against a ~290 px glyph.
-        socTextEdgePx: 4,
-        socTextEdgeColor: 'rgba(255,255,255,0.55)',
+        socTextWeight: '600',
+        // Option G: white glyphs, lime stroke, soft green bloom. Lime fill
+        // vanished into the pale floor; a white body with a green outline
+        // keeps the charge colour and still reads as a number.
+        socTextColor: '#ffffff',
+        socTextGlowColor: 'rgba(0,255,0,0.55)',
+        socTextGlowPx: 12,
+        socTextGlowPasses: 2,
+        socTextShadowX: 0,
+        socTextShadowY: 0,
+        socTextOpacity: 1,
+        socTextEdgePx: 8,
+        socTextEdgeColor: 'rgba(0,255,0,0.95)',
         // Label is knocked out of the plate. badgeTextKnockPx widens the hole,
         // badgeTextEdge* draws the dark edge that gives it definition where
         // plate and floor are close in brightness.
@@ -26080,6 +26431,8 @@ class Component extends DCLogic {
     const g = cv.getContext('2d');
     const W = cv.width, H = cv.height;
     const tune = this._powertrainFxTune();
+    const fill = tune.socTextColor || '#ffffff';
+    const glow = tune.socTextGlowColor || 'rgba(0,255,0,0.55)';
     g.clearRect(0, 0, W, H);
     // Shrink to fit rather than letting "100%" run off the plate.
     let px = Math.round(H * 0.78);
@@ -26092,18 +26445,27 @@ class Component extends DCLogic {
     }
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.shadowColor = tune.socTextColor;
-    g.shadowBlur = tune.socTextGlowPx * 2;
-    g.fillStyle = tune.socTextColor;
-    // Repeat fills to build the glow up: one pass barely registers against a
-    // 236/255 floor.
-    for (let i = 0; i < tune.socTextGlowPasses; i++) g.fillText(text, W / 2, H / 2);
+    const x = W / 2, y = H / 2;
+    // Option G: lime bloom + lime outline around a white glyph.
+    g.shadowOffsetX = tune.socTextShadowX || 0;
+    g.shadowOffsetY = tune.socTextShadowY || 0;
+    g.shadowColor = glow;
+    g.fillStyle = fill;
+    g.shadowBlur = tune.socTextGlowPx * 2.2;
+    for (let i = 0; i < tune.socTextGlowPasses; i++) g.fillText(text, x, y);
+    g.shadowBlur = tune.socTextGlowPx * 0.7;
+    g.fillText(text, x, y);
     if (tune.socTextEdgePx > 0) {
-      g.shadowBlur = 0;                            // an edge, not another glow
+      g.shadowBlur = 0;
+      g.lineJoin = 'round';
+      g.miterLimit = 2;
       g.lineWidth = tune.socTextEdgePx;
       g.strokeStyle = tune.socTextEdgeColor;
-      g.strokeText(text, W / 2, H / 2);
+      g.strokeText(text, x, y);
     }
+    g.shadowBlur = 0;
+    g.fillStyle = fill;
+    g.fillText(text, x, y);
     node.tex.needsUpdate = true;
     // Canvas font fallback is SILENT, and this canvas is painted once and then
     // cached on its signature -- so a paint that ran before the webfont
@@ -27086,6 +27448,9 @@ class Component extends DCLogic {
     if (this._xrayWheelGlows) {
       this._xrayWheelGlows.front.mesh.visible = false;
       this._xrayWheelGlows.rear.mesh.visible = false;
+    }
+    if (this._xrayTireBands) {
+      this._xrayTireBands.bands.forEach((b) => { b.mesh.visible = false; });
     }
   }
 
