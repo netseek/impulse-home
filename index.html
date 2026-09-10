@@ -4626,28 +4626,44 @@ window.HavalSplash = (function () {
       border: 1px solid var(--hv-frost-edge);
       border-radius: 15px;
       color: var(--hv-widget-fg, #edf5fa);
+      overflow: visible;
       user-select: none;
       touch-action: pan-y;
       pointer-events: auto;
     }
-    .hv-desktop-switcher button { color: inherit; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
+    .hv-desktop-switcher button {
+      color: inherit; border: 0; background: transparent; cursor: pointer; pointer-events: auto;
+      -webkit-appearance: none; appearance: none;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+    }
     .hv-desktop-arrow {
       position: relative;
-      width: 102px; height: 37px; border-radius: 0 !important;
+      width: 102px; height: 37px; border-radius: 0;
       flex: 0 0 auto;
       display: flex; align-items: center; justify-content: center;
       font: 300 22px/1 system-ui;
       padding-top: 1px;
-      background: rgba(255,255,255,.04) !important;
-      transition: background .15s ease, transform .12s ease;
+      background: rgba(255,255,255,.04);
+      overflow: visible;
+    }
+    /* 20% slop around each chevron so the status-bar tap is easier to hit. */
+    .hv-desktop-arrow::before {
+      content: '';
+      position: absolute;
+      inset: -20%;
     }
     .hv-desktop-switcher > .hv-desktop-arrow:first-child {
-      border-radius: 13px 0 0 13px !important;
+      border-radius: 13px 0 0 13px;
     }
     .hv-desktop-switcher > .hv-desktop-arrow:last-child {
-      border-radius: 0 13px 13px 0 !important;
+      border-radius: 0 13px 13px 0;
     }
-    .hv-desktop-arrow:active { background: rgba(255,255,255,.10) !important; transform: scale(.97); }
+    /* Fill must follow the segmented radii — WebView's default tap highlight is a
+       blue oval that ignores border-radius. No scale: that also mismatches. */
+    .hv-desktop-arrow:active {
+      background: rgba(79,214,232,.34);
+    }
     .hv-desktop-current {
       min-width: 92px; height: 37px; padding: 0 7px;
       display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -31252,13 +31268,19 @@ class Component extends DCLogic {
     const r = el ? el.getBoundingClientRect() : null;
     const vis = !!(r && r.width > 1 && r.height > 1
       && el && window.getComputedStyle(el).display !== 'none');
+    const padX = vis ? r.width * 0.2 : 0;
+    const padY = vis ? r.height * 0.2 : 0;
+    const left = vis ? r.left - padX : 0;
+    const top = vis ? r.top - padY : 0;
+    const width = vis ? r.width + padX * 2 : 0;
+    const height = vis ? r.height + padY * 2 : 0;
     const key = vis
-      ? ([Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join(','))
+      ? ([Math.round(left), Math.round(top), Math.round(width), Math.round(height)].join(','))
       : 'off';
     if (key === this._desktopHitSig) return;
     this._desktopHitSig = key;
     try {
-      if (vis) B.reportDesktopSwitcherHit(r.left, r.top, r.width, r.height, true);
+      if (vis) B.reportDesktopSwitcherHit(left, top, width, height, true);
       else B.reportDesktopSwitcherHit(0, 0, 0, 0, false);
     } catch (e) {}
   }

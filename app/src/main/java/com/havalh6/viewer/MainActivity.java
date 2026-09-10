@@ -796,6 +796,18 @@ public final class MainActivity extends Activity {
         }
 
         /**
+         * Viewer → shell: CSS box of the desktop switcher, in WebView client
+         * pixels. Native places a SYSTEM_ALERT_WINDOW proxy on that display
+         * rect so taps in the MMI StatusBar (y=0..60) reach the WebView.
+         */
+        @JavascriptInterface
+        public void reportDesktopSwitcherHit(float left, float top, float width,
+                float height, boolean visible) {
+            mainHandler.post(() -> updateDesktopSwitcherHitProxy(
+                    left, top, width, height, visible));
+        }
+
+        /**
          * Fetch Bing daily-wallpaper JSON from native code. WebView fetch() to
          * bing.com is blocked on some builds; this uses the same HTTPS endpoint
          * as Windows Spotlight (HPImageArchive).
@@ -955,6 +967,11 @@ public final class MainActivity extends Activity {
     private View quickMediaAppRow;
     private boolean quickMediaCanLaunch;
     private QuickMediaBarsView quickMediaBars;
+    /** Session-0 Visualizer probe for the MEDIA rail bars; null until first play. */
+    private MediaAudioVisualizer mediaAudioViz;
+    private static final int REQ_MEDIA_VIZ_AUDIO = 7101;
+    /** Avoid re-prompting every play/pause after the user denies RECORD_AUDIO. */
+    private boolean mediaVizPermissionAsked;
     /**
      * The last now-playing payload, replayed after the rail is rebuilt.
      *
@@ -1091,21 +1108,14 @@ public final class MainActivity extends Activity {
     /**
      * Ambient bars behind the MEDIA tile's copy.
      *
-     * <p><b>These do not follow the audio, and cannot.</b> The viewer has no
-     * audio input of any kind — no AnalyserNode, no native capture — which is
-     * the same limitation CLAUDE.md records for the web media visualisers.
-     * Real spectrum would need android.media.audiofx.Visualizer on session 0,
-     * which means RECORD_AUDIO, and the MMI is Android 9 so AudioPlaybackCapture
-     * (API 29+) is not available either.
-     *
-     * <p>What they ARE driven by is the one thing the payload actually reports:
-     * whether a track is playing. They move while it plays and settle when it
-     * pauses. That makes them a playing indicator wearing an equaliser's shape,
-     * not a readout — which is why they are kept faint and behind the copy
-     * rather than presented as data.
+     * <p>Prefer {@link MediaAudioVisualizer} (session 0 waveform) when it
+     * reports live energy. Otherwise fall back to the synthetic playing
+     * indicator — session 0 is often silent on OEM builds, and Android 9 has
+     * no AudioPlaybackCapture. Bars stay faint and behind the copy either way;
+     * they are not presented as a calibrated meter.
      */
     private final class QuickMediaBarsView extends View {
-        private static final int BARS = 24;
+        private static final int BARS = MediaAudioVisualizer.BARS;
         /** 15 Hz, not 60: this redraws on a panel that is already short of frames. */
         private static final long FRAME_MS = 66;
 
@@ -1113,6 +1123,7 @@ public final class MainActivity extends Activity {
                 new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         private final android.graphics.RectF bar = new android.graphics.RectF();
         private final float[] level = new float[BARS];
+        private final float[] liveTarget = new float[BARS];
         private boolean playing;
         private boolean visible = true;
         private long startedAt;
@@ -1123,6 +1134,8 @@ public final class MainActivity extends Activity {
             public void run() {
                 if (!playing || !visible || !isAttachedToWindow()) return;
                 invalidate();
+                // Live captures also post invalidate; keep a slow tick so the
+                // synthetic fallback (and settle-after-pause) still animate.
                 postDelayed(this, FRAME_MS);
             }
         };
@@ -1143,7 +1156,8 @@ public final class MainActivity extends Activity {
          * The rail is hidden whenever the dock is in launcher mode, and the tile
          * can be scrolled off its row. Neither stops isAttachedToWindow() being
          * true, so without this the bars would keep redrawing off screen for as
-         * long as something was playing.
+         * long as something was playing. The Visualizer probe is separate — it
+         * tracks playback even while the rail is hidden.
          */
         @Override
         public void onVisibilityAggregated(boolean isVisible) {
@@ -1158,6 +1172,9 @@ public final class MainActivity extends Activity {
             if (playing == next) return;
             playing = next;
             removeCallbacks(frame);
+            // Probe follows audible music — not only the now-playing flag — so
+            // Android Auto's stale paused bit does not block the session-0 test.
+            syncMediaVisualizerWanted(mediaAudioWanted());
             if (playing && visible) {
                 startedAt = android.os.SystemClock.uptimeMillis();
                 post(frame);
@@ -1192,24 +1209,29 @@ public final class MainActivity extends Activity {
             float travel = floor - ceiling;
             if (travel <= 0f) return;
 
+            boolean live = playing && mediaAudioViz != null
+                    && mediaAudioViz.copyLiveLevels(liveTarget);
             float seconds = playing
                     ? (android.os.SystemClock.uptimeMillis() - startedAt) / 1000f : 0f;
             for (int i = 0; i < BARS; i++) {
                 float target;
-                if (playing) {
+                if (!playing) {
+                    target = 0.10f;
+                } else if (live) {
+                    target = liveTarget[i];
+                } else {
                     // Three incommensurate rates per bar, so the row never reads
                     // as one sine wave marching across it.
                     double a = Math.sin(seconds * 2.7 + i * 0.9);
                     double b = Math.sin(seconds * 1.3 + i * 2.1);
                     double c = Math.sin(seconds * 4.1 + i * 0.4);
                     target = (float) (0.46 + 0.26 * a + 0.18 * b + 0.10 * c);
-                } else {
-                    target = 0.10f;
                 }
                 if (target < 0.06f) target = 0.06f;
                 if (target > 1f) target = 1f;
                 // Ease toward the target so a pause settles instead of snapping.
-                level[i] += (target - level[i]) * (playing ? 0.55f : 0.22f);
+                float ease = !playing ? 0.22f : (live ? 0.42f : 0.55f);
+                level[i] += (target - level[i]) * ease;
 
                 float x = left + i * (barW + gap);
                 float top = floor - travel * level[i];
@@ -1229,6 +1251,80 @@ public final class MainActivity extends Activity {
                 }
                 if (!settled) postDelayed(frame, FRAME_MS);
             }
+        }
+    }
+
+    private void syncMediaVisualizerWanted(boolean want) {
+        if (!want) {
+            if (mediaAudioViz != null) mediaAudioViz.setWanted(false);
+            return;
+        }
+        ensureMediaVisualizer();
+    }
+
+    /** Playing flag from now-playing, or any STREAM_MUSIC activity (AA often lies). */
+    private boolean mediaAudioWanted() {
+        if (quickMediaPlaying) return true;
+        try {
+            android.media.AudioManager am =
+                    (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+            return am != null && am.isMusicActive();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private final Runnable mediaVizPoll = new Runnable() {
+        @Override
+        public void run() {
+            boolean want = mediaAudioWanted();
+            syncMediaVisualizerWanted(want);
+            mainHandler.postDelayed(this, 1000);
+        }
+    };
+
+    private void ensureMediaVisualizer() {
+        Log.i(MediaAudioVisualizer.TAG, "ensure playing=" + quickMediaPlaying
+                + " musicActive=" + mediaAudioWanted()
+                + " bars=" + (quickMediaBars != null));
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (mediaVizPermissionAsked) {
+                Log.i(MediaAudioVisualizer.TAG, "no-permission (already asked)");
+                return;
+            }
+            mediaVizPermissionAsked = true;
+            Log.i(MediaAudioVisualizer.TAG, "no-permission — requesting RECORD_AUDIO");
+            requestPermissions(
+                    new String[]{android.Manifest.permission.RECORD_AUDIO},
+                    REQ_MEDIA_VIZ_AUDIO);
+            return;
+        }
+        startMediaVisualizerIfNeeded();
+    }
+
+    private void startMediaVisualizerIfNeeded() {
+        if (mediaAudioViz == null) {
+            mediaAudioViz = new MediaAudioVisualizer();
+            mediaAudioViz.setOnUpdate(() -> {
+                if (quickMediaBars != null) quickMediaBars.invalidate();
+            });
+        }
+        mediaAudioViz.setWanted(true);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_MEDIA_VIZ_AUDIO) return;
+        boolean granted = grantResults.length > 0
+                && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (granted && quickMediaPlaying) {
+            Log.i(MediaAudioVisualizer.TAG, "permission-granted");
+            startMediaVisualizerIfNeeded();
+        } else {
+            Log.i(MediaAudioVisualizer.TAG, "permission-denied — synthetic bars only");
         }
     }
 
@@ -2063,17 +2159,22 @@ public final class MainActivity extends Activity {
     private final List<MotionTrailLayout> launcherItems = new ArrayList<>();
     private ProjectionPresence projectionPresence;
     private MotionTrailLayout projectionItem;
-    private View projectionGap;
     /** Waiting for Impulse to resolve a projection display task id. */
     private ProjectionPresence.Kind pendingProjectionKind;
     private final java.util.Set<String> pendingProjectionPackages = new java.util.HashSet<>();
     private Runnable pendingProjectionTimeout;
-    private final MotionTrailLayout[] pinnedItems = new MotionTrailLayout[PINNED_PACKAGES.length];
-    /** Pinned slots with an installed app behind them — the rest stay GONE forever. */
+    /**
+     * Single GWM hub that opens a flyout of {@link #PINNED_PACKAGES}. Destinations
+     * still tracked in {@link #pinnedBound}; only the hub is drawn on the strip.
+     */
+    private MotionTrailLayout gwmHubItem;
+    /** Which pinned destinations are installed (or emulator-stubbed). */
     private final boolean[] pinnedBound = new boolean[PINNED_PACKAGES.length];
-    private View pinnedGap;
+    private android.widget.PopupWindow gwmHubMenu;
+    private android.widget.PopupWindow dockCustomizeSheet;
+    /** Impulse-style name/icon/color overrides for dock tiles. */
+    private DockAppOverrides dockAppOverrides = new DockAppOverrides(null);
     private final MotionTrailLayout[] recentItems = new MotionTrailLayout[3];
-    private View recentsGap;
     private final List<String> recentPackages = new ArrayList<>();
     /** User-hidden packages (long-press → Hide). Survives restarts. */
     private final java.util.Set<String> hiddenPackages = new java.util.HashSet<>();
@@ -2153,6 +2254,12 @@ public final class MainActivity extends Activity {
     private View appsFabScrim;
     private WindowManager.LayoutParams appsFabScrimLp;
     private boolean appsFabScrimAttached;
+    /** Last CSS-mapped screen rect of the desktop switcher; the accessibility overlay consumes it. */
+    private int desktopHitX;
+    private int desktopHitY;
+    private int desktopHitW;
+    private int desktopHitH;
+    private boolean desktopHitWanted;
     private Runnable pinMediaBoundsRunnable;
     private final MediaNowPlaying mediaNowPlaying = new MediaNowPlaying();
     /** Full-width 2px load line at display Y=655 (65px above the 720px panel). */
@@ -3089,6 +3196,37 @@ public final class MainActivity extends Activity {
                 android.graphics.PixelFormat.TRANSLUCENT);
         lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
         return lp;
+    }
+
+    private void updateDesktopSwitcherHitProxy(float cssLeft, float cssTop,
+            float cssWidth, float cssHeight, boolean visible) {
+        if (webView == null) return;
+        int[] loc = new int[2];
+        webView.getLocationOnScreen(loc);
+        float scale = webView.getScale();
+        if (scale <= 0f) scale = 1f;
+        desktopHitX = loc[0] + Math.round(cssLeft * scale);
+        desktopHitY = loc[1] + Math.round(cssTop * scale);
+        desktopHitW = Math.max(0, Math.round(cssWidth * scale));
+        desktopHitH = Math.max(0, Math.round(cssHeight * scale));
+        desktopHitWanted = visible && desktopHitW > 1 && desktopHitH > 1;
+        DesktopSwitcherHitService.applyFromViewer(this,
+                desktopHitX, desktopHitY, desktopHitW, desktopHitH, desktopHitWanted);
+    }
+
+    boolean dispatchDesktopSwitcherHit(android.view.MotionEvent ev) {
+        if (webView == null) return false;
+        int[] loc = new int[2];
+        webView.getLocationOnScreen(loc);
+        android.view.MotionEvent copy = android.view.MotionEvent.obtain(ev);
+        copy.offsetLocation(
+                ev.getRawX() - loc[0] - ev.getX(),
+                ev.getRawY() - loc[1] - ev.getY());
+        try {
+            return webView.dispatchTouchEvent(copy);
+        } finally {
+            copy.recycle();
+        }
     }
 
     private void ensureAppsFabBuilt() {
@@ -5989,11 +6127,12 @@ public final class MainActivity extends Activity {
         loadRecentApps();
         loadHiddenApps();
         loadWindowApps();
+        dockAppOverrides = DockAppOverrides.load(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
         dockSurfaceMode = normalizeDockSurfaceMode(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
                 .getString(PREF_DOCK_SURFACE, DOCK_SURFACE_LAUNCHER));
         float density = getResources().getDisplayMetrics().density;
         // Bigger than the old 52/78: dropping the captions freed vertical room in
-        // the dock band. GWM tiles use the full Impulse ic_gwm asset on black.
+        // the dock band. One GWM hub (ic_gwm on black) opens the four OEM shortcuts.
         int iconSizePx = Math.round(60 * density);
         int itemWidthPx = Math.round(84 * density);
         dockCellPx = itemWidthPx;
@@ -6101,56 +6240,35 @@ public final class MainActivity extends Activity {
             }
         }
 
-        int gapPx = Math.round(28 * density);
+        // Uniform spacing: every dock tile uses makeDockItem's rightMargin.
+        // Order only: projection (AA/CarPlay) → GWM hub → recents → remaining apps.
         projectionItem = makeDockItem(itemWidthPx, iconSizePx, density);
         projectionItem.setVisibility(View.GONE);
         iconsLayout.addView(projectionItem);
         launcherItems.add(projectionItem);
 
-        projectionGap = makeDockGap(gapPx);
-        projectionGap.setVisibility(View.GONE);
-        iconsLayout.addView(projectionGap);
-
-        int pinnedShown = 0;
         for (int i = 0; i < PINNED_PACKAGES.length; i++) {
             String pkg = PINNED_PACKAGES[i];
-            pinnedItems[i] = makeDockItem(itemWidthPx, iconSizePx, density);
-            pinnedItems[i].setVisibility(View.GONE);
-            iconsLayout.addView(pinnedItems[i]);
-            launcherItems.add(pinnedItems[i]);
+            pinnedBound[i] = false;
             ResolveInfo info = byPkg.get(pkg);
             if (info == null) {
                 if (isEmulatorDevice()) {
                     emulatorStubPackages.add(pkg);
-                    String labelStr = pinnedLabel(pkg, pm, null);
-                    bindDockItem(pinnedItems[i], launcherIconForPackage(pkg), labelStr,
-                            v -> launchAppForPackage(pkg, labelStr), pkg);
                     pinnedBound[i] = true;
-                    if (isUserHidden(pkg)) {
-                        pinnedItems[i].setVisibility(View.GONE);
-                        continue;
-                    }
-                    pinnedShown++;
-                    Log.w(TAG, "Launcher pinned stub " + pkg + " | " + labelStr);
+                    Log.w(TAG, "Launcher pinned stub " + pkg + " | " + pinnedLabel(pkg, pm, null));
                 }
                 continue;
             }
-            String labelStr = pinnedLabel(pkg, pm, info);
-            // Bind even when hidden — the slot stays GONE until "Unhide" flips it.
-            bindDockItem(pinnedItems[i], iconForLauncherApp(pm, info), labelStr,
-                    v -> launchAppForPackage(pkg, labelStr), pkg);
             pinnedBound[i] = true;
-            if (isUserHidden(pkg)) {
-                pinnedItems[i].setVisibility(View.GONE);
-                continue;
-            }
-            pinnedShown++;
-            Log.w(TAG, "Launcher pinned " + pkg + " | " + labelStr);
+            Log.w(TAG, "Launcher pinned " + pkg + " | " + pinnedLabel(pkg, pm, info));
         }
 
-        pinnedGap = makeDockGap(gapPx);
-        pinnedGap.setVisibility(pinnedShown > 0 ? View.VISIBLE : View.GONE);
-        iconsLayout.addView(pinnedGap);
+        gwmHubItem = makeDockItem(itemWidthPx, iconSizePx, density);
+        gwmHubItem.setVisibility(View.GONE);
+        iconsLayout.addView(gwmHubItem);
+        launcherItems.add(gwmHubItem);
+        bindGwmHub();
+        updatePinnedVisibility();
 
         for (int i = 0; i < recentItems.length; i++) {
             recentItems[i] = makeDockItem(itemWidthPx, iconSizePx, density);
@@ -6158,10 +6276,6 @@ public final class MainActivity extends Activity {
             iconsLayout.addView(recentItems[i]);
             launcherItems.add(recentItems[i]);
         }
-
-        recentsGap = makeDockGap(gapPx);
-        recentsGap.setVisibility(View.GONE);
-        iconsLayout.addView(recentsGap);
 
         seedRecentAppsFromSystem(apps);
         dockItemsByPackage.clear();
@@ -7999,7 +8113,10 @@ public final class MainActivity extends Activity {
         quickMediaPackage = payload.optString("packageName", "");
         quickMediaPlaying = payload.optBoolean("playing", false);
         quickMediaCanLaunch = payload.optBoolean("canLaunch", false);
-        if (quickMediaBars != null) quickMediaBars.setPlaying(quickMediaPlaying);
+        if (quickMediaBars != null) {
+            quickMediaBars.setPlaying(quickMediaPlaying);
+        }
+        syncMediaVisualizerWanted(mediaAudioWanted());
         boolean hasTrack = payload.optBoolean("hasTrack", false);
         quickMediaAvailable = hasTrack && mediaNowPlaying != null;
         for (android.widget.ImageView button : quickMediaButtons) {
@@ -9704,16 +9821,6 @@ public final class MainActivity extends Activity {
         return item;
     }
 
-    private View makeDockGap(int widthPx) {
-        View gap = new View(this);
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                widthPx, android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
-        gap.setLayoutParams(lp);
-        gap.setClickable(false);
-        gap.setFocusable(false);
-        return gap;
-    }
-
     private boolean isPinnedPackage(String packageName) {
         if (packageName == null) return false;
         for (String pinned : PINNED_PACKAGES) {
@@ -9934,10 +10041,159 @@ public final class MainActivity extends Activity {
         return isGwmApp(pkg) && !"com.beantechs.energyassistant".equalsIgnoreCase(pkg);
     }
 
-    /** Rounded plate behind launcher icons — dark for GWM emblem + Energy Assistant. */
+    /** Rounded plate behind launcher icons — dark for GWM emblem + Energy + gwm substitute. */
     private boolean usesDarkIconPlate(String pkg) {
+        if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
+            String slug = dockAppOverrides != null ? dockAppOverrides.icon(pkg) : null;
+            return slug == null || DockAppOverrides.isDarkPlateSlug(slug);
+        }
+        String slug = dockAppOverrides != null ? dockAppOverrides.icon(pkg) : null;
+        if (slug != null) return DockAppOverrides.isDarkPlateSlug(slug);
         return usesGwmEmblem(pkg)
                 || "com.beantechs.energyassistant".equalsIgnoreCase(pkg);
+    }
+
+    private String resolveDockLabel(String pkg, String stock) {
+        if (pkg == null) return stock != null ? stock : "";
+        String custom = dockAppOverrides != null ? dockAppOverrides.name(pkg) : null;
+        if (custom != null) return custom;
+        if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) return "GWM";
+        return stock != null ? stock : "";
+    }
+
+    private Drawable resolveDockIcon(String pkg, Drawable stock) {
+        if (pkg == null || dockAppOverrides == null) return stock;
+        String slug = dockAppOverrides.icon(pkg);
+        if (slug == null) {
+            if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
+                try {
+                    return getDrawable(R.drawable.ic_gwm);
+                } catch (Exception e) {
+                    return stock;
+                }
+            }
+            return stock;
+        }
+        Drawable sub = DockAppOverrides.drawableFor(this, slug, dockAppOverrides.color(pkg));
+        return sub != null ? sub : stock;
+    }
+
+    private void bindGwmHub() {
+        if (gwmHubItem == null) return;
+        Drawable icon = resolveDockIcon(DockAppOverrides.GWM_HUB_PKG, launcherIconForPackage("com.beantechs.vehiclecenter"));
+        if (icon == null) {
+            try { icon = getDrawable(R.drawable.ic_gwm); } catch (Exception ignored) {}
+        }
+        String label = resolveDockLabel(DockAppOverrides.GWM_HUB_PKG, "GWM");
+        bindDockItem(gwmHubItem, icon, label,
+                v -> showGwmHubMenu(v), DockAppOverrides.GWM_HUB_PKG);
+    }
+
+    private void showGwmHubMenu(View anchor) {
+        if (anchor == null) return;
+        dismissGwmHubMenu();
+        dismissDockEditMenu();
+        float d = getResources().getDisplayMetrics().density;
+        PackageManager pm = getPackageManager();
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setBackgroundColor(0xF2141820);
+        box.setElevation(14f * d);
+        int pad = Math.round(18 * d);
+        box.setPadding(pad, Math.round(12 * d), pad, Math.round(12 * d));
+        box.setMinimumWidth(Math.round(280 * d));
+
+        int shown = 0;
+        int iconPx = Math.round(40 * d);
+        for (int i = 0; i < PINNED_PACKAGES.length; i++) {
+            if (!pinnedBound[i]) continue;
+            String pkg = PINNED_PACKAGES[i];
+            if (isUserHidden(pkg)) continue;
+            String label = resolveDockLabel(pkg, pinnedLabel(pkg, pm, null));
+            Drawable icon = flyoutIconForPinned(pkg);
+
+            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(Math.round(8 * d), Math.round(14 * d), Math.round(8 * d), Math.round(14 * d));
+            row.setMinimumHeight(Math.round(56 * d));
+            row.setClickable(true);
+            row.setFocusable(true);
+
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            iv.setImageDrawable(icon);
+            android.widget.LinearLayout.LayoutParams ilp =
+                    new android.widget.LinearLayout.LayoutParams(iconPx, iconPx);
+            ilp.rightMargin = Math.round(14 * d);
+            row.addView(iv, ilp);
+
+            android.widget.TextView tv = new android.widget.TextView(this);
+            tv.setText(label);
+            tv.setTextColor(0xFFFFFFFF);
+            tv.setTextSize(17f);
+            row.addView(tv);
+
+            final String targetPkg = pkg;
+            final String targetLabel = label;
+            row.setOnClickListener(v -> {
+                dismissGwmHubMenu();
+                launchAppForPackage(targetPkg, targetLabel);
+            });
+            box.addView(row);
+            shown++;
+        }
+        if (shown == 0) {
+            android.widget.TextView empty = new android.widget.TextView(this);
+            empty.setText("Nenhum app GWM");
+            empty.setTextColor(0x99FFFFFF);
+            empty.setTextSize(15f);
+            empty.setPadding(Math.round(8 * d), Math.round(10 * d), Math.round(8 * d), Math.round(10 * d));
+            box.addView(empty);
+        }
+
+        android.widget.PopupWindow popup = new android.widget.PopupWindow(
+                box,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                true);
+        popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
+        popup.setOnDismissListener(() -> {
+            if (gwmHubMenu == popup) gwmHubMenu = null;
+        });
+        gwmHubMenu = popup;
+        box.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int xOff = (anchor.getWidth() - box.getMeasuredWidth()) / 2;
+        int yOff = -(box.getMeasuredHeight() + anchor.getHeight() + Math.round(10 * d));
+        popup.showAsDropDown(anchor, xOff, yOff);
+    }
+    private void dismissGwmHubMenu() {
+        if (gwmHubMenu == null) return;
+        try { gwmHubMenu.dismiss(); } catch (Exception ignored) {}
+        gwmHubMenu = null;
+    }
+
+    /** Small leading glyph for each GWM flyout row. */
+    private Drawable flyoutIconForPinned(String pkg) {
+        if ("com.beantechs.energyassistant".equalsIgnoreCase(pkg)) {
+            try {
+                Drawable d = getDrawable(R.drawable.ic_energy_assistant);
+                if (d != null) return d;
+            } catch (Exception ignored) {}
+        }
+        if ("com.beantechs.settings".equals(pkg)) {
+            Drawable sub = DockAppOverrides.drawableFor(this, "settings", "#FFFFFF");
+            if (sub != null) return sub;
+        }
+        try {
+            Drawable emblem = getDrawable(R.drawable.ic_gwm_emblem);
+            if (emblem != null) return emblem;
+        } catch (Exception ignored) {}
+        try {
+            return getDrawable(R.drawable.ic_gwm);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void bindDockItem(MotionTrailLayout item, Drawable icon, String label,
@@ -9952,7 +10208,9 @@ public final class MainActivity extends Activity {
         android.widget.TextView tv = (android.widget.TextView) item.findViewWithTag("label");
         float density = getResources().getDisplayMetrics().density;
         int iconPx = dockIconPx > 0 ? dockIconPx : Math.round(60 * density);
-        if (iv != null) iv.setImageDrawable(normalizeAdaptiveIcon(icon, iconPx));
+        Drawable drawn = editPackage != null ? resolveDockIcon(editPackage, icon) : icon;
+        String caption = editPackage != null ? resolveDockLabel(editPackage, label) : (label != null ? label : "");
+        if (iv != null) iv.setImageDrawable(normalizeAdaptiveIcon(drawn, iconPx));
         View plate = item.findViewWithTag("iconPlate");
         if (plate != null) {
             boolean darkPlate = editPackage != null && usesDarkIconPlate(editPackage);
@@ -9963,7 +10221,6 @@ public final class MainActivity extends Activity {
             plate.setPadding(inset, inset, inset, inset);
         }
         if (tv != null) {
-            String caption = label != null ? label : "";
             tv.setText(caption);
             tv.setVisibility(caption.isEmpty() ? View.GONE : View.VISIBLE);
         }
@@ -9989,13 +10246,11 @@ public final class MainActivity extends Activity {
         if (projectionItem == null) return;
         if (kind == null || kind == ProjectionPresence.Kind.NONE) {
             projectionItem.setVisibility(View.GONE);
-            if (projectionGap != null) projectionGap.setVisibility(View.GONE);
             return;
         }
         Drawable icon = projectionPresence != null ? projectionPresence.iconFor(kind) : null;
         String label = projectionPresence != null ? projectionPresence.labelFor(kind) : "";
         bindDockItem(projectionItem, icon, label, v -> launchProjection(kind));
-        if (projectionGap != null) projectionGap.setVisibility(View.VISIBLE);
     }
 
     private void bindRecentSlots(PackageManager pm, List<ResolveInfo> apps) {
@@ -10025,7 +10280,6 @@ public final class MainActivity extends Activity {
         for (int i = shown; i < recentItems.length; i++) {
             if (recentItems[i] != null) recentItems[i].setVisibility(View.GONE);
         }
-        if (recentsGap != null) recentsGap.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
         hideRecentDuplicatesFromStrip(shownRecents);
     }
 
@@ -10101,6 +10355,7 @@ public final class MainActivity extends Activity {
 
     private void dismissDockEditMenu() {
         dismissUnhidePicker();
+        dismissDockCustomizeSheet();
         if (dockEditMenu == null) return;
         try {
             dockEditMenu.dismiss();
@@ -10111,20 +10366,31 @@ public final class MainActivity extends Activity {
     private void showDockEditMenu(View anchor, String pkg) {
         if (anchor == null || pkg == null || pkg.isEmpty()) return;
         dismissDockEditMenu();
+        dismissGwmHubMenu();
         float d = getResources().getDisplayMetrics().density;
         android.widget.LinearLayout box = new android.widget.LinearLayout(this);
         box.setOrientation(android.widget.LinearLayout.VERTICAL);
         box.setBackgroundColor(0xF2141820);
         box.setElevation(12f * d);
-        int padH = Math.round(14 * d);
-        int padV = Math.round(8 * d);
+        int padH = Math.round(18 * d);
+        int padV = Math.round(12 * d);
         box.setPadding(padH, padV, padH, padV);
+        box.setMinimumWidth(Math.round(220 * d));
 
+        final boolean isHub = DockAppOverrides.GWM_HUB_PKG.equals(pkg);
+        box.addView(makeDockMenuRow("Customize…", () -> {
+            dismissDockEditMenu();
+            showDockCustomizeSheet(anchor, pkg);
+        }));
         box.addView(makeDockMenuRow("Hide", () -> {
             dismissDockEditMenu();
-            removeDockPackage(pkg, true);
+            if (isHub) {
+                hideGwmHub();
+            } else {
+                removeDockPackage(pkg, true);
+            }
         }));
-        if (canToggleOpenAsWindow(pkg)) {
+        if (!isHub && canToggleOpenAsWindow(pkg)) {
             boolean on = prefersWindow(pkg);
             box.addView(makeDockMenuRow(on ? "✓ Open as window" : "Open as window", () -> {
                 dismissDockEditMenu();
@@ -10137,7 +10403,7 @@ public final class MainActivity extends Activity {
                 showUnhidePicker();
             }));
         }
-        if (canUninstallPackage(pkg)) {
+        if (!isHub && canUninstallPackage(pkg)) {
             box.addView(makeDockMenuRow("Uninstall", () -> {
                 dismissDockEditMenu();
                 try {
@@ -10165,6 +10431,305 @@ public final class MainActivity extends Activity {
         int xOff = (anchor.getWidth() - box.getMeasuredWidth()) / 2;
         int yOff = -(box.getMeasuredHeight() + anchor.getHeight() + Math.round(8 * d));
         popup.showAsDropDown(anchor, xOff, yOff);
+    }
+
+    private void hideGwmHub() {
+        for (String pinned : PINNED_PACKAGES) {
+            hiddenPackages.add(pinned);
+        }
+        saveHiddenApps();
+        updatePinnedVisibility();
+        refreshRecentSlots();
+    }
+
+    private void dismissDockCustomizeSheet() {
+        if (dockCustomizeSheet == null) return;
+        try { dockCustomizeSheet.dismiss(); } catch (Exception ignored) {}
+        dockCustomizeSheet = null;
+    }
+
+    /**
+     * Impulse-style editor: rename + substitute icon + accent color.
+     * Saves into {@link DockAppOverrides} and rebinds the affected tile.
+     */
+    private void showDockCustomizeSheet(View anchor, String pkg) {
+        if (anchor == null || pkg == null || pkg.isEmpty()) return;
+        dismissDockCustomizeSheet();
+        float d = getResources().getDisplayMetrics().density;
+        String stockLabel;
+        if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
+            stockLabel = "GWM";
+        } else if (isPinnedPackage(pkg)) {
+            stockLabel = pinnedLabel(pkg, getPackageManager(), null);
+        } else {
+            String fromCaption = null;
+            MotionTrailLayout row = dockItemsByPackage.get(pkg);
+            if (row != null) {
+                android.widget.TextView tv = (android.widget.TextView) row.findViewWithTag("label");
+                if (tv != null && tv.getText() != null) {
+                    fromCaption = tv.getText().toString().trim();
+                }
+            }
+            String resolved = fromCaption != null ? fromCaption : pkg;
+            try {
+                PackageManager pm = getPackageManager();
+                android.content.pm.ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+                CharSequence lab = pm.getApplicationLabel(ai);
+                if (lab != null) resolved = lab.toString();
+            } catch (Exception ignored) {}
+            stockLabel = resolved;
+        }
+        final String curName = dockAppOverrides != null ? dockAppOverrides.name(pkg) : null;
+        final String[] selectedIcon = {
+                dockAppOverrides != null ? dockAppOverrides.icon(pkg) : null
+        };
+        final String[] selectedColor = {
+                dockAppOverrides != null && dockAppOverrides.color(pkg) != null
+                        ? dockAppOverrides.color(pkg) : DockAppOverrides.COLORS[0]
+        };
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setBackgroundColor(0xF2141820);
+        box.setElevation(16f * d);
+        int pad = Math.round(20 * d);
+        box.setPadding(pad, pad, pad, pad);
+        scroll.addView(box);
+
+        android.widget.TextView title = new android.widget.TextView(this);
+        title.setText("Personalizar");
+        title.setTextColor(0x99FFFFFF);
+        title.setTextSize(14f);
+        title.setPadding(0, 0, 0, Math.round(8 * d));
+        box.addView(title);
+
+        android.widget.EditText nameField = new android.widget.EditText(this);
+        nameField.setHint(stockLabel);
+        nameField.setText(curName != null ? curName : "");
+        nameField.setHintTextColor(0x66FFFFFF);
+        nameField.setTextColor(0xFFFFFFFF);
+        nameField.setTextSize(17f);
+        nameField.setSingleLine(true);
+        nameField.setBackgroundColor(0x33FFFFFF);
+        nameField.setPadding(Math.round(10 * d), Math.round(8 * d), Math.round(10 * d), Math.round(8 * d));
+        box.addView(nameField);
+
+        android.widget.TextView iconLabel = new android.widget.TextView(this);
+        iconLabel.setText("Ícone");
+        iconLabel.setTextColor(0x99FFFFFF);
+        iconLabel.setTextSize(14f);
+        iconLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
+        box.addView(iconLabel);
+
+        android.widget.HorizontalScrollView iconScroll = new android.widget.HorizontalScrollView(this);
+        iconScroll.setHorizontalScrollBarEnabled(false);
+        android.widget.LinearLayout iconRow = new android.widget.LinearLayout(this);
+        iconRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        iconScroll.addView(iconRow);
+        box.addView(iconScroll);
+
+        final java.util.List<View> iconCells = new ArrayList<>();
+        Runnable refreshIconSel = () -> {
+            for (View cell : iconCells) {
+                Object tag = cell.getTag();
+                boolean on = (tag == null && selectedIcon[0] == null)
+                        || (tag != null && tag.equals(selectedIcon[0]));
+                cell.setBackgroundColor(on ? 0xFF4A9EFF : 0x33FFFFFF);
+            }
+        };
+        int cellPx = Math.round(56 * d);
+        int cellPad = Math.round(8 * d);
+        // Padrão
+        {
+            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+            android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(cellPx, cellPx);
+            lp.rightMargin = Math.round(8 * d);
+            cell.setLayoutParams(lp);
+            cell.setPadding(cellPad, cellPad, cellPad, cellPad);
+            cell.setTag(null);
+            android.widget.TextView t = new android.widget.TextView(this);
+            t.setText("Padrão");
+            t.setTextColor(0xFFFFFFFF);
+            t.setTextSize(9f);
+            t.setGravity(android.view.Gravity.CENTER);
+            cell.addView(t, new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            cell.setOnClickListener(v -> {
+                selectedIcon[0] = null;
+                refreshIconSel.run();
+            });
+            iconRow.addView(cell);
+            iconCells.add(cell);
+        }
+        for (String[] pair : DockAppOverrides.SUBSTITUTE_ICONS) {
+            final String slug = pair[0];
+            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+            android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(cellPx, cellPx);
+            lp.rightMargin = Math.round(8 * d);
+            cell.setLayoutParams(lp);
+            cell.setPadding(cellPad, cellPad, cellPad, cellPad);
+            cell.setTag(slug);
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            Drawable preview = DockAppOverrides.drawableFor(this, slug, selectedColor[0]);
+            if (preview == null && "gwm".equals(slug)) {
+                try { preview = getDrawable(R.drawable.ic_gwm); } catch (Exception ignored) {}
+            }
+            iv.setImageDrawable(preview);
+            iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            cell.addView(iv, new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            cell.setOnClickListener(v -> {
+                selectedIcon[0] = slug;
+                refreshIconSel.run();
+            });
+            iconRow.addView(cell);
+            iconCells.add(cell);
+        }
+        refreshIconSel.run();
+
+        android.widget.TextView colorLabel = new android.widget.TextView(this);
+        colorLabel.setText("Cor de destaque");
+        colorLabel.setTextColor(0x99FFFFFF);
+        colorLabel.setTextSize(14f);
+        colorLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
+        box.addView(colorLabel);
+
+        android.widget.HorizontalScrollView colorScroll = new android.widget.HorizontalScrollView(this);
+        colorScroll.setHorizontalScrollBarEnabled(false);
+        android.widget.LinearLayout colorRow = new android.widget.LinearLayout(this);
+        colorRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        colorScroll.addView(colorRow);
+        box.addView(colorScroll);
+
+        final java.util.List<View> colorCells = new ArrayList<>();
+        Runnable refreshColorSel = () -> {
+            for (View cell : colorCells) {
+                boolean on = selectedColor[0] != null
+                        && selectedColor[0].equalsIgnoreCase(String.valueOf(cell.getTag()));
+                cell.setAlpha(on ? 1f : 0.55f);
+                if (cell instanceof android.widget.FrameLayout) {
+                    ((android.widget.FrameLayout) cell).setForeground(
+                            on ? new android.graphics.drawable.ColorDrawable(0x66FFFFFF) : null);
+                }
+            }
+        };
+        int swatchPx = Math.round(36 * d);
+        for (String hex : DockAppOverrides.COLORS) {
+            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+            android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(swatchPx, swatchPx);
+            lp.rightMargin = Math.round(8 * d);
+            cell.setLayoutParams(lp);
+            cell.setTag(hex);
+            android.graphics.drawable.GradientDrawable bg =
+                    new android.graphics.drawable.GradientDrawable();
+            bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            bg.setColor(DockAppOverrides.parseColor(hex, 0xFFFFFFFF));
+            cell.setBackground(bg);
+            cell.setOnClickListener(v -> {
+                selectedColor[0] = hex;
+                refreshColorSel.run();
+                // Refresh tintable previews in the icon row.
+                for (View ic : iconCells) {
+                    Object tag = ic.getTag();
+                    if (!(tag instanceof String)) continue;
+                    if (!(ic instanceof android.widget.FrameLayout)) continue;
+                    android.widget.FrameLayout fl = (android.widget.FrameLayout) ic;
+                    if (fl.getChildCount() == 0) continue;
+                    View child = fl.getChildAt(0);
+                    if (!(child instanceof android.widget.ImageView)) continue;
+                    ((android.widget.ImageView) child).setImageDrawable(
+                            DockAppOverrides.drawableFor(this, (String) tag, selectedColor[0]));
+                }
+            });
+            colorRow.addView(cell);
+            colorCells.add(cell);
+        }
+        refreshColorSel.run();
+
+        android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
+        actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        actions.setPadding(0, Math.round(14 * d), 0, 0);
+        box.addView(actions);
+
+        android.widget.TextView reset = makeDockMenuRow("Reset", () -> {
+            if (dockAppOverrides != null) {
+                dockAppOverrides.clear(pkg);
+                dockAppOverrides.save(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
+            }
+            dismissDockCustomizeSheet();
+            rebindDockPackage(pkg);
+        });
+        actions.addView(reset);
+
+        android.widget.TextView save = makeDockMenuRow("Save", () -> {
+            if (dockAppOverrides == null) {
+                dockAppOverrides = new DockAppOverrides(null);
+            }
+            String name = nameField.getText() != null ? nameField.getText().toString() : "";
+            dockAppOverrides.put(pkg, name, selectedIcon[0], selectedColor[0]);
+            dockAppOverrides.save(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
+            dismissDockCustomizeSheet();
+            rebindDockPackage(pkg);
+        });
+        actions.addView(save);
+
+        int maxW = Math.round(480 * d);
+        android.widget.PopupWindow popup = new android.widget.PopupWindow(
+                scroll, maxW, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
+        popup.setFocusable(true);
+        popup.setOnDismissListener(() -> {
+            if (dockCustomizeSheet == popup) dockCustomizeSheet = null;
+        });
+        dockCustomizeSheet = popup;
+        scroll.measure(
+                View.MeasureSpec.makeMeasureSpec(maxW, View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.UNSPECIFIED);
+        int yOff = -(Math.min(scroll.getMeasuredHeight(), Math.round(520 * d))
+                + anchor.getHeight() + Math.round(8 * d));
+        popup.showAsDropDown(anchor, 0, yOff);
+    }
+
+    /** Re-apply icon/label after a customize save (hub or a scroll-row package). */
+    private void rebindDockPackage(String pkg) {
+        if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
+            bindGwmHub();
+            updatePinnedVisibility();
+            return;
+        }
+        MotionTrailLayout row = dockItemsByPackage.get(pkg);
+        if (row != null) {
+            PackageManager pm = getPackageManager();
+            Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
+            mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+            ResolveInfo info = null;
+            List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
+            if (apps != null) {
+                for (ResolveInfo ri : apps) {
+                    if (ri != null && ri.activityInfo != null
+                            && pkg.equals(ri.activityInfo.packageName)) {
+                        info = ri;
+                        break;
+                    }
+                }
+            }
+            String label = info != null ? launcherLabel(pm, info) : pinnedLabel(pkg, pm, null);
+            Drawable icon = info != null ? iconForLauncherApp(pm, info) : launcherIconForPackage(pkg);
+            final String targetPkg = pkg;
+            final String targetLabel = label;
+            bindDockItem(row, icon, label,
+                    v -> launchAppForPackage(targetPkg, targetLabel), targetPkg);
+            if (isUserHidden(pkg)) row.setVisibility(View.GONE);
+        }
+        // Recents may show the same package.
+        refreshRecentSlots();
     }
 
     /**
@@ -10198,7 +10763,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView title = new android.widget.TextView(this);
         title.setText("Hidden apps");
         title.setTextColor(0x99FFFFFF);
-        title.setTextSize(11f);
+        title.setTextSize(14f);
         title.setPadding(Math.round(6 * d), 0, Math.round(6 * d), Math.round(6 * d));
         box.addView(title);
 
@@ -10206,7 +10771,7 @@ public final class MainActivity extends Activity {
         // is a HashSet).
         List<String> pkgs = new ArrayList<>(hiddenPackages);
         java.util.Collections.sort(pkgs);
-        int iconPx = Math.round(28 * d);
+        int iconPx = Math.round(36 * d);
         for (String hidden : pkgs) {
             final String target = hidden;
             ResolveInfo info = byPkg.get(hidden);
@@ -10216,7 +10781,8 @@ public final class MainActivity extends Activity {
             android.widget.LinearLayout row = new android.widget.LinearLayout(this);
             row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
             row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            row.setPadding(Math.round(6 * d), Math.round(8 * d), Math.round(6 * d), Math.round(8 * d));
+            row.setPadding(Math.round(8 * d), Math.round(12 * d), Math.round(8 * d), Math.round(12 * d));
+            row.setMinimumHeight(Math.round(52 * d));
             row.setClickable(true);
             row.setFocusable(true);
 
@@ -10235,7 +10801,7 @@ public final class MainActivity extends Activity {
             android.widget.TextView tv = new android.widget.TextView(this);
             tv.setText(label);
             tv.setTextColor(0xFFFFFFFF);
-            tv.setTextSize(13f);
+            tv.setTextSize(16f);
             tv.setSingleLine(true);
             tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
             tv.setMaxWidth(Math.round(240 * d));
@@ -10292,27 +10858,26 @@ public final class MainActivity extends Activity {
         Log.w(TAG, "Launcher unhidden " + pkg);
     }
 
-    /** Pinned slots follow the hide list; the trailing gap follows the slots. */
+    /** Hub follows the hide list; gap follows the hub. */
     private void updatePinnedVisibility() {
-        int pinnedVisible = 0;
+        boolean anyVisible = false;
         for (int i = 0; i < PINNED_PACKAGES.length; i++) {
-            if (pinnedItems[i] == null) continue;
-            if (isUserHidden(PINNED_PACKAGES[i])) {
-                pinnedItems[i].setVisibility(View.GONE);
-                continue;
-            }
-            // Never revive a slot with no app behind it.
             if (!pinnedBound[i]) continue;
-            pinnedItems[i].setVisibility(View.VISIBLE);
-            if (launcherRevealed) {
-                pinnedItems[i].setAlpha(1f);
-                pinnedItems[i].setTranslationX(0f);
-                pinnedItems[i].setTrailPx(0f);
-            }
-            pinnedVisible++;
+            if (isUserHidden(PINNED_PACKAGES[i])) continue;
+            anyVisible = true;
+            break;
         }
-        if (pinnedGap != null) {
-            pinnedGap.setVisibility(pinnedVisible > 0 ? View.VISIBLE : View.GONE);
+        if (gwmHubItem != null) {
+            if (anyVisible) {
+                gwmHubItem.setVisibility(View.VISIBLE);
+                if (launcherRevealed) {
+                    gwmHubItem.setAlpha(1f);
+                    gwmHubItem.setTranslationX(0f);
+                    gwmHubItem.setTrailPx(0f);
+                }
+            } else {
+                gwmHubItem.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -10321,8 +10886,10 @@ public final class MainActivity extends Activity {
         android.widget.TextView row = new android.widget.TextView(this);
         row.setText(title);
         row.setTextColor(0xFFFFFFFF);
-        row.setTextSize(13f);
-        row.setPadding(Math.round(6 * d), Math.round(8 * d), Math.round(6 * d), Math.round(8 * d));
+        row.setTextSize(16f);
+        row.setMinHeight(Math.round(48 * d));
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(Math.round(10 * d), Math.round(12 * d), Math.round(10 * d), Math.round(12 * d));
         row.setClickable(true);
         row.setFocusable(true);
         row.setOnClickListener(v -> action.run());
@@ -10351,12 +10918,8 @@ public final class MainActivity extends Activity {
                 }
             }
             for (int i = 0; i < PINNED_PACKAGES.length; i++) {
-                if (!PINNED_PACKAGES[i].equals(pkg) || pinnedItems[i] == null) continue;
+                if (!PINNED_PACKAGES[i].equals(pkg)) continue;
                 pinnedBound[i] = false;
-                pinnedItems[i].setOnClickListener(null);
-                pinnedItems[i].setClickable(false);
-                pinnedItems[i].setOnLongClickListener(null);
-                pinnedItems[i].setVisibility(View.GONE);
             }
             // Also drop it from the hide list so it stops haunting the unhide picker.
             if (hiddenPackages.remove(pkg)) saveHiddenApps();
@@ -10665,7 +11228,14 @@ public final class MainActivity extends Activity {
         webView.onResume();
         enterImmersiveMode();
         mediaNowPlaying.start();
+        // Permission may have been granted via adb while we were paused; retry.
+        mainHandler.removeCallbacks(mediaVizPoll);
+        mainHandler.post(mediaVizPoll);
         notifyViewerShellLayout();
+        if (desktopHitWanted) {
+            DesktopSwitcherHitService.applyFromViewer(this,
+                    desktopHitX, desktopHitY, desktopHitW, desktopHitH, true);
+        }
         keepOverlayTasksOnTop();
         syncOverlaySlots(false);
         mainHandler.postDelayed(() -> syncOverlaySlots(true), 500);
@@ -10679,6 +11249,7 @@ public final class MainActivity extends Activity {
         // Freeform on top keeps our window visible. A fullscreen app covering
         // the MMI hides it — that's when we close both slots.
         if (decor != null && decor.getWindowVisibility() == View.VISIBLE) return;
+        DesktopSwitcherHitService.applyFromViewer(this, 0, 0, 0, 0, false);
         dismissAllOverlays();
     }
 
@@ -10686,6 +11257,11 @@ public final class MainActivity extends Activity {
     protected void onDestroy() {
         stopOverlayWatchdog();
         unregisterOverlayTaskListener();
+        if (mediaAudioViz != null) {
+            mediaAudioViz.release();
+            mediaAudioViz = null;
+        }
+        mainHandler.removeCallbacks(mediaVizPoll);
         mediaNowPlaying.stop();
         dismissDockEditMenu();
         if (projectionPresence != null) projectionPresence.stop();
@@ -10693,6 +11269,7 @@ public final class MainActivity extends Activity {
         if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
         if (raiseOverlayRunnable != null) mainHandler.removeCallbacks(raiseOverlayRunnable);
         dismissAppsFabOverlay();
+        DesktopSwitcherHitService.applyFromViewer(this, 0, 0, 0, 0, false);
         try {
             unregisterReceiver(telemetryReceiver);
         } catch (Exception ignored) {}

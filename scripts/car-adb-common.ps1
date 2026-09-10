@@ -3,6 +3,7 @@
 $CarPackage = 'com.havalh6.viewer'
 $CarActivity = 'com.havalh6.viewer/.MainActivity'
 $CarMediaListener = 'com.havalh6.viewer/com.havalh6.viewer.MediaNotificationListener'
+$CarHitAccessibility = 'com.havalh6.viewer/com.havalh6.viewer.DesktopSwitcherHitService'
 $CarSubnets = @('192.168.33', '192.168.1')
 $CarRoot = Split-Path -Parent $PSScriptRoot
 $CarHintFile = Join-Path $CarRoot '.car-adb-serial'
@@ -99,6 +100,36 @@ function Grant-CarMediaAccess([string]$Adb, [string]$Serial) {
     Write-Host 'Notification listener granted.'
   } else {
     Write-Warning "Could not grant $CarMediaListener - the media rail will show ENABLE MEDIA ACCESS."
+  }
+}
+
+# Desktop switcher sits inside the MMI StatusBar (y=0..60). A normal overlay
+# cannot steal those taps (StatusBar layer 211000). TYPE_ACCESSIBILITY_OVERLAY
+# can; this grant is what connects DesktopSwitcherHitService. Append, never
+# replace — Impulse's accessibility service is already on this list.
+function Grant-CarHitAccessibility([string]$Adb, [string]$Serial) {
+  $callerEap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $current = (& $Adb -s $Serial shell settings get secure enabled_accessibility_services 2>&1 | Out-String).Trim()
+  $ErrorActionPreference = $callerEap
+  if ($current -match [regex]::Escape($CarHitAccessibility)) {
+    Write-Host 'Desktop switcher hit accessibility already granted.'
+    return
+  }
+  Write-Host 'Granting accessibility overlay for desktop switcher taps ...'
+  $next = $CarHitAccessibility
+  if ($current -and $current -ne 'null' -and $current -ne '') {
+    $next = "$($current):$CarHitAccessibility"
+  }
+  $ErrorActionPreference = 'Continue'
+  $null = & $Adb -s $Serial shell settings put secure enabled_accessibility_services $next 2>&1
+  $null = & $Adb -s $Serial shell settings put secure accessibility_enabled 1 2>&1
+  $after = (& $Adb -s $Serial shell settings get secure enabled_accessibility_services 2>&1 | Out-String).Trim()
+  $ErrorActionPreference = $callerEap
+  if ($after -match [regex]::Escape($CarHitAccessibility)) {
+    Write-Host 'Desktop switcher hit accessibility granted.'
+  } else {
+    Write-Warning "Could not grant $CarHitAccessibility - status-bar desktop switcher taps will miss."
   }
 }
 
