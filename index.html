@@ -3728,14 +3728,15 @@ window.HavalSplash = (function () {
       will-change: transform, opacity;
     }
     .hv-hs.on, .hv-xr.on { opacity: 1; visibility: visible; }
+    .hv-hs.open { z-index: 30; }
     /* Anchored on the far side of the car: still placed, clearly secondary. */
     .hv-hs.on.far { opacity: .26; }
     .hv-xr.on.far { opacity: .34; }
 
     .hv-hs-dot {
       position: absolute;
-      left: -11px; top: -11px;
-      width: 22px; height: 22px;
+      left: -17px; top: -17px;
+      width: 34px; height: 34px;
       padding: 0;
       border-radius: 50%;
       border: 1px solid var(--hv-widget-border, rgba(255,255,255,.28));
@@ -3750,12 +3751,31 @@ window.HavalSplash = (function () {
       transition: background .15s ease, border-color .15s ease, color .15s ease;
       font-size: 0;
     }
-    .hv-hs-dot::before {
-      content: '';
-      width: 7px; height: 7px;
-      border-radius: 50%;
+    /* MDI automotive glyphs (mask) — same trick as .hv-xray-icon. */
+    .hv-hs-icon {
+      display: block;
+      width: 17px;
+      height: 17px;
       background: currentColor;
-      opacity: .82;
+      opacity: .9;
+      -webkit-mask: center / contain no-repeat;
+      mask: center / contain no-repeat;
+    }
+    .hv-hs-icon-roof {
+      -webkit-mask-image: url('assets/icons/hs-roof.svg');
+      mask-image: url('assets/icons/hs-roof.svg');
+    }
+    .hv-hs-icon-windows {
+      -webkit-mask-image: url('assets/icons/hs-windows.svg');
+      mask-image: url('assets/icons/hs-windows.svg');
+    }
+    .hv-hs-icon-mirrors {
+      -webkit-mask-image: url('assets/icons/hs-mirrors.svg');
+      mask-image: url('assets/icons/hs-mirrors.svg');
+    }
+    .hv-hs-icon-trunk {
+      -webkit-mask-image: url('assets/icons/hs-trunk.svg');
+      mask-image: url('assets/icons/hs-trunk.svg');
     }
     .hv-hs-dot:active { transform: scale(.92); }
     /* The thing this bullet controls is currently open / active. */
@@ -3846,14 +3866,14 @@ window.HavalSplash = (function () {
 
     .hv-hs-menu {
       position: absolute;
-      left: 19px; top: -14px;
+      left: 24px; top: -14px;
       display: none;
       flex-direction: column;
       align-items: flex-start;
       gap: 4px;
       pointer-events: none;
     }
-    .hv-hs.flip .hv-hs-menu { left: auto; right: 19px; align-items: flex-end; }
+    .hv-hs.flip .hv-hs-menu { left: auto; right: 24px; align-items: flex-end; }
     .hv-hs.open .hv-hs-menu { display: flex; pointer-events: auto; }
     .hv-hs-menu button {
       font-family: 'Space Mono', monospace;
@@ -3875,6 +3895,260 @@ window.HavalSplash = (function () {
       background: var(--hv-widget-bg, rgba(16,21,28,.42));
       color: var(--hv-widget-fg, #eaf2f8);
     }
+
+    /* Shared frosted quick menus (roof / windows / trunk hotspot popups).
+       Hang just off the dot, vertically centred on it — outward flip (JS) keeps
+       them off the body while the layer z-index keeps them above widgets. */
+    .hv-hs-menu.hv-hs-quick-menu {
+      top: 0;
+      transform: translateY(-50%);
+      gap: 8px;
+      padding: 10px;
+      border-radius: 16px;
+      border: 1px solid var(--hv-widget-border, rgba(255,255,255,.14));
+      background: rgba(10,14,20,.94);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: var(--hv-widget-shadow, 0 8px 24px rgba(0,0,0,.28));
+      align-items: stretch;
+      z-index: 2;
+    }
+    #hv-root.hv-widgets-light .hv-hs-menu.hv-hs-quick-menu {
+      background: rgba(252,253,255,.97);
+      border-color: rgba(20,28,40,.16);
+    }
+    .hv-hs.flip .hv-hs-menu.hv-hs-quick-menu { align-items: stretch; }
+
+    /* Roof hotspot: fat-thumb horizontal sliders with open/close toggle.
+       Class names are deliberately distinct from .hv-hs-roof-range / .hv-hs-roof-rail
+       in the full VEHICLE STATUS popup (those hide the native thumb at opacity .01). */
+    .hv-hs-menu.hv-hs-roof-menu { width: 310px; }
+    .hv-hs-roof-row {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .hv-hs-roof-toggle {
+      width: 58px;
+      min-height: 44px;
+      padding: 0 4px;
+      border-radius: 12px;
+      border: 1px solid var(--hv-widget-border, rgba(255,255,255,.16));
+      background: rgba(255,255,255,.07);
+      color: var(--hv-widget-fg, #eaf2f8);
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .08em;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .hv-hs-roof-toggle.open-action {
+      border-color: rgba(99,217,231,.45);
+      color: var(--hv-accent, #2aa7b7);
+    }
+    .hv-hs-roof-toggle:active { transform: scale(.96); }
+    .hv-hs-roof-slide {
+      position: relative;
+      min-width: 0;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      column-gap: 8px;
+      row-gap: 4px;
+      align-items: center;
+      --level: 0%;
+    }
+    .hv-hs-roof-slide-name {
+      grid-column: 1;
+      font-family: 'Space Mono', monospace;
+      font-size: 7px;
+      letter-spacing: .12em;
+      color: var(--hv-widget-muted, rgba(234,242,248,.55));
+    }
+    .hv-hs-roof-slide-pct {
+      grid-column: 2;
+      grid-row: 1;
+      font: 600 13px/1 'Space Grotesk', sans-serif;
+      color: var(--hv-widget-fg, #eaf2f8);
+      font-variant-numeric: tabular-nums;
+      min-width: 36px;
+      text-align: right;
+    }
+    .hv-hs-roof-track {
+      position: relative;
+      grid-column: 1 / 3;
+      width: 100%;
+      height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.28);
+      box-sizing: border-box;
+      touch-action: none;
+      overflow: hidden;
+    }
+    #hv-root.hv-widgets-light .hv-hs-roof-track {
+      border-color: rgba(20,28,40,.18);
+      background: rgba(20,28,40,.10);
+    }
+    .hv-hs-roof-track-fill {
+      position: absolute;
+      left: 8px; top: 50%;
+      width: calc((100% - 16px - 32px) * var(--level-num, 0) + 32px);
+      max-width: calc(100% - 16px);
+      height: 6px;
+      margin-top: -3px;
+      border-radius: 999px;
+      background: var(--hv-accent, #2aa7b7);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .hv-hs-roof-track-well {
+      position: absolute;
+      left: 8px; right: 8px; top: 50%;
+      height: 6px;
+      margin-top: -3px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.18);
+      pointer-events: none;
+      z-index: 0;
+    }
+    #hv-root.hv-widgets-light .hv-hs-roof-track-well {
+      background: rgba(20,28,40,.16);
+    }
+    .hv-hs-roof-vent-mark {
+      position: absolute;
+      left: calc(8px + (100% - 16px - 32px) * 0.25 + 16px);
+      top: 50%;
+      width: 2px;
+      height: 16px;
+      margin: -8px 0 0 -1px;
+      border-radius: 1px;
+      background: rgba(255,255,255,.65);
+      pointer-events: none;
+      z-index: 2;
+    }
+    #hv-root.hv-widgets-light .hv-hs-roof-vent-mark {
+      background: rgba(20,28,40,.45);
+    }
+    .hv-hs-roof-knob {
+      position: absolute;
+      left: calc(8px + (100% - 16px - 32px) * var(--level-num, 0));
+      top: 50%;
+      width: 32px;
+      height: 32px;
+      margin-top: -16px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,.92);
+      background: linear-gradient(180deg, #ffffff 0%, #d7e0e7 100%);
+      box-shadow: 0 2px 10px rgba(0,0,0,.40), inset 0 1px 0 rgba(255,255,255,.9);
+      pointer-events: none;
+      z-index: 3;
+    }
+    #hv-root.hv-widgets-light .hv-hs-roof-knob {
+      border-color: rgba(20,28,40,.35);
+      background: linear-gradient(180deg, #ffffff 0%, #e8eef3 100%);
+      box-shadow: 0 2px 8px rgba(20,28,40,.28), inset 0 1px 0 #fff;
+    }
+    .hv-hs-roof-quick-range {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      opacity: 0;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+      outline: none;
+      cursor: pointer;
+      touch-action: none;
+    }
+    .hv-hs-roof-quick-range::-webkit-slider-runnable-track,
+    .hv-hs-roof-quick-range::-webkit-slider-thumb,
+    .hv-hs-roof-quick-range::-moz-range-track,
+    .hv-hs-roof-quick-range::-moz-range-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: 0;
+    }
+
+    .hv-hs-menu.hv-hs-windows-menu { width: 228px; }
+    .hv-hs-windows-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .hv-hs-windows-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-height: 54px;
+      padding: 8px 6px;
+      border-radius: 12px;
+      border: 1px solid var(--hv-widget-border, rgba(255,255,255,.16));
+      background: rgba(255,255,255,.07);
+      color: var(--hv-widget-fg, #eaf2f8);
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      white-space: normal;
+      letter-spacing: .06em;
+    }
+    .hv-hs-windows-btn strong {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: .10em;
+    }
+    .hv-hs-windows-btn span {
+      font: 600 11px/1 'Space Grotesk', sans-serif;
+      letter-spacing: .02em;
+      opacity: .78;
+    }
+    .hv-hs-windows-btn.open {
+      border-color: rgba(99,217,231,.45);
+      color: var(--hv-accent, #2aa7b7);
+    }
+    .hv-hs-windows-btn.open span { opacity: 1; }
+    .hv-hs-windows-btn:active { transform: scale(.96); }
+
+    .hv-hs-menu.hv-hs-trunk-menu,
+    .hv-hs-menu.hv-hs-mirrors-menu { width: auto; min-width: 132px; }
+    .hv-hs-trunk-toggle,
+    .hv-hs-mirrors-toggle {
+      min-height: 56px;
+      min-width: 132px;
+      padding: 0 16px;
+      border-radius: 14px;
+      border: 1px solid var(--hv-widget-border, rgba(255,255,255,.16));
+      background: rgba(255,255,255,.07);
+      color: var(--hv-widget-fg, #eaf2f8);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      letter-spacing: .12em;
+      font-weight: 700;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      cursor: pointer;
+    }
+    .hv-hs-trunk-toggle.open-action,
+    .hv-hs-mirrors-toggle.open-action {
+      border-color: rgba(99,217,231,.45);
+      color: var(--hv-accent, #2aa7b7);
+    }
+    .hv-hs-trunk-toggle:active,
+    .hv-hs-mirrors-toggle:active { transform: scale(.96); }
 
     /* Roof control surface — CoffeeOS-style top view with independent rails. */
     .hv-hs-roof-pop {
@@ -4315,18 +4589,19 @@ window.HavalSplash = (function () {
     .hv-desktop-switcher {
       position: absolute;
       z-index: 74;
-      /* Thin always-on strip above the boards. Auto-hide drops only the frost
-         pill — arrows, name and dots stay — so idle colour must contrast the
-         scene (inline labelColor), not the frost fill. */
-      top: max(2px, calc(var(--hv-safe-top, 22px) - 10px));
-      left: 50%;
+      /* Always-on strip over the Android status bar, anchored at ~1/3 width
+         so it sits in the header band rather than over widget boards. Auto-hide
+         drops only the frost pill — arrows, name and dots stay — so idle
+         colour must contrast the scene (inline labelColor), not the frost fill. */
+      top: max(0px, calc((var(--hv-safe-top, 28px) - 34px) / 2));
+      left: 33.333%;
       transform: translateX(-50%);
-      height: 22px;
-      padding: 0 2px;
+      height: 34px;
+      padding: 0;
       align-items: center;
-      gap: 1px;
+      gap: 2px;
       border: 1px solid transparent;
-      border-radius: 11px;
+      border-radius: 14px;
       background: transparent !important;
       background-image: none !important;
       box-shadow: none !important;
@@ -4334,6 +4609,7 @@ window.HavalSplash = (function () {
       backdrop-filter: none;
       color: var(--hv-widget-fg, #edf5fa);
       user-select: none;
+      touch-action: pan-y;
       transition: background-color .22s ease, background-image .22s ease, border-color .22s ease, box-shadow .22s ease, color .28s ease, -webkit-backdrop-filter .22s ease, backdrop-filter .22s ease;
     }
     .hv-desktop-switcher.expanded {
@@ -4346,27 +4622,48 @@ window.HavalSplash = (function () {
       color: var(--hv-widget-fg, #edf5fa);
     }
     .hv-desktop-switcher button { color: inherit; border: 0; background: transparent; cursor: pointer; }
+    /* Wide side hit pads — easy to tap on a 1920 panel without hunting the
+       chevron. Outer ends stay pill-rounded; inner edges are square so the
+       pair reads as one segmented control around the name/dots. */
     .hv-desktop-arrow {
-      width: 22px; height: 22px; border-radius: 8px !important;
+      position: relative;
+      width: 132px; height: 34px; border-radius: 0 !important;
+      flex: 0 0 auto;
       display: flex; align-items: center; justify-content: center;
-      font: 300 15px/1 system-ui;
-      /* Optical mid — glyph sits slightly high in the em box. */
+      font: 300 22px/1 system-ui;
       padding-top: 1px;
+      background: rgba(128,140,155,.04) !important;
+      transition: background .15s ease, transform .12s ease;
     }
-    .hv-desktop-arrow:active { background: rgba(255,255,255,.09) !important; transform: scale(.94); }
+    .hv-desktop-switcher > .hv-desktop-arrow:first-child {
+      border-radius: 12px 0 0 12px !important;
+    }
+    .hv-desktop-switcher > .hv-desktop-arrow:last-child {
+      border-radius: 0 12px 12px 0 !important;
+    }
+    .hv-desktop-switcher.scene-night .hv-desktop-arrow {
+      background: rgba(255,255,255,.03) !important;
+    }
+    .hv-desktop-switcher.scene-day .hv-desktop-arrow {
+      background: rgba(20,28,36,.03) !important;
+    }
+    .hv-desktop-switcher.expanded .hv-desktop-arrow {
+      background: rgba(255,255,255,.04) !important;
+    }
+    .hv-desktop-arrow:active { background: rgba(255,255,255,.10) !important; transform: scale(.97); }
     .hv-desktop-current {
-      min-width: 88px; height: 22px; padding: 0 6px;
-      display: flex; align-items: center; justify-content: center; gap: 5px;
+      min-width: 120px; height: 34px; padding: 0 8px;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
     }
     .hv-desktop-name {
-      max-width: 82px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      font-weight: 650; font-size: 11px; line-height: 1; letter-spacing: .015em;
+      max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-weight: 650; font-size: 15px; line-height: 1; letter-spacing: .015em;
     }
-    .hv-desktop-count { font: 7px/1 'Space Mono', monospace; opacity: .52; display: block; }
-    .hv-desktop-dots { display: flex; align-items: center; justify-content: center; height: 22px; gap: 0; }
-    .hv-desktop-dot { position: relative; width: 14px; height: 22px; padding: 0; }
-    .hv-desktop-dot::after { content: ''; position: absolute; width: 4px; height: 4px; border-radius: 5px; background: currentColor; opacity: .28; left: 50%; top: 50%; transform: translate(-50%,-50%); transition: width .2s ease, opacity .2s ease, background .2s ease; }
-    .hv-desktop-dot.on::after { width: 13px; opacity: 1; background: var(--hv-accent); }
+    .hv-desktop-count { font: 10px/1 'Space Mono', monospace; opacity: .52; display: block; }
+    .hv-desktop-dots { display: flex; align-items: center; justify-content: center; height: 34px; gap: 0; }
+    .hv-desktop-dot { position: relative; width: 18px; height: 34px; padding: 0; }
+    .hv-desktop-dot::after { content: ''; position: absolute; width: 6px; height: 6px; border-radius: 6px; background: currentColor; opacity: .28; left: 50%; top: 50%; transform: translate(-50%,-50%); transition: width .2s ease, opacity .2s ease, background .2s ease; }
+    .hv-desktop-dot.on::after { width: 18px; opacity: 1; background: var(--hv-accent); }
     /* Idle (no frost): soft shadow keeps glyphs readable on mixed wallpapers.
        Shadow polarity follows scene day/night, same as the idle text colour. */
     .hv-desktop-switcher.scene-night:not(.expanded) .hv-desktop-name,
@@ -5160,7 +5457,7 @@ window.HavalSplash = (function () {
     </div>
   </div>
 
-  <div class="hv-desktop-switcher {{ desktopSwitcherClass }}" style="display: {{ desktopSwitcherDisplay }}; {{ desktopSwitcherStyle }}" role="navigation" aria-label="Virtual desktops">
+  <div class="hv-desktop-switcher {{ desktopSwitcherClass }}" style="display: {{ desktopSwitcherDisplay }}; {{ desktopSwitcherStyle }}" role="navigation" aria-label="Virtual desktops" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}" onMouseDown="{{ desktopSwipeStart }}" onMouseMove="{{ desktopSwipeMove }}" onMouseUp="{{ desktopSwipeEnd }}" onMouseLeave="{{ desktopSwipeCancel }}">
     <button type="button" class="hv-desktop-arrow" onClick="{{ previousDesktop }}" aria-label="Previous desktop" title="Previous desktop · Ctrl+Left">‹</button>
     <button type="button" class="hv-desktop-current" onClick="{{ openDesktopStudio }}" aria-label="Open Desktop Studio">
       <span class="hv-desktop-name">{{ desktopName }}</span>
@@ -6676,17 +6973,15 @@ const CAR_SIGNALS = {
     'car.basic.tpms_warning',
     'car.ipk_light.tpms_warning',
   ],
-  // Per-window state vector, {fl,fr,rl,rr}. Present on the bus all along; the
-  // OEM-APK audit concluded it was not and the viewer never subscribed it.
-  //
-  // Polarity CONFIRMED on the car by lowering the driver's window and raising it
-  // again: all shut is {1,1,1,1} and driver-down is {0,1,1,1}. So 1 = CLOSED and
-  // 0 = open -- the inverse of door_status, where 0 is shut. Slot order matches
-  // door_status (slot 0 = front left). Anything other than 0 or 1 is a state we
-  // have not observed and leaves the glass where it is, the same way
-  // _applyCarDoors treats a negative door slot: a travel state must not be
-  // guessed at.
+  // Per-window state vector, {fl,fr,rl,rr}. Measured on the car 2026-09-09:
+  //   0 = moving (transient)   1 = closed   2 = fully open   3 = partial
+  // Slot 0 is the driver. Older comments claiming 0=open / 1=closed were wrong
+  // — they sampled mid-travel and discarded every real open frame (2).
   windows: 'car.basic.window_status',
+  // Outside mirror fold. Voice adapter setRearViewMirrorFoldState writes this
+  // key; Impulse treats "0" as folded (close-windows-on-fold). 0 = folded,
+  // 1 = unfolded — confirm on the car before treating as settled.
+  mirrorsFold: 'car.drive.setting.outside_view_mirror_fold_state',
   doorLock: 'car.basic.door_lock_status',
   cycleEv: 'car.ev_info.cycle_energy_consume_info',
   cycleFuel: 'car.ev_info.cycle_fuel_consume_info',
@@ -7500,6 +7795,7 @@ class Component extends DCLogic {
     carHeightOffset: 0,
     sunroofOpen: 0,
     curtainOpen: 0,
+    hotspotsChrome: false,
     motionActive: false,
     dayBg: '#efefef',
     nightBg: '#060606',
@@ -7529,6 +7825,7 @@ class Component extends DCLogic {
     doorRROpen: 0,
     trunkOpen: 0,
     windowsOpen: 0,
+    mirrorsFolded: 0,
     mediaColumnVisible: false,
     mediaRight: false,
     mediaLeftOpen: false,
@@ -7622,6 +7919,10 @@ class Component extends DCLogic {
     this._doorTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
     this._trunkProgress = 0;
     this._trunkTarget = 0;
+    this._mirrorsProgress = 0;
+    this._mirrorsTarget = 0;
+    this._windowCornerProgress = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    this._windowCornerTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
     this._sunroofProgress = 0;
     this._sunroofTarget = 0;
     this._curtainProgress = 0;
@@ -8130,7 +8431,7 @@ class Component extends DCLogic {
             CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange, CAR_SIGNALS.cycleEv,
             CAR_SIGNALS.fuelLevel,
             CAR_SIGNALS.tireStatus, CAR_SIGNALS.tireUnits,
-            CAR_SIGNALS.windows, CAR_SIGNALS.doorLock,
+            CAR_SIGNALS.windows, CAR_SIGNALS.mirrorsFold, CAR_SIGNALS.doorLock,
             CAR_SIGNALS.cycleFuel, CAR_SIGNALS.powerFlow,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
@@ -8245,6 +8546,7 @@ class Component extends DCLogic {
     if (key === CAR_SIGNALS.night) return;
     if (key === CAR_SIGNALS.doors)  { this._applyCarDoors(value); return; }
     if (key === CAR_SIGNALS.windows) { this._applyCarWindows(value); return; }
+    if (key === CAR_SIGNALS.mirrorsFold) { this._applyCarMirrorsFold(value); return; }
     if (key === CAR_SIGNALS.speed)  { this._applyCarSpeed(value); return; }
     if (key === CAR_SIGNALS.sunroof) { this._applyCarSunroof(value); return; }
     if (key === CAR_SIGNALS.curtain) { this._applyCarOpening('_setCurtainOpen', value, CAR_SUNSHADE_MAX); return; }
@@ -10750,15 +11052,9 @@ class Component extends DCLogic {
    * uses. Anything else is left alone rather than slamming every door shut.
    */
   /**
-   * `car.basic.window_status` -- `{fl,fr,rl,rr}`, 1 = closed, 0 = open. See the
-   * CAR_SIGNALS entry for how that polarity was pinned on the car.
-   *
-   * The rig animates all four windows together off a single `windowsOpen`
-   * percentage, so this reports the glass as open when ANY corner is down.
-   * Per-corner state is deliberately not synthesised into a percentage: the
-   * signal is a state, not a travel position, and a "25% open" invented from one
-   * corner being down would be a plausible-looking number the vehicle never
-   * said.
+   * `car.basic.window_status` — `{fl,fr,rl,rr}` with measured values
+   * 0=moving, 1=closed, 2=open, 3=partial. Mid-travel (0) is left alone so a
+   * frame straddling motion cannot thrash the glass.
    */
   _applyCarWindows(value) {
     const raw = String(value == null ? '' : value).trim();
@@ -10768,17 +11064,49 @@ class Component extends DCLogic {
       if (this._carTrace) console.warn('[CarSignal] window_status unparsed:', value);
       return;
     }
-    // Only 0 and 1 are understood. A slot carrying anything else is a state we
-    // have not observed, so the whole frame is left alone rather than half read.
-    if (slots.some((n) => n !== 0 && n !== 1)) {
-      if (this._carTrace) console.warn('[CarSignal] window_status unknown state:', value);
+    const corners = ['fl', 'fr', 'rl', 'rr'];
+    const prev = this._carWindowStates || {};
+    const states = {};
+    let understood = 0;
+    corners.forEach((corner, i) => {
+      const n = slots[i];
+      if (n === 0) {
+        // Moving — keep last known for this corner.
+        states[corner] = prev[corner] || 'closed';
+        return;
+      }
+      if (n === 1) { states[corner] = 'closed'; understood++; return; }
+      if (n === 2) { states[corner] = 'open'; understood++; return; }
+      if (n === 3) { states[corner] = 'partial'; understood++; return; }
+      if (this._carTrace) console.warn('[CarSignal] window_status unknown slot', corner, n);
+      states[corner] = prev[corner] || 'closed';
+    });
+    if (!understood) return;
+    this._carWindowStates = states;
+    const menu = {};
+    corners.forEach((c) => { menu[c] = states[c] === 'closed' ? 'closed' : 'open'; });
+    this._hsWindowMenuStates = menu;
+    if (!this._windowCornerTargets) this._windowCornerTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    if (!this._windowCornerProgress) this._windowCornerProgress = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    corners.forEach((c) => {
+      this._windowCornerTargets[c] = states[c] === 'closed' ? 0 : 1;
+    });
+    this._syncWindowsOpenFromCorners();
+    this._syncHotspotWindowsMenu();
+    if (this.requestRender) this.requestRender(4);
+  }
+
+  /**
+   * `car.drive.setting.outside_view_mirror_fold_state` — Impulse treats "0" as
+   * folded. Only 0/1 are accepted; anything else is left alone.
+   */
+  _applyCarMirrorsFold(value) {
+    const n = parseInt(String(value == null ? '' : value).trim(), 10);
+    if (n !== 0 && n !== 1) {
+      if (this._carTrace) console.warn('[CarSignal] mirrors_fold unknown state:', value);
       return;
     }
-    const corners = ['fl', 'fr', 'rl', 'rr'];
-    const states = {};
-    corners.forEach((corner, i) => { states[corner] = slots[i] === 0 ? 'open' : 'closed'; });
-    this._carWindowStates = states;
-    this._setWindowsOpen(slots.some((n) => n === 0) ? 100 : 0);
+    this._setMirrorsFolded(n === 0 ? 100 : 0);
   }
 
   _applyCarDoors(value) {
@@ -12284,8 +12612,10 @@ class Component extends DCLogic {
         this.state.grainEnabled
       );
       this._syncCenterFillIndicator();
+      // Always re-evaluate car visibility — wallpaper-only must hide the model
+      // AND clear any vehicle hotspot dots left from a previous car fill.
+      this._syncCarSceneForShell();
       if (next === 'car' || next === 'mixed') {
-        this._syncCarSceneForShell();
         this._kickShadowRefresh(16);
         if (typeof this.renderContactShadow === 'function') {
           try { this.renderContactShadow(); } catch (e) {}
@@ -12575,21 +12905,68 @@ class Component extends DCLogic {
     });
     console.log('[Haval H6] windows:',
       this._windows.map((w) => w.key + '@' + w.drop.toFixed(3)).join(' ') || 'none');
-    // A variant swap re-runs this, so re-seat whatever the saved state says.
-    this._windowsTarget = (this.state.windowsOpen ?? 0) / 100;
+    // A variant swap re-runs this, so re-seat whatever the saved / menu state says.
+    if (!this._windowCornerTargets) this._windowCornerTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    if (!this._windowCornerProgress) this._windowCornerProgress = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    const fallback = (this.state.windowsOpen ?? 0) / 100;
+    const menu = this._hsWindowMenuStates;
+    ['fl', 'fr', 'rl', 'rr'].forEach((k) => {
+      let t = fallback;
+      if (menu && (menu[k] === 'open' || menu[k] === 'closed')) t = menu[k] === 'open' ? 1 : 0;
+      else if (this._windowCornerTargets[k] !== undefined) t = this._windowCornerTargets[k];
+      this._windowCornerTargets[k] = t;
+      this._windowCornerProgress[k] = t;
+    });
+    this._windowsTarget = Math.max(
+      this._windowCornerTargets.fl, this._windowCornerTargets.fr,
+      this._windowCornerTargets.rl, this._windowCornerTargets.rr);
     this._windowsProgress = this._windowsTarget;
     this._applyWindowsTransform();
   }
 
   _applyWindowsTransform(progress) {
-    const p = progress !== undefined ? progress : (this._windowsProgress || 0);
-    (this._windows || []).forEach((w) => { w.node.position.y = w.y0 - w.drop * p; });
+    const corners = this._windowCornerProgress;
+    (this._windows || []).forEach((w) => {
+      let p;
+      if (progress !== undefined) p = progress;
+      else if (corners && corners[w.key] !== undefined) p = corners[w.key];
+      else p = this._windowsProgress || 0;
+      w.node.position.y = w.y0 - w.drop * p;
+    });
+  }
+
+  _syncWindowsOpenFromCorners() {
+    const t = this._windowCornerTargets || {};
+    const anyOpen = ['fl', 'fr', 'rl', 'rr'].some((k) => (t[k] || 0) > 0.01);
+    this.setState({ windowsOpen: anyOpen ? 100 : 0 });
+    this._windowsTarget = anyOpen ? 1 : 0;
+  }
+
+  /** Drop / raise a single side pane. pct 0 = shut, 100 = open. */
+  _setWindowCornerOpen(key, pct) {
+    if (!['fl', 'fr', 'rl', 'rr'].includes(key)) return;
+    const v = Math.max(0, Math.min(100, Math.round(isFinite(pct) ? Number(pct) : 0)));
+    if (!this._windowCornerTargets) this._windowCornerTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    if (!this._windowCornerProgress) this._windowCornerProgress = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    this._windowCornerTargets[key] = v / 100;
+    const states = this._ensureHsWindowMenuStates();
+    states[key] = v > 2 ? 'open' : 'closed';
+    this._syncWindowsOpenFromCorners();
+    this._syncHotspotWindowsMenu();
+    if (this.requestRender) this.requestRender(4);
   }
 
   _setWindowsOpen(pct) {
     const v = Math.max(0, Math.min(100, pct));
+    const t = v / 100;
+    if (!this._windowCornerTargets) this._windowCornerTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    if (!this._windowCornerProgress) this._windowCornerProgress = { fl: 0, fr: 0, rl: 0, rr: 0 };
+    ['fl', 'fr', 'rl', 'rr'].forEach((k) => { this._windowCornerTargets[k] = t; });
+    const open = v > 2 ? 'open' : 'closed';
+    this._hsWindowMenuStates = { fl: open, fr: open, rl: open, rr: open };
     this.setState({ windowsOpen: v });
-    this._windowsTarget = v / 100;
+    this._windowsTarget = t;
+    this._syncHotspotWindowsMenu();
     if (this.requestRender) this.requestRender(4);
   }
 
@@ -12620,7 +12997,16 @@ class Component extends DCLogic {
   _setTrunkOpen(pct) {
     this.setState({ trunkOpen: pct });
     this._trunkTarget = pct / 100;
+    this._syncHotspotTrunkMenu();
     this._syncEventCamera();
+  }
+
+  _setMirrorsFolded(pct) {
+    const v = Math.max(0, Math.min(100, Math.round(isFinite(pct) ? Number(pct) : 0)));
+    this.setState({ mirrorsFolded: v });
+    this._mirrorsTarget = v / 100;
+    this._syncHotspotMirrorsMenu();
+    if (this.requestRender) this.requestRender(4);
   }
 
   _holdMotionFromUi(which) {
@@ -14321,6 +14707,85 @@ class Component extends DCLogic {
     });
 
     console.log('[Haval H6] Created door hinges:', Object.keys(this._hinges));
+  }
+
+  /**
+   * Side-mirror fold pivots. Housing shells ride the door open via _initDoors;
+   * this re-parents them under a local fold group so they can tuck in without
+   * leaving the door hinge. Progress 0 = open (driving), 1 = folded.
+   */
+  _initMirrors(obj) {
+    if (!obj || !this.THREE) return;
+    const THREE = this.THREE;
+    const meshNames = {
+      // HEV/PHEV BuildingMesh names — marked as the side-mirror cluster in
+      // _initDoors' extraDoorMeshNames comments.
+      fl: ['BuildingMesh-00045', 'BuildingMesh-00075', 'BuildingMesh-00094'],
+      fr: ['BuildingMesh-00031', 'BuildingMesh-00076', 'BuildingMesh-00095'],
+    };
+    this._mirrorFolds = {};
+    ['fl', 'fr'].forEach((side) => {
+      const meshes = [];
+      meshNames[side].forEach((name) => {
+        const m = obj.getObjectByName(name);
+        if (m) meshes.push(m);
+      });
+      if (!meshes.length) {
+        const hinge = this._hinges && this._hinges[side];
+        if (hinge) {
+          hinge.traverse((c) => {
+            if (c.isMesh && /mirror/i.test(c.name || '') && meshes.indexOf(c) < 0) {
+              meshes.push(c);
+            }
+          });
+        }
+      }
+      if (!meshes.length) return;
+
+      const box = new THREE.Box3();
+      meshes.forEach((m) => box.expandByObject(m));
+      if (box.isEmpty()) return;
+
+      const pivotWorld = new THREE.Vector3(
+        (box.min.x + box.max.x) * 0.5,
+        (box.min.y + box.max.y) * 0.5,
+        // Left outer is +Z → inboard is min.z; right is the inverse.
+        side === 'fl' ? box.min.z + 0.008 : box.max.z - 0.008
+      );
+
+      const parent = meshes[0].parent || obj;
+      const fold = new THREE.Group();
+      fold.name = 'MirrorFold_' + side.toUpperCase();
+      parent.add(fold);
+      parent.updateMatrixWorld(true);
+      fold.position.copy(parent.worldToLocal(pivotWorld.clone()));
+      fold.updateMatrixWorld(true);
+      meshes.forEach((m) => fold.attach(m));
+
+      this._mirrorFolds[side] = {
+        group: fold,
+        // Fold toward the body (glass against the door), not forward toward
+        // the nose. Left outer is +Z — positive Y swing tucks it inboard;
+        // right is the opposite.
+        sign: side === 'fl' ? 1 : -1,
+      };
+    });
+
+    this._mirrorsTarget = (this.state && this.state.mirrorsFolded ? this.state.mirrorsFolded : 0) / 100;
+    this._mirrorsProgress = this._mirrorsTarget;
+    this._applyMirrorsTransform();
+    console.log('[Haval H6] Mirror folds:', Object.keys(this._mirrorFolds || {}));
+  }
+
+  _applyMirrorsTransform(progress) {
+    if (!this._mirrorFolds) return;
+    const p = progress !== undefined ? progress : (this._mirrorsProgress || 0);
+    const maxAngle = 1.15; // ~66 deg — enough to sit flat against the door skin
+    Object.keys(this._mirrorFolds).forEach((side) => {
+      const entry = this._mirrorFolds[side];
+      if (!entry || !entry.group) return;
+      entry.group.rotation.y = entry.sign * p * maxAngle;
+    });
   }
 
   _applyDoorsTransform(progress) {
@@ -17403,22 +17868,10 @@ class Component extends DCLogic {
   // ── Car hotspots (tap body → bullets; tap outside → safe zone) ───────────
   _getHotspotDefs() {
     return [
-      { id: 'roof', glyph: '', title: 'Sunroof & curtain',
-        menu: [
-          { label: 'OPEN SUNROOF', cmd: 'open_sunroof' },
-          { label: 'CLOSE SUNROOF', cmd: 'close_sunroof' },
-          { label: 'OPEN CURTAIN', cmd: 'open_curtain' },
-          { label: 'CLOSE CURTAIN', cmd: 'close_curtain' },
-          { label: 'LEVELS…', action: 'roof_levels' },
-        ] },
-      { id: 'windows', glyph: '', title: 'Windows & doors',
-        menu: [
-          { label: 'OPEN WINDOWS', cmd: 'open_windows' },
-          { label: 'CLOSE WINDOWS', cmd: 'close_windows' },
-          { label: 'TOGGLE DOORS', cmd: 'toggle_doors_all' },
-        ] },
-      { id: 'trunk', glyph: '', title: 'Tailgate',
-        menu: [{ label: 'TOGGLE TRUNK', cmd: 'toggle_trunk' }] },
+      { id: 'roof', icon: 'roof', title: 'Sunroof & curtain', ui: 'roof-sliders' },
+      { id: 'windows', icon: 'windows', title: 'Windows', ui: 'windows-toggles' },
+      { id: 'mirrors', icon: 'mirrors', title: 'Mirrors', ui: 'mirrors-toggle' },
+      { id: 'trunk', icon: 'trunk', title: 'Tailgate', ui: 'trunk-toggle' },
     ];
   }
 
@@ -17432,24 +17885,308 @@ class Component extends DCLogic {
     dot.className = 'hv-hs-dot';
     dot.title = def.title;
     dot.setAttribute('aria-label', def.title);
-    if (def.glyph) dot.textContent = def.glyph;
+    const icon = document.createElement('span');
+    icon.className = 'hv-hs-icon hv-hs-icon-' + (def.icon || def.id);
+    icon.setAttribute('aria-hidden', 'true');
+    dot.appendChild(icon);
     const menu = document.createElement('div');
     menu.className = 'hv-hs-menu';
-    def.menu.forEach((item) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = item.label;
-      btn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        this._onHotspotMenuAction(def.id, item);
+    if (def.ui === 'roof-sliders') {
+      menu.classList.add('hv-hs-quick-menu', 'hv-hs-roof-menu');
+      menu.setAttribute('aria-label', def.title);
+      menu.appendChild(this._buildHotspotRoofRow('sunroof', 'ROOF'));
+      menu.appendChild(this._buildHotspotRoofRow('curtain', 'CURTAIN'));
+      this._hsRoofMenu = menu;
+    } else if (def.ui === 'windows-toggles') {
+      menu.classList.add('hv-hs-quick-menu', 'hv-hs-windows-menu');
+      menu.setAttribute('aria-label', def.title);
+      this._buildHotspotWindowsMenu(menu);
+      this._hsWindowsMenu = menu;
+    } else if (def.ui === 'mirrors-toggle') {
+      menu.classList.add('hv-hs-quick-menu', 'hv-hs-mirrors-menu');
+      menu.setAttribute('aria-label', def.title);
+      this._buildHotspotMirrorsMenu(menu);
+      this._hsMirrorsMenu = menu;
+    } else if (def.ui === 'trunk-toggle') {
+      menu.classList.add('hv-hs-quick-menu', 'hv-hs-trunk-menu');
+      menu.setAttribute('aria-label', def.title);
+      this._buildHotspotTrunkMenu(menu);
+      this._hsTrunkMenu = menu;
+    } else {
+      (def.menu || []).forEach((item) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = item.label;
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          this._onHotspotMenuAction(def.id, item);
+        });
+        menu.appendChild(btn);
       });
-      menu.appendChild(btn);
-    });
+    }
     el.appendChild(dot);
     el.appendChild(menu);
     this._hsLayer.appendChild(el);
     if (!this._hsEls) this._hsEls = {};
     this._hsEls[def.id] = el;
+  }
+
+  _buildHotspotRoofRow(kind, label) {
+    const row = document.createElement('div');
+    row.className = 'hv-hs-roof-row';
+    row.dataset.hsRoofKind = kind;
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'hv-hs-roof-toggle open-action';
+    toggle.dataset.hsRoofToggle = kind;
+    toggle.textContent = 'OPEN';
+    toggle.setAttribute('aria-label', label + ' open or close');
+    toggle.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const open = (kind === 'sunroof'
+        ? (this.state && this.state.sunroofOpen)
+        : (this.state && this.state.curtainOpen)) > 2;
+      this._runVehicleOpeningAction(kind, open ? 'close' : 'open');
+      this._armHotspotHideTimer();
+    });
+
+    const slide = document.createElement('div');
+    slide.className = 'hv-hs-roof-slide';
+    slide.dataset.hsRoofSlide = kind;
+    slide.style.setProperty('--level', '0%');
+    slide.style.setProperty('--level-num', '0');
+
+    const name = document.createElement('span');
+    name.className = 'hv-hs-roof-slide-name';
+    name.textContent = label;
+
+    const pct = document.createElement('span');
+    pct.className = 'hv-hs-roof-slide-pct';
+    pct.dataset.hsRoofPct = kind;
+    pct.textContent = '0%';
+
+    const track = document.createElement('div');
+    track.className = 'hv-hs-roof-track';
+    track.dataset.kind = kind;
+    track.dataset.hsRoofTrack = kind;
+
+    const well = document.createElement('i');
+    well.className = 'hv-hs-roof-track-well';
+    const fill = document.createElement('i');
+    fill.className = 'hv-hs-roof-track-fill';
+    const knob = document.createElement('i');
+    knob.className = 'hv-hs-roof-knob';
+    knob.dataset.hsRoofKnob = kind;
+
+    if (kind === 'sunroof') {
+      const vent = document.createElement('i');
+      vent.className = 'hv-hs-roof-vent-mark';
+      vent.title = 'Ventilation';
+      track.appendChild(vent);
+    }
+
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.className = 'hv-hs-roof-quick-range';
+    range.min = '0';
+    range.max = '100';
+    range.step = '1';
+    range.value = '0';
+    range.setAttribute('aria-label', label + ' opening');
+    range.dataset.hsRoofRange = kind;
+    const onInput = () => {
+      let level = this._vehicleOpeningLevel(range.value);
+      if (kind === 'sunroof') level = this._snapSunroofVentLevel(level, false);
+      range.value = String(level);
+      this._syncHotspotRoofRow(kind, level);
+      this._queueVehicleOpeningLevel(kind, level);
+      this._armHotspotHideTimer();
+    };
+    const onChange = () => {
+      let level = this._vehicleOpeningLevel(range.value);
+      if (kind === 'sunroof') level = this._snapSunroofVentLevel(level, true);
+      range.value = String(level);
+      this._syncHotspotRoofRow(kind, level);
+      this._setVehicleOpeningLevel(kind, level);
+      this._armHotspotHideTimer();
+    };
+    range.addEventListener('input', onInput);
+    range.addEventListener('change', onChange);
+    range.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+
+    track.appendChild(well);
+    track.appendChild(fill);
+    track.appendChild(knob);
+    track.appendChild(range);
+    slide.appendChild(name);
+    slide.appendChild(pct);
+    slide.appendChild(track);
+    row.appendChild(toggle);
+    row.appendChild(slide);
+    return row;
+  }
+
+  /** Soft magnetic detent at SUNROOF_TILT_PCT (ventilation). */
+  _snapSunroofVentLevel(raw, force) {
+    const level = this._vehicleOpeningLevel(raw);
+    const band = force ? 6 : 3;
+    if (Math.abs(level - SUNROOF_TILT_PCT) <= band) return SUNROOF_TILT_PCT;
+    return level;
+  }
+
+  _syncHotspotRoofRow(kind, raw) {
+    const level = this._vehicleOpeningLevel(raw);
+    const menu = this._hsRoofMenu;
+    if (!menu) return;
+    const slide = menu.querySelector('[data-hs-roof-slide="' + kind + '"]');
+    const range = menu.querySelector('[data-hs-roof-range="' + kind + '"]');
+    const pct = menu.querySelector('[data-hs-roof-pct="' + kind + '"]');
+    const toggle = menu.querySelector('[data-hs-roof-toggle="' + kind + '"]');
+    if (slide) {
+      slide.style.setProperty('--level', level + '%');
+      slide.style.setProperty('--level-num', (level / 100).toFixed(4));
+    }
+    if (range) range.value = String(level);
+    if (pct) pct.textContent = level + '%';
+    if (toggle) {
+      const open = level > 2;
+      toggle.textContent = open ? 'CLOSE' : 'OPEN';
+      toggle.classList.toggle('open-action', !open);
+    }
+  }
+
+  _syncHotspotRoofMenu() {
+    if (!this._hsRoofMenu) return;
+    const st = this.state || {};
+    this._syncHotspotRoofRow('sunroof', st.sunroofOpen || 0);
+    this._syncHotspotRoofRow('curtain', st.curtainOpen || 0);
+  }
+
+  _hsWindowCornerKeys() {
+    return [
+      { key: 'fl', label: 'FRONT L' },
+      { key: 'fr', label: 'FRONT R' },
+      { key: 'rl', label: 'REAR L' },
+      { key: 'rr', label: 'REAR R' },
+    ];
+  }
+
+  _ensureHsWindowMenuStates() {
+    if (this._hsWindowMenuStates) return this._hsWindowMenuStates;
+    const seeded = {};
+    const car = this._carWindowStates || null;
+    this._hsWindowCornerKeys().forEach(({ key }) => {
+      if (car && (car[key] === 'open' || car[key] === 'closed')) seeded[key] = car[key];
+      else seeded[key] = 'closed';
+    });
+    this._hsWindowMenuStates = seeded;
+    return seeded;
+  }
+
+  _hsWindowCornerState(key) {
+    const menu = this._hsWindowMenuStates;
+    if (menu && (menu[key] === 'open' || menu[key] === 'closed')) return menu[key];
+    const car = this._carWindowStates;
+    if (car && (car[key] === 'open' || car[key] === 'closed')) return car[key];
+    return 'closed';
+  }
+
+  _buildHotspotWindowsMenu(menu) {
+    const grid = document.createElement('div');
+    grid.className = 'hv-hs-windows-grid';
+    this._hsWindowCornerKeys().forEach(({ key, label }) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hv-hs-windows-btn';
+      btn.dataset.hsWindowKey = key;
+      const name = document.createElement('strong');
+      name.textContent = label;
+      const state = document.createElement('span');
+      state.dataset.hsWindowLbl = key;
+      state.textContent = 'CLOSED';
+      btn.appendChild(name);
+      btn.appendChild(state);
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        this._toggleHotspotWindow(key);
+      });
+      grid.appendChild(btn);
+    });
+    menu.appendChild(grid);
+  }
+
+  _toggleHotspotWindow(key) {
+    if (!['fl', 'fr', 'rl', 'rr'].includes(key)) return;
+    const openNow = this._hsWindowCornerState(key) === 'open';
+    this._setWindowCornerOpen(key, openNow ? 0 : 100);
+    // Local 3D already applied; bridge only needs the per-corner command.
+    this._sendCarCommand('toggle_window_' + key, '', { skipLocal: true });
+    this._armHotspotHideTimer();
+  }
+
+  _syncHotspotWindowsMenu() {
+    const menu = this._hsWindowsMenu;
+    if (!menu) return;
+    this._ensureHsWindowMenuStates();
+    this._hsWindowCornerKeys().forEach(({ key }) => {
+      const open = this._hsWindowCornerState(key) === 'open';
+      const btn = menu.querySelector('[data-hs-window-key="' + key + '"]');
+      const lbl = menu.querySelector('[data-hs-window-lbl="' + key + '"]');
+      if (btn) btn.classList.toggle('open', open);
+      if (lbl) lbl.textContent = open ? 'OPEN' : 'CLOSED';
+    });
+  }
+
+  _buildHotspotTrunkMenu(menu) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hv-hs-trunk-toggle open-action';
+    btn.dataset.hsTrunkToggle = '1';
+    btn.textContent = 'OPEN';
+    btn.setAttribute('aria-label', 'Tailgate open or close');
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._sendCarCommand('toggle_trunk');
+      this._armHotspotHideTimer();
+    });
+    menu.appendChild(btn);
+  }
+
+  _syncHotspotTrunkMenu() {
+    const menu = this._hsTrunkMenu;
+    if (!menu) return;
+    const open = ((this.state && this.state.trunkOpen) || 0) > 0;
+    const btn = menu.querySelector('[data-hs-trunk-toggle]');
+    if (!btn) return;
+    btn.textContent = open ? 'CLOSE' : 'OPEN';
+    btn.classList.toggle('open-action', !open);
+  }
+
+  _buildHotspotMirrorsMenu(menu) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hv-hs-mirrors-toggle open-action';
+    btn.dataset.hsMirrorsToggle = '1';
+    btn.textContent = 'FOLD';
+    btn.setAttribute('aria-label', 'Mirrors fold or unfold');
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const folded = ((this.state && this.state.mirrorsFolded) || 0) > 2;
+      this._sendCarCommand(folded ? 'unfold_mirrors' : 'fold_mirrors');
+      this._armHotspotHideTimer();
+    });
+    menu.appendChild(btn);
+  }
+
+  _syncHotspotMirrorsMenu() {
+    const menu = this._hsMirrorsMenu;
+    if (!menu) return;
+    const folded = ((this.state && this.state.mirrorsFolded) || 0) > 2;
+    const btn = menu.querySelector('[data-hs-mirrors-toggle]');
+    if (!btn) return;
+    btn.textContent = folded ? 'UNFOLD' : 'FOLD';
+    btn.classList.toggle('open-action', !folded);
   }
 
   _ensureHotspotElements() {
@@ -17463,6 +18200,10 @@ class Component extends DCLogic {
       const el = this._hsEls[id];
       if (el && el.parentNode) el.parentNode.removeChild(el);
       delete this._hsEls[id];
+      if (id === 'roof') this._hsRoofMenu = null;
+      if (id === 'windows') this._hsWindowsMenu = null;
+      if (id === 'mirrors') this._hsMirrorsMenu = null;
+      if (id === 'trunk') this._hsTrunkMenu = null;
     });
     defs.forEach((def) => {
       if (!this._hsEls[def.id]) this._mountHotspotElement(def);
@@ -17688,7 +18429,6 @@ class Component extends DCLogic {
       this._setRoofLevelPopup(false);
     });
     roofPop.addEventListener('click', (ev) => ev.stopPropagation());
-    this._initCamFab();
     this._initXrayFab();
 
     const canvas = this.renderer && this.renderer.domElement;
@@ -17735,7 +18475,7 @@ class Component extends DCLogic {
           return;
         }
       }
-      if (this._raycastCarBody(e)) {
+      if (this._shouldShowCar() && this._raycastCarBody(e)) {
         this._closeCameraPanel();
         this._pulseHotspots();
       } else {
@@ -18003,6 +18743,10 @@ class Component extends DCLogic {
     this._xrayFabAnchor = null;
     this._hsEls = null;
     this._hsRoofPop = null;
+    this._hsRoofMenu = null;
+    this._hsWindowsMenu = null;
+    this._hsMirrorsMenu = null;
+    this._hsTrunkMenu = null;
     this._hsRoofSunSl = null;
     this._hsRoofCurSl = null;
     this._hsRoofSunVal = null;
@@ -18109,7 +18853,12 @@ class Component extends DCLogic {
       open_windows: ['windows', 'open'], close_windows: ['windows', 'close'],
       open_sunroof: ['sunroof', 'open'], close_sunroof: ['sunroof', 'close'],
       open_curtain: ['curtain', 'open'], close_curtain: ['curtain', 'close'],
+      fold_mirrors: true, unfold_mirrors: true,
     };
+    if (actions[cmd] === true) {
+      this._setMirrorsFolded(cmd === 'fold_mirrors' ? 100 : 0);
+      return true;
+    }
     if (actions[cmd]) {
       this._applyVehicleOpeningLevel(actions[cmd][0], actions[cmd][1] === 'open' ? 100 : 0);
       return true;
@@ -18117,9 +18866,14 @@ class Component extends DCLogic {
     const local = {
       toggle_doors_all: () => this.toggleSideDoors(),
       toggle_windows: () => this._applyVehicleOpeningLevel('windows', (s.windowsOpen || 0) > 0 ? 0 : 100),
+      toggle_window_fl: () => this._setWindowCornerOpen('fl', this._hsWindowCornerState('fl') === 'open' ? 0 : 100),
+      toggle_window_fr: () => this._setWindowCornerOpen('fr', this._hsWindowCornerState('fr') === 'open' ? 0 : 100),
+      toggle_window_rl: () => this._setWindowCornerOpen('rl', this._hsWindowCornerState('rl') === 'open' ? 0 : 100),
+      toggle_window_rr: () => this._setWindowCornerOpen('rr', this._hsWindowCornerState('rr') === 'open' ? 0 : 100),
       toggle_trunk: () => this._setTrunkOpen((s.trunkOpen || 0) > 0 ? 0 : 100),
       toggle_sunroof: () => this._applyVehicleOpeningLevel('sunroof', (s.sunroofOpen || 0) > 0 ? 0 : 100),
       toggle_curtain: () => this._applyVehicleOpeningLevel('curtain', (s.curtainOpen || 0) > 0 ? 0 : 100),
+      toggle_mirrors: () => this._setMirrorsFolded(((s.mirrorsFolded || 0) > 0) ? 0 : 100),
     };
     if (!local[cmd]) return false;
     local[cmd]();
@@ -18196,6 +18950,7 @@ class Component extends DCLogic {
         button.classList.toggle('on', preset === level);
       });
     }
+    this._syncHotspotRoofRow(kind, level);
   }
 
   _syncRoofVehicleStatus(snapshot) {
@@ -18371,6 +19126,7 @@ class Component extends DCLogic {
 
   /** Show dots (fade in) and optionally start the auto-hide countdown. */
   _pulseHotspots(opts) {
+    if (!this._shouldShowCar()) return;
     const deferHide = opts && opts.deferHide;
     if (!this._hotspotsVisible) this._showHotspots({ deferHide: true });
     else if (this._hsLayer) this._hsLayer.classList.add('lit');
@@ -18379,6 +19135,7 @@ class Component extends DCLogic {
   }
 
   _showHotspots(opts) {
+    if (!this._shouldShowCar()) return;
     const deferHide = opts && opts.deferHide;
     clearTimeout(this._hsFadeOutTimer);
     this._hotspotsVisible = true;
@@ -18391,9 +19148,10 @@ class Component extends DCLogic {
     Object.values(this._hsEls || {}).forEach((el) => {
       if (el) el.classList.remove('open', 'flip');
     });
+    if (this._hsLayer) this._hsLayer.classList.remove('menu-open');
     this._updateHotspotLayer();
-    this._updateCamFab();
     this._updateXrayFab();
+    if (!(this.state && this.state.hotspotsChrome)) this.setState({ hotspotsChrome: true });
     if (!deferHide) this._armHotspotHideTimer();
     if (this.requestRender) this.requestRender(8);
   }
@@ -18402,12 +19160,15 @@ class Component extends DCLogic {
     this._hotspotsVisible = false;
     this._hsOpenId = null;
     this._setRoofLevelPopup(false);
-    if (this._hsLayer) this._hsLayer.setAttribute('aria-hidden', 'true');
+    if (this._hsLayer) {
+      this._hsLayer.setAttribute('aria-hidden', 'true');
+      this._hsLayer.classList.remove('menu-open');
+    }
     Object.values(this._hsEls || {}).forEach((el) => {
       if (el) el.classList.remove('on', 'open', 'act', 'flip');
     });
-    if (this._camFabEl) this._camFabEl.classList.remove('on');
     if (this._xrayFabEl) this._xrayFabEl.classList.remove('on');
+    if (this.state && this.state.hotspotsChrome) this.setState({ hotspotsChrome: false });
   }
 
   _hideHotspots() {
@@ -18426,7 +19187,14 @@ class Component extends DCLogic {
     const wasOpen = el.classList.contains('open');
     Object.values(this._hsEls).forEach((node) => { if (node) node.classList.remove('open'); });
     this._hsOpenId = wasOpen ? null : id;
-    if (!wasOpen) el.classList.add('open');
+    if (this._hsLayer) this._hsLayer.classList.toggle('menu-open', !!this._hsOpenId);
+    if (!wasOpen) {
+      el.classList.add('open');
+      if (id === 'roof') this._syncHotspotRoofMenu();
+      else if (id === 'windows') this._syncHotspotWindowsMenu();
+      else if (id === 'mirrors') this._syncHotspotMirrorsMenu();
+      else if (id === 'trunk') this._syncHotspotTrunkMenu();
+    }
     this._setRoofLevelPopup(false);
     this._armHotspotHideTimer();
     if (this.requestRender) this.requestRender(2);
@@ -18447,6 +19215,8 @@ class Component extends DCLogic {
 
   _openRoofLevelPopup() {
     Object.values(this._hsEls || {}).forEach((el) => { if (el) el.classList.remove('open'); });
+    this._hsOpenId = null;
+    if (this._hsLayer) this._hsLayer.classList.remove('menu-open');
     this._syncRoofLevelPopup();
     this._setRoofLevelPopup(true);
     if (this.requestRender) this.requestRender(6);
@@ -18544,27 +19314,73 @@ class Component extends DCLogic {
 
     // The door bullet gets one anchor per flank. A single one would spend half
     // of every orbit buried inside the car; _hsResolveAnchor picks the near
-    // side each frame. Height comes from the pane's REST belt line rather than
-    // its live box, so a dropped window does not drag the bullet down with it.
-    const pane = (id, key) => {
-      const wn = (this._windows || []).find((entry) => entry.key === key);
-      if (!wn) return;
-      const a = this._hsNodeAnchorLocal(wn.node);
-      if (!a) return;
-      if (typeof wn.restY === 'number') a.y = wn.restY;
-      if (typeof wn.restX === 'number') a.x = wn.restX;
-      anchors[id] = a;
+    // side each frame. Sit it between the front and rear panes on that flank
+    // so it stays clear of the mirror housing up front.
+    const midWindows = (id, frontKey, rearKey) => {
+      const wf = (this._windows || []).find((entry) => entry.key === frontKey);
+      const wr = (this._windows || []).find((entry) => entry.key === rearKey);
+      if (!wf || !wr) return false;
+      const af = this._hsNodeAnchorLocal(wf.node);
+      const ar = this._hsNodeAnchorLocal(wr.node);
+      if (!af || !ar) return false;
+      const x0 = typeof wf.restX === 'number' ? wf.restX : af.x;
+      const x1 = typeof wr.restX === 'number' ? wr.restX : ar.x;
+      const y0 = typeof wf.restY === 'number' ? wf.restY : af.y;
+      const y1 = typeof wr.restY === 'number' ? wr.restY : ar.y;
+      af.x = (x0 + x1) * 0.5;
+      af.y = (y0 + y1) * 0.5;
+      af.z = (af.z + ar.z) * 0.5;
+      anchors[id] = af;
+      return true;
     };
-    pane('windowsL', 'fl');
-    pane('windowsR', 'fr');
+    if (!midWindows('windowsL', 'fl', 'rl')) {
+      const wn = (this._windows || []).find((entry) => entry.key === 'fl');
+      if (wn) {
+        const a = this._hsNodeAnchorLocal(wn.node);
+        if (a) {
+          if (typeof wn.restY === 'number') a.y = wn.restY;
+          if (typeof wn.restX === 'number') a.x = wn.restX;
+          anchors.windowsL = a;
+        }
+      }
+    }
+    if (!midWindows('windowsR', 'fr', 'rr')) {
+      const wn = (this._windows || []).find((entry) => entry.key === 'fr');
+      if (wn) {
+        const a = this._hsNodeAnchorLocal(wn.node);
+        if (a) {
+          if (typeof wn.restY === 'number') a.y = wn.restY;
+          if (typeof wn.restX === 'number') a.x = wn.restX;
+          anchors.windowsR = a;
+        }
+      }
+    }
     if (!anchors.windowsL || !anchors.windowsR) {
-      // No named glass on this body: fall back to the flanks of the box. size.z
-      // spans the mirrors, so 0.40 lands on the door skin rather than past it.
+      // No named glass on this body: fall back to mid-flank of the box.
       const side = (sign) => this._hsBBoxAnchorLocal(model, (_min, _max, c, sz, pt) => {
-        pt.set(c.x - sz.x * 0.04, c.y + sz.y * 0.16, c.z + sign * sz.z * 0.40);
+        pt.set(c.x + sz.x * 0.02, c.y + sz.y * 0.16, c.z + sign * sz.z * 0.38);
       });
       if (!anchors.windowsL) { const a = side(1); if (a) anchors.windowsL = a; }
       if (!anchors.windowsR) { const a = side(-1); if (a) anchors.windowsR = a; }
+    }
+
+    // Mirror bullets sit further outboard than the window belt. Prefer the
+    // live fold groups; fall back to a bbox flank past the door skin.
+    const putMirror = (id, side) => {
+      const entry = this._mirrorFolds && this._mirrorFolds[side];
+      if (entry && entry.group) {
+        const a = this._hsNodeAnchorLocal(entry.group);
+        if (a) { anchors[id] = a; return; }
+      }
+    };
+    putMirror('mirrorsL', 'fl');
+    putMirror('mirrorsR', 'fr');
+    if (!anchors.mirrorsL || !anchors.mirrorsR) {
+      const side = (sign) => this._hsBBoxAnchorLocal(model, (_min, _max, c, sz, pt) => {
+        pt.set(c.x - sz.x * 0.02, c.y + sz.y * 0.22, c.z + sign * sz.z * 0.52);
+      });
+      if (!anchors.mirrorsL) { const a = side(1); if (a) anchors.mirrorsL = a; }
+      if (!anchors.mirrorsR) { const a = side(-1); if (a) anchors.mirrorsR = a; }
     }
 
     this._hsAnchors = anchors;
@@ -18597,6 +19413,10 @@ class Component extends DCLogic {
 
   _updateHotspotLayer() {
     if (!this._hsLayer || !this.camera || !this.renderer) return;
+    if (!this._shouldShowCar()) {
+      if (this._hotspotsVisible || this._hsRoofPopOpen) this._hideHotspots();
+      return;
+    }
     if (!this._hotspotsVisible && !this._hsRoofPopOpen) return;
     if (!this._hsProj) {
       this._hsProj = {
@@ -18642,12 +19462,22 @@ class Component extends DCLogic {
       scratch.anchorFwd.copy(scratch.v).sub(this.camera.position).normalize();
       const facing = scratch.camFwd.dot(scratch.anchorFwd);
       el.classList.toggle('far', facing < 0.12);
-      const flip = x > layerRect.width * 0.62;
+      // Open the menu away from the car body (toward the screen edge / widgets),
+      // not across the silhouette. Fall back to a right-third flip if we have
+      // no fit centre yet.
+      let flip = x > layerRect.width * 0.62;
+      if (this._fitCenter) {
+        scratch.alt.copy(this._fitCenter);
+        scratch.ndc.copy(scratch.alt).project(this.camera);
+        const carX = (scratch.ndc.x * 0.5 + 0.5) * rect.width + (rect.left - layerRect.left);
+        flip = x < carX;
+      }
       el.classList.toggle('flip', flip);
       const s = this.state || {};
       let active = false;
       if (id === 'roof') active = (s.sunroofOpen || 0) > 2 || (s.curtainOpen || 0) > 2;
       else if (id === 'trunk') active = (s.trunkOpen || 0) > 2;
+      else if (id === 'mirrors') active = (s.mirrorsFolded || 0) > 2;
       else if (id === 'windows') {
         active = (s.windowsOpen || 0) > 2
           || (s.doorFLOpen || 0) > 2 || (s.doorFROpen || 0) > 2
@@ -22300,6 +23130,7 @@ class Component extends DCLogic {
         }
         Object.values(this._hsEls || {}).forEach((el) => { if (el) el.classList.remove('open'); });
         this._hsOpenId = null;
+        if (this._hsLayer) this._hsLayer.classList.remove('menu-open');
         this._pulseHotspots({ deferHide: true });
       });
       controls.addEventListener('end', () => {
@@ -23070,20 +23901,51 @@ class Component extends DCLogic {
           this._requestTweenShadow();
         }
 
-        // Smooth window drop
-        if (this._windows && this._windows.length
-            && this._windowsProgress !== this._windowsTarget) {
-          const step = openingStep(WINDOW_OPENING_STEP, delta);
-          if (this._windowsProgress < this._windowsTarget) {
-            this._windowsProgress = Math.min(this._windowsTarget, this._windowsProgress + step);
+        // Smooth mirror fold
+        if (this._mirrorFolds
+            && this._mirrorsProgress !== this._mirrorsTarget) {
+          const step = openingStep(MANUAL_OPENING_STEP, delta);
+          if (this._mirrorsProgress < this._mirrorsTarget) {
+            this._mirrorsProgress = Math.min(this._mirrorsTarget, this._mirrorsProgress + step);
           } else {
-            this._windowsProgress = Math.max(this._windowsTarget, this._windowsProgress - step);
+            this._mirrorsProgress = Math.max(this._mirrorsTarget, this._mirrorsProgress - step);
           }
-          this._applyWindowsTransform();
+          this._applyMirrorsTransform();
           needRender = true;
           this._postFxDirty = true;
           tweenActive = true;
           this._requestTweenShadow();
+        }
+
+        // Smooth per-corner window drop (hotspot / car signal can move one pane)
+        if (this._windows && this._windows.length
+            && this._windowCornerProgress && this._windowCornerTargets) {
+          const step = openingStep(WINDOW_OPENING_STEP, delta);
+          let moved = false;
+          for (const k of ['fl', 'fr', 'rl', 'rr']) {
+            const cur = this._windowCornerProgress[k] || 0;
+            const tgt = this._windowCornerTargets[k] || 0;
+            if (cur === tgt) continue;
+            if (cur < tgt) {
+              this._windowCornerProgress[k] = Math.min(tgt, cur + step);
+            } else {
+              this._windowCornerProgress[k] = Math.max(tgt, cur - step);
+            }
+            moved = true;
+          }
+          if (moved) {
+            this._windowsProgress = Math.max(
+              this._windowCornerProgress.fl, this._windowCornerProgress.fr,
+              this._windowCornerProgress.rl, this._windowCornerProgress.rr);
+            this._windowsTarget = Math.max(
+              this._windowCornerTargets.fl, this._windowCornerTargets.fr,
+              this._windowCornerTargets.rl, this._windowCornerTargets.rr);
+            this._applyWindowsTransform();
+            needRender = true;
+            this._postFxDirty = true;
+            tweenActive = true;
+            this._requestTweenShadow();
+          }
         }
 
         // Smooth sunroof animation
@@ -23183,10 +24045,7 @@ class Component extends DCLogic {
         }
         if (this._hotspotsVisible || this._hsRoofPopOpen) {
           this._updateHotspotLayer();
-          if (this._hotspotsVisible) {
-            this._updateCamFab();
-            this._updateXrayFab();
-          }
+          if (this._hotspotsVisible) this._updateXrayFab();
         }
         // Badge follows the car if the camera moves mid-swap (orbit, or the
         // board layout re-framing). Only while a swap is up, so it costs
@@ -27217,6 +28076,7 @@ class Component extends DCLogic {
     // After _initDoors: the panes have just been re-parented onto the hinges,
     // so their rest position has to be captured in hinge space, not model space.
     this._initWindows(obj, profile, findMesh);
+    this._initMirrors(obj);
     this._initTrunk(obj, profile);
     this._fixRearGlassSurfaces(obj, profile);
     this._initGtCosmeticFixes(obj, profile);
@@ -27386,7 +28246,7 @@ class Component extends DCLogic {
       '_sunroofFrontOrigRot', '_sunroofRange', 'sunroofCurtain', '_curtainParams', 'lightGroups',
       '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels', '_allWheels',
       '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels', '_steerOnlyMeshes',
-      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges', '_trunkHinge'];
+      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges', '_mirrorFolds', '_trunkHinge'];
   }
 
   /**
@@ -28233,6 +29093,14 @@ class Component extends DCLogic {
       if ((p[k] || 0) !== (t[k] || 0)) return true;
     }
     if ((this._trunkProgress || 0) !== (this._trunkTarget || 0)) return true;
+    if ((this._mirrorsProgress || 0) !== (this._mirrorsTarget || 0)) return true;
+    {
+      const wt = this._windowCornerTargets || {};
+      const wp = this._windowCornerProgress || {};
+      for (const k of ['fl', 'fr', 'rl', 'rr']) {
+        if ((wp[k] || 0) !== (wt[k] || 0)) return true;
+      }
+    }
     return this._roofEventBusy();
   }
 
@@ -28552,6 +29420,14 @@ class Component extends DCLogic {
     const show = !!visible && this._shouldShowCar();
     this._carSceneVisible = show;
     this._syncCanvasPointerEvents();
+    // Wallpaper / apps-only: no orbit target, and any leftover vehicle dots
+    // would float over the Bing photo at the last projected anchors.
+    if (!show) {
+      if (this._hotspotsVisible || this._hsRoofPopOpen) this._hideHotspots();
+      if (this.controls && !this._introActive) this.controls.enabled = false;
+    } else if (this.controls && !this._introActive && this._introPlayed) {
+      this.controls.enabled = true;
+    }
 
     const activeKey = (this.state && this.state.modelVariant) || 'hev';
     if (this._variants) {
@@ -28759,13 +29635,13 @@ class Component extends DCLogic {
       return;
     }
     if (!this._shouldShowCar()) {
-      // Abort an in-flight intro if we switched to APP+APP.
+      // Abort an in-flight intro if we switched to APP+APP / wallpaper-only.
       if (this._introActive) {
         this._intro = null;
         this._introActive = false;
         this._camAnim = null;
-        if (this.controls) this.controls.enabled = true;
       }
+      if (this.controls) this.controls.enabled = false;
       this._setCarSceneVisible(false);
       return;
     }
@@ -29852,8 +30728,18 @@ class Component extends DCLogic {
     } catch (e) {}
   }
 
-  _previousDesktop() { this._switchDesktop((this._desktopIndex || 0) - 1); }
-  _nextDesktop() { this._switchDesktop((this._desktopIndex || 0) + 1); }
+  _previousDesktop() {
+    if (this._desktopClickSuppressed()) return;
+    this._switchDesktop((this._desktopIndex || 0) - 1);
+  }
+  _nextDesktop() {
+    if (this._desktopClickSuppressed()) return;
+    this._switchDesktop((this._desktopIndex || 0) + 1);
+  }
+
+  _desktopClickSuppressed() {
+    return !!(this._suppressDesktopClickUntil && Date.now() < this._suppressDesktopClickUntil);
+  }
 
   _openDesktopStudio(tab) {
     const requested = tab || this.state.desktopStudioTab || 'desktop';
@@ -30210,8 +31096,13 @@ class Component extends DCLogic {
     if (!ev || !ev.ctrlKey || ev.altKey || ev.metaKey) return;
     const t = ev.target;
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')) return;
-    if (ev.key === 'ArrowLeft') { ev.preventDefault(); this._previousDesktop(); }
-    else if (ev.key === 'ArrowRight') { ev.preventDefault(); this._nextDesktop(); }
+    if (ev.key === 'ArrowLeft') {
+      ev.preventDefault();
+      this._switchDesktop((this._desktopIndex || 0) - 1);
+    } else if (ev.key === 'ArrowRight') {
+      ev.preventDefault();
+      this._switchDesktop((this._desktopIndex || 0) + 1);
+    }
   }
 
   _revealDesktopIndicator() {
@@ -30229,15 +31120,22 @@ class Component extends DCLogic {
   _onDesktopGestureStart(ev) {
     const p = this._eventClientPoint(ev);
     const mode = this._shellMode || this.state.shellMode || 'triple';
-    // Only the dedicated outer lanes own desktop swipes. This avoids competing
-    // with widget controls and the 3D stage while keeping a generous target.
-    if (!p || !this._pointInDesktopSwipeZone(p.x, p.y) || mode === 'appsOnly'
+    // Background + top switcher own desktop swipes. Widget cards / apps panes
+    // keep pointer-events and never reach here; the car orbit disc is excluded
+    // so a drag on the model still rotates it.
+    if (!p || !this._pointInDesktopSwipeZone(p.x, p.y, ev) || mode === 'appsOnly'
       || this.state.desktopStudioOpen || this._widgetAddingOn() || this.state.graphEditId
       || this.state.widgetMenuId || this.state.widgetPickerStep) return;
     this._desktopGesture = {
       x: p.x, y: p.y, at: Date.now(), moved: false,
+      fromSwitcher: !!(ev && ev.currentTarget
+        && ev.currentTarget.classList
+        && ev.currentTarget.classList.contains('hv-desktop-switcher')),
       controlsEnabled: this.controls ? this.controls.enabled !== false : null,
     };
+    // Outside the car disc, this press is a desktop swipe — don't let orbit
+    // steal the first 18 px of travel.
+    if (this.controls && !this._desktopGesture.fromSwitcher) this.controls.enabled = false;
   }
 
   _onDesktopGestureMove(ev) {
@@ -30246,10 +31144,7 @@ class Component extends DCLogic {
     if (!p) return;
     const dx = p.x - this._desktopGesture.x;
     const dy = p.y - this._desktopGesture.y;
-    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-      this._desktopGesture.moved = true;
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 18 && this.controls) this.controls.enabled = false;
-    }
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) this._desktopGesture.moved = true;
   }
 
   _onDesktopGestureEnd(ev) {
@@ -30262,7 +31157,10 @@ class Component extends DCLogic {
     const dx = p.x - g.x;
     const dy = p.y - g.y;
     if (Date.now() - g.at < 900 && Math.abs(dx) >= 72 && Math.abs(dy) <= 64 && Math.abs(dx) > Math.abs(dy) * 1.35) {
-      if (dx < 0) this._nextDesktop(); else this._previousDesktop();
+      if (dx < 0) this._switchDesktop((this._desktopIndex || 0) + 1);
+      else this._switchDesktop((this._desktopIndex || 0) - 1);
+      // A swipe that started on a switcher button must not also fire its click.
+      this._suppressDesktopClickUntil = Date.now() + 450;
     }
   }
 
@@ -30403,9 +31301,9 @@ class Component extends DCLogic {
       desktopSwipeMove: (ev) => this._onDesktopGestureMove(ev),
       desktopSwipeEnd: (ev) => this._onDesktopGestureEnd(ev),
       desktopSwipeCancel: () => this._onDesktopGestureCancel(),
-      // The virtual-desktop control is navigation, not a widget. Keep it
-      // compact and centred even when a canvas is filled, so it has one stable
-      // location across all desktop layouts. Idle (no frost pill) uses the same
+      // The virtual-desktop control is navigation, not a widget. Keep it over
+      // the Android status bar at ~1/3 width so it has one stable location
+      // across all desktop layouts. Idle (no frost pill) uses the same
       // scene-contrast colour as chrome labels — inverse brightness to day/night.
       desktopSwitcherStyle: s.desktopIndicatorExpanded
         ? ''
@@ -30415,7 +31313,10 @@ class Component extends DCLogic {
       desktopDots: list.map((d, i) => ({
         cls: i === index ? 'on' : '',
         title: d.name,
-        onClick: () => this._switchDesktop(i),
+        onClick: () => {
+          if (self._desktopClickSuppressed()) return;
+          self._switchDesktop(i);
+        },
         onHoldStart: (function(n) { return function(ev) { self._onDesktopDotHoldStart(n, ev); }; })(i),
         onHoldEnd: (ev) => this._onDesktopDotHoldEnd(ev),
         onContextMenu: (function(n) { return function(ev) {
@@ -30426,7 +31327,10 @@ class Component extends DCLogic {
       })),
       previousDesktop: () => this._previousDesktop(),
       nextDesktop: () => this._nextDesktop(),
-      openDesktopStudio: () => this._openDesktopStudio('desktop'),
+      openDesktopStudio: () => {
+        if (this._desktopClickSuppressed()) return;
+        this._openDesktopStudio('desktop');
+      },
       desktopStudioClass: s.desktopStudioOpen ? 'on' : '',
       desktopStudioBackdropClass: s.desktopStudioOpen ? 'on' : '',
       closeDesktopStudio: () => this._closeDesktopStudio(),
@@ -32555,14 +33459,85 @@ class Component extends DCLogic {
     return this._pointInCenterGap(clientX, clientY) || !!this._boardSideAt(clientX, clientY);
   }
 
-  _pointInDesktopSwipeZone(clientX, clientY) {
+  /**
+   * Screen-space disc around the car where orbit must keep winning over
+   * desktop swipe. Built from the projected fit box so it tracks camera
+   * framing; padded a little so the silhouette edge still rotates cleanly.
+   */
+  _carOrbitScreenDisc() {
+    if (!this._shouldShowCar()) return null;
+    const THREE = this.THREE;
+    if (!THREE || !this.camera || !this.renderer || !this._fitCenter || !this._fitSize) return null;
+    if (!this._carOrbitProj) this._carOrbitProj = new THREE.Vector3();
+    const v = this._carOrbitProj;
+    const c = this._fitCenter;
+    const sz = this._fitSize;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, ok = false;
+    for (let i = 0; i < 8; i++) {
+      v.set(
+        c.x + (i & 1 ? sz.x : -sz.x) * 0.5,
+        c.y + (i & 2 ? sz.y : -sz.y) * 0.5,
+        c.z + (i & 4 ? sz.z : -sz.z) * 0.5
+      );
+      v.project(this.camera);
+      if (!isFinite(v.x) || !isFinite(v.y) || v.z > 1) continue;
+      const px = (v.x * 0.5 + 0.5) * rect.width + rect.left;
+      const py = (-v.y * 0.5 + 0.5) * rect.height + rect.top;
+      if (px < minX) minX = px;
+      if (px > maxX) maxX = px;
+      if (py < minY) minY = py;
+      if (py > maxY) maxY = py;
+      ok = true;
+    }
+    if (!ok) return null;
+    const cx = (minX + maxX) * 0.5;
+    const cy = (minY + maxY) * 0.5;
+    const halfW = (maxX - minX) * 0.5;
+    const halfH = (maxY - minY) * 0.5;
+    // Cover the silhouette with a little margin; clamp so a distant tiny
+    // projection never collapses the orbit target, and a close-up never
+    // swallows the whole panel.
+    const r = Math.max(140, Math.min(420, Math.sqrt(halfW * halfW + halfH * halfH) * 1.12));
+    return { cx: cx, cy: cy, r: r };
+  }
+
+  _pointInCarOrbitZone(clientX, clientY) {
+    const disc = this._carOrbitScreenDisc();
+    if (!disc) return false;
+    const dx = clientX - disc.cx;
+    const dy = clientY - disc.cy;
+    return (dx * dx + dy * dy) <= (disc.r * disc.r);
+  }
+
+  _pointInDesktopSwitcher(clientX, clientY) {
+    const el = typeof document !== 'undefined'
+      ? document.querySelector('.hv-desktop-switcher') : null;
+    if (!el) return false;
+    const style = el.style && el.style.display;
+    if (style === 'none') return false;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return false;
+    return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+  }
+
+  _pointInDesktopSwipeZone(clientX, clientY, ev) {
+    // Top switcher always swipes — handlers sit on the element itself.
+    if ((ev && ev.currentTarget && ev.currentTarget.classList
+        && ev.currentTarget.classList.contains('hv-desktop-switcher'))
+      || this._pointInDesktopSwitcher(clientX, clientY)) {
+      return true;
+    }
     const width = (typeof window !== 'undefined' && window.innerWidth) || 1920;
     const height = (typeof window !== 'undefined' && window.innerHeight) || 720;
     const workspace = this._popupWorkspace();
-    // Match the two visible touch lanes: 16–160px at the outer sides, ending
-    // above the native dock. The first 16px remains free for Android gestures.
-    return clientY >= 72 && clientY <= Math.min(height, workspace.bottom)
-      && ((clientX >= 16 && clientX <= 160) || (clientX >= width - 160 && clientX <= width - 16));
+    // Full empty background (canvas under cards/apps panes), minus Android's
+    // outer gesture gutters and the car orbit disc.
+    if (clientY < 8 || clientY > Math.min(height, workspace.bottom)) return false;
+    if (clientX < 16 || clientX > width - 16) return false;
+    if (this._pointInCarOrbitZone(clientX, clientY)) return false;
+    return true;
   }
 
   _centerGapRect(mode) {
@@ -32711,7 +33686,10 @@ class Component extends DCLogic {
   _syncCanvasPointerEvents() {
     const el = this.containerRef && this.containerRef.current;
     if (!el) return;
-    el.style.pointerEvents = this._shouldShowCar() ? 'auto' : 'none';
+    const mode = this._shellMode || (this.state && this.state.shellMode) || 'triple';
+    // Wallpaper-only still needs the canvas to catch background desktop swipes
+    // and empty-board long-press. appsOnly has no centre stage at all.
+    el.style.pointerEvents = mode === 'appsOnly' ? 'none' : 'auto';
   }
 
   _placeCells(side) {
@@ -32857,7 +33835,7 @@ class Component extends DCLogic {
     const holdAddWidget = !appsOnly && !slotPick && !pickerOpen && !addOn;
     const widgetFlowOpen = !appsOnly && (slotPick || pickerOpen || addOn);
     const stageControlsVisible = android && onMain && !appsOnly && !widgetFlowOpen
-      && !s.desktopStudioOpen && !s.focusedCardType && !s.panelOpen ? 'flex' : 'none';
+      && !s.desktopStudioOpen && !s.focusedCardType && !s.panelOpen && s.hotspotsChrome ? 'flex' : 'none';
     const pickClass = slotPick ? 'slot-picking' : (
       (!appsOnly && s.widgetPlaceType && !s.widgetPickerStep && s.widgetPlaceW && s.widgetPlaceH) ? 'placing' : ''
     );
@@ -32911,8 +33889,8 @@ class Component extends DCLogic {
         ? (pickerOpen ? 'on picker-open' : 'on slot-pick')
         : '',
       closeWidgetPicker: () => this._cancelWidgetPicker(),
-      // Gestures observe the WebGL canvas itself, in parallel with OrbitControls.
-      // No overlay captures the centre gap, so ordinary orbit drag is untouched.
+      // Gestures observe the WebGL canvas (and the top switcher). Empty
+      // background swipes change desktop; the projected car disc still orbits.
       centerSlotZoneDisplay: 'none',
       centerSlotZoneClass: '',
       centerSlotLeft: centerRect.left,
@@ -33810,9 +34788,28 @@ class Component extends DCLogic {
     this._trunkProgress = this._trunkTarget;
     this._applyTrunkTransform();
     // Same for the side glass — the panes belong to the model that just swapped.
-    this._windowsTarget = (this.state.windowsOpen ?? 0) / 100;
-    this._windowsProgress = this._windowsTarget;
-    this._applyWindowsTransform();
+    {
+      const fallback = (this.state.windowsOpen ?? 0) / 100;
+      const menu = this._hsWindowMenuStates;
+      const prev = this._windowCornerTargets || {};
+      this._windowCornerTargets = { fl: 0, fr: 0, rl: 0, rr: 0 };
+      this._windowCornerProgress = { fl: 0, fr: 0, rl: 0, rr: 0 };
+      ['fl', 'fr', 'rl', 'rr'].forEach((k) => {
+        let t = fallback;
+        if (menu && (menu[k] === 'open' || menu[k] === 'closed')) t = menu[k] === 'open' ? 1 : 0;
+        else if (prev[k] !== undefined) t = prev[k];
+        this._windowCornerTargets[k] = t;
+        this._windowCornerProgress[k] = t;
+      });
+      this._windowsTarget = Math.max(
+        this._windowCornerTargets.fl, this._windowCornerTargets.fr,
+        this._windowCornerTargets.rl, this._windowCornerTargets.rr);
+      this._windowsProgress = this._windowsTarget;
+      this._applyWindowsTransform();
+    }
+    this._mirrorsTarget = (this.state.mirrorsFolded ?? 0) / 100;
+    this._mirrorsProgress = this._mirrorsTarget;
+    this._applyMirrorsTransform();
     // Reset emitters to a clean off baseline FIRST (this zeroes brake/reverse/
     // turn/fog), then re-light whatever the saved light state says is on.
     this._applyInitialFogStates();

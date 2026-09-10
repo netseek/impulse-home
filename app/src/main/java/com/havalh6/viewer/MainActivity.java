@@ -137,10 +137,17 @@ public final class MainActivity extends Activity {
                     "toggle_curtain",
                     "open_windows",
                     "close_windows",
+                    "toggle_window_fl",
+                    "toggle_window_fr",
+                    "toggle_window_rl",
+                    "toggle_window_rr",
                     "open_sunroof",
                     "close_sunroof",
                     "open_curtain",
-                    "close_curtain"
+                    "close_curtain",
+                    "fold_mirrors",
+                    "unfold_mirrors",
+                    "toggle_mirrors"
             ));
     /** Vehicle commands that require a 0-100 opening level. */
     private static final java.util.Set<String> VEHICLE_LEVEL_COMMANDS =
@@ -181,7 +188,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v25-clock-config";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v31-hs-icons";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
