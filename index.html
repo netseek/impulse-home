@@ -6559,7 +6559,7 @@ window.HavalSplash = (function () {
     <div class="hv-config-head">
       <div class="hv-config-title">{{ configHeaderTitle }}</div>
       <div class="hv-config-head-actions">
-        <button type="button" class="hv-config-save {{ saveBtnClass }}" onClick="{{ onSaveSettings }}" title="Save settings">SAVE</button>
+        <button type="button" class="hv-config-save {{ saveBtnClass }}" onClick="{{ onSaveSettings }}" title="{{ configSaveTitle }}">SAVE</button>
         <button class="hv-config-close" onClick="{{ closeConfigPanel }}" title="Close panel">×</button>
       </div>
     </div>
@@ -6676,12 +6676,11 @@ window.HavalSplash = (function () {
           </button>
         </sc-for>
       </div>
-      <div class="hv-cam-save-row">
-        <button onClick="{{ saveCurrentDesktopCamera }}" title="{{ camDesktopSaveHint }}" style="border: 1px solid {{ camDesktopSaveBorder }}; background: {{ camDesktopSaveBg }}; color: {{ camDesktopSaveCol }}; opacity: {{ camDesktopSaveOpacity }};">{{ camDesktopSaveLabel }}</button>
-        <sc-if value="{{ camSaveToSlotVisible }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ camSaveToSlotVisible }}" hint-placeholder-val="{{ false }}">
+        <div class="hv-cam-save-row">
           <button onClick="{{ toggleCamSlotPick }}" title="{{ camSlotSaveHint }}" style="border: 1px solid {{ camSlotSaveBorder }}; background: {{ camSlotSaveBg }}; color: {{ camSlotSaveCol }};">{{ camSlotSaveLabel }}</button>
-        </sc-if>
-      </div>
+        </div>
+      </sc-if>
       <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">{{ camDesktopSaveHint }}</div>
 
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin: 16px 0 9px;">OPTIONS</div>
@@ -7157,7 +7156,7 @@ const CAR_POWER_DEMO_PACKED = [
 ];
 const CAR_WIDGET_HOLD_MS = 500;
 const H6_DESKTOPS_KEY = 'h6_desktops_v1';
-const H6_DESKTOPS_VERSION = 3;
+const H6_DESKTOPS_VERSION = 4;
 const H6_MAX_DESKTOPS = 6;
 const H6_DESKTOP_ACCENTS = [
   { key: 'cyan', color: '#2aa7b7' },
@@ -8043,7 +8042,7 @@ class Component extends DCLogic {
     this._debugMode = readDebugFlag();
     this._loadLayoutCameras();
     this._loadCustomCamViews();
-    this._desktopCamera = null;
+    this._desktopCameras = { triple: null, appCar: null };
     this._camEventKind = null;
     this._camEventPrevRel = null;
     this._camEventPrevPreset = null;
@@ -8236,6 +8235,44 @@ class Component extends DCLogic {
       px: typeof p.px === 'number' ? p.px : 0,
       py: typeof p.py === 'number' ? p.py : 0,
       viewShift: typeof p.viewShift === 'number' ? p.viewShift : 0,
+    };
+  }
+
+  /** Per-desktop home poses keyed by shell layout (triple / appCar). */
+  _normalizeDesktopCameras(raw, shellMode) {
+    const out = { triple: null, appCar: null };
+    const src = raw && typeof raw === 'object' ? raw : null;
+    if (src && (src.triple || src.appCar || src.cameras)) {
+      const map = src.cameras && typeof src.cameras === 'object' ? src.cameras : src;
+      out.triple = this._normalizeDesktopCam(map.triple);
+      out.appCar = this._normalizeDesktopCam(map.appCar);
+    }
+    // Legacy: a single `camera` pose applied to every layout. Keep it on the
+    // desktop's current (or default) car layout so older saves still load.
+    if (!out.triple && !out.appCar && src && src.camera) {
+      const legacy = this._normalizeDesktopCam(src.camera);
+      if (legacy) {
+        const key = (shellMode === 'appCar') ? 'appCar' : 'triple';
+        out[key] = legacy;
+      }
+    }
+    return out;
+  }
+
+  _desktopCamForLayout(mode) {
+    const key = (mode === 'triple' || mode === 'appCar')
+      ? mode
+      : this._currentLayoutCamKey();
+    if (!key) return null;
+    const map = this._desktopCameras || {};
+    return this._normalizeDesktopCam(map[key]);
+  }
+
+  _cloneDesktopCameras(map) {
+    const src = this._normalizeDesktopCameras(map || this._desktopCameras);
+    return {
+      triple: src.triple ? Object.assign({}, src.triple) : null,
+      appCar: src.appCar ? Object.assign({}, src.appCar) : null,
     };
   }
 
@@ -11865,18 +11902,29 @@ class Component extends DCLogic {
     }
   }
 
-  saveCurrentDesktopCamera() {
-    if (!this._desktopReady) return;
+  saveCurrentDesktopCamera(opts) {
+    if (!this._desktopReady) return false;
+    const key = this._currentLayoutCamKey();
+    if (!key) return false;
     const rel = this._captureCurrentLayoutCam();
-    if (!rel) return;
-    this._desktopCamera = this._normalizeDesktopCam(rel);
+    if (!rel) return false;
+    if (!this._desktopCameras) this._desktopCameras = { triple: null, appCar: null };
+    // Layout-scoped, desktop-scoped: this angle is the home for *this*
+    // shell mode on *this* desktop only — never the global layoutCameras map.
+    this._desktopCameras[key] = this._normalizeDesktopCam(rel);
     this._persistActiveDesktop();
-    this.setState({ camDesktopFlash: true, cameraPreset: null, camSlotPickMode: false });
-    clearTimeout(this._camDesktopFlashTimer);
-    this._camDesktopFlashTimer = setTimeout(() => {
-      if (!this._unmounted) this.setState({ camDesktopFlash: false });
-    }, 1400);
+    const quiet = !!(opts && opts.quiet);
+    if (!quiet) {
+      this.setState({ camDesktopFlash: true, cameraPreset: null, camSlotPickMode: false });
+      clearTimeout(this._camDesktopFlashTimer);
+      this._camDesktopFlashTimer = setTimeout(() => {
+        if (!this._unmounted) this.setState({ camDesktopFlash: false });
+      }, 1400);
+    } else if (this.state.cameraPreset || this.state.camSlotPickMode) {
+      this.setState({ cameraPreset: null, camSlotPickMode: false });
+    }
     if (this.requestRender) this.requestRender(4);
+    return true;
   }
 
   _saveCamViewToSlot(key) {
@@ -11890,8 +11938,7 @@ class Component extends DCLogic {
     this._camCycleKeys = null;
     if (this._camIcons) delete this._camIcons[key];
     this._ensureCamIcons(0, { background: false });
-    // Slot save only: blink the tile. Do not write the desktop home, and do
-    // not flash SAVE TO CURRENT VIEW.
+    // Slot save only: blink the tile. Do not write the desktop layout home.
     this.setState({
       camSlotFlashKey: key,
       camSlotPickMode: false,
@@ -11933,6 +11980,8 @@ class Component extends DCLogic {
 
   saveSettings() {
     const s = this.state;
+    // One SAVE for the dock: settings + current layout home on this desktop.
+    this.saveCurrentDesktopCamera({ quiet: true });
     const payload = {
       timeMode: s.timeMode,
       nightMode: s.nightMode,
@@ -11978,6 +12027,7 @@ class Component extends DCLogic {
       wallpaperAuto: !!s.wallpaperAuto,
       wallpaperIdx: Math.max(0, s.wallpaperIdx || 0),
       wallpaperEntries: Array.isArray(this._wallpaperEntries) ? this._wallpaperEntries : [],
+      // Builtins / debug overrides only — per-desktop homes live in H6_DESKTOPS.
       layoutCameras: this._layoutCameras || {},
       customCamViews: this._customCamViews || this._emptyCustomCamViews(),
     };
@@ -12171,12 +12221,10 @@ class Component extends DCLogic {
       safeBottom: (this._safeBottomPx || 0) + 'px',
       launcherBottom: (this._launcherBottomPx == null ? 60 : this._launcherBottomPx) + 'px',
       popupWorkspaceStyle: '--hv-popup-top:' + this._popupWorkspace().top + 'px;--hv-popup-bottom-inset:' + this._popupWorkspace().bottomInset + 'px;',
-      // The shell paints the FINAL background from the very first render.
-      // Previously this div carried a hardcoded light radial gradient and only
-      // became the real colour once _applyBackground ran after the model
-      // loaded, so a night-mode car flashed light grey for the whole load and
-      // then snapped dark. state.nightMode/dayBg/nightBg are restored from
-      // localStorage in the constructor, so they are already correct here.
+      // The shell paints the same day/night colour the 3D scene will use, from
+      // the first render — including while the model is still loading — so the
+      // wait frame matches the car instead of flashing WebView white or splash
+      // black. state.nightMode/dayBg/nightBg are restored in the constructor.
       shellBg: this._resolvedBg(),
       // Config panel docks over the left widget board (see configDock*).
       toolbarRight: (s.panelOpen ? 286 : 26) + 'px',
@@ -12334,16 +12382,11 @@ class Component extends DCLogic {
       saveCurrentDesktopCamera: () => this.saveCurrentDesktopCamera(),
       toggleCamSlotPick: () => this.toggleCamSlotPick(),
       camSaveToSlotVisible: this._hasFilledCamSlots(),
-      camDesktopSaveLabel: s.camDesktopFlash ? 'SAVED TO CURRENT VIEW' : 'SAVE TO CURRENT VIEW',
       camDesktopSaveHint: this._desktopReady
         ? (s.camSlotPickMode
           ? 'Pick a slot to overwrite with the current camera.'
-          : 'Orbit the car, then save this angle as the home for the current desktop.')
+          : 'Header SAVE stores this angle as the home for the current layout on this desktop. Empty tiles (+) save a slot; SAVE TO SLOT replaces one.')
         : 'Desktops are still loading.',
-      camDesktopSaveBorder: hv(!!s.camDesktopFlash).border,
-      camDesktopSaveBg:     hv(!!s.camDesktopFlash).bg,
-      camDesktopSaveCol:    hv(!!s.camDesktopFlash).col,
-      camDesktopSaveOpacity: this._desktopReady ? '1' : '0.4',
       camSlotSaveLabel: s.camSlotPickMode ? 'CANCEL' : 'SAVE TO SLOT',
       camSlotSaveHint: s.camSlotPickMode
         ? 'Tap a slot to overwrite it, or Cancel.'
@@ -12391,6 +12434,9 @@ class Component extends DCLogic {
         });
       })(),
       onSaveSettings: () => this.saveSettings(),
+      configSaveTitle: s.configSection === 'camera'
+        ? 'Save settings and this layout’s camera home for the current desktop'
+        : 'Save settings',
       saveBtnBorder: hv(s.saveFlash).border,
       saveBtnCol:    hv(s.saveFlash).col,
       saveBtnClass: s.saveFlash ? 'on' : '',
@@ -23885,9 +23931,8 @@ class Component extends DCLogic {
 
       // _applyBackground takes over once the model is in (it swaps in the
       // vignette/grain texture), but until then the canvas still has to paint
-      // something. Use the SAME colour it will settle on rather than a fixed
-      // light grey, so the canvas appearing over the shell is invisible instead
-      // of a flash of the wrong colour.
+      // something. Use the SAME colour the car will settle on rather than a
+      // fixed black or light grey, so the wait frame matches the model.
       if (this._isMixedCenterFill()) {
         scene.background = null;
         renderer.setClearColor(0x000000, 0);
@@ -24490,11 +24535,12 @@ class Component extends DCLogic {
         this._forceViewerLayout();
         const W = (container.clientWidth || window.innerWidth || 1920);
         const H = (container.clientHeight || window.innerHeight || 720);
-        if (this.camera && this.camera.isOrthographicCamera) {
+        const cam = this.camera;
+        if (cam && cam.isOrthographicCamera) {
           this._syncOrthoFrustum();
-        } else {
-          camera.aspect = W / H;
-          camera.updateProjectionMatrix();
+        } else if (cam) {
+          cam.aspect = W / H;
+          cam.updateProjectionMatrix();
         }
         renderer.setSize(W, H);
         if (this._fitCam) this._applyShellViewOffset(this._fitCam.viewShift || 0);
@@ -24670,6 +24716,9 @@ class Component extends DCLogic {
         const now = performance.now();
         const delta = Math.min((now - _lastT) / 1000, 0.1); // seconds, capped
         _lastT = now;
+        // _setCameraOrtho swaps this.camera; the outer `const camera` is the
+        // boot PerspectiveCamera and would keep rendering perspective forever.
+        const camera = this.camera;
 
         // FPS HUD — rendered frames in the last second ("idle" when on-demand
         // rendering is skipping frames because nothing changed).
@@ -29224,7 +29273,8 @@ class Component extends DCLogic {
     const THREE = window.THREE;
     if (!THREE || !this._fitCenter || !this._fitDist) return null;
     const key = (mode === 'triple' || mode === 'appCar') ? mode : null;
-    const saved = key && this._layoutCameras && this._layoutCameras[key];
+    const desk = key && this._desktopCamForLayout(key);
+    const saved = desk || (key && this._layoutCameras && this._layoutCameras[key]);
     let position, target;
     if (saved && typeof saved.f === 'number') {
       ({ position, target } = this._relPositionTarget(saved));
@@ -29489,9 +29539,9 @@ class Component extends DCLogic {
   }
 
   _layoutHomePose() {
-    const desk = this._normalizeDesktopCam(this._desktopCamera);
-    if (desk) return this._relToPose(desk);
     const key = this._currentLayoutCamKey();
+    const desk = this._desktopCamForLayout(key);
+    if (desk) return this._relToPose(desk);
     const saved = key && this._layoutCameras && this._layoutCameras[key];
     if (saved && typeof saved.f === 'number') return this._relToPose(saved);
     return this._proceduralHomePose();
@@ -29545,7 +29595,8 @@ class Component extends DCLogic {
     const target = this._shellCameraTarget(popupActive);
     const key = this._currentLayoutCamKey();
     const mode = key || this._shellMode || 'triple';
-    const saved = key && this._layoutCameras && this._layoutCameras[key];
+    const saved = this._desktopCamForLayout(key)
+      || (key && this._layoutCameras && this._layoutCameras[key]);
     const hasSaved = !!(saved && typeof saved.f === 'number');
     const home = this._layoutHomePose();
     // viewShift always tracks the LIVE gap (see _relToPose) - a saved pose only
@@ -31420,7 +31471,7 @@ class Component extends DCLogic {
       widgetClock: this._cloneDesktopValue(this._normalizeWidgetClock(this._widgetClockConfig), this._normalizeWidgetClock()),
       bottomClock: this._cloneDesktopValue(this._normalizeBottomClock(this._bottomClockConfig), this._normalizeBottomClock()),
       widgetLayout: this._cloneDesktopValue(layout || this._widgetLayout || this._defaultWidgetLayout(), this._defaultWidgetLayout()),
-      camera: this._normalizeDesktopCam(this._desktopCamera),
+      cameras: this._cloneDesktopCameras(this._desktopCameras),
     };
   }
 
@@ -31454,7 +31505,10 @@ class Component extends DCLogic {
     base.widgetClock = this._normalizeWidgetClock(d.widgetClock || { style: d.clockStyle, hourFormat: d.clockHourFormat || (d.clockFormat === '12h' ? '12' : '24') });
     base.bottomClock = this._normalizeBottomClock(d.bottomClock || { face: d.clockFace, hourFormat: d.clockHourFormat || (d.clockFormat === '12h' ? '12' : '24') });
     base.widgetLayout = this._parseWidgetLayout(d.widgetLayout || base.widgetLayout);
-    base.camera = this._normalizeDesktopCam(d.camera);
+    base.cameras = this._normalizeDesktopCameras(
+      { cameras: d.cameras, camera: d.camera },
+      base.shellMode
+    );
     return base;
   }
 
@@ -31463,7 +31517,8 @@ class Component extends DCLogic {
     try { store = JSON.parse(localStorage.getItem(H6_DESKTOPS_KEY) || 'null'); } catch (e) { store = null; }
     let desktops = [];
     let active = 0;
-    if (store && (store.version === 1 || store.version === 2 || store.version === H6_DESKTOPS_VERSION) && Array.isArray(store.desktops)) {
+    if (store && typeof store.version === 'number' && store.version >= 1
+        && store.version <= H6_DESKTOPS_VERSION && Array.isArray(store.desktops)) {
       for (let i = 0; i < store.desktops.length && desktops.length < H6_MAX_DESKTOPS; i++) {
         desktops.push(this._normalizeDesktop(store.desktops[i], 'Desktop ' + (i + 1)));
       }
@@ -31508,7 +31563,7 @@ class Component extends DCLogic {
     this._pendingSlotSync = true;
     this._shellMode = current.shellMode;
     this._splitRatio = current.splitRatio;
-    this._desktopCamera = this._normalizeDesktopCam(current.camera);
+    this._desktopCameras = this._cloneDesktopCameras(current.cameras);
     Object.assign(this.state, {
       desktopIndex: active,
       shellMode: current.shellMode,
@@ -31568,7 +31623,7 @@ class Component extends DCLogic {
     this._widgetsReady = true;
     this._shellMode = d.shellMode;
     this._splitRatio = d.splitRatio;
-    this._desktopCamera = this._normalizeDesktopCam(d.camera);
+    this._desktopCameras = this._cloneDesktopCameras(d.cameras);
     persistBootShellLayout(d.shellMode, d.splitRatio);
     this._saveDesktopStore();
     const left = this._board('left', d.shellMode);
