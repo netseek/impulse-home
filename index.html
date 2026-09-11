@@ -3944,6 +3944,36 @@ window.HavalSplash = (function () {
       width: 17px; height: 17px;
     }
 
+    /* Cold-load ring — sits around the FAB button, independent of the React
+       tree (see _applyPowertrainVisibility): a CSS animation keeps spinning
+       on its own compositor thread, so it cannot be swallowed by a commit
+       that never gets painted. Toggled by a plain classList add/remove.
+       Unlike the button icon, this ring sits OUTSIDE the button's opaque
+       backing, directly over the 3D scene — a plain white arc would repeat
+       the day-mode invisibility mistake CLAUDE.md documents for the old
+       boot-center ring. The dim full track keeps it readable in day mode;
+       the drop-shadow keeps the bright arc readable in night mode. */
+    .hv-fab-ring {
+      position: absolute;
+      left: -21px; top: -21px;
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      border: 2px solid rgba(0,0,0,.22);
+      border-top-color: #fff;
+      border-right-color: #fff;
+      filter: drop-shadow(0 0 1.5px rgba(0,0,0,.55));
+      opacity: 0;
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+    .hv-fab-ring.on {
+      opacity: .95;
+      animation: hv-fab-ring-spin .85s linear infinite;
+    }
+    @keyframes hv-fab-ring-spin {
+      to { transform: rotate(360deg); }
+    }
+
     /* Flaticon car-engine glyph — masked so it tracks currentColor like stroke icons. */
     .hv-xray-icon {
       display: block;
@@ -19238,10 +19268,14 @@ class Component extends DCLogic {
       ev.stopPropagation();
       this._togglePowertrainFromFab();
     });
+    const ring = document.createElement('div');
+    ring.className = 'hv-fab-ring';
     wrap.appendChild(btn);
+    wrap.appendChild(ring);
     this._hsLayer.appendChild(wrap);
     this._xrayFabEl = wrap;
     this._xrayFabBtn = btn;
+    this._xrayFabRing = ring;
   }
 
   _togglePowertrainFromFab() {
@@ -19457,6 +19491,7 @@ class Component extends DCLogic {
     this._xrayFabEl = null;
     this._xrayFabBtn = null;
     this._xrayFabAnchor = null;
+    this._xrayFabRing = null;
     this._hsEls = null;
     this._hsRoofPop = null;
     this._hsRoofMenu = null;
@@ -28891,8 +28926,16 @@ class Component extends DCLogic {
     if (cold) {
       this._beginCarSwap('xray');
       this.setState({});                 // paint the badge on the next render
+      // Belt-and-suspenders feedback: a CSS animation on the FAB itself,
+      // independent of whether the boot-center badge's commit ever gets
+      // painted (see _applyPowertrainVisibility notes above/CLAUDE.md) —
+      // this ring is toggled by a plain classList call, not a React render.
+      if (this._xrayFabRing) this._xrayFabRing.classList.add('on');
     }
-    const endBadge = () => { if (cold) this._endCarSwap(); };
+    const endBadge = () => {
+      if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
+      if (cold) this._endCarSwap();
+    };
     this._ensurePowertrain().then((rig) => {
       if (!rig) { endBadge(); return; }
       this._applyPowertrainVariant();
