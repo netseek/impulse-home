@@ -737,8 +737,9 @@ window.HavalSplash = (function () {
       height: 100%;
       max-height: none;
       box-sizing: border-box;
-      overflow-x: hidden;
-      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
     .hv-config-panel {
       height: auto;
@@ -759,7 +760,7 @@ window.HavalSplash = (function () {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       flex-shrink: 0;
     }
     .hv-config-title {
@@ -777,10 +778,175 @@ window.HavalSplash = (function () {
       border: none;
       color: var(--hv-widget-muted);
       cursor: pointer;
-      padding: 2px 4px;
-      font-size: 16px;
+      padding: 4px 8px;
+      font-size: 18px;
       line-height: 1;
-      border-radius: 4px;
+      border-radius: 8px;
+      min-width: 36px;
+      min-height: 36px;
+    }
+    .hv-config-head-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .hv-config-save {
+      min-height: 36px;
+      min-width: 52px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.18));
+      background: rgba(255,255,255,.06);
+      color: inherit;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .1em;
+      font-weight: 600;
+    }
+    .hv-config-save.on {
+      color: var(--hv-accent, #4fd6e8);
+      border-color: var(--hv-accent, #4fd6e8);
+      background: rgba(255,255,255,.1);
+    }
+    .hv-config-tabs,
+    .hv-config-subtabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .hv-config-tabs button,
+    .hv-config-subtabs button {
+      min-height: 38px;
+      padding: 6px 2px;
+      border-radius: 9px;
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.16));
+      background: transparent;
+      color: inherit;
+      opacity: .55;
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .05em;
+      font-weight: 600;
+      line-height: 1.15;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hv-config-subtabs button { min-height: 32px; font-size: 7px; letter-spacing: .04em; }
+    .hv-config-tabs button.on,
+    .hv-config-subtabs button.on {
+      opacity: 1;
+      color: var(--hv-accent, #4fd6e8);
+      border-color: var(--hv-accent, #4fd6e8);
+      background: rgba(255,255,255,.08);
+    }
+    .hv-config-body {
+      flex: 1;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-right: 2px;
+    }
+    .hv-config-section-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .16em;
+      opacity: .5;
+      margin: 0 0 8px;
+    }
+    .hv-paint-swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .hv-paint-swatches button {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      cursor: pointer;
+      padding: 0;
+      box-shadow: 0 1px 4px rgba(0,0,0,.4);
+      transition: border-color .15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hv-config-color-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .hv-config-color-grid label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .1em;
+      opacity: .68;
+    }
+    .hv-config-color-grid input[type="color"] {
+      width: 100%;
+      height: 34px;
+      border: 1px solid var(--hv-widget-border, rgba(255,255,255,.18));
+      border-radius: 8px;
+      background: transparent;
+      padding: 2px;
+      cursor: pointer;
+    }
+    .hv-config-reset {
+      width: 100%;
+      min-height: 40px;
+      margin-top: 4px;
+      padding: 0 10px;
+      border-radius: 9px;
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.18));
+      background: rgba(255,255,255,.05);
+      color: inherit;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .1em;
+      font-weight: 600;
+    }
+    .hv-config-row {
+      margin-bottom: 12px;
+    }
+    .hv-config-row-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 4px;
+    }
+    .hv-config-row-head span:first-child {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .14em;
+      opacity: .5;
+    }
+    .hv-size-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .hv-size-row button {
+      min-height: 36px;
+      border: 1px solid rgba(79,214,232,.3);
+      border-radius: 8px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .hv-config-dock .hv-wheel-catalog {
+      /* Fill leftover dock height so the rim grid scrolls inside the popup. */
+      max-height: none;
+      flex: 1;
+      min-height: 120px;
     }
     .hv-config-kicker {
       font-family: 'Space Mono', monospace;
@@ -1001,6 +1167,8 @@ window.HavalSplash = (function () {
     }
     /* Slightly larger panel type without rewriting every inline size. */
     .hv-config-panel { font-size: 13px; }
+    .hv-config-tabs button { font-size: 9px !important; }
+    .hv-config-subtabs button { font-size: 8px !important; }
     .hv-config-panel [style*="font-size: 7px"] { font-size: 9px !important; }
     .hv-config-panel [style*="font-size: 8px"] { font-size: 10px !important; }
     .hv-config-panel [style*="font-size: 9px"] { font-size: 11px !important; }
@@ -6390,25 +6558,77 @@ window.HavalSplash = (function () {
     <!-- Header -->
     <div class="hv-config-head">
       <div class="hv-config-title">{{ configHeaderTitle }}</div>
-      <button class="hv-config-close" onClick="{{ closeConfigPanel }}" title="Close panel">×</button>
+      <div class="hv-config-head-actions">
+        <button type="button" class="hv-config-save {{ saveBtnClass }}" onClick="{{ onSaveSettings }}" title="Save settings">SAVE</button>
+        <button class="hv-config-close" onClick="{{ closeConfigPanel }}" title="Close panel">×</button>
+      </div>
     </div>
 
-    <!-- ── CAR TUNING: PAINT ── -->
+    <!-- Main tabs: Paint / Wheel / Tuning / Advanced -->
+    <sc-if value="{{ showConfigMainTabs }}" hint-placeholder-val="{{ true }}">
+      <div class="hv-config-tabs">
+        <button type="button" class="{{ tabPaintClass }}" onClick="{{ setConfigTabPaint }}">Paint</button>
+        <button type="button" class="{{ tabWheelClass }}" onClick="{{ setConfigTabWheel }}">Wheel</button>
+        <button type="button" class="{{ tabTuneClass }}" onClick="{{ setConfigTabTune }}">Tuning</button>
+        <button type="button" class="{{ tabAdvancedClass }}" onClick="{{ setConfigTabAdvanced }}">Advanced</button>
+      </div>
+    </sc-if>
+
+    <!-- Advanced subtabs stay pinned under the main tabs -->
+    <sc-if value="{{ showAdvancedSubtabs }}" hint-placeholder-val="{{ false }}">
+      <div class="hv-config-subtabs">
+        <button type="button" class="{{ advEnvClass }}" onClick="{{ setAdvancedEnv }}">Env</button>
+        <button type="button" class="{{ advMotionClass }}" onClick="{{ setAdvancedMotion }}">Speed</button>
+        <button type="button" class="{{ advDoorsClass }}" onClick="{{ setAdvancedDoors }}">Doors</button>
+        <button type="button" class="{{ advLightsClass }}" onClick="{{ setAdvancedLights }}">Lights</button>
+      </div>
+    </sc-if>
+
+    <div class="hv-config-body slim-scrollbar">
+
+    <!-- ── PAINT ── -->
     <sc-if value="{{ sectionIsPaint }}" hint-placeholder-val="{{ true }}">
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">PAINT</div>
-      <div style="display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 8px;">
+      <div class="hv-config-section-label">BODY COLOR</div>
+      <div class="hv-paint-swatches">
         <sc-for list="{{ swatches }}" as="sw" hint-placeholder-count="7">
-          <button onClick="{{ sw.onClick }}" title="{{ sw.title }}" style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; background: {{ sw.hex }}; border: 2px solid {{ sw.ring }}; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: border-color .15s ease;"></button>
+          <button type="button" onClick="{{ sw.onClick }}" title="{{ sw.title }}" style="background: {{ sw.hex }}; border: 2px solid {{ sw.ring }};"></button>
         </sc-for>
       </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;">
-        <label style="display:flex; flex-direction:column; gap:6px; font-family:'Space Mono',monospace; font-size:8px; letter-spacing:.12em; opacity:.68;">CUSTOM BODY COLOR
-          <input type="color" value="{{ currentCarPaintHex }}" onChange="{{ onCustomCarColor }}" onInput="{{ onCustomCarColor }}" style="width:100%; height:30px; border:1px solid var(--hv-widget-border,rgba(255,255,255,.18)); border-radius:7px; background:transparent; padding:2px; cursor:pointer;" />
-        </label>
-        <label style="display:flex; flex-direction:column; gap:6px; font-family:'Space Mono',monospace; font-size:8px; letter-spacing:.12em; opacity:.68;">WHEEL COLOR
-          <input type="color" value="{{ wheelColor }}" onChange="{{ onWheelColor }}" onInput="{{ onWheelColor }}" style="width:100%; height:30px; border:1px solid var(--hv-widget-border,rgba(255,255,255,.18)); border-radius:7px; background:transparent; padding:2px; cursor:pointer;" />
+      <div class="hv-config-row">
+        <label style="display: flex; flex-direction: column; gap: 6px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .1em; opacity: .68;">CUSTOM BODY
+          <input type="color" value="{{ currentCarPaintHex }}" onChange="{{ onCustomCarColor }}" onInput="{{ onCustomCarColor }}" style="width: 100%; height: 34px; border: 1px solid var(--hv-widget-border, rgba(255,255,255,.18)); border-radius: 8px; background: transparent; padding: 2px; cursor: pointer;" />
         </label>
       </div>
+
+      <div class="hv-config-section-label">RIM FINISH</div>
+      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 12px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; opacity: .85; min-height: 36px;">
+        <input type="checkbox" checked="{{ wheelTintOverride }}" onChange="{{ onWheelTintOverride }}" style="accent-color: #4fd6e8; width: 18px; height: 18px; cursor: pointer;" />
+        TINT OVERRIDE
+      </label>
+      <div style="opacity: {{ tintOverrideOpacity }}; pointer-events: {{ tintOverridePointer }}; transition: opacity 0.2s ease;">
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+          <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
+            COLOR
+            <input type="color" value="{{ wheelColor }}" onChange="{{ onWheelColor }}" onInput="{{ onWheelColor }}" disabled="{{ tintControlsDisabled }}" style="width: 44px; height: 34px; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; cursor: pointer; background: none; padding: 2px;" />
+          </label>
+          <div style="flex: 1;">
+            <div class="hv-config-row-head">
+              <span>ROUGHNESS</span>
+              <span class="hv-config-val">{{ wheelRoughnessLabel }}</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.02" value="{{ wheelRoughness }}" onChange="{{ onWheelRoughness }}" onInput="{{ onWheelRoughness }}" disabled="{{ tintControlsDisabled }}" style="width: 100%; accent-color: #4fd6e8;" />
+          </div>
+        </div>
+        <div class="hv-config-row">
+          <div class="hv-config-row-head">
+            <span>METALNESS</span>
+            <span class="hv-config-val">{{ wheelMetalnessLabel }}</span>
+          </div>
+          <input type="range" min="0" max="1" step="0.02" value="{{ wheelMetalness }}" onChange="{{ onWheelMetalness }}" onInput="{{ onWheelMetalness }}" disabled="{{ tintControlsDisabled }}" style="width: 100%; accent-color: #4fd6e8;" />
+        </div>
+      </div>
+
+      <button type="button" class="hv-config-reset" onClick="{{ resetPaintColors }}" title="Restore stock body and rim finish">RESET COLORS</button>
     </sc-if>
 
     <!-- ── LAYOUT (background + widget hint) ── -->
@@ -6475,20 +6695,24 @@ window.HavalSplash = (function () {
 
     <!-- ── ENV TAB ── -->
     <sc-if value="{{ sectionIsEnv }}" hint-placeholder-val="{{ false }}">
-      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
-        <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">LIGHT</span>
-        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ lightLabel }}</span>
+      <div class="hv-config-row">
+        <div class="hv-config-row-head">
+          <span>LIGHT</span>
+          <span class="hv-config-val">{{ lightLabel }}</span>
+        </div>
+        <input type="range" min="0" max="6" step="0.1" value="{{ lightIntensity }}" onChange="{{ onLight }}" onInput="{{ onLight }}" style="width: 100%; accent-color: #4fd6e8;" />
       </div>
-      <input type="range" min="0" max="6" step="0.1" value="{{ lightIntensity }}" onChange="{{ onLight }}" onInput="{{ onLight }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
 
-      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px;">
-        <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5;">EXPOSURE</span>
-        <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ exposureLabel }}</span>
+      <div class="hv-config-row">
+        <div class="hv-config-row-head">
+          <span>EXPOSURE</span>
+          <span class="hv-config-val">{{ exposureLabel }}</span>
+        </div>
+        <input type="range" min="0.3" max="1.8" step="0.02" value="{{ exposure }}" onChange="{{ onExposure }}" onInput="{{ onExposure }}" style="width: 100%; accent-color: #4fd6e8;" />
       </div>
-      <input type="range" min="0.3" max="1.8" step="0.02" value="{{ exposure }}" onChange="{{ onExposure }}" onInput="{{ onExposure }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
 
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">ENVIRONMENT</div>
-      <select value="{{ hdriKey }}" onChange="{{ onHdri }}" style="width: 100%; background: rgba(255,255,255,.06); color: #eaf2f8; border: 1px solid rgba(255,255,255,.16); border-radius: 6px; padding: 7px 9px; font-family: 'Space Grotesk', sans-serif; font-size: 12px; outline: none; cursor: pointer; margin-bottom: 8px;">
+      <div class="hv-config-section-label">ENVIRONMENT</div>
+      <select value="{{ hdriKey }}" onChange="{{ onHdri }}" style="width: 100%; background: rgba(255,255,255,.06); color: #eaf2f8; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; padding: 10px 9px; font-family: 'Space Grotesk', sans-serif; font-size: 12px; outline: none; cursor: pointer; margin-bottom: 12px;">
         <option value="dyad" style="color:#111;">Dyad showroom cube</option>
         <option value="st_peters" style="color:#111;">St. Peter's Square Night</option>
         <option value="studio" style="color:#111;">Studio (neutral)</option>
@@ -6499,49 +6723,37 @@ window.HavalSplash = (function () {
         <option value="studio_loft" style="color:#111;">Studio Loft</option>
         <option value="custom" style="color:#111;" disabled="{{ customDisabled }}">{{ customLabel }}</option>
       </select>
-      <label style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 9px; border: 1px dashed rgba(79,214,232,.4); border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: .12em; color: #9fe6f0; cursor: pointer; margin-bottom: 18px;">
-        UPLOAD .HDR
-        <input type="file" accept=".hdr,image/vnd.radiance" onChange="{{ onUploadHdri }}" style="display: none;" />
-      </label>
+      <!-- UPLOAD .HDR removed from UI; onUploadHdri kept in JS -->
 
-      <!-- BG colors row -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;">
-        <label style="display: flex; flex-direction: column; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; opacity: .6; cursor: pointer;">
-          DAY BG
-          <input type="color" value="{{ dayBg }}" onChange="{{ onDayBg }}" onInput="{{ onDayBgInput }}" style="width: 100%; height: 26px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer; background: none; padding: 2px;" />
+      <div class="hv-config-color-grid">
+        <label>DAY BG
+          <input type="color" value="{{ dayBg }}" onChange="{{ onDayBg }}" onInput="{{ onDayBgInput }}" />
         </label>
-        <label style="display: flex; flex-direction: column; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .12em; opacity: .6; cursor: pointer;">
-          NIGHT BG
-          <input type="color" value="{{ nightBg }}" onChange="{{ onNightBg }}" onInput="{{ onNightBgInput }}" style="width: 100%; height: 26px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; cursor: pointer; background: none; padding: 2px;" />
+        <label>NIGHT BG
+          <input type="color" value="{{ nightBg }}" onChange="{{ onNightBg }}" onInput="{{ onNightBgInput }}" />
         </label>
       </div>
 
-      <!-- Night: keep day hemi+dir on the car; only BG + ground pools change. -->
-      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: -4px 0 14px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .7;" title="Night keeps day car lighting; only background and ground light pools change. Uncheck to restore the old dim night car.">
-        <input type="checkbox" checked="{{ nightKeepDayLighting }}" onChange="{{ onNightKeepDayLighting }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
+      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0 0 12px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; opacity: .75; min-height: 36px;" title="Night keeps day car lighting; only background and ground light pools change.">
+        <input type="checkbox" checked="{{ nightKeepDayLighting }}" onChange="{{ onNightKeepDayLighting }}" style="accent-color: #4fd6e8; width: 18px; height: 18px; cursor: pointer;" />
         KEEP DAY LIGHTING
       </label>
 
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">VIGNETTE</div>
-      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+      <div class="hv-config-section-label">VIGNETTE</div>
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
         <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
           COLOR
-          <input type="color" value="{{ vignetteColor }}" onChange="{{ onVignetteColor }}" onInput="{{ onVignetteColorInput }}" style="width: 40px; height: 22px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; background: none; padding: 1px;" />
+          <input type="color" value="{{ vignetteColor }}" onChange="{{ onVignetteColor }}" onInput="{{ onVignetteColorInput }}" style="width: 44px; height: 34px; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; cursor: pointer; background: none; padding: 2px;" />
         </label>
         <div style="flex: 1;">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
-            <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">INTENSITY</span>
-            <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ vignetteIntensity }}%</span>
+          <div class="hv-config-row-head">
+            <span>INTENSITY</span>
+            <span class="hv-config-val">{{ vignetteIntensity }}%</span>
           </div>
           <input type="range" min="0" max="95" step="1" value="{{ vignetteIntensity }}" onChange="{{ onVignetteIntensity }}" onInput="{{ onVignetteIntensity }}" style="width: 100%; accent-color: #4fd6e8;" />
         </div>
       </div>
-
-      <!-- Grain toggle -->
-      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 6px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .7;">
-        <input type="checkbox" checked="{{ grainEnabled }}" onChange="{{ onGrain }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
-        GRAIN EFFECT
-      </label>
+      <!-- GRAIN EFFECT removed from UI; grainEnabled state kept for saves -->
     </sc-if>
 
     <!-- ── CAR OVERRIDE ── -->
@@ -6653,109 +6865,50 @@ window.HavalSplash = (function () {
       </sc-if>
     </sc-if>
 
-    <!-- ── WHEELS ── -->
-    <sc-if value="{{ sectionIsWheels }}" hint-placeholder-val="{{ false }}">
+    <!-- ── WHEEL (catalog) ── -->
+    <sc-if value="{{ sectionIsWheelCatalog }}" hint-placeholder-val="{{ false }}">
+      <div class="hv-config-section-label">RIM CATALOG</div>
+      <div class="slim-scrollbar hv-wheel-catalog" style="grid-template-columns: {{ wheelCatalogCols }};">
+        <button type="button" class="hv-wheel-card" onClick="{{ onSelectStockWheel }}" title="Stock" style="border: 1px solid {{ stockRing }}; background: {{ stockBg }};">
+          <div class="hv-wheel-thumb">
+            <img src="{{ stockThumb }}" style="opacity: {{ stockImgOpacity }}; animation: {{ stockImgAnim }};" />
+            <div class="hv-wheel-thumb-spin" style="display: {{ stockSpinDisplay }};"></div>
+          </div>
+          <span style="color: {{ stockCol }};">STOCK</span>
+        </button>
+        <sc-for list="{{ catalogItems }}" as="cw" hint-placeholder-count="21">
+          <button type="button" class="hv-wheel-card" onClick="{{ cw.onClick }}" title="{{ cw.label }}" style="border: 1px solid {{ cw.ring }}; background: {{ cw.bg }};">
+            <div class="hv-wheel-thumb">
+              <img src="{{ cw.thumb }}" style="opacity: {{ cw.imgOpacity }}; animation: {{ cw.imgAnim }};" />
+              <div class="hv-wheel-thumb-spin" style="display: {{ cw.spinDisplay }};"></div>
+            </div>
+            <span style="color: {{ cw.textColor }};">{{ cw.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </sc-if>
 
-      <!-- sub-tab pills: CATALOG / WHEEL TUNE -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 16px;">
-        <button onClick="{{ setWheelSubCatalog }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subCatalogBorder }}; background: {{ subCatalogBg }}; color: {{ subCatalogCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">CATALOG</button>
-        <button onClick="{{ setWheelSubSettings }}" style="padding: 7px 1px; border-radius: 6px; border: 1px solid {{ subSettingsBorder }}; background: {{ subSettingsBg }}; color: {{ subSettingsCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; transition: all 0.15s ease;">WHEEL TUNE</button>
+    <!-- ── WHEEL TUNING ── -->
+    <sc-if value="{{ sectionIsWheelTune }}" hint-placeholder-val="{{ false }}">
+      <div class="hv-config-row">
+        <div class="hv-config-row-head">
+          <span>RIDE HEIGHT</span>
+          <span class="hv-config-val">{{ carHeightLabel }}</span>
+        </div>
+        <div style="font-family: 'Space Mono', monospace; font-size: 7px; opacity: .4; margin-bottom: 2px;">LOWER ←  → RAISE</div>
+        <input type="range" min="-4" max="6" step="0.2" value="{{ carHeightVal }}" onChange="{{ onCarHeight }}" onInput="{{ onCarHeight }}" style="width: 100%; accent-color: #4fd6e8;" />
       </div>
 
-      <!-- ── 1. RIM CATALOG ── -->
-      <sc-if value="{{ subIsCatalog }}" hint-placeholder-val="{{ true }}">
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM CATALOG</div>
-        <div class="slim-scrollbar hv-wheel-catalog" style="grid-template-columns: {{ wheelCatalogCols }};">
-          <button type="button" class="hv-wheel-card" onClick="{{ onSelectStockWheel }}" title="Stock" style="border: 1px solid {{ stockRing }}; background: {{ stockBg }};">
-            <div class="hv-wheel-thumb">
-              <img src="{{ stockThumb }}" style="opacity: {{ stockImgOpacity }}; animation: {{ stockImgAnim }};" />
-              <div class="hv-wheel-thumb-spin" style="display: {{ stockSpinDisplay }};"></div>
-            </div>
-            <span style="color: {{ stockCol }};">STOCK</span>
-          </button>
-          <sc-for list="{{ catalogItems }}" as="cw" hint-placeholder-count="21">
-            <button type="button" class="hv-wheel-card" onClick="{{ cw.onClick }}" title="{{ cw.label }}" style="border: 1px solid {{ cw.ring }}; background: {{ cw.bg }};">
-              <div class="hv-wheel-thumb">
-                <img src="{{ cw.thumb }}" style="opacity: {{ cw.imgOpacity }}; animation: {{ cw.imgAnim }};" />
-                <div class="hv-wheel-thumb-spin" style="display: {{ cw.spinDisplay }};"></div>
-              </div>
-              <span style="color: {{ cw.textColor }};">{{ cw.label }}</span>
-            </button>
-          </sc-for>
-        </div>
-      </sc-if>
-
-      <!-- ── 2. CUSTOM WHEEL ── -->
-      <sc-if value="{{ subIsCustom }}" hint-placeholder-val="{{ false }}">
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">UPLOAD WHEEL MODEL</div>
-        <label style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px 9px; border: 1px dashed rgba(79,214,232,.35); border-radius: 8px; background: rgba(79,214,232,.02); color: #9fe6f0; cursor: pointer; margin-bottom: 18px; text-align: center; transition: all 0.15s ease;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <span style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .08em; line-height: 1.3; word-break: break-all;">
-            {{ uploadedWheelLabel }}
-          </span>
-          <input type="file" accept=".glb,.gltf" onChange="{{ onUploadWheel }}" style="display: none;" />
-        </label>
-
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CALIPER DEPTH</div>
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-          <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">INWARD ←  → OUTWARD</span>
-          <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ wheelDepthOffsetLabel }}</span>
-        </div>
-        <input type="range" min="-15" max="15" step="0.5" value="{{ wheelDepthOffsetVal }}" onChange="{{ onWheelDepthOffset }}" onInput="{{ onWheelDepthOffset }}" style="width: 100%; accent-color: #4fd6e8;" />
-      </sc-if>
-
-      <!-- ── 3. WHEEL SETTINGS (finish + ride height + size) ── -->
-      <sc-if value="{{ subIsSettings }}" hint-placeholder-val="{{ false }}">
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIM FINISH</div>
-
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; opacity: .8;">
-          <input type="checkbox" checked="{{ wheelTintOverride }}" onChange="{{ onWheelTintOverride }}" style="accent-color: #4fd6e8; width: 14px; height: 14px; cursor: pointer;" />
-          TINT OVERRIDE
-        </label>
-
-        <div style="opacity: {{ tintOverrideOpacity }}; pointer-events: {{ tintOverridePointer }}; transition: opacity 0.2s ease;">
-          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
-            <label style="display: flex; flex-direction: column; gap: 4px; font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6; cursor: pointer; flex-shrink: 0;">
-              COLOR
-              <input type="color" value="{{ wheelColor }}" onChange="{{ onWheelColor }}" onInput="{{ onWheelColor }}" disabled="{{ tintControlsDisabled }}" style="width: 40px; height: 22px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; cursor: pointer; background: none; padding: 1px;" />
-            </label>
-
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">ROUGHNESS</span>
-                <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelRoughnessLabel }}</span>
-              </div>
-              <input type="range" min="0" max="1" step="0.02" value="{{ wheelRoughness }}" onChange="{{ onWheelRoughness }}" onInput="{{ onWheelRoughness }}" disabled="{{ tintControlsDisabled }}" style="width: 100%; accent-color: #4fd6e8;" />
-            </div>
-          </div>
-
-          <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-              <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .6;">METALNESS / GLOSS</span>
-              <span style="font-family: 'Space Mono', monospace; font-size: 9px; color: #4fd6e8;">{{ wheelMetalnessLabel }}</span>
-            </div>
-            <input type="range" min="0" max="1" step="0.02" value="{{ wheelMetalness }}" onChange="{{ onWheelMetalness }}" onInput="{{ onWheelMetalness }}" disabled="{{ tintControlsDisabled }}" style="width: 100%; accent-color: #4fd6e8;" />
-          </div>
-        </div>
-
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">RIDE HEIGHT</div>
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-          <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">LOWER ←  → RAISE</span>
-          <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ carHeightLabel }}</span>
-        </div>
-        <input type="range" min="-4" max="6" step="0.2" value="{{ carHeightVal }}" onChange="{{ onCarHeight }}" onInput="{{ onCarHeight }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 18px;" />
-
-        <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">WHEEL SIZE</div>
-        <div style="display: flex; gap: 4px; margin-bottom: 6px;">
-          <button onClick="{{ setSize19 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size19Bg }}; color: {{ size19Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">19"</button>
-          <button onClick="{{ setSize20 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size20Bg }}; color: {{ size20Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">20"</button>
-          <button onClick="{{ setSize21 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size21Bg }}; color: {{ size21Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">21"</button>
-          <button onClick="{{ setSize22 }}" style="flex: 1; height: 26px; border: 1px solid rgba(79,214,232,.3); background: {{ size22Bg }}; color: {{ size22Col }}; font-family: 'Space Mono', monospace; font-size: 9px; cursor: pointer; border-radius: 4px; transition: all 0.2s;">22"</button>
-        </div>
-        <div style="font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: .06em; opacity: .4; line-height: 1.4;">Size also applies to wheels picked from the catalog.</div>
-      </sc-if>
-
+      <div class="hv-config-section-label">WHEEL SIZE</div>
+      <div class="hv-size-row">
+        <button type="button" onClick="{{ setSize19 }}" style="background: {{ size19Bg }}; color: {{ size19Col }};">19"</button>
+        <button type="button" onClick="{{ setSize20 }}" style="background: {{ size20Bg }}; color: {{ size20Col }};">20"</button>
+        <button type="button" onClick="{{ setSize21 }}" style="background: {{ size21Bg }}; color: {{ size21Col }};">21"</button>
+        <button type="button" onClick="{{ setSize22 }}" style="background: {{ size22Bg }}; color: {{ size22Col }};">22"</button>
+      </div>
     </sc-if>
+
+    </div>
 
   </div>
   </div>
@@ -12105,27 +12258,46 @@ class Component extends DCLogic {
       configBtnBg:     hv(s.configExpanded).bg,
       toggleConfigPanel: () => this.toggleConfigRail(),
       closeConfigPanel: () => this.setState({ panelOpen: false, activeGroup: null }),
-      openSectionEnv: () => this._toggleConfigSection('env', { activeGroup: 'env' }),
-      openSectionTuning: () => this._toggleConfigSection('paint', { activeGroup: 'tuning', tuningSubTab: 'paint' }),
-      openSectionOverride: () => this._toggleConfigSection('override', { activeGroup: 'override', overrideSubTab: 'motion' }),
+      openSectionEnv: () => this._openConfigTab('advanced', { advanced: 'env' }),
+      openSectionTuning: () => this._openConfigTab('paint'),
+      openSectionOverride: () => this._openConfigTab('advanced', { advanced: 'motion' }),
       tabEnvBorder:      hv(s.panelOpen && s.configSection === 'env').border,
       tabEnvCol:         hv(s.panelOpen && s.configSection === 'env').col,
       tabCameraBorder:   hv(s.panelOpen && s.configSection === 'camera').border,
       tabCameraCol:      hv(s.panelOpen && s.configSection === 'camera').col,
       cameraBtnBg:       hv(s.panelOpen && s.configSection === 'camera').bg,
-      configHeaderTitle: s.configSection === 'paint' ? 'PAINT'
-        : s.configSection === 'wheels' ? 'WHEELS'
-        : s.configSection === 'env' ? 'ENVIRONMENT'
-        : s.configSection === 'camera' ? 'CAMERA'
-        : s.configSection === 'layout' ? 'LAYOUT'
-        : s.configSection === 'override' ? (
-            s.overrideSubTab === 'doors' ? 'DOORS'
-            : s.overrideSubTab === 'lights' ? 'LIGHTS'
-            : 'SPEED'
-          )
-        : 'CONFIGURE',
+      configHeaderTitle: (() => {
+        if (s.configSection === 'camera') return 'CAMERA';
+        if (s.configSection === 'layout') return 'LAYOUT';
+        if (s.configSection === 'paint') return 'PAINT';
+        if (s.configSection === 'wheels' && s.wheelSubTab === 'settings') return 'WHEEL TUNING';
+        if (s.configSection === 'wheels') return 'WHEELS';
+        if (s.configSection === 'env' || s.configSection === 'override') return 'ADVANCED';
+        return 'CUSTOMIZE';
+      })(),
+      showConfigMainTabs: !!(s.panelOpen && (s.configSection === 'paint' || s.configSection === 'wheels'
+        || s.configSection === 'env' || s.configSection === 'override')),
+      showAdvancedSubtabs: !!(s.panelOpen && (s.configSection === 'env' || s.configSection === 'override')),
+      tabPaintClass: (s.configSection === 'paint' ? 'on' : ''),
+      tabWheelClass: (s.configSection === 'wheels' && s.wheelSubTab !== 'settings' ? 'on' : ''),
+      tabTuneClass: (s.configSection === 'wheels' && s.wheelSubTab === 'settings' ? 'on' : ''),
+      tabAdvancedClass: (s.configSection === 'env' || s.configSection === 'override' ? 'on' : ''),
+      setConfigTabPaint: () => this._openConfigTab('paint'),
+      setConfigTabWheel: () => this._openConfigTab('wheel'),
+      setConfigTabTune: () => this._openConfigTab('tune'),
+      setConfigTabAdvanced: () => this._openConfigTab('advanced'),
+      setAdvancedEnv: () => this._openConfigTab('advanced', { advanced: 'env' }),
+      setAdvancedMotion: () => this._openConfigTab('advanced', { advanced: 'motion' }),
+      setAdvancedDoors: () => this._openConfigTab('advanced', { advanced: 'doors' }),
+      setAdvancedLights: () => this._openConfigTab('advanced', { advanced: 'lights' }),
+      advEnvClass: (s.configSection === 'env' ? 'on' : ''),
+      advMotionClass: (s.configSection === 'override' && s.overrideSubTab === 'motion' ? 'on' : ''),
+      advDoorsClass: (s.configSection === 'override' && s.overrideSubTab === 'doors' ? 'on' : ''),
+      advLightsClass: (s.configSection === 'override' && s.overrideSubTab === 'lights' ? 'on' : ''),
       sectionIsPaint:    s.configSection === 'paint',
       sectionIsWheels:   s.configSection === 'wheels',
+      sectionIsWheelCatalog: s.configSection === 'wheels' && s.wheelSubTab !== 'settings',
+      sectionIsWheelTune: s.configSection === 'wheels' && s.wheelSubTab === 'settings',
       sectionIsOverride: s.configSection === 'override',
       sectionIsEnv:      s.configSection === 'env',
       sectionIsCamera:   s.configSection === 'camera',
@@ -12221,8 +12393,9 @@ class Component extends DCLogic {
       onSaveSettings: () => this.saveSettings(),
       saveBtnBorder: hv(s.saveFlash).border,
       saveBtnCol:    hv(s.saveFlash).col,
-      setTuningPaint:  () => this._toggleConfigSection('paint', { activeGroup: 'tuning', tuningSubTab: 'paint' }),
-      setTuningWheels: () => this._toggleConfigSection('wheels', { activeGroup: 'tuning', tuningSubTab: 'wheels' }),
+      saveBtnClass: s.saveFlash ? 'on' : '',
+      setTuningPaint:  () => this._openConfigTab('paint'),
+      setTuningWheels: () => this._openConfigTab('wheel'),
       tunPaintBorder:  hv(s.panelOpen && s.configSection === 'paint').border,
       tunWheelsBorder: hv(s.panelOpen && s.configSection === 'wheels').border,
       tunPaintCol:  hv(s.panelOpen && s.configSection === 'paint').col,
@@ -12230,9 +12403,9 @@ class Component extends DCLogic {
       overrideIsMotion: s.overrideSubTab === 'motion',
       overrideIsDoors:  s.overrideSubTab === 'doors',
       overrideIsLights: s.overrideSubTab === 'lights',
-      setOverrideMotion: () => this._toggleConfigSection('override', { activeGroup: 'override', overrideSubTab: 'motion' }),
-      setOverrideDoors:  () => this._toggleConfigSection('override', { activeGroup: 'override', overrideSubTab: 'doors' }),
-      setOverrideLights: () => this._toggleConfigSection('override', { activeGroup: 'override', overrideSubTab: 'lights' }),
+      setOverrideMotion: () => this._openConfigTab('advanced', { advanced: 'motion' }),
+      setOverrideDoors:  () => this._openConfigTab('advanced', { advanced: 'doors' }),
+      setOverrideLights: () => this._openConfigTab('advanced', { advanced: 'lights' }),
       ovMotionBg: hv(s.panelOpen && s.overrideSubTab === 'motion').bg,
       ovDoorsBg:  hv(s.panelOpen && s.overrideSubTab === 'doors').bg,
       ovLightsBg: hv(s.panelOpen && s.overrideSubTab === 'lights').bg,
@@ -12272,6 +12445,7 @@ class Component extends DCLogic {
         const color = e && e.target ? e.target.value : null;
         if (color) this.setColor(color);
       },
+      resetPaintColors: () => this.resetPaintColors(),
       lightIntensity: s.lightIntensity,
       lightLabel: s.lightIntensity.toFixed(1),
       exposure: s.exposure,
@@ -12303,13 +12477,13 @@ class Component extends DCLogic {
       onWheelColor: (e) => this.onWheelColor(e),
       onWheelRoughness: (e) => this.onWheelRoughness(e),
       onWheelMetalness: (e) => this.onWheelMetalness(e),
-      // Wheels sub-tabs: CATALOG / WHEEL TUNE (CUSTOM is hidden)
+      // Wheels: catalog vs tune are top-level tabs now (CUSTOM stays hidden)
       wheelSubTab: s.wheelSubTab,
       subIsCatalog:  s.wheelSubTab !== 'settings',
       subIsCustom:   false,
       subIsSettings: s.wheelSubTab === 'settings',
-      setWheelSubCatalog:  () => this.setWheelSubTab('catalog'),
-      setWheelSubSettings: () => this.setWheelSubTab('settings'),
+      setWheelSubCatalog:  () => this._openConfigTab('wheel'),
+      setWheelSubSettings: () => this._openConfigTab('tune'),
       subCatalogBg:  hv(s.wheelSubTab !== 'settings').bg,
       subCustomBg:   'transparent',
       subSettingsBg: hv(s.wheelSubTab === 'settings').bg,
@@ -33417,7 +33591,8 @@ class Component extends DCLogic {
     const s = this.state;
     const sameSection = s.panelOpen && s.configSection === section;
     const sameSub = extra.overrideSubTab == null || extra.overrideSubTab === s.overrideSubTab;
-    if (sameSection && sameSub) {
+    const sameWheel = extra.wheelSubTab == null || extra.wheelSubTab === s.wheelSubTab;
+    if (sameSection && sameSub && sameWheel) {
       this.setState({ panelOpen: false, activeGroup: null });
       return;
     }
@@ -33429,8 +33604,82 @@ class Component extends DCLogic {
     };
     if (extra.tuningSubTab) patch.tuningSubTab = extra.tuningSubTab;
     if (extra.overrideSubTab) patch.overrideSubTab = extra.overrideSubTab;
+    if (extra.wheelSubTab) patch.wheelSubTab = extra.wheelSubTab;
+    else if (section === 'wheels' && s.wheelSubTab === 'settings' && !extra.keepWheelSub) {
+      // Native "Wheels" chip wants the catalog, not leftover Tuning state.
+      patch.wheelSubTab = 'catalog';
+    }
     this.setState(patch);
     if (section === 'wheels') this._generateCatalogThumbnails();
+  }
+
+  /**
+   * Open a customize-dock main tab without the toggle-to-close behaviour of
+   * `_toggleConfigSection` (tab switches must never dismiss the popup).
+   * @param {'paint'|'wheel'|'tune'|'advanced'} tab
+   * @param {{ advanced?: 'env'|'motion'|'doors'|'lights' }} [opts]
+   */
+  _openConfigTab(tab, opts) {
+    opts = opts || {};
+    const s = this.state;
+    let patch = {
+      configExpanded: true,
+      panelOpen: true,
+    };
+    if (tab === 'paint') {
+      patch = Object.assign(patch, {
+        configSection: 'paint',
+        activeGroup: 'tuning',
+        tuningSubTab: 'paint',
+      });
+    } else if (tab === 'wheel') {
+      patch = Object.assign(patch, {
+        configSection: 'wheels',
+        activeGroup: 'tuning',
+        tuningSubTab: 'wheels',
+        wheelSubTab: 'catalog',
+      });
+    } else if (tab === 'tune') {
+      patch = Object.assign(patch, {
+        configSection: 'wheels',
+        activeGroup: 'tuning',
+        tuningSubTab: 'wheels',
+        wheelSubTab: 'settings',
+      });
+    } else {
+      const adv = opts.advanced
+        || (s.configSection === 'override' ? (s.overrideSubTab || 'motion')
+          : (s.configSection === 'env' ? 'env' : 'env'));
+      if (adv === 'env') {
+        patch = Object.assign(patch, {
+          configSection: 'env',
+          activeGroup: 'env',
+        });
+      } else {
+        patch = Object.assign(patch, {
+          configSection: 'override',
+          activeGroup: 'override',
+          overrideSubTab: adv === 'doors' || adv === 'lights' ? adv : 'motion',
+        });
+      }
+    }
+    this.setState(patch);
+    if (tab === 'wheel') this._generateCatalogThumbnails();
+  }
+
+  resetPaintColors() {
+    this.setColor('stock');
+    this.setState({
+      wheelColor: '#3a3a3d',
+      wheelTintOverride: false,
+    }, () => {
+      if (typeof this.applyWheelMaterialProperties === 'function') {
+        this.applyWheelMaterialProperties();
+      }
+      if (typeof this._requestBlurCapture === 'function') {
+        this._requestBlurCapture();
+      }
+    });
   }
 
   /**
