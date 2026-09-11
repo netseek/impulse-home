@@ -852,6 +852,35 @@ mode write was broadcast into the void. The classes were committed in Impulse
 all along; only `VehicleCommandReceiver` was declared in its manifest. Fixed
 upstream in `6d053976` on `feature/new-screen-enhancements-v8`.
 
+### Software mirror fold is a no-op on this MMI (2026-09-10)
+
+Status **read** works: `car.drive.setting.outside_view_mirror_fold_state`
+(`0` = folded, `1` = unfolded). The viewer hotspot / Impulse
+`fold_mirrors` / `unfold_mirrors` / `toggle_mirrors` path is wired end-to-end
+(viewer allowlist → `ACTION_VEHICLE_COMMAND` + caller PendingIntent →
+`VehicleCommandReceiver` → `IVehicle.setRearViewMirrorFoldState`), and Impulse
+logs `ok=true`, but the bus value never changes.
+
+What the OEM voice-adapter actually does:
+
+- `setRearViewMirrorFoldState(n)` →
+  `PlatformAdapterClient.requestCmdAsync("cmd.common.request.set",
+  "car.drive.setting.outside_view_mirror_fold_state", String.valueOf(n))`
+- `isSupportRearViewMirrorFold()` returns 1 only when
+  `persist.vendor.gwm.cfg.outside.rr.view.mirror` is in **1..5** (this car: **3**)
+  **and** `persist.vendor.gwm.cfg.osrvm.fold.virtual.sw.control == 1`
+  (this car shipped at **0**).
+
+Forcing the virtual-SW prop to `1` (persists across reboot) did **not** make
+the set actuate. Physical fold still updates the status key. The mirror
+hotspot and command allowlists are therefore commented out / hidden for
+reference until a working write path is found (likely deeper than IVehicle —
+`Its_IntelligentVehicleControlService` accepts the key in its subscribe list
+but ignores the set).
+
+**Do not** send a bare Android `stop` over the car's root telnet while probing
+— that tears down zygote; recover with `start`.
+
 **Installing that fix needs the release keystore.** Impulse on the car is signed
 `7e00ad11...`; a plain `assembleDebug` is signed with the Android debug key
 (`6a44a729...`) and Android will not upgrade across signers. Installing a debug

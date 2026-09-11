@@ -17898,7 +17898,10 @@ class Component extends DCLogic {
     return [
       { id: 'roof', title: 'Sunroof & curtain', ui: 'roof-sliders' },
       { id: 'windows', title: 'Windows', ui: 'windows-toggles' },
-      { id: 'mirrors', title: 'Mirrors', ui: 'mirrors-toggle' },
+      // Hidden: IVehicle.setRearViewMirrorFoldState returns ok but does not
+      // move the mirrors on this car (osrvm.fold.virtual.sw.control gate +
+      // IntelligentVehicleControl no-op). Status read/anim still live.
+      // { id: 'mirrors', title: 'Mirrors', ui: 'mirrors-toggle' },
       { id: 'trunk', title: 'Tailgate', ui: 'trunk-toggle' },
     ];
   }
@@ -18919,12 +18922,12 @@ class Component extends DCLogic {
       open_windows: ['windows', 'open'], close_windows: ['windows', 'close'],
       open_sunroof: ['sunroof', 'open'], close_sunroof: ['sunroof', 'close'],
       open_curtain: ['curtain', 'open'], close_curtain: ['curtain', 'close'],
-      fold_mirrors: true, unfold_mirrors: true,
+      // fold_mirrors / unfold_mirrors: hardware path is a no-op on this MMI.
     };
-    if (actions[cmd] === true) {
-      this._setMirrorsFolded(cmd === 'fold_mirrors' ? 100 : 0);
-      return true;
-    }
+    // if (actions[cmd] === true) {
+    //   this._setMirrorsFolded(cmd === 'fold_mirrors' ? 100 : 0);
+    //   return true;
+    // }
     if (actions[cmd]) {
       const kind = actions[cmd][0];
       const level = actions[cmd][1] === 'open' ? 100 : 0;
@@ -18969,7 +18972,7 @@ class Component extends DCLogic {
       },
       toggle_sunroof: () => this._applyVehicleOpeningLevel('sunroof', (s.sunroofOpen || 0) > 0 ? 0 : 100),
       toggle_curtain: () => this._applyVehicleOpeningLevel('curtain', (s.curtainOpen || 0) > 0 ? 0 : 100),
-      toggle_mirrors: () => this._setMirrorsFolded(((s.mirrorsFolded || 0) > 0) ? 0 : 100),
+      // toggle_mirrors: () => this._setMirrorsFolded(((s.mirrorsFolded || 0) > 0) ? 0 : 100),
     };
     if (!local[cmd]) return false;
     local[cmd]();

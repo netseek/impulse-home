@@ -144,10 +144,10 @@ public final class MainActivity extends Activity {
                     "open_sunroof",
                     "close_sunroof",
                     "open_curtain",
-                    "close_curtain",
-                    "fold_mirrors",
-                    "unfold_mirrors",
-                    "toggle_mirrors"
+                    "close_curtain"
+                    // Software mirror fold is a no-op on this MMI (see CLAUDE.md).
+                    // Keep the names for when OEM virtual-SW fold actually actuates:
+                    // "fold_mirrors", "unfold_mirrors", "toggle_mirrors"
             ));
     /** Vehicle commands that require a 0-100 opening level. */
     private static final java.util.Set<String> VEHICLE_LEVEL_COMMANDS =
@@ -188,7 +188,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v40-window-trunk-pace";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v41-hide-mirror-fold";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
