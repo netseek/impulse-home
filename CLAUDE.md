@@ -240,6 +240,83 @@ explains it. Measure the specific change; do not reason from this table.
   the models roughly 3x on disk (HEV 11.3 -> 34.6 MB) in exchange for 4 MB of
   VRAM per 2048 map instead of 16 MB.
 
+## Cold start: the download is not I/O bound, it is React bound
+
+**Measured 2026-09-11.** A cold boot had drifted to ~29 s against a splash clip
+that holds at ~18-22 s, i.e. the car arrived AFTER its own intro. Almost all of
+it was one line.
+
+The boot GLB is 13.5 MB. Its fetch measured **14.4-15.0 s** during boot, and
+**0.36 s** when the same file was re-fetched from the idle, already-booted app.
+So it was never I/O: the APK asset read runs at ~40 MB/s.
+
+The cause was the loader's `onProgress`, which called
+`setState({ progress, processing })` on every XHR chunk. A commit here costs
+~197 ms (see the `_live` seam section above), and the damage is not just the
+commit time — **each commit hands the main thread back mid-transfer**, so the
+transfer itself stretches. Interleaved A/B on the car, same file, same page:
+
+| | run 1 | run 2 | run 3 | progress events |
+|---|---|---|---|---|
+| plain XHR | 405 ms | 695 ms | 726 ms | 9-14 |
+| + `setState` per chunk | 8811 ms | 10053 ms | 9636 ms | 91-97 |
+
+Repeated later on a hot device: 758/1492/972 against 15432/18896/18432. Every
+pair the same sign; the ratio is 13-19x. Note the **event count** is itself the
+tell — yielding per chunk makes Chromium deliver ~7x more, smaller chunks.
+
+**Nothing about that readout needed React.** On Android the percent is drawn
+NATIVELY (`AppLauncherBridge.setBootProgress` — the splash `<video>`
+hole-punches through the page, so the HTML loader is not even on screen), and
+the HTML fallback is one bar's width. It now goes through the `_live` seam like
+every other hot signal: `_setLoadProgress` → `_liveSet('progress')` → a `paint`
+that writes the bar and calls `_syncBootHud`. React sees progress only at the
+settle points that already commit. Measured after: **70 HUD paints, 1 React
+commit** for a whole boot, against ~95 commits before.
+
+`_loadProgressPct()` / `_loadProcessing()` are the live readers, and
+`renderVals` uses them — same lesson as `mediaPositionMs`: if a re-render from
+some other cause reads `s.progress`, the bar snaps back.
+
+### The transfer also started 4 s late
+
+Even fixed, the GLB request could not be issued until three.js and GLTFLoader
+were on the page (~4.8 s), with the network idle until then. A `<head>` script
+(`window.__bootGlb`) now starts the fetch at ~0.9 s and the boot loader calls
+`loader.parse()` on **its buffer** rather than requesting the file again —
+WebViewAssetLoader sends no caching headers, so a second request is not
+guaranteed to be served from memory. Two things that matter:
+
+- the preload resolves the body the same way `_resolvedBootVariant()` does
+  (only a GT trim/variant is not the HEV body). A disagreement is not a bug:
+  the URLs will not match, and the loader falls through to its own fetch.
+- it reports bytes as **plain numbers** that the app samples on a 120 ms timer.
+  A per-chunk callback into the app is the exact regression above.
+
+### Numbers, and why they need pairing
+
+Interleaved before/after APK installs, three pairs, ready-to-drive in ms:
+
+| pair | before | after |
+|---|---|---|
+| 1 | 38662 | 27735 |
+| 2 | 46832 | 16111 |
+| 3 | 32266 | 18046 |
+
+On a rested unit the same build boots in **14.6-14.9 s**; the table above was
+taken after ~15 consecutive cold starts had pushed the MMI to 5.6/6.4 GB used
+with 223 MB swapped, and EVERYTHING slowed with it — the loader `<script>`s
+went from ~120 ms each to ~1.3 s. So: **a cold-start number taken after a
+string of restarts is measuring the memory pressure you just created.** Reboot
+or rest the unit before quoting an absolute, and compare arms in PAIRS
+regardless.
+
+`scripts/device-cdp.mjs` cannot see this on its own. What found it was a CDP
+probe installed with `Page.addScriptToEvaluateOnNewDocument` (NOT a plain
+evaluate — the WebView navigates after attach and wipes anything you injected
+into the first document), recording `performance.getEntriesByType('resource')`
+plus a `longtask` observer and a poll for `__app._viewerReady`.
+
 ## Card, widget, popup are three different surfaces
 
 Three things get called "the card" and a change verified on one can be broken

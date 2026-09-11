@@ -9,6 +9,75 @@
 <script src="./appLauncherClient.js"></script>
 <script src="./assets/clock-core.js"></script>
 <script src="./assets/clock-elements.js"></script>
+<script>
+/* Boot GLB preload.
+   ------------------------------------------------------------------------
+   MEASURED ON THE CAR: the body GLB request cannot start until three.js and
+   GLTFLoader are on the page, which is ~4.8 s in. Until then the network is
+   idle and the transfer - 0.36 s when nothing competes with it - has not
+   begun. Starting it HERE overlaps it with the rest of the boot.
+
+   The buffer is handed to GLTFLoader.parse() (see __bootGlb in the boot
+   loader), NOT left to the HTTP cache: WebViewAssetLoader sets no caching
+   headers, so a second request is not guaranteed to be served from memory.
+
+   `loaded` / `total` are plain numbers, deliberately - the app samples them
+   on a timer for the progress bar. A per-chunk CALLBACK into the app is what
+   made the boot 13 s slower in the first place (see _setLoadProgress).
+
+   The body resolution mirrors _resolvedBootVariant(): only a GT trim/variant
+   is not the HEV body. If it ever disagrees, the preload is a wasted local
+   read and the loader falls back to its own fetch - nothing breaks. */
+(function () {
+  var HEV = 'assets/haval-h6-hev-lite.glb?rev=4';
+  var GT  = 'assets/haval-h6-gt-lite.glb?rev=2';
+  var url = HEV;
+  try {
+    var q = new URLSearchParams((location.search || '').replace(/^[#?]/, ''));
+    var h = new URLSearchParams((location.hash || '').replace(/^[#?]/, ''));
+    var preset = String(q.get('model') || h.get('model') || '').toLowerCase().trim();
+    if (preset === 'gt') url = GT;
+    else if (!preset) {
+      var saved = JSON.parse(localStorage.getItem('h6_settings_v1') || '{}') || {};
+      if (saved.modelTrim === 'gt') url = GT;
+      else if (!saved.modelTrim && saved.modelVariant === 'gt') url = GT;
+    }
+  } catch (e) {}
+
+  var state = window.__bootGlb = { url: url, loaded: 0, total: 0, buffer: null, failed: false };
+  state.promise = fetch(url).then(function (res) {
+    if (!res.ok) throw new Error('preload ' + res.status);
+    state.total = Number(res.headers.get('content-length')) || 0;
+    if (!res.body || !res.body.getReader) return res.arrayBuffer();
+    var reader = res.body.getReader();
+    var chunks = [], n = 0;
+    return (function pump() {
+      return reader.read().then(function (r) {
+        if (r.done) {
+          var out = new Uint8Array(n), at = 0;
+          for (var i = 0; i < chunks.length; i++) { out.set(chunks[i], at); at += chunks[i].length; }
+          chunks.length = 0;
+          return out.buffer;
+        }
+        chunks.push(r.value);
+        n += r.value.length;
+        state.loaded = n;
+        return pump();
+      });
+    })();
+  }).then(function (buf) {
+    state.loaded = buf.byteLength;
+    if (!state.total) state.total = buf.byteLength;
+    state.buffer = buf;
+    return buf;
+  }).catch(function (err) {
+    state.failed = true;
+    console.warn('[BootGlb] preload failed, loader will fetch it', err);
+    throw err;
+  });
+  state.promise.catch(function () {});
+}());
+</script>
 <style>
   /* Boot splash. This block lives in <head> rather than in the x-dc <helmet>
      below, because the helmet's styles are only injected once the template
@@ -12365,8 +12434,10 @@ class Component extends DCLogic {
       bootCenterCardClass: this._carSwapLabel ? 'hv-badge' : '',
       errorDisplay: s.error ? 'flex' : 'none',
       errorMsg: s.error || '',
-      progressText: s.processing ? 'PROCESSING…' : (Math.round(s.progress) + '%'),
-      progressWidth: (s.processing ? 100 : Math.max(0, Math.min(100, s.progress || 0))) + '%',
+      progressText: this._loadProcessing() ? 'PROCESSING…'
+        : (Math.round(this._loadProgressPct()) + '%'),
+      progressWidth: (this._loadProcessing()
+        ? 100 : Math.max(0, Math.min(100, this._loadProgressPct()))) + '%',
       hintOpacity: (s.loading && !this._viewerReady) || this._androidApp ? '0' : '0.85',
       panelDisplay: (s.loading && !this._viewerReady) || s.error ? 'none' : 'block',
       panelOpen: s.panelOpen,
@@ -14022,6 +14093,85 @@ class Component extends DCLogic {
         if (input && document.activeElement !== input) input.value = String(v);
       },
     });
+    // Download progress is the hottest signal on the BOOT path, and it used to
+    // go straight to setState. See _setLoadProgress.
+    this._liveDefine('progress', {
+      epsilon: 1,       // one whole percent - finer than the readout shows
+      paint(v) { this._paintLoadProgress(v); },
+    });
+  }
+
+  /**
+   * Boot / model-load progress, painted instead of committed.
+   *
+   * XHR fires a progress event per chunk, and each one used to call setState -
+   * a full React commit (197 ms p50 on this car, see CLAUDE.md) per chunk of a
+   * 13.5 MB body. That does not merely cost its own time: each commit hands the
+   * main thread back mid-transfer, so the DOWNLOAD stretches with it. Measured
+   * on the car, same file, three interleaved pairs:
+   *
+   *   | no setState |  405 ms |   695 ms |  726 ms |  9-14 progress events |
+   *   | setState    | 8811 ms | 10053 ms | 9636 ms | 91-97 progress events |
+   *
+   * i.e. ~13x, and it is why a cold boot sat at ~29 s against a ~17 s intro.
+   *
+   * Nothing about the readout needs React. On Android the percent is drawn
+   * NATIVELY - the splash <video> hole-punches through the page, so the HTML
+   * loader is not even on screen (see _syncBootHud) - and the HTML fallback is
+   * one bar whose width this writes directly. So it goes through the _live
+   * seam like every other hot signal, and React sees progress only at the
+   * settle points that already commit (_finishLoading and friends).
+   */
+  _setLoadProgress(pct) {
+    const p = Math.max(0, Math.min(100, Number(pct) || 0));
+    const processing = p >= 99;
+    if (processing !== !!this._bootProcessing) {
+      // The label swaps to PROCESSING here, so repaint even when the percent
+      // itself has not moved a whole point since the last paint.
+      this._bootProcessing = processing;
+      if (!this._live) this._live = {};
+      if (!this._livePainted) this._livePainted = {};
+      this._live.progress = p;
+      this._livePainted.progress = p;
+      this._paintLoadProgress(p);
+      return;
+    }
+    this._liveSet('progress', p);
+  }
+
+  /**
+   * A settle point - a load starting, finishing, or handing over. These are
+   * one-shot, so they still commit to React; they just have to move the live
+   * mirror with them or the painted bar would stay on the last streamed value.
+   */
+  _resetLoadProgress(pct, processing) {
+    const p = Math.max(0, Math.min(100, Number(pct) || 0));
+    this._bootProcessing = !!processing;
+    if (!this._live) this._live = {};
+    if (!this._livePainted) this._livePainted = {};
+    this._live.progress = p;
+    this._livePainted.progress = p;
+    this._paintLoadProgress(p);
+  }
+
+  /** Live progress, so a re-render from any other cause cannot reset the bar. */
+  _loadProgressPct() {
+    const v = this._liveGet('progress');
+    return typeof v === 'number' ? v : 0;
+  }
+
+  _loadProcessing() {
+    return (this._bootProcessing != null)
+      ? !!this._bootProcessing
+      : !!(this.state && this.state.processing);
+  }
+
+  _paintLoadProgress(v) {
+    const w = (this._loadProcessing()
+      ? 100
+      : Math.max(0, Math.min(100, Number(v) || 0))) + '%';
+    document.querySelectorAll('.hv-boot-line > span').forEach((el) => { el.style.width = w; });
+    this._syncBootHud();
   }
 
   _currentMotionSpeed() {
@@ -21809,6 +21959,7 @@ class Component extends DCLogic {
     if (!file || !THREE) return;
 
     this._beginCarSwap('upload');
+    this._resetLoadProgress(20, false);
     this.setState({ progress: 20, progressText: 'LOADING UPLOADED WHEEL...', loading: true, processing: false, selectedCatalogKey: null, wheelSizeInch: 21 }); // non-stock wheels default to 21" when picked
     const url = URL.createObjectURL(file);
     const loader = new THREE.GLTFLoader();
@@ -21837,7 +21988,7 @@ class Component extends DCLogic {
       },
       (xhr) => {
         if (xhr.lengthComputable) {
-          this.setState({ progress: (xhr.loaded / xhr.total) * 100 });
+          this._setLoadProgress((xhr.loaded / xhr.total) * 100);
         }
       },
       (err) => {
@@ -21916,6 +22067,7 @@ class Component extends DCLogic {
     if (opts.initial) {
       this.setState({ loading: true, processing: true, catalogLoadingKey: item.key });
     } else {
+      this._resetLoadProgress(20, false);
       this.setState({ progress: 20, progressText: 'LOADING ' + item.label.toUpperCase() + '...', loading: true, processing: false, catalogLoadingKey: item.key });
     }
     // Sync hints for onWheelStyle — React setState may not have flushed yet when a
@@ -21987,8 +22139,8 @@ class Component extends DCLogic {
       },
       (xhr) => {
         // Don't fight the continuous PROCESSING state during the cold-start swap.
-        if (xhr.lengthComputable && !this.state.processing) {
-          this.setState({ progress: (xhr.loaded / xhr.total) * 100 });
+        if (xhr.lengthComputable && !this._loadProcessing()) {
+          this._setLoadProgress((xhr.loaded / xhr.total) * 100);
         }
       },
       (err) => {
@@ -24855,7 +25007,7 @@ class Component extends DCLogic {
             let p;
             if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
             else p = Math.min(99, (e.loaded / bytes) * 100);
-            this.setState({ progress: p, processing: p >= 99 });
+            this._setLoadProgress(p);
           },
           (err) => {
             console.warn(v.toUpperCase() + ' model failed to load', err);
@@ -24872,30 +25024,54 @@ class Component extends DCLogic {
         // Skipped for ?model=gt standalone boot — see _gtBootStandalone().
         this._loadVariantModel('hev', null, { silent: true });
       }
-      loader.load(
-        bootUrl,
-        (gltf) => {
-          this._variantLoadState[bootKey] = 'ready';
-          this.onModelLoaded(gltf.scene, profiles[bootKey], { primary: true });
-        },
-        (e) => {
-          // The MMI server may omit Content-Length, so fall back to the known
-          // on-disk byte size of the CURRENT boot GLB. KEEP THIS IN SYNC
-          // whenever the model is re-exported/re-optimized, or the bar under- or
-          // over-shoots. (Was 24129420 before the texture-shrink pass.)
-          let p;
-          if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
-          else p = Math.min(99, (e.loaded / bootBytes) * 100);
-          // Once bytes are in, the frozen tail is Draco/JPEG decode + scene
-          // setup — label it honestly instead of a stuck percent.
-          this.setState({ progress: p, processing: p >= 99 });
-        },
-        (err) => {
-          console.error('GLB load error', err);
-          this.setState({ error: 'The model failed to load. Check the file path and that the Draco decoder is reachable.' });
-          this._endCarSwap();
-        }
-      );
+      const onBootLoaded = (gltf) => {
+        this._variantLoadState[bootKey] = 'ready';
+        const pre = window.__bootGlb;
+        if (pre) { pre.buffer = null; pre.promise = null; }   // drop the 13.5 MB
+        this.onModelLoaded(gltf.scene, profiles[bootKey], { primary: true });
+      };
+      const onBootProgress = (e) => {
+        // The MMI server may omit Content-Length, so fall back to the known
+        // on-disk byte size of the CURRENT boot GLB. KEEP THIS IN SYNC
+        // whenever the model is re-exported/re-optimized, or the bar under- or
+        // over-shoots. (Was 24129420 before the texture-shrink pass.)
+        let p;
+        if (e.lengthComputable && e.total) p = (e.loaded / e.total) * 100;
+        else p = Math.min(99, (e.loaded / bootBytes) * 100);
+        // Once bytes are in, the frozen tail is Draco/JPEG decode + scene
+        // setup - label it honestly instead of a stuck percent.
+        this._setLoadProgress(p);
+      };
+      const onBootError = (err) => {
+        console.error('GLB load error', err);
+        this.setState({ error: 'The model failed to load. Check the file path and that the Draco decoder is reachable.' });
+        this._endCarSwap();
+      };
+      // The <head> preload started this transfer before three.js existed (see
+      // __bootGlb). PARSE ITS BUFFER rather than asking for the file again:
+      // WebViewAssetLoader sends no caching headers, so a second request is
+      // not guaranteed to come out of memory. A disagreeing or failed preload
+      // just falls through to the normal fetch.
+      const pre = window.__bootGlb;
+      if (pre && pre.url === bootUrl && !pre.failed && pre.promise) {
+        // Sample the preload's byte counter for the bar. A per-chunk CALLBACK
+        // into the app is exactly the regression _setLoadProgress documents,
+        // so the preload only ever writes plain numbers and this reads them.
+        const poll = setInterval(() => {
+          const total = pre.total || bootBytes;
+          if (total) this._setLoadProgress(Math.min(99, (pre.loaded / total) * 100));
+        }, 120);
+        pre.promise.then((buf) => {
+          clearInterval(poll);
+          this._setLoadProgress(99);
+          loader.parse(buf, 'assets/', onBootLoaded, onBootError);
+        }).catch(() => {
+          clearInterval(poll);
+          loader.load(bootUrl, onBootLoaded, onBootProgress, onBootError);
+        });
+      } else {
+        loader.load(bootUrl, onBootLoaded, onBootProgress, onBootError);
+      }
 
       // Preload the initial STOCK rim IN PARALLEL with the car. The cold-start
       // stock swap (onModelLoaded → _loadCatalogWheelByKey with {initial:true})
@@ -29863,6 +30039,7 @@ class Component extends DCLogic {
       // Unreachable: the !primary (GT) case already returned earlier in this
       // function (see the early-return block above, which runs its own
       // synchronous _warmupLights()). Kept as a harmless fallback.
+      this._resetLoadProgress(100, false);
       this.setState({ loading: false, progress: 100 });
     }
   }
@@ -31070,8 +31247,8 @@ class Component extends DCLogic {
     const s = this.state || {};
     const bootPhase = !this._viewerReady;
     const loading = !!(s.loading && !s.error && bootPhase);
-    const processing = !!s.processing;
-    const pct = processing ? 100 : Math.round(s.progress || 0);
+    const processing = this._loadProcessing();
+    const pct = processing ? 100 : Math.round(this._loadProgressPct());
     const title = s.catalogLoadingKey ? 'LOADING WHEEL' : 'LOADING MODEL';
     const text = processing ? 'PROCESSING…' : (pct + '%');
     try {
@@ -36301,6 +36478,7 @@ class Component extends DCLogic {
         this._introWaitingForLoader = true;
       }
     }
+    this._resetLoadProgress(100, false);
     const patch = Object.assign({
       loading: false,
       processing: false,
@@ -36650,6 +36828,7 @@ class Component extends DCLogic {
     // switch to a not-yet-loaded variant, show the loader, fetch + process it,
     // then fall through to the normal activation/wheel-follow path once ready.
     if ((!this._variants || !this._variants[v]) && this._loadVariantModel) {
+      this._resetLoadProgress(5, false);
       this.setState({ loading: true, processing: false, progress: 5 });
       this._loadVariantModel(v, (err) => {
         if (err) return; // loader already rolled the overlay back
@@ -36662,6 +36841,7 @@ class Component extends DCLogic {
       });
       return;
     }
+    this._resetLoadProgress(40, true);
     this.setState({ loading: true, processing: true, progress: 40 });
     this._applyModelVariant(v, trimKey);
   }
