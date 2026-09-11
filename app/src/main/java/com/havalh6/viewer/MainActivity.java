@@ -6322,21 +6322,22 @@ public final class MainActivity extends Activity {
         lp.leftMargin = Math.round(8 * density);
         drawer.setLayoutParams(lp);
 
-        // One clear dock affordance: Apps reveals the launcher; pressing it
-        // again returns to the glanceable Cards surface. Layout and settings
-        // deliberately live in the Workspace card, not a second hidden menu.
+        // One clear dock affordance: the stacked-cards glyph returns to the
+        // glanceable Cards surface. Layout and settings live in the Workspace
+        // card, not a second hidden menu.
         modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
-                dockGlyphCards(iconPx, dockGlyphColor(false)),
-                "Menu", v -> {
+                dockGlyphCards(cardsDockGlyphPx(iconPx, density), dockGlyphColor(false)),
+                "Cards", v -> {
                     toggleDockSurface();
                     selectStripMode(STRIP_APPS);
                 });
-        modeCollapsedBtn.setContentDescription("Switch between app launcher and cards");
+        modeCollapsedBtn.setContentDescription("Show quick cards");
         modeCollapsedBtn.setOnLongClickListener(v -> {
             callViewerDock("openDesktopStudio");
             return true;
         });
         modeCollapsedIcon = (android.widget.ImageView) modeCollapsedBtn.findViewWithTag("modeIcon");
+        styleCardsDockCell(modeCollapsedBtn, density, iconPx);
         drawer.addView(modeCollapsedBtn);
         modeAppsBtn = null;
         modeLayoutBtn = null;
@@ -6381,7 +6382,7 @@ public final class MainActivity extends Activity {
         ivLp.gravity = android.view.Gravity.CENTER;
         iv.setLayoutParams(ivLp);
         iv.setImageDrawable(glyph);
-        iv.setScaleType(android.widget.ImageView.ScaleType.CENTER);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         iv.setAdjustViewBounds(false);
         iconWrap.addView(iv);
         cell.addView(iconWrap);
@@ -6718,6 +6719,57 @@ public final class MainActivity extends Activity {
         return iconPx + Math.round(10f * density);
     }
 
+    /** Stacked-cards mark inside the round Cards plate — 32/72 from the HTML picker. */
+    private static int cardsDockGlyphPx(int iconPx, float density) {
+        return Math.round(dockPlatePx(iconPx, density) * (32f / 72f));
+    }
+
+    private void styleCardsDockCell(View cell, float density, int iconPx) {
+        if (cell == null) return;
+        View plate = cell.findViewWithTag("modePlate");
+        if (plate != null) plate.setBackground(makeCircleFrostDrawable(false, density));
+        android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
+        if (iv == null) return;
+        int glyphPx = cardsDockGlyphPx(iconPx, density);
+        android.view.ViewGroup.LayoutParams lp = iv.getLayoutParams();
+        lp.width = glyphPx;
+        lp.height = glyphPx;
+        iv.setLayoutParams(lp);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setImageDrawable(dockGlyphCards(glyphPx, dockGlyphColor(false)));
+    }
+
+    private android.graphics.drawable.Drawable makeCircleFrostDrawable(
+            boolean selected, float density) {
+        int inset = Math.max(1, Math.round(density));
+        android.graphics.drawable.GradientDrawable rim =
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        selected
+                                ? new int[] { withAlpha(dockAccentColor, 0xD8),
+                                        withAlpha(dockAccentColor, 0x60) }
+                                : (dockUiLight ? new int[] { 0xB8FFFFFF, 0x4F8A99A8 }
+                                        : new int[] { 0x70FFFFFF, 0x20FFFFFF }));
+        rim.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        int[] fillColors = dockUiLight
+                ? (selected
+                        ? new int[] { blendArgb(0xF8F8FAFC, dockAccentColor, 0.10f),
+                                blendArgb(0xF0E9EEF3, dockAccentColor, 0.06f) }
+                        : new int[] { 0xF2F7F9FB, 0xE9E9EFF4 })
+                : (selected
+                        ? new int[] { blendArgb(0xEB18232D, dockAccentColor, 0.08f), 0xE00E141B }
+                        : new int[] { 0xE01A222D, 0xD90E141B });
+        android.graphics.drawable.GradientDrawable fill =
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        fillColors);
+        fill.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        android.graphics.drawable.LayerDrawable layers =
+                new android.graphics.drawable.LayerDrawable(new Drawable[] { rim, fill });
+        layers.setLayerInset(1, inset, inset, inset, inset);
+        return layers;
+    }
+
     /**
      * No inset. A normalized adaptive icon (see {@link #normalizeAdaptiveIcon})
      * is always drawn back out as a fully opaque {@code sizePx x sizePx}
@@ -6784,13 +6836,15 @@ public final class MainActivity extends Activity {
                 : Math.round(60 * getResources().getDisplayMetrics().density);
         if (plate != null) {
             plate.setBackground(cell == modeCollapsedBtn
-                    ? makeFrostStateDrawable(selected, density)
+                    ? makeCircleFrostDrawable(selected, density)
                     : makeDockPlateDrawable(selected, density));
         }
         cell.setAlpha(dockUiLight ? 1f : (selected ? 1f : 0.78f));
         android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
         if (iv != null) {
-            Drawable glyph = glyphForModeCell(cell, iconPx, selected);
+            int glyphPx = cell == modeCollapsedBtn
+                    ? cardsDockGlyphPx(iconPx, density) : iconPx;
+            Drawable glyph = glyphForModeCell(cell, glyphPx, selected);
             if (glyph != null) iv.setImageDrawable(glyph);
         }
         android.widget.TextView label = findModeCellLabel(cell);
@@ -6829,19 +6883,70 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private Drawable dockGlyphCards(int sizePx, int color) {
-        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+    private android.graphics.Paint dockGlyphStroke(int color, int sizePx) {
+        return dockGlyphStroke(color, sizePx, 0.055f);
+    }
+
+    private android.graphics.Paint dockGlyphStroke(int color, int sizePx, float widthFrac) {
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         p.setColor(color);
         p.setStyle(android.graphics.Paint.Style.STROKE);
-        p.setStrokeWidth(Math.max(2f, sizePx * 0.075f));
+        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+        p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+        p.setStrokeWidth(Math.max(1.75f, sizePx * widthFrac));
+        return p;
+    }
+
+    private Drawable dockGlyphCards(int sizePx, int color) {
+        // HTML cards-stack in a 24 viewBox, shown at 32px inside a 72px circle.
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 1.7f / 24f);
         float s = sizePx;
-        c.drawRoundRect(s * 0.15f, s * 0.20f, s * 0.85f, s * 0.47f,
-                s * 0.08f, s * 0.08f, p);
-        c.drawRoundRect(s * 0.15f, s * 0.56f, s * 0.58f, s * 0.82f,
-                s * 0.08f, s * 0.08f, p);
-        c.drawCircle(s * 0.74f, s * 0.69f, s * 0.12f, p);
+        float rx = s * (2f / 24f);
+        c.drawRoundRect(s * (6.2f / 24f), s * (3.4f / 24f),
+                s * (20.4f / 24f), s * (13.8f / 24f), rx, rx, p);
+        c.drawRoundRect(s * (3.4f / 24f), s * (9.4f / 24f),
+                s * (17.6f / 24f), s * (20.6f / 24f), rx, rx, p);
+        return new BitmapDrawable(getResources(), bmp);
+    }
+
+    private Drawable dockGlyphAppTiles(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 0.05f);
+        float s = sizePx;
+        float inset = p.getStrokeWidth() * 0.5f + 0.5f;
+        float gap = s * 0.14f;
+        float tile = (s - 2f * inset - gap) / 2f;
+        float rx = s * 0.08f;
+        for (int row = 0; row < 2; row++) {
+            for (int col = 0; col < 2; col++) {
+                float l = inset + col * (tile + gap);
+                float t = inset + row * (tile + gap);
+                c.drawRoundRect(l, t, l + tile, t + tile, rx, rx, p);
+            }
+        }
+        return new BitmapDrawable(getResources(), bmp);
+    }
+
+    private Drawable dockGlyphMosaic(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 0.05f);
+        float s = sizePx;
+        float inset = p.getStrokeWidth() * 0.5f + 0.5f;
+        float gap = s * 0.12f;
+        float leftW = s * 0.42f;
+        float rightL = inset + leftW + gap;
+        float midY = s * 0.5f;
+        float rx = s * 0.08f;
+        c.drawRoundRect(inset, inset, inset + leftW, s - inset, rx, rx, p);
+        c.drawRoundRect(rightL, inset, s - inset, midY - gap * 0.5f, rx, rx, p);
+        c.drawRoundRect(rightL, midY + gap * 0.5f, s - inset, s - inset, rx, rx, p);
         return new BitmapDrawable(getResources(), bmp);
     }
 
@@ -7487,18 +7592,14 @@ public final class MainActivity extends Activity {
     }
 
     private View makeQuickWorkspaceCard(float density) {
-        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
-        card.setOrientation(android.widget.LinearLayout.VERTICAL);
-        card.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        int pad = Math.round(14 * density);
-        card.setPadding(pad, Math.round(10 * density), pad, Math.round(9 * density));
+        // Split card: two full-height hit targets, no inner chips. Heading sits
+        // behind the actions so it does not steal taps from the Apps half.
+        FrameLayout card = new FrameLayout(this);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 Math.round(242 * density), Math.round(124 * density));
         lp.rightMargin = Math.round(10 * density);
         card.setLayoutParams(lp);
         card.setContentDescription("Workspace: app launcher and layout manager");
-        // Workspace is navigation, not a selected mode.  Keep the same neutral
-        // frost treatment as Climate, Consumption and Media cards.
         card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
         quickCardViews.add(card);
@@ -7510,59 +7611,112 @@ public final class MainActivity extends Activity {
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         heading.setLetterSpacing(0.11f);
+        heading.setTextColor(dockLabelColorMuted());
+        heading.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        FrameLayout.LayoutParams headingLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        headingLp.leftMargin = Math.round(14 * density);
+        headingLp.topMargin = Math.round(10 * density);
+        heading.setLayoutParams(headingLp);
         card.addView(heading);
 
         android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        actions.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        android.widget.LinearLayout.LayoutParams actionsLp = new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        actionsLp.topMargin = Math.round(3 * density);
-        actions.setLayoutParams(actionsLp);
-        actions.addView(makeWorkspaceAction(density, "APP\nLAUNCHER", "Show app launcher",
+        actions.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        // Title band is ~10dp inset + 10.5sp caption. Pad the stacks (not the
+        // row) so APPS / LAYOUT centre in the leftover height and the halves
+        // still receive taps on the title.
+        int titleBand = Math.round(28 * density);
+        actions.addView(makeWorkspaceAction(density, true, "APPS", "Show app launcher",
                 v -> chooseDockSurface(DOCK_SURFACE_LAUNCHER, true)));
-        actions.addView(makeWorkspaceAction(density, "LAYOUT\nMANAGER", "Open layout manager",
+
+        View divider = new View(this);
+        divider.setTag("workspaceSplit");
+        android.widget.LinearLayout.LayoutParams dividerLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        Math.max(1, Math.round(density)),
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+        dividerLp.topMargin = titleBand;
+        dividerLp.bottomMargin = Math.round(14 * density);
+        divider.setLayoutParams(dividerLp);
+        divider.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
+        actions.addView(divider);
+
+        actions.addView(makeWorkspaceAction(density, false, "LAYOUT", "Open layout manager",
                 v -> callViewerDock("openDesktopStudio")));
         card.addView(actions);
         return card;
     }
 
-    private View makeWorkspaceAction(float density, String label, String description,
-            View.OnClickListener click) {
-        android.widget.TextView button = new android.widget.TextView(this);
-        button.setText(label);
-        button.setContentDescription(description);
-        button.setGravity(android.view.Gravity.CENTER);
-        button.setTextSize(9.5f);
-        button.setMaxLines(2);
-        button.setLineSpacing(0f, 0.92f);
-        button.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                android.graphics.Typeface.NORMAL));
-        button.setLetterSpacing(0.07f);
-        button.setClickable(true);
-        button.setFocusable(true);
-        button.setOnClickListener(click);
-        button.setTextColor(dockGlyphColor(true));
-        // Give each action a visual cue as well as a precise label.  A small
-        // icon above the two-line caption reads as an action, not a second
-        // mode selector.
-        Drawable actionGlyph = label.startsWith("APP")
-                ? dockGlyphSwitcher(Math.round(22 * density), dockGlyphColor(true))
-                : dockGlyphLayout(Math.round(22 * density), dockGlyphColor(true));
-        actionGlyph.setBounds(0, 0, Math.round(22 * density), Math.round(22 * density));
-        button.setCompoundDrawables(null, actionGlyph, null, null);
-        button.setCompoundDrawablePadding(Math.round(1 * density));
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        bg.setCornerRadius(8f * density);
-        bg.setColor(dockUiLight ? 0x55FFFFFF : 0x22FFFFFF);
-        bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0x8A));
-        button.setBackground(bg);
+    private View makeWorkspaceAction(float density, boolean apps, String label,
+            String description, View.OnClickListener click) {
+        // Icon + caption centred as one stack. A TextView compound-drawable
+        // centres the label and parks the glyph above it, which is why
+        // WORKSPACE sat on the Apps tiles in the first car capture.
+        android.widget.LinearLayout cell = new android.widget.LinearLayout(this);
+        cell.setOrientation(android.widget.LinearLayout.VERTICAL);
+        cell.setGravity(android.view.Gravity.CENTER);
+        cell.setTag(apps ? "workspaceApps" : "workspaceLayout");
+        cell.setContentDescription(description);
+        cell.setClickable(true);
+        cell.setFocusable(true);
+        cell.setOnClickListener(click);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                0, Math.round(62 * density), 1f);
-        lp.rightMargin = Math.round(5 * density);
-        button.setLayoutParams(lp);
-        return button;
+                0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+        cell.setLayoutParams(lp);
+        cell.setPadding(0, Math.round(28 * density), 0, 0);
+
+        android.widget.ImageView glyph = new android.widget.ImageView(this);
+        glyph.setTag("workspaceGlyph");
+        int size = Math.round(32 * density);
+        android.widget.LinearLayout.LayoutParams glyphLp =
+                new android.widget.LinearLayout.LayoutParams(size, size);
+        glyph.setLayoutParams(glyphLp);
+        glyph.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        cell.addView(glyph);
+
+        android.widget.TextView caption = new android.widget.TextView(this);
+        caption.setText(label);
+        caption.setTag("workspaceLabel");
+        caption.setGravity(android.view.Gravity.CENTER);
+        caption.setTextSize(10.5f);
+        caption.setMaxLines(1);
+        caption.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        caption.setLetterSpacing(0.11f);
+        android.widget.LinearLayout.LayoutParams captionLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        captionLp.topMargin = Math.round(6 * density);
+        caption.setLayoutParams(captionLp);
+        cell.addView(caption);
+
+        applyWorkspaceActionGlyph(cell);
+        return cell;
+    }
+
+    private void applyWorkspaceActionGlyph(View cell) {
+        if (cell == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        int size = Math.round(32 * density);
+        int color = dockLabelColor();
+        android.widget.ImageView glyph = cell.findViewWithTag("workspaceGlyph");
+        if (glyph != null) {
+            glyph.setImageDrawable("workspaceApps".equals(cell.getTag())
+                    ? dockGlyphAppTiles(size, color)
+                    : dockGlyphMosaic(size, color));
+        }
+        android.widget.TextView caption = cell.findViewWithTag("workspaceLabel");
+        if (caption != null) caption.setTextColor(color);
+        android.graphics.drawable.GradientDrawable mask =
+                new android.graphics.drawable.GradientDrawable();
+        mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        mask.setColor(0xFFFFFFFF);
+        cell.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(withAlpha(color, 0x33)),
+                null, mask));
     }
 
     private View makeQuickTextCard(float density, int widthDp, String title, String value,
@@ -7975,24 +8129,6 @@ public final class MainActivity extends Activity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
-    /** Hamburger affordance for the single launcher/cards control. */
-    private Drawable dockGlyphSwitcher(int sizePx, int color) {
-        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
-        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(color);
-        p.setStyle(android.graphics.Paint.Style.STROKE);
-        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
-        p.setStrokeWidth(Math.max(2f, sizePx * 0.085f));
-        float s = sizePx;
-        float left = s * 0.18f, right = s * 0.82f;
-        float y1 = s * 0.28f, y2 = s * 0.50f, y3 = s * 0.72f;
-        c.drawLine(left, y1, right, y1, p);
-        c.drawLine(left, y2, right, y2, p);
-        c.drawLine(left, y3, right, y3, p);
-        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
-    }
-
     private void updateQuickMediaCard(JSONObject payload) {
         if (payload == null) return;
         lastMediaPayload = payload;
@@ -8098,8 +8234,10 @@ public final class MainActivity extends Activity {
     }
 
     private void tintFrostText(View view) {
-        if (view instanceof android.widget.TextView) {
-            Object tag = view.getTag();
+        Object tag = view.getTag();
+        if ("workspaceApps".equals(tag) || "workspaceLayout".equals(tag)) {
+            applyWorkspaceActionGlyph(view);
+        } else if (view instanceof android.widget.TextView) {
             boolean accent = "frostAccent".equals(tag) || "frostActionAccent".equals(tag);
             ((android.widget.TextView) view).setTextColor(accent ? dockAccentColor
                     : ("frostSecondary".equals(tag) ? dockLabelColorMuted() : dockLabelColor()));
@@ -8110,8 +8248,10 @@ public final class MainActivity extends Activity {
                 view.setBackground(makeDockPlateDrawable(false,
                         getResources().getDisplayMetrics().density));
             }
-        } else if ("quickAccentRail".equals(view.getTag())) {
+        } else if ("quickAccentRail".equals(tag)) {
             view.setBackgroundColor(withAlpha(dockAccentColor, 0xD8));
+        } else if ("workspaceSplit".equals(tag)) {
+            view.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
         }
         if (view instanceof android.view.ViewGroup) {
             android.view.ViewGroup group = (android.view.ViewGroup) view;
