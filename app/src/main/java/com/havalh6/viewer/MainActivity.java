@@ -7793,9 +7793,9 @@ public final class MainActivity extends Activity {
         actions.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         // Title band is ~10dp inset + 10.5sp caption. Pad the stacks (not the
-        // row) so APPS / LAYOUT centre in the leftover height and the halves
-        // still receive taps on the title.
-        int titleBand = Math.round(28 * density);
+        // row) so APPS / LAYOUT sit just under WORKSPACE; halves still receive
+        // taps on the title.
+        int titleBand = Math.round(22 * density);
         actions.addView(makeWorkspaceAction(density, true, "APPS", "Show app launcher",
                 v -> chooseDockSurface(DOCK_SURFACE_LAUNCHER, true)));
 
@@ -7824,7 +7824,9 @@ public final class MainActivity extends Activity {
         // WORKSPACE sat on the Apps tiles in the first car capture.
         android.widget.LinearLayout cell = new android.widget.LinearLayout(this);
         cell.setOrientation(android.widget.LinearLayout.VERTICAL);
-        cell.setGravity(android.view.Gravity.CENTER);
+        // Top-align under the WORKSPACE kicker — centering in the leftover
+        // band parked the glyphs too low.
+        cell.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
         cell.setTag(apps ? "workspaceApps" : "workspaceLayout");
         cell.setContentDescription(description);
         cell.setClickable(true);
@@ -7833,7 +7835,7 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
         cell.setLayoutParams(lp);
-        cell.setPadding(0, Math.round(28 * density), 0, 0);
+        cell.setPadding(0, Math.round(22 * density), 0, Math.round(10 * density));
 
         android.widget.ImageView glyph = new android.widget.ImageView(this);
         glyph.setTag("workspaceGlyph");
