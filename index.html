@@ -3735,8 +3735,8 @@ window.HavalSplash = (function () {
 
     .hv-hs-dot {
       position: absolute;
-      left: -17px; top: -17px;
-      width: 34px; height: 34px;
+      left: -11px; top: -11px;
+      width: 22px; height: 22px;
       padding: 0;
       border-radius: 50%;
       border: 1px solid var(--hv-widget-border, rgba(255,255,255,.28));
@@ -3751,31 +3751,12 @@ window.HavalSplash = (function () {
       transition: background .15s ease, border-color .15s ease, color .15s ease;
       font-size: 0;
     }
-    /* MDI automotive glyphs (mask) — same trick as .hv-xray-icon. */
-    .hv-hs-icon {
-      display: block;
-      width: 17px;
-      height: 17px;
+    .hv-hs-dot::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
       background: currentColor;
-      opacity: .9;
-      -webkit-mask: center / contain no-repeat;
-      mask: center / contain no-repeat;
-    }
-    .hv-hs-icon-roof {
-      -webkit-mask-image: url('assets/icons/hs-roof.svg');
-      mask-image: url('assets/icons/hs-roof.svg');
-    }
-    .hv-hs-icon-windows {
-      -webkit-mask-image: url('assets/icons/hs-windows.svg');
-      mask-image: url('assets/icons/hs-windows.svg');
-    }
-    .hv-hs-icon-mirrors {
-      -webkit-mask-image: url('assets/icons/hs-mirrors.svg');
-      mask-image: url('assets/icons/hs-mirrors.svg');
-    }
-    .hv-hs-icon-trunk {
-      -webkit-mask-image: url('assets/icons/hs-trunk.svg');
-      mask-image: url('assets/icons/hs-trunk.svg');
+      opacity: .82;
     }
     .hv-hs-dot:active { transform: scale(.92); }
     /* The thing this bullet controls is currently open / active. */
@@ -3874,12 +3855,12 @@ window.HavalSplash = (function () {
       pointer-events: none;
     }
     .hv-hs.flip .hv-hs-menu { left: auto; right: 24px; align-items: flex-end; }
-    /* Roof: always open to the LEFT of the dot (same 24px gap) so the panel
-       does not sit on top of the sunroof the controls are about. */
+    /* Roof: always open to the LEFT of the dot with extra gap so the panel
+       clears the sunroof the controls are about. */
     .hv-hs[data-hs-id="roof"] .hv-hs-menu,
     .hv-hs[data-hs-id="roof"].flip .hv-hs-menu {
       left: auto;
-      right: 24px;
+      right: 72px;
       align-items: flex-end;
     }
     .hv-hs.open .hv-hs-menu { display: flex; pointer-events: auto; }
@@ -7596,6 +7577,20 @@ const CAR_DRL_FOLLOWS_READY = true;
 const CAR_OPENING_STEP = 0.0015;
 const MANUAL_OPENING_STEP = 0.02;
 const WINDOW_OPENING_STEP = 0.025;
+// Wall-clock full-travel times used to ignore echo bus updates after a UI
+// command. Curtain measured on the MMI 2026-09-10 (~11 s). Sunroof has not
+// been swept yet — same pace until it is.
+const CAR_CURTAIN_FULL_MS = 11000;
+const CAR_SUNROOF_FULL_MS = 11000;
+const CAR_ROOF_BUS_IGNORE_PAD_MS = 400;  // command + first-report latency
+const CAR_ROOF_BUS_IGNORE_MIN_MS = 300;
+function carRoofFullTravelMs(kind) {
+  return kind === 'sunroof' ? CAR_SUNROOF_FULL_MS : CAR_CURTAIN_FULL_MS;
+}
+function carRoofTravelMs(kind, fromPct, toPct) {
+  const span = Math.abs((Number(toPct) || 0) - (Number(fromPct) || 0));
+  return (span / 100) * carRoofFullTravelMs(kind);
+}
 // Opening tweens were authored as a fixed progress tick per frame at 60 Hz.
 // Scale by delta so full travel takes the same wall-clock time at any fps.
 const OPENING_STEP_REF_FPS = 60;
@@ -11225,6 +11220,22 @@ class Component extends DCLogic {
       return;
     }
     const pct = Math.max(0, Math.min(100, (n / max) * 100));
+    const kind = setter === '_setCurtainOpen' ? 'curtain'
+      : (setter === '_setSunroofOpen' ? 'sunroof' : null);
+    if (kind) {
+      if (!this._roofBusLevel) this._roofBusLevel = {};
+      // Always remember the last bus sample — ignore windows measure travel
+      // from this, not from the optimistic local slider.
+      if (!(this._roofBusIgnore && this._roofBusIgnore[kind]
+          && performance.now() < (this._roofBusIgnore[kind].until || 0))) {
+        this._roofBusLevel[kind] = pct;
+      }
+      if (this._isRoofBusIgnored(kind)) {
+        this._bufferRoofBusIgnore(kind, pct);
+        this._syncEventCamera();
+        return;
+      }
+    }
     // Full open/close from the UI aims at 0 or 100 at car pace. The bus only
     // reports every 10%, and adopting each step as the new target used to yank
     // the model BACKWARD after the optimistic tween had already raced ahead
@@ -11247,6 +11258,77 @@ class Component extends DCLogic {
     if (setter === '_setSunroofOpen') this._sunroofStep = CAR_OPENING_STEP;
     else if (setter === '_setCurtainOpen') this._curtainStep = CAR_OPENING_STEP;
     this[setter](pct);
+    this._syncEventCamera();
+  }
+
+  _roofBusKindLevel(kind) {
+    if (this._roofBusLevel && this._roofBusLevel[kind] != null) return this._roofBusLevel[kind];
+    if (kind === 'curtain') {
+      if (this._curtainProgress != null) return this._curtainProgress * 100;
+      return (this.state && this.state.curtainOpen) || 0;
+    }
+    if (this._sunroofProgress != null) return this._sunroofProgress * 100;
+    return (this.state && this.state.sunroofOpen) || 0;
+  }
+
+  _isRoofBusIgnored(kind) {
+    const entry = this._roofBusIgnore && this._roofBusIgnore[kind];
+    return !!(entry && performance.now() < (entry.until || 0));
+  }
+
+  _bufferRoofBusIgnore(kind, pct) {
+    if (!this._roofBusIgnore) this._roofBusIgnore = {};
+    const entry = this._roofBusIgnore[kind] || (this._roofBusIgnore[kind] = {});
+    entry.pending = pct;
+  }
+
+  /**
+   * After a UI roof command, swallow sunroof/curtain bus echoes for the time
+   * the hardware still needs to cover |from→to| at the measured pace, then
+   * apply the latest buffered sample so the slider settles on the car.
+   */
+  _armRoofBusIgnore(kind, fromPct, toPct) {
+    if (kind !== 'sunroof' && kind !== 'curtain') return;
+    if (!this._roofBusIgnore) this._roofBusIgnore = {};
+    if (!this._roofGestureFrom) this._roofGestureFrom = {};
+    // One gesture keeps the bus origin fixed so dragging 20→80 arms ~6.6 s,
+    // not a fresh 110 ms window on every 1% tick.
+    if (this._roofGestureFrom[kind] == null) {
+      this._roofGestureFrom[kind] = fromPct;
+    }
+    const from = this._roofGestureFrom[kind];
+    const travel = carRoofTravelMs(kind, from, toPct);
+    const wait = Math.max(CAR_ROOF_BUS_IGNORE_MIN_MS,
+      Math.round(travel + CAR_ROOF_BUS_IGNORE_PAD_MS));
+    const entry = this._roofBusIgnore[kind] || (this._roofBusIgnore[kind] = {});
+    entry.until = performance.now() + wait;
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => this._flushRoofBusIgnore(kind), wait);
+  }
+
+  _flushRoofBusIgnore(kind) {
+    const entry = this._roofBusIgnore && this._roofBusIgnore[kind];
+    if (!entry) return;
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+    entry.until = 0;
+    const pending = entry.pending;
+    entry.pending = null;
+    if (this._roofGestureFrom) this._roofGestureFrom[kind] = null;
+    if (kind === 'curtain') this._curtainTravelGoal = null;
+    else if (kind === 'sunroof') this._sunroofTravelGoal = null;
+    if (pending == null || !isFinite(pending)) return;
+    if (!this._roofBusLevel) this._roofBusLevel = {};
+    this._roofBusLevel[kind] = pending;
+    if (kind === 'curtain') {
+      this._curtainStep = CAR_OPENING_STEP;
+      this._setCurtainOpen(pending);
+    } else if (kind === 'sunroof') {
+      this._sunroofStep = CAR_OPENING_STEP;
+      this._setSunroofOpen(pending);
+    }
     this._syncEventCamera();
   }
 
@@ -17937,10 +18019,10 @@ class Component extends DCLogic {
   // ── Car hotspots (tap body → bullets; tap outside → safe zone) ───────────
   _getHotspotDefs() {
     return [
-      { id: 'roof', icon: 'roof', title: 'Sunroof & curtain', ui: 'roof-sliders' },
-      { id: 'windows', icon: 'windows', title: 'Windows', ui: 'windows-toggles' },
-      { id: 'mirrors', icon: 'mirrors', title: 'Mirrors', ui: 'mirrors-toggle' },
-      { id: 'trunk', icon: 'trunk', title: 'Tailgate', ui: 'trunk-toggle' },
+      { id: 'roof', title: 'Sunroof & curtain', ui: 'roof-sliders' },
+      { id: 'windows', title: 'Windows', ui: 'windows-toggles' },
+      { id: 'mirrors', title: 'Mirrors', ui: 'mirrors-toggle' },
+      { id: 'trunk', title: 'Tailgate', ui: 'trunk-toggle' },
     ];
   }
 
@@ -17954,10 +18036,6 @@ class Component extends DCLogic {
     dot.className = 'hv-hs-dot';
     dot.title = def.title;
     dot.setAttribute('aria-label', def.title);
-    const icon = document.createElement('span');
-    icon.className = 'hv-hs-icon hv-hs-icon-' + (def.icon || def.id);
-    icon.setAttribute('aria-hidden', 'true');
-    dot.appendChild(icon);
     const menu = document.createElement('div');
     menu.className = 'hv-hs-menu';
     if (def.ui === 'roof-sliders') {
@@ -18847,13 +18925,15 @@ class Component extends DCLogic {
     const level = this._vehicleOpeningLevel(raw);
     if (kind === 'windows') this._setWindowsOpen(level);
     else if (kind === 'sunroof') {
-      this._sunroofTravelGoal = null;
+      const from = this._roofBusKindLevel('sunroof');
       this._sunroofStep = MANUAL_OPENING_STEP;
       this._setSunroofOpen(level);
+      this._armRoofBusIgnore('sunroof', from, level);
     } else if (kind === 'curtain') {
-      this._curtainTravelGoal = null;
+      const from = this._roofBusKindLevel('curtain');
       this._curtainStep = MANUAL_OPENING_STEP;
       this._setCurtainOpen(level);
+      this._armRoofBusIgnore('curtain', from, level);
     }
     return level;
   }
@@ -18864,14 +18944,20 @@ class Component extends DCLogic {
    */
   _beginCarRoofTravel(kind, level) {
     const pct = this._vehicleOpeningLevel(level);
+    const from = this._roofBusKindLevel(kind);
+    // Fresh gesture for open/close — do not inherit a prior slider origin.
+    if (!this._roofGestureFrom) this._roofGestureFrom = {};
+    this._roofGestureFrom[kind] = null;
     if (kind === 'sunroof') {
       this._sunroofStep = CAR_OPENING_STEP;
       this._sunroofTravelGoal = pct;
       this._setSunroofOpen(pct);
+      this._armRoofBusIgnore('sunroof', from, pct);
     } else if (kind === 'curtain') {
       this._curtainStep = CAR_OPENING_STEP;
       this._curtainTravelGoal = pct;
       this._setCurtainOpen(pct);
+      this._armRoofBusIgnore('curtain', from, pct);
     }
     return pct;
   }
@@ -18917,6 +19003,9 @@ class Component extends DCLogic {
     const command = this._vehicleOpeningCommand(kind);
     if (!command || !command.set) return;
     this._clearVehicleOpeningLevel(kind);
+    // Settled value — measure ignore from the last bus sample, not an earlier
+    // drag origin, so a reverse (80→40) still covers the hardware turn-around.
+    if (this._roofGestureFrom) this._roofGestureFrom[kind] = null;
     const level = this._applyVehicleOpeningLevel(kind, raw);
     this._sendCarCommand(command.set, String(level), { skipLocal: true });
   }
