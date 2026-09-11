@@ -10,10 +10,10 @@ import android.util.Log;
  * Prototype: drive the MEDIA rail bars from {@link Visualizer} on audio
  * session 0 (the mixed output).
  *
- * <p>This is the only path that can follow real playback on Android 9 — there
- * is no {@code AudioPlaybackCapture}. Session 0 often returns silence on OEM
- * builds, which is why every status change is logged under {@code H6Viz} and
- * why callers must keep a synthetic fallback.
+ * <p>Uses the FFT capture (not the time-domain waveform). Waveform peaks on
+ * this unit sit around 0.5–0.8 even on calm tracks, so a peak×gain map
+ * saturates every bar; slicing the waveform into columns also makes every
+ * bar read the same. Magnitude bins give a real spectrum and leave headroom.
  *
  * <p>Measure on the car with music playing:
  * <pre>adb logcat -s H6Viz</pre>
@@ -24,10 +24,18 @@ final class MediaAudioVisualizer {
     static final int BARS = 24;
 
     private static final long SILENT_GRACE_MS = 1500;
-    private static final float SILENT_PEAK = 0.025f;
+    private static final float SILENT_MAG = 0.02f;
     private static final long STATUS_LOG_MS = 2000;
-    /** Mild gain so typical music peaks read mid-travel on the rail bars. */
-    private static final float GAIN = 2.4f;
+    /**
+     * Soft scale on hypot(re,im)/128. Measured calm peaks were ~0.5–0.8 on the
+     * waveform path; FFT magnitudes are smaller per bin, and the sqrt below
+     * keeps loud passages from pinning the ceiling.
+     */
+    private static final float MAG_GAIN = 1.15f;
+    /** Exponent &lt; 1 expands quiet detail without lifting the floor as much. */
+    private static final float MAG_GAMMA = 0.55f;
+    /** Cap after gamma so a spike cannot fill the whole travel. */
+    private static final float LEVEL_CAP = 0.82f;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final float[] levels = new float[BARS];
@@ -45,6 +53,7 @@ final class MediaAudioVisualizer {
     private int captureFrames;
     private float lastRms;
     private float lastPeak;
+    private float lastMean;
 
     void setOnUpdate(Runnable onUpdate) {
         this.onUpdate = onUpdate;
@@ -91,15 +100,14 @@ final class MediaAudioVisualizer {
                 @Override
                 public void onWaveFormDataCapture(Visualizer visualizer, byte[] waveform,
                         int samplingRate) {
-                    onWaveform(waveform);
+                    // FFT path only — waveform saturated the rail on this MMI.
                 }
 
                 @Override
                 public void onFftDataCapture(Visualizer visualizer, byte[] fft, int samplingRate) {
-                    // Waveform alone is enough for the prototype; FFT kept off
-                    // so we do not pay for a second callback path until measured.
+                    onFft(fft);
                 }
-            }, rate, true, false);
+            }, rate, false, true);
             if (ok != Visualizer.SUCCESS) {
                 viz.release();
                 status("listener-failed code=" + ok);
@@ -111,7 +119,7 @@ final class MediaAudioVisualizer {
             captureFrames = 0;
             firstNonSilentAt = 0;
             lastNonSilentAt = 0;
-            status("started session=0 size=" + size + " rateHz=" + (rate / 1000));
+            status("started session=0 fft size=" + size + " rateHz=" + (rate / 1000));
         } catch (Throwable t) {
             enabled = false;
             visualizer = null;
@@ -147,33 +155,63 @@ final class MediaAudioVisualizer {
         } catch (Throwable ignored) {}
     }
 
-    private void onWaveform(byte[] waveform) {
-        if (waveform == null || waveform.length < BARS) return;
+    /**
+     * Android FFT layout: byte 0 = DC, byte 1 = nyquist, then interleaved
+     * real/imag pairs for bins 1..n/2-1. Magnitudes are hypot(re,im).
+     */
+    private void onFft(byte[] fft) {
+        if (fft == null || fft.length < 4) return;
         int n = BARS;
-        int chunk = Math.max(1, waveform.length / n);
-        float sumSq = 0f;
-        float peakAll = 0f;
+        // Usable complex bins (skip DC at [0]/nyquist at [1]).
+        int binCount = (fft.length / 2) - 1;
+        if (binCount < n) return;
+
+        float sumMag = 0f;
+        float peakMag = 0f;
+        float sumLevel = 0f;
         for (int i = 0; i < n; i++) {
-            int start = i * chunk;
-            int end = Math.min(waveform.length, start + chunk);
+            // Log-ish spacing: more resolution in the low/mid band that music
+            // actually moves, less weight on empty top octaves.
+            float t0 = (float) i / n;
+            float t1 = (float) (i + 1) / n;
+            int b0 = 1 + (int) (Math.pow(t0, 1.55) * (binCount - 1));
+            int b1 = 1 + (int) (Math.pow(t1, 1.55) * (binCount - 1));
+            if (b1 <= b0) b1 = b0 + 1;
+            if (b1 > binCount) b1 = binCount;
+
             float peak = 0f;
-            for (int j = start; j < end; j++) {
-                float v = Math.abs((waveform[j] & 0xff) - 128) / 128f;
-                if (v > peak) peak = v;
-                sumSq += v * v;
+            float acc = 0f;
+            int count = 0;
+            for (int b = b0; b < b1; b++) {
+                int idx = b * 2;
+                if (idx + 1 >= fft.length) break;
+                float re = fft[idx];
+                float im = fft[idx + 1];
+                float mag = (float) Math.hypot(re, im) / 128f;
+                acc += mag;
+                if (mag > peak) peak = mag;
+                count++;
             }
-            float scaled = peak * GAIN;
-            if (scaled > 1f) scaled = 1f;
-            scratch[i] = scaled;
-            if (peak > peakAll) peakAll = peak;
+            float avg = count > 0 ? acc / count : 0f;
+            // Blend avg+peak so a kick lifts the bar without a single bin
+            // slamming every column to the ceiling.
+            float raw = avg * 0.72f + peak * 0.28f;
+            float level = shape(raw);
+            scratch[i] = level;
+            sumLevel += level;
+            sumMag += avg;
+            if (peak > peakMag) peakMag = peak;
         }
-        float rms = (float) Math.sqrt(sumSq / Math.max(1, waveform.length));
-        lastRms = rms;
-        lastPeak = peakAll;
+
+        float meanMag = sumMag / n;
+        float meanLevel = sumLevel / n;
+        lastRms = meanMag;
+        lastPeak = peakMag;
+        lastMean = meanLevel;
         captureFrames++;
 
         long now = SystemClock.uptimeMillis();
-        boolean audible = peakAll >= SILENT_PEAK;
+        boolean audible = peakMag >= SILENT_MAG;
         if (audible) {
             if (firstNonSilentAt == 0) firstNonSilentAt = now;
             lastNonSilentAt = now;
@@ -187,13 +225,13 @@ final class MediaAudioVisualizer {
             if (audible || lastNonSilentAt > 0) {
                 status(String.format(
                         java.util.Locale.US,
-                        "live frames=%d rms=%.3f peak=%.3f",
-                        captureFrames, rms, peakAll));
+                        "live frames=%d mag=%.3f peak=%.3f meanBar=%.3f",
+                        captureFrames, meanMag, peakMag, meanLevel));
             } else {
                 status(String.format(
                         java.util.Locale.US,
-                        "silent frames=%d rms=%.3f peak=%.3f (session 0 empty?)",
-                        captureFrames, rms, peakAll));
+                        "silent frames=%d mag=%.3f peak=%.3f (session 0 empty?)",
+                        captureFrames, meanMag, peakMag));
             }
         }
 
@@ -201,9 +239,18 @@ final class MediaAudioVisualizer {
         if (cb != null) main.post(cb);
     }
 
+    private static float shape(float mag) {
+        if (mag <= 0f) return 0f;
+        float v = mag * MAG_GAIN;
+        if (v > 1f) v = 1f;
+        v = (float) Math.pow(v, MAG_GAMMA);
+        if (v > LEVEL_CAP) v = LEVEL_CAP;
+        return v;
+    }
+
     private void status(String msg) {
         lastStatus = msg;
         lastStatusAt = SystemClock.uptimeMillis();
-        Log.i(TAG, msg);
+        Log.w(TAG, msg);
     }
 }

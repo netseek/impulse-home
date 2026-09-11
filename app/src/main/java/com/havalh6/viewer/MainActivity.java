@@ -525,30 +525,18 @@ public final class MainActivity extends Activity {
 
                 for (ResolveInfo info : apps) {
                     String pkg = info.activityInfo.packageName;
-                    if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
-                            || hiddenPackages.contains(pkg)) continue;
+                    if (skipInAppRow(pkg)) continue;
 
-                    String label = info.loadLabel(pm).toString();
+                    String label = resolveDockLabel(pkg, launcherLabel(pm, info));
                     JSONObject appObj = new JSONObject();
                     appObj.put("packageName", pkg);
                     appObj.put("label", label);
 
                     try {
-                        Drawable icon = normalizeAdaptiveIcon(info.loadIcon(pm), 96);
-                        if (icon != null) {
-                            int w = Math.max(1, icon.getIntrinsicWidth());
-                            int h = Math.max(1, icon.getIntrinsicHeight());
-                            if (w > 128 || h > 128 || w <= 0 || h <= 0) { w = 96; h = 96; }
-                            Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
-                            icon.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
-                            icon.draw(canvas);
-
-                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                            bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
-                            String b64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
-                            appObj.put("icon", "data:image/png;base64," + b64);
-                        }
+                        Drawable icon = resolveDockIcon(pkg, iconForLauncherApp(pm, info));
+                        icon = normalizeAdaptiveIcon(icon, 96);
+                        String dataUrl = encodeIconDataUrl(icon, 96, dockOverridePlateColor(pkg));
+                        if (dataUrl != null) appObj.put("icon", dataUrl);
                     } catch (Exception e) {
                         Log.e(TAG, "Error drawing icon for " + pkg, e);
                     }
@@ -1209,16 +1197,20 @@ public final class MainActivity extends Activity {
             float travel = floor - ceiling;
             if (travel <= 0f) return;
 
-            boolean live = playing && mediaAudioViz != null
+            // Prefer live FFT whenever session 0 has energy — not only when the
+            // now-playing payload says playing. AA/MediaCenter often publish
+            // paused while music is still audible, which used to flip the row
+            // back to the synthetic sine fallback.
+            boolean live = mediaAudioViz != null
                     && mediaAudioViz.copyLiveLevels(liveTarget);
             float seconds = playing
                     ? (android.os.SystemClock.uptimeMillis() - startedAt) / 1000f : 0f;
             for (int i = 0; i < BARS; i++) {
                 float target;
-                if (!playing) {
-                    target = 0.10f;
-                } else if (live) {
+                if (live) {
                     target = liveTarget[i];
+                } else if (!playing) {
+                    target = 0.10f;
                 } else {
                     // Three incommensurate rates per bar, so the row never reads
                     // as one sine wave marching across it.
@@ -1227,10 +1219,13 @@ public final class MainActivity extends Activity {
                     double c = Math.sin(seconds * 4.1 + i * 0.4);
                     target = (float) (0.46 + 0.26 * a + 0.18 * b + 0.10 * c);
                 }
-                if (target < 0.06f) target = 0.06f;
+                // Synthetic keeps a visible floor; live must be allowed to drop
+                // or calm passages read as a solid wall of bars.
+                float floorLevel = live ? 0.02f : 0.06f;
+                if (target < floorLevel) target = floorLevel;
                 if (target > 1f) target = 1f;
                 // Ease toward the target so a pause settles instead of snapping.
-                float ease = !playing ? 0.22f : (live ? 0.42f : 0.55f);
+                float ease = live ? 0.38f : (!playing ? 0.22f : 0.55f);
                 level[i] += (target - level[i]) * ease;
 
                 float x = left + i * (barW + gap);
@@ -1244,7 +1239,7 @@ public final class MainActivity extends Activity {
                 paint.setColor(withAlpha(tint, alpha));
                 canvas.drawRoundRect(bar, barW * 0.5f, barW * 0.5f, paint);
             }
-            if (!playing) {
+            if (!playing && !live) {
                 boolean settled = true;
                 for (int i = 0; i < BARS; i++) {
                     if (Math.abs(level[i] - 0.10f) > 0.01f) { settled = false; break; }
@@ -1284,17 +1279,11 @@ public final class MainActivity extends Activity {
     };
 
     private void ensureMediaVisualizer() {
-        Log.i(MediaAudioVisualizer.TAG, "ensure playing=" + quickMediaPlaying
-                + " musicActive=" + mediaAudioWanted()
-                + " bars=" + (quickMediaBars != null));
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            if (mediaVizPermissionAsked) {
-                Log.i(MediaAudioVisualizer.TAG, "no-permission (already asked)");
-                return;
-            }
+            if (mediaVizPermissionAsked) return;
             mediaVizPermissionAsked = true;
-            Log.i(MediaAudioVisualizer.TAG, "no-permission — requesting RECORD_AUDIO");
+            Log.w(MediaAudioVisualizer.TAG, "no-permission — requesting RECORD_AUDIO");
             requestPermissions(
                     new String[]{android.Manifest.permission.RECORD_AUDIO},
                     REQ_MEDIA_VIZ_AUDIO);
@@ -1320,11 +1309,11 @@ public final class MainActivity extends Activity {
         if (requestCode != REQ_MEDIA_VIZ_AUDIO) return;
         boolean granted = grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
-        if (granted && quickMediaPlaying) {
-            Log.i(MediaAudioVisualizer.TAG, "permission-granted");
+        if (granted && mediaAudioWanted()) {
+            Log.w(MediaAudioVisualizer.TAG, "permission-granted");
             startMediaVisualizerIfNeeded();
         } else {
-            Log.i(MediaAudioVisualizer.TAG, "permission-denied — synthetic bars only");
+            Log.w(MediaAudioVisualizer.TAG, "permission-denied — synthetic bars only");
         }
     }
 
@@ -6827,6 +6816,49 @@ public final class MainActivity extends Activity {
         return layers;
     }
 
+    /** Custom plate fill from Personalizar — hairline so black still reads on the dark dock. */
+    private android.graphics.drawable.Drawable makeLauncherIconPlateDrawable(
+            float density, int fillColor) {
+        int stroke = Math.max(1, Math.round(density));
+        float radius = 14f * density;
+        android.graphics.drawable.GradientDrawable fill =
+                new android.graphics.drawable.GradientDrawable();
+        fill.setCornerRadius(radius);
+        fill.setColor(fillColor);
+        fill.setStroke(stroke, 0x38FFFFFF);
+        return fill;
+    }
+
+    /** Saved plate colour when a substitute icon is in force; null keeps the default plate. */
+    private Integer dockOverridePlateColor(String pkg) {
+        if (pkg == null || dockAppOverrides == null) return null;
+        if (dockAppOverrides.icon(pkg) == null) return null;
+        String bg = dockAppOverrides.bg(pkg);
+        if (bg == null) return null;
+        return Integer.valueOf(DockAppOverrides.parseColor(bg, 0xFF3D4650));
+    }
+
+    /** PNG data URL for APP+APP tiles — same glyph/plate the dock already resolved. */
+    private String encodeIconDataUrl(Drawable icon, int size, Integer plateColor) {
+        if (icon == null || size <= 0) return null;
+        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+        if (plateColor != null) {
+            android.graphics.Paint fill = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            fill.setColor(plateColor.intValue());
+            float r = size * 0.22f;
+            canvas.drawRoundRect(0, 0, size, size, r, r, fill);
+            int pad = Math.round(size * 0.16f);
+            icon.setBounds(pad, pad, size - pad, size - pad);
+        } else {
+            icon.setBounds(0, 0, size, size);
+        }
+        icon.draw(canvas);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
+        return "data:image/png;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+    }
+
     /** Square plate behind every dock icon — mode drawer + launcher row share this size. */
     private static int dockPlatePx(int iconPx, float density) {
         return iconPx + Math.round(10f * density);
@@ -6938,8 +6970,13 @@ public final class MainActivity extends Activity {
             if (item == null) continue;
             View plate = item.findViewWithTag("iconPlate");
             if (plate == null) continue;
-            boolean dark = Boolean.TRUE.equals(item.getTag());
-            plate.setBackground(makeLauncherIconPlateDrawable(density, dark));
+            Object tag = item.getTag();
+            if (tag instanceof Integer) {
+                plate.setBackground(makeLauncherIconPlateDrawable(density, ((Integer) tag).intValue()));
+            } else {
+                boolean dark = Boolean.TRUE.equals(tag);
+                plate.setBackground(makeLauncherIconPlateDrawable(density, dark));
+            }
         }
     }
 
@@ -7926,17 +7963,86 @@ public final class MainActivity extends Activity {
 
     private void applyQuickMediaAppChip(String iconDataUrl, String label) {
         if (quickMediaAppRow == null) return;
-        Bitmap icon = decodeDataUrlBitmap(iconDataUrl);
-        boolean show = icon != null || (label != null && !label.isEmpty());
+        String pkg = quickMediaPackage != null ? quickMediaPackage : "";
+        String chipLabel = resolveMediaChipLabel(pkg, label);
+        Drawable customIcon = resolveMediaChipIcon(pkg, label);
+        Bitmap decoded = customIcon == null ? decodeDataUrlBitmap(iconDataUrl) : null;
+        boolean show = customIcon != null || decoded != null
+                || (chipLabel != null && !chipLabel.isEmpty());
         quickMediaAppRow.setVisibility(show ? View.VISIBLE : View.GONE);
         if (!show) return;
         if (quickMediaAppIcon != null) {
-            quickMediaAppIcon.setVisibility(icon != null ? View.VISIBLE : View.GONE);
-            if (icon != null) quickMediaAppIcon.setImageBitmap(icon);
+            if (customIcon != null) {
+                quickMediaAppIcon.setVisibility(View.VISIBLE);
+                quickMediaAppIcon.setImageDrawable(customIcon);
+            } else if (decoded != null) {
+                quickMediaAppIcon.setVisibility(View.VISIBLE);
+                quickMediaAppIcon.setImageBitmap(decoded);
+            } else {
+                quickMediaAppIcon.setVisibility(View.GONE);
+            }
         }
         if (quickMediaAppName != null) {
-            quickMediaAppName.setText(label == null ? "" : label.toUpperCase(java.util.Locale.US));
+            quickMediaAppName.setText(chipLabel == null ? ""
+                    : chipLabel.toUpperCase(java.util.Locale.US));
         }
+    }
+
+    /**
+     * Icon for the MEDIA card's source chip: dock substitute first, then our
+     * AA/CarPlay assets (the system packages ship a generic glyph), then the
+     * launcher icon MediaNowPlaying encoded into the payload.
+     */
+    private Drawable resolveMediaChipIcon(String pkg, String label) {
+        if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
+            String slug = dockAppOverrides.icon(pkg);
+            if (slug != null) {
+                Drawable sub = DockAppOverrides.drawableFor(this, slug, dockAppOverrides.color(pkg));
+                if (sub != null) return sub;
+            }
+        }
+        if (isAndroidAutoMediaSource(pkg, label)) {
+            if (projectionPresence != null) {
+                Drawable branded = projectionPresence.iconFor(ProjectionPresence.Kind.ANDROID_AUTO);
+                if (branded != null) return branded;
+            }
+            try { return getDrawable(R.drawable.ic_android_auto_default); } catch (Exception ignored) {}
+        }
+        if (isCarPlayMediaSource(pkg, label)) {
+            if (projectionPresence != null) {
+                Drawable branded = projectionPresence.iconFor(ProjectionPresence.Kind.CARPLAY);
+                if (branded != null) return branded;
+            }
+            try { return getDrawable(R.drawable.ic_carplay_default); } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    private String resolveMediaChipLabel(String pkg, String stock) {
+        if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
+            String custom = dockAppOverrides.name(pkg);
+            if (custom != null) return custom;
+        }
+        if (isAndroidAutoMediaSource(pkg, stock)) return "Android Auto";
+        if (isCarPlayMediaSource(pkg, stock)) return "CarPlay";
+        return stock != null ? stock : "";
+    }
+
+    /** MediaCenter owns both AA and USB — only the AA label is projection. */
+    private static boolean isAndroidAutoMediaSource(String pkg, String label) {
+        if (label != null && label.equalsIgnoreCase("ANDROID AUTO")) return true;
+        if (pkg == null || pkg.isEmpty()) return false;
+        String p = pkg.toLowerCase(java.util.Locale.US);
+        return p.contains("androidauto") || p.contains("projection.gearhead");
+    }
+
+    private static boolean isCarPlayMediaSource(String pkg, String label) {
+        if (label != null) {
+            String l = label.trim();
+            if (l.equalsIgnoreCase("CARPLAY") || l.equalsIgnoreCase("CarPlay")) return true;
+        }
+        if (pkg == null || pkg.isEmpty()) return false;
+        return pkg.toLowerCase(java.util.Locale.US).contains("carplay");
     }
 
     /** Shared decode for the base64 payloads the media bridge sends. */
@@ -10213,9 +10319,15 @@ public final class MainActivity extends Activity {
         if (iv != null) iv.setImageDrawable(normalizeAdaptiveIcon(drawn, iconPx));
         View plate = item.findViewWithTag("iconPlate");
         if (plate != null) {
-            boolean darkPlate = editPackage != null && usesDarkIconPlate(editPackage);
-            item.setTag(Boolean.valueOf(darkPlate));
-            plate.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
+            Integer plateColor = editPackage != null ? dockOverridePlateColor(editPackage) : null;
+            if (plateColor != null) {
+                item.setTag(plateColor);
+                plate.setBackground(makeLauncherIconPlateDrawable(density, plateColor.intValue()));
+            } else {
+                boolean darkPlate = editPackage != null && usesDarkIconPlate(editPackage);
+                item.setTag(Boolean.valueOf(darkPlate));
+                plate.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
+            }
             int platePx = dockPlatePx(iconPx, density);
             int inset = Math.round(platePx * launcherIconInsetFrac());
             plate.setPadding(inset, inset, inset, inset);
@@ -10448,9 +10560,53 @@ public final class MainActivity extends Activity {
         dockCustomizeSheet = null;
     }
 
+    private void addDockIconGridCell(
+            android.widget.LinearLayout grid,
+            android.widget.LinearLayout[] currentRow,
+            int[] col,
+            java.util.List<View> iconCells,
+            int cols, int cellPx, int gap, View cell) {
+        if (currentRow[0] == null || col[0] >= cols) {
+            currentRow[0] = new android.widget.LinearLayout(this);
+            currentRow[0].setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            android.widget.LinearLayout.LayoutParams rowLp =
+                    new android.widget.LinearLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            rowLp.bottomMargin = gap;
+            currentRow[0].setLayoutParams(rowLp);
+            grid.addView(currentRow[0]);
+            col[0] = 0;
+        }
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(cellPx, cellPx);
+        lp.rightMargin = gap;
+        cell.setLayoutParams(lp);
+        currentRow[0].addView(cell);
+        col[0]++;
+        iconCells.add(cell);
+    }
+
+    private void addDockColorSwatches(android.widget.LinearLayout row, int swatchPx, float d) {
+        for (String hex : DockAppOverrides.COLORS) {
+            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+            android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(swatchPx, swatchPx);
+            lp.rightMargin = Math.round(8 * d);
+            cell.setLayoutParams(lp);
+            cell.setTag(hex);
+            android.graphics.drawable.GradientDrawable oval =
+                    new android.graphics.drawable.GradientDrawable();
+            oval.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            oval.setColor(DockAppOverrides.parseColor(hex, 0xFFFFFFFF));
+            oval.setStroke(Math.round(d), 0x38FFFFFF);
+            cell.setBackground(oval);
+            row.addView(cell);
+        }
+    }
+
     /**
-     * Impulse-style editor: rename + substitute icon + accent color.
-     * Saves into {@link DockAppOverrides} and rebinds the affected tile.
+     * Rename + substitute icon + tint + plate. Saves into {@link DockAppOverrides}.
      */
     private void showDockCustomizeSheet(View anchor, String pkg) {
         if (anchor == null || pkg == null || pkg.isEmpty()) return;
@@ -10485,7 +10641,11 @@ public final class MainActivity extends Activity {
         };
         final String[] selectedColor = {
                 dockAppOverrides != null && dockAppOverrides.color(pkg) != null
-                        ? dockAppOverrides.color(pkg) : DockAppOverrides.COLORS[0]
+                        ? dockAppOverrides.color(pkg) : DockAppOverrides.COLOR_DEFAULT
+        };
+        final String[] selectedBg = {
+                dockAppOverrides != null && dockAppOverrides.bg(pkg) != null
+                        ? dockAppOverrides.bg(pkg) : DockAppOverrides.BG_DEFAULT
         };
 
         android.widget.ScrollView scroll = new android.widget.ScrollView(this);
@@ -10493,7 +10653,7 @@ public final class MainActivity extends Activity {
         box.setOrientation(android.widget.LinearLayout.VERTICAL);
         box.setBackgroundColor(0xF2141820);
         box.setElevation(16f * d);
-        int pad = Math.round(20 * d);
+        int pad = Math.round(16 * d);
         box.setPadding(pad, pad, pad, pad);
         scroll.addView(box);
 
@@ -10522,55 +10682,70 @@ public final class MainActivity extends Activity {
         iconLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
         box.addView(iconLabel);
 
-        android.widget.HorizontalScrollView iconScroll = new android.widget.HorizontalScrollView(this);
-        iconScroll.setHorizontalScrollBarEnabled(false);
-        android.widget.LinearLayout iconRow = new android.widget.LinearLayout(this);
-        iconRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        iconScroll.addView(iconRow);
-        box.addView(iconScroll);
+        final int cols = 7;
+        final int cellPx = Math.round(48 * d);
+        final int cellPad = Math.round(7 * d);
+        final int gap = Math.round(6 * d);
+        android.widget.LinearLayout iconGrid = new android.widget.LinearLayout(this);
+        iconGrid.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.addView(iconGrid);
 
         final java.util.List<View> iconCells = new ArrayList<>();
-        Runnable refreshIconSel = () -> {
+        final android.widget.LinearLayout[] currentRow = { null };
+        final int[] col = { 0 };
+
+        Runnable paintIconCells = () -> {
+            int plate = DockAppOverrides.parseColor(selectedBg[0], 0xFF3D4650);
             for (View cell : iconCells) {
                 Object tag = cell.getTag();
                 boolean on = (tag == null && selectedIcon[0] == null)
                         || (tag != null && tag.equals(selectedIcon[0]));
-                cell.setBackgroundColor(on ? 0xFF4A9EFF : 0x33FFFFFF);
+                android.graphics.drawable.GradientDrawable bg =
+                        new android.graphics.drawable.GradientDrawable();
+                bg.setCornerRadius(10f * d);
+                bg.setColor(tag == null ? 0x33FFFFFF : plate);
+                bg.setStroke(Math.round((on ? 2.5f : 1f) * d), on ? 0xFF4FD6E8 : 0x33FFFFFF);
+                cell.setBackground(bg);
+                if (tag instanceof String && cell instanceof android.widget.FrameLayout) {
+                    android.widget.FrameLayout fl = (android.widget.FrameLayout) cell;
+                    if (fl.getChildCount() > 0) {
+                        View child = fl.getChildAt(0);
+                        if (child instanceof android.widget.ImageView) {
+                            ((android.widget.ImageView) child).setImageDrawable(
+                                    DockAppOverrides.drawableFor(this, (String) tag, selectedColor[0]));
+                        }
+                    }
+                }
             }
         };
-        int cellPx = Math.round(56 * d);
-        int cellPad = Math.round(8 * d);
-        // Padrão
+
         {
             android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
-            android.widget.LinearLayout.LayoutParams lp =
-                    new android.widget.LinearLayout.LayoutParams(cellPx, cellPx);
-            lp.rightMargin = Math.round(8 * d);
-            cell.setLayoutParams(lp);
             cell.setPadding(cellPad, cellPad, cellPad, cellPad);
             cell.setTag(null);
             android.widget.TextView t = new android.widget.TextView(this);
             t.setText("Padrão");
             t.setTextColor(0xFFFFFFFF);
-            t.setTextSize(9f);
+            t.setTextSize(8f);
             t.setGravity(android.view.Gravity.CENTER);
             cell.addView(t, new android.widget.FrameLayout.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT));
             cell.setOnClickListener(v -> {
                 selectedIcon[0] = null;
-                refreshIconSel.run();
+                paintIconCells.run();
+                // Color rows are added below; visibility is synced after they exist.
+                View tint = box.findViewWithTag("dockTintBlock");
+                View bgv = box.findViewWithTag("dockBgBlock");
+                int vis = View.GONE;
+                if (tint != null) tint.setVisibility(vis);
+                if (bgv != null) bgv.setVisibility(vis);
             });
-            iconRow.addView(cell);
-            iconCells.add(cell);
+            addDockIconGridCell(iconGrid, currentRow, col, iconCells, cols, cellPx, gap, cell);
         }
         for (String[] pair : DockAppOverrides.SUBSTITUTE_ICONS) {
             final String slug = pair[0];
             android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
-            android.widget.LinearLayout.LayoutParams lp =
-                    new android.widget.LinearLayout.LayoutParams(cellPx, cellPx);
-            lp.rightMargin = Math.round(8 * d);
-            cell.setLayoutParams(lp);
             cell.setPadding(cellPad, cellPad, cellPad, cellPad);
             cell.setTag(slug);
             android.widget.ImageView iv = new android.widget.ImageView(this);
@@ -10585,72 +10760,92 @@ public final class MainActivity extends Activity {
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT));
             cell.setOnClickListener(v -> {
                 selectedIcon[0] = slug;
-                refreshIconSel.run();
+                paintIconCells.run();
+                View tint = box.findViewWithTag("dockTintBlock");
+                View bgv = box.findViewWithTag("dockBgBlock");
+                int vis = View.VISIBLE;
+                if (tint != null) tint.setVisibility(vis);
+                if (bgv != null) bgv.setVisibility(vis);
             });
-            iconRow.addView(cell);
-            iconCells.add(cell);
+            addDockIconGridCell(iconGrid, currentRow, col, iconCells, cols, cellPx, gap, cell);
         }
-        refreshIconSel.run();
+        paintIconCells.run();
 
+        android.widget.LinearLayout tintBlock = new android.widget.LinearLayout(this);
+        tintBlock.setOrientation(android.widget.LinearLayout.VERTICAL);
+        tintBlock.setTag("dockTintBlock");
+        box.addView(tintBlock);
         android.widget.TextView colorLabel = new android.widget.TextView(this);
-        colorLabel.setText("Cor de destaque");
+        colorLabel.setText("Cor");
         colorLabel.setTextColor(0x99FFFFFF);
         colorLabel.setTextSize(14f);
         colorLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
-        box.addView(colorLabel);
-
-        android.widget.HorizontalScrollView colorScroll = new android.widget.HorizontalScrollView(this);
-        colorScroll.setHorizontalScrollBarEnabled(false);
+        tintBlock.addView(colorLabel);
         android.widget.LinearLayout colorRow = new android.widget.LinearLayout(this);
         colorRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        colorScroll.addView(colorRow);
-        box.addView(colorScroll);
+        tintBlock.addView(colorRow);
 
-        final java.util.List<View> colorCells = new ArrayList<>();
-        Runnable refreshColorSel = () -> {
-            for (View cell : colorCells) {
+        android.widget.LinearLayout bgBlock = new android.widget.LinearLayout(this);
+        bgBlock.setOrientation(android.widget.LinearLayout.VERTICAL);
+        bgBlock.setTag("dockBgBlock");
+        box.addView(bgBlock);
+        android.widget.TextView bgLabel = new android.widget.TextView(this);
+        bgLabel.setText("Fundo");
+        bgLabel.setTextColor(0x99FFFFFF);
+        bgLabel.setTextSize(14f);
+        bgLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
+        bgBlock.addView(bgLabel);
+        android.widget.LinearLayout bgRow = new android.widget.LinearLayout(this);
+        bgRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        bgBlock.addView(bgRow);
+
+        int colorVis = selectedIcon[0] == null ? View.GONE : View.VISIBLE;
+        tintBlock.setVisibility(colorVis);
+        bgBlock.setVisibility(colorVis);
+
+        int swatchPx = Math.round(32 * d);
+        addDockColorSwatches(colorRow, swatchPx, d);
+        addDockColorSwatches(bgRow, swatchPx, d);
+
+        Runnable refreshSwatchSel = () -> {
+            for (int i = 0; i < colorRow.getChildCount(); i++) {
+                View cell = colorRow.getChildAt(i);
                 boolean on = selectedColor[0] != null
                         && selectedColor[0].equalsIgnoreCase(String.valueOf(cell.getTag()));
-                cell.setAlpha(on ? 1f : 0.55f);
+                cell.setAlpha(on ? 1f : 0.5f);
+                if (cell instanceof android.widget.FrameLayout) {
+                    ((android.widget.FrameLayout) cell).setForeground(
+                            on ? new android.graphics.drawable.ColorDrawable(0x66FFFFFF) : null);
+                }
+            }
+            for (int i = 0; i < bgRow.getChildCount(); i++) {
+                View cell = bgRow.getChildAt(i);
+                boolean on = selectedBg[0] != null
+                        && selectedBg[0].equalsIgnoreCase(String.valueOf(cell.getTag()));
+                cell.setAlpha(on ? 1f : 0.5f);
                 if (cell instanceof android.widget.FrameLayout) {
                     ((android.widget.FrameLayout) cell).setForeground(
                             on ? new android.graphics.drawable.ColorDrawable(0x66FFFFFF) : null);
                 }
             }
         };
-        int swatchPx = Math.round(36 * d);
-        for (String hex : DockAppOverrides.COLORS) {
-            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
-            android.widget.LinearLayout.LayoutParams lp =
-                    new android.widget.LinearLayout.LayoutParams(swatchPx, swatchPx);
-            lp.rightMargin = Math.round(8 * d);
-            cell.setLayoutParams(lp);
-            cell.setTag(hex);
-            android.graphics.drawable.GradientDrawable bg =
-                    new android.graphics.drawable.GradientDrawable();
-            bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            bg.setColor(DockAppOverrides.parseColor(hex, 0xFFFFFFFF));
-            cell.setBackground(bg);
+        for (int i = 0; i < colorRow.getChildCount(); i++) {
+            View cell = colorRow.getChildAt(i);
             cell.setOnClickListener(v -> {
-                selectedColor[0] = hex;
-                refreshColorSel.run();
-                // Refresh tintable previews in the icon row.
-                for (View ic : iconCells) {
-                    Object tag = ic.getTag();
-                    if (!(tag instanceof String)) continue;
-                    if (!(ic instanceof android.widget.FrameLayout)) continue;
-                    android.widget.FrameLayout fl = (android.widget.FrameLayout) ic;
-                    if (fl.getChildCount() == 0) continue;
-                    View child = fl.getChildAt(0);
-                    if (!(child instanceof android.widget.ImageView)) continue;
-                    ((android.widget.ImageView) child).setImageDrawable(
-                            DockAppOverrides.drawableFor(this, (String) tag, selectedColor[0]));
-                }
+                selectedColor[0] = String.valueOf(v.getTag());
+                refreshSwatchSel.run();
+                paintIconCells.run();
             });
-            colorRow.addView(cell);
-            colorCells.add(cell);
         }
-        refreshColorSel.run();
+        for (int i = 0; i < bgRow.getChildCount(); i++) {
+            View cell = bgRow.getChildAt(i);
+            cell.setOnClickListener(v -> {
+                selectedBg[0] = String.valueOf(v.getTag());
+                refreshSwatchSel.run();
+                paintIconCells.run();
+            });
+        }
+        refreshSwatchSel.run();
 
         android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -10672,7 +10867,7 @@ public final class MainActivity extends Activity {
                 dockAppOverrides = new DockAppOverrides(null);
             }
             String name = nameField.getText() != null ? nameField.getText().toString() : "";
-            dockAppOverrides.put(pkg, name, selectedIcon[0], selectedColor[0]);
+            dockAppOverrides.put(pkg, name, selectedIcon[0], selectedColor[0], selectedBg[0]);
             dockAppOverrides.save(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
             dismissDockCustomizeSheet();
             rebindDockPackage(pkg);
@@ -10692,7 +10887,7 @@ public final class MainActivity extends Activity {
         scroll.measure(
                 View.MeasureSpec.makeMeasureSpec(maxW, View.MeasureSpec.AT_MOST),
                 View.MeasureSpec.UNSPECIFIED);
-        int yOff = -(Math.min(scroll.getMeasuredHeight(), Math.round(520 * d))
+        int yOff = -(Math.min(scroll.getMeasuredHeight(), Math.round(560 * d))
                 + anchor.getHeight() + Math.round(8 * d));
         popup.showAsDropDown(anchor, 0, yOff);
     }
@@ -10702,6 +10897,7 @@ public final class MainActivity extends Activity {
         if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
             bindGwmHub();
             updatePinnedVisibility();
+            notifyAppsCatalogChanged();
             return;
         }
         MotionTrailLayout row = dockItemsByPackage.get(pkg);
@@ -10730,6 +10926,18 @@ public final class MainActivity extends Activity {
         }
         // Recents may show the same package.
         refreshRecentSlots();
+        // MEDIA chip may be showing this package — refresh so a substitute
+        // icon/name lands without waiting for the next track change.
+        if (pkg != null && pkg.equals(quickMediaPackage)) replayMediaPayload();
+        notifyAppsCatalogChanged();
+    }
+
+    private void notifyAppsCatalogChanged() {
+        if (webView == null) return;
+        webView.post(() -> webView.evaluateJavascript(
+                "try{if(window.__app&&typeof window.__app._invalidateAppsCatalog==='function'){"
+                        + "window.__app._invalidateAppsCatalog();}}catch(e){}",
+                null));
     }
 
     /**

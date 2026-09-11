@@ -12,7 +12,7 @@ import org.json.JSONObject;
 
 /**
  * Impulse-style per-app dock display overrides: custom name, substitute icon slug,
- * and accent color. Persisted under {@link #PREF_KEY} in the shell prefs.
+ * glyph tint, and plate fill. Persisted under {@link #PREF_KEY} in the shell prefs.
  */
 final class DockAppOverrides {
     private static final String TAG = "DockAppOverrides";
@@ -20,7 +20,10 @@ final class DockAppOverrides {
     static final String GWM_HUB_PKG = "__gwm_hub";
     static final String PREF_KEY = "dock_app_overrides";
 
-    /** Impulse TelasScreen substitute icon ids + labels. */
+    /**
+     * Brand marks first (untinted), then the shared geometric set.
+     * Labels stay Portuguese to match the rest of the Personalizar sheet.
+     */
     static final String[][] SUBSTITUTE_ICONS = {
             {"youtube", "YouTube"},
             {"youtube_music", "YT Music"},
@@ -28,22 +31,39 @@ final class DockAppOverrides {
             {"nav", "Navegação"},
             {"music", "Música"},
             {"video", "Vídeo"},
-            {"settings", "Configurações"},
-            {"haval", "Carro"},
-            {"game", "Jogo"},
-            {"tv", "TV"},
+            {"radio", "Rádio"},
             {"phone", "Telefone"},
             {"chat", "Chat"},
             {"map_alt", "Mapa"},
+            {"browser", "Navegador"},
+            {"camera", "Câmera"},
+            {"photos", "Fotos"},
+            {"settings", "Configurações"},
+            {"haval", "Carro"},
+            {"bolt", "Carga"},
+            {"weather", "Clima"},
+            {"calendar", "Agenda"},
+            {"clock", "Relógio"},
+            {"folder", "Arquivos"},
+            {"download", "Download"},
+            {"store", "Loja"},
+            {"game", "Jogo"},
+            {"star", "Estrela"},
+            {"tv", "TV"},
+            {"mail", "Email"},
+            {"wifi", "Rede"},
+            {"speaker", "Caixa"},
     };
 
-    /** Impulse “Cor de Destaque” swatches. */
+    /** Tint and plate: white, gray, dark gray, black. First is default tint. */
     static final String[] COLORS = {
-            "#FFFFFF", "#ECEFF1", "#FF0000", "#FF4B4B",
-            "#00FF00", "#0000FF", "#4A9EFF", "#90CAF9",
-            "#FFFF00", "#FF00FF", "#00FFFF", "#FFA500",
-            "#800080", "#808080",
+            "#FFFFFF",
+            "#9AA3AD",
+            "#3D4650",
+            "#111111",
     };
+    static final String COLOR_DEFAULT = COLORS[0];
+    static final String BG_DEFAULT = COLORS[2];
 
     final JSONObject map;
 
@@ -93,7 +113,14 @@ final class DockAppOverrides {
         return c.isEmpty() ? null : c;
     }
 
-    void put(String pkg, String name, String iconSlug, String colorHex) {
+    String bg(String pkg) {
+        JSONObject e = entry(pkg);
+        if (e == null) return null;
+        String b = e.optString("bg", "").trim();
+        return b.isEmpty() ? null : b;
+    }
+
+    void put(String pkg, String name, String iconSlug, String colorHex, String bgHex) {
         if (pkg == null || pkg.isEmpty()) return;
         boolean hasName = name != null && !name.trim().isEmpty();
         boolean hasIcon = iconSlug != null && !iconSlug.trim().isEmpty();
@@ -106,8 +133,10 @@ final class DockAppOverrides {
             if (hasName) e.put("name", name.trim());
             if (hasIcon) {
                 e.put("icon", iconSlug.trim());
-                String c = (colorHex != null && !colorHex.isEmpty()) ? colorHex : COLORS[0];
+                String c = (colorHex != null && !colorHex.isEmpty()) ? colorHex : COLOR_DEFAULT;
+                String b = (bgHex != null && !bgHex.isEmpty()) ? bgHex : BG_DEFAULT;
                 e.put("color", c);
+                e.put("bg", b);
             }
             map.put(pkg, e);
         } catch (JSONException ignored) {}
@@ -168,6 +197,7 @@ final class DockAppOverrides {
             case "nav": return R.drawable.ic_sub_nav;
             case "music": return R.drawable.ic_sub_music;
             case "video": return R.drawable.ic_sub_video;
+            case "radio": return R.drawable.ic_sub_radio;
             case "settings": return R.drawable.ic_sub_settings;
             case "haval": return R.drawable.ic_sub_haval;
             case "game": return R.drawable.ic_sub_game;
@@ -175,6 +205,20 @@ final class DockAppOverrides {
             case "phone": return R.drawable.ic_sub_phone;
             case "chat": return R.drawable.ic_sub_chat;
             case "map_alt": return R.drawable.ic_sub_map_alt;
+            case "browser": return R.drawable.ic_sub_browser;
+            case "camera": return R.drawable.ic_sub_camera;
+            case "photos": return R.drawable.ic_sub_photos;
+            case "bolt": return R.drawable.ic_sub_bolt;
+            case "weather": return R.drawable.ic_sub_weather;
+            case "calendar": return R.drawable.ic_sub_calendar;
+            case "clock": return R.drawable.ic_sub_clock;
+            case "folder": return R.drawable.ic_sub_folder;
+            case "download": return R.drawable.ic_sub_download;
+            case "store": return R.drawable.ic_sub_store;
+            case "star": return R.drawable.ic_sub_star;
+            case "mail": return R.drawable.ic_sub_mail;
+            case "wifi": return R.drawable.ic_sub_wifi;
+            case "speaker": return R.drawable.ic_sub_speaker;
             default: return null;
         }
     }
