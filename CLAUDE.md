@@ -462,6 +462,55 @@ same applies to any diagnostic or capture you add — `_generateBlurredWheelText
 already gets this right, saving and restoring both the target and the clear
 colour around its work.
 
+## The boot hand-off: three things the panel shows before the car does
+
+All three were measured on the car 2026-09-11 with `adb exec-out screencap`
+bursts across a cold start. **`screencap` cannot see the hole-punched <video>**,
+so the clip itself reads as pure black in every capture — which is exactly what
+makes the bursts useful: anything NON-black during the clip is the page leaking
+over it.
+
+- **A promoted page layer draws OVER the clip; ordinary page paint does not.**
+  The splash goes `background: transparent` (`hv-splash-playing`) so the video
+  overlay can show, and the WebView itself is `setBackgroundColor(0)`. The car
+  fill's flat `#efefef` on `#hv-root` is punched away correctly and never
+  appeared. `.hv-wallpaper` is not: it animates opacity, so Chromium gives it
+  its own compositor layer, and the Bing photo was captured covering the whole
+  1920x720 panel **4.6 s into the clip**. `.bg-grain::after` is promoted for the
+  same reason (it runs an animation).
+
+  `body.hv-splash-up` (set in the markup, cleared by `HavalSplash.releasePage()`
+  from `fadeOut` / `dropNow` / the no-splash paths) holds all three back. Add
+  any new full-bleed layer to that rule, not just to `hv-boot` — `hv-boot` is
+  removed ~2 s AFTER the fade and is about the widget boards.
+
+- **The loading background was flat, because the vignette lives in a shader.**
+  `scene.background` was a flat colour and `vignetteIntensity` sat at 0 until
+  `_applyBackground` ran, which happened only once the model landed. Measured
+  with SKIP during a cold boot: **8.6 s of 239,239,239 across the whole panel**,
+  then a step to the settled 156 in the corners / 222 in the middle. That step
+  is the "it goes white while the model loads" report. `_applyBackground` now
+  runs at scene init (right after the vignette material exists), and
+  `_shellBgCss` puts the matching radial on the CSS shell surface for the frames
+  before the canvas draws. Residual after: ~6%, ~1.4 s — see that method.
+
+- **`_applyShellViewOffset(0)` does not mean centred; it adds `_userPanPx`.**
+  The intro's splash-matching front pose inherited the pan of whatever camera
+  the layout restored at boot. Measured against the clip's last frame, same
+  metric on both (dark features, y 120-500): clip cx **964.5** top **246**;
+  intro cx **827.5** top **183** — 135 px left, 62 px up, exactly the saved pan.
+  Width was identical at 274 px, which is why this read as "the car sits a bit
+  far" rather than as a shift, and why chasing `INTRO_FRONT_DIST_MUL` or the FOV
+  would have been wasted. The intro now zeroes the pan for the hold and eases it
+  back over the orbit: measured after, cx **962.5** top **245**.
+
+  **Measure this one from the clip, not from the camera.** `ffmpeg -sseof -0.2`
+  gives the hold frame; both silhouettes then come from one thresholding pass.
+  Driving `_parkIntroCamera()` from devtools does NOT reproduce the intro —
+  `_tickFitCamera` re-applies the layout's view offset the moment
+  `_introActive` is false, so the first measurement taken that way was
+  contaminated until `_introActive = true` was set by hand.
+
 ## Post-boot swaps are badged, not veiled; a new load path has to opt in
 
 Cold boot hides the car until it is finished (`_pendingIntro` ->
@@ -1207,6 +1256,60 @@ build means uninstalling first, which wipes Impulse's settings -- bottom bar,
 cluster themes, overscan, Shizuku grant. Build `assembleRelease` with
 `SIGNING_STORE_PASSWORD` / `SIGNING_KEY_ALIAS` / `SIGNING_KEY_PASSWORD` and
 `app/release.keystore` in place, then `adb install -r`.
+
+### Hazard is not on the Android side at all (measured 2026-09-11)
+
+Asked for repeatedly, because the lamps are plainly visible through the
+windscreen. They do not reach the head unit. Measured across 95 min parked, a
+20 min drive with 11 indicator uses, and two deliberate hazard presses:
+
+- `car.basic.hazard_light_status` — **never fires.** It sits at `0` and is
+  replayed as `0` in every snapshot. Do not build on it.
+- `car.basic.left/right_turn_light_status` — **do not assert during hazard.**
+  Both stay `0`.
+- `car.drive.setting.outline_lamps_state` — does not move during hazard.
+
+So the "position lamps go dark and flash amber" that you can SEE is done inside
+the body control module and is never published. There is no key to find.
+
+**What the turn keys DO give you, and it is better than a blink.** They report
+STALK STATE, not the lamp flash: a single `1` held for the whole turn, then `0`.
+Measured 11 turns at 2.0-10.4 s each, and the two sides never overlapped once —
+so `left && right` WOULD have been an unambiguous hazard discriminator if hazard
+drove them. It does not. Flash-to-pass is also readable: `high_beam` and
+`low_beam` both `1` for ~100 ms, then both `0`.
+
+**The trap that burned this session.** `car.ipk_info.warning_tts_notify` pulses
+`1121 -> 0` every 5.58 s, and it happened to be running during the hazard test.
+It looked conclusive — 0 occurrences in 115 min of earlier captures, 6 during
+hazard, phase-locked to the millisecond. It is a repeating CLUSTER WARNING NAG
+(the driver could read it on the panel) and it ran unbroken for 94 pulses across
+8m39s, straight through hazard being switched OFF. Two lessons:
+
+- **A periodic pulse is a nag timer, not a lamp circuit.** Lamps blink at
+  ~1.5 Hz; 5.58 s is something the car is SAYING.
+- **Controls recorded on a different day are not controls.** The absence of 1121
+  in earlier captures meant only that the warning was not active then. A
+  correlation needs the negative arm measured in the SAME session — here, simply
+  watching it keep running with hazard off.
+
+`warning_tts_notify` is an announcement-id channel (Impulse's
+`ClusterWarningPolicy` lists it among transient alerts); it also carried `1083`
+during normal driving. Any value there names something the cluster is
+announcing, never a lamp state.
+
+**How to re-test cheaply.** `Its_IntelligentVehicleControlService` logs
+`onDataChanged` for every property the car pushes, upstream of Impulse:
+
+```bash
+adb logcat -v time -s Its_IntelligentVehicleControlService:W | grep onDataChanged
+```
+
+Two cautions. Filter out `battery_voltage` — it streams at 10 Hz and rotates the
+ring buffer in about 20 s, so `logcat -d` cannot see an event from a minute ago;
+only a live stream works. And keys arriving at the viewer WITHOUT a matching
+`onDataChanged` are Impulse cache replays, not live events — they land within
+~400 ms of a "Telemetry snapshot requested" line, which is how to tell.
 
 ## Media visualisers
 
