@@ -36445,6 +36445,36 @@ class Component extends DCLogic {
       this._graphVizHueDeg = this._hashHue(trackKey);
       this._reshuffleRandomViz();
     }
+
+    // The media session re-publishes UNCHANGED metadata. Measured on the car
+    // 2026-09-11: 8 identical applies inside an 8 s window (mediaTitle:8,
+    // mediaArt:15 -- art commits twice per apply, '' then the bitmap), each a
+    // 13-key commit at ~114 ms p50 / 223 ms p90, which put React back to 16% of
+    // wall clock in bursts while every quiet sample sat at 0%.
+    //
+    // A real track change DOES need the re-render -- it changes what is on
+    // screen structurally -- so this is not the _live seam treatment that
+    // motionSpeed and the POWER card got. It only needs to stop committing the
+    // SAME thing. applyMediaPosition already keeps the progress bar moving
+    // without React, so a republish has nothing left that needs a commit.
+    //
+    // Art is compared by length + head rather than whole-string: these are
+    // base64 data URLs and a full compare on every republish is its own cost.
+    const metaSig = [
+      p.title || '', p.artist || '', p.album || '',
+      p.playing ? 1 : 0, Number(p.durationMs) || 0,
+      p.appLabel || '', p.packageName || '', p.appIcon || '',
+      p.canLaunch ? 1 : 0, p.needsListener ? 1 : 0, hasTrack ? 1 : 0,
+      art.length, art.slice(0, 64),
+    ].join('');
+    if (metaSig === this._mediaMetaSig) {
+      // Position still advances on a republish; keep the bar live, no commit.
+      this._mediaPositionMs = Number(p.positionMs) || 0;
+      this._syncMediaPositionDom(this._mediaPositionMs, Number(p.durationMs) || 0);
+      return;
+    }
+    this._mediaMetaSig = metaSig;
+
     this.setState({
       mediaTitle: p.title || '',
       mediaArtist: p.artist || '',
