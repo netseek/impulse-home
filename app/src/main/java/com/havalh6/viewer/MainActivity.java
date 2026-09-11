@@ -522,26 +522,22 @@ public final class MainActivity extends Activity {
                 Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
                 mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
                 List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
+                java.util.Set<String> seen = new java.util.HashSet<>();
 
-                for (ResolveInfo info : apps) {
-                    String pkg = info.activityInfo.packageName;
-                    if (skipInAppRow(pkg)) continue;
-
-                    String label = resolveDockLabel(pkg, launcherLabel(pm, info));
-                    JSONObject appObj = new JSONObject();
-                    appObj.put("packageName", pkg);
-                    appObj.put("label", label);
-
-                    try {
-                        Drawable icon = resolveDockIcon(pkg, iconForLauncherApp(pm, info));
-                        icon = normalizeAdaptiveIcon(icon, 96);
-                        String dataUrl = encodeIconDataUrl(icon, 96, dockOverridePlateColor(pkg));
-                        if (dataUrl != null) appObj.put("icon", dataUrl);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error drawing icon for " + pkg, e);
+                if (apps != null) {
+                    for (ResolveInfo info : apps) {
+                        if (info == null || info.activityInfo == null) continue;
+                        String pkg = info.activityInfo.packageName;
+                        if (skipInAppsCatalog(pkg) || !seen.add(pkg)) continue;
+                        appsArray.put(appsCatalogEntry(pm, info, pkg));
                     }
-
-                    appsArray.put(appObj);
+                }
+                if (isEmulatorDevice()) {
+                    for (String[] stub : EMULATOR_EXTRA_GWM_STUBS) {
+                        String pkg = stub[0];
+                        if (skipInAppsCatalog(pkg) || !seen.add(pkg)) continue;
+                        appsArray.put(appsCatalogStubEntry(pkg, stub[1]));
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error getting installed apps", e);
@@ -1120,13 +1116,21 @@ public final class MainActivity extends Activity {
         private final Runnable frame = new Runnable() {
             @Override
             public void run() {
-                if (!playing || !visible || !isAttachedToWindow()) return;
+                if (!visible || !isAttachedToWindow()) return;
+                boolean live = mediaAudioViz != null && mediaAudioViz.hasLiveAudio();
+                if (!playing && !live) return;
                 invalidate();
-                // Live captures also post invalidate; keep a slow tick so the
-                // synthetic fallback (and settle-after-pause) still animate.
+                // Tick while the payload says playing OR session 0 still has
+                // energy — AA often reports paused while the mix is audible.
                 postDelayed(this, FRAME_MS);
             }
         };
+
+        void ensureTicking() {
+            if (!visible || !isAttachedToWindow()) return;
+            removeCallbacks(frame);
+            post(frame);
+        }
 
         QuickMediaBarsView(Context context) {
             super(context);
@@ -1153,23 +1157,20 @@ public final class MainActivity extends Activity {
             if (visible == isVisible) return;
             visible = isVisible;
             removeCallbacks(frame);
-            if (visible && playing) { startedAt = android.os.SystemClock.uptimeMillis(); post(frame); }
+            if (visible) ensureTicking();
         }
 
         void setPlaying(boolean next) {
-            if (playing == next) return;
-            playing = next;
+            if (playing != next) {
+                playing = next;
+                if (playing) startedAt = android.os.SystemClock.uptimeMillis();
+            }
             removeCallbacks(frame);
             // Probe follows audible music — not only the now-playing flag — so
             // Android Auto's stale paused bit does not block the session-0 test.
             syncMediaVisualizerWanted(mediaAudioWanted());
-            if (playing && visible) {
-                startedAt = android.os.SystemClock.uptimeMillis();
-                post(frame);
-            } else {
-                // One last frame so the bars settle rather than freeze mid-swing.
-                invalidate();
-            }
+            if (visible) ensureTicking();
+            else invalidate();
         }
 
         @Override
@@ -1296,7 +1297,7 @@ public final class MainActivity extends Activity {
         if (mediaAudioViz == null) {
             mediaAudioViz = new MediaAudioVisualizer();
             mediaAudioViz.setOnUpdate(() -> {
-                if (quickMediaBars != null) quickMediaBars.invalidate();
+                if (quickMediaBars != null) quickMediaBars.ensureTicking();
             });
         }
         mediaAudioViz.setWanted(true);
@@ -6838,6 +6839,22 @@ public final class MainActivity extends Activity {
         return Integer.valueOf(DockAppOverrides.parseColor(bg, 0xFF3D4650));
     }
 
+    /**
+     * Plate baked into APP+APP PNGs so a customized glyph matches the dock tile.
+     * Stock adaptive icons already fill the square; those stay unplated.
+     */
+    private Integer appsCatalogPlateColor(String pkg) {
+        Integer custom = dockOverridePlateColor(pkg);
+        if (custom != null) return custom;
+        boolean substitute = dockAppOverrides != null && dockAppOverrides.icon(pkg) != null;
+        if (!substitute && !usesDarkIconPlate(pkg)) return null;
+        boolean dark = usesDarkIconPlate(pkg);
+        int fill = dark
+                ? (dockUiLight ? 0xFF202733 : 0xF20A0D12)
+                : (dockUiLight ? 0xFFFCFDFE : 0xF8F3F6FA);
+        return Integer.valueOf(fill);
+    }
+
     /** PNG data URL for APP+APP tiles — same glyph/plate the dock already resolved. */
     private String encodeIconDataUrl(Drawable icon, int size, Integer plateColor) {
         if (icon == null || size <= 0) return null;
@@ -9958,6 +9975,46 @@ public final class MainActivity extends Activity {
         return excludedFromAppRow(pkg) || isUserHidden(pkg);
     }
 
+    /**
+     * APP+APP catalog: the same packages the launcher actually shows — scroll-row
+     * apps plus visible GWM hub destinations — with the same hide list. Pinned
+     * packages stay in the catalog because they are on the launcher (hub flyout);
+     * ignored / projection / this viewer / user-hidden stay out.
+     */
+    private boolean skipInAppsCatalog(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return true;
+        if (pkg.equals(getPackageName())) return true;
+        if (IGNORED_PACKAGES.contains(pkg)) return true;
+        if (ProjectionPresence.isProjectionPackage(pkg)) return true;
+        return isUserHidden(pkg);
+    }
+
+    private JSONObject appsCatalogEntry(PackageManager pm, ResolveInfo info, String pkg)
+            throws JSONException {
+        String stockLabel = isPinnedPackage(pkg) ? pinnedLabel(pkg, pm, info) : launcherLabel(pm, info);
+        Drawable stockIcon = isPinnedPackage(pkg) ? flyoutIconForPinned(pkg) : iconForLauncherApp(pm, info);
+        return appsCatalogObject(pkg, resolveDockLabel(pkg, stockLabel), resolveDockIcon(pkg, stockIcon));
+    }
+
+    private JSONObject appsCatalogStubEntry(String pkg, String stubLabel) throws JSONException {
+        return appsCatalogObject(pkg, resolveDockLabel(pkg, stubLabel),
+                resolveDockIcon(pkg, launcherIconForPackage(pkg)));
+    }
+
+    private JSONObject appsCatalogObject(String pkg, String label, Drawable icon) throws JSONException {
+        JSONObject appObj = new JSONObject();
+        appObj.put("packageName", pkg);
+        appObj.put("label", label != null ? label : "");
+        try {
+            Drawable drawn = normalizeAdaptiveIcon(icon, 96);
+            String dataUrl = encodeIconDataUrl(drawn, 96, appsCatalogPlateColor(pkg));
+            if (dataUrl != null) appObj.put("icon", dataUrl);
+        } catch (Exception e) {
+            Log.e(TAG, "Error drawing icon for " + pkg, e);
+        }
+        return appObj;
+    }
+
     private boolean skipInRecents(String pkg) {
         return skipInAppRow(pkg);
     }
@@ -10552,6 +10609,7 @@ public final class MainActivity extends Activity {
         saveHiddenApps();
         updatePinnedVisibility();
         refreshRecentSlots();
+        notifyAppsCatalogChanged();
     }
 
     private void dismissDockCustomizeSheet() {
@@ -11064,6 +11122,7 @@ public final class MainActivity extends Activity {
         // Rebinds recents and settles app-row visibility from the hide list.
         refreshRecentSlots();
         Log.w(TAG, "Launcher unhidden " + pkg);
+        notifyAppsCatalogChanged();
     }
 
     /** Hub follows the hide list; gap follows the hub. */
@@ -11135,6 +11194,7 @@ public final class MainActivity extends Activity {
         }
         updatePinnedVisibility();
         refreshRecentSlots();
+        notifyAppsCatalogChanged();
     }
 
     /** Recents already occupy the left slots — drop the same package from the main row. */
