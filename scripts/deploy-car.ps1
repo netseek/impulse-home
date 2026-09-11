@@ -27,6 +27,7 @@ $serial = Find-Car $Adb
 Save-CarSerial $serial
 Install-CarApk $Adb $serial $Apk
 Grant-CarMediaAccess $Adb $serial
+Grant-CarHitAccessibility $Adb $serial
 
 if (-not $NoLaunch) {
   Write-Host 'Launching viewer ...'
