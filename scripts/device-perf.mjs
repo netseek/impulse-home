@@ -47,6 +47,30 @@ let SERIAL = flag('--serial', null);
 const SECONDS = Number(flag('--sec', 10));
 const AS_JSON = has('--json');
 const WATCH = has('--watch');
+// --assert turns this from a report into a GATE.
+//
+// Prose has already failed at stopping this bug class. CLAUDE.md said "if you
+// add a signal handler that calls setState, throttle it the same way", and an
+// agent then wrote the POWER card's "update DOM and React no more than four
+// times a second" -- faithfully implementing the thing the file was warning
+// about. Three separate handlers have now shipped the same defect
+// (motionSpeed, widgetRev, media metadata). A check that exits non-zero is the
+// only form of this lesson an agent cannot read past.
+const ASSERT = has('--assert');
+// Calibrated against real measured payloads, not guessed. A 5% ceiling was
+// tried first and failed the CLEAN build: a 12 s window containing someone
+// opening the config panel read 5.8% (configExpanded:4, panelOpen:4,
+// tuningSubTab:2 -- user taps, ~0.33/s per key). The gate has to tell a human
+// driving the UI apart from a signal driving the tree, so:
+//
+//   per-key rate  is the PRECISE check -- a repeating signal commits the same
+//                 key over and over; a person does not. Measured: POWER 1.43/s,
+//                 media 1.88/s, config-panel taps 0.33/s.
+//   React %       is the blunt backstop for a commit storm that somehow spreads
+//                 across keys. Measured: POWER 17%, media 15.9%, motionSpeed
+//                 65.9%, config-panel 5.8%.
+const MAX_REACT_PCT = Number(flag('--max-react-pct', 12));
+const MAX_KEY_RATE = Number(flag('--max-key-rate', 1));
 
 const adb = (args) => execFileSync(ADB, SERIAL ? ['-s', SERIAL, ...args] : args,
   { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -152,6 +176,49 @@ function verdict(d) {
   return out;
 }
 
+/**
+ * Returns a list of failures. Empty means the gate passes.
+ *
+ * Deliberately NOT keyed on frame rate: fps legitimately reads ~1 on a parked,
+ * idle car because the render loop is on-demand, and 0.37 fps with a 59/s bare
+ * rAF is the system working correctly. What is always wrong, at any frame rate,
+ * is re-rendering the React tree from a repeating signal.
+ */
+function assertions(d) {
+  const fails = [];
+
+  // A hidden WebView makes every timing number meaningless, so refuse to pass
+  // OR fail on one -- reporting "healthy" from a 1 Hz clamp would be worse
+  // than reporting nothing.
+  if (!d.rafAlive || d.visibility !== 'visible') {
+    fails.push('INCONCLUSIVE: the WebView is hidden, so no timing here is valid. '
+      + 'Bring the viewer to the foreground and re-run.');
+    return fails;
+  }
+
+  if (d.pctWallInCommits > MAX_REACT_PCT) {
+    fails.push(`React is ${d.pctWallInCommits}% of wall clock (limit ${MAX_REACT_PCT}%), `
+      + `${d.commitsPerSec}/s at ${d.commitMsP50} ms p50.`);
+  }
+
+  // The attribution line is the part that names the culprit, so assert on it
+  // directly: any single state key committing repeatedly is the signature.
+  const secs = d.windowSec || 1;
+  for (const [key, n] of Object.entries(d.setStateKeys || {})) {
+    const rate = n / secs;
+    if (rate > MAX_KEY_RATE) {
+      fails.push(`setState key "${key}" fired ${n}x in ${secs}s (${rate.toFixed(1)}/s, `
+        + `limit ${MAX_KEY_RATE}/s) -- a repeating signal is re-rendering the tree.`);
+    }
+  }
+
+  if (d.liveCommitsPerSec > 1) {
+    fails.push(`live seam committed ${d.liveCommitsPerSec}/s; a hot signal is passing `
+      + '{ commit: true } when it should only paint.');
+  }
+  return fails;
+}
+
 const rows = (d) => [
   ['frame', `${d.realFps} fps   submit ${d.submitMsP50} ms   dpr ${d.dpr}   tier ${d.resTier}`],
   ['bare rAF', `p50 ${d.bareRafP50} ms   p90 ${d.bareRafP90} ms   ${d.bareRafPerSec}/s   alive=${d.rafAlive}`],
@@ -173,6 +240,24 @@ async function once() {
   console.log('');
   for (const line of verdict(d)) console.log(`  ${line}`);
   console.log('');
+
+  if (ASSERT) {
+    const fails = assertions(d);
+    if (fails.length) {
+      console.log('  PERF GATE FAILED');
+      for (const f of fails) console.log(`    - ${f}`);
+      console.log('');
+      console.log('  See CLAUDE.md, "A hot CAN signal must never reach setState at all".');
+      console.log('  Throttling is not the fix -- three handlers have tried it. Paint the DOM');
+      console.log('  directly and commit only at settle points.');
+      console.log('');
+      process.exitCode = 1;
+    } else {
+      console.log(`  PERF GATE PASSED — React ${d.pctWallInCommits}% of wall `
+        + `(limit ${MAX_REACT_PCT}%), no setState key above ${MAX_KEY_RATE}/s.`);
+      console.log('');
+    }
+  }
 }
 
 if (WATCH) { for (;;) await once(); } else { await once(); ws.close(); }
