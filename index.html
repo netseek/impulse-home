@@ -8051,11 +8051,51 @@ class Component extends DCLogic {
       // spin freezes or runs backwards — the wagon-wheel effect, and the
       // reason a rim can look motionless at 20 km/h on a 14-22 fps panel.
       stepFrac: 0.45,
-      // The blur sprite fades in from the speed where the sharp rim starts to
-      // alias, and is fully in by fadeSpan x that speed.
-      fadeSpan: 1.7,
+      // Where the sprite takes over. The sharp rim is GONE by blurFullKmh and
+      // fades in over the fadeKmh below it — an ADDITIVE span, not the
+      // multiplicative `fadeSpan: 1.7` this replaced (which put `full` at 51
+      // km/h and left the rim sharp right through the band where it misbehaves).
+      //
+      // Measured on the car 2026-09-11, speed held and re-asserted against the
+      // bus, _rollAngle sampled once per RENDERED frame, 5 s windows:
+      //
+      //   km/h  fps   dt med/max   step deg med   step deg min-max   clamped
+      //     20  44.2   23 / 52         10.0         5.8 - 23.6         0%
+      //     28  43.9   23 / 69         14.3         6.5 - 32.4         1%
+      //     36  28.1   36 / 2861       24.6        12.9 - 32.4        36%
+      //     45  45.2   22 / 66         21.7         8.5 - 32.4        11%
+      //     60  57.1   18 / 91         22.9        12.4 - 32.4        19%
+      //
+      // reverseFrac and frozenFrac were 0 at every speed, so this is NOT
+      // wagon-wheel aliasing — it is step VARIANCE. The roll is
+      // `delta * speed * 15.2`, so the rim inherits the frame interval's jitter
+      // one for one (stepCV 0.24-0.31 against dtCV 0.32-0.46), and at a
+      // CONSTANT 20 km/h it advances anywhere from 5.8 to 23.6 deg between two
+      // drawn frames. Every row with clamped > 0 is above 30, so pinning the
+      // handover at 30 takes the sharp rim out of the whole band that misbehaves.
+      blurFullKmh: 30,
+      fadeKmh: 3,
+      // 3 km/h is narrow enough that a real vehicle_speed hovering at 28-30
+      // would strobe the spokes on and off, so the spoke switch is hysteretic:
+      // they vanish at blend >= 1-fastOnMargin and do not come back until
+      // blend < 1-fastOffMargin.
+      //
+      // The hysteresis is in BLEND, not in km/h. Sliding the speed window down
+      // on latch — the obvious way to write this — drags the fade CURVE down
+      // with it, so the ramp collapses to a single step: measured 27 km/h ->
+      // 0.28 then 28 km/h -> 1.00, i.e. no fade at all. In blend space it can
+      // neither draw spokes under an opaque sprite nor leave a see-through
+      // wheel, whatever fadeKmh is set to.
+      fastOnMargin: 0.02,
+      fastOffMargin: 0.25,
       minBlurKmh: 8,          // never blur at parking speeds
-      maxBlurStartKmh: 30,    // however coarse the rim, blur by here
+      // A low-opacity smear laid over the STILL-SHARP rim, easing in from
+      // preBlendFromKmh up to the fade. It does not take the spokes away at a
+      // speed where the driver expects to see them; it low-passes the angular
+      // detail that is what actually judders, in the 12-27 km/h band the
+      // handover alone cannot reach. preBlend: 0 restores the hard-zero floor.
+      preBlend: 0.28,
+      preBlendFromKmh: 12,
       // Blur arc as a fraction of the repeat period. CLAUDE.md: the arc has
       // to stay UNDER the spoke pitch or the smear is axisymmetric and the
       // sprite reads as standing still. Capped at the 60 degrees that suits a
@@ -8080,8 +8120,38 @@ class Component extends DCLogic {
       // Costs 35 ms/capture against 10.6 ms single-layer (a second scene render
       // plus two readbacks). That is fine because _requestBlurCapture debounces
       // it — but it is one capture, not one per frame, so keep it that way.
-      // Turn off from devtools with __wheelSpin({ twoLayer: false }).
-      twoLayer: true,
+      // Turn on from devtools with __wheelSpin({ twoLayer: true }).
+      //
+      // OFF, because measured on the car 2026-09-11 it leaves the highlight
+      // ORBITING — the symptom the file elsewhere calls "reads as a wheel out
+      // of balance". This is the device measurement the two-layer section of
+      // CLAUDE.md said it had never had.
+      //
+      // Method: park the FL wheel at roll 0 and roll 120 deg, frame it down its
+      // own axle (_introActive = true, or _tickFitCamera re-applies the layout
+      // view offset between placing the camera and the screencap), screencap
+      // both, and take the FIRST ANGULAR HARMONIC of the lip's brightness. h1
+      // IS the "one bright side" term; its PHASE is where the highlight sits.
+      // A static highlight shifts 0 deg while the wheel turns 120.
+      //
+      //   radial band     two-layer          single + uLobeTex
+      //   0.35-0.60       +47 deg            -21 deg
+      //   0.60-0.82       -169 deg           -26 deg
+      //   0.82-0.97 lip   -112 deg           -22 deg
+      //
+      // Two-layer also PULSES: h1 amplitude 0.056 -> 0.121 and 0.143 -> 0.049
+      // between the same two frames, against 0.102 -> 0.102 and 0.099 -> 0.117
+      // for single-layer. The single-layer path is not merely dimmer, it STAYS
+      // PUT, which is the whole point of the exercise.
+      //
+      // Why: the two-layer path deliberately gates uLobeTex off (applying it to
+      // only the lit half would corrupt the lit/flat ratio), but its own ratio
+      // layer does not neutralise the lip's h1 — so with twoLayer on, NOTHING
+      // corrects the brightest, most visible band. uLobeTex is the correction
+      // actually built for this, per angle AND per radius.
+      //
+      // Do not switch this back on without re-running that table.
+      twoLayer: false,
       // Flip if the lighting layer counter-rotates the wrong way on a model.
       lightRollSign: 1,
       // What to do about the static brake/hub showing through the sprite's
@@ -13839,17 +13909,39 @@ class Component extends DCLogic {
     // then took another 30 km/h to hand over). For a fine-patterned rim like
     // the Concept L it opens much earlier, because that rim aliases from ~7.
     const blurWin = this._blurSpeedWindow();
-    const isFast = speedKmh >= blurWin.full;
-    const isBlending = speedKmh >= blurWin.start;
+    const spinTune = this._wheelSpinTune;
+    const winStart = blurWin.start;
+    const winFull = blurWin.full;
+    const isBlending = speedKmh >= winStart;
 
     // Fade the sprite in; translucency itself comes from the captured
     // spoke-gap alpha (see the blur shader), not from capping this below 1.
     const MAX_BLUR_OPACITY = 1.0;
+    // Below the window the sprite is not off: it eases from 0 at
+    // preBlendFromKmh to preBlend at winStart and lies over the still-sharp
+    // rim, then the real fade carries it on to 1. One monotonic curve, so
+    // nothing pops at either join.
+    const pre = Math.max(0, Math.min(1, spinTune.preBlend || 0));
+    const preFrom = spinTune.preBlendFromKmh || 0;
     let blend = 0;
-    if (isBlending) {
-      const span = Math.max(1e-3, blurWin.full - blurWin.start);
-      blend = Math.min(1.0, (speedKmh - blurWin.start) / span) * MAX_BLUR_OPACITY;
+    if (pre > 0 && speedKmh > preFrom) {
+      const preSpan = Math.max(1e-3, winStart - preFrom);
+      blend = Math.min(1, (speedKmh - preFrom) / preSpan) * pre;
     }
+    if (isBlending) {
+      const span = Math.max(1e-3, winFull - winStart);
+      const k = Math.min(1.0, (speedKmh - winStart) / span);
+      blend = Math.max(blend, (pre + (MAX_BLUR_OPACITY - pre) * k));
+    }
+
+    // The spokes vanish once the sprite is effectively opaque and come back a
+    // little lower, so a speed hovering on the handover cannot pop them in and
+    // out. See fastOnMargin/fastOffMargin for why this is hysteresis in BLEND
+    // rather than in km/h.
+    const fastOn = 1 - Math.max(0, spinTune.fastOnMargin || 0);
+    const fastOff = 1 - Math.max(0, spinTune.fastOffMargin || 0);
+    const isFast = this._blurLatched ? (blend >= fastOff) : (blend >= fastOn);
+    this._blurLatched = isFast;
 
     if (this._blurredDiscs) {
       // Each disc has its own material so the lighting layer can be held still
@@ -13897,9 +13989,14 @@ class Component extends DCLogic {
       });
     }
     if (this._blurredDiscs) {
-      this._blurredDiscs.forEach(m => { m.visible = isBlending; });
+      // blend, not isBlending: the pre-blend smear lives BELOW the window.
+      this._blurredDiscs.forEach(m => { m.visible = blend > 0.002; });
     }
 
+    // The backing disc stays on the real window. Its job is to give the
+    // semi-transparent smear something to sit on once the rim is gone; during
+    // the pre-blend the sharp rim is still right there behind the sprite, and a
+    // dark disc in front of it would just dim the wheel.
     if (this._backingDiscs) {
       this._backingDiscs.forEach(m => { m.visible = isBlending; });
     }
@@ -14464,13 +14561,22 @@ class Component extends DCLogic {
     // back to a pessimistic 18 fps, the measured median on the MMI.
     const dt = this._motionDt || (1 / 18);
     const aliasKmh = (t.stepFrac * period) / (dt * WHEEL_RAD_PER_S_PER_KMH);
-    const start = Math.min(t.maxBlurStartKmh, Math.max(t.minBlurKmh, aliasKmh));
+    // The fps-derived alias speed is a FLOOR, not the answer. The top of the
+    // window is pinned to blurFullKmh so the handover cannot wander with the
+    // frame rate — measured travelling 25.1 -> 30 km/h inside a single 5 s
+    // window at a constant 36 km/h, and 18.7 -> 30 across runs, which is most
+    // of "the wheels only look wrong SOMETIMES". A hot unit at 14 fps does
+    // genuinely alias the stock rim from ~21, so a LOWER aliasKmh still opens
+    // the sprite early; it just can no longer push the handover later.
+    const fade = Math.max(0.1, t.fadeKmh);
+    const ceiling = Math.max(t.minBlurKmh, t.blurFullKmh - fade);
+    const start = Math.min(ceiling, Math.max(t.minBlurKmh, aliasKmh));
     // Written into a reusable object: _applyWheelTransforms calls this on every
     // rAF tick, parked included, and a fresh literal there is avoidable garbage
     // on a memory-constrained head unit.
     const out = this._blurWinScratch || (this._blurWinScratch = { start: 0, full: 0 });
     out.start = start;
-    out.full = start * t.fadeSpan;
+    out.full = start + fade;
     return out;
   }
 
@@ -24793,8 +24899,17 @@ class Component extends DCLogic {
           blurLobePeak: this._blurLobe ? this._blurLobe.peak : null,
           blurLobeOrders: this._blurLobe ? this._blurLobe.orders : null,
           blurLobeBands: this._blurLobe ? this._blurLobe.bands : null,
+          // The EFFECTIVE window. It equals tune.blurFullKmh - tune.fadeKmh ..
+          // tune.blurFullKmh unless the frame rate is bad enough that the rim
+          // aliases earlier, in which case it slides DOWN — never up.
           blurStartKmh: +win.start.toFixed(1),
           blurFullKmh: +win.full.toFixed(1),
+          // True while the spokes are hidden, i.e. the sprite is holding the
+          // wheel on its own (and holding it against a hovering speed).
+          blurLatched: !!this._blurLatched,
+          spriteOpacity: (this._blurredDiscs && this._blurredDiscs[0]
+            && this._blurredDiscs[0].material && this._blurredDiscs[0].material.uniforms)
+            ? +this._blurredDiscs[0].material.uniforms.uOpacity.value.toFixed(2) : null,
           maxStepDeg: deg(period * this._wheelSpinTune.stepFrac),
           clamped: !!this._rollClamped,
           tune: { ...this._wheelSpinTune },
