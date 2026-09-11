@@ -826,6 +826,7 @@ window.HavalSplash = (function () {
     }
     .hv-cam-tile {
       aspect-ratio: 1;
+      position: relative;
       padding: 3px !important;
       display: flex !important;
       align-items: center;
@@ -881,6 +882,42 @@ window.HavalSplash = (function () {
       pointer-events: none;
     }
     .hv-cam-tile.is-on .hv-cam-cap { color: rgba(11,16,22,.62); }
+    .hv-cam-tile.is-pick .hv-cam-ico-shot { opacity: 0.28; }
+    .hv-cam-tile.is-flash {
+      border-color: rgba(79,214,232,.95) !important;
+      background: rgba(79,214,232,.22) !important;
+      box-shadow: 0 0 0 1px rgba(79,214,232,.55);
+    }
+    .hv-cam-plus {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1;
+      color: rgba(255,255,255,.55);
+      pointer-events: none;
+    }
+    .hv-cam-tile.is-on .hv-cam-plus { color: rgba(11,16,22,.55); }
+    .hv-cam-tile.is-pick .hv-cam-plus { color: rgba(79,214,232,.95); }
+    .hv-cam-save-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .hv-cam-save-row > button {
+      flex: 1;
+      padding: 10px 6px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: .08em;
+      font-weight: 600;
+    }
     /* MMI WebView: a finger-drag on a range inside overflow-y:auto is treated
        as a panel scroll, so the thumb never moves. pan-x + a larger thumb. */
     .hv-config-panel input[type="range"] {
@@ -6405,25 +6442,35 @@ window.HavalSplash = (function () {
     <sc-if value="{{ sectionIsCamera }}" hint-placeholder-val="{{ false }}">
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CAMERA</div>
       <div class="hv-cam-grid">
-        <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="12">
-          <button class="hv-cam-tile {{ cp.onClass }}" onClick="{{ cp.onClick }}" title="{{ cp.title }}">
+        <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="6">
+          <button class="hv-cam-tile {{ cp.onClass }} {{ cp.emptyClass }} {{ cp.pickClass }} {{ cp.flashClass }}" onClick="{{ cp.onClick }}" title="{{ cp.title }}">
             <sc-if value="{{ cp.shotUrl }}" hint-placeholder-val="{{ false }}">
               <img class="hv-cam-ico hv-cam-ico-shot" src="{{ cp.shotUrl }}" alt="" draggable="false" />
             </sc-if>
-            <span class="hv-cam-cap {{ cp.capClass }}">{{ cp.caption }}</span>
+            <sc-if value="{{ cp.showPlus }}" hint-placeholder-val="{{ false }}">
+              <span class="hv-cam-plus">+</span>
+            </sc-if>
+            <sc-if value="{{ cp.showCap }}" hint-placeholder-val="{{ false }}">
+              <span class="hv-cam-cap">{{ cp.caption }}</span>
+            </sc-if>
           </button>
         </sc-for>
       </div>
-      <button onClick="{{ saveLayoutCamera }}" title="{{ layoutCamSaveHint }}" style="width: 100%; padding: 10px 8px; border-radius: 7px; border: 1px solid {{ layoutCamSaveBorder }}; background: {{ layoutCamSaveBg }}; color: {{ layoutCamSaveCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600; opacity: {{ layoutCamSaveOpacity }};">{{ layoutCamSaveLabel }}</button>
-      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">{{ layoutCamSaveHint }}</div>
+      <div class="hv-cam-save-row">
+        <button onClick="{{ saveCurrentDesktopCamera }}" title="{{ camDesktopSaveHint }}" style="border: 1px solid {{ camDesktopSaveBorder }}; background: {{ camDesktopSaveBg }}; color: {{ camDesktopSaveCol }}; opacity: {{ camDesktopSaveOpacity }};">{{ camDesktopSaveLabel }}</button>
+        <sc-if value="{{ camSaveToSlotVisible }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ toggleCamSlotPick }}" title="{{ camSlotSaveHint }}" style="border: 1px solid {{ camSlotSaveBorder }}; background: {{ camSlotSaveBg }}; color: {{ camSlotSaveCol }};">{{ camSlotSaveLabel }}</button>
+        </sc-if>
+      </div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">{{ camDesktopSaveHint }}</div>
 
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin: 16px 0 9px;">OPTIONS</div>
       <div style="display: flex; flex-direction: column; gap: 6px;">
-        <sc-for list="{{ cameraOptions }}" as="co" hint-placeholder-count="3">
+        <sc-for list="{{ cameraOptions }}" as="co" hint-placeholder-count="4">
           <button onClick="{{ co.onClick }}" title="{{ co.title }}" style="width: 100%; padding: 9px 8px; border-radius: 7px; border: 1px solid {{ co.border }}; background: {{ co.bg }}; color: {{ co.col }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600; text-align: left; line-height: 1.35;">{{ co.label }}</button>
         </sc-for>
       </div>
-      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">Event: doors → top-left, roof → top facing left; returns to the previous view a couple of seconds after the opening settles. Cycle steps every preset every 60s while moving. Orbit is a slow spin.</div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">Event: doors → top-left, roof → top facing left; returns after openings settle. Cycle steps saved slots while moving. Orbit is a slow spin. Orthographic removes perspective foreshortening.</div>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -7415,6 +7462,7 @@ const CAM_ICON_WARMUP_MS = 900; // after boot + intro, before background prefetc
 const CAM_ICON_DUTY = 2.5;      // idle this many times the last render's cost
 const CAM_ICON_BG_DUTY = 4.5;   // gentler when prefetching off-screen after boot
 const CAM_ICON_GAP_MIN_MS = 60;
+const CUSTOM_CAM_SLOTS = 6; // user slots in the CAMERA rail (empty until saved)
 const CAM_ICON_GAP_MAX_MS = 500;
 const CAM_ICON_BG_GAP_MIN_MS = 120;
 const CAM_ICON_BG_GAP_MAX_MS = 800;
@@ -7565,10 +7613,14 @@ class Component extends DCLogic {
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
     overrideSubTab: 'motion', // 'motion' | 'doors' | 'lights'
-    cameraPreset: null, // named view key or 'home'
+    cameraPreset: null, // custom slot key ('view0'..) or event preset name
     camEventEnabled: false,
     camCycleEnabled: false,
     camOrbitEnabled: false,
+    camOrthoEnabled: false,
+    camSlotPickMode: false,
+    camSlotFlashKey: null,
+    camDesktopFlash: false,
     layoutCamFlash: false,
     activeGroup: null, // 'tuning' | 'override' | 'env' | 'camera' | 'time' | null — which top-level section owns the submenu
     modelVariant: 'hev',
@@ -7837,6 +7889,8 @@ class Component extends DCLogic {
     this._applyUrlModelPreset();
     this._debugMode = readDebugFlag();
     this._loadLayoutCameras();
+    this._loadCustomCamViews();
+    this._desktopCamera = null;
     this._camEventKind = null;
     this._camEventPrevRel = null;
     this._camEventPrevPreset = null;
@@ -7956,6 +8010,81 @@ class Component extends DCLogic {
 
   _settingsStorageKey() { return 'h6_settings_v1'; }
   _layoutCamStorageKey() { return 'h6_layout_cam_v1'; }
+  _customCamStorageKey() { return 'h6_custom_cam_v1'; }
+
+  _customCamSlotKeys() {
+    const keys = [];
+    for (let i = 0; i < CUSTOM_CAM_SLOTS; i++) keys.push('view' + i);
+    return keys;
+  }
+
+  _customCamSlotIdx(key) {
+    if (typeof key !== 'string' || key.indexOf('view') !== 0) return -1;
+    const n = parseInt(key.slice(4), 10);
+    return (n >= 0 && n < CUSTOM_CAM_SLOTS) ? n : -1;
+  }
+
+  _getCustomCamRel(key) {
+    const i = this._customCamSlotIdx(key);
+    if (i < 0 || !this._customCamViews) return null;
+    const p = this._customCamViews[i];
+    return (p && typeof p.f === 'number' && typeof p.r === 'number' && typeof p.y === 'number') ? p : null;
+  }
+
+  _hasFilledCamSlots() {
+    if (!this._customCamViews) return false;
+    for (let i = 0; i < CUSTOM_CAM_SLOTS; i++) {
+      const p = this._customCamViews[i];
+      if (p && typeof p.f === 'number') return true;
+    }
+    return false;
+  }
+
+  _emptyCustomCamViews() {
+    const slots = [];
+    for (let i = 0; i < CUSTOM_CAM_SLOTS; i++) slots.push(null);
+    return slots;
+  }
+
+  _loadCustomCamViews() {
+    this._customCamViews = this._emptyCustomCamViews();
+    if (this._debugMode) return;
+    const apply = (src) => {
+      if (!Array.isArray(src)) return;
+      for (let i = 0; i < CUSTOM_CAM_SLOTS; i++) {
+        const p = src[i];
+        if (p && typeof p.f === 'number' && typeof p.r === 'number' && typeof p.y === 'number') {
+          this._customCamViews[i] = p;
+        }
+      }
+    };
+    try {
+      const raw = localStorage.getItem(this._customCamStorageKey());
+      if (raw) apply(JSON.parse(raw));
+    } catch (e) {}
+    if (this._savedSettings && this._savedSettings.customCamViews) {
+      apply(this._savedSettings.customCamViews);
+    }
+  }
+
+  _persistCustomCamViews() {
+    if (!this._customCamViews || this._debugMode) return;
+    try { localStorage.setItem(this._customCamStorageKey(), JSON.stringify(this._customCamViews)); } catch (e) {}
+  }
+
+  _normalizeDesktopCam(p) {
+    if (!p || typeof p !== 'object') return null;
+    if (typeof p.f !== 'number' || typeof p.r !== 'number' || typeof p.y !== 'number') return null;
+    return {
+      f: p.f, r: p.r, y: p.y,
+      tf: typeof p.tf === 'number' ? p.tf : 0,
+      tr: typeof p.tr === 'number' ? p.tr : 0,
+      ty: typeof p.ty === 'number' ? p.ty : 0,
+      px: typeof p.px === 'number' ? p.px : 0,
+      py: typeof p.py === 'number' ? p.py : 0,
+      viewShift: typeof p.viewShift === 'number' ? p.viewShift : 0,
+    };
+  }
 
   _layoutCamBuiltins() {
     // f/r/y are offsets from the car centre along forward / right / up,
@@ -8089,6 +8218,7 @@ class Component extends DCLogic {
     if (typeof saved.camEventEnabled === 'boolean') s.camEventEnabled = saved.camEventEnabled;
     if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
     if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
+    if (typeof saved.camOrthoEnabled === 'boolean') s.camOrthoEnabled = saved.camOrthoEnabled;
     const urlFill = readUrlCenterFill();
     if (urlFill) s.centerFill = urlFill;
     else if (saved.centerFill === 'car' || saved.centerFill === 'wallpaper' || saved.centerFill === 'mixed') {
@@ -11538,7 +11668,7 @@ class Component extends DCLogic {
     const cameraOpen = this.state.activeGroup === 'camera' && this.state.panelOpen;
     const open = forceOpen === true || !cameraOpen;
     if (!open) {
-      this.setState({ panelOpen: false, activeGroup: null });
+      this.setState({ panelOpen: false, activeGroup: null, camSlotPickMode: false });
       return;
     }
     // Arm first: setState paints the tiles, and they need to know a render
@@ -11566,6 +11696,7 @@ class Component extends DCLogic {
   }
 
   saveLayoutCamera() {
+    // Debug / layout builtins only — CAMERA rail saves desktop + custom slots.
     const key = this._currentLayoutCamKey();
     if (!key) return;
     const rel = this._captureCurrentLayoutCam();
@@ -11579,11 +11710,65 @@ class Component extends DCLogic {
       console.log('[debug:camera] saved layout', key, rel);
       console.log('[debug:camera] builtins snippet:', JSON.stringify({ [key]: rel }));
     }
-    this.setState({ layoutCamFlash: true, cameraPreset: null });
-    clearTimeout(this._layoutCamFlashTimer);
-    this._layoutCamFlashTimer = setTimeout(() => {
-      if (!this._unmounted) this.setState({ layoutCamFlash: false });
+  }
+
+  saveCurrentDesktopCamera() {
+    if (!this._desktopReady) return;
+    const rel = this._captureCurrentLayoutCam();
+    if (!rel) return;
+    this._desktopCamera = this._normalizeDesktopCam(rel);
+    this._persistActiveDesktop();
+    this.setState({ camDesktopFlash: true, cameraPreset: null, camSlotPickMode: false });
+    clearTimeout(this._camDesktopFlashTimer);
+    this._camDesktopFlashTimer = setTimeout(() => {
+      if (!this._unmounted) this.setState({ camDesktopFlash: false });
     }, 1400);
+    if (this.requestRender) this.requestRender(4);
+  }
+
+  _saveCamViewToSlot(key) {
+    const i = this._customCamSlotIdx(key);
+    if (i < 0) return false;
+    const rel = this._captureCurrentLayoutCam();
+    if (!rel) return false;
+    if (!this._customCamViews) this._customCamViews = this._emptyCustomCamViews();
+    this._customCamViews[i] = rel;
+    this._persistCustomCamViews();
+    this._camCycleKeys = null;
+    if (this._camIcons) delete this._camIcons[key];
+    this._ensureCamIcons(0, { background: false });
+    // Slot save only: blink the tile. Do not write the desktop home, and do
+    // not flash SAVE TO CURRENT VIEW.
+    this.setState({
+      camSlotFlashKey: key,
+      camSlotPickMode: false,
+      camIconTick: (this.state.camIconTick || 0) + 1,
+    });
+    clearTimeout(this._camSlotFlashTimer);
+    this._camSlotFlashTimer = setTimeout(() => {
+      if (!this._unmounted && this.state.camSlotFlashKey === key) {
+        this.setState({ camSlotFlashKey: null });
+      }
+    }, 700);
+    if (this.requestRender) this.requestRender(4);
+    return true;
+  }
+
+  toggleCamSlotPick() {
+    this.setState({ camSlotPickMode: !this.state.camSlotPickMode });
+  }
+
+  onCamSlotClick(key) {
+    if (this._introActive) return;
+    if (this.state.camSlotPickMode) {
+      this._saveCamViewToSlot(key);
+      return;
+    }
+    if (this._getCustomCamRel(key)) {
+      this.setCameraPreset(key);
+      return;
+    }
+    this._saveCamViewToSlot(key);
   }
 
   cycleTimeMode() {
@@ -11635,15 +11820,18 @@ class Component extends DCLogic {
       camEventEnabled: !!s.camEventEnabled,
       camCycleEnabled: !!s.camCycleEnabled,
       camOrbitEnabled: !!s.camOrbitEnabled,
+      camOrthoEnabled: !!s.camOrthoEnabled,
       centerFill: (s.centerFill === 'wallpaper' || s.centerFill === 'mixed') ? s.centerFill : 'car',
       wallpaperAuto: !!s.wallpaperAuto,
       wallpaperIdx: Math.max(0, s.wallpaperIdx || 0),
       wallpaperEntries: Array.isArray(this._wallpaperEntries) ? this._wallpaperEntries : [],
       layoutCameras: this._layoutCameras || {},
+      customCamViews: this._customCamViews || this._emptyCustomCamViews(),
     };
     try {
       localStorage.setItem(this._settingsStorageKey(), JSON.stringify(payload));
       this._persistLayoutCameras();
+      this._persistCustomCamViews();
     } catch (e) {
       console.warn('[Settings] Failed to save', e);
       return;
@@ -11947,20 +12135,50 @@ class Component extends DCLogic {
       openSectionLayout: () => this.openLayoutPanel(),
       cameraPresets: (() => {
         const shots = this._camIcons || {};
-        return this._cameraPresetDefs().map((d) => {
-          const on = s.cameraPreset === d.key;
-          const shot = shots[d.key];
+        const pick = !!s.camSlotPickMode;
+        const flashKey = s.camSlotFlashKey;
+        void s.camIconTick;
+        return this._customCamSlotKeys().map((key, i) => {
+          const filled = !!this._getCustomCamRel(key);
+          const on = !pick && s.cameraPreset === key;
+          const shot = filled ? (shots[key] || '') : '';
           return {
-            ...d,
-            capClass: shot ? 'hv-cam-cap-off' : '',
-            caption: shot ? '' : (d.label || d.title),
-            shotUrl: shot || '',
+            key,
+            title: pick
+              ? (filled ? 'Replace view ' + (i + 1) : 'Save to slot ' + (i + 1))
+              : (filled ? 'Custom view ' + (i + 1) : 'Save current view to slot ' + (i + 1)),
+            shotUrl: shot,
+            showPlus: !filled || pick,
+            showCap: !!(filled && !shot && !pick),
+            caption: String(i + 1),
             onClass: on ? 'is-on' : '',
-            onClick: () => this.setCameraPreset(d.key),
+            emptyClass: filled ? '' : 'is-empty',
+            pickClass: pick ? 'is-pick' : '',
+            flashClass: flashKey === key ? 'is-flash' : '',
+            onClick: () => this.onCamSlotClick(key),
           };
         });
       })(),
-      saveLayoutCamera: () => this.saveLayoutCamera(),
+      saveCurrentDesktopCamera: () => this.saveCurrentDesktopCamera(),
+      toggleCamSlotPick: () => this.toggleCamSlotPick(),
+      camSaveToSlotVisible: this._hasFilledCamSlots(),
+      camDesktopSaveLabel: s.camDesktopFlash ? 'SAVED TO CURRENT VIEW' : 'SAVE TO CURRENT VIEW',
+      camDesktopSaveHint: this._desktopReady
+        ? (s.camSlotPickMode
+          ? 'Pick a slot to overwrite with the current camera.'
+          : 'Orbit the car, then save this angle as the home for the current desktop.')
+        : 'Desktops are still loading.',
+      camDesktopSaveBorder: hv(!!s.camDesktopFlash).border,
+      camDesktopSaveBg:     hv(!!s.camDesktopFlash).bg,
+      camDesktopSaveCol:    hv(!!s.camDesktopFlash).col,
+      camDesktopSaveOpacity: this._desktopReady ? '1' : '0.4',
+      camSlotSaveLabel: s.camSlotPickMode ? 'CANCEL' : 'SAVE TO SLOT',
+      camSlotSaveHint: s.camSlotPickMode
+        ? 'Tap a slot to overwrite it, or Cancel.'
+        : 'Fade the slots and pick which one to update.',
+      camSlotSaveBorder: hv(!!s.camSlotPickMode).border,
+      camSlotSaveBg:     hv(!!s.camSlotPickMode).bg,
+      camSlotSaveCol:    hv(!!s.camSlotPickMode).col,
       layoutCamPickerVisible: !!this._shellPreview,
       layoutCamModes: (() => {
         const defs = [
@@ -11980,20 +12198,13 @@ class Component extends DCLogic {
           };
         });
       })(),
-      layoutCamSaveLabel: s.layoutCamFlash ? 'SAVED TO CURRENT LAYOUT' : 'SAVE TO CURRENT LAYOUT',
-      layoutCamSaveHint: this._currentLayoutCamKey()
-        ? 'Orbit the car, then save this view as the home for ' + (this._layoutCamLabel(s.shellMode) || 'the current layout') + '.'
-        : 'Switch to a car layout to save a home camera.',
-      layoutCamSaveBorder: hv(!!s.layoutCamFlash).border,
-      layoutCamSaveBg:     hv(!!s.layoutCamFlash).bg,
-      layoutCamSaveCol:    hv(!!s.layoutCamFlash).col,
-      layoutCamSaveOpacity: this._currentLayoutCamKey() ? '1' : '0.4',
       ...this._wallpaperRenderFields(s),
       cameraOptions: (() => {
         const defs = [
           { key: 'camEventEnabled', label: 'ON EVENT', title: 'Doors → top (20° left). Roof/curtain → top facing left. Returns to the previous view ~2s after the opening settles.' },
-          { key: 'camCycleEnabled', label: 'CYCLE 60s', title: 'Cycle every predefined camera view every 60 seconds while the car is moving.' },
+          { key: 'camCycleEnabled', label: 'CYCLE 60s', title: 'Cycle every saved camera view every 60 seconds while the car is moving.' },
           { key: 'camOrbitEnabled', label: 'ORBIT', title: 'Very slow continuous orbit around the car.' },
+          { key: 'camOrthoEnabled', label: 'ORTHOGRAPHIC', title: 'Toggle orthographic projection (no perspective foreshortening).' },
         ];
         return defs.map((d) => {
           const on = !!s[d.key];
@@ -23487,6 +23698,7 @@ class Component extends DCLogic {
       const camera = new THREE.PerspectiveCamera(30, w / h, 0.1, 2000000);
       camera.position.set(7, 3.2, 9);
       this.camera = camera;
+      this._perspFov = camera.fov;
 
       // --- Sun direction (drives the single soft shadow under the car) ---
       const sun = new THREE.Vector3();
@@ -24104,11 +24316,18 @@ class Component extends DCLogic {
         this._forceViewerLayout();
         const W = (container.clientWidth || window.innerWidth || 1920);
         const H = (container.clientHeight || window.innerHeight || 720);
-        camera.aspect = W / H;
-        camera.updateProjectionMatrix();
+        if (this.camera && this.camera.isOrthographicCamera) {
+          this._syncOrthoFrustum();
+        } else {
+          camera.aspect = W / H;
+          camera.updateProjectionMatrix();
+        }
         renderer.setSize(W, H);
         if (this._fitCam) this._applyShellViewOffset(this._fitCam.viewShift || 0);
-        if (this.occluderCam) { this.occluderCam.aspect = W/H; this.occluderCam.updateProjectionMatrix(); }
+        if (this.occluderCam) {
+          if (this.occluderCam.isOrthographicCamera) this._copyCamProjection(this.camera, this.occluderCam);
+          else { this.occluderCam.aspect = W / H; this.occluderCam.updateProjectionMatrix(); }
+        }
         this._resizePostFX(W, H);
         if (this.requestRender) this.requestRender(2);
       };
@@ -24213,6 +24432,7 @@ class Component extends DCLogic {
       this.streakComposer = streakComposer;
       this.sAnaPass = sAna;
       this._resizePostFX(w, h);
+      if (this.state && this.state.camOrthoEnabled) this._setCameraOrtho(true);
 
       // Additive overlay material — reused for both bloom and streak.
       // setAdditiveKeepAlpha, not AdditiveBlending: both composers' RenderPass
@@ -24616,8 +24836,14 @@ class Component extends DCLogic {
         const syncCam = (dst) => {
           dst.position.copy(camera.position);
           dst.quaternion.copy(camera.quaternion);
-          dst.fov = camera.fov; dst.aspect = camera.aspect;
           dst.near = camera.near; dst.far = camera.far;
+          if (camera.isOrthographicCamera && dst.isOrthographicCamera) {
+            dst.left = camera.left; dst.right = camera.right;
+            dst.top = camera.top; dst.bottom = camera.bottom;
+            dst.zoom = camera.zoom;
+          } else if (camera.isPerspectiveCamera && dst.isPerspectiveCamera) {
+            dst.fov = camera.fov; dst.aspect = camera.aspect;
+          }
           // Keep bloom/streak aligned with shell view-offset on the main camera.
           // clearViewOffset() only sets view.enabled = false — the old offsetX
           // stays on the object — so copying view blindly leaves light glows
@@ -28663,7 +28889,10 @@ class Component extends DCLogic {
     this._setupNightSceneLights(center3, size3, groundY);
     this._setupWindLines(center3, size3, groundY);
     const radius = Math.max(size3.x, size3.y, size3.z) * 0.6;
-    const fov = this.camera.fov * Math.PI / 180;
+    const fovDeg = (this.camera && this.camera.isPerspectiveCamera)
+      ? this.camera.fov
+      : (this._perspFov || 30);
+    const fov = fovDeg * Math.PI / 180;
     const dist = (radius / Math.sin(fov / 2)) * 1.28;
     this._fitCenter = center3.clone();
     this._fitSize = size3.clone();
@@ -28833,7 +29062,9 @@ class Component extends DCLogic {
     }
     if (!this._scratchCam) this._scratchCam = new THREE.PerspectiveCamera();
     const cam = this._scratchCam;
-    cam.fov = (this.camera && this.camera.fov) || 45;
+    cam.fov = (this.camera && this.camera.isPerspectiveCamera)
+      ? this.camera.fov
+      : (this._perspFov || 45);
     cam.aspect = w / h;
     cam.near = 0.1;
     cam.far = 10000;
@@ -28977,8 +29208,7 @@ class Component extends DCLogic {
     const { h } = this._viewportSize();
     // Same world-units-per-pixel OrbitControls' own pan() uses - clientHeight
     // only, so the aspect ratio never distorts the rate.
-    const dist = this.camera.position.distanceTo(this.controls.target);
-    const wpp = 2 * dist * Math.tan(this.camera.fov / 2 * Math.PI / 180) / h;
+    const wpp = this._camWorldPerPixel(h);
     if (!(wpp > 1e-9)) return false;
     // camera.matrix lags a frame after OrbitControls' lookAt(); refresh it
     // before reading the basis columns out of it.
@@ -29085,6 +29315,8 @@ class Component extends DCLogic {
   }
 
   _layoutHomePose() {
+    const desk = this._normalizeDesktopCam(this._desktopCamera);
+    if (desk) return this._relToPose(desk);
     const key = this._currentLayoutCamKey();
     const saved = key && this._layoutCameras && this._layoutCameras[key];
     if (saved && typeof saved.f === 'number') return this._relToPose(saved);
@@ -29219,12 +29451,126 @@ class Component extends DCLogic {
     return { F, R, up };
   }
 
+  _camWorldPerPixel(h) {
+    const cam = this.camera;
+    if (!cam || !this.controls) return 0;
+    const hh = h || this._viewportSize().h;
+    if (cam.isOrthographicCamera) {
+      return ((cam.top - cam.bottom) / Math.max(1e-6, cam.zoom)) / Math.max(1, hh);
+    }
+    const dist = cam.position.distanceTo(this.controls.target);
+    const fov = ((cam.fov != null ? cam.fov : (this._perspFov || 30)) / 2) * Math.PI / 180;
+    return 2 * dist * Math.tan(fov) / Math.max(1, hh);
+  }
+
+  _copyCamProjection(src, dst) {
+    if (!src || !dst) return;
+    dst.near = src.near;
+    dst.far = src.far;
+    if (src.isOrthographicCamera && dst.isOrthographicCamera) {
+      dst.left = src.left; dst.right = src.right;
+      dst.top = src.top; dst.bottom = src.bottom;
+      dst.zoom = src.zoom;
+    } else if (src.isPerspectiveCamera && dst.isPerspectiveCamera) {
+      dst.fov = src.fov; dst.aspect = src.aspect;
+    }
+    dst.updateProjectionMatrix();
+  }
+
+  _syncOrthoFrustum() {
+    const cam = this.camera;
+    if (!cam || !cam.isOrthographicCamera) return;
+    const { w, h } = this._viewportSize();
+    const aspect = Math.max(0.1, w / Math.max(1, h));
+    let halfH = this._orthoHalfH;
+    if (!(halfH > 0)) {
+      halfH = Math.max(0.01, (cam.top - cam.bottom) * 0.5);
+      this._orthoHalfH = halfH;
+    }
+    cam.top = halfH;
+    cam.bottom = -halfH;
+    cam.left = -halfH * aspect;
+    cam.right = halfH * aspect;
+    cam.updateProjectionMatrix();
+  }
+
+  _replacePostFxCams() {
+    if (!this.camera) return;
+    const make = () => {
+      const c = this.camera.clone();
+      c.layers.enableAll();
+      return c;
+    };
+    this.bloomCam = make();
+    this.streakCam = make();
+    if (this.bloomComposer && this.bloomComposer.passes && this.bloomComposer.passes[0]) {
+      this.bloomComposer.passes[0].camera = this.bloomCam;
+    }
+    if (this.streakComposer && this.streakComposer.passes && this.streakComposer.passes[0]) {
+      this.streakComposer.passes[0].camera = this.streakCam;
+    }
+  }
+
+  _setCameraOrtho(enabled) {
+    const THREE = this.THREE || window.THREE;
+    if (!THREE || !this.camera || !this.controls) return;
+    const wantOrtho = !!enabled;
+    const isOrtho = !!this.camera.isOrthographicCamera;
+    if (wantOrtho === isOrtho) {
+      if (wantOrtho) this._syncOrthoFrustum();
+      return;
+    }
+    const old = this.camera;
+    const { w, h } = this._viewportSize();
+    const aspect = Math.max(0.1, w / Math.max(1, h));
+    const target = this.controls.target.clone();
+    const pos = old.position.clone();
+    const dist = Math.max(0.05, pos.distanceTo(target));
+    const near = old.near;
+    const far = old.far;
+    const view = (old.view && old.view.enabled) ? { ...old.view } : null;
+    let cam;
+    if (wantOrtho) {
+      const fovDeg = old.isPerspectiveCamera ? old.fov : (this._perspFov || 30);
+      this._perspFov = fovDeg;
+      const halfH = dist * Math.tan((fovDeg * Math.PI / 180) / 2);
+      this._orthoHalfH = halfH;
+      cam = new THREE.OrthographicCamera(-halfH * aspect, halfH * aspect, halfH, -halfH, near, far);
+      cam.zoom = 1;
+    } else {
+      const fovDeg = this._perspFov || 30;
+      const visHalfH = (this._orthoHalfH > 0 ? this._orthoHalfH : ((old.top - old.bottom) * 0.5))
+        / Math.max(1e-6, old.zoom || 1);
+      const newDist = visHalfH / Math.tan((fovDeg * Math.PI / 180) / 2);
+      const dir = pos.clone().sub(target);
+      if (dir.lengthSq() < 1e-10) dir.set(0, 0.3, 1);
+      dir.setLength(newDist);
+      pos.copy(target).add(dir);
+      cam = new THREE.PerspectiveCamera(fovDeg, aspect, near, far);
+    }
+    cam.position.copy(pos);
+    cam.up.copy(old.up);
+    cam.lookAt(target);
+    if (view && typeof cam.setViewOffset === 'function') {
+      cam.setViewOffset(view.fullWidth, view.fullHeight, view.offsetX, view.offsetY, view.width, view.height);
+    }
+    cam.updateProjectionMatrix();
+    this.camera = cam;
+    this.controls.object = cam;
+    this.controls.update();
+    this._replacePostFxCams();
+    this._applyShellViewOffset(this._layoutViewShift || 0);
+    if (typeof window !== 'undefined') window.__camera = cam;
+    this._postFxDirty = true;
+    if (this.requestRender) this.requestRender(8);
+  }
+
   _homeCameraPose() {
     return this._layoutHomePose();
   }
 
   _cameraPresetDefs() {
-    // label: short tile caption; title: tooltip / accessibility.
+    // Built-in named poses for ON EVENT (not shown in the CAMERA rail).
     return [
       { key: 'front',         label: 'Front',  title: 'Front' },
       { key: 'frontSide',     label: 'F 3/4',  title: 'Front three-quarter' },
@@ -29272,7 +29618,10 @@ class Component extends DCLogic {
     const pose = this._getCameraPresetPose(key);
     const box = this._camIconBox();
     if (!pose || !box) return null;
-    const cam = new THREE.PerspectiveCamera(this.camera.fov, 1, 0.05, 500);
+    const fov = (this.camera && this.camera.isPerspectiveCamera)
+      ? this.camera.fov
+      : (this._perspFov || 30);
+    const cam = new THREE.PerspectiveCamera(fov, 1, 0.05, 500);
     const target = box.getCenter(new THREE.Vector3());
     const offset = pose.position.clone().sub(pose.target);
     const corners = [];
@@ -29382,9 +29731,8 @@ class Component extends DCLogic {
     if (!this._camIcons) this._camIcons = {};
     if (this._camIconTimer || this._introActive) return;
     if (!this.renderer || !this.model || !this._fitCenter || !this._fitDist) return;
-    const missing = this._cameraPresetDefs()
-      .map((d) => d.key)
-      .filter((k) => !this._camIcons[k]);
+    const missing = this._customCamSlotKeys()
+      .filter((k) => this._getCustomCamRel(k) && !this._camIcons[k]);
     if (!missing.length) return;
     this._camIconQueue = missing;
     this._camIconTimer = setTimeout(() => this._stepCamIcons(),
@@ -29476,6 +29824,8 @@ class Component extends DCLogic {
   _getCameraPresetPose(key) {
     if (!this._fitCenter || !this._fitDist) return null;
     if (key === 'home') return this._homeCameraPose();
+    const custom = this._getCustomCamRel(key);
+    if (custom) return this._relToPose(custom);
     const THREE = window.THREE;
     const c = this._fitCenter.clone();
     const d = this._fitDist;
@@ -29764,9 +30114,7 @@ class Component extends DCLogic {
   }
 
   _camCyclePresetKeys() {
-    if (this._camCycleKeys && this._camCycleKeys.length) return this._camCycleKeys;
-    this._camCycleKeys = this._cameraPresetDefs().map((d) => d.key);
-    return this._camCycleKeys;
+    return this._customCamSlotKeys().filter((k) => !!this._getCustomCamRel(k));
   }
 
   _tickCamCycle(dt) {
@@ -29806,11 +30154,13 @@ class Component extends DCLogic {
         saved.camEventEnabled = key === 'camEventEnabled' ? on : !!this.state.camEventEnabled;
         saved.camCycleEnabled = key === 'camCycleEnabled' ? on : !!this.state.camCycleEnabled;
         saved.camOrbitEnabled = key === 'camOrbitEnabled' ? on : !!this.state.camOrbitEnabled;
+        saved.camOrthoEnabled = key === 'camOrthoEnabled' ? on : !!this.state.camOrthoEnabled;
         localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
         if (this._savedSettings) {
           this._savedSettings.camEventEnabled = saved.camEventEnabled;
           this._savedSettings.camCycleEnabled = saved.camCycleEnabled;
           this._savedSettings.camOrbitEnabled = saved.camOrbitEnabled;
+          this._savedSettings.camOrthoEnabled = saved.camOrthoEnabled;
         }
       }
     } catch (e) {}
@@ -29820,6 +30170,7 @@ class Component extends DCLogic {
       else this._restoreEventCam();
     }
     if (key === 'camCycleEnabled') this._camCycleElapsed = 0;
+    if (key === 'camOrthoEnabled') this._setCameraOrtho(on);
     if (this.requestRender) this.requestRender(12);
   }
 
@@ -30895,6 +31246,7 @@ class Component extends DCLogic {
       widgetClock: this._cloneDesktopValue(this._normalizeWidgetClock(this._widgetClockConfig), this._normalizeWidgetClock()),
       bottomClock: this._cloneDesktopValue(this._normalizeBottomClock(this._bottomClockConfig), this._normalizeBottomClock()),
       widgetLayout: this._cloneDesktopValue(layout || this._widgetLayout || this._defaultWidgetLayout(), this._defaultWidgetLayout()),
+      camera: this._normalizeDesktopCam(this._desktopCamera),
     };
   }
 
@@ -30928,6 +31280,7 @@ class Component extends DCLogic {
     base.widgetClock = this._normalizeWidgetClock(d.widgetClock || { style: d.clockStyle, hourFormat: d.clockHourFormat || (d.clockFormat === '12h' ? '12' : '24') });
     base.bottomClock = this._normalizeBottomClock(d.bottomClock || { face: d.clockFace, hourFormat: d.clockHourFormat || (d.clockFormat === '12h' ? '12' : '24') });
     base.widgetLayout = this._parseWidgetLayout(d.widgetLayout || base.widgetLayout);
+    base.camera = this._normalizeDesktopCam(d.camera);
     return base;
   }
 
@@ -30981,6 +31334,7 @@ class Component extends DCLogic {
     this._pendingSlotSync = true;
     this._shellMode = current.shellMode;
     this._splitRatio = current.splitRatio;
+    this._desktopCamera = this._normalizeDesktopCam(current.camera);
     Object.assign(this.state, {
       desktopIndex: active,
       shellMode: current.shellMode,
@@ -31040,6 +31394,7 @@ class Component extends DCLogic {
     this._widgetsReady = true;
     this._shellMode = d.shellMode;
     this._splitRatio = d.splitRatio;
+    this._desktopCamera = this._normalizeDesktopCam(d.camera);
     persistBootShellLayout(d.shellMode, d.splitRatio);
     this._saveDesktopStore();
     const left = this._board('left', d.shellMode);
