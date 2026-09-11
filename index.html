@@ -125,10 +125,25 @@
     -webkit-tap-highlight-color: transparent;
   }
   #hv-splash-skip:active { background: rgba(79,214,232,.22); }
+  /* The clip plays on a hole-punched hardware overlay, so the page's own
+     painting is punched away underneath it — EXCEPT for layers Chromium
+     promotes to their own compositor layer, which draw OVER the clip. The
+     wallpaper div is one (it animates opacity), and the Bing photo was
+     measured covering the whole 1920x720 panel mid-clip, 4.6s into a cold
+     boot, while the car flat #efefef behind it correctly stayed punched out.
+     So hold every page surface back until the overlay comes down: HavalSplash
+     clears this class in fadeOut() / dropNow(), which is also where the
+     wallpaper's own 0.7s fade-in starts, under the splash's 1.1s fade out.
+     .bg-grain::after is promoted too (it runs an animation) and gets the same
+     treatment for the same reason. */
+  body.hv-splash-up #hv-root { background: #000 !important; }
+  body.hv-splash-up .hv-wallpaper { opacity: 0 !important; }
+  body.hv-splash-up .bg-grain::after { opacity: 0 !important; }
 </style>
 </head>
-<!-- hv-boot holds the widget boards back until the reveal — see .hv-widget-board. -->
-<body class="hv-boot">
+<!-- hv-boot holds the widget boards back until the reveal — see .hv-widget-board.
+     hv-splash-up holds the background and wallpaper back — see above. -->
+<body class="hv-boot hv-splash-up">
 
 <!-- ── Boot splash ───────────────────────────────────────────────────────────
      Deliberately outside the design-component template: plain markup paints on the
@@ -173,6 +188,14 @@ window.HavalSplash = (function () {
     skipBtn.style.display = 'none';
   }
 
+  // Release the page's own painting (background, wallpaper, grain) — see the
+  // body.hv-splash-up rules in <head>. Called from every path that takes the
+  // overlay down, never before: anything Chromium promotes to its own layer
+  // draws OVER the hole-punched clip.
+  function releasePage() {
+    try { document.body.classList.remove('hv-splash-up'); } catch (e) {}
+  }
+
   function finish() {
     if (finished) return;
     finished = true;
@@ -194,6 +217,7 @@ window.HavalSplash = (function () {
   if (noSplash && el) el.parentNode.removeChild(el);
 
   if (!el || !video) {
+    releasePage();
     finish();
     return {
       active: false, fadeMs: 0,
@@ -327,6 +351,10 @@ window.HavalSplash = (function () {
   // Hard ceiling. The clip is ~15.1s; if it has not reported `ended` a couple of
   // seconds past that, freeze whatever frame we have rather than waiting forever.
   var guard = setTimeout(holdLastFrame, 19000);
+  // A stuck splash must never leave the page painting nothing but black. Well
+  // past every other ceiling here (19s guard + a ~25s swap-badge safety), so
+  // it only ever fires if fadeOut/dropNow were both missed outright.
+  setTimeout(releasePage, 45000);
   video.addEventListener('timeupdate', function () {
     if (holding || finished || !video) return;
     var d = video.duration;
@@ -463,6 +491,7 @@ window.HavalSplash = (function () {
   function dropNow() {
     if (faded) return;
     faded = true;
+    releasePage();
     hideSkip();
     clearTimeout(guard);
     clearInterval(watchdog);
@@ -518,6 +547,7 @@ window.HavalSplash = (function () {
     fadeOut: function () {
       if (faded) return;
       faded = true;
+      releasePage();
       hideSkip();
       clearTimeout(guard);
       clearInterval(watchdog);
@@ -9117,13 +9147,12 @@ class Component extends DCLogic {
    * focused POWER popup, which renders out of renderVals via
    * _focusedCardRenderFields (keyed on state.focusedCardType).
    *
-   * Measured on the car WHILE DRIVING (2026-09-11): bumping widgetRev on every
-   * tick cost a React commit of **92-100 ms p50, 211 ms p90, 8-17% of wall
-   * clock**, and held bare rAF to 20-25/s. The 250 ms debounce did not save it
-   * -- exactly the lesson _setMotionSpeed already learned: there is no safe
-   * rate at which to re-render this tree from the bus, because the commit cost
-   * dwarfs the interval. After: widgetRev gone from the setState attribution
-   * entirely, timer lag p50 29.7 ms -> 5.8 ms.
+   * Measured on the car WHILE DRIVING (2026-09-11, monitor run): bumping
+   * widgetRev on every tick cost a React commit of **92-100 ms p50, 211 ms
+   * p90, 8-17% of wall clock**, and held bare rAF to 20-25/s. The 250 ms
+   * debounce did not save it -- exactly the lesson _setMotionSpeed already
+   * learned: there is no safe rate at which to re-render this tree from the
+   * bus, because the commit cost dwarfs the interval.
    *
    * widgetRev is also part of the desktop-persist signature (see
    * componentDidUpdate), so each of those ticks additionally scheduled a
@@ -12564,7 +12593,10 @@ class Component extends DCLogic {
       // the first render — including while the model is still loading — so the
       // wait frame matches the car instead of flashing WebView white or splash
       // black. state.nightMode/dayBg/nightBg are restored in the constructor.
-      shellBg: this._resolvedBg(),
+      // Vignetted, so the very first paint already matches the settled 3D
+      // background instead of stepping to it — see _shellBgCss.
+      shellBg: this._shellBgCss(this._resolvedBg(), s.vignette && s.vignette.color,
+        s.vignette && s.vignette.intensity),
       // Config panel docks over the left widget board (see configDock*).
       toolbarRight: (s.panelOpen ? 286 : 26) + 'px',
       configPanelRight: '26px',
@@ -13115,6 +13147,40 @@ class Component extends DCLogic {
     return s.nightMode ? s.nightBg : s.dayBg;
   }
 
+  /**
+   * The same background as a CSS paint — base colour plus the vignette.
+   *
+   * The shell div is what the panel shows before the WebGL canvas has drawn a
+   * frame, and it used to paint the base colour ALONE. Measured on the car
+   * (skip during a cold boot): 8.6 s of flat #efefef at 239,239,239 across the
+   * whole panel, then a step to the settled 3D background at 156 in the
+   * corners. That step is the "it goes white while the model loads" report.
+   *
+   * The radial stop matches the vignette shader exactly: alpha ramps linearly
+   * with length(uv - 0.5) * 2, so it reaches full intensity on the ellipse
+   * inscribed in the viewport and CSS holds the last stop past it, the same
+   * way the shader's clamp() does.
+   *
+   * What it does NOT reproduce is the renderer's tone mapping, which the
+   * canvas applies to scene.background and CSS cannot. Measured on the car at
+   * eight points: CSS 237/192/181/179/169/167 against the canvas's
+   * 222/180/170/169/158/156 — a uniform ~0.93, i.e. the CSS phase reads ~6%
+   * bright for the ~1.4 s before the canvas draws its first frame. The step
+   * was 239 -> 156 over 8.6 s before this; closing the rest would mean either
+   * duplicating ACES in JS or caching a probe render across boots, and the
+   * first paint happens before the renderer exists either way.
+   */
+  _shellBgCss(bg, vigColor, vigIntensity) {
+    const a = Math.max(0, Math.min(1, (vigIntensity ?? 0) / 100));
+    if (!a) return bg;
+    const h = (vigColor || '#000000').replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16) || 0;
+    const g = parseInt(h.slice(2, 4), 16) || 0;
+    const b = parseInt(h.slice(4, 6), 16) || 0;
+    return `radial-gradient(ellipse 50% 50% at 50% 50%,`
+      + ` rgba(${r},${g},${b},0) 0%, rgba(${r},${g},${b},${a.toFixed(3)}) 100%), ${bg}`;
+  }
+
   _normalizeCenterFill(fill) {
     if (fill === 'wallpaper' || fill === 'mixed') return fill;
     return 'car';
@@ -13147,7 +13213,7 @@ class Component extends DCLogic {
         this.vignetteMat.uniforms.vignetteIntensity.value = vi / 100;
       }
       if (this.outerRef && this.outerRef.current) {
-        this.outerRef.current.style.background = bg;
+        this.outerRef.current.style.background = this._shellBgCss(bg, vc, vi);
         this.outerRef.current.classList.toggle('bg-grain', !!grain);
       }
       if (this.requestRender) this.requestRender(4);
@@ -13180,7 +13246,7 @@ class Component extends DCLogic {
     }
     // CSS background — loading state + behind the panel
     if (this.outerRef && this.outerRef.current) {
-      this.outerRef.current.style.background = bg;
+      this.outerRef.current.style.background = this._shellBgCss(bg, vc, vi);
       this.outerRef.current.classList.toggle('bg-grain', !!grain);
     }
     // Paint the native shell for the NEXT cold start. The WebView's own colour
@@ -25454,6 +25520,16 @@ class Component extends DCLogic {
       this.vignetteMat   = vignetteMat;
       this.vignetteScene = vignetteScene;
 
+      // Settle the background NOW, not when the model lands. scene.background
+      // was a flat colour until then and the vignette uniform sat at 0, so a
+      // boot that reveals the shell before the GLB arrives (SKIP, or a slow
+      // cold start) showed a flat panel that stepped darker at the corners the
+      // moment the car appeared — measured on the car at 239 for 8.6 s, then
+      // 156. The vignette quad and material exist as of this line, which is
+      // the only reason this could not be done at scene creation.
+      this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg,
+        this.state.vignette, this.state.grainEnabled);
+
       // --- Render loop (on-demand: only draws when something actually changes) ---
       let _lastT = performance.now();
       let _fpsT = _lastT, _fpsCount = 0;
@@ -30605,6 +30681,8 @@ class Component extends DCLogic {
         this._intro.camTo.copy(home.position);
         this._intro.camToTarget.copy(home.target);
         this._intro.viewShiftTo = viewShift;
+        const vp = this._viewportSize();
+        this._intro.panTo = { x: (home.panX || 0) * vp.w, y: (home.panY || 0) * vp.h };
       }
       return;
     }
@@ -31802,6 +31880,19 @@ class Component extends DCLogic {
    * That match is a property of the clip, so this distance must NOT follow the
    * layout's home framing — the intro orbits from here to wherever the current
    * layout wants the car, and only the destination is the layout's business.
+   *
+   * The same goes for the ON-SCREEN placement, and that one shipped broken.
+   * `_applyShellViewOffset(0)` does not mean "centred": it adds `_userPanPx`,
+   * the pan carried by whatever camera pose the layout restored at boot. A
+   * desktop saved with a pan therefore dragged the splash-matching pose with
+   * it. Measured on the car against the clip's last frame (1920x720, the same
+   * thresholding pass over both): the clip holds the car at cx 964.5, top 246;
+   * the intro held it at cx 827.5, top 183 — 135 px left and 62 px high,
+   * exactly the saved pan. The car's projected WIDTH was right (326 px against
+   * the clip's 320), which is why this read as "the car sits a bit far" rather
+   * than as a shift, and why INTRO_FRONT_DIST_MUL is not the knob. So the intro
+   * zeroes the pan for the hold and eases it back in over the orbit, landing on
+   * the layout's own framing. Measured after: cx 962.5, top 245.
    */
   _introFrontPoses() {
     if (!this._fitCenter || !this._fitDist) return null;
@@ -31830,6 +31921,9 @@ class Component extends DCLogic {
     this.camera.near = Math.max(0.05, poses.defaultDist / 120);
     this.camera.far = Math.max(200, poses.defaultDist * 120);
     this.camera.updateProjectionMatrix();
+    // Zero shift AND zero pan — see _introFrontPoses. _applyShellViewOffset
+    // ADDS _userPanPx, so a shift of 0 is not the same as centred.
+    this._setUserPan(0, 0);
     this._applyShellViewOffset(0);
     this.controls.update();
     if (this.requestRender) this.requestRender(2);
@@ -31988,6 +32082,8 @@ class Component extends DCLogic {
     this.camera.near = Math.max(0.05, poses.defaultDist / 120);
     this.camera.far = Math.max(200, poses.defaultDist * 120);
     this.camera.updateProjectionMatrix();
+    // Centred means shift 0 AND pan 0 — see _introFrontPoses.
+    this._setUserPan(0, 0);
     this._applyShellViewOffset(0);
     this.controls.update();
 
@@ -32000,6 +32096,7 @@ class Component extends DCLogic {
 
     const home = this._homeCameraPose();
     const fadeSec = Math.max(0.2, ((splash && splash.fadeMs) || 1100) / 1000);
+    const { w: vw, h: vh } = this._viewportSize();
     this._intro = {
       phase: 'hold',
       t: 0,
@@ -32012,6 +32109,9 @@ class Component extends DCLogic {
       viewShiftTo: (home && home.viewShift != null)
         ? home.viewShift
         : ((this._fitCam && this._fitCam.viewShift) || 0),
+      // Poses store pan as a fraction of the viewport (see _captureCurrentLayoutCam).
+      panFrom: { x: 0, y: 0 },
+      panTo: { x: ((home && home.panX) || 0) * vw, y: ((home && home.panY) || 0) * vh },
     };
     if (this.requestRender) this.requestRender(240);
   }
@@ -32041,6 +32141,14 @@ class Component extends DCLogic {
     const intro = this._intro;
     intro.t += dt;
 
+    // The pan rides the same easing as the orbit. It has to be written BEFORE
+    // _applyShellViewOffset, which folds _userPanPx into the offset it sets.
+    const panAt = (e) => {
+      const from = intro.panFrom || { x: 0, y: 0 };
+      const to = intro.panTo || { x: 0, y: 0 };
+      this._setUserPan(from.x + (to.x - from.x) * e, from.y + (to.y - from.y) * e);
+    };
+
     const applyCamLerp = (fromPos, toPos, fromTarget, toTarget, e, viewShift) => {
       this.camera.position.lerpVectors(fromPos, toPos, e);
       this.controls.target.lerpVectors(fromTarget, toTarget, e);
@@ -32048,6 +32156,7 @@ class Component extends DCLogic {
       this.camera.near = Math.max(0.05, dist / 120);
       this.camera.far = Math.max(200, dist * 120);
       this.camera.updateProjectionMatrix();
+      panAt(e);
       if (viewShift != null) this._applyShellViewOffset(viewShift);
       this.controls.update();
     };
@@ -32060,11 +32169,16 @@ class Component extends DCLogic {
       this.camera.near = Math.max(0.05, dist / 120);
       this.camera.far = Math.max(200, dist * 120);
       this.camera.updateProjectionMatrix();
+      panAt(0);
       this._applyShellViewOffset(0);
       this.controls.update();
       const holdDur = intro.holdDur != null ? intro.holdDur : 1.1;
       if (intro.t >= holdDur) {
         if (!intro.camTo || intro.camTo.distanceToSquared(intro.camFrom) < 1e-6) {
+          // No orbit to run, so the pan has nothing to ride in on — hand the
+          // layout's own framing over directly rather than settling on zero.
+          panAt(1);
+          this._applyShellViewOffset(intro.viewShiftTo || 0);
           this._endIntroAnimation();
           return true;
         }
@@ -32084,6 +32198,7 @@ class Component extends DCLogic {
       if (u >= 1) {
         this.camera.position.copy(intro.camTo);
         this.controls.target.copy(intro.camToTarget);
+        panAt(1);
         this._applyShellViewOffset(intro.viewShiftTo || 0);
         this._endIntroAnimation();
       }
@@ -36569,9 +36684,10 @@ class Component extends DCLogic {
     //
     // A real track change DOES need the re-render -- it changes what is on
     // screen structurally -- so this is not the _live seam treatment that
-    // motionSpeed and the POWER card got. It only needs to stop committing the
-    // SAME thing. applyMediaPosition already keeps the progress bar moving
-    // without React, so a republish has nothing left that needs a commit.
+    // motionSpeed and the POWER card got. It is just a guard against
+    // committing the same thing repeatedly. applyMediaPosition already keeps
+    // the progress bar moving without React, so a republish has nothing left
+    // that needs a commit.
     //
     // Art is compared by length + head rather than whole-string: these are
     // base64 data URLs and a full compare on every republish is its own cost.
