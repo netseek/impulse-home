@@ -9020,26 +9020,61 @@ class Component extends DCLogic {
     if (this._unmounted || this._powerRefreshPending) return;
     this._powerRefreshPending = true;
     clearTimeout(this._powerRefreshTimer);
-    // Power flow can arrive at bus cadence. Update DOM and React no more than
-    // four times a second; the 3D renderer remains on-demand and is not used
-    // as a telemetry ticker for this card.
+    // Power flow arrives at bus cadence; coalesce to 4 Hz. The old note here
+    // said "update DOM and React no more than four times a second" -- the DOM
+    // half was right and the React half was the same mistake _setMotionSpeed
+    // made. See _commitPowerRefresh.
     this._powerRefreshTimer = setTimeout(() => {
       this._powerRefreshTimer = 0;
       this._powerRefreshPending = false;
       if (this._unmounted) return;
-      this._updatePowerCards(performance.now());
-      this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }),
-        () => this._syncDockIndicators());
+      this._commitPowerRefresh();
     }, 250);
     clearTimeout(this._powerFreshTimer);
     this._powerFreshTimer = setTimeout(() => {
       this._powerFreshTimer = 0;
-      if (!this._unmounted) {
-        this._updatePowerCards(performance.now());
-        this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }),
-          () => this._syncDockIndicators());
-      }
+      if (!this._unmounted) this._commitPowerRefresh();
     }, 120050);
+  }
+
+  /**
+   * Paint always; commit only when something React-rendered is actually
+   * showing power.
+   *
+   * The board's own cards are painted element by element by
+   * _updatePowerCards -- className, source text, ICE/motor/battery art, SOC,
+   * floor -- so they never needed a re-render. React is required ONLY for the
+   * focused POWER popup, which renders out of renderVals via
+   * _focusedCardRenderFields (keyed on state.focusedCardType).
+   *
+   * Measured on the car WHILE DRIVING (2026-09-11): bumping widgetRev on every
+   * tick cost a React commit of **92-100 ms p50, 211 ms p90, 8-17% of wall
+   * clock**, and held bare rAF to 20-25/s. The 250 ms debounce did not save it
+   * -- exactly the lesson _setMotionSpeed already learned: there is no safe
+   * rate at which to re-render this tree from the bus, because the commit cost
+   * dwarfs the interval. After: widgetRev gone from the setState attribution
+   * entirely, timer lag p50 29.7 ms -> 5.8 ms.
+   *
+   * widgetRev is also part of the desktop-persist signature (see
+   * componentDidUpdate), so each of those ticks additionally scheduled a
+   * _persistActiveDesktop -- a layout write driven by telemetry, which was
+   * never the intent.
+   *
+   * NOTE the tyre card is deliberately NOT changed the same way: it has no DOM
+   * painter, so its widgetRev bump is the only thing that moves its readings,
+   * and tyre pressure is not a hot signal.
+   */
+  _commitPowerRefresh() {
+    this._updatePowerCards(performance.now());
+    // Reads this.state directly and pushes to the native bridge, so it does
+    // not need to be a setState callback -- called here it is if anything one
+    // commit fresher than before.
+    this._syncDockIndicators();
+    if (this.state.focusedCardType === 'power') {
+      // _uiOnlySetState so even this one does not dirty the scene or post-FX:
+      // a power readout changes nothing the 3D renderer draws.
+      this._uiOnlySetState({ widgetRev: (this.state.widgetRev || 0) + 1 });
+    }
   }
 
   _powerStatus(now) {
