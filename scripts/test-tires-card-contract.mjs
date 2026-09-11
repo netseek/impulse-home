@@ -18,6 +18,8 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const html = readFileSync(resolve(root, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const native = readFileSync(
   resolve(root, 'app/src/main/java/com/havalh6/viewer/MainActivity.java'), 'utf8').replace(/\r\n/g, '\n');
+const dockOverrides = readFileSync(
+  resolve(root, 'app/src/main/java/com/havalh6/viewer/DockAppOverrides.java'), 'utf8').replace(/\r\n/g, '\n');
 
 function blockFrom(source, token, label = token) {
   const start = source.indexOf(token);
@@ -290,7 +292,9 @@ includesAll(native, [
   'private static final String PREFS_SHELL = "h6_shell";',
   '.putString("widgets",',
   '.getString("widgets", "")',
-  'static final String PREF_KEY = "dock_app_overrides";',
 ], 'native persistence keys');
+includesAll(dockOverrides, [
+  'static final String PREF_KEY = "dock_app_overrides";',
+], 'dock override persistence key');
 
 console.log('Tires card contracts: ok');

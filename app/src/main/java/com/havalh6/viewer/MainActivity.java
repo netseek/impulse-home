@@ -188,7 +188,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v39-no-web-app-edit";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v40-window-trunk-pace";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -9786,15 +9786,7 @@ public final class MainActivity extends Activity {
         list.setOrientation(android.widget.LinearLayout.VERTICAL);
         int pad = Math.round(6 * density);
         list.setPadding(pad, pad, pad, pad);
-        android.graphics.drawable.GradientDrawable panel =
-                new android.graphics.drawable.GradientDrawable();
-        panel.setCornerRadius(14f * density);
-        // Near-opaque on purpose: this sits over a widget board full of text,
-        // not over the scene, and a car UI has to be readable at a glance.
-        panel.setColor(dockUiLight ? 0xFCF7FAFC : 0xFA0B1016);
-        panel.setStroke(Math.max(1, Math.round(density)),
-                dockUiLight ? 0x2225303B : 0x26FFFFFF);
-        list.setBackground(panel);
+        list.setBackground(makeDockPopupPanel(density));
         list.setElevation(12f * density);
 
         for (QuickMenuRow row : descriptor.menu) {
@@ -9882,6 +9874,59 @@ public final class MainActivity extends Activity {
         states.addState(new int[] { android.R.attr.state_pressed }, pressed);
         states.addState(new int[0], rest);
         return states;
+    }
+
+    private android.graphics.drawable.GradientDrawable makeDockPopupPanel(float density) {
+        android.graphics.drawable.GradientDrawable panel =
+                new android.graphics.drawable.GradientDrawable();
+        panel.setCornerRadius(14f * density);
+        panel.setColor(dockUiLight ? 0xFCF7FAFC : 0xFA0B1016);
+        panel.setStroke(Math.max(1, Math.round(density)),
+                dockUiLight ? 0x2225303B : 0x26FFFFFF);
+        return panel;
+    }
+
+    private android.graphics.drawable.Drawable makeDockPopupFieldBackground(float density) {
+        android.graphics.drawable.GradientDrawable field =
+                new android.graphics.drawable.GradientDrawable();
+        field.setCornerRadius(10f * density);
+        field.setColor(dockUiLight ? 0x0F25303B : 0x14FFFFFF);
+        field.setStroke(Math.max(1, Math.round(density)),
+                dockUiLight ? 0x1A25303B : 0x1AFFFFFF);
+        return field;
+    }
+
+    private android.widget.TextView makeDockPopupKicker(String text, float density) {
+        android.widget.TextView t = new android.widget.TextView(this);
+        t.setText(text);
+        t.setTextColor(dockLabelColorMuted());
+        t.setTextSize(11f);
+        t.setLetterSpacing(0.08f);
+        t.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        t.setPadding(0, 0, 0, Math.round(6 * density));
+        return t;
+    }
+
+    private android.widget.TextView makeDockPopupAction(String label, boolean primary,
+            float density, Runnable action) {
+        android.widget.TextView t = new android.widget.TextView(this);
+        t.setText(label);
+        t.setTextSize(14f);
+        t.setGravity(android.view.Gravity.CENTER);
+        t.setPadding(Math.round(16 * density), Math.round(12 * density),
+                Math.round(16 * density), Math.round(12 * density));
+        t.setTextColor(primary ? dockAccentColor : dockLabelColor());
+        t.setBackground(makeQuickMenuItemBackground(primary, !primary, density));
+        t.setClickable(true);
+        t.setFocusable(true);
+        t.setOnClickListener(v -> action.run());
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(0,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.setMargins(Math.round(4 * density), 0, Math.round(4 * density), 0);
+        t.setLayoutParams(lp);
+        return t;
     }
 
     private void dismissQuickMenu() {
@@ -10645,12 +10690,14 @@ public final class MainActivity extends Activity {
         iconCells.add(cell);
     }
 
-    private void addDockColorSwatches(android.widget.LinearLayout row, int swatchPx, float d) {
-        for (String hex : DockAppOverrides.COLORS) {
+    private void addDockColorSwatches(android.widget.LinearLayout row, int swatchPx, int gapPx, float d) {
+        String[] colors = DockAppOverrides.COLORS;
+        for (int i = 0; i < colors.length; i++) {
+            String hex = colors[i];
             android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
             android.widget.LinearLayout.LayoutParams lp =
                     new android.widget.LinearLayout.LayoutParams(swatchPx, swatchPx);
-            lp.rightMargin = Math.round(8 * d);
+            if (i < colors.length - 1) lp.rightMargin = gapPx;
             cell.setLayoutParams(lp);
             cell.setTag(hex);
             android.graphics.drawable.GradientDrawable oval =
@@ -10707,43 +10754,45 @@ public final class MainActivity extends Activity {
         };
 
         android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setBackground(makeDockPopupPanel(d));
+        scroll.setClipToOutline(true);
+        scroll.setElevation(12f * d);
         android.widget.LinearLayout box = new android.widget.LinearLayout(this);
         box.setOrientation(android.widget.LinearLayout.VERTICAL);
-        box.setBackgroundColor(0xF2141820);
-        box.setElevation(16f * d);
         int pad = Math.round(16 * d);
         box.setPadding(pad, pad, pad, pad);
-        scroll.addView(box);
+        scroll.addView(box, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        android.widget.TextView title = new android.widget.TextView(this);
-        title.setText("Personalizar");
-        title.setTextColor(0x99FFFFFF);
-        title.setTextSize(14f);
-        title.setPadding(0, 0, 0, Math.round(8 * d));
-        box.addView(title);
+        box.addView(makeDockPopupKicker("PERSONALIZAR", d));
 
         android.widget.EditText nameField = new android.widget.EditText(this);
         nameField.setHint(stockLabel);
         nameField.setText(curName != null ? curName : "");
-        nameField.setHintTextColor(0x66FFFFFF);
-        nameField.setTextColor(0xFFFFFFFF);
-        nameField.setTextSize(17f);
+        nameField.setHintTextColor(dockLabelColorMuted());
+        nameField.setTextColor(dockLabelColor());
+        nameField.setTextSize(16f);
         nameField.setSingleLine(true);
-        nameField.setBackgroundColor(0x33FFFFFF);
-        nameField.setPadding(Math.round(10 * d), Math.round(8 * d), Math.round(10 * d), Math.round(8 * d));
+        nameField.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        nameField.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+        nameField.setBackground(makeDockPopupFieldBackground(d));
+        nameField.setPadding(Math.round(12 * d), Math.round(10 * d),
+                Math.round(12 * d), Math.round(10 * d));
         box.addView(nameField);
 
-        android.widget.TextView iconLabel = new android.widget.TextView(this);
-        iconLabel.setText("Ícone");
-        iconLabel.setTextColor(0x99FFFFFF);
-        iconLabel.setTextSize(14f);
+        android.widget.TextView iconLabel = makeDockPopupKicker("ÍCONE", d);
         iconLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
         box.addView(iconLabel);
 
-        final int cols = 7;
         final int cellPx = Math.round(48 * d);
         final int cellPad = Math.round(7 * d);
         final int gap = Math.round(6 * d);
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int availInner = screenW - Math.round(24 * d) - 2 * pad;
+        final int cols = Math.max(7, Math.min(14, (availInner + gap) / (cellPx + gap)));
+        final int maxW = 2 * pad + cols * (cellPx + gap);
         android.widget.LinearLayout iconGrid = new android.widget.LinearLayout(this);
         iconGrid.setOrientation(android.widget.LinearLayout.VERTICAL);
         box.addView(iconGrid);
@@ -10761,8 +10810,11 @@ public final class MainActivity extends Activity {
                 android.graphics.drawable.GradientDrawable bg =
                         new android.graphics.drawable.GradientDrawable();
                 bg.setCornerRadius(10f * d);
-                bg.setColor(tag == null ? 0x33FFFFFF : plate);
-                bg.setStroke(Math.round((on ? 2.5f : 1f) * d), on ? 0xFF4FD6E8 : 0x33FFFFFF);
+                bg.setColor(tag == null
+                        ? (dockUiLight ? 0x0F25303B : 0x14FFFFFF)
+                        : plate);
+                bg.setStroke(Math.round((on ? 2.5f : 1f) * d), on ? dockAccentColor
+                        : (dockUiLight ? 0x2225303B : 0x33FFFFFF));
                 cell.setBackground(bg);
                 if (tag instanceof String && cell instanceof android.widget.FrameLayout) {
                     android.widget.FrameLayout fl = (android.widget.FrameLayout) cell;
@@ -10783,7 +10835,7 @@ public final class MainActivity extends Activity {
             cell.setTag(null);
             android.widget.TextView t = new android.widget.TextView(this);
             t.setText("Padrão");
-            t.setTextColor(0xFFFFFFFF);
+            t.setTextColor(dockLabelColor());
             t.setTextSize(8f);
             t.setGravity(android.view.Gravity.CENTER);
             cell.addView(t, new android.widget.FrameLayout.LayoutParams(
@@ -10792,10 +10844,11 @@ public final class MainActivity extends Activity {
             cell.setOnClickListener(v -> {
                 selectedIcon[0] = null;
                 paintIconCells.run();
-                // Color rows are added below; visibility is synced after they exist.
+                View host = box.findViewWithTag("dockColorHost");
                 View tint = box.findViewWithTag("dockTintBlock");
                 View bgv = box.findViewWithTag("dockBgBlock");
                 int vis = View.GONE;
+                if (host != null) host.setVisibility(vis);
                 if (tint != null) tint.setVisibility(vis);
                 if (bgv != null) bgv.setVisibility(vis);
             });
@@ -10819,9 +10872,11 @@ public final class MainActivity extends Activity {
             cell.setOnClickListener(v -> {
                 selectedIcon[0] = slug;
                 paintIconCells.run();
+                View host = box.findViewWithTag("dockColorHost");
                 View tint = box.findViewWithTag("dockTintBlock");
                 View bgv = box.findViewWithTag("dockBgBlock");
                 int vis = View.VISIBLE;
+                if (host != null) host.setVisibility(vis);
                 if (tint != null) tint.setVisibility(vis);
                 if (bgv != null) bgv.setVisibility(vis);
             });
@@ -10829,15 +10884,21 @@ public final class MainActivity extends Activity {
         }
         paintIconCells.run();
 
+        android.widget.LinearLayout colorHost = new android.widget.LinearLayout(this);
+        colorHost.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        colorHost.setTag("dockColorHost");
+        colorHost.setPadding(0, Math.round(8 * d), 0, 0);
+        box.addView(colorHost);
+
         android.widget.LinearLayout tintBlock = new android.widget.LinearLayout(this);
         tintBlock.setOrientation(android.widget.LinearLayout.VERTICAL);
         tintBlock.setTag("dockTintBlock");
-        box.addView(tintBlock);
-        android.widget.TextView colorLabel = new android.widget.TextView(this);
-        colorLabel.setText("Cor");
-        colorLabel.setTextColor(0x99FFFFFF);
-        colorLabel.setTextSize(14f);
-        colorLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
+        android.widget.LinearLayout.LayoutParams tintLp =
+                new android.widget.LinearLayout.LayoutParams(0,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tintLp.rightMargin = Math.round(12 * d);
+        colorHost.addView(tintBlock, tintLp);
+        android.widget.TextView colorLabel = makeDockPopupKicker("COR", d);
         tintBlock.addView(colorLabel);
         android.widget.LinearLayout colorRow = new android.widget.LinearLayout(this);
         colorRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -10846,24 +10907,29 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout bgBlock = new android.widget.LinearLayout(this);
         bgBlock.setOrientation(android.widget.LinearLayout.VERTICAL);
         bgBlock.setTag("dockBgBlock");
-        box.addView(bgBlock);
-        android.widget.TextView bgLabel = new android.widget.TextView(this);
-        bgLabel.setText("Fundo");
-        bgLabel.setTextColor(0x99FFFFFF);
-        bgLabel.setTextSize(14f);
-        bgLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
+        android.widget.LinearLayout.LayoutParams bgLp =
+                new android.widget.LinearLayout.LayoutParams(0,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        colorHost.addView(bgBlock, bgLp);
+        android.widget.TextView bgLabel = makeDockPopupKicker("FUNDO", d);
         bgBlock.addView(bgLabel);
         android.widget.LinearLayout bgRow = new android.widget.LinearLayout(this);
         bgRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         bgBlock.addView(bgRow);
 
         int colorVis = selectedIcon[0] == null ? View.GONE : View.VISIBLE;
+        colorHost.setVisibility(colorVis);
         tintBlock.setVisibility(colorVis);
         bgBlock.setVisibility(colorVis);
 
-        int swatchPx = Math.round(32 * d);
-        addDockColorSwatches(colorRow, swatchPx, d);
-        addDockColorSwatches(bgRow, swatchPx, d);
+        int swatchCount = DockAppOverrides.COLORS.length;
+        int swatchGap = Math.round(5 * d);
+        int halfInner = Math.max(1, (maxW - 2 * pad - Math.round(12 * d)) / 2);
+        int swatchPx = Math.min(Math.round(28 * d),
+                (halfInner - (swatchCount - 1) * swatchGap) / swatchCount);
+        swatchPx = Math.max(Math.round(20 * d), swatchPx);
+        addDockColorSwatches(colorRow, swatchPx, swatchGap, d);
+        addDockColorSwatches(bgRow, swatchPx, swatchGap, d);
 
         Runnable refreshSwatchSel = () -> {
             for (int i = 0; i < colorRow.getChildCount(); i++) {
@@ -10910,17 +10976,15 @@ public final class MainActivity extends Activity {
         actions.setPadding(0, Math.round(14 * d), 0, 0);
         box.addView(actions);
 
-        android.widget.TextView reset = makeDockMenuRow("Reset", () -> {
+        actions.addView(makeDockPopupAction("RESET", false, d, () -> {
             if (dockAppOverrides != null) {
                 dockAppOverrides.clear(pkg);
                 dockAppOverrides.save(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
             }
             dismissDockCustomizeSheet();
             rebindDockPackage(pkg);
-        });
-        actions.addView(reset);
-
-        android.widget.TextView save = makeDockMenuRow("Save", () -> {
+        }));
+        actions.addView(makeDockPopupAction("SAVE", true, d, () -> {
             if (dockAppOverrides == null) {
                 dockAppOverrides = new DockAppOverrides(null);
             }
@@ -10929,10 +10993,8 @@ public final class MainActivity extends Activity {
             dockAppOverrides.save(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
             dismissDockCustomizeSheet();
             rebindDockPackage(pkg);
-        });
-        actions.addView(save);
+        }));
 
-        int maxW = Math.round(480 * d);
         android.widget.PopupWindow popup = new android.widget.PopupWindow(
                 scroll, maxW, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true);
         popup.setOutsideTouchable(true);
@@ -10945,9 +11007,19 @@ public final class MainActivity extends Activity {
         scroll.measure(
                 View.MeasureSpec.makeMeasureSpec(maxW, View.MeasureSpec.AT_MOST),
                 View.MeasureSpec.UNSPECIFIED);
-        int yOff = -(Math.min(scroll.getMeasuredHeight(), Math.round(560 * d))
+        int yOff = -(Math.min(scroll.getMeasuredHeight(), Math.round(520 * d))
                 + anchor.getHeight() + Math.round(8 * d));
-        popup.showAsDropDown(anchor, 0, yOff);
+        int[] loc = new int[2];
+        anchor.getLocationOnScreen(loc);
+        int margin = Math.round(12 * d);
+        int xOff = 0;
+        if (loc[0] + maxW > screenW - margin) {
+            xOff = (screenW - margin) - maxW - loc[0];
+        }
+        if (loc[0] + xOff < margin) {
+            xOff = margin - loc[0];
+        }
+        popup.showAsDropDown(anchor, xOff, yOff);
     }
 
     /** Re-apply icon/label after a customize save (hub or a scroll-row package). */

@@ -55,12 +55,21 @@ final class DockAppOverrides {
             {"speaker", "Caixa"},
     };
 
-    /** Tint and plate: white, gray, dark gray, black. First is default tint. */
+    /**
+     * Tint and plate. Neutrals first so {@link #COLOR_DEFAULT} / {@link #BG_DEFAULT}
+     * stay white / dark gray; then six accents that read as both glyph and fill.
+     */
     static final String[] COLORS = {
             "#FFFFFF",
             "#9AA3AD",
             "#3D4650",
             "#111111",
+            "#E53935",
+            "#FB8C00",
+            "#F5C542",
+            "#43A047",
+            "#1E88E5",
+            "#26C6DA",
     };
     static final String COLOR_DEFAULT = COLORS[0];
     static final String BG_DEFAULT = COLORS[2];

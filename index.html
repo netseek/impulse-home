@@ -1091,7 +1091,7 @@ window.HavalSplash = (function () {
       height: 52px;
       border-radius: 12px;
       object-fit: contain;
-      background: rgba(0,0,0,0.25);
+      background: transparent;
     }
     .hv-apps-tile-label {
       font-family: 'Space Mono', monospace;
@@ -7335,7 +7335,17 @@ const CAR_DRL_FOLLOWS_READY = true;
 
 const CAR_OPENING_STEP = 0.0015;
 const MANUAL_OPENING_STEP = 0.02;
-const WINDOW_OPENING_STEP = 0.025;
+// Measured MMI 2026-09-10 driver window (toggle_window_fl → window_status):
+//   open  cmd→2 ≈ 3.4 s   close cmd→1 ≈ 2.9 s   (glass travel ~1.7–2.3 s)
+// At 60 fps, ~3.2 s full travel needs step ≈ 1/(3.2*60) ≈ 0.0052.
+const WINDOW_OPENING_STEP = 0.005;
+const CAR_WINDOW_FULL_MS = 3200;
+// Measured MMI 2026-09-10 powered tailgate (door_status slot 5):
+//   close first-moving(4)→shut(0) ≈ 5.9 s; open reports resting "1" early,
+//   so close is the honest paced sample — use ~6 s both ways.
+// At 60 fps → step ≈ 1/(6*60) ≈ 0.0028.
+const TRUNK_OPENING_STEP = 0.0028;
+const CAR_TRUNK_FULL_MS = 6000;
 // Wall-clock full-travel times used to ignore echo bus updates after a UI
 // command. Curtain measured on the MMI 2026-09-10 (~11 s). Sunroof has not
 // been swept yet — same pace until it is.
@@ -10851,6 +10861,29 @@ class Component extends DCLogic {
         states[corner] = prev[corner] || 'closed';
       }
     });
+    // While a UI toggle is travelling, swallow mid-travel 0/3 echoes so the
+    // optimistic car-paced tween is not yanked to PARTIAL mid-glass.
+    let anyIgnored = false;
+    corners.forEach((corner) => {
+      if (!this._isWindowBusIgnored(corner)) return;
+      anyIgnored = true;
+      const entry = this._windowBusIgnore[corner];
+      const st = states[corner];
+      entry.pending = st;
+      if (entry.goal && st === entry.goal) {
+        // Arrived — clear ignore early and adopt.
+        if (entry.timer) {
+          clearTimeout(entry.timer);
+          entry.timer = null;
+        }
+        entry.until = 0;
+        entry.goal = null;
+        entry.pending = null;
+        return;
+      }
+      // Keep showing the optimistic goal for this corner.
+      states[corner] = entry.goal || prev[corner] || states[corner];
+    });
     const changed = corners.some((c) => (prev[c] || null) !== states[c]);
     this._carWindowStates = states;
     const menu = {};
@@ -10868,7 +10901,7 @@ class Component extends DCLogic {
     // The roof popup and the Status card paint imperatively and were only
     // synced when the popup opened, so a window moving while either was on
     // screen left a stale label. Repaint on change only.
-    if (changed) {
+    if (changed && !anyIgnored) {
       try { this._syncRoofVehicleStatus(this._statusEnvelopeSnapshot()); } catch (e) {}
     }
     if (this.requestRender) this.requestRender(4);
@@ -10920,7 +10953,28 @@ class Component extends DCLogic {
       applySlot(slots[CAR_DOOR_SLOTS[door]], (pct) => this._setDoorOpen(door, pct));
     }
     if (typeof this._setTrunkOpen === 'function') {
-      applySlot(slots[CAR_DOOR_SLOTS.trunk], (pct) => this._setTrunkOpen(pct));
+      const trunkN = slots[CAR_DOOR_SLOTS.trunk];
+      // While a UI toggle is in flight, swallow travel codes (3/1/5/4) so they
+      // cannot yank the car-paced tween back open mid-close.
+      if (this._isTrunkBusIgnored()) {
+        const entry = this._trunkBusIgnore;
+        if (trunkN !== undefined && isFinite(trunkN) && trunkN >= 0) {
+          const pct = trunkN > 0 ? 100 : 0;
+          entry.pending = pct;
+          if (entry.goal != null && pct === entry.goal) {
+            if (entry.timer) {
+              clearTimeout(entry.timer);
+              entry.timer = null;
+            }
+            entry.until = 0;
+            entry.goal = null;
+            entry.pending = null;
+            this._setTrunkOpen(pct);
+          }
+        }
+      } else {
+        applySlot(trunkN, (pct) => this._setTrunkOpen(pct));
+      }
     }
     this._syncEventCamera();
   }
@@ -11083,6 +11137,76 @@ class Component extends DCLogic {
       this._setSunroofOpen(pending);
     }
     this._syncEventCamera();
+  }
+
+  _armWindowBusIgnore(corner, toPct) {
+    if (!['fl', 'fr', 'rl', 'rr'].includes(corner)) return;
+    if (!this._windowBusIgnore) this._windowBusIgnore = {};
+    const wait = Math.max(CAR_ROOF_BUS_IGNORE_MIN_MS,
+      CAR_WINDOW_FULL_MS + CAR_ROOF_BUS_IGNORE_PAD_MS);
+    const entry = this._windowBusIgnore[corner] || (this._windowBusIgnore[corner] = {});
+    entry.until = performance.now() + wait;
+    entry.goal = toPct > 50 ? 'open' : 'closed';
+    entry.pending = null;
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => this._flushWindowBusIgnore(corner), wait);
+  }
+
+  _isWindowBusIgnored(corner) {
+    const entry = this._windowBusIgnore && this._windowBusIgnore[corner];
+    return !!(entry && performance.now() < (entry.until || 0));
+  }
+
+  _flushWindowBusIgnore(corner) {
+    const entry = this._windowBusIgnore && this._windowBusIgnore[corner];
+    if (!entry) return;
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+    entry.until = 0;
+    const pending = entry.pending;
+    entry.pending = null;
+    entry.goal = null;
+    if (!pending) return;
+    const byCorner = {};
+    byCorner[corner] = pending === 'open' ? 100 : (pending === 'partial' ? 45 : 0);
+    this._setWindowCornerTargets(byCorner);
+    this._syncWindowsOpenFromCorners();
+    this._syncHotspotWindowsMenu();
+    try { this._syncRoofVehicleStatus(this._statusEnvelopeSnapshot()); } catch (e) {}
+  }
+
+  _armTrunkBusIgnore(toPct) {
+    if (!this._trunkBusIgnore) this._trunkBusIgnore = {};
+    const wait = Math.max(CAR_ROOF_BUS_IGNORE_MIN_MS,
+      CAR_TRUNK_FULL_MS + CAR_ROOF_BUS_IGNORE_PAD_MS);
+    const entry = this._trunkBusIgnore;
+    entry.until = performance.now() + wait;
+    entry.goal = toPct > 0 ? 100 : 0;
+    entry.pending = null;
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => this._flushTrunkBusIgnore(), wait);
+  }
+
+  _isTrunkBusIgnored() {
+    const entry = this._trunkBusIgnore;
+    return !!(entry && performance.now() < (entry.until || 0));
+  }
+
+  _flushTrunkBusIgnore() {
+    const entry = this._trunkBusIgnore;
+    if (!entry) return;
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+    entry.until = 0;
+    const pending = entry.pending;
+    entry.pending = null;
+    entry.goal = null;
+    if (pending == null || !isFinite(pending)) return;
+    this._setTrunkOpen(pending);
   }
 
   /** Steering-wheel degrees → road-wheel degrees, clamped to the model's range. */
@@ -18019,7 +18143,9 @@ class Component extends DCLogic {
   _toggleHotspotWindow(key) {
     if (!['fl', 'fr', 'rl', 'rr'].includes(key)) return;
     const openNow = this._hsWindowCornerState(key) === 'open';
-    this._setWindowCornerOpen(key, openNow ? 0 : 100);
+    const next = openNow ? 0 : 100;
+    this._setWindowCornerOpen(key, next);
+    this._armWindowBusIgnore(key, next);
     // Local 3D already applied; bridge only needs the per-corner command.
     this._sendCarCommand('toggle_window_' + key, '', { skipLocal: true });
     this._armHotspotHideTimer();
@@ -18047,7 +18173,10 @@ class Component extends DCLogic {
     btn.setAttribute('aria-label', 'Tailgate open or close');
     btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      this._sendCarCommand('toggle_trunk');
+      const next = ((this.state && this.state.trunkOpen) || 0) > 0 ? 0 : 100;
+      this._setTrunkOpen(next);
+      this._armTrunkBusIgnore(next);
+      this._sendCarCommand('toggle_trunk', '', { skipLocal: true });
       this._armHotspotHideTimer();
     });
     menu.appendChild(btn);
@@ -18770,6 +18899,9 @@ class Component extends DCLogic {
     const level = action === 'open' ? 100 : 0;
     if (kind === 'curtain' || kind === 'sunroof') this._beginCarRoofTravel(kind, level);
     else this._applyVehicleOpeningLevel(kind, level);
+    if (kind === 'windows') {
+      ['fl', 'fr', 'rl', 'rr'].forEach((k) => this._armWindowBusIgnore(k, level));
+    }
     this._sendCarCommand(command[action], '', { skipLocal: true });
   }
 
@@ -18798,16 +18930,43 @@ class Component extends DCLogic {
       const level = actions[cmd][1] === 'open' ? 100 : 0;
       if (kind === 'curtain' || kind === 'sunroof') this._beginCarRoofTravel(kind, level);
       else this._applyVehicleOpeningLevel(kind, level);
+      if (kind === 'windows') {
+        ['fl', 'fr', 'rl', 'rr'].forEach((k) => this._armWindowBusIgnore(k, level));
+      }
       return true;
     }
     const local = {
       toggle_doors_all: () => this.toggleSideDoors(),
-      toggle_windows: () => this._applyVehicleOpeningLevel('windows', (s.windowsOpen || 0) > 0 ? 0 : 100),
-      toggle_window_fl: () => this._setWindowCornerOpen('fl', this._hsWindowCornerState('fl') === 'open' ? 0 : 100),
-      toggle_window_fr: () => this._setWindowCornerOpen('fr', this._hsWindowCornerState('fr') === 'open' ? 0 : 100),
-      toggle_window_rl: () => this._setWindowCornerOpen('rl', this._hsWindowCornerState('rl') === 'open' ? 0 : 100),
-      toggle_window_rr: () => this._setWindowCornerOpen('rr', this._hsWindowCornerState('rr') === 'open' ? 0 : 100),
-      toggle_trunk: () => this._setTrunkOpen((s.trunkOpen || 0) > 0 ? 0 : 100),
+      toggle_windows: () => {
+        const next = (s.windowsOpen || 0) > 0 ? 0 : 100;
+        this._applyVehicleOpeningLevel('windows', next);
+        ['fl', 'fr', 'rl', 'rr'].forEach((k) => this._armWindowBusIgnore(k, next));
+      },
+      toggle_window_fl: () => {
+        const next = this._hsWindowCornerState('fl') === 'open' ? 0 : 100;
+        this._setWindowCornerOpen('fl', next);
+        this._armWindowBusIgnore('fl', next);
+      },
+      toggle_window_fr: () => {
+        const next = this._hsWindowCornerState('fr') === 'open' ? 0 : 100;
+        this._setWindowCornerOpen('fr', next);
+        this._armWindowBusIgnore('fr', next);
+      },
+      toggle_window_rl: () => {
+        const next = this._hsWindowCornerState('rl') === 'open' ? 0 : 100;
+        this._setWindowCornerOpen('rl', next);
+        this._armWindowBusIgnore('rl', next);
+      },
+      toggle_window_rr: () => {
+        const next = this._hsWindowCornerState('rr') === 'open' ? 0 : 100;
+        this._setWindowCornerOpen('rr', next);
+        this._armWindowBusIgnore('rr', next);
+      },
+      toggle_trunk: () => {
+        const next = (s.trunkOpen || 0) > 0 ? 0 : 100;
+        this._setTrunkOpen(next);
+        this._armTrunkBusIgnore(next);
+      },
       toggle_sunroof: () => this._applyVehicleOpeningLevel('sunroof', (s.sunroofOpen || 0) > 0 ? 0 : 100),
       toggle_curtain: () => this._applyVehicleOpeningLevel('curtain', (s.curtainOpen || 0) > 0 ? 0 : 100),
       toggle_mirrors: () => this._setMirrorsFolded(((s.mirrorsFolded || 0) > 0) ? 0 : 100),
@@ -24207,9 +24366,9 @@ class Component extends DCLogic {
           }
         }
 
-        // Smooth trunk animation
+        // Smooth trunk animation — car-paced, not the manual slider rate.
         if (this._trunkProgress !== this._trunkTarget) {
-          const step = openingStep(MANUAL_OPENING_STEP, delta);
+          const step = openingStep(TRUNK_OPENING_STEP, delta);
           if (this._trunkProgress < this._trunkTarget) {
             this._trunkProgress = Math.min(this._trunkTarget, this._trunkProgress + step);
           } else {
