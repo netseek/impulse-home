@@ -1054,6 +1054,24 @@ window.HavalSplash = (function () {
       background: rgba(79,214,232,.22) !important;
       box-shadow: 0 0 0 1px rgba(79,214,232,.55);
     }
+    .hv-cam-tile.is-delete {
+      border-color: rgba(255, 92, 92, .9) !important;
+      background: rgba(255, 60, 60, .22) !important;
+    }
+    .hv-cam-tile.is-delete .hv-cam-ico-shot { opacity: 0.22; }
+    .hv-cam-del {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: #ff9a9a;
+      pointer-events: none;
+    }
     .hv-cam-plus {
       position: absolute;
       inset: 0;
@@ -6663,7 +6681,7 @@ window.HavalSplash = (function () {
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CAMERA</div>
       <div class="hv-cam-grid">
         <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="6">
-          <button class="hv-cam-tile {{ cp.onClass }} {{ cp.emptyClass }} {{ cp.pickClass }} {{ cp.flashClass }}" onClick="{{ cp.onClick }}" title="{{ cp.title }}">
+          <button class="hv-cam-tile {{ cp.onClass }} {{ cp.emptyClass }} {{ cp.pickClass }} {{ cp.flashClass }} {{ cp.deleteClass }}" onClick="{{ cp.onClick }}" onTouchStart="{{ cp.onHoldStart }}" onTouchEnd="{{ cp.onHoldEnd }}" onTouchCancel="{{ cp.onHoldEnd }}" onMouseDown="{{ cp.onHoldStart }}" onMouseUp="{{ cp.onHoldEnd }}" onMouseLeave="{{ cp.onHoldEnd }}" onContextMenu="{{ cp.onContextMenu }}" title="{{ cp.title }}">
             <sc-if value="{{ cp.shotUrl }}" hint-placeholder-val="{{ false }}">
               <img class="hv-cam-ico hv-cam-ico-shot" src="{{ cp.shotUrl }}" alt="" draggable="false" />
             </sc-if>
@@ -6673,9 +6691,18 @@ window.HavalSplash = (function () {
             <sc-if value="{{ cp.showCap }}" hint-placeholder-val="{{ false }}">
               <span class="hv-cam-cap">{{ cp.caption }}</span>
             </sc-if>
+            <sc-if value="{{ cp.showDel }}" hint-placeholder-val="{{ false }}">
+              <span class="hv-cam-del">DEL</span>
+            </sc-if>
           </button>
         </sc-for>
       </div>
+      <sc-if value="{{ camSlotDeleteArmed }}" hint-placeholder-val="{{ false }}">
+        <div class="hv-cam-save-row">
+          <button onClick="{{ confirmCamSlotDelete }}" title="Clear this saved camera slot" style="border: 1px solid {{ camSlotDeleteBorder }}; background: {{ camSlotDeleteBg }}; color: {{ camSlotDeleteCol }};">{{ camSlotDeleteLabel }}</button>
+          <button onClick="{{ cancelCamSlotDelete }}" title="Keep this slot">CANCEL</button>
+        </div>
+      </sc-if>
       <sc-if value="{{ camSaveToSlotVisible }}" hint-placeholder-val="{{ false }}">
         <div class="hv-cam-save-row">
           <button onClick="{{ toggleCamSlotPick }}" title="{{ camSlotSaveHint }}" style="border: 1px solid {{ camSlotSaveBorder }}; background: {{ camSlotSaveBg }}; color: {{ camSlotSaveCol }};">{{ camSlotSaveLabel }}</button>
@@ -7771,6 +7798,7 @@ class Component extends DCLogic {
     camOrbitEnabled: false,
     camOrthoEnabled: false,
     camSlotPickMode: false,
+    camSlotDeleteKey: null,
     camSlotFlashKey: null,
     camDesktopFlash: false,
     layoutCamFlash: false,
@@ -8096,6 +8124,11 @@ class Component extends DCLogic {
     this._widgetHold = null;
     this._widgetTouchActive = false;
     this._widgetSuppressClick = false;
+    this._camSlotHoldTimer = 0;
+    this._camSlotHoldFired = false;
+    this._camSlotHoldKey = null;
+    this._camSlotTouchActive = false;
+    this._camSlotSuppressClick = false;
     this._demoDoorSequenceIndex = 0;
     this._demoDoorTicker = 0;
     if (typeof document !== 'undefined') {
@@ -8222,6 +8255,17 @@ class Component extends DCLogic {
   _persistCustomCamViews() {
     if (!this._customCamViews || this._debugMode) return;
     try { localStorage.setItem(this._customCamStorageKey(), JSON.stringify(this._customCamViews)); } catch (e) {}
+    // Header SAVE also snapshots slots into the settings blob. Overlaying that
+    // on load would resurrect a slot we just cleared, so keep the two in sync.
+    try {
+      const raw = localStorage.getItem(this._settingsStorageKey());
+      const saved = raw ? JSON.parse(raw) : null;
+      if (saved && typeof saved === 'object') {
+        saved.customCamViews = this._customCamViews.slice();
+        localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
+        if (this._savedSettings) this._savedSettings.customCamViews = saved.customCamViews;
+      }
+    } catch (e) {}
   }
 
   _normalizeDesktopCam(p) {
@@ -11858,7 +11902,7 @@ class Component extends DCLogic {
     const cameraOpen = this.state.activeGroup === 'camera' && this.state.panelOpen;
     const open = forceOpen === true || !cameraOpen;
     if (!open) {
-      this.setState({ panelOpen: false, activeGroup: null, camSlotPickMode: false });
+      this.setState({ panelOpen: false, activeGroup: null, camSlotPickMode: false, camSlotDeleteKey: null });
       return;
     }
     // Arm first: setState paints the tiles, and they need to know a render
@@ -11942,6 +11986,7 @@ class Component extends DCLogic {
     this.setState({
       camSlotFlashKey: key,
       camSlotPickMode: false,
+      camSlotDeleteKey: null,
       camIconTick: (this.state.camIconTick || 0) + 1,
     });
     clearTimeout(this._camSlotFlashTimer);
@@ -11955,11 +12000,92 @@ class Component extends DCLogic {
   }
 
   toggleCamSlotPick() {
-    this.setState({ camSlotPickMode: !this.state.camSlotPickMode });
+    this.setState({ camSlotPickMode: !this.state.camSlotPickMode, camSlotDeleteKey: null });
+  }
+
+  _clearCamSlotHold() {
+    if (this._camSlotHoldTimer) {
+      clearTimeout(this._camSlotHoldTimer);
+      this._camSlotHoldTimer = 0;
+    }
+    this._camSlotHoldKey = null;
+    this._camSlotHoldFired = false;
+  }
+
+  _armCamSlotDelete(key) {
+    if (!this._getCustomCamRel(key)) return;
+    this._camSlotHoldFired = true;
+    this._camSlotSuppressClick = true;
+    const self = this;
+    setTimeout(() => { self._camSlotSuppressClick = false; }, 400);
+    this.setState({ camSlotDeleteKey: key, camSlotPickMode: false });
+  }
+
+  _onCamSlotHoldStart(key, ev) {
+    if (ev && ev.type === 'mousedown' && this._camSlotTouchActive) return;
+    if (ev && ev.type === 'touchstart') this._camSlotTouchActive = true;
+    if (!this._getCustomCamRel(key)) return;
+    this._clearCamSlotHold();
+    this._camSlotHoldKey = key;
+    this._camSlotHoldTimer = setTimeout(() => {
+      this._camSlotHoldTimer = 0;
+      this._armCamSlotDelete(key);
+    }, CAR_WIDGET_HOLD_MS);
+  }
+
+  _onCamSlotHoldEnd(ev) {
+    if (ev && ev.type === 'mouseup' && this._camSlotTouchActive) return;
+    if (ev && ev.type === 'mouseleave' && this._camSlotTouchActive) return;
+    if (ev && (ev.type === 'touchend' || ev.type === 'touchcancel')) this._camSlotTouchActive = false;
+    const fired = this._camSlotHoldFired;
+    this._clearCamSlotHold();
+    if (fired) {
+      this._camSlotSuppressClick = true;
+      if (ev && ev.preventDefault) ev.preventDefault();
+    }
+  }
+
+  _onCamSlotContextMenu(key, ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    if (!this._getCustomCamRel(key)) return;
+    this._clearCamSlotHold();
+    this._armCamSlotDelete(key);
+  }
+
+  _cancelCamSlotDelete() {
+    if (!this.state.camSlotDeleteKey) return;
+    this.setState({ camSlotDeleteKey: null });
+  }
+
+  _clearCamSlot(key) {
+    const i = this._customCamSlotIdx(key);
+    if (i < 0 || !this._customCamViews) return false;
+    this._customCamViews[i] = null;
+    this._persistCustomCamViews();
+    this._camCycleKeys = null;
+    if (this._camIcons) delete this._camIcons[key];
+    const next = {
+      camSlotDeleteKey: null,
+      camSlotPickMode: false,
+      camIconTick: (this.state.camIconTick || 0) + 1,
+    };
+    if (this.state.cameraPreset === key) next.cameraPreset = null;
+    this.setState(next);
+    if (this.requestRender) this.requestRender(4);
+    return true;
   }
 
   onCamSlotClick(key) {
+    if (this._camSlotSuppressClick) {
+      this._camSlotSuppressClick = false;
+      return;
+    }
     if (this._introActive) return;
+    if (this.state.camSlotDeleteKey) {
+      if (this.state.camSlotDeleteKey === key) this._clearCamSlot(key);
+      else this._cancelCamSlotDelete();
+      return;
+    }
     if (this.state.camSlotPickMode) {
       this._saveCamViewToSlot(key);
       return;
@@ -12362,30 +12488,49 @@ class Component extends DCLogic {
           const filled = !!this._getCustomCamRel(key);
           const on = !pick && s.cameraPreset === key;
           const shot = filled ? (shots[key] || '') : '';
+          const del = s.camSlotDeleteKey === key;
           return {
             key,
-            title: pick
+            title: del
+              ? 'Tap to delete this slot'
+              : pick
               ? (filled ? 'Replace view ' + (i + 1) : 'Save to slot ' + (i + 1))
-              : (filled ? 'Custom view ' + (i + 1) : 'Save current view to slot ' + (i + 1)),
+              : (filled ? 'Custom view ' + (i + 1) + ' · hold to delete' : 'Save current view to slot ' + (i + 1)),
             shotUrl: shot,
             showPlus: !filled || pick,
-            showCap: !!(filled && !shot && !pick),
+            showCap: !!(filled && !shot && !pick && !del),
+            showDel: del,
             caption: String(i + 1),
             onClass: on ? 'is-on' : '',
             emptyClass: filled ? '' : 'is-empty',
             pickClass: pick ? 'is-pick' : '',
             flashClass: flashKey === key ? 'is-flash' : '',
+            deleteClass: del ? 'is-delete' : '',
             onClick: () => this.onCamSlotClick(key),
+            onHoldStart: (ev) => this._onCamSlotHoldStart(key, ev),
+            onHoldEnd: (ev) => this._onCamSlotHoldEnd(ev),
+            onContextMenu: (ev) => this._onCamSlotContextMenu(key, ev),
           };
         });
       })(),
       saveCurrentDesktopCamera: () => this.saveCurrentDesktopCamera(),
       toggleCamSlotPick: () => this.toggleCamSlotPick(),
-      camSaveToSlotVisible: this._hasFilledCamSlots(),
+      confirmCamSlotDelete: () => this._clearCamSlot(s.camSlotDeleteKey),
+      cancelCamSlotDelete: () => this._cancelCamSlotDelete(),
+      camSlotDeleteArmed: !!s.camSlotDeleteKey,
+      camSlotDeleteLabel: s.camSlotDeleteKey
+        ? ('DELETE SLOT ' + (this._customCamSlotIdx(s.camSlotDeleteKey) + 1))
+        : 'DELETE',
+      camSlotDeleteBorder: 'rgba(255,92,92,.85)',
+      camSlotDeleteBg: 'rgba(255,60,60,.18)',
+      camSlotDeleteCol: '#ffb4b4',
+      camSaveToSlotVisible: this._hasFilledCamSlots() && !s.camSlotDeleteKey,
       camDesktopSaveHint: this._desktopReady
-        ? (s.camSlotPickMode
+        ? (s.camSlotDeleteKey
+          ? 'Tap Delete to clear this slot, or Cancel to keep it.'
+          : s.camSlotPickMode
           ? 'Pick a slot to overwrite with the current camera.'
-          : 'Header SAVE stores this angle as the home for the current layout on this desktop. Empty tiles (+) save a slot; SAVE TO SLOT replaces one.')
+          : 'Header SAVE stores this angle as the home for the current layout on this desktop. Empty tiles (+) save a slot; SAVE TO SLOT replaces one. Hold a filled slot to delete it.')
         : 'Desktops are still loading.',
       camSlotSaveLabel: s.camSlotPickMode ? 'CANCEL' : 'SAVE TO SLOT',
       camSlotSaveHint: s.camSlotPickMode
@@ -19149,7 +19294,7 @@ class Component extends DCLogic {
 
   _closeCameraPanel() {
     if (this.state.panelOpen && this.state.activeGroup === 'camera') {
-      this.setState({ panelOpen: false, activeGroup: null });
+      this.setState({ panelOpen: false, activeGroup: null, camSlotPickMode: false, camSlotDeleteKey: null });
     }
   }
 
@@ -35957,6 +36102,7 @@ class Component extends DCLogic {
     clearTimeout(this._desktopGestureHoldTimer);
     clearTimeout(this._desktopIndicatorTimer);
     clearTimeout(this._desktopDotHoldTimer);
+    clearTimeout(this._camSlotHoldTimer);
     clearTimeout(this._consumptionRefreshTimer);
     clearTimeout(this._tireFreshTimer);
     clearInterval(this._demoDoorTicker);
