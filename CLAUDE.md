@@ -542,6 +542,49 @@ phase does not jump.
 Watch for the same shape anywhere a per-frame delta is clamped "for safety":
 the clamp is correct for tweens and physics and wrong for anything periodic.
 
+## X-ray is a draw-call problem, and rendering harder does not help
+
+Measured on the car 2026-09-11, parked, interleaved arms so drift cancels
+(`window.__xrayGhost(false)` reverts to the material-clone ghost):
+
+| | material ghost | single-mesh ghost |
+|---|---|---|
+| frame | 20.94 / 22.99 fps | **46.00 / 46.17 fps** |
+| submit | 23.5 / 41.0 ms | 8.0 / 10.9 ms |
+| draw calls | 380 | **118** |
+| triangles | 497,356 | 271,426 |
+
+The old ghost kept the whole body and cloned all 42 materials into
+transparent ones, so x-ray paid the full draw-call count AND lost early-Z AND
+added ~44 transparent meshes to the per-frame depth sort. The replacement is a
+purpose-built asset -- ONE mesh, ONE material, no textures
+(`scripts/build-xray-ghost.mjs`) -- and 141 shell meshes are hidden behind it.
+
+**Optimise draw calls here, not polygons.** `gl.finish()` measures 0.1 ms, so
+the GPU is idle and triangle throughput is not the constraint; a 5k-triangle
+ghost split across 40 draw calls would be WORSE than a 100k-triangle ghost in
+one.
+
+### "Make the loop infinite so it always renders at max FPS" does not work
+
+Frame rate is frame COST, not frame DEMAND. X-ray already renders continuously
+(`_tickPowertrainFx` returns true every frame, so the beads and glow keep
+asking), and it still sat at 21 fps with the old ghost -- asking more often
+could not have helped, because each frame genuinely cost ~45 ms.
+
+Measured the other way round too: parked and idle with x-ray off, a bare rAF
+ticks at **59/s with 16.7 ms p50 and 5.1 ms timer lag**. The browser is already
+offering ~60 frames a second; the on-demand loop uses one of them because
+nothing changed. There is no headroom to unlock by looping -- the frames are
+on offer and being declined on purpose.
+
+Rendering unconditionally would cost real things: the main thread is the
+bottleneck (GPU idle at 0.1 ms), this SoC is shared with Android Auto and
+navigation, and the unit already drifts ~2x thermally over minutes, so
+sustained load trades a stable frame rate for a decaying one. A continuous
+mode is a BENCH tool -- drive the camera so every frame renders and demand
+stops being a variable -- not a shipping mode.
+
 ## Things that look like wins and are not
 
 - **More MSAA.** `MAX_SAMPLES` is 4 on this GPU. You are already there.
