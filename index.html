@@ -1106,120 +1106,6 @@ window.HavalSplash = (function () {
       -webkit-box-orient: vertical;
       opacity: 0.9;
     }
-    /* Long-press an app tile to rename / re-icon it. Sits above the widget
-       picker (49/50) and the slot banner (51). */
-    .hv-app-edit-backdrop {
-      position: fixed;
-      inset: 0;
-      z-index: 60;
-      background: rgba(0,0,0,.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .hv-app-edit {
-      width: min(560px, 86vw);
-      max-height: 88vh;
-      overflow-y: auto;
-      padding: 16px 18px 14px;
-      border-radius: 14px;
-      background: var(--hv-widget-menu-bg);
-      border: 1px solid var(--hv-widget-border);
-      box-shadow: var(--hv-widget-shadow);
-      color: var(--hv-widget-fg);
-      backdrop-filter: blur(22px) saturate(1.25);
-      -webkit-backdrop-filter: blur(22px) saturate(1.25);
-    }
-    .hv-app-edit-head {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .hv-app-edit-head img {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      object-fit: contain;
-      background: rgba(0,0,0,0.25);
-    }
-    .hv-app-edit-title {
-      font-family: 'Space Mono', monospace;
-      font-size: 11px;
-      letter-spacing: .12em;
-    }
-    .hv-app-edit-pkg {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: .06em;
-      opacity: .45;
-      word-break: break-all;
-    }
-    .hv-app-edit-kicker {
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: .18em;
-      opacity: .5;
-      margin: 12px 0 7px;
-    }
-    .hv-app-edit-input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 8px 10px;
-      border-radius: 8px;
-      border: 1px solid var(--hv-widget-border);
-      background: rgba(0,0,0,0.22);
-      color: var(--hv-widget-fg);
-      font-family: 'Space Mono', monospace;
-      font-size: 12px;
-    }
-    .hv-app-edit-icons {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
-      gap: 7px;
-    }
-    .hv-app-edit-icon {
-      height: 46px;
-      padding: 5px;
-      border-radius: 10px;
-      background: rgba(0,0,0,0.25);
-      border: 1px solid transparent;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .hv-app-edit-icon img { width: 100%; height: 100%; object-fit: contain; }
-    .hv-app-edit-icon.on { border-color: #4fd6e8; background: rgba(79,214,232,.14); }
-    .hv-app-edit-colors { display: flex; gap: 9px; flex-wrap: wrap; }
-    .hv-app-edit-color {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      border: 2px solid transparent;
-      cursor: pointer;
-      padding: 0;
-    }
-    .hv-app-edit-color.on { border-color: var(--hv-widget-fg); }
-    .hv-app-edit-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 16px;
-    }
-    .hv-app-edit-btn {
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--hv-widget-border);
-      background: transparent;
-      color: var(--hv-widget-fg);
-      font-family: 'Space Mono', monospace;
-      font-size: 10px;
-      letter-spacing: .12em;
-      cursor: pointer;
-    }
-    .hv-app-edit-btn.primary { border-color: #4fd6e8; color: #4fd6e8; }
-    .hv-app-edit-btn.ghost { opacity: .6; margin-right: auto; }
     .hv-apps-fab-wrap {
       position: absolute;
       z-index: 30;
@@ -5318,12 +5204,6 @@ window.HavalSplash = (function () {
       background-image: var(--hv-frost-noise);
     }
     .hv-wallpaper-pop { overflow-y: auto; }
-    .hv-app-edit-backdrop {
-      padding-top:var(--hv-popup-top,46px);
-      padding-bottom:var(--hv-popup-bottom-inset,72px);
-      box-sizing:border-box;
-    }
-    .hv-app-edit { max-height:100%; box-sizing:border-box; background-color:var(--hv-frost-fill-strong); }
     .hv-hs-roof-pop {
       position:fixed; top:var(--hv-popup-top,46px); transform:translateX(-50%);
       max-height:calc(100vh - var(--hv-popup-top,46px) - var(--hv-popup-bottom-inset,72px));
@@ -5979,7 +5859,7 @@ window.HavalSplash = (function () {
     <div class="hv-apps-pane-title">LEFT</div>
     <div class="hv-apps-grid">
       <sc-for list="{{ appsPaneLeftItems }}" as="ap" hint-placeholder-count="0">
-        <button type="button" class="hv-apps-tile" onClick="{{ ap.onClick }}" title="{{ ap.label }}" onTouchStart="{{ ap.onHoldStart }}" onTouchEnd="{{ ap.onHoldEnd }}" onTouchCancel="{{ ap.onHoldCancel }}" onMouseDown="{{ ap.onHoldStart }}" onMouseUp="{{ ap.onHoldEnd }}" onMouseLeave="{{ ap.onHoldCancel }}" onContextMenu="{{ ap.onContextMenu }}">
+        <button type="button" class="hv-apps-tile" onClick="{{ ap.onClick }}" title="{{ ap.label }}">
           <img src="{{ ap.icon }}" alt="">
           <span class="hv-apps-tile-label">{{ ap.label }}</span>
         </button>
@@ -5990,50 +5870,11 @@ window.HavalSplash = (function () {
     <div class="hv-apps-pane-title">RIGHT</div>
     <div class="hv-apps-grid">
       <sc-for list="{{ appsPaneRightItems }}" as="ap" hint-placeholder-count="0">
-        <button type="button" class="hv-apps-tile" onClick="{{ ap.onClick }}" title="{{ ap.label }}" onTouchStart="{{ ap.onHoldStart }}" onTouchEnd="{{ ap.onHoldEnd }}" onTouchCancel="{{ ap.onHoldCancel }}" onMouseDown="{{ ap.onHoldStart }}" onMouseUp="{{ ap.onHoldEnd }}" onMouseLeave="{{ ap.onHoldCancel }}" onContextMenu="{{ ap.onContextMenu }}">
+        <button type="button" class="hv-apps-tile" onClick="{{ ap.onClick }}" title="{{ ap.label }}">
           <img src="{{ ap.icon }}" alt="">
           <span class="hv-apps-tile-label">{{ ap.label }}</span>
         </button>
       </sc-for>
-    </div>
-  </div>
-
-  <!-- APP+APP: long-press a tile to rename / re-icon it -->
-  <div class="hv-app-edit-backdrop" style="display: {{ appEditDisplay }};" onClick="{{ onAppEditCancel }}">
-    <div class="hv-app-edit" onClick="{{ onAppEditStop }}">
-      <div class="hv-app-edit-head">
-        <img src="{{ appEditHeadIcon }}" alt="">
-        <div>
-          <div class="hv-app-edit-title">{{ appEditTitle }}</div>
-          <div class="hv-app-edit-pkg">{{ appEditPkgLabel }}</div>
-        </div>
-      </div>
-
-      <div class="hv-app-edit-kicker">NAME</div>
-      <input class="hv-app-edit-input" type="text" value="{{ appEditNameValue }}"
-        placeholder="{{ appEditNamePlaceholder }}" onInput="{{ onAppEditName }}" />
-
-      <div class="hv-app-edit-kicker">ICON</div>
-      <div class="hv-app-edit-icons">
-        <sc-for list="{{ appEditIconItems }}" as="ic" hint-placeholder-count="0">
-          <button type="button" class="hv-app-edit-icon {{ ic.cls }}" onClick="{{ ic.onClick }}" title="{{ ic.title }}">
-            <img src="{{ ic.icon }}" alt="">
-          </button>
-        </sc-for>
-      </div>
-
-      <div class="hv-app-edit-kicker" style="display: {{ appEditColorsDisplay }};">TINT</div>
-      <div class="hv-app-edit-colors" style="display: {{ appEditColorsDisplay }};">
-        <sc-for list="{{ appEditColorItems }}" as="cl" hint-placeholder-count="0">
-          <button type="button" class="hv-app-edit-color {{ cl.cls }}" style="{{ cl.style }}" onClick="{{ cl.onClick }}"></button>
-        </sc-for>
-      </div>
-
-      <div class="hv-app-edit-actions">
-        <button type="button" class="hv-app-edit-btn ghost" onClick="{{ onAppEditReset }}">RESET</button>
-        <button type="button" class="hv-app-edit-btn" onClick="{{ onAppEditCancel }}">CANCEL</button>
-        <button type="button" class="hv-app-edit-btn primary" onClick="{{ onAppEditSave }}">SAVE</button>
-      </div>
     </div>
   </div>
 
@@ -7168,88 +7009,6 @@ const H6_BOTTOM_CARD_CATALOG = [
     longAction: 'openDrivingOnePedal' },
 ];
 
-/**
- * Per-app name / icon overrides, set by long-pressing a launcher tile.
- *
- * Android has no per-package icon or label override table — `loadIcon()` and
- * `loadLabel()` resolve out of the target APK's own resources — so a launcher
- * that offers icon customisation has to keep its own map. This is ours:
- * `{ "<package>": { name?, icon?, color? } }`, sparse, page-side, applied at
- * render in `_appsOnlyRenderFields`. The native bridge keeps returning stock
- * icons and knows nothing about this.
- */
-const APP_OVERRIDES_KEY = 'h6_appOverrides';
-
-/** Tints offered in the edit sheet. First entry is the default. */
-const APP_ICON_COLORS = ['#e6edf6', '#4fd6e8', '#7ee787', '#ffd166', '#ff8fa3', '#c4a7ff'];
-
-/**
- * The built-in substitute icons, drawn on the tile's own dark plate.
- *
- * Deliberately geometric rather than brand marks: a launcher that shipped
- * recognisable third-party logos would be redistributing them. These say what
- * an app *is* — the user picks "music" for whichever music app they run.
- * `svg` is inner markup for a 24x24 viewBox with `CCC` standing in for the
- * chosen tint; see appIconDataUrl().
- */
-const APP_ICON_SET = [
-  { slug: 'music', label: 'Music', svg: '<circle cx="8" cy="17.5" r="3.2" fill="CCC"/><path d="M10.4 5.2 19 3.2v3.4l-8.6 2z" fill="CCC"/><rect x="10.4" y="4" width="1.8" height="13.5" fill="CCC"/>' },
-  { slug: 'video', label: 'Video', svg: '<rect x="2.5" y="6" width="13" height="12" rx="2.5" fill="CCC"/><path d="M17 11.2 21.5 8v8l-4.5-3.2z" fill="CCC"/>' },
-  { slug: 'radio', label: 'Radio', svg: '<rect x="2.5" y="8" width="19" height="12" rx="2.5" fill="CCC"/><circle cx="8" cy="14" r="3.6" fill="#0b0f14"/><rect x="14" y="11" width="5.5" height="1.8" rx="0.9" fill="#0b0f14"/><rect x="14" y="15" width="5.5" height="1.8" rx="0.9" fill="#0b0f14"/><rect x="13" y="3.4" width="6.5" height="1.7" rx="0.85" transform="rotate(20 13 3.4)" fill="CCC"/>' },
-  { slug: 'maps', label: 'Maps', svg: '<path d="M12 2a7.2 7.2 0 0 0-7.2 7.2C4.8 14.6 12 22 12 22s7.2-7.4 7.2-12.8A7.2 7.2 0 0 0 12 2z" fill="CCC"/><circle cx="12" cy="9.3" r="2.9" fill="#0b0f14"/>' },
-  { slug: 'phone', label: 'Phone', svg: '<path d="M7.4 10.9a14.4 14.4 0 0 0 5.7 5.7l2-2a1.2 1.2 0 0 1 1.2-.3 12 12 0 0 0 3.4.6 1.2 1.2 0 0 1 1.2 1.2v3.1a1.2 1.2 0 0 1-1.2 1.2A17.6 17.6 0 0 1 2.6 4.3 1.2 1.2 0 0 1 3.8 3.1h3.1a1.2 1.2 0 0 1 1.2 1.2 12 12 0 0 0 .6 3.4 1.2 1.2 0 0 1-.3 1.2l-2 2z" fill="CCC"/>' },
-  { slug: 'message', label: 'Message', svg: '<path d="M20 3.5H4A2.2 2.2 0 0 0 1.8 5.7v8.9A2.2 2.2 0 0 0 4 16.8h2.6v4.2l4.8-4.2H20a2.2 2.2 0 0 0 2.2-2.2V5.7A2.2 2.2 0 0 0 20 3.5z" fill="CCC"/>' },
-  { slug: 'browser', label: 'Browser', svg: '<circle cx="12" cy="12" r="9.2" fill="none" stroke="CCC" stroke-width="1.9"/><ellipse cx="12" cy="12" rx="4" ry="9.2" fill="none" stroke="CCC" stroke-width="1.7"/><path d="M3.2 12h17.6" stroke="CCC" stroke-width="1.7"/>' },
-  { slug: 'camera', label: 'Camera', svg: '<path fill-rule="evenodd" d="M9.2 3.5h5.6l1.4 2.2H20A2.2 2.2 0 0 1 22.2 7.9v10A2.2 2.2 0 0 1 20 20.1H4a2.2 2.2 0 0 1-2.2-2.2v-10A2.2 2.2 0 0 1 4 5.7h3.8l1.4-2.2zM12 8.6a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6z" fill="CCC"/>' },
-  { slug: 'photos', label: 'Photos', svg: '<path fill-rule="evenodd" d="M3.4 4h17.2A1.4 1.4 0 0 1 22 5.4v13.2a1.4 1.4 0 0 1-1.4 1.4H3.4A1.4 1.4 0 0 1 2 18.6V5.4A1.4 1.4 0 0 1 3.4 4zm1 13.6h15.2l-4.8-6.4-3.6 4.6-2.5-2.9-4.3 4.7zM7.6 6.9a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8z" fill="CCC"/>' },
-  { slug: 'tune', label: 'Settings', svg: '<path d="M3 6.6h11M17.6 6.6H21M3 12h3.4M10 12h11M3 17.4h11M17.6 17.4H21" stroke="CCC" stroke-width="1.9" stroke-linecap="round"/><circle cx="15.6" cy="6.6" r="2.4" fill="CCC"/><circle cx="8.2" cy="12" r="2.4" fill="CCC"/><circle cx="15.6" cy="17.4" r="2.4" fill="CCC"/>' },
-  { slug: 'car', label: 'Car', svg: '<path d="M4.2 11.2 6 6.4A2 2 0 0 1 7.9 5h8.2a2 2 0 0 1 1.9 1.4l1.8 4.8v6a1 1 0 0 1-1 1h-1.4a1 1 0 0 1-1-1v-1H6.6v1a1 1 0 0 1-1 1H4.2a1 1 0 0 1-1-1v-6z" fill="CCC"/><circle cx="7.4" cy="13.6" r="1.5" fill="#0b0f14"/><circle cx="16.6" cy="13.6" r="1.5" fill="#0b0f14"/>' },
-  { slug: 'bolt', label: 'Charge', svg: '<path d="M13.4 2 4.6 14h5.6l-1.2 8 9.4-12.6h-5.8z" fill="CCC"/>' },
-  { slug: 'weather', label: 'Weather', svg: '<circle cx="16.8" cy="6.2" r="3.6" fill="CCC"/><path d="M6.6 20a4.6 4.6 0 0 1 .5-9.2 6 6 0 0 1 11.4 1.6 3.9 3.9 0 0 1-.6 7.6z" fill="CCC"/><circle cx="16.8" cy="6.2" r="5.1" fill="none" stroke="#0b0f14" stroke-width="1.1"/>' },
-  { slug: 'calendar', label: 'Calendar', svg: '<rect x="3" y="5" width="18" height="16" rx="2.2" fill="CCC"/><rect x="3" y="5" width="18" height="4.4" rx="2.2" fill="#0b0f14" opacity=".55"/><rect x="6.6" y="2.6" width="2" height="4.4" rx="1" fill="CCC"/><rect x="15.4" y="2.6" width="2" height="4.4" rx="1" fill="CCC"/><rect x="6.4" y="12" width="4" height="4" rx="1" fill="#0b0f14"/>' },
-  { slug: 'clock', label: 'Clock', svg: '<circle cx="12" cy="12" r="9.2" fill="none" stroke="CCC" stroke-width="2"/><path d="M12 6.6V12l3.8 2.4" stroke="CCC" stroke-width="2" stroke-linecap="round" fill="none"/>' },
-  { slug: 'folder', label: 'Files', svg: '<path d="M2.8 6.4a2 2 0 0 1 2-2h4l2.2 2.2h8.2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4.8a2 2 0 0 1-2-2z" fill="CCC"/>' },
-  { slug: 'download', label: 'Download', svg: '<path d="M12 3v11m0 0 4.4-4.4M12 14l-4.4-4.4" stroke="CCC" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M4 17.6v1.4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.4" stroke="CCC" stroke-width="2.1" stroke-linecap="round" fill="none"/>' },
-  { slug: 'store', label: 'Store', svg: '<path d="M5 7.6h14l1.2 12A1.6 1.6 0 0 1 18.6 21.4H5.4A1.6 1.6 0 0 1 3.8 19.6z" fill="CCC"/><path d="M8.4 9.4V6.6a3.6 3.6 0 0 1 7.2 0v2.8" stroke="CCC" stroke-width="1.9" fill="none" stroke-linecap="round"/>' },
-  { slug: 'game', label: 'Game', svg: '<rect x="1.8" y="7" width="20.4" height="11" rx="4.4" fill="CCC"/><rect x="5.4" y="11.4" width="4.6" height="1.7" rx="0.85" fill="#0b0f14"/><rect x="6.85" y="9.95" width="1.7" height="4.6" rx="0.85" fill="#0b0f14"/><circle cx="16.4" cy="11.2" r="1.5" fill="#0b0f14"/><circle cx="18.8" cy="14" r="1.5" fill="#0b0f14"/>' },
-  { slug: 'star', label: 'Star', svg: '<path d="M12 2.4 14.9 8.3l6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5-4.7-4.6 6.5-.9z" fill="CCC"/>' },
-  { slug: 'tv', label: 'TV', svg: '<rect x="2.2" y="4.4" width="19.6" height="13" rx="2.2" fill="CCC"/><path d="M8 20.6h8" stroke="CCC" stroke-width="2" stroke-linecap="round"/>' },
-  { slug: 'mail', label: 'Mail', svg: '<rect x="2.2" y="4.8" width="19.6" height="14.4" rx="2.2" fill="CCC"/><path d="m3.6 7 8.4 6 8.4-6" stroke="#0b0f14" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' },
-  { slug: 'wifi', label: 'Network', svg: '<path d="M2.6 8.6a14 14 0 0 1 18.8 0M5.8 12.4a9.4 9.4 0 0 1 12.4 0M9 16.2a4.8 4.8 0 0 1 6 0" stroke="CCC" stroke-width="2.1" stroke-linecap="round" fill="none"/><circle cx="12" cy="19.6" r="1.7" fill="CCC"/>' },
-  { slug: 'speaker', label: 'Speaker', svg: '<rect x="5" y="2.6" width="14" height="18.8" rx="2.6" fill="CCC"/><circle cx="12" cy="15" r="3.6" fill="#0b0f14"/><circle cx="12" cy="6.8" r="1.8" fill="#0b0f14"/>' },
-];
-
-const APP_ICON_BY_SLUG = (() => {
-  const m = {};
-  APP_ICON_SET.forEach((it) => { m[it.slug] = it; });
-  return m;
-})();
-
-function loadAppOverrides() {
-  try {
-    const raw = localStorage.getItem(APP_OVERRIDES_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return (parsed && typeof parsed === 'object') ? parsed : {};
-  } catch (e) { return {}; }
-}
-
-function saveAppOverrides(map) {
-  try { localStorage.setItem(APP_OVERRIDES_KEY, JSON.stringify(map || {})); } catch (e) {}
-}
-
-/**
- * A built-in icon as a data URL, so a substituted tile stays a plain `<img>`
- * and needs no change to the tile markup or its CSS.
- */
-function appIconDataUrl(slug, color) {
-  const item = APP_ICON_BY_SLUG[slug];
-  if (!item) return '';
-  const tint = /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : APP_ICON_COLORS[0];
-  const inner = item.svg.split('CCC').join(tint);
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' + inner + '</svg>';
-  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-}
-
 // MODES widget — same keys/values as Impulse SettingsMenuContent / Ajustes.
 // One chip per option so a tap writes the raw CAN value (no cycle).
 const CAR_MODE_ESP = {
@@ -7907,12 +7666,6 @@ class Component extends DCLogic {
     clockFormat: '24h',
     accentKey: 'cyan',
     accentColor: '#2aa7b7',
-    // Long-press editor for a launcher tile. appEditPkg null = closed; the
-    // other three fields are the unsaved draft.
-    appEditPkg: null,
-    appEditName: '',
-    appEditIcon: '',
-    appEditColor: '',
   };
 
   constructor(props) {
@@ -30729,7 +30482,7 @@ class Component extends DCLogic {
 
   _ensureAppsCatalog() {
     if (this._appsCatalogLoading) return;
-    if (Array.isArray(this._appsCatalog) && this._appsCatalog.length) return;
+    if (Array.isArray(this._appsCatalog)) return;
     this._appsCatalogLoading = true;
     try {
       const bridge = window.AppLauncherBridge;
@@ -30749,6 +30502,16 @@ class Component extends DCLogic {
     this._appsCatalogLoading = false;
   }
 
+  _invalidateAppsCatalog() {
+    this._appsCatalog = null;
+    this._appsCatalogLoading = false;
+    if (this._shellMode === 'appsOnly' || (this.state && this.state.shellMode === 'appsOnly')) {
+      this._ensureAppsCatalog();
+    } else {
+      this.setState({ appsCatalogRev: (this.state.appsCatalogRev || 0) + 1 });
+    }
+  }
+
   _launchAppInSlot(pkg, side) {
     if (!pkg) return;
     try {
@@ -30760,92 +30523,6 @@ class Component extends DCLogic {
     } catch (e) {
       console.warn('[Shell] launchAppInSlot failed', e);
     }
-  }
-
-  /** Per-package name / icon overrides, read through once and kept in memory. */
-  _appOverrides() {
-    if (!this._appOverrideMap) this._appOverrideMap = loadAppOverrides();
-    return this._appOverrideMap;
-  }
-
-  /**
-   * Hold to edit, mirroring the widget cards' idiom (`CAR_WIDGET_HOLD_MS`).
-   * The tile is a <button>, so the hold has to suppress the click that would
-   * otherwise launch the app on release.
-   */
-  _onAppTileHoldStart(app, ev) {
-    if (ev && ev.type === 'mousedown' && this._appTileTouchActive) return;
-    if (ev && ev.type === 'touchstart') this._appTileTouchActive = true;
-    this._clearAppTileHold();
-    this._appTileHoldFired = false;
-    this._appTileHoldTimer = setTimeout(() => {
-      this._appTileHoldTimer = 0;
-      this._appTileHoldFired = true;
-      this._appTileSuppressClick = true;
-      this._openAppEdit(app);
-    }, CAR_WIDGET_HOLD_MS);
-  }
-
-  _onAppTileHoldEnd(app, ev) {
-    if (ev && ev.type === 'mouseup' && this._appTileTouchActive) return;
-    if (ev && (ev.type === 'touchend' || ev.type === 'touchcancel')) this._appTileTouchActive = false;
-    this._clearAppTileHold();
-  }
-
-  _onAppTileHoldCancel() {
-    this._clearAppTileHold();
-  }
-
-  _clearAppTileHold() {
-    if (this._appTileHoldTimer) {
-      clearTimeout(this._appTileHoldTimer);
-      this._appTileHoldTimer = 0;
-    }
-  }
-
-  _openAppEdit(app) {
-    if (!app || !app.packageName) return;
-    const cur = this._appOverrides()[app.packageName] || {};
-    this.setState({
-      appEditPkg: app.packageName,
-      appEditName: (typeof cur.name === 'string') ? cur.name : '',
-      appEditIcon: cur.icon || '',
-      appEditColor: cur.color || APP_ICON_COLORS[0],
-    });
-  }
-
-  _closeAppEdit() {
-    if (!this.state.appEditPkg) return;
-    this.setState({ appEditPkg: null, appEditName: '', appEditIcon: '', appEditColor: '' });
-  }
-
-  /** Write the draft through, dropping the entry entirely when it overrides nothing. */
-  _saveAppEdit() {
-    const pkg = this.state.appEditPkg;
-    if (!pkg) return;
-    const map = this._appOverrides();
-    const name = (this.state.appEditName || '').trim();
-    const icon = this.state.appEditIcon || '';
-    if (!name && !icon) {
-      delete map[pkg];
-    } else {
-      const entry = {};
-      if (name) entry.name = name;
-      if (icon) {
-        entry.icon = icon;
-        entry.color = this.state.appEditColor || APP_ICON_COLORS[0];
-      }
-      map[pkg] = entry;
-    }
-    saveAppOverrides(map);
-    this._closeAppEdit();
-    // The catalog itself has not changed — only how it renders.
-    this.setState({ appsCatalogRev: (this.state.appsCatalogRev || 0) + 1 });
-  }
-
-  /** Back to the app's own name and icon. */
-  _clearAppEdit() {
-    this.setState({ appEditName: '', appEditIcon: '' });
   }
 
   _setAppsFabOpen(open) {
@@ -30919,35 +30596,17 @@ class Component extends DCLogic {
         setAppsRatio12: () => {},
         swapAppsSlots: () => {},
         saveAppsOnlyDefault: () => {},
-        ...this._appEditRenderFields(null, false),
       };
     }
     this._ensureAppsCatalog();
     const catalog = Array.isArray(this._appsCatalog) ? this._appsCatalog : [];
-    const overrides = this._appOverrides();
     const FALLBACK_ICON = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-    const mk = (side) => catalog.map((app) => {
-      const ov = overrides[app.packageName] || {};
-      const custom = ov.icon ? appIconDataUrl(ov.icon, ov.color) : '';
-      return {
-        label: ov.name || app.label || app.packageName || '',
-        icon: custom || app.icon || FALLBACK_ICON,
-        onClick: () => {
-          // A hold already opened the editor — swallow the click it releases into.
-          if (this._appTileSuppressClick) { this._appTileSuppressClick = false; return; }
-          this._launchAppInSlot(app.packageName, side);
-        },
-        onHoldStart: (ev) => this._onAppTileHoldStart(app, ev),
-        onHoldEnd: (ev) => this._onAppTileHoldEnd(app, ev),
-        onHoldCancel: (ev) => this._onAppTileHoldCancel(app, ev),
-        onContextMenu: (ev) => {
-          if (ev && ev.preventDefault) ev.preventDefault();
-          this._openAppEdit(app);
-        },
-      };
-    });
+    const mk = (side) => catalog.map((app) => ({
+      label: app.label || app.packageName || '',
+      icon: app.icon || FALLBACK_ICON,
+      onClick: () => this._launchAppInSlot(app.packageName, side),
+    }));
     return {
-      ...this._appEditRenderFields(catalog, true),
       appsPaneDisplay: 'flex',
       appsFabDisplay: 'none',
       appsFabMenuDisplay: 'none',
@@ -30963,78 +30622,6 @@ class Component extends DCLogic {
       setAppsRatio12: () => {},
       swapAppsSlots: () => {},
       saveAppsOnlyDefault: () => {},
-    };
-  }
-
-  /** Bindings for the long-press edit sheet. Closed unless a tile asked for it. */
-  _appEditRenderFields(catalog, visible) {
-    const pkg = visible ? this.state.appEditPkg : null;
-    if (!pkg) {
-      return {
-        appEditDisplay: 'none',
-        appEditTitle: '',
-        appEditPkgLabel: '',
-        appEditHeadIcon: '',
-        appEditNameValue: '',
-        appEditNamePlaceholder: '',
-        appEditIconItems: [],
-        appEditColorItems: [],
-        appEditColorsDisplay: 'none',
-        onAppEditName: () => {},
-        onAppEditSave: () => {},
-        onAppEditCancel: () => {},
-        onAppEditReset: () => {},
-        onAppEditStop: () => {},
-      };
-    }
-    const list = Array.isArray(catalog) ? catalog : [];
-    let app = null;
-    for (let i = 0; i < list.length; i++) {
-      if (list[i] && list[i].packageName === pkg) { app = list[i]; break; }
-    }
-    if (!app) app = { packageName: pkg, label: '', icon: '' };
-
-    const stockIcon = app.icon || '';
-    const chosen = this.state.appEditIcon || '';
-    const color = this.state.appEditColor || APP_ICON_COLORS[0];
-
-    // "Default" first, then the built-in set, all previewed in the live tint.
-    const iconItems = [{
-      cls: chosen ? '' : 'on',
-      icon: stockIcon,
-      title: 'App default',
-      onClick: () => this.setState({ appEditIcon: '' }),
-    }];
-    for (let i = 0; i < APP_ICON_SET.length; i++) {
-      const it = APP_ICON_SET[i];
-      iconItems.push({
-        cls: chosen === it.slug ? 'on' : '',
-        icon: appIconDataUrl(it.slug, color),
-        title: it.label,
-        onClick: () => this.setState({ appEditIcon: it.slug }),
-      });
-    }
-
-    return {
-      appEditDisplay: 'flex',
-      appEditTitle: (this.state.appEditName || '').trim() || app.label || pkg,
-      appEditPkgLabel: pkg,
-      appEditHeadIcon: chosen ? appIconDataUrl(chosen, color) : stockIcon,
-      appEditNameValue: this.state.appEditName || '',
-      appEditNamePlaceholder: app.label || pkg,
-      appEditIconItems: iconItems,
-      appEditColorItems: APP_ICON_COLORS.map((c) => ({
-        cls: c === color ? 'on' : '',
-        style: 'background: ' + c + ';',
-        onClick: () => this.setState({ appEditColor: c }),
-      })),
-      // Tint only means anything once a built-in icon is chosen.
-      appEditColorsDisplay: chosen ? 'flex' : 'none',
-      onAppEditName: (ev) => this.setState({ appEditName: (ev && ev.target) ? ev.target.value : '' }),
-      onAppEditSave: () => this._saveAppEdit(),
-      onAppEditCancel: () => this._closeAppEdit(),
-      onAppEditReset: () => this._clearAppEdit(),
-      onAppEditStop: (ev) => { if (ev && ev.stopPropagation) ev.stopPropagation(); },
     };
   }
 

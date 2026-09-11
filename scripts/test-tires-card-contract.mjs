@@ -282,7 +282,6 @@ assert.match(nativeTireColor, /if\s*\("demo"\.equals\(descriptor\.state\)\)\s*re
 // desktops, layouts, shell boot choice, launcher overrides, or native shell.
 includesAll(html, [
   "const H6_DESKTOPS_KEY = 'h6_desktops_v1';",
-  "const APP_OVERRIDES_KEY = 'h6_appOverrides';",
   "const SHELL_BOOT_KEY = 'hv_shell_boot_v1';",
   "localStorage.getItem('h6_widgets')",
   "localStorage.setItem('h6_widgets', json)",
@@ -291,6 +290,7 @@ includesAll(native, [
   'private static final String PREFS_SHELL = "h6_shell";',
   '.putString("widgets",',
   '.getString("widgets", "")',
+  'static final String PREF_KEY = "dock_app_overrides";',
 ], 'native persistence keys');
 
 console.log('Tires card contracts: ok');
