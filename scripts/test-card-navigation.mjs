@@ -99,7 +99,7 @@ includesAll(method('_widgetRenderFields'), [
 const dockIndicators = method('_syncDockIndicators');
 includesAll(dockIndicators, [
   'const bottomVisuals = {',
-  'primary: navigation.navigationDistance',
+  'primary: navigation.navigationShowTurn',
   'secondary: range.rangeSource',
   "metricA: 'EV ' + range.rangeEv + ' ' + range.rangeUnit",
   'progress: percent(range.rangeSoc, 0)',
@@ -188,5 +188,158 @@ includesAll(method('_createFocusedCardDesktop'), [
 includesAll(html, ['top:var(--hv-popup-top', 'bottom:var(--hv-popup-bottom-inset'], 'popup geometry');
 includesAll(method('_switchDesktop'), ['focusedCardType: null'], 'desktop popup cleanup');
 includesAll(method('_openDesktopStudio'), ['focusedCardType: null'], 'studio popup cleanup');
+
+// Android Auto TBT on the Navigation card / widget. Impulse publishes
+// app.androidauto.session and app.navigation.directions; this viewer must
+// listen, not invent a second map.
+const htmlRoot = html;
+const java = readFileSync(resolve(root, 'app/src/main/java/com/havalh6/viewer/MainActivity.java'), 'utf8').replace(/\r\n/g, '\n');
+includesAll(htmlRoot, [
+  "aaSession: 'app.androidauto.session'",
+  "navDirections: 'app.navigation.directions'",
+  "place: 'app.location.place'",
+  'CAR_SIGNALS.aaSession, CAR_SIGNALS.navDirections, CAR_SIGNALS.place',
+], 'AA telemetry keys');
+includesAll(method('_applyCarSignal'), [
+  'CAR_SIGNALS.aaSession',
+  'CAR_SIGNALS.navDirections',
+  'CAR_SIGNALS.place',
+  'this._applyAaSession(value)',
+  'this._applyNavDirections(value)',
+  'this._applyPlaceGlance(value)',
+], 'AA signal routing');
+const navView = method('_navigationWidgetView');
+includesAll(navView, [
+  "'ANDROID AUTO · LIVE'",
+  "'ANDROID AUTO · NO GUIDANCE'",
+  "'NAVIGATION · NO ROUTE DATA'",
+  "'DEMO · ROUTE PREVIEW'",
+  "'DEMO · NO GUIDANCE'",
+  'navigationTurnGlyph',
+  'navigationCardState',
+  'navigationCardGlyph',
+  'navigationHasAppIcon',
+  'navigationAppPackage',
+  'navigationStreet',
+  'navigationRemaining',
+  'navigationDuration',
+  'navigationEta',
+  'navigationHasEta',
+  'DEMO_NAV_SEQUENCE',
+  'this._openNavigationApp()',
+], 'navigation live sources');
+includesAll(navView, [
+  'formatNavMeters',
+  'formatNavDuration',
+  'formatNavEta',
+  'live.remainingM',
+  'live.remainingS',
+  'metricSlots',
+], 'Impulse remaining distance / time / ETA');
+includesAll(htmlRoot, [
+  "family: 'turn_right'",
+  "family: 'turn_left'",
+  "family: 'straight'",
+  "family: 'roundabout'",
+  "family: 'uturn'",
+  "family: 'fork'",
+  "family: 'merge'",
+  "family: 'exit'",
+  "family: 'destination'",
+  '{ idle: true }',
+], 'demo cycles every turn family then idle');
+includesAll(method('_openNavigationApp'), [
+  "this._aaSession === 'active'",
+  "B.launchProjection('AA')",
+  'CAR_NAV_PACKAGE',
+], 'AA session tap must raise projection, not fake navigation');
+includesAll(method('_ensureDemoNavTicker'), [
+  'DEMO_NAV_INTERVAL_MS',
+  "this._aaSession === 'active'",
+], 'disconnected demo must cycle guidance vs idle');
+includesAll(htmlRoot, [
+  "place: 'app.location.place'",
+  'class="hv-nav-app-icon"',
+  'class="hv-navigation-tbt"',
+  'class="hv-navigation-metrics"',
+  'class="hv-navigation-metric is-eta"',
+  'NAV_TURN_ICONS',
+  './assets/ui/tbt/right.svg',
+], 'AA icon + place glance wiring');
+assert.equal((htmlRoot.match(/class="hv-navigation-tbt"/g) || []).length, 2,
+  'TBT strip must exist on both widget boards');
+assert.equal((htmlRoot.match(/class="hv-navigation-metrics"/g) || []).length, 2,
+  'GMaps metric row must exist on both widget boards');
+assert.equal((htmlRoot.match(/class="hv-nav-app-icon"/g) || []).length, 2,
+  'AA icon must exist on both widget boards');
+includesAll(method('_parseNavDirections'), [
+  'obj.active',
+  'obj.street',
+  'obj.distance',
+  'obj.distance_m',
+  'obj.turn',
+  'obj.remaining_m',
+  'obj.remaining_s',
+  'return null',
+], 'directions JSON shape');
+includesAll(method('_queueNavRefresh'), [
+  'setTimeout',
+  '250',
+  'this._commitNavUi()',
+], 'TBT refresh throttle');
+includesAll(method('_commitNavUi'), [
+  "_hasWidgetType(mode, 'navigation')",
+  'this._uiOnlyStateWrite = true',
+  'this._syncDockIndicators()',
+], 'TBT must not dirty the 3D loop');
+const dock = method('_syncDockIndicators');
+includesAll(dock, [
+  'state: navigation.navigationCardState',
+  'glyph: navigation.navigationCardGlyph',
+  'appPackage: navigation.navigationAppPackage',
+  'navRemaining: navigation.navigationRemaining',
+  'navDuration: navigation.navigationDuration',
+  'navEta: navigation.navigationShowTurn',
+  "{ type: 'navigation', w: 3, h: 1 }",
+], 'native rail TBT payload');
+assert.equal((htmlRoot.match(/d="\{\{ wg\.navigationTurnGlyph \}\}"/g) || []).length, 2,
+  'turn glyph fallback must exist on both widget boards');
+assert.equal((htmlRoot.match(/class="hv-navigation-turn-icon"/g) || []).length, 2,
+  'minimalist TBT mask icon must exist on both widget boards');
+assert.ok(java.includes('case "navigation": drawNavigation'));
+assert.ok(java.includes('sanitizeNavigationState'));
+assert.ok(java.includes('ic_tbt_turn_right'));
+const drawNavAt = java.indexOf('private void drawNavigation(');
+assert.ok(drawNavAt >= 0, 'missing drawNavigation');
+const drawNav = java.slice(drawNavAt, java.indexOf('private void drawTires(', drawNavAt));
+assert.ok(drawNav.includes('drawTbtIcon'),
+  'live navigation graphic must paint the filled minimalist TBT icon');
+assert.ok(drawNav.includes('drawGlyphPath'),
+  'drawNavigation must keep the stroke glyph as fallback for exit/destination');
+assert.ok(drawNav.includes('drawNavigationAppBadge'),
+  'drawNavigation must stamp the live nav app icon');
+assert.ok(drawNav.includes('descriptor.metricA'),
+  'manoeuvre distance is drawn under the glyph');
+assert.ok(drawNav.includes('drawNavMetricRow'),
+  'remaining / time / ETA are stacked Google Maps columns');
+assert.ok(java.includes('measureNavMetricWidths'),
+  'native metric columns pack to content width instead of equal-splitting into ellipses');
+assert.ok(drawNav.includes('descriptor.navEta'),
+  'ETA is a dedicated column, not a leftover trip-strip string');
+assert.ok(java.includes('|| "navigation".equals(descriptor.id)'),
+  'navigation is a full-graphic rail tile so the TBT strip can own the body');
+assert.ok(java.includes('Opens navigation.'));
+assert.ok(java.includes('ProjectionPresence.isProjectionPackage(packageName)'),
+  'launchAppForPackage must raise AA/CarPlay instead of MediaCenter MAIN');
+assert.ok(java.includes('public void launchProjection(String kind)'),
+  'JS must be able to raise projection without a launcher entry');
+assert.ok(java.includes('public String getAppIcon(String packageName)'),
+  'widget AA chip needs a package icon data URL');
+assert.ok(java.includes('new PlaceGlance('),
+  'idle place glance must be started from the viewer, not invented in JS');
+assert.ok(java.includes('PlaceGlance.KEY'),
+  'place JSON must reuse the existing onCarDataUpdate pipe');
+assert.ok(!java.includes('case "navigation": drawRing'),
+  'navigation must not fall through to the generic ring');
 
 console.log('card-navigation contracts: ok');

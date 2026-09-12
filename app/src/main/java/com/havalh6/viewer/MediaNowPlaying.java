@@ -440,6 +440,9 @@ final class MediaNowPlaying {
      */
     private boolean canLaunch(String pkg) {
         if (appContext == null || pkg == null || pkg.isEmpty()) return false;
+        // AapActivity is not exported; PackageManager often has no launcher
+        // entry, but the live projection task can still be raised.
+        if (ProjectionPresence.isProjectionPackage(pkg)) return true;
         try {
             return appContext.getPackageManager().getLaunchIntentForPackage(pkg) != null;
         } catch (Exception e) {

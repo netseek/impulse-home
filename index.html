@@ -5046,6 +5046,8 @@ window.HavalSplash = (function () {
     .hv-profile,.hv-navigation,.hv-tires,.hv-status,.hv-range-card { height:100%; min-width:0; box-sizing:border-box; padding:14px; color:var(--hv-widget-fg,#edf5fa); overflow:hidden; }
     .hv-glance-head { display:flex; align-items:center; justify-content:space-between; gap:8px; font:8px/1 'Space Mono',monospace; letter-spacing:.14em; }
     .hv-glance-head small { opacity:.5; font-size:7px; letter-spacing:.06em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-nav-head-meta { display:flex; align-items:center; gap:6px; min-width:0; }
+    .hv-nav-app-icon { width:14px; height:14px; border-radius:3px; object-fit:cover; flex:0 0 auto; }
     .hv-profile { padding:10px; cursor:pointer; }
     .hv-profile-stage { position:relative; height:calc(100% - 1px); min-height:0; border-radius:16px; overflow:hidden; background:var(--profile-paint,#f4f5f7); color:var(--profile-ink,#111820); }
     .hv-profile-stage::before { content:''; position:absolute; inset:0; background:linear-gradient(128deg,rgba(255,255,255,.40),transparent 42%),radial-gradient(circle at 78% 24%,var(--profile-accent),transparent 34%); opacity:.68; }
@@ -5059,13 +5061,29 @@ window.HavalSplash = (function () {
     h6-clock.hv-widget-clock { display:block; width:100%; height:100%; min-width:0; min-height:0; }
 
     .hv-navigation { cursor:pointer; }
+    .hv-navigation.is-idle .hv-navigation-tbt { display:none; }
+    .hv-navigation.is-live .hv-navigation-map { display:none; }
+    .hv-navigation-tbt { display:flex; align-items:center; gap:14px; height:calc(100% - 22px); min-height:72px; margin-top:2px; min-width:0; }
+    .hv-navigation-maneuver { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; flex:0 0 auto; min-width:56px; }
+    .hv-navigation-turn { width:46px; height:46px; display:grid; place-items:center; border-radius:13px; background:var(--hv-frost-fill-strong); box-shadow:0 8px 20px rgba(0,0,0,.22); }
+    .hv-navigation-turn-icon { width:28px; height:28px; display:block; background:var(--hv-accent); -webkit-mask-position:center; mask-position:center; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; -webkit-mask-size:contain; mask-size:contain; }
+    .hv-navigation-turn svg { width:24px; height:24px; fill:var(--hv-accent); stroke:none; }
+    .hv-navigation-maneuver strong { font-size:clamp(13px,2.2vw,18px); font-weight:600; font-variant-numeric:tabular-nums; line-height:1; }
+    .hv-navigation-text { display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; flex:1 1 auto; }
+    .hv-navigation-text > strong { display:block; font-size:clamp(12px,1.8vw,16px); font-weight:560; line-height:1.15; letter-spacing:-.015em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-navigation-metrics { display:flex; align-items:flex-start; gap:14px; min-width:0; }
+    .hv-navigation-metric { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .hv-navigation-metric strong { font-size:clamp(16px,2.8vw,26px); font-weight:620; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.03em; }
+    .hv-navigation-metric span { font:7px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.5; }
+    .hv-navigation-metric.is-eta strong { color:var(--hv-accent); }
+    .hv-navigation-1x1 .hv-navigation-metrics { display:none; }
+    .hv-navigation-2x1 .hv-navigation-metrics,.hv-navigation-2x2 .hv-navigation-metrics { gap:12px; }
+    .hv-navigation-3x1 .hv-navigation-metrics,.hv-navigation-3x2 .hv-navigation-metrics { gap:18px; }
     .hv-navigation-map { position:relative; height:calc(100% - 25px); min-height:78px; margin-top:3px; border-radius:14px; overflow:hidden; background-color:rgba(99,217,231,.055); background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px); background-size:22px 22px; }
     .hv-navigation-map::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at 78% 25%,rgba(99,217,231,.20),transparent 34%); pointer-events:none; }
     .hv-navigation-route { position:absolute; inset:8px 12px; width:calc(100% - 24px); height:calc(100% - 16px); overflow:visible; }
     .hv-navigation-route .track { fill:none; stroke:rgba(255,255,255,.16); stroke-width:7; stroke-linecap:round; stroke-linejoin:round; }
     .hv-navigation-route .route { fill:none; stroke:var(--hv-accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(0 0 5px rgba(99,217,231,.42)); }
-    .hv-navigation-turn { position:absolute; z-index:2; left:12px; top:11px; width:46px; height:46px; display:grid; place-items:center; border-radius:13px; background:var(--hv-frost-fill-strong); box-shadow:0 8px 20px rgba(0,0,0,.22); }
-    .hv-navigation-turn svg { width:24px; height:24px; fill:none; stroke:var(--hv-accent); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
     .hv-navigation-copy { position:absolute; z-index:2; right:12px; bottom:10px; text-align:right; }
     .hv-navigation-copy strong { display:block; font-size:clamp(24px,4vw,39px); line-height:.9; font-weight:520; font-variant-numeric:tabular-nums; }
     .hv-navigation-copy span { display:block; margin-top:5px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.07em; opacity:.58; }
@@ -5813,7 +5831,7 @@ window.HavalSplash = (function () {
             <h6-clock class="hv-widget-clock" surface="widget" size="{{ wg.clockSize }}" clock-style="{{ wg.clockStyle }}" hour-format="{{ wg.clockHourFormat }}"></h6-clock>
           </sc-if>
           <sc-if value="{{ wg.isNavigation }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-navigation {{ wg.navigationSizeClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><small>{{ wg.navigationSource }}</small></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-turn"><svg viewBox="0 0 24 24"><path d="M7 18V11a4 4 0 0 1 4-4h7"></path><path d="m15 4 3 3-3 3"></path></svg></div><div class="hv-navigation-copy"><strong>{{ wg.navigationDistance }}</strong><span>{{ wg.navigationHint }}</span></div></div></div>
+            <div class="hv-navigation {{ wg.navigationSizeClass }} {{ wg.navigationLiveClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><span class="hv-nav-head-meta"><sc-if value="{{ wg.navigationHasAppIcon }}" hint-placeholder-val="{{ false }}"><img class="hv-nav-app-icon" src="{{ wg.navigationAppIcon }}" alt=""></sc-if><small>{{ wg.navigationSource }}</small></span></div><div class="hv-navigation-tbt"><div class="hv-navigation-maneuver"><div class="hv-navigation-turn"><sc-if value="{{ wg.navigationHasTurnIcon }}" hint-placeholder-val="{{ true }}"><span class="hv-navigation-turn-icon" style="{{ wg.navigationTurnStyle }}"></span></sc-if><sc-if value="{{ wg.navigationHasTurnGlyph }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24"><path d="{{ wg.navigationTurnGlyph }}"></path></svg></sc-if></div><strong>{{ wg.navigationDistance }}</strong></div><div class="hv-navigation-text"><strong>{{ wg.navigationStreet }}</strong><div class="hv-navigation-metrics"><sc-if value="{{ wg.navigationHasRemaining }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationRemaining }}</strong><span>REMAINING</span></div></sc-if><sc-if value="{{ wg.navigationHasDuration }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationDuration }}</strong><span>TIME</span></div></sc-if><sc-if value="{{ wg.navigationHasEta }}" hint-placeholder-val="{{ false }}"><div class="hv-navigation-metric is-eta"><strong>{{ wg.navigationEta }}</strong><span>ETA</span></div></sc-if></div></div></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-copy"><strong>{{ wg.navigationIdlePrimary }}</strong><span>{{ wg.navigationIdleHint }}</span></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
             <div class="hv-media {{ wg.mediaSizeClass }} {{ wg.mediaLayoutClass }} {{ wg.mediaArtClass }} {{ wg.mediaOpenClass }}" onClick="{{ wg.onMediaOpen }}">
@@ -6018,7 +6036,7 @@ window.HavalSplash = (function () {
             <h6-clock class="hv-widget-clock" surface="widget" size="{{ wg.clockSize }}" clock-style="{{ wg.clockStyle }}" hour-format="{{ wg.clockHourFormat }}"></h6-clock>
           </sc-if>
           <sc-if value="{{ wg.isNavigation }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-navigation {{ wg.navigationSizeClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><small>{{ wg.navigationSource }}</small></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-turn"><svg viewBox="0 0 24 24"><path d="M7 18V11a4 4 0 0 1 4-4h7"></path><path d="m15 4 3 3-3 3"></path></svg></div><div class="hv-navigation-copy"><strong>{{ wg.navigationDistance }}</strong><span>{{ wg.navigationHint }}</span></div></div></div>
+            <div class="hv-navigation {{ wg.navigationSizeClass }} {{ wg.navigationLiveClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><span class="hv-nav-head-meta"><sc-if value="{{ wg.navigationHasAppIcon }}" hint-placeholder-val="{{ false }}"><img class="hv-nav-app-icon" src="{{ wg.navigationAppIcon }}" alt=""></sc-if><small>{{ wg.navigationSource }}</small></span></div><div class="hv-navigation-tbt"><div class="hv-navigation-maneuver"><div class="hv-navigation-turn"><sc-if value="{{ wg.navigationHasTurnIcon }}" hint-placeholder-val="{{ true }}"><span class="hv-navigation-turn-icon" style="{{ wg.navigationTurnStyle }}"></span></sc-if><sc-if value="{{ wg.navigationHasTurnGlyph }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24"><path d="{{ wg.navigationTurnGlyph }}"></path></svg></sc-if></div><strong>{{ wg.navigationDistance }}</strong></div><div class="hv-navigation-text"><strong>{{ wg.navigationStreet }}</strong><div class="hv-navigation-metrics"><sc-if value="{{ wg.navigationHasRemaining }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationRemaining }}</strong><span>REMAINING</span></div></sc-if><sc-if value="{{ wg.navigationHasDuration }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationDuration }}</strong><span>TIME</span></div></sc-if><sc-if value="{{ wg.navigationHasEta }}" hint-placeholder-val="{{ false }}"><div class="hv-navigation-metric is-eta"><strong>{{ wg.navigationEta }}</strong><span>ETA</span></div></sc-if></div></div></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-copy"><strong>{{ wg.navigationIdlePrimary }}</strong><span>{{ wg.navigationIdleHint }}</span></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
             <div class="hv-media {{ wg.mediaSizeClass }} {{ wg.mediaLayoutClass }} {{ wg.mediaArtClass }} {{ wg.mediaOpenClass }}" onClick="{{ wg.onMediaOpen }}">
@@ -7178,7 +7196,72 @@ const CAR_SIGNALS = {
   cycleFuel: 'car.ev_info.cycle_fuel_consume_info',
   // Derived by Impulse PowerFlowMapper. Packed v1|state|ice|front|rear.
   powerFlow: 'haval.power.flow',
+  // Impulse-owned Android Auto telemetry. Not CAN: session is stopped|active,
+  // directions is JSON (turn / street / distance). Same EVENT_CHANGED bus.
+  aaSession: 'app.androidauto.session',
+  navDirections: 'app.navigation.directions',
+  // Best-effort city/street when AA is not guiding. Published by the viewer
+  // itself (PlaceGlance), not Impulse; must not keep the CAN bus "live".
+  place: 'app.location.place',
 };
+const NAV_TURN_ICONS = {
+  turn_right: './assets/ui/tbt/right.svg',
+  turn_left: './assets/ui/tbt/left.svg',
+  straight: './assets/ui/tbt/straight.svg',
+  uturn: './assets/ui/tbt/uturn.svg',
+  roundabout: './assets/ui/tbt/roundabout.svg',
+  fork: './assets/ui/tbt/fork.svg',
+  merge: './assets/ui/tbt/merge.svg',
+};
+const NAV_TURN_GLYPHS = {
+  turn_right: 'M 7 18 L 7 11 C 7 8.8 8.8 7 11 7 L 18 7 M 15 4 L 18 7 L 15 10',
+  turn_left: 'M 17 18 L 17 11 C 17 8.8 15.2 7 13 7 L 6 7 M 9 4 L 6 7 L 9 10',
+  straight: 'M 12 20 L 12 5 M 8 9 L 12 5 L 16 9',
+  uturn: 'M 7 20 L 7 11 C 7 7.2 9.8 4.5 13.5 4.5 C 17.2 4.5 20 7.2 20 11 L 20 14 M 17 11 L 20 14 L 22.5 11',
+  roundabout: 'M 12 4 C 16.4 4 20 7.6 20 12 C 20 16.4 16.4 20 12 20 C 7.6 20 4 16.4 4 12 C 4 7.6 7.6 4 12 4 M 12 8 L 12 4 L 15.2 6.2',
+  fork: 'M 12 20 L 12 12 M 12 12 L 6 5 M 12 12 L 18 5 M 15.2 8 L 18 5 L 18.2 8.4',
+  merge: 'M 18 20 L 18 13 L 12 6 M 6 20 L 6 14 L 12 8 M 9 9 L 12 6 L 15 9',
+  exit: 'M 6 4 L 6 20 M 6 12 L 18 12 M 14.5 8.5 L 18 12 L 14.5 15.5',
+  destination: 'M 12 21 L 6.8 10.2 C 5.7 7.8 7.4 4.8 12 4.8 C 16.6 4.8 18.3 7.8 17.2 10.2 L 12 21',
+};
+const DEMO_NAV_SEQUENCE = [
+  { family: 'turn_right', street: 'Av. Paulista', distanceM: 450, remainingM: 12300, remainingS: 840 },
+  { family: 'turn_left', street: 'Rua Augusta', distanceM: 120, remainingM: 11850, remainingS: 810 },
+  { family: 'straight', street: 'Av. 9 de Julho', distanceM: 800, remainingM: 10500, remainingS: 720 },
+  { family: 'roundabout', street: 'Praça da Bandeira', distanceM: 90, remainingM: 9800, remainingS: 660 },
+  { family: 'uturn', street: 'R. da Consolação', distanceM: 60, remainingM: 9200, remainingS: 620 },
+  { family: 'fork', street: 'Marginal Pinheiros', distanceM: 300, remainingM: 8100, remainingS: 540 },
+  { family: 'merge', street: 'Av. Brasil', distanceM: 200, remainingM: 7400, remainingS: 480 },
+  { family: 'exit', street: 'Saída 12', distanceM: 150, remainingM: 6100, remainingS: 400 },
+  { family: 'destination', street: 'Chegada', distanceM: 40, remainingM: 40, remainingS: 45 },
+  { idle: true },
+];
+function formatNavMeters(meters) {
+  const value = Number(meters);
+  if (!isFinite(value) || value < 0) return '';
+  if (value < 1000) return Math.round(value) + ' m';
+  const km = value / 1000;
+  if (km >= 100) return Math.round(km) + ' km';
+  return (Math.round(km * 10) / 10) + ' km';
+}
+function formatNavDuration(seconds) {
+  const value = Number(seconds);
+  if (!isFinite(value) || value < 0) return '';
+  if (value < 45) return '<1 min';
+  const minutes = Math.round(value / 60);
+  if (minutes < 60) return minutes + ' min';
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? hours + ' h ' + rest + ' min' : hours + ' h';
+}
+function formatNavEta(seconds, now) {
+  const value = Number(seconds);
+  if (!isFinite(value) || value < 0) return '';
+  const eta = new Date((now || new Date()).getTime() + value * 1000);
+  const hrs = String(eta.getHours()).padStart(2, '0');
+  const mins = String(eta.getMinutes()).padStart(2, '0');
+  return hrs + ':' + mins;
+}
 /**
  * How long after the last bus frame of ANY kind the vehicle data is still
  * treated as current. Impulse republishes `car.basic.battery_voltage` about ten
@@ -7272,6 +7355,7 @@ const CAR_GRAPH_COLOR_Y2_LIGHT = '#0a6f7c';
 const CAR_GRAPH_COLOR_REGEN_LIGHT = '#1a7a4c';
 const CAR_POWER_PACKAGE = 'com.beantechs.energyassistant';
 const CAR_NAV_PACKAGE = 'com.beantechs.fake.navigation';
+const CAR_AA_PACKAGE = 'com.ts.androidauto.app';
 const CAR_POWER_ASSETS = {
   iceOff: 'assets/power/engine.webp',
   iceOn: 'assets/power/engine_on.webp',
@@ -7573,6 +7657,7 @@ const DEMO_DOOR_SEQUENCE = [
   { key: 'trunk', label: 'Tailgate open', open: { trunk: true } },
 ];
 const DEMO_DOOR_INTERVAL_MS = 2500;
+const DEMO_NAV_INTERVAL_MS = 2800;
 
 // Slot values are NOT all binary. The powered tailgate reports travel states:
 // opening/closing cycle observed as -1 → 3 → 1 → 5 → 4 → -1 → 0.
@@ -8287,6 +8372,14 @@ class Component extends DCLogic {
     this._camCycleKeys = null;
     this._powerLive = { soc: '', evRange: '', fuelRange: '', fuelLevel: '',
                         voltage: '', current: '', cycleEv: '', evInst: '', flow: '' };
+    this._aaSession = 'stopped';
+    this._navLive = { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    this._placeLive = { city: '', street: '' };
+    this._navAppIconByPkg = {};
+    this._demoNavPhase = 0;
+    this._demoNavTicker = 0;
+    this._navRefreshTimer = 0;
+    this._navRefreshPending = false;
     this._tirePressuresRaw = '';
     this._tireTemperaturesRaw = '';
     this._tireWarningsRaw = {};
@@ -8775,6 +8868,7 @@ class Component extends DCLogic {
             CAR_SIGNALS.tireStatus, CAR_SIGNALS.tireUnits,
             CAR_SIGNALS.windows, CAR_SIGNALS.mirrorsFold, CAR_SIGNALS.doorLock,
             CAR_SIGNALS.cycleFuel, CAR_SIGNALS.powerFlow,
+            CAR_SIGNALS.aaSession, CAR_SIGNALS.navDirections, CAR_SIGNALS.place,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
       .concat(Object.keys(lights).map((k) => lights[k]))
@@ -8877,6 +8971,11 @@ class Component extends DCLogic {
     if (this._carTrace) console.log('[CarSignal]', key, '=', value);
     if (!this._carSignalAt) this._carSignalAt = {};
     this._carSignalAt[key] = Date.now();
+    // AA session / TBT are Impulse app keys. They must not keep the CAN bus
+    // "live" for doors/tyres/modes while the vehicle itself is silent.
+    if (key === CAR_SIGNALS.aaSession) { this._applyAaSession(value); return; }
+    if (key === CAR_SIGNALS.navDirections) { this._applyNavDirections(value); return; }
+    if (key === CAR_SIGNALS.place) { this._applyPlaceGlance(value); return; }
     this._carBusAt = this._carSignalAt[key];
     // Drive-time bus load, surfaced through window.__perf() -> TelemetryBridge
     // .reportPerf -> logcat. The bus is almost silent parked, so this question
@@ -9010,6 +9109,141 @@ class Component extends DCLogic {
         this._syncAutoNightMode();
       }
       return;
+    }
+  }
+
+  _applyAaSession(value) {
+    const raw = String(value == null ? '' : value).trim().toLowerCase();
+    const next = raw === 'active' ? 'active' : 'stopped';
+    if (this._aaSession === next) return;
+    this._aaSession = next;
+    if (next !== 'active' && this._navLive && this._navLive.active) {
+      this._navLive = { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    }
+    this._queueNavRefresh(true);
+  }
+
+  _applyPlaceGlance(value) {
+    let obj = value;
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (!text) return;
+      try { obj = JSON.parse(text); } catch (e) { return; }
+    }
+    if (!obj || typeof obj !== 'object') return;
+    const city = String(obj.city == null ? '' : obj.city).trim();
+    const street = String(obj.street == null ? '' : obj.street).trim();
+    const prev = this._placeLive || { city: '', street: '' };
+    if (prev.city === city && prev.street === street) return;
+    this._placeLive = { city: city, street: street };
+    this._queueNavRefresh(true);
+  }
+
+  _applyNavDirections(value) {
+    const parsed = this._parseNavDirections(value);
+    if (!parsed) return;
+    const prev = this._navLive || { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    const same = !!prev.active === !!parsed.active
+      && prev.street === parsed.street
+      && prev.turn === parsed.turn
+      && prev.distance === parsed.distance
+      && prev.distanceM === parsed.distanceM
+      && prev.remainingM === parsed.remainingM
+      && prev.remainingS === parsed.remainingS;
+    if (same) return;
+    const identity = !!prev.active !== !!parsed.active
+      || prev.street !== parsed.street
+      || prev.turn !== parsed.turn;
+    this._navLive = parsed;
+    this._queueNavRefresh(identity);
+  }
+
+  /**
+   * Impulse publishes `{"active":false}` when guidance is off, and a full
+   * object while Maps is guiding. Malformed payloads are ignored so a bad
+   * frame cannot blank a live manoeuvre.
+   */
+  _parseNavDirections(value) {
+    if (value == null || value === '') return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    let obj = value;
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (!text) return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+      try { obj = JSON.parse(text); } catch (e) { return null; }
+    }
+    if (!obj || typeof obj !== 'object') return null;
+    const active = obj.active === true || obj.active === 'true' || obj.active === 1;
+    if (!active) return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    const street = String(obj.street == null ? '' : obj.street).trim();
+    const turn = String(obj.turn == null ? '' : obj.turn).trim();
+    const distanceM = this._carNumber(obj.distance_m);
+    const metres = isFinite(distanceM) ? Math.max(0, Math.round(distanceM)) : null;
+    let distance = String(obj.distance == null ? '' : obj.distance).trim();
+    if (!distance && metres != null) distance = formatNavMeters(metres);
+    const remainingMRaw = this._carNumber(obj.remaining_m);
+    const remainingSRaw = this._carNumber(obj.remaining_s);
+    const remainingM = isFinite(remainingMRaw) ? Math.max(0, Math.round(remainingMRaw)) : null;
+    const remainingS = isFinite(remainingSRaw) ? Math.max(0, Math.round(remainingSRaw)) : null;
+    return { active: true, street: street, distance: distance, distanceM: metres, turn: turn,
+      remainingM: remainingM, remainingS: remainingS };
+  }
+
+  _navTurnFamily(turn) {
+    const token = String(turn || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (!token) return 'straight';
+    if (token.indexOf('DESTINATION') >= 0) return 'destination';
+    if (token.indexOf('ROUNDABOUT') >= 0 || token.indexOf('ROTARY') >= 0) return 'roundabout';
+    if (token.indexOf('U_TURN') >= 0 || token === 'UTURN') return 'uturn';
+    if (token.indexOf('MERGE') >= 0) return 'merge';
+    if (token.indexOf('FORK') >= 0) return 'fork';
+    if (token.indexOf('EXIT') >= 0 || token.indexOf('OFF_RAMP') >= 0 || token.indexOf('OFFRAMP') >= 0) {
+      return 'exit';
+    }
+    if (token.indexOf('STRAIGHT') >= 0 || token.indexOf('CONTINUE') >= 0
+        || token === 'DEPART' || token.indexOf('NAME_CHANGE') >= 0) {
+      return 'straight';
+    }
+    if (token.indexOf('LEFT') >= 0) return 'turn_left';
+    if (token.indexOf('RIGHT') >= 0) return 'turn_right';
+    return 'straight';
+  }
+
+  _navTurnLabel(turn) {
+    return String(turn || '').replace(/_/g, ' ').trim().toUpperCase();
+  }
+
+  /**
+   * Identity (turn / street / active) commits immediately. Distance-only
+   * updates trail at 250 ms so a 1 Hz Impulse publish cannot rebuild the
+   * React tree faster than the native rail can paint.
+   */
+  _queueNavRefresh(immediate) {
+    if (this._unmounted) return;
+    if (immediate) {
+      clearTimeout(this._navRefreshTimer);
+      this._navRefreshTimer = 0;
+      this._navRefreshPending = false;
+      this._commitNavUi();
+      return;
+    }
+    if (this._navRefreshPending) return;
+    this._navRefreshPending = true;
+    this._navRefreshTimer = setTimeout(() => {
+      this._navRefreshTimer = 0;
+      this._navRefreshPending = false;
+      if (!this._unmounted) this._commitNavUi();
+    }, 250);
+  }
+
+  _commitNavUi() {
+    const mode = this._shellMode || this.state.shellMode;
+    const needsWidget = this._hasWidgetType(mode, 'navigation');
+    const sync = () => this._syncDockIndicators();
+    if (needsWidget) {
+      this._uiOnlyStateWrite = true;
+      this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }), sync);
+    } else {
+      sync();
     }
   }
 
@@ -20863,10 +21097,10 @@ class Component extends DCLogic {
     applyAxle(glows.rear, awd ? (flow.rear || 0) : 0, fit.rear, fit.rearTrack);
   }
 
-  // ?????? X-ray tyre contact bands ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  // ── X-ray tyre contact bands ──────────────────────────────────────────────
   //
   // An open cylinder (no caps) per corner, sized to the tyre, with a repeating
-  // arrow texture. Only the ground-contact arc is lit ??? the rest of the shell
+  // arrow texture. Only the ground-contact arc is lit — the rest of the shell
   // fades out by world Y. Colour and spin follow the same packed flow the
   // POWER card uses: blue with the tyre while that axle is driving, green
   // against it while regen, hidden when idle.
@@ -33725,22 +33959,158 @@ class Component extends DCLogic {
   }
 
   _navigationWidgetView(item) {
-    const demo = !!this._demoPreview;
+    this._ensureDemoNavTicker();
+    const live = this._navLive || { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    const session = this._aaSession === 'active';
+    const guiding = !!live.active;
+    const demo = !!this._demoPreview && !guiding && !session;
+    const demoFrame = DEMO_NAV_SEQUENCE[
+      Math.max(0, Number(this._demoNavPhase) || 0) % DEMO_NAV_SEQUENCE.length
+    ] || DEMO_NAV_SEQUENCE[0];
+    const demoIdle = !!(demo && demoFrame.idle);
+    const place = this._placeLive || { city: '', street: '' };
+    const family = demo && !demoIdle
+      ? (demoFrame.family || 'turn_right')
+      : (guiding ? this._navTurnFamily(live.turn) : 'turn_right');
+    const glyph = NAV_TURN_GLYPHS[family] || NAV_TURN_GLYPHS.turn_right;
+    const iconUrl = NAV_TURN_ICONS[family] || '';
+    const now = new Date();
+    let source, street, distance, remainingM, remainingS, cardState, showTurn;
+    if (demo && !demoIdle) {
+      source = 'DEMO · ROUTE PREVIEW';
+      street = demoFrame.street || '';
+      remainingM = demoFrame.remainingM;
+      remainingS = demoFrame.remainingS;
+      distance = formatNavMeters(demoFrame.distanceM);
+      cardState = family;
+      showTurn = true;
+    } else if (demoIdle) {
+      source = 'DEMO · NO GUIDANCE';
+      street = '';
+      distance = '';
+      remainingM = null;
+      remainingS = null;
+      cardState = 'idle';
+      showTurn = false;
+    } else if (guiding) {
+      source = 'ANDROID AUTO · LIVE';
+      street = live.street || this._navTurnLabel(live.turn) || 'GUIDING';
+      distance = live.distance || formatNavMeters(live.distanceM);
+      remainingM = live.remainingM;
+      remainingS = live.remainingS;
+      cardState = family;
+      showTurn = true;
+    } else if (session) {
+      source = 'ANDROID AUTO · NO GUIDANCE';
+      street = '';
+      distance = '';
+      remainingM = null;
+      remainingS = null;
+      cardState = 'idle';
+      showTurn = false;
+    } else {
+      source = 'NAVIGATION · NO ROUTE DATA';
+      street = '';
+      distance = '';
+      remainingM = null;
+      remainingS = null;
+      cardState = 'unavailable';
+      showTurn = false;
+    }
+    const metricSlots = Math.max(1, Math.min(3, Number(item.w) || 2));
+    let remaining = showTurn ? formatNavMeters(remainingM) : '';
+    let duration = showTurn ? formatNavDuration(remainingS) : '';
+    let eta = showTurn ? formatNavEta(remainingS, now) : '';
+    const metricCount = (remaining ? 1 : 0) + (duration ? 1 : 0) + (eta ? 1 : 0);
+    if (metricSlots <= 1) {
+      remaining = '';
+      duration = '';
+      eta = '';
+    } else if (metricCount > metricSlots && remaining && eta) {
+      duration = '';
+    }
+    const trip = [remaining, duration].filter(Boolean).join('  |  ');
+    const idlePrimary = place.city || (demoIdle ? 'SÃO PAULO' : '—');
+    const idleHint = place.street || (session ? 'NO GUIDANCE' : (demoIdle ? 'NO ROUTE IN PROGRESS' : 'OPEN NAVIGATION'));
+    const appPackage = (session || guiding) ? CAR_AA_PACKAGE : '';
+    const appIcon = appPackage ? this._navAppIcon(appPackage) : '';
     return {
       navigationSizeClass: 'hv-navigation-' + (item.w || 2) + 'x' + (item.h || 1),
-      navigationSource: demo ? 'DEMO · ROUTE PREVIEW' : 'NAVIGATION · NO ROUTE DATA',
-      navigationDistance: demo ? '450 m' : '—',
-      navigationHint: demo ? 'TURN RIGHT · 2 MIN' : 'OPEN NAVIGATION',
+      navigationLiveClass: showTurn ? 'is-live' : 'is-idle',
+      navigationSource: source,
+      navigationDistance: distance,
+      navigationStreet: street,
+      navigationTrip: trip,
+      navigationRemaining: remaining,
+      navigationDuration: duration,
+      navigationEta: eta,
+      navigationHasRemaining: !!remaining,
+      navigationHasDuration: !!duration,
+      navigationHasEta: !!eta,
+      navigationHint: street,
+      navigationIdlePrimary: idlePrimary,
+      navigationIdleHint: idleHint,
+      navigationTurnGlyph: (!iconUrl && showTurn) ? glyph : '',
+      navigationHasTurnGlyph: !!(!iconUrl && showTurn),
+      navigationHasTurnIcon: !!(iconUrl && showTurn),
+      navigationTurnStyle: (iconUrl && showTurn)
+        ? ('-webkit-mask-image:url(' + iconUrl + ');mask-image:url(' + iconUrl + ')')
+        : '',
+      navigationShowTurn: showTurn,
+      navigationHasAppIcon: !!appIcon,
+      navigationAppIcon: appIcon,
+      navigationCardState: cardState,
+      navigationCardGlyph: showTurn ? glyph : '',
+      navigationAppPackage: appPackage,
       onNavigationOpen: (ev) => {
         this._cardControlEvent(ev);
         if (this._widgetSuppressClick || this.state.widgetMenuId) return;
-        try {
-          if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
-            window.AppLauncherBridge.launchAppInPopup(CAR_NAV_PACKAGE);
-          }
-        } catch (e) {}
+        this._openNavigationApp();
       },
     };
+  }
+
+  _navAppIcon(pkg) {
+    if (!pkg) return '';
+    if (Object.prototype.hasOwnProperty.call(this._navAppIconByPkg || {}, pkg)) {
+      return this._navAppIconByPkg[pkg];
+    }
+    let url = '';
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.getAppIcon === 'function') {
+        url = window.AppLauncherBridge.getAppIcon(pkg) || '';
+      }
+    } catch (e) {}
+    if (!this._navAppIconByPkg) this._navAppIconByPkg = {};
+    this._navAppIconByPkg[pkg] = url;
+    return url;
+  }
+
+  _ensureDemoNavTicker() {
+    if (this._demoNavTicker || !this._demoPreview || typeof setInterval !== 'function') return;
+    this._demoNavTicker = setInterval(() => {
+      if (this._unmounted || !this._demoPreview) return;
+      if (this._aaSession === 'active') return;
+      if (this._navLive && this._navLive.active) return;
+      this._demoNavPhase = (Number(this._demoNavPhase) || 0) + 1;
+      this.setState((state) => ({ widgetRev: (state.widgetRev || 0) + 1 }), () => {
+        if (this._unmounted) return;
+        this._syncDockIndicators();
+      });
+    }, DEMO_NAV_INTERVAL_MS);
+  }
+
+  _openNavigationApp() {
+    try {
+      const B = window.AppLauncherBridge;
+      if (!B) return;
+      if (this._aaSession === 'active') {
+        if (typeof B.launchProjection === 'function') B.launchProjection('AA');
+        else if (typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_AA_PACKAGE);
+        return;
+      }
+      if (typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_NAV_PACKAGE);
+    } catch (e) {}
   }
 
   _tiresWidgetView(item) {
@@ -35022,11 +35392,7 @@ class Component extends DCLogic {
         this._openFocusedCard('power');
         break;
       case 'openNavigation':
-        try {
-          if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
-            window.AppLauncherBridge.launchAppInPopup(CAR_NAV_PACKAGE);
-          }
-        } catch (e) {}
+        this._openNavigationApp();
         break;
       case 'cycleDriveMode':
         this._cycleDriveRoadMode();
@@ -35071,7 +35437,8 @@ class Component extends DCLogic {
     const consumptionSummary = consumption.consumptionSource.indexOf('VEHICLE') === 0
       ? consumption.consumptionFuel + ' L/100 · ' + consumption.consumptionEv + ' kWh'
       : (this._demoPreview ? 'DEMO · ' + consumption.consumptionFuel + ' L/100' : 'No current vehicle data');
-    const navigation = this._navigationWidgetView({ type: 'navigation', w: 2, h: 1 });
+    // Rail tiles are wider than a 2-col widget: send remaining + time + ETA.
+    const navigation = this._navigationWidgetView({ type: 'navigation', w: 3, h: 1 });
     const range = this._rangeWidgetView({ type: 'range', w: 2, h: 1 });
     const power = this._powerWidgetView({ type: 'power', w: 2, h: 1 });
     const status = this._statusWidgetView({ type: 'status', w: 2, h: 1 });
@@ -35146,7 +35513,9 @@ class Component extends DCLogic {
       progress: Math.round((roofSun + roofShade) / 2),
     };
     const bottomValues = {
-      navigation: navigation.navigationDistance + ' · ' + navigation.navigationHint,
+      navigation: navigation.navigationStreet
+        ? (navigation.navigationDistance + ' · ' + navigation.navigationStreet)
+        : (navigation.navigationIdlePrimary + ' · ' + navigation.navigationIdleHint),
       climate: climateSummary,
       consumption: consumptionSummary,
       media: media.mediaTitle,
@@ -35168,11 +35537,21 @@ class Component extends DCLogic {
     // preserving compatibility with older native shells.
     const bottomVisuals = {
       navigation: {
-        primary: navigation.navigationDistance,
-        secondary: navigation.navigationHint,
-        metricA: navigation.navigationSource,
-        metricB: '',
-        progress: this._demoPreview ? 68 : 0,
+        primary: navigation.navigationShowTurn
+          ? navigation.navigationStreet
+          : navigation.navigationIdlePrimary,
+        secondary: navigation.navigationShowTurn
+          ? navigation.navigationTrip
+          : navigation.navigationIdleHint,
+        metricA: navigation.navigationDistance,
+        metricB: navigation.navigationEta,
+        navRemaining: navigation.navigationRemaining || '',
+        navDuration: navigation.navigationDuration || '',
+        navEta: navigation.navigationShowTurn ? (navigation.navigationEta || '') : '',
+        progress: this._demoPreview && navigation.navigationShowTurn ? 68 : 0,
+        state: navigation.navigationCardState,
+        glyph: navigation.navigationCardGlyph,
+        appPackage: navigation.navigationAppPackage || '',
       },
       climate: {
         primary: this._demoPreview ? '22°' : '—°',
