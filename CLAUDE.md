@@ -1338,6 +1338,73 @@ only a live stream works. And keys arriving at the viewer WITHOUT a matching
 `onDataChanged` are Impulse cache replays, not live events — they land within
 ~400 ms of a "Telemetry snapshot requested" line, which is how to tell.
 
+## The navigation card's idle city needs a NETWORK geocoder, not the platform one
+
+The card has two halves and they arrive by different routes. **TBT is fine and
+was never the problem** — `app.androidauto.session` and
+`app.navigation.directions` are Impulse keys on the same `EVENT_CHANGED` bus as
+everything else, and both land. Verified on the car 2026-09-11 with a snapshot
+request:
+
+```
+H6Viewer: CarSignal ... key=app.androidauto.session   value=stopped
+H6Viewer: CarSignal ... key=app.navigation.directions value={"active":false}
+```
+
+The IDLE half — the city / street shown when nothing is guiding — is
+`app.location.place`, which the viewer publishes to itself from `PlaceGlance`.
+It was arriving never, for two independent reasons, and the card's honest
+fallback for that is `—`. Both are worth knowing because both look like nothing:
+
+- **A manifest `<uses-permission>` for location is not a grant.** targetSdk is
+  28, so `ACCESS_FINE/COARSE_LOCATION` is a RUNTIME permission, and
+  `MainActivity` requested only `RECORD_AUDIO`. `PlaceGlance.pollOnce` therefore
+  returned on its first line on every 45 s tick, silently, forever. The tell is
+  one line of `dumpsys package com.havalh6.viewer`:
+
+  ```
+  runtime permissions:
+    android.permission.RECORD_AUDIO: granted=true
+  ```
+
+  `ensurePlaceLocationPermission()` now asks once at startup. A denial is not
+  retried.
+
+- **`android.location.Geocoder` does not work on this MMI**, and it fails in the
+  most misleading way available: `Geocoder.isPresent()` returns **true**, and
+  then every `getFromLocation` throws `Service not Available`. The reason is in
+  `dumpsys location`:
+
+  ```
+  Overlay Provider Packages:
+    network: null
+  ```
+
+  The geocode backend is supplied by whichever package implements the NETWORK
+  location provider, and nothing here does — GMS on this unit is ReVanced-patched
+  (`app.revanced.android.gms`) and registers neither. This is permanent, not a
+  transient bind failure, so retrying buys nothing.
+
+GPS itself is healthy and is NOT the missing piece: `dumpsys location` reports a
+real fix with `hAcc=1` and 7 satellites. Only lat/lon -> name was missing.
+
+`PlaceGlance` now tries the platform geocoder once, latches it off on failure
+(`platformGeocoderDead`), and reverse-geocodes over HTTPS instead. Three things
+that path has to keep right:
+
+- **Gate it on movement, not just on the 45 s tick.** `REGEOCODE_MIN_MOVE_M`
+  (120 m) skips the request when the car has not left the block, which keeps a
+  parked unit off the network entirely and a moving one far inside Nominatim's
+  1 req/s policy. Its usage terms also require an identifying `User-Agent`.
+- **Nominatim's `address` object has no fixed shape.** Which key carries "where
+  you are" depends on how the area was mapped, so walk them most-local-first —
+  the same order the platform path walks `subLocality -> locality ->
+  subAdminArea`. Measured at the car's own fix, `suburb: "a suburb"` is the
+  useful answer and `town: "an administrative region"` is an administrative region
+  nobody says out loud.
+- **Staying silent is correct when it fails.** Offline, the card shows `—`
+  rather than a stale or invented city.
+
 ## Media visualisers
 
 They have **no audio input**. `_graphVizLevel` derives its level from EV power

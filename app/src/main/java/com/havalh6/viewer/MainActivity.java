@@ -433,6 +433,10 @@ public final class MainActivity extends Activity {
                 } catch (Throwable t) {
                     Log.w(TAG, "mediaNowPlaying.start failed", t);
                 }
+                // Here rather than at WebView setup: a permission dialog raised
+                // during onCreate lands on top of the boot splash clip, which
+                // holds for ~18-22 s. This fires once the car is on screen.
+                ensurePlaceLocationPermission();
             });
         }
 
@@ -982,6 +986,9 @@ public final class MainActivity extends Activity {
     private static final int REQ_MEDIA_VIZ_AUDIO = 7101;
     /** Avoid re-prompting every play/pause after the user denies RECORD_AUDIO. */
     private boolean mediaVizPermissionAsked;
+    private static final int REQ_PLACE_LOCATION = 7102;
+    /** onViewerReady fires again on post-boot loads; ask for location only once. */
+    private boolean placeLocationAsked;
     /**
      * The last now-playing payload, replayed after the rail is rebuilt.
      *
@@ -1335,10 +1342,52 @@ public final class MainActivity extends Activity {
         mediaAudioViz.setWanted(true);
     }
 
+    /**
+     * Ask for location, once, for the navigation card's idle city line.
+     *
+     * targetSdk is 28, so ACCESS_*_LOCATION is a RUNTIME grant — declaring it
+     * in the manifest is not enough. It was declared and never requested, so
+     * PlaceGlance returned on its first line on every 45 s tick and the card
+     * sat at an em dash forever. Measured on the car 2026-09-11: the only
+     * runtime permission the viewer held was RECORD_AUDIO.
+     *
+     * A denial is not retried — the glance is a nicety, and re-prompting on
+     * every launch would be worse than the em dash.
+     */
+    private void ensurePlaceLocationPermission() {
+        if (placeLocationAsked) return;
+        placeLocationAsked = true;
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        try {
+            requestPermissions(new String[]{
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            }, REQ_PLACE_LOCATION);
+        } catch (Throwable t) {
+            Log.w(TAG, "location permission request failed", t);
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions,
             int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQ_PLACE_LOCATION) {
+            boolean granted = false;
+            for (int result : grantResults) {
+                if (result == android.content.pm.PackageManager.PERMISSION_GRANTED) granted = true;
+            }
+            Log.w(TAG, "PlaceGlance location permission " + (granted ? "granted" : "denied"));
+            // The worker is already ticking; poke it so the city does not wait
+            // out the remainder of the current 45 s gap.
+            if (granted && placeGlance != null) placeGlance.pokeNow();
+            return;
+        }
         if (requestCode != REQ_MEDIA_VIZ_AUDIO) return;
         boolean granted = grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
