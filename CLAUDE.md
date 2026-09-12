@@ -1249,13 +1249,40 @@ but ignores the set).
 **Do not** send a bare Android `stop` over the car's root telnet while probing
 — that tears down zygote; recover with `start`.
 
-**Installing that fix needs the release keystore.** Impulse on the car is signed
-`7e00ad11...`; a plain `assembleDebug` is signed with the Android debug key
-(`6a44a729...`) and Android will not upgrade across signers. Installing a debug
-build means uninstalling first, which wipes Impulse's settings -- bottom bar,
-cluster themes, overscan, Shizuku grant. Build `assembleRelease` with
-`SIGNING_STORE_PASSWORD` / `SIGNING_KEY_ALIAS` / `SIGNING_KEY_PASSWORD` and
-`app/release.keystore` in place, then `adb install -r`.
+**Installing Impulse does NOT need a release keystore — `assembleDebug` is
+correct.** Corrected 2026-09-11; the previous note here sent a session hunting
+for a keystore that was never involved.
+
+`7e00ad11...` is not a release signer. Read the certificate rather than assuming:
+
+```bash
+adb pull "$(adb shell pm path br.com.redesurftank.havalshisuku | sed 's/^package://')" impulse-on-car.apk
+"$LOCALAPPDATA/Android/Sdk/build-tools/36.1.0/apksigner.bat" verify --print-certs impulse-on-car.apk
+```
+
+That prints `CN=Android Debug`, SHA-256 `7e00ad11a25d1e24c7ea609123510b332b663cf0a3f655219666c2209533ee2a`
+— which is **this machine's `~/.android/debug.keystore`** (`keytool -list -v
+-keystore ~/.android/debug.keystore -storepass android` matches it exactly). So
+`./gradlew assembleDebug` here reproduces the same signer and `pm install -r`
+upgrades IN PLACE: bottom bar, cluster themes, overscan and the Shizuku grant
+all survive. There is no `app/release.keystore` in the repo and the
+`SIGNING_*` env vars are unset, so `assembleRelease` cannot be built anyway.
+
+`6a44a729` was presumably a different machine's debug key. Debug keystores are
+per-machine, so **the only safe check is to compare fingerprints**, never to
+assume "debug" means one fixed key.
+
+Two practical notes. `adb install` stalls silently on this unit — push then
+`pm install` instead, with the Autolink installer identity:
+
+```bash
+adb push app/build/outputs/apk/debug/app-debug.apk /data/local/tmp/impulse.apk
+adb shell pm install -r -i com.autolink.installer /data/local/tmp/impulse.apk
+```
+
+And the APK is ~135 MB, so the push takes ~80 s at the LAN's ~1.7 MB/s. Pull
+the installed APK BEFORE upgrading: it is signed with the same key, so it is a
+one-command rollback.
 
 ### Hazard is not on the Android side at all (measured 2026-09-11)
 
