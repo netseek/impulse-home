@@ -30,8 +30,8 @@ function method(source, name) {
 assert.ok(html.includes("{ id: 'power', title: 'Power flow', action: 'openPower' }"));
 assert.ok(html.includes("power: { label: 'POWER', title: 'Energy flow'"));
 assert.ok(html.includes("[3, 2]"), '3x2 Power widget size is required');
-assert.equal((html.match(/value="\{\{ wg\.isPower \}\}"/g) || []).length, 2,
-  'Power widget markup must exist on both boards');
+assert.equal((html.match(/value="\{\{ wg\.isPower \}\}"/g) || []).length, 1,
+  'Power widget markup must exist on the widget board');
 assert.ok(html.includes('focusedCardIsPower'));
 assert.ok(html.includes('class="hv-power-focus"'));
 assert.ok(html.includes("case 'openPower':\n        this._openFocusedCard('power');"));

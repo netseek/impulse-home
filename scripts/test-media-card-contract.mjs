@@ -292,15 +292,15 @@ assert.match(itemView, /item\.type === 'media' \? ' has-controls' : ''/,
   'the media widget must mark itself has-controls');
 
 // ---------------------------------------------------------------------------
-// 7. The widget markup is duplicated per board, and the popup is not.
+// 7. One widget board carries the media block, and so does the one popup.
 // ---------------------------------------------------------------------------
 const widgetBlocks = html.match(/<sc-if value="\{\{ wg\.isMedia \}\}"/g) || [];
-assert.equal(widgetBlocks.length, 2,
-  'the left and right widget boards each need the media block — they are separate markup');
+assert.equal(widgetBlocks.length, 1,
+  'the full-size widget board needs exactly one media block');
 const popupBlocks = html.match(/<sc-if value="\{\{ focusedCardIsMedia \}\}"/g) || [];
 assert.equal(popupBlocks.length, 1, 'the popup is one shared frame, so it carries one media block');
 
-// Both boards must render the SAME card, not two that drift.
+// The board's copy of the card, sliced out for the control checks below.
 const boardCopies = html.split('<sc-if value="{{ wg.isMedia }}"').slice(1)
   // The delimiter must not care about line endings: this file is checked out
   // with LF on some machines and CRLF on others, and a hardcoded \r\n sliced
@@ -313,10 +313,8 @@ const boardCopies = html.split('<sc-if value="{{ wg.isMedia }}"').slice(1)
     return chunk.slice(0, end < 0 ? chunk.length : end + '</sc-if>'.length)
       .replace(/\s+/g, ' ').trim();
   });
-assert.equal(boardCopies[0], boardCopies[1],
-  'the two board copies of the media widget have drifted apart');
-assert.ok(boardCopies.length === 2 && boardCopies.every((copy) => copy.length > 400),
-  'both board copies of the media widget must be found, not sliced to nothing');
+assert.ok(boardCopies.length === 1 && boardCopies[0].length > 400,
+  'the board copy of the media widget must be found, not sliced to nothing');
 
 // Every control the widget offers must carry the disabled flag.
 for (const field of ['wg.mediaPrev', 'wg.mediaNext', 'wg.mediaPlayPause']) {

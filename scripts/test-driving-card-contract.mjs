@@ -108,7 +108,7 @@ assert.match(html, /const H6_DRIVING_LEGACY_WIDGET_TYPES = \{ modes: 'driving' \
   'retired widget types must be named');
 includesAll(blockFrom(html, '  _migrateRetiredWidgetTypes(layout) {', 'widget migration'),
   ['H6_DRIVING_LEGACY_WIDGET_TYPES[item.type]', 'item.type = next'], 'retype in place');
-includesAll(blockFrom(html, '  _parseWidgetLayout(raw) {', 'layout parser'),
+includesAll(blockFrom(html, '  _parseWidgetLayout(raw, fromMode) {', 'layout parser'),
   ['this._migrateRetiredWidgetTypes(parsed)'], 'migration runs on every load');
 // MODES is gone: two widgets offering the same four groups, one of them unusable
 // on the light board, is the worse outcome.
@@ -263,17 +263,17 @@ includesAll(blockFrom(html, '  _drivingEspModel(', 'esp model'),
   ['on: on && (known || preview)', 'onToggle:'], 'ESP exposes a toggle');
 
 // ---------------------------------------------------------------------------
-// 6. Markup. The card renders on both widget boards, the popup renders the
-//    group list, and the picker offers the type.
+// 6. Markup. The card renders on the one full-size widget board, the popup
+//    renders the group list, and the picker offers the type.
 // ---------------------------------------------------------------------------
-assert.equal(html.split('<sc-if value="{{ wg.isDriving }}"').length - 1, 2,
-  'the Driving card must render on both widget boards');
-assert.equal(html.split('class="hv-driving {{ wg.drivingSizeClass }}"').length - 1, 2,
-  'both boards must size the Driving card from the item');
+assert.equal(html.split('<sc-if value="{{ wg.isDriving }}"').length - 1, 1,
+  'the Driving card must render on the widget board');
+assert.equal(html.split('class="hv-driving {{ wg.drivingSizeClass }}"').length - 1, 1,
+  'the board must size the Driving card from the item');
 // Three rows contain an option called "Normal" and two contain "Sport", so the
 // drive row carries each mode's own glyph beside the word.
-assert.equal(html.split('class="hv-driving-chip-icon"').length - 1, 2,
-  'both boards must render the chip icon');
+assert.equal(html.split('class="hv-driving-chip-icon"').length - 1, 1,
+  'the board must render the chip icon');
 assert.match(html, /hasIcon: !!opt\.glyph/, 'chips take an optional leading icon');
 includesAll(blockFrom(html, '  _drivingOptionGlyph(key, value, selected) {', 'option glyph'), [
   "key === 'car.drive_setting.drive_mode'",
@@ -426,9 +426,10 @@ for (const fn of ['  _applyCarMode(stateKey, value) {', '  _setCarMode(stateKey,
 }
 assert.ok(html.split('this._uiOnlySetState({').length - 1 >= 3,
   'the UI-only path must still be in use (a floor, not an exact count)');
-// The popup centres on the band the dock leaves rather than hugging the top.
-includesAll(html, ['.hv-card-focus.fit.on { transform:translate(-50%,-50%) scale(1); }'],
-  'the popup centres vertically');
+// The popup centres vertically on the band the dock leaves, and sits on the
+// shared left edge (nearest the driver) rather than the panel centre.
+includesAll(html, ['.hv-card-focus.fit.on { transform:translate(0,-50%) scale(1); }', 'left:var(--hv-popup-left, 24px)'],
+  'the popup centres vertically on the left edge');
 // The head printed the value the selected tile already shows. The toggles keep
 // their ON/OFF: a two-state control has to say which way it is set, and a lit
 // border alone does not.

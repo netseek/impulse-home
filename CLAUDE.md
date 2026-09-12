@@ -325,8 +325,8 @@ on another. **See `docs/ui-surfaces.md` for the full contract.** The short form:
 | Term | Where | Drawn by |
 | --- | --- | --- |
 | **card** | the launcher rail along the bottom | **native Android**, not HTML |
-| **widget** | the reserved boards left/right of the car | the WebView |
-| **popup** | floating over everything | the WebView |
+| **widget** | the one full-size board; the car takes its rightmost free columns | the WebView |
+| **popup** | floating over everything, anchored on the left edge | the WebView |
 
 Three traps worth knowing before you touch any of them:
 
@@ -334,8 +334,12 @@ Three traps worth knowing before you touch any of them:
   card id and anything with no `case` falls through to a generic progress ring.
   Adding an id to `H6_BOTTOM_CARD_CATALOG` without adding its `case` ships a
   card that looks blank, and no web-side test or screenshot will catch it.
-- **Widget board markup is duplicated.** The left and right boards each carry a
-  full copy, so every `<sc-if value="{{ wg.isX }}">` block has to be added twice.
+- **There is one widget board, but thumbnail markup is duplicated.** The old
+  left/right boards (and the `triple` layout) are gone; `_migrateLayoutToFull`
+  folds saved layouts. The picker thumbnail block exists twice — the on-board
+  picker and Layout manager → Widgets — both fed by `_widgetThumbItems`.
+  `appCar` is still the stored/sent key for the one layout; Side by Side
+  (`appsOnly`) is a launcher tile, not a desktop setting.
 - **A popup needs no second builder.** `_focusedCardRenderFields` re-exports any
   widget-view key starting with the card type, prefixed with `focused`. Build the
   popup's data in the widget view builder and let the prefixing carry it.

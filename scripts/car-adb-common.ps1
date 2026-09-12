@@ -85,6 +85,9 @@ function Install-CarApk([string]$Adb, [string]$Serial, [string]$Apk) {
 function Grant-CarMediaAccess([string]$Adb, [string]$Serial) {
   $callerEap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
+  # The MEDIA rail bars read the output mix (Visualizer, session 0). The app no
+  # longer prompts for RECORD_AUDIO on the panel, so it is granted here.
+  $null = & $Adb -s $Serial shell pm grant com.havalh6.viewer android.permission.RECORD_AUDIO 2>&1
   $current = & $Adb -s $Serial shell settings get secure enabled_notification_listeners 2>&1 | Out-String
   $ErrorActionPreference = $callerEap
   if ($current -match [regex]::Escape($CarMediaListener)) {

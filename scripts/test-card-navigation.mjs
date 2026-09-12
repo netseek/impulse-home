@@ -65,7 +65,7 @@ assert.ok(!html.includes("{ id: 'consumption', title: 'Consumption', action: 'ad
 assert.ok(!html.includes("{ id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' }"), 'Vehicle status must not open Desktop Studio');
 
 // CoffeeOS-style glance widgets remain page-owned cards: they are selectable
-// from the visual picker and render in both widget boards.
+// from the visual picker and render on the widget board.
 includesAll(html, [
   "profile: { label: 'PROFILE'",
   "clock: { label: 'CLOCK'",
@@ -157,29 +157,28 @@ includesAll(method('_openRangeCard'), ["this._openFocusedCard('range')", 'this.s
 includesAll(method('_setRangeDistanceUnit'), ["localStorage.setItem('h6_range_unit', unit)", 'widgetRev'], 'range unit preference');
 includesAll(html, ['aria-label="Distance unit"', '>KM</button>', '>MI</button>'], 'range unit controls');
 
-// Studio separates placement from bottom-bar management. The latter is one
-// ordered enabled-first list, and no longer lets a second display-limit value
-// hide cards that the user just enabled.
-includesAll(html, ['>Layout &amp; widgets</button>', '>Bottom bar</button>', 'aria-label="Help"', 'studioBottomCardItems', 'Full area · car on right'], 'studio flow');
+// The Layout manager: a Desktops strip, and one frame for Cards & widgets. Cards is the enabled list itself, in rail
+// order, with no second display-limit value hiding cards the user just enabled.
+includesAll(html, ['class="hv-studio-segtabs"', '>Cards</button>', '>Widgets</button>',
+  'list="{{ desksItems }}"', 'list="{{ studioAvailCards }}"', 'list="{{ studioWidgetItems }}"'], 'layout manager screens');
 const studioFields = method('_desktopRenderFields');
-includesAll(studioFields, ['studioIsLayout:', 'studioWidgetSummary:', 'studioBottomCardItems: H6_BOTTOM_CARD_CATALOG.slice().sort', 'leftDisabled: !enabled'], 'studio and bottom-bar ordering');
-assert.ok(!studioFields.includes('studioIsWidgets:'), 'Widgets should be merged into Layout & widgets');
+includesAll(studioFields, ['desksItems:', 'studioIsLayout:', 'studioIsCards:', 'studioIsWidgets:', 'studioIsAppearance:',
+  'this._studioCardFields(s, bottomCards,'], 'layout manager fields');
 assert.ok(!studioFields.includes('studioBottomLimitItems:'), 'enabled cards must not have a separate display limit');
+includesAll(method('_studioCardFields'), ['bottomCards.indexOf(card.id) < 0', 'this._addBottomCardLast(card.id)'], 'cards tab offers only cards not on the rail');
 
-// Creating a destination needs a usable large card in the layout it opens,
-// not only in the triple-layout template.
+// Creating a destination needs a usable large card on the board it opens.
 // Any popup-backed card can choose its destination, and the focused desktop is
 // named after the workspace it hosts rather than a two-way ternary that called
 // everything past Climate 'Consumption'.
-includesAll(html, ['const H6_CARD_POPUP_TYPES = {', 'const canSetDestination = !!focusType;',
-  'this._setCardAction(focusType,'], 'destination chooser');
+includesAll(html, ['const H6_CARD_POPUP_TYPES = {', 'H6_CARD_FOCUS_TYPES.indexOf(type) < 0'], 'card destinations');
 assert.ok(!html.includes("['climate', 'consumption'].indexOf(card.id) >= 0"),
   'the destination chooser must not be hardcoded to two cards');
 includesAll(method('_createFocusedCardDesktop'), [
   "w: 2, h: 2",
   "this._widgetCatalog()[type]",
   "layout.appCar.left = { use: 'widgets'",
-  "d.shellMode = 'appCar'",
+  "this._desktopSnapshot(name, null, layout)",
   "desktopId: d.id",
 ], 'focused desktop');
 
@@ -266,12 +265,12 @@ includesAll(htmlRoot, [
   'NAV_TURN_ICONS',
   './assets/ui/tbt/right.svg',
 ], 'AA icon + place glance wiring');
-assert.equal((htmlRoot.match(/class="hv-navigation-tbt"/g) || []).length, 2,
-  'TBT strip must exist on both widget boards');
-assert.equal((htmlRoot.match(/class="hv-navigation-metrics"/g) || []).length, 2,
-  'GMaps metric row must exist on both widget boards');
-assert.equal((htmlRoot.match(/class="hv-nav-app-icon"/g) || []).length, 2,
-  'AA icon must exist on both widget boards');
+assert.equal((htmlRoot.match(/class="hv-navigation-tbt"/g) || []).length, 1,
+  'TBT strip must exist on the widget board');
+assert.equal((htmlRoot.match(/class="hv-navigation-metrics"/g) || []).length, 1,
+  'GMaps metric row must exist on the widget board');
+assert.equal((htmlRoot.match(/class="hv-nav-app-icon"/g) || []).length, 1,
+  'AA icon must exist on the widget board');
 includesAll(method('_parseNavDirections'), [
   'obj.active',
   'obj.street',
@@ -302,10 +301,10 @@ includesAll(dock, [
   'navEta: navigation.navigationShowTurn',
   "{ type: 'navigation', w: 3, h: 1 }",
 ], 'native rail TBT payload');
-assert.equal((htmlRoot.match(/d="\{\{ wg\.navigationTurnGlyph \}\}"/g) || []).length, 2,
-  'turn glyph fallback must exist on both widget boards');
-assert.equal((htmlRoot.match(/class="hv-navigation-turn-icon"/g) || []).length, 2,
-  'minimalist TBT mask icon must exist on both widget boards');
+assert.equal((htmlRoot.match(/d="\{\{ wg\.navigationTurnGlyph \}\}"/g) || []).length, 1,
+  'turn glyph fallback must exist on the widget board');
+assert.equal((htmlRoot.match(/class="hv-navigation-turn-icon"/g) || []).length, 1,
+  'minimalist TBT mask icon must exist on the widget board');
 assert.ok(java.includes('case "navigation": drawNavigation'));
 assert.ok(java.includes('sanitizeNavigationState'));
 assert.ok(java.includes('ic_tbt_turn_right'));
