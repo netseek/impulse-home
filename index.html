@@ -8205,11 +8205,22 @@ class Component extends DCLogic {
       fastOffMargin: 0.25,
       minBlurKmh: 8,          // never blur at parking speeds
       // A low-opacity smear laid over the STILL-SHARP rim, easing in from
-      // preBlendFromKmh up to the fade. It does not take the spokes away at a
-      // speed where the driver expects to see them; it low-passes the angular
-      // detail that is what actually judders, in the 12-27 km/h band the
-      // handover alone cannot reach. preBlend: 0 restores the hard-zero floor.
-      preBlend: 0.28,
+      // preBlendFromKmh up to the fade, meant to low-pass the angular detail
+      // that judders in the 12-27 km/h band the handover cannot reach.
+      //
+      // OFF (0), because on the car it read as WOBBLE. The geometry says why,
+      // and it was predictable without a measurement: the sprite is a 57.6 deg
+      // ARC smear, so its apparent angular position sits ~arc/2 (~29 deg) away
+      // from the sharp rim it is drawn over. Both roll together, so what you
+      // see is a second rim locked ~29 deg off the real one -- a doubled,
+      // out-of-phase wheel, not a softened one. Blur only helps once it has
+      // REPLACED the rim, which is what the fade above does.
+      //
+      // A speed-scaled arc would fix it in principle (~9 deg of smear at
+      // 20 km/h, matching the real per-frame travel) but the arc is baked into
+      // the capture, so that needs an arc LADDER with debounced re-capture --
+      // real work, not a tunable. Do not just raise this value.
+      preBlend: 0,
       preBlendFromKmh: 12,
       // Blur arc as a fraction of the repeat period. CLAUDE.md: the arc has
       // to stay UNDER the spoke pitch or the smear is axisymmetric and the
@@ -8235,38 +8246,50 @@ class Component extends DCLogic {
       // Costs 35 ms/capture against 10.6 ms single-layer (a second scene render
       // plus two readbacks). That is fine because _requestBlurCapture debounces
       // it — but it is one capture, not one per frame, so keep it that way.
-      // Turn on from devtools with __wheelSpin({ twoLayer: true }).
+      // Turn off from devtools with __wheelSpin({ twoLayer: false }).
       //
-      // OFF, because measured on the car 2026-09-11 it leaves the highlight
-      // ORBITING — the symptom the file elsewhere calls "reads as a wheel out
-      // of balance". This is the device measurement the two-layer section of
-      // CLAUDE.md said it had never had.
+      // ON, and READ THE NEXT PARAGRAPH BEFORE TURNING IT OFF AGAIN. It was
+      // switched off on 2026-09-11 on the strength of a STILL-FRAME measurement
+      // and had to be switched straight back on, because the moving wheel
+      // wobbled visibly worse. This is the trap the "Measuring wheel changes
+      // without fooling yourself" section warns about, walked into again:
+      // a measurement that looked rigorous was believed over what the panel
+      // plainly showed.
       //
-      // Method: park the FL wheel at roll 0 and roll 120 deg, frame it down its
-      // own axle (_introActive = true, or _tickFitCamera re-applies the layout
-      // view offset between placing the camera and the screencap), screencap
-      // both, and take the FIRST ANGULAR HARMONIC of the lip's brightness. h1
-      // IS the "one bright side" term; its PHASE is where the highlight sits.
-      // A static highlight shifts 0 deg while the wheel turns 120.
+      // The measurement, for the record, because the NUMBERS are probably fine
+      // and only the INFERENCE was wrong: park the FL wheel at roll 0 and roll
+      // 120 deg, frame it down its own axle (_introActive = true, or
+      // _tickFitCamera re-applies the layout view offset between placing the
+      // camera and the screencap), and take the first angular harmonic of the
+      // lip's brightness. h1 is the "one bright side" term and its PHASE is
+      // where the highlight sits; a static highlight shifts 0 deg while the
+      // wheel turns 120:
       //
       //   radial band     two-layer          single + uLobeTex
       //   0.35-0.60       +47 deg            -21 deg
       //   0.60-0.82       -169 deg           -26 deg
       //   0.82-0.97 lip   -112 deg           -22 deg
       //
-      // Two-layer also PULSES: h1 amplitude 0.056 -> 0.121 and 0.143 -> 0.049
+      // Two-layer also pulses: h1 amplitude 0.056 -> 0.121 and 0.143 -> 0.049
       // between the same two frames, against 0.102 -> 0.102 and 0.099 -> 0.117
-      // for single-layer. The single-layer path is not merely dimmer, it STAYS
-      // PUT, which is the whole point of the exercise.
+      // for single-layer.
       //
-      // Why: the two-layer path deliberately gates uLobeTex off (applying it to
-      // only the lit half would corrupt the lit/flat ratio), but its own ratio
-      // layer does not neutralise the lip's h1 — so with twoLayer on, NOTHING
-      // corrects the brightest, most visible band. uLobeTex is the correction
-      // actually built for this, per angle AND per radius.
+      // Why that did not translate: TWO STILL FRAMES CANNOT SEE WOBBLE. They
+      // measure where the highlight sits at two instants, not what the eye
+      // integrates over a turn at 14-50 fps. Whatever single-layer does between
+      // those samples -- the uLobeTex division is clamped and unbounded
+      // division here has blown this sprite out before -- costs more than the
+      // orbiting h1 it removes. If you want to revisit this, measure a VIDEO of
+      // a turning wheel, not a pair of stills, and check it against the panel
+      // before changing the default.
       //
-      // Do not switch this back on without re-running that table.
-      twoLayer: false,
+      // The open question this leaves, worth stating so nobody re-derives it:
+      // the two-layer path deliberately gates uLobeTex off (applying it to only
+      // the lit half would corrupt the lit/flat ratio), so with twoLayer on,
+      // nothing corrects the lip's h1 -- and that h1 IS real and IS orbiting.
+      // It just is not what the eye objects to. Fixing it properly means making
+      // the ratio layer cover the lip, not swapping paths wholesale.
+      twoLayer: true,
       // Flip if the lighting layer counter-rotates the wrong way on a model.
       lightRollSign: 1,
       // What to do about the static brake/hub showing through the sprite's
