@@ -10554,11 +10554,58 @@ public final class MainActivity extends Activity {
         return label != null ? label.toString() : "";
     }
 
+    /**
+     * Our bundled mark for a projection package, or null for anything else.
+     *
+     * CarPlay is matched first because ProjectionPresence.isProjectionPackage
+     * answers true for both families, so an unordered test would hand a CarPlay
+     * package the Android Auto drawable.
+     */
+    private Bitmap projectionIconBitmap(String packageName) {
+        if (!ProjectionPresence.isProjectionPackage(packageName)) return null;
+        boolean carPlay = packageName.toLowerCase().contains("carplay");
+        Drawable icon = null;
+        if (projectionPresence != null) {
+            icon = projectionPresence.iconFor(
+                    carPlay ? ProjectionPresence.Kind.CARPLAY
+                            : ProjectionPresence.Kind.ANDROID_AUTO);
+        }
+        if (icon == null) {
+            try {
+                icon = getDrawable(carPlay ? R.drawable.ic_carplay_default
+                        : R.drawable.ic_android_auto_default);
+            } catch (Exception ignored) {}
+        }
+        if (icon == null) return null;
+        try {
+            Bitmap bmp = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+            icon.setBounds(0, 0, 96, 96);
+            icon.draw(canvas);
+            return bmp;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     private Bitmap iconBitmapForPackage(String packageName) {
         if (packageName == null || packageName.isEmpty()) return null;
         Bitmap hit = packageIconBitmaps.get(packageName);
         if (hit != null) return hit;
         if (packageIconMiss.contains(packageName)) return null;
+        // Our own branding wins for projection packages, BEFORE the package
+        // manager is asked. The OEM Autolink icon resolves perfectly well, so
+        // it used to win everywhere this is called and the bundled drawable was
+        // only ever reached when the lookup FAILED. That put the OEM badge on
+        // the navigation card while the media card — which resolves through
+        // ProjectionPresence — showed ours, two different Android Auto marks on
+        // one rail. This is also what AppLauncherBridge.getAppIcon serves, so
+        // the web widget and popup pick the same icon up for free.
+        Bitmap branded = projectionIconBitmap(packageName);
+        if (branded != null) {
+            packageIconBitmaps.put(packageName, branded);
+            return branded;
+        }
         try {
             Drawable icon = getPackageManager().getApplicationIcon(packageName);
             icon = normalizeAdaptiveIcon(icon, 96);
