@@ -26927,7 +26927,13 @@ class Component extends DCLogic {
         root.visible = false;
         root.traverse((o) => {
           if (!o.isMesh) return;
-          o.castShadow = false;
+          // DOES cast: while x-ray is open this mesh is the only thing standing
+          // in for the 141 hidden shell meshes, so with it castShadow:false the
+          // car loses its floor shadow the moment the map is rebaked. It is one
+          // merged mesh of the body silhouette, so it is both the correct caster
+          // and a cheaper one than the shell it replaces. Shadow casting uses a
+          // depth material, so transparent/depthWrite:false do not affect it.
+          o.castShadow = true;
           o.receiveShadow = false;
           o.renderOrder = 3;
         });
@@ -27004,6 +27010,12 @@ class Component extends DCLogic {
       o._ghostPrepared = true;
     });
     this._ghostHidden = hidden;
+    // The shell meshes just hidden were the shadow casters, and the ghost is
+    // built castShadow:false (see _ensureGhostBody). shadowMap.autoUpdate is
+    // off, so without this the map keeps the solid car's silhouette until some
+    // unrelated event rebakes it -- and when one does, mid-x-ray, the floor
+    // shadow vanishes outright. Rebake now, against what is actually on screen.
+    if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     return true;
   }
 
@@ -27101,6 +27113,11 @@ class Component extends DCLogic {
         this._ghostHidden = null;
         if (this.requestRender) this.requestRender(4);
       }
+      // Casters are back (or their materials are). Pairs with the needsUpdate
+      // in _useGhostBodyModel: requestRender alone reuses the baked map, so
+      // leaving x-ray would otherwise keep whatever was baked while the shell
+      // was hidden -- i.e. no shadow under the car.
+      if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
       if (!this._ghostMats) return;
       this._ghostMats.forEach((e) => {
         const cur = Array.isArray(e.mesh.material) ? e.mesh.material : [e.mesh.material];
