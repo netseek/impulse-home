@@ -177,3 +177,14 @@ interpolated text inside a sibling `<strong>` and silently shrinks it. Use a
 child combinator (`> span`); `small`, `em` and `i` are safe. See
 `docs/driving-card.md` for the full write-up, the way to diagnose it in one
 call, and the three shared card rules that still have it.
+
+## The template engine splits an interpolated `style` on `;`
+
+`style="{{ x }}"` is parsed declaration by declaration, so a `;` inside a value
+ends it. A data URL always has one (`data:image/jpeg;base64,...`): the Desktops
+strip's thumbnails rendered as `background-image: url("data:image/jpeg")` --
+black boxes -- while the view builder held the full 25 KB string. Plain `https`
+wallpaper URLs never hit it, which is why the same pattern looked safe. Put a
+data URL in an attribute instead (`<img src="{{ url }}">`, as the media art and
+the thumbnails do). The tell is `getAttribute('style')` being far shorter than
+the value the builder returned.

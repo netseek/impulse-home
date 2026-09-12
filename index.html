@@ -4760,6 +4760,8 @@ window.HavalSplash = (function () {
     .hv-studio-desk-screen { position: relative; display: block; width: 100%; aspect-ratio: 8 / 3; overflow: hidden; border-radius: 14px; border: 1px solid var(--hv-frost-edge); background-color: #b9bcc0; background-image: radial-gradient(ellipse at 50% 55%, #e8eaec 0%, #bdc0c4 70%, #9da0a4 100%); background-size: cover; background-position: center; }
     .hv-studio-desk-screen.night { background-color: #11161c; background-image: radial-gradient(ellipse at 50% 55%, #2a3138 0%, #11161c 75%); }
     .hv-studio-desk-screen.has-wall { background-size: cover; }
+    .hv-studio-desk-screen.has-shot { background: #000; }
+    .hv-studio-desk-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     .hv-studio-desk-car { position: absolute; height: auto; filter: drop-shadow(0 4px 5px rgba(0,0,0,.28)); pointer-events: none; }
     .hv-studio-desk-widget { position: absolute; box-sizing: border-box; display: flex; align-items: flex-end; padding: 0 0 4px 6px; border-radius: 6px; font: 600 7px/1 'Space Mono', monospace; letter-spacing: .08em; overflow: hidden; background: rgba(14,20,27,.8); color: #e8eef3; border: 1px solid rgba(255,255,255,.14); }
     .hv-desks-item.theme-light .hv-studio-desk-widget { background: rgba(248,250,252,.88); color: #1c2733; border-color: rgba(20,28,40,.12); }
@@ -6096,6 +6098,7 @@ window.HavalSplash = (function () {
       <sc-for list="{{ desksItems }}" as="dk" hint-placeholder-count="3">
         <div class="hv-desks-item {{ dk.cls }}" data-desk-id="{{ dk.id }}" onClick="{{ dk.onClick }}" role="button" aria-label="{{ dk.ariaLabel }}">
           <span class="hv-studio-desk-screen {{ dk.fillClass }}" style="{{ dk.screenStyle }}">
+            <sc-if value="{{ dk.hasShot }}" hint-placeholder-val="{{ false }}"><img class="hv-studio-desk-shot" src="{{ dk.shotUrl }}" alt="" draggable="false"></sc-if>
             <sc-if value="{{ dk.showCar }}" hint-placeholder-val="{{ true }}"><img class="hv-studio-desk-car" src="assets/power/car.webp?v=4" alt="" draggable="false" style="{{ dk.carStyle }}"></sc-if>
             <sc-for list="{{ dk.widgets }}" as="dw" hint-placeholder-count="1"><span class="hv-studio-desk-widget" style="{{ dw.style }}">{{ dw.label }}</span></sc-for>
           </span>
@@ -7020,6 +7023,8 @@ const CAR_WIDGET_HOLD_MS = 500;
 const H6_DESKTOPS_KEY = 'h6_desktops_v1';
 const H6_DESKTOPS_VERSION = 5;
 const H6_MAX_DESKTOPS = 6;
+// Real thumbnails for the Desktops strip, one JPEG data URL per desktop id.
+const H6_DESKTOP_SHOTS_KEY = 'h6_desktop_shots_v1';
 // The one widget canvas: panel-wide and fixed. See _gridColsForMode.
 const H6_FULL_GRID = { cols: 6, rows: 2 };
 const H6_DESKTOP_ACCENTS = [
@@ -8121,6 +8126,7 @@ class Component extends DCLogic {
     this._wallpaperUrl = '';
     this._wallpaperFetchPromise = null;
     this._loadDesktops();
+    this._loadDesktopShots();
   }
 
   _detectShellPreview() {
@@ -23998,6 +24004,18 @@ class Component extends DCLogic {
         clearTimeout(this._desktopPersistTimer);
         this._desktopPersistTimer = setTimeout(() => this._persistActiveDesktop(), 120);
       }
+      // Not `sig`: it carries widgetRev, which live widgets bump about once a
+      // second, and that re-armed the 3 s timer forever so no background
+      // capture ever ran. Only what a thumbnail shows: which desktop, its
+      // layout, its look.
+      const board = this._widgetLayout && this._widgetLayout.appCar && this._widgetLayout.appCar.left;
+      const shotSig = [this._desktopIndex || 0, s.desktopRev || 0, s.centerFill, s.wallpaperAuto ? 1 : 0,
+        s.wallpaperIdx || 0, s.widgetThemeMode, s.accentColor, s.nightMode ? 1 : 0, this._viewerReady ? 1 : 0,
+        ((board && board.items) || []).map((i) => i.type + i.x + i.y + i.w + i.h).join(',')].join('|');
+      if (shotSig !== this._desktopShotTrigger) {
+        this._desktopShotTrigger = shotSig;
+        if (this._viewerReady) this._scheduleDesktopShot(3000);
+      }
     }
     // Start the load intro only after the loading overlay has actually cleared.
     //
@@ -32718,15 +32736,126 @@ class Component extends DCLogic {
     return !!(this._suppressDesktopClickUntil && Date.now() < this._suppressDesktopClickUntil);
   }
 
-  _openDesktopStudio(tab) {
+  _openDesktopStudio(tab, shotTaken) {
     // Older entry points still ask for 'desktop' / 'layout' / 'help'.
     const aliases = { desktop: 'desktops', layout: 'widgets', help: 'desktops' };
     const raw = tab || this.state.desktopStudioTab || 'desktops';
     const next = H6_STUDIO_TABS.indexOf(aliases[raw] || raw) >= 0 ? (aliases[raw] || raw) : 'desktops';
+    // Photograph the desktop on screen before the strip covers it, so its own
+    // thumbnail is current. Bounded: a capture that never answers opens the
+    // strip anyway (see _requestDesktopShot).
+    if (next === 'desktops' && !shotTaken && !this.state.desktopStudioOpen) {
+      this._requestDesktopShot(() => this._openDesktopStudio('desktops', true));
+      return;
+    }
     this.setState({ desktopStudioOpen: true, desktopStudioTab: next, studioCardFocus: null, desksEditing: false, focusedCardType: null, panelOpen: false }, () => {
       this._syncDockIndicators();
       if (next === 'desktops') this._centerStudioDesktopStrip();
     });
+  }
+
+  /*
+   * Desktop thumbnails. Only the desktop on screen can be photographed, so each
+   * desktop is captured while it is the one showing -- a few seconds after it
+   * changes or is switched to, and just before the Desktops strip opens -- and
+   * the picture is cached per desktop id. Native does the capture
+   * (AppLauncherBridge.captureDesktopSnapshot: PixelCopy of the window, so the
+   * WebGL car, the widgets and the rail all come out as drawn). A cached picture
+   * is used only while the desktop still matches what was photographed
+   * (_desktopShotSig); otherwise the schematic thumbnail stands in until the
+   * next capture. Live values (clock, media, speed) are deliberately not part
+   * of that match.
+   */
+  _loadDesktopShots() {
+    this._desktopShotReqs = {};
+    this._desktopShotSeq = 0;
+    try {
+      const raw = JSON.parse(localStorage.getItem(H6_DESKTOP_SHOTS_KEY) || '{}');
+      this._desktopShots = raw && typeof raw === 'object' ? raw : {};
+    } catch (e) {
+      this._desktopShots = {};
+    }
+  }
+
+  _saveDesktopShots() {
+    try { localStorage.setItem(H6_DESKTOP_SHOTS_KEY, JSON.stringify(this._desktopShots || {})); } catch (e) {}
+  }
+
+  /** What a thumbnail depends on. Live telemetry is not part of it. */
+  _desktopShotSig(d) {
+    if (!d) return '';
+    const left = d.widgetLayout && d.widgetLayout.appCar && d.widgetLayout.appCar.left;
+    return JSON.stringify([
+      ((left && left.items) || []).map((i) => [i.type, i.x, i.y, i.w, i.h]),
+      d.centerFill, d.wallpaperAuto !== false, d.wallpaperIdx || 0, d.widgetThemeMode, d.accentColor,
+      (d.bottomCards || []).join(','),
+    ]);
+  }
+
+  /** Anything covering the desktop would end up in its thumbnail. */
+  _desktopShotBlocked() {
+    const s = this.state;
+    return !!(s.loading || s.error || !this._viewerReady || this._introActive
+      || s.desktopStudioOpen || s.focusedCardType || s.widgetMenuId || s.widgetPickerStep
+      || s.widgetPlaceType || s.widgetPlaceMode || s.wallpaperPopupOpen || s.panelOpen || s.graphEditId
+      || (this._shellMode || s.shellMode) === 'appsOnly'
+      || (typeof document !== 'undefined' && document.visibilityState === 'hidden'));
+  }
+
+  /**
+   * Ask native for a picture of the desktop on screen. `after(ok)` runs once:
+   * when the picture arrives, straight away when a capture is not possible, or
+   * after 400 ms if native never answers -- a late picture is still stored.
+   */
+  _requestDesktopShot(after) {
+    const once = (ok) => { if (after) { const fn = after; after = null; fn(ok); } };
+    const bridge = window.AppLauncherBridge;
+    const d = this._desktops && this._desktops[this._desktopIndex || 0];
+    if (!d || !bridge || typeof bridge.captureDesktopSnapshot !== 'function' || this._desktopShotBlocked()) {
+      once(false);
+      return;
+    }
+    this._captureActiveDesktop();
+    const current = this._desktops[this._desktopIndex || 0];
+    const token = 's' + (++this._desktopShotSeq);
+    this._desktopShotReqs[token] = { id: current.id, sig: this._desktopShotSig(current), after: once };
+    try {
+      bridge.captureDesktopSnapshot(token, 480, 180);
+    } catch (e) {
+      delete this._desktopShotReqs[token];
+      once(false);
+      return;
+    }
+    setTimeout(() => once(false), 400);
+  }
+
+  /** Called by native with the JPEG for a capture this page asked for. */
+  onDesktopSnapshot(token, url) {
+    const req = this._desktopShotReqs && this._desktopShotReqs[token];
+    if (!req) return;
+    delete this._desktopShotReqs[token];
+    if (typeof url !== 'string' || url.indexOf('data:image/jpeg;base64,') !== 0 || url.length > 200000) return;
+    this._desktopShots[req.id] = { url, sig: req.sig, at: Date.now() };
+    this._saveDesktopShots();
+    req.after(true);
+    if (this.state.desktopStudioOpen && this.state.desktopStudioTab === 'desktops') {
+      this._uiOnlyStateWrite = true;
+      this.setState((s) => ({ desktopShotRev: (s.desktopShotRev || 0) + 1 }));
+    }
+  }
+
+  /** Photograph the current desktop once things settle; retry while covered. */
+  _scheduleDesktopShot(delay) {
+    clearTimeout(this._desktopShotTimer);
+    this._desktopShotTimer = setTimeout(() => {
+      if (this._desktopShotBlocked()) {
+        this._desktopShotTries = (this._desktopShotTries || 0) + 1;
+        if (this._desktopShotTries < 20) this._scheduleDesktopShot(3000);
+        return;
+      }
+      this._desktopShotTries = 0;
+      this._requestDesktopShot();
+    }, delay);
   }
 
   _setStudioTab(tab) {
@@ -33151,6 +33280,10 @@ class Component extends DCLogic {
     const copy = this._normalizeDesktop(this._cloneDesktopValue(source, {}), (source.name || 'Desktop') + ' copy');
     copy.id = this._desktopId();
     copy.name = ((source.name || 'Desktop') + ' copy').slice(0, 24);
+    if (this._desktopShots && this._desktopShots[source.id]) {
+      this._desktopShots[copy.id] = Object.assign({}, this._desktopShots[source.id]);
+      this._saveDesktopShots();
+    }
     this._desktops.splice(i + 1, 0, copy);
     this._commitDesktopListChange(activeId, () => this._centerDesksOn(copy.id, true));
   }
@@ -33168,6 +33301,10 @@ class Component extends DCLogic {
 
   _deleteDesktopAt(i) {
     if (!this._desktops || this._desktops.length <= 1 || !this._desktops[i]) return;
+    if (this._desktopShots && this._desktopShots[this._desktops[i].id]) {
+      delete this._desktopShots[this._desktops[i].id];
+      this._saveDesktopShots();
+    }
     if (i !== (this._desktopIndex || 0)) {
       this._captureActiveDesktop();
       const activeId = this._activeDesktopId();
@@ -33526,16 +33663,24 @@ class Component extends DCLogic {
       : null;
     const theme = (d.widgetThemeMode === 'light' || d.widgetThemeMode === 'dark')
       ? d.widgetThemeMode : this._effectiveWidgetTheme();
+    const shot = this._desktopShots && this._desktopShots[d.id];
+    const useShot = !!(shot && shot.url && shot.sig === this._desktopShotSig(d));
     return {
       cls: (active ? 'on ' : '') + 'theme-' + theme,
       name: d.name,
       ariaLabel: (active ? 'Current desktop, ' : 'Go to desktop ') + d.name,
-      fillClass: 'fill-' + fill + (wall ? ' has-wall' : '') + (this.state.nightMode ? ' night' : ''),
-      screenStyle: wall && wall.url ? "background-image:url('" + String(wall.url).replace(/'/g, '%27') + "');" : '',
-      showCar: fill !== 'wallpaper',
+      fillClass: 'fill-' + fill + (wall ? ' has-wall' : '') + (this.state.nightMode ? ' night' : '')
+        + (useShot ? ' has-shot' : ''),
+      // The photograph goes in an <img src>, never in screenStyle: the template
+      // engine splits a style value on ';', and a data URL's ';base64,' cut it
+      // down to url("data:image/jpeg") -- a black box.
+      hasShot: useShot,
+      shotUrl: useShot ? shot.url : '',
+      screenStyle: !useShot && wall && wall.url ? "background-image:url('" + String(wall.url).replace(/'/g, '%27') + "');" : '',
+      showCar: !useShot && fill !== 'wallpaper',
       carStyle: 'left:' + pct((gap.l + gap.r) / 2 - carW / 2, vw) + ';top:' + pct(gap.t + bandH * 0.55 - carH / 2, vh)
         + ';width:' + pct(carW, vw) + ';',
-      widgets,
+      widgets: useShot ? [] : widgets,
       accentStyle: 'background:' + (d.accentColor || '#2aa7b7') + ';',
       id: d.id,
       onClick: (ev) => this._onDesksItemClick(i, ev),

@@ -679,6 +679,12 @@ public final class MainActivity extends Activity {
             return getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).getString("widgets", "");
         }
 
+        /** A thumbnail of the desktop on screen; answered via __app.onDesktopSnapshot. */
+        @JavascriptInterface
+        public void captureDesktopSnapshot(String token, int width, int height) {
+            mainHandler.post(() -> captureDesktopSnapshotNow(token, width, height));
+        }
+
         /**
          * Remember the shell background so the NEXT cold start can paint the
          * WebView with it. The WebView's own colour is what fills the screen
@@ -10282,6 +10288,48 @@ public final class MainActivity extends Activity {
             applyRailEdit(false);
             // Rebuilding restores every click listener edit mode took away.
             rebuildQuickCardsRow();
+        }
+    }
+
+    /**
+     * A downscaled copy of this window for the Desktops strip. PixelCopy reads
+     * the composited surface, so the WebGL car, the HTML widgets and the native
+     * rail come out as drawn; other apps' freeform windows are separate windows
+     * and do not. The render thread scales straight into a thumbnail-sized
+     * bitmap, and the JPEG encode runs off the UI thread. Cost on the MMI is
+     * not measured yet -- it runs a few seconds after a desktop settles, never
+     * per frame.
+     */
+    private void captureDesktopSnapshotNow(String token, int width, int height) {
+        final String safeToken = token == null ? "" : token.replaceAll("[^A-Za-z0-9_-]", "");
+        if (safeToken.isEmpty() || webView == null
+                || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return;
+        View decor = getWindow().getDecorView();
+        if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
+        final int w = Math.max(64, Math.min(960, width));
+        final int h = Math.max(24, Math.min(360, height));
+        final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        try {
+            android.view.PixelCopy.request(getWindow(), new Rect(0, 0, decor.getWidth(), decor.getHeight()), bmp,
+                    result -> {
+                        if (result != android.view.PixelCopy.SUCCESS) {
+                            bmp.recycle();
+                            Log.w(TAG, "desktop snapshot failed: " + result);
+                            return;
+                        }
+                        new Thread(() -> {
+                            ByteArrayOutputStream out = new ByteArrayOutputStream();
+                            bmp.compress(Bitmap.CompressFormat.JPEG, 72, out);
+                            bmp.recycle();
+                            final String js = "try{window.__app&&window.__app.onDesktopSnapshot('" + safeToken
+                                    + "','data:image/jpeg;base64,"
+                                    + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP) + "');}catch(e){}";
+                            webView.post(() -> webView.evaluateJavascript(js, null));
+                        }, "desktop-snapshot").start();
+                    }, mainHandler);
+        } catch (RuntimeException e) {
+            bmp.recycle();
+            Log.w(TAG, "desktop snapshot failed", e);
         }
     }
 
