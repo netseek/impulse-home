@@ -979,6 +979,10 @@ public final class MainActivity extends Activity {
     private android.widget.ImageView quickMediaAppIcon;
     private android.widget.TextView quickMediaAppName;
     private View quickMediaAppRow;
+    private SourceChip quickMediaChip;
+    /** Source chips owned by a bottom card's header, keyed by card id. */
+    private final java.util.Map<String, SourceChip> quickCardSourceChips =
+            new java.util.HashMap<>();
     private boolean quickMediaCanLaunch;
     private QuickMediaBarsView quickMediaBars;
     /** Session-0 Visualizer probe for the MEDIA rail bars; null until first play. */
@@ -1792,7 +1796,6 @@ public final class MainActivity extends Activity {
             }
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
-            drawNavigationAppBadge(c, w, h, accent);
         }
 
         private void drawNavMetricRow(android.graphics.Canvas c, float x, float top,
@@ -1909,20 +1912,6 @@ public final class MainActivity extends Activity {
             int n = text.length();
             while (n > 0 && paint.measureText(text.substring(0, n) + ellipsis) > maxWidth) n--;
             return n <= 0 ? ellipsis : text.substring(0, n) + ellipsis;
-        }
-
-        private void drawNavigationAppBadge(android.graphics.Canvas c, float w, float h,
-                int accent) {
-            String pkg = descriptor.appPackage == null ? "" : descriptor.appPackage.trim();
-            if (pkg.isEmpty()) return;
-            Bitmap icon = iconBitmapForPackage(pkg);
-            if (icon == null) return;
-            float size = Math.min(h * .22f, 22f);
-            float pad = Math.max(3f, w * .05f);
-            android.graphics.RectF dest = new android.graphics.RectF(
-                    w - pad - size, pad, w - pad, pad + size);
-            paint.setAlpha(255);
-            c.drawBitmap(icon, null, dest, paint);
         }
 
         private void drawTires(android.graphics.Canvas c, float w, float h,
@@ -7773,6 +7762,7 @@ public final class MainActivity extends Activity {
         quickMediaAppIcon = null;
         quickMediaAppName = null;
         quickMediaAppRow = null;
+        quickMediaChip = null;
         if (quickMediaBars != null) quickMediaBars.setPlaying(false);
         quickMediaBars = null;
         quickMediaButtons.clear();
@@ -7918,6 +7908,20 @@ public final class MainActivity extends Activity {
         heading.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         header.addView(heading);
+
+        // Same slot the MEDIA card puts its chip in: after the weighted
+        // heading, before the chevron, so both read as one rail.
+        if ("navigation".equals(descriptor.id)) {
+            SourceChip navChip = makeSourceChip(density);
+            android.widget.LinearLayout.LayoutParams navChipLp =
+                    new android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            navChipLp.rightMargin = Math.round(6 * density);
+            header.addView(navChip.row, navChipLp);
+            quickCardSourceChips.put(descriptor.id, navChip);
+            applyNavigationSourceChip(descriptor);
+        }
 
         android.widget.TextView affordance = new android.widget.TextView(this);
         affordance.setTag("frostSecondary");
@@ -8381,71 +8385,123 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * The source app's icon and name, on the card's top right.
+     * The source app's icon and name, on a card's top right.
      *
-     * Hidden outright when the payload carries neither, because an empty pill
-     * on an idle card reads as a control that has stopped working.
+     * One chip, two cards: MEDIA names what is playing, NAVIGATION names what
+     * is guiding. They used to disagree — NAVIGATION drew its own badge onto
+     * the QuickCardGraphicView canvas, icon only and at its own size, so the
+     * same rail showed two different Android Auto marks side by side. The
+     * canvas badge is gone; both now build this and resolve through
+     * {@link #resolveSourceChipIcon} / {@link #resolveSourceChipLabel}, which
+     * were already keyed on package + label and needed nothing media-specific.
      */
-    private View makeQuickMediaAppChip(float density) {
-        android.widget.LinearLayout chip = new android.widget.LinearLayout(this);
-        chip.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        chip.setPadding(0, 0, 0, 0);
-        chip.setVisibility(View.GONE);
+    private static final class SourceChip {
+        final android.widget.LinearLayout row;
+        final android.widget.ImageView icon;
+        final android.widget.TextView name;
 
-        quickMediaAppIcon = new android.widget.ImageView(this);
-        quickMediaAppIcon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        SourceChip(android.widget.LinearLayout row, android.widget.ImageView icon,
+                android.widget.TextView name) {
+            this.row = row;
+            this.icon = icon;
+            this.name = name;
+        }
+    }
+
+    private SourceChip makeSourceChip(float density) {
+        android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, 0, 0, 0);
+        row.setVisibility(View.GONE);
+
+        android.widget.ImageView icon = new android.widget.ImageView(this);
+        icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         android.widget.LinearLayout.LayoutParams iconLp =
                 new android.widget.LinearLayout.LayoutParams(
                         Math.round(15 * density), Math.round(15 * density));
         iconLp.rightMargin = Math.round(5 * density);
-        quickMediaAppIcon.setLayoutParams(iconLp);
-        chip.addView(quickMediaAppIcon);
+        icon.setLayoutParams(iconLp);
+        row.addView(icon);
 
-        quickMediaAppName = new android.widget.TextView(this);
-        quickMediaAppName.setTag("frostSecondary");
-        quickMediaAppName.setTextSize(8.5f);
-        quickMediaAppName.setLetterSpacing(0.09f);
-        quickMediaAppName.setMaxLines(1);
-        quickMediaAppName.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        quickMediaAppName.setMaxWidth(Math.round(96 * density));
-        chip.addView(quickMediaAppName);
-        return chip;
+        android.widget.TextView name = new android.widget.TextView(this);
+        name.setTag("frostSecondary");
+        name.setTextSize(8.5f);
+        name.setLetterSpacing(0.09f);
+        name.setMaxLines(1);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        name.setMaxWidth(Math.round(96 * density));
+        row.addView(name);
+        return new SourceChip(row, icon, name);
+    }
+
+    /**
+     * Hidden outright when there is neither icon nor label, because an empty
+     * pill on an idle card reads as a control that has stopped working.
+     */
+    private void applySourceChip(SourceChip chip, Drawable customIcon, Bitmap decoded,
+            String label) {
+        if (chip == null) return;
+        boolean show = customIcon != null || decoded != null
+                || (label != null && !label.isEmpty());
+        chip.row.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show) return;
+        if (customIcon != null) {
+            chip.icon.setVisibility(View.VISIBLE);
+            chip.icon.setImageDrawable(customIcon);
+        } else if (decoded != null) {
+            chip.icon.setVisibility(View.VISIBLE);
+            chip.icon.setImageBitmap(decoded);
+        } else {
+            chip.icon.setVisibility(View.GONE);
+        }
+        chip.name.setText(label == null ? "" : label.toUpperCase(java.util.Locale.US));
+    }
+
+    private View makeQuickMediaAppChip(float density) {
+        SourceChip chip = makeSourceChip(density);
+        quickMediaAppIcon = chip.icon;
+        quickMediaAppName = chip.name;
+        quickMediaChip = chip;
+        return chip.row;
     }
 
     private void applyQuickMediaAppChip(String iconDataUrl, String label) {
         if (quickMediaAppRow == null) return;
         String pkg = quickMediaPackage != null ? quickMediaPackage : "";
-        String chipLabel = resolveMediaChipLabel(pkg, label);
-        Drawable customIcon = resolveMediaChipIcon(pkg, label);
-        Bitmap decoded = customIcon == null ? decodeDataUrlBitmap(iconDataUrl) : null;
-        boolean show = customIcon != null || decoded != null
-                || (chipLabel != null && !chipLabel.isEmpty());
-        quickMediaAppRow.setVisibility(show ? View.VISIBLE : View.GONE);
-        if (!show) return;
-        if (quickMediaAppIcon != null) {
-            if (customIcon != null) {
-                quickMediaAppIcon.setVisibility(View.VISIBLE);
-                quickMediaAppIcon.setImageDrawable(customIcon);
-            } else if (decoded != null) {
-                quickMediaAppIcon.setVisibility(View.VISIBLE);
-                quickMediaAppIcon.setImageBitmap(decoded);
-            } else {
-                quickMediaAppIcon.setVisibility(View.GONE);
-            }
-        }
-        if (quickMediaAppName != null) {
-            quickMediaAppName.setText(chipLabel == null ? ""
-                    : chipLabel.toUpperCase(java.util.Locale.US));
-        }
+        Drawable customIcon = resolveSourceChipIcon(pkg, label);
+        applySourceChip(
+                quickMediaChip,
+                customIcon,
+                customIcon == null ? decodeDataUrlBitmap(iconDataUrl) : null,
+                resolveSourceChipLabel(pkg, label));
     }
 
     /**
-     * Icon for the MEDIA card's source chip: dock substitute first, then our
-     * AA/CarPlay assets (the system packages ship a generic glyph), then the
-     * launcher icon MediaNowPlaying encoded into the payload.
+     * Stamp the NAVIGATION card's chip from its descriptor.
+     *
+     * There is no icon payload here the way MediaNowPlaying supplies one, so
+     * the chip is whatever the shared resolvers make of the package — which
+     * for a projection package is our own mark, the point of the exercise.
      */
-    private Drawable resolveMediaChipIcon(String pkg, String label) {
+    private void applyNavigationSourceChip(BottomCardDescriptor card) {
+        SourceChip chip = quickCardSourceChips.get(card.id);
+        if (chip == null) return;
+        String pkg = card.appPackage == null ? "" : card.appPackage.trim();
+        if (pkg.isEmpty()) {
+            applySourceChip(chip, null, null, "");
+            return;
+        }
+        applySourceChip(chip, resolveSourceChipIcon(pkg, null), null,
+                resolveSourceChipLabel(pkg, null));
+    }
+
+    /**
+     * Icon for a card's source chip: dock substitute first, then our own
+     * AA/CarPlay assets (the system packages ship a generic glyph), then the
+     * caller's own payload icon if it has one (MEDIA does; NAVIGATION does not).
+     */
+    private Drawable resolveSourceChipIcon(String pkg, String label) {
         if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
             String slug = dockAppOverrides.icon(pkg);
             if (slug != null) {
@@ -8470,7 +8526,7 @@ public final class MainActivity extends Activity {
         return null;
     }
 
-    private String resolveMediaChipLabel(String pkg, String stock) {
+    private String resolveSourceChipLabel(String pkg, String stock) {
         if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
             String custom = dockAppOverrides.name(pkg);
             if (custom != null) return custom;
@@ -10046,6 +10102,7 @@ public final class MainActivity extends Activity {
             if (demoBadge != null) demoBadge.setVisibility(card.demo ? View.VISIBLE : View.GONE);
             QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
             if (graphic != null) graphic.setDescriptor(card);
+            applyNavigationSourceChip(card);
             // The rail is patched in place rather than rebuilt, so a mode change
             // has to repaint the card's own background too.
             View host = quickCardHosts.get(card.id);
