@@ -186,6 +186,8 @@ for (const key of ['appIcon', 'canLaunch']) {
 }
 assert.match(nowPlaying, /getLaunchIntentForPackage\(pkg\) != null/,
   'canLaunch must be answered by PackageManager, not assumed from a package name');
+assert.match(nowPlaying, /ProjectionPresence\.isProjectionPackage\(pkg\)\) return true/,
+  'Android Auto has no launcher entry but the live projection task is still raisable');
 assert.match(nowPlaying, /private final java\.util\.Map<String, String> appIconCache/,
   'the app icon must be cached per package: a cover changes per track, an icon does not');
 

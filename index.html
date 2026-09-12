@@ -4540,6 +4540,8 @@ window.HavalSplash = (function () {
     .hv-profile,.hv-navigation,.hv-tires,.hv-status,.hv-range-card { height:100%; min-width:0; box-sizing:border-box; padding:14px; color:var(--hv-widget-fg,#edf5fa); overflow:hidden; }
     .hv-glance-head { display:flex; align-items:center; justify-content:space-between; gap:8px; font:8px/1 'Space Mono',monospace; letter-spacing:.14em; }
     .hv-glance-head small { opacity:.5; font-size:7px; letter-spacing:.06em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-nav-head-meta { display:flex; align-items:center; gap:6px; min-width:0; }
+    .hv-nav-app-icon { width:14px; height:14px; border-radius:3px; object-fit:cover; flex:0 0 auto; }
     .hv-profile { padding:10px; cursor:pointer; }
     .hv-profile-stage { position:relative; height:calc(100% - 1px); min-height:0; border-radius:16px; overflow:hidden; background:var(--profile-paint,#f4f5f7); color:var(--profile-ink,#111820); }
     .hv-profile-stage::before { content:''; position:absolute; inset:0; background:linear-gradient(128deg,rgba(255,255,255,.40),transparent 42%),radial-gradient(circle at 78% 24%,var(--profile-accent),transparent 34%); opacity:.68; }
@@ -4553,13 +4555,29 @@ window.HavalSplash = (function () {
     h6-clock.hv-widget-clock { display:block; width:100%; height:100%; min-width:0; min-height:0; }
 
     .hv-navigation { cursor:pointer; }
+    .hv-navigation.is-idle .hv-navigation-tbt { display:none; }
+    .hv-navigation.is-live .hv-navigation-map { display:none; }
+    .hv-navigation-tbt { display:flex; align-items:center; gap:14px; height:calc(100% - 22px); min-height:72px; margin-top:2px; min-width:0; }
+    .hv-navigation-maneuver { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; flex:0 0 auto; min-width:56px; }
+    .hv-navigation-turn { width:46px; height:46px; display:grid; place-items:center; border-radius:13px; background:var(--hv-frost-fill-strong); box-shadow:0 8px 20px rgba(0,0,0,.22); }
+    .hv-navigation-turn-icon { width:28px; height:28px; display:block; background:var(--hv-accent); -webkit-mask-position:center; mask-position:center; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; -webkit-mask-size:contain; mask-size:contain; }
+    .hv-navigation-turn svg { width:24px; height:24px; fill:var(--hv-accent); stroke:none; }
+    .hv-navigation-maneuver strong { font-size:clamp(13px,2.2vw,18px); font-weight:600; font-variant-numeric:tabular-nums; line-height:1; }
+    .hv-navigation-text { display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; flex:1 1 auto; }
+    .hv-navigation-text > strong { display:block; font-size:clamp(12px,1.8vw,16px); font-weight:560; line-height:1.15; letter-spacing:-.015em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-navigation-metrics { display:flex; align-items:flex-start; gap:14px; min-width:0; }
+    .hv-navigation-metric { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .hv-navigation-metric strong { font-size:clamp(16px,2.8vw,26px); font-weight:620; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.03em; }
+    .hv-navigation-metric span { font:7px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.5; }
+    .hv-navigation-metric.is-eta strong { color:var(--hv-accent); }
+    .hv-navigation-1x1 .hv-navigation-metrics { display:none; }
+    .hv-navigation-2x1 .hv-navigation-metrics,.hv-navigation-2x2 .hv-navigation-metrics { gap:12px; }
+    .hv-navigation-3x1 .hv-navigation-metrics,.hv-navigation-3x2 .hv-navigation-metrics { gap:18px; }
     .hv-navigation-map { position:relative; height:calc(100% - 25px); min-height:78px; margin-top:3px; border-radius:14px; overflow:hidden; background-color:rgba(99,217,231,.055); background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px); background-size:22px 22px; }
     .hv-navigation-map::after { content:''; position:absolute; inset:0; background:radial-gradient(circle at 78% 25%,rgba(99,217,231,.20),transparent 34%); pointer-events:none; }
     .hv-navigation-route { position:absolute; inset:8px 12px; width:calc(100% - 24px); height:calc(100% - 16px); overflow:visible; }
     .hv-navigation-route .track { fill:none; stroke:rgba(255,255,255,.16); stroke-width:7; stroke-linecap:round; stroke-linejoin:round; }
     .hv-navigation-route .route { fill:none; stroke:var(--hv-accent); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(0 0 5px rgba(99,217,231,.42)); }
-    .hv-navigation-turn { position:absolute; z-index:2; left:12px; top:11px; width:46px; height:46px; display:grid; place-items:center; border-radius:13px; background:var(--hv-frost-fill-strong); box-shadow:0 8px 20px rgba(0,0,0,.22); }
-    .hv-navigation-turn svg { width:24px; height:24px; fill:none; stroke:var(--hv-accent); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
     .hv-navigation-copy { position:absolute; z-index:2; right:12px; bottom:10px; text-align:right; }
     .hv-navigation-copy strong { display:block; font-size:clamp(24px,4vw,39px); line-height:.9; font-weight:520; font-variant-numeric:tabular-nums; }
     .hv-navigation-copy span { display:block; margin-top:5px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.07em; opacity:.58; }
@@ -5313,7 +5331,7 @@ window.HavalSplash = (function () {
             <h6-clock class="hv-widget-clock" surface="widget" size="{{ wg.clockSize }}" clock-style="{{ wg.clockStyle }}" hour-format="{{ wg.clockHourFormat }}"></h6-clock>
           </sc-if>
           <sc-if value="{{ wg.isNavigation }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-navigation {{ wg.navigationSizeClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><small>{{ wg.navigationSource }}</small></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-turn"><svg viewBox="0 0 24 24"><path d="M7 18V11a4 4 0 0 1 4-4h7"></path><path d="m15 4 3 3-3 3"></path></svg></div><div class="hv-navigation-copy"><strong>{{ wg.navigationDistance }}</strong><span>{{ wg.navigationHint }}</span></div></div></div>
+            <div class="hv-navigation {{ wg.navigationSizeClass }} {{ wg.navigationLiveClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><span class="hv-nav-head-meta"><sc-if value="{{ wg.navigationHasAppIcon }}" hint-placeholder-val="{{ false }}"><img class="hv-nav-app-icon" src="{{ wg.navigationAppIcon }}" alt=""></sc-if><small>{{ wg.navigationSource }}</small></span></div><div class="hv-navigation-tbt"><div class="hv-navigation-maneuver"><div class="hv-navigation-turn"><sc-if value="{{ wg.navigationHasTurnIcon }}" hint-placeholder-val="{{ true }}"><span class="hv-navigation-turn-icon" style="{{ wg.navigationTurnStyle }}"></span></sc-if><sc-if value="{{ wg.navigationHasTurnGlyph }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24"><path d="{{ wg.navigationTurnGlyph }}"></path></svg></sc-if></div><strong>{{ wg.navigationDistance }}</strong></div><div class="hv-navigation-text"><strong>{{ wg.navigationStreet }}</strong><div class="hv-navigation-metrics"><sc-if value="{{ wg.navigationHasRemaining }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationRemaining }}</strong><span>REMAINING</span></div></sc-if><sc-if value="{{ wg.navigationHasDuration }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationDuration }}</strong><span>TIME</span></div></sc-if><sc-if value="{{ wg.navigationHasEta }}" hint-placeholder-val="{{ false }}"><div class="hv-navigation-metric is-eta"><strong>{{ wg.navigationEta }}</strong><span>ETA</span></div></sc-if></div></div></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-copy"><strong>{{ wg.navigationIdlePrimary }}</strong><span>{{ wg.navigationIdleHint }}</span></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
             <div class="hv-media {{ wg.mediaSizeClass }} {{ wg.mediaLayoutClass }} {{ wg.mediaArtClass }} {{ wg.mediaOpenClass }}" onClick="{{ wg.onMediaOpen }}">
@@ -5518,7 +5536,7 @@ window.HavalSplash = (function () {
             <h6-clock class="hv-widget-clock" surface="widget" size="{{ wg.clockSize }}" clock-style="{{ wg.clockStyle }}" hour-format="{{ wg.clockHourFormat }}"></h6-clock>
           </sc-if>
           <sc-if value="{{ wg.isNavigation }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-navigation {{ wg.navigationSizeClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><small>{{ wg.navigationSource }}</small></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-turn"><svg viewBox="0 0 24 24"><path d="M7 18V11a4 4 0 0 1 4-4h7"></path><path d="m15 4 3 3-3 3"></path></svg></div><div class="hv-navigation-copy"><strong>{{ wg.navigationDistance }}</strong><span>{{ wg.navigationHint }}</span></div></div></div>
+            <div class="hv-navigation {{ wg.navigationSizeClass }} {{ wg.navigationLiveClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><span class="hv-nav-head-meta"><sc-if value="{{ wg.navigationHasAppIcon }}" hint-placeholder-val="{{ false }}"><img class="hv-nav-app-icon" src="{{ wg.navigationAppIcon }}" alt=""></sc-if><small>{{ wg.navigationSource }}</small></span></div><div class="hv-navigation-tbt"><div class="hv-navigation-maneuver"><div class="hv-navigation-turn"><sc-if value="{{ wg.navigationHasTurnIcon }}" hint-placeholder-val="{{ true }}"><span class="hv-navigation-turn-icon" style="{{ wg.navigationTurnStyle }}"></span></sc-if><sc-if value="{{ wg.navigationHasTurnGlyph }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24"><path d="{{ wg.navigationTurnGlyph }}"></path></svg></sc-if></div><strong>{{ wg.navigationDistance }}</strong></div><div class="hv-navigation-text"><strong>{{ wg.navigationStreet }}</strong><div class="hv-navigation-metrics"><sc-if value="{{ wg.navigationHasRemaining }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationRemaining }}</strong><span>REMAINING</span></div></sc-if><sc-if value="{{ wg.navigationHasDuration }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationDuration }}</strong><span>TIME</span></div></sc-if><sc-if value="{{ wg.navigationHasEta }}" hint-placeholder-val="{{ false }}"><div class="hv-navigation-metric is-eta"><strong>{{ wg.navigationEta }}</strong><span>ETA</span></div></sc-if></div></div></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-copy"><strong>{{ wg.navigationIdlePrimary }}</strong><span>{{ wg.navigationIdleHint }}</span></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
             <div class="hv-media {{ wg.mediaSizeClass }} {{ wg.mediaLayoutClass }} {{ wg.mediaArtClass }} {{ wg.mediaOpenClass }}" onClick="{{ wg.onMediaOpen }}">
@@ -6725,7 +6743,72 @@ const CAR_SIGNALS = {
   cycleFuel: 'car.ev_info.cycle_fuel_consume_info',
   // Derived by Impulse PowerFlowMapper. Packed v1|state|ice|front|rear.
   powerFlow: 'haval.power.flow',
+  // Impulse-owned Android Auto telemetry. Not CAN: session is stopped|active,
+  // directions is JSON (turn / street / distance). Same EVENT_CHANGED bus.
+  aaSession: 'app.androidauto.session',
+  navDirections: 'app.navigation.directions',
+  // Best-effort city/street when AA is not guiding. Published by the viewer
+  // itself (PlaceGlance), not Impulse; must not keep the CAN bus "live".
+  place: 'app.location.place',
 };
+const NAV_TURN_ICONS = {
+  turn_right: './assets/ui/tbt/right.svg',
+  turn_left: './assets/ui/tbt/left.svg',
+  straight: './assets/ui/tbt/straight.svg',
+  uturn: './assets/ui/tbt/uturn.svg',
+  roundabout: './assets/ui/tbt/roundabout.svg',
+  fork: './assets/ui/tbt/fork.svg',
+  merge: './assets/ui/tbt/merge.svg',
+};
+const NAV_TURN_GLYPHS = {
+  turn_right: 'M 7 18 L 7 11 C 7 8.8 8.8 7 11 7 L 18 7 M 15 4 L 18 7 L 15 10',
+  turn_left: 'M 17 18 L 17 11 C 17 8.8 15.2 7 13 7 L 6 7 M 9 4 L 6 7 L 9 10',
+  straight: 'M 12 20 L 12 5 M 8 9 L 12 5 L 16 9',
+  uturn: 'M 7 20 L 7 11 C 7 7.2 9.8 4.5 13.5 4.5 C 17.2 4.5 20 7.2 20 11 L 20 14 M 17 11 L 20 14 L 22.5 11',
+  roundabout: 'M 12 4 C 16.4 4 20 7.6 20 12 C 20 16.4 16.4 20 12 20 C 7.6 20 4 16.4 4 12 C 4 7.6 7.6 4 12 4 M 12 8 L 12 4 L 15.2 6.2',
+  fork: 'M 12 20 L 12 12 M 12 12 L 6 5 M 12 12 L 18 5 M 15.2 8 L 18 5 L 18.2 8.4',
+  merge: 'M 18 20 L 18 13 L 12 6 M 6 20 L 6 14 L 12 8 M 9 9 L 12 6 L 15 9',
+  exit: 'M 6 4 L 6 20 M 6 12 L 18 12 M 14.5 8.5 L 18 12 L 14.5 15.5',
+  destination: 'M 12 21 L 6.8 10.2 C 5.7 7.8 7.4 4.8 12 4.8 C 16.6 4.8 18.3 7.8 17.2 10.2 L 12 21',
+};
+const DEMO_NAV_SEQUENCE = [
+  { family: 'turn_right', street: 'Av. Paulista', distanceM: 450, remainingM: 12300, remainingS: 840 },
+  { family: 'turn_left', street: 'Rua Augusta', distanceM: 120, remainingM: 11850, remainingS: 810 },
+  { family: 'straight', street: 'Av. 9 de Julho', distanceM: 800, remainingM: 10500, remainingS: 720 },
+  { family: 'roundabout', street: 'Praça da Bandeira', distanceM: 90, remainingM: 9800, remainingS: 660 },
+  { family: 'uturn', street: 'R. da Consolação', distanceM: 60, remainingM: 9200, remainingS: 620 },
+  { family: 'fork', street: 'Marginal Pinheiros', distanceM: 300, remainingM: 8100, remainingS: 540 },
+  { family: 'merge', street: 'Av. Brasil', distanceM: 200, remainingM: 7400, remainingS: 480 },
+  { family: 'exit', street: 'Saída 12', distanceM: 150, remainingM: 6100, remainingS: 400 },
+  { family: 'destination', street: 'Chegada', distanceM: 40, remainingM: 40, remainingS: 45 },
+  { idle: true },
+];
+function formatNavMeters(meters) {
+  const value = Number(meters);
+  if (!isFinite(value) || value < 0) return '';
+  if (value < 1000) return Math.round(value) + ' m';
+  const km = value / 1000;
+  if (km >= 100) return Math.round(km) + ' km';
+  return (Math.round(km * 10) / 10) + ' km';
+}
+function formatNavDuration(seconds) {
+  const value = Number(seconds);
+  if (!isFinite(value) || value < 0) return '';
+  if (value < 45) return '<1 min';
+  const minutes = Math.round(value / 60);
+  if (minutes < 60) return minutes + ' min';
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? hours + ' h ' + rest + ' min' : hours + ' h';
+}
+function formatNavEta(seconds, now) {
+  const value = Number(seconds);
+  if (!isFinite(value) || value < 0) return '';
+  const eta = new Date((now || new Date()).getTime() + value * 1000);
+  const hrs = String(eta.getHours()).padStart(2, '0');
+  const mins = String(eta.getMinutes()).padStart(2, '0');
+  return hrs + ':' + mins;
+}
 /**
  * How long after the last bus frame of ANY kind the vehicle data is still
  * treated as current. Impulse republishes `car.basic.battery_voltage` about ten
@@ -6819,6 +6902,7 @@ const CAR_GRAPH_COLOR_Y2_LIGHT = '#0a6f7c';
 const CAR_GRAPH_COLOR_REGEN_LIGHT = '#1a7a4c';
 const CAR_POWER_PACKAGE = 'com.beantechs.energyassistant';
 const CAR_NAV_PACKAGE = 'com.beantechs.fake.navigation';
+const CAR_AA_PACKAGE = 'com.ts.androidauto.app';
 const CAR_POWER_ASSETS = {
   iceOff: 'assets/power/engine.webp',
   iceOn: 'assets/power/engine_on.webp',
@@ -7202,6 +7286,7 @@ const DEMO_DOOR_SEQUENCE = [
   { key: 'trunk', label: 'Tailgate open', open: { trunk: true } },
 ];
 const DEMO_DOOR_INTERVAL_MS = 2500;
+const DEMO_NAV_INTERVAL_MS = 2800;
 
 // Slot values are NOT all binary. The powered tailgate reports travel states:
 // opening/closing cycle observed as -1 → 3 → 1 → 5 → 4 → -1 → 0.
@@ -7807,6 +7892,14 @@ class Component extends DCLogic {
     this._camCycleKeys = null;
     this._powerLive = { soc: '', evRange: '', fuelRange: '', fuelLevel: '',
                         voltage: '', current: '', cycleEv: '', evInst: '', flow: '' };
+    this._aaSession = 'stopped';
+    this._navLive = { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    this._placeLive = { city: '', street: '' };
+    this._navAppIconByPkg = {};
+    this._demoNavPhase = 0;
+    this._demoNavTicker = 0;
+    this._navRefreshTimer = 0;
+    this._navRefreshPending = false;
     this._tirePressuresRaw = '';
     this._tireTemperaturesRaw = '';
     this._tireWarningsRaw = {};
@@ -8165,6 +8258,7 @@ class Component extends DCLogic {
             CAR_SIGNALS.tireStatus, CAR_SIGNALS.tireUnits,
             CAR_SIGNALS.windows, CAR_SIGNALS.doorLock,
             CAR_SIGNALS.cycleFuel, CAR_SIGNALS.powerFlow,
+            CAR_SIGNALS.aaSession, CAR_SIGNALS.navDirections, CAR_SIGNALS.place,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
       .concat(Object.keys(lights).map((k) => lights[k]))
@@ -8267,6 +8361,11 @@ class Component extends DCLogic {
     if (this._carTrace) console.log('[CarSignal]', key, '=', value);
     if (!this._carSignalAt) this._carSignalAt = {};
     this._carSignalAt[key] = Date.now();
+    // AA session / TBT are Impulse app keys. They must not keep the CAN bus
+    // "live" for doors/tyres/modes while the vehicle itself is silent.
+    if (key === CAR_SIGNALS.aaSession) { this._applyAaSession(value); return; }
+    if (key === CAR_SIGNALS.navDirections) { this._applyNavDirections(value); return; }
+    if (key === CAR_SIGNALS.place) { this._applyPlaceGlance(value); return; }
     this._carBusAt = this._carSignalAt[key];
     // Drive-time bus load, surfaced through window.__perf() -> TelemetryBridge
     // .reportPerf -> logcat. The bus is almost silent parked, so this question
@@ -8399,6 +8498,141 @@ class Component extends DCLogic {
         this._syncAutoNightMode();
       }
       return;
+    }
+  }
+
+  _applyAaSession(value) {
+    const raw = String(value == null ? '' : value).trim().toLowerCase();
+    const next = raw === 'active' ? 'active' : 'stopped';
+    if (this._aaSession === next) return;
+    this._aaSession = next;
+    if (next !== 'active' && this._navLive && this._navLive.active) {
+      this._navLive = { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    }
+    this._queueNavRefresh(true);
+  }
+
+  _applyPlaceGlance(value) {
+    let obj = value;
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (!text) return;
+      try { obj = JSON.parse(text); } catch (e) { return; }
+    }
+    if (!obj || typeof obj !== 'object') return;
+    const city = String(obj.city == null ? '' : obj.city).trim();
+    const street = String(obj.street == null ? '' : obj.street).trim();
+    const prev = this._placeLive || { city: '', street: '' };
+    if (prev.city === city && prev.street === street) return;
+    this._placeLive = { city: city, street: street };
+    this._queueNavRefresh(true);
+  }
+
+  _applyNavDirections(value) {
+    const parsed = this._parseNavDirections(value);
+    if (!parsed) return;
+    const prev = this._navLive || { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    const same = !!prev.active === !!parsed.active
+      && prev.street === parsed.street
+      && prev.turn === parsed.turn
+      && prev.distance === parsed.distance
+      && prev.distanceM === parsed.distanceM
+      && prev.remainingM === parsed.remainingM
+      && prev.remainingS === parsed.remainingS;
+    if (same) return;
+    const identity = !!prev.active !== !!parsed.active
+      || prev.street !== parsed.street
+      || prev.turn !== parsed.turn;
+    this._navLive = parsed;
+    this._queueNavRefresh(identity);
+  }
+
+  /**
+   * Impulse publishes `{"active":false}` when guidance is off, and a full
+   * object while Maps is guiding. Malformed payloads are ignored so a bad
+   * frame cannot blank a live manoeuvre.
+   */
+  _parseNavDirections(value) {
+    if (value == null || value === '') return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    let obj = value;
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (!text) return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+      try { obj = JSON.parse(text); } catch (e) { return null; }
+    }
+    if (!obj || typeof obj !== 'object') return null;
+    const active = obj.active === true || obj.active === 'true' || obj.active === 1;
+    if (!active) return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    const street = String(obj.street == null ? '' : obj.street).trim();
+    const turn = String(obj.turn == null ? '' : obj.turn).trim();
+    const distanceM = this._carNumber(obj.distance_m);
+    const metres = isFinite(distanceM) ? Math.max(0, Math.round(distanceM)) : null;
+    let distance = String(obj.distance == null ? '' : obj.distance).trim();
+    if (!distance && metres != null) distance = formatNavMeters(metres);
+    const remainingMRaw = this._carNumber(obj.remaining_m);
+    const remainingSRaw = this._carNumber(obj.remaining_s);
+    const remainingM = isFinite(remainingMRaw) ? Math.max(0, Math.round(remainingMRaw)) : null;
+    const remainingS = isFinite(remainingSRaw) ? Math.max(0, Math.round(remainingSRaw)) : null;
+    return { active: true, street: street, distance: distance, distanceM: metres, turn: turn,
+      remainingM: remainingM, remainingS: remainingS };
+  }
+
+  _navTurnFamily(turn) {
+    const token = String(turn || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    if (!token) return 'straight';
+    if (token.indexOf('DESTINATION') >= 0) return 'destination';
+    if (token.indexOf('ROUNDABOUT') >= 0 || token.indexOf('ROTARY') >= 0) return 'roundabout';
+    if (token.indexOf('U_TURN') >= 0 || token === 'UTURN') return 'uturn';
+    if (token.indexOf('MERGE') >= 0) return 'merge';
+    if (token.indexOf('FORK') >= 0) return 'fork';
+    if (token.indexOf('EXIT') >= 0 || token.indexOf('OFF_RAMP') >= 0 || token.indexOf('OFFRAMP') >= 0) {
+      return 'exit';
+    }
+    if (token.indexOf('STRAIGHT') >= 0 || token.indexOf('CONTINUE') >= 0
+        || token === 'DEPART' || token.indexOf('NAME_CHANGE') >= 0) {
+      return 'straight';
+    }
+    if (token.indexOf('LEFT') >= 0) return 'turn_left';
+    if (token.indexOf('RIGHT') >= 0) return 'turn_right';
+    return 'straight';
+  }
+
+  _navTurnLabel(turn) {
+    return String(turn || '').replace(/_/g, ' ').trim().toUpperCase();
+  }
+
+  /**
+   * Identity (turn / street / active) commits immediately. Distance-only
+   * updates trail at 250 ms so a 1 Hz Impulse publish cannot rebuild the
+   * React tree faster than the native rail can paint.
+   */
+  _queueNavRefresh(immediate) {
+    if (this._unmounted) return;
+    if (immediate) {
+      clearTimeout(this._navRefreshTimer);
+      this._navRefreshTimer = 0;
+      this._navRefreshPending = false;
+      this._commitNavUi();
+      return;
+    }
+    if (this._navRefreshPending) return;
+    this._navRefreshPending = true;
+    this._navRefreshTimer = setTimeout(() => {
+      this._navRefreshTimer = 0;
+      this._navRefreshPending = false;
+      if (!this._unmounted) this._commitNavUi();
+    }, 250);
+  }
+
+  _commitNavUi() {
+    const mode = this._shellMode || this.state.shellMode;
+    const needsWidget = this._hasWidgetType(mode, 'navigation');
+    const sync = () => this._syncDockIndicators();
+    if (needsWidget) {
+      this._uiOnlyStateWrite = true;
+      this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }), sync);
+    } else {
+      sync();
     }
   }
 
@@ -15137,6 +15371,7 @@ class Component extends DCLogic {
       return mats.some(m => m && /tire|tyre/i.test(m.name || ''));
     };
     this._tireWheels = this._allWheels.filter(isTire);
+    this._xrayTireBandSizeCache = null;
     this._rimWheels = this._allWheels.filter(m => !isTire(m));
 
     // Get vertex count helper
@@ -18079,6 +18314,7 @@ class Component extends DCLogic {
     if (this._hsLayer && this._hsLayer.parentNode) this._hsLayer.parentNode.removeChild(this._hsLayer);
     this._hsLayer = null;
     this._disposeXrayWheelGlows();
+    this._disposeXrayTireBands();
     this._camFabEl = null;
     this._camFabBtn = null;
     this._camFabAnchor = null;
@@ -18853,6 +19089,7 @@ class Component extends DCLogic {
   }
 
   _syncXrayWheelGlows(now) {
+    this._syncXrayTireBands(now);
     const want = !!(this.state.powertrainOn && this._powertrainRig && this._powertrainRig.visible
                     && this._powertrainFxTune().motorGlowOn);
     if (!want) {
@@ -18906,10 +19143,328 @@ class Component extends DCLogic {
     applyAxle(glows.rear, awd ? (flow.rear || 0) : 0, fit.rear, fit.rearTrack);
   }
 
+  // ── X-ray tyre contact bands ──────────────────────────────────────────────
+  //
+  // An open cylinder (no caps) per corner, sized to the tyre, with a repeating
+  // arrow texture. Only the ground-contact arc is lit — the rest of the shell
+  // fades out by world Y. Colour and spin follow the same packed flow the
+  // POWER card uses: blue with the tyre while that axle is driving, green
+  // against it while regen, hidden when idle.
+
+  _xrayTireBandTexture() {
+    const THREE = this.THREE;
+    const tune = this._powertrainFxTune();
+    const n = Math.max(4, Math.round(tune.tireBandArrows || 12));
+    if (this._xrayTireBandTex && this._xrayTireBandTexN === n) return this._xrayTireBandTex;
+    if (this._xrayTireBandTex) this._xrayTireBandTex.dispose();
+    const W = 512;
+    const H = 64;
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+    const slot = W / n;
+    const padY = 6;
+    for (let i = 0; i < n; i++) {
+      const x0 = i * slot;
+      ctx.beginPath();
+      ctx.moveTo(x0 + slot * 0.96, padY);
+      ctx.lineTo(x0 + slot * 0.22, H * 0.5);
+      ctx.lineTo(x0 + slot * 0.96, H - padY);
+      ctx.lineTo(x0 + slot * 0.68, H * 0.5);
+      ctx.closePath();
+      const grd = ctx.createLinearGradient(x0 + slot, 0, x0, 0);
+      grd.addColorStop(0.00, 'rgba(255,255,255,0.20)');
+      grd.addColorStop(0.40, 'rgba(255,255,255,1.00)');
+      grd.addColorStop(1.00, 'rgba(255,255,255,0.08)');
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    if (tex.colorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+    this._xrayTireBandTex = tex;
+    this._xrayTireBandTexN = n;
+    return tex;
+  }
+
+  _xrayTireBandMeasure(tire) {
+    const THREE = this.THREE;
+    if (!tire || !tire.geometry || !tire._pivot || !tire._rollAxis || !tire._initWorld) return null;
+    const geo = tire.geometry;
+    const pos = geo.attributes && geo.attributes.position;
+    if (!pos) return null;
+    const cache = this._xrayTireBandSizeCache || (this._xrayTireBandSizeCache = new Map());
+    const sig = geo.uuid + '|' + pos.count + '|' + (tire._origLocalPos ? tire._origLocalPos.length : 0);
+    const hit = cache.get(tire.uuid);
+    if (hit && hit.sig === sig) return hit;
+    const inv = tire._initWorld.clone().invert();
+    const localPivot = tire._pivot.clone().applyMatrix4(inv);
+    const axisEnd = tire._pivot.clone().add(tire._rollAxis).applyMatrix4(inv);
+    const localAxis = axisEnd.sub(localPivot);
+    if (localAxis.lengthSq() < 1e-10) return null;
+    localAxis.normalize();
+    // Radius / width in the rest-pose WORLD frame, so a mirrored (negative
+    // scale) rear tyre still yields a positive cylinder. The band mesh is
+    // parented to the car root, not the spinning tyre.
+    const v = new THREE.Vector3();
+    const rel = new THREE.Vector3();
+    const src = tire._origLocalPos;
+    const axis = tire._rollAxis;
+    const pivot = tire._pivot;
+    let minA = Infinity, maxA = -Infinity, maxR = 0;
+    const step = Math.max(1, Math.floor(pos.count / 8000));
+    for (let i = 0; i < pos.count; i += step) {
+      if (src) v.set(src[i * 3], src[i * 3 + 1], src[i * 3 + 2]);
+      else v.fromBufferAttribute(pos, i);
+      v.applyMatrix4(tire._initWorld);
+      rel.copy(v).sub(pivot);
+      const axial = rel.dot(axis);
+      const radial = rel.addScaledVector(axis, -axial).length();
+      if (axial < minA) minA = axial;
+      if (axial > maxA) maxA = axial;
+      if (radial > maxR) maxR = radial;
+    }
+    if (!(maxR > 1e-4) || !isFinite(minA) || !isFinite(maxA)) return null;
+    const out = {
+      sig: sig,
+      radius: maxR,
+      width: Math.max(0.08, maxA - minA),
+      localPivot: localPivot,
+      localAxis: localAxis,
+    };
+    cache.set(tire.uuid, out);
+    return out;
+  }
+
+  _xrayTireBandCornerTire(side) {
+    const tires = (this._tireWheels || []).filter((m) => m && m._wheelSide === side);
+    if (tires.length) return tires[0];
+    const clusters = {
+      fl: this._frontLeftWheels, fr: this._frontRightWheels,
+      rl: this._rearLeftWheels, rr: this._rearRightWheels,
+    };
+    const arr = clusters[side] || [];
+    return arr.find((m) => m && m._pivot && m._rollAxis) || null;
+  }
+
+  _ensureXrayTireBands() {
+    if (this._xrayTireBands) return this._xrayTireBands;
+    const THREE = this.THREE;
+    const model = this.model;
+    if (!THREE || !model) return null;
+    const tex = this._xrayTireBandTexture();
+    const group = new THREE.Group();
+    group.name = 'XrayTireBands';
+    const bands = ['fl', 'fr', 'rl', 'rr'].map((side) => {
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          map: { value: tex },
+          color: { value: new THREE.Color('#6ecfff') },
+          color2: { value: new THREE.Color('#ff5a12') },
+          opacity: { value: 0 },
+          uOffset: { value: 0 },
+          uDir: { value: 1 },
+          uIce: { value: 0 },
+          uGroundY: { value: 0 },
+          uBandH: { value: 0.12 },
+        },
+        vertexShader: [
+          'varying vec2 vUv;',
+          'varying float vWorldY;',
+          'void main() {',
+          '  vUv = uv;',
+          '  vec4 worldPos = modelMatrix * vec4(position, 1.0);',
+          '  vWorldY = worldPos.y;',
+          '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+          '}',
+        ].join('\n'),
+        fragmentShader: [
+          'uniform sampler2D map;',
+          'uniform vec3 color;',
+          'uniform vec3 color2;',
+          'uniform float opacity;',
+          'uniform float uOffset;',
+          'uniform float uDir;',
+          'uniform float uIce;',
+          'uniform float uGroundY;',
+          'uniform float uBandH;',
+          'varying vec2 vUv;',
+          'varying float vWorldY;',
+          'void main() {',
+          '  float x = vUv.x + uOffset;',
+          '  if (uDir < 0.0) x = 1.0 - x;',
+          '  vec2 uv = vec2(x, vUv.y);',
+          '  vec4 texel = texture2D(map, uv);',
+          '  float h = clamp((vWorldY - uGroundY) / max(uBandH, 1e-4), 0.0, 1.0);',
+          '  float contact = smoothstep(0.28, 0.82, h);',
+          '  float edge = 1.0 - abs(vUv.y - 0.5) * 2.0;',
+          '  edge = smoothstep(0.0, 0.22, edge);',
+          '  float arrow = texel.r;',
+          '  float a = opacity * contact * edge * (0.62 + 0.38 * arrow);',
+          '  vec3 col = mix(color, color2, uIce * (0.78 - 0.62 * arrow));',
+          '  gl_FragColor = vec4(col * (0.70 + 0.30 * texel.rgb), a);',
+          '}',
+        ].join('\n'),
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+        fog: false,
+      });
+      setAdditiveKeepAlpha(THREE, mat);
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+      mesh.name = 'XrayTireBand';
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 20;
+      mesh.visible = false;
+      group.add(mesh);
+      return { side: side, mesh: mesh, mat: mat, geoKey: '' };
+    });
+    model.add(group);
+    this._xrayTireBands = { group: group, bands: bands };
+    return this._xrayTireBands;
+  }
+
+  _disposeXrayTireBands() {
+    const pack = this._xrayTireBands;
+    if (!pack) return;
+    pack.bands.forEach((b) => {
+      if (b.mesh.parent) b.mesh.parent.remove(b.mesh);
+      if (b.mesh.geometry) b.mesh.geometry.dispose();
+      if (b.mat) b.mat.dispose();
+    });
+    if (pack.group.parent) pack.group.parent.remove(pack.group);
+    if (this._xrayTireBandTex) {
+      this._xrayTireBandTex.dispose();
+      this._xrayTireBandTex = null;
+      this._xrayTireBandTexN = 0;
+    }
+    this._xrayTireBandSizeCache = null;
+    this._xrayTireBands = null;
+  }
+
+  _syncXrayTireBands(now) {
+    const tune = this._powertrainFxTune();
+    const want = !!(this.state.powertrainOn && this._powertrainRig && this._powertrainRig.visible
+                    && tune.tireBandOn);
+    if (!want) {
+      if (this._xrayTireBands) {
+        this._xrayTireBands.bands.forEach((b) => { b.mesh.visible = false; });
+      }
+      return;
+    }
+    const THREE = this.THREE;
+    const model = this.model;
+    if (!THREE || !model) return;
+    if (this._xrayTireBands && this._xrayTireBands.group.parent !== model) {
+      if (this._xrayTireBands.group.parent) {
+        this._xrayTireBands.group.parent.remove(this._xrayTireBands.group);
+      }
+      model.add(this._xrayTireBands.group);
+    }
+    const pack = this._ensureXrayTireBands();
+    if (!pack) return;
+
+    const tex = this._xrayTireBandTexture();
+    const flow = this._powerFlowRaw(now);
+    const manifest = this._powertrainManifest;
+    const packKey = this._powertrainPackKey || this._currentTrim().pack;
+    const batt = manifest && (manifest.batteries || {})[packKey];
+    const awd = !!(batt && batt.awd);
+    const G = this._powertrainGlowTones();
+    const t = this._powertrainFxT || 0;
+    const moving = Math.abs(this._currentMotionSpeed()) > 0.002;
+    const uvFlip = (typeof tune.tireBandUvFlip === 'number') ? tune.tireBandUvFlip : 1;
+
+    if (!this._xrayTireBandScratch) {
+      this._xrayTireBandScratch = {
+        center: new THREE.Vector3(),
+        axle: new THREE.Vector3(),
+        yAxis: new THREE.Vector3(0, 1, 0),
+        worldQuat: new THREE.Quaternion(),
+        parentQuat: new THREE.Quaternion(),
+        parentInv: new THREE.Matrix4(),
+        modelScale: new THREE.Vector3(),
+      };
+    }
+    const S = this._xrayTireBandScratch;
+    if (typeof model.updateWorldMatrix === 'function') model.updateWorldMatrix(true, false);
+    else model.updateMatrixWorld(true);
+    S.parentInv.copy(model.matrixWorld).invert();
+    model.getWorldQuaternion(S.parentQuat);
+    model.getWorldScale(S.modelScale);
+    const modelScale = Math.max(
+      Math.abs(S.modelScale.x), Math.abs(S.modelScale.y), Math.abs(S.modelScale.z), 1e-6);
+
+    pack.bands.forEach((b) => {
+      const tire = this._xrayTireBandCornerTire(b.side);
+      const axleDir = (b.side === 'fl' || b.side === 'fr') ? (flow.front || 0)
+        : (awd ? (flow.rear || 0) : 0);
+      const on = !!tire && axleDir !== 0;
+      b.mesh.visible = on;
+      if (!on) return;
+
+      const size = this._xrayTireBandMeasure(tire);
+      if (!size) { b.mesh.visible = false; return; }
+      if (typeof tire.updateWorldMatrix === 'function') tire.updateWorldMatrix(true, false);
+      else tire.updateMatrixWorld(true);
+      const worldRadius = size.radius + (tune.tireBandProud || 0);
+      const radius = worldRadius / modelScale;
+      const width = size.width / modelScale;
+      const geoKey = radius.toFixed(4) + '|' + width.toFixed(4);
+      if (b.geoKey !== geoKey) {
+        if (b.mesh.geometry) b.mesh.geometry.dispose();
+        b.mesh.geometry = new THREE.CylinderGeometry(radius, radius, width, 48, 1, true);
+        b.geoKey = geoKey;
+      }
+
+      S.center.copy(size.localPivot).applyMatrix4(tire.matrixWorld);
+      S.axle.copy(size.localPivot).add(size.localAxis).applyMatrix4(tire.matrixWorld).sub(S.center);
+      if (S.axle.lengthSq() < 1e-10) { b.mesh.visible = false; return; }
+      S.axle.normalize();
+      S.worldQuat.setFromUnitVectors(S.yAxis, S.axle);
+      b.mesh.position.copy(S.center).applyMatrix4(S.parentInv);
+      b.mesh.quaternion.copy(S.parentQuat).invert().multiply(S.worldQuat);
+
+      const regen = axleDir < 0;
+      const front = (b.side === 'fl' || b.side === 'fr');
+      const iceDrive = !regen && !!flow.ice && front;
+      const tone = regen ? G.regen : G.drive;
+      const gain = regen ? tune.regenMax : tune.driveMax;
+      b.mat.uniforms.map.value = tex;
+      b.mat.uniforms.color.value.copy(tone.color);
+      if (b.mat.uniforms.color2) {
+        b.mat.uniforms.color2.value.copy((G.ice && G.ice.color) || tone.color);
+      }
+      if (b.mat.uniforms.uIce) b.mat.uniforms.uIce.value = iceDrive ? 1 : 0;
+      b.mat.uniforms.opacity.value = (tune.tireBandOpacity || 0.9) * gain;
+      b.mat.uniforms.uGroundY.value = S.center.y - worldRadius;
+      b.mat.uniforms.uBandH.value = worldRadius * (tune.tireBandContact || 0.42);
+
+      // Left/right axles already point opposite, so an extra side flip made
+      // the car's right pair scroll backwards. Regen mirrors the chevrons
+      // (uDir) and runs the offset the other way.
+      const dirSign = axleDir < 0 ? -1 : 1;
+      if (b.mat.uniforms.uDir) b.mat.uniforms.uDir.value = dirSign;
+      const rollUv = (tire._rollAngle || 0) / (Math.PI * 2);
+      const flowUv = t * (tune.beadSpeed || 0.40);
+      const uv = ((moving ? rollUv : flowUv) * dirSign * uvFlip);
+      b.mat.uniforms.uOffset.value = uv - Math.floor(uv);
+    });
+  }
+
   _getGlassMeshes() {
     const meshes = [];
     this.scene && this.scene.traverse(c => {
       if (!c.isMesh || !c.visible) return;
+      if (c.name === 'XrayTireBand') return;
       const mat = Array.isArray(c.material) ? c.material[0] : c.material;
       if (mat && mat.transparent) meshes.push(c);
     });
@@ -22588,6 +23143,9 @@ class Component extends DCLogic {
           if ('wheelGlowRadius' in patch || 'wheelGlowY' in patch) {
             this._rebuildPowertrainWheelGlows();
           }
+          if ('tireBandArrows' in patch) {
+            this._xrayTireBandTexture();
+          }
           if ('wheelBoxOn' in patch || 'wheelBoxLen' in patch
               || 'wheelBoxWide' in patch) {
             this._rebuildPowertrainBadges();
@@ -22600,8 +23158,15 @@ class Component extends DCLogic {
             this._rebuildPowertrainBadges();
           }
           if ('socTextX' in patch || 'socTextZ' in patch || 'socTextLen' in patch
-              || 'socTextWide' in patch || 'socTextEdgePx' in patch) {
+              || 'socTextWide' in patch || 'socTextEdgePx' in patch
+              || 'socTextColor' in patch || 'socTextGlowColor' in patch
+              || 'socTextGlowPx' in patch || 'socTextGlowPasses' in patch
+              || 'socTextEdgeColor' in patch || 'socTextWeight' in patch
+              || 'socTextShadowX' in patch || 'socTextShadowY' in patch
+              || 'socTextOpacity' in patch) {
             this._rebuildPowertrainSocText();
+            this._updatePowertrainSocText(
+              this._powerSocPct(performance.now()), !!this._powertrainPlugged);
           }
           if ('bloomOn' in patch || 'bloomStrength' in patch) {
             const want = !!(this._powertrainFxTune().bloomOn && this.state.powertrainOn);
@@ -23313,8 +23878,9 @@ class Component extends DCLogic {
         // Same idea for the charge %: which side is nearest depends on where
         // the camera is now, so it cannot be decided when the flow changes.
         if (this.state.powertrainOn) this._syncSocTextNearSide();
-        // Wheel-floor glows track live flow while x-ray is up.
-        if (this.state.powertrainOn || this._xrayWheelGlows) {
+        // Tyre contact bands (and the unused floor glows) track live flow
+        // while x-ray is up.
+        if (this.state.powertrainOn || this._xrayWheelGlows || this._xrayTireBands) {
           this._syncXrayWheelGlows(performance.now());
         }
         // Forced frames after UI changes / async loads (componentDidUpdate, etc.)
@@ -23677,6 +24243,12 @@ class Component extends DCLogic {
       }
       this.model.add(this._xrayWheelGlows.group);
     }
+    if (this._xrayTireBands && this._xrayTireBands.group.parent !== this.model) {
+      if (this._xrayTireBands.group.parent) {
+        this._xrayTireBands.group.parent.remove(this._xrayTireBands.group);
+      }
+      this.model.add(this._xrayTireBands.group);
+    }
   }
 
   _powertrainTuning() {
@@ -23948,6 +24520,7 @@ class Component extends DCLogic {
     const box = new THREE.Box3();
     model.traverse((c) => {
       if (!c.isMesh || this._isCarFloorMesh(c)) return;
+      if (c.name === 'XrayTireBand') return;
       if (rig.getObjectById(c.id)) return;   // never measure ourselves
       const b = new THREE.Box3().setFromObject(c);
       if (!b.isEmpty()) box.union(b.applyMatrix4(toLocal));
@@ -24036,6 +24609,9 @@ class Component extends DCLogic {
       // wheel mesh lists above — ghosting them kills the spin sprite in x-ray.
       [...(this._blurredDiscs || []), ...(this._backingDiscs || [])].forEach((d) => {
         if (d && d.id !== undefined) keepSolid.add(d.id);
+      });
+      ((this._xrayTireBands && this._xrayTireBands.bands) || []).forEach((b) => {
+        if (b && b.mesh && b.mesh.id !== undefined) keepSolid.add(b.mesh.id);
       });
       const saved = [];
       model.traverse((c) => {
@@ -24342,6 +24918,17 @@ class Component extends DCLogic {
         // than as anything about the powertrain, so both are off.
         wheelGlowOn: 0,
         motorGlowOn: 0,
+        // Open cylinder on each tyre: arrows on the tread, faded toward the
+        // CROWN (top of the tyre). Blue while that axle is driving, blue+orange
+        // when the engine is in the mix, green while regen (chevrons mirrored).
+        // while regen (chevrons mirrored + offset reversed), hidden when idle.
+        tireBandOn: 1,
+        tireBandProud: 0.022,
+        tireBandContact: 0.95,
+        tireBandOpacity: 1.0,
+        tireBandArrows: 8,
+        tireBandIdleHz: 0.40,
+        tireBandUvFlip: 1,
         // Route the emissive x-ray parts through the app's bloom composer, so
         // the light actually BLEEDS instead of stopping at the surface. This is
         // the only thing here that costs real frame time: CLAUDE.md measures
@@ -24603,21 +25190,19 @@ class Component extends DCLogic {
         // 400 rather than bold: the packaged range is 400-600, and asking for
         // 700 gets a synthesised bold, not a real one.
         socTextFamily: "'Space Grotesk', system-ui, sans-serif",
-        socTextWeight: '400',
-        // Grey rather than the ring's green. NOTE this needs the opacity below
-        // to carry it: measured, #aab4bd at 50% over the 236 floor composites
-        // to (218,222,225) -- under 20 levels of separation. At 0.85 it lands
-        // near (185,192,198), which reads.
-        socTextColor: '#aab4bd',
-        socTextGlowPx: 14,
-        socTextGlowPasses: 3,
-        socTextOpacity: 0.85,
-        // Thin semi-transparent white rim round the glyphs. Drawn with the
-        // shadow OFF, after the glow passes: with the shadow still set it
-        // would just add another glow pass in white and fatten the halo
-        // instead of drawing an edge. Thin against a ~290 px glyph.
-        socTextEdgePx: 4,
-        socTextEdgeColor: 'rgba(255,255,255,0.55)',
+        socTextWeight: '600',
+        // Option G: white glyphs, lime stroke, soft green bloom. Lime fill
+        // vanished into the pale floor; a white body with a green outline
+        // keeps the charge colour and still reads as a number.
+        socTextColor: '#ffffff',
+        socTextGlowColor: 'rgba(0,255,0,0.55)',
+        socTextGlowPx: 12,
+        socTextGlowPasses: 2,
+        socTextShadowX: 0,
+        socTextShadowY: 0,
+        socTextOpacity: 1,
+        socTextEdgePx: 8,
+        socTextEdgeColor: 'rgba(0,255,0,0.95)',
         // Label is knocked out of the plate. badgeTextKnockPx widens the hole,
         // badgeTextEdge* draws the dark edge that gives it definition where
         // plate and floor are close in brightness.
@@ -25191,6 +25776,8 @@ class Component extends DCLogic {
     const g = cv.getContext('2d');
     const W = cv.width, H = cv.height;
     const tune = this._powertrainFxTune();
+    const fill = tune.socTextColor || '#ffffff';
+    const glow = tune.socTextGlowColor || 'rgba(0,255,0,0.55)';
     g.clearRect(0, 0, W, H);
     // Shrink to fit rather than letting "100%" run off the plate.
     let px = Math.round(H * 0.78);
@@ -25203,18 +25790,27 @@ class Component extends DCLogic {
     }
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.shadowColor = tune.socTextColor;
-    g.shadowBlur = tune.socTextGlowPx * 2;
-    g.fillStyle = tune.socTextColor;
-    // Repeat fills to build the glow up: one pass barely registers against a
-    // 236/255 floor.
-    for (let i = 0; i < tune.socTextGlowPasses; i++) g.fillText(text, W / 2, H / 2);
+    const x = W / 2, y = H / 2;
+    // Option G: lime bloom + lime outline around a white glyph.
+    g.shadowOffsetX = tune.socTextShadowX || 0;
+    g.shadowOffsetY = tune.socTextShadowY || 0;
+    g.shadowColor = glow;
+    g.fillStyle = fill;
+    g.shadowBlur = tune.socTextGlowPx * 2.2;
+    for (let i = 0; i < tune.socTextGlowPasses; i++) g.fillText(text, x, y);
+    g.shadowBlur = tune.socTextGlowPx * 0.7;
+    g.fillText(text, x, y);
     if (tune.socTextEdgePx > 0) {
-      g.shadowBlur = 0;                            // an edge, not another glow
+      g.shadowBlur = 0;
+      g.lineJoin = 'round';
+      g.miterLimit = 2;
       g.lineWidth = tune.socTextEdgePx;
       g.strokeStyle = tune.socTextEdgeColor;
-      g.strokeText(text, W / 2, H / 2);
+      g.strokeText(text, x, y);
     }
+    g.shadowBlur = 0;
+    g.fillStyle = fill;
+    g.fillText(text, x, y);
     node.tex.needsUpdate = true;
     // Canvas font fallback is SILENT, and this canvas is painted once and then
     // cached on its signature -- so a paint that ran before the webfont
@@ -26197,6 +26793,9 @@ class Component extends DCLogic {
     if (this._xrayWheelGlows) {
       this._xrayWheelGlows.front.mesh.visible = false;
       this._xrayWheelGlows.rear.mesh.visible = false;
+    }
+    if (this._xrayTireBands) {
+      this._xrayTireBands.bands.forEach((b) => { b.mesh.visible = false; });
     }
   }
 
@@ -30798,22 +31397,158 @@ class Component extends DCLogic {
   }
 
   _navigationWidgetView(item) {
-    const demo = !!this._demoPreview;
+    this._ensureDemoNavTicker();
+    const live = this._navLive || { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    const session = this._aaSession === 'active';
+    const guiding = !!live.active;
+    const demo = !!this._demoPreview && !guiding && !session;
+    const demoFrame = DEMO_NAV_SEQUENCE[
+      Math.max(0, Number(this._demoNavPhase) || 0) % DEMO_NAV_SEQUENCE.length
+    ] || DEMO_NAV_SEQUENCE[0];
+    const demoIdle = !!(demo && demoFrame.idle);
+    const place = this._placeLive || { city: '', street: '' };
+    const family = demo && !demoIdle
+      ? (demoFrame.family || 'turn_right')
+      : (guiding ? this._navTurnFamily(live.turn) : 'turn_right');
+    const glyph = NAV_TURN_GLYPHS[family] || NAV_TURN_GLYPHS.turn_right;
+    const iconUrl = NAV_TURN_ICONS[family] || '';
+    const now = new Date();
+    let source, street, distance, remainingM, remainingS, cardState, showTurn;
+    if (demo && !demoIdle) {
+      source = 'DEMO · ROUTE PREVIEW';
+      street = demoFrame.street || '';
+      remainingM = demoFrame.remainingM;
+      remainingS = demoFrame.remainingS;
+      distance = formatNavMeters(demoFrame.distanceM);
+      cardState = family;
+      showTurn = true;
+    } else if (demoIdle) {
+      source = 'DEMO · NO GUIDANCE';
+      street = '';
+      distance = '';
+      remainingM = null;
+      remainingS = null;
+      cardState = 'idle';
+      showTurn = false;
+    } else if (guiding) {
+      source = 'ANDROID AUTO · LIVE';
+      street = live.street || this._navTurnLabel(live.turn) || 'GUIDING';
+      distance = live.distance || formatNavMeters(live.distanceM);
+      remainingM = live.remainingM;
+      remainingS = live.remainingS;
+      cardState = family;
+      showTurn = true;
+    } else if (session) {
+      source = 'ANDROID AUTO · NO GUIDANCE';
+      street = '';
+      distance = '';
+      remainingM = null;
+      remainingS = null;
+      cardState = 'idle';
+      showTurn = false;
+    } else {
+      source = 'NAVIGATION · NO ROUTE DATA';
+      street = '';
+      distance = '';
+      remainingM = null;
+      remainingS = null;
+      cardState = 'unavailable';
+      showTurn = false;
+    }
+    const metricSlots = Math.max(1, Math.min(3, Number(item.w) || 2));
+    let remaining = showTurn ? formatNavMeters(remainingM) : '';
+    let duration = showTurn ? formatNavDuration(remainingS) : '';
+    let eta = showTurn ? formatNavEta(remainingS, now) : '';
+    const metricCount = (remaining ? 1 : 0) + (duration ? 1 : 0) + (eta ? 1 : 0);
+    if (metricSlots <= 1) {
+      remaining = '';
+      duration = '';
+      eta = '';
+    } else if (metricCount > metricSlots && remaining && eta) {
+      duration = '';
+    }
+    const trip = [remaining, duration].filter(Boolean).join('  |  ');
+    const idlePrimary = place.city || (demoIdle ? 'SÃO PAULO' : '—');
+    const idleHint = place.street || (session ? 'NO GUIDANCE' : (demoIdle ? 'NO ROUTE IN PROGRESS' : 'OPEN NAVIGATION'));
+    const appPackage = (session || guiding) ? CAR_AA_PACKAGE : '';
+    const appIcon = appPackage ? this._navAppIcon(appPackage) : '';
     return {
       navigationSizeClass: 'hv-navigation-' + (item.w || 2) + 'x' + (item.h || 1),
-      navigationSource: demo ? 'DEMO · ROUTE PREVIEW' : 'NAVIGATION · NO ROUTE DATA',
-      navigationDistance: demo ? '450 m' : '—',
-      navigationHint: demo ? 'TURN RIGHT · 2 MIN' : 'OPEN NAVIGATION',
+      navigationLiveClass: showTurn ? 'is-live' : 'is-idle',
+      navigationSource: source,
+      navigationDistance: distance,
+      navigationStreet: street,
+      navigationTrip: trip,
+      navigationRemaining: remaining,
+      navigationDuration: duration,
+      navigationEta: eta,
+      navigationHasRemaining: !!remaining,
+      navigationHasDuration: !!duration,
+      navigationHasEta: !!eta,
+      navigationHint: street,
+      navigationIdlePrimary: idlePrimary,
+      navigationIdleHint: idleHint,
+      navigationTurnGlyph: (!iconUrl && showTurn) ? glyph : '',
+      navigationHasTurnGlyph: !!(!iconUrl && showTurn),
+      navigationHasTurnIcon: !!(iconUrl && showTurn),
+      navigationTurnStyle: (iconUrl && showTurn)
+        ? ('-webkit-mask-image:url(' + iconUrl + ');mask-image:url(' + iconUrl + ')')
+        : '',
+      navigationShowTurn: showTurn,
+      navigationHasAppIcon: !!appIcon,
+      navigationAppIcon: appIcon,
+      navigationCardState: cardState,
+      navigationCardGlyph: showTurn ? glyph : '',
+      navigationAppPackage: appPackage,
       onNavigationOpen: (ev) => {
         this._cardControlEvent(ev);
         if (this._widgetSuppressClick || this.state.widgetMenuId) return;
-        try {
-          if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
-            window.AppLauncherBridge.launchAppInPopup(CAR_NAV_PACKAGE);
-          }
-        } catch (e) {}
+        this._openNavigationApp();
       },
     };
+  }
+
+  _navAppIcon(pkg) {
+    if (!pkg) return '';
+    if (Object.prototype.hasOwnProperty.call(this._navAppIconByPkg || {}, pkg)) {
+      return this._navAppIconByPkg[pkg];
+    }
+    let url = '';
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.getAppIcon === 'function') {
+        url = window.AppLauncherBridge.getAppIcon(pkg) || '';
+      }
+    } catch (e) {}
+    if (!this._navAppIconByPkg) this._navAppIconByPkg = {};
+    this._navAppIconByPkg[pkg] = url;
+    return url;
+  }
+
+  _ensureDemoNavTicker() {
+    if (this._demoNavTicker || !this._demoPreview || typeof setInterval !== 'function') return;
+    this._demoNavTicker = setInterval(() => {
+      if (this._unmounted || !this._demoPreview) return;
+      if (this._aaSession === 'active') return;
+      if (this._navLive && this._navLive.active) return;
+      this._demoNavPhase = (Number(this._demoNavPhase) || 0) + 1;
+      this.setState((state) => ({ widgetRev: (state.widgetRev || 0) + 1 }), () => {
+        if (this._unmounted) return;
+        this._syncDockIndicators();
+      });
+    }, DEMO_NAV_INTERVAL_MS);
+  }
+
+  _openNavigationApp() {
+    try {
+      const B = window.AppLauncherBridge;
+      if (!B) return;
+      if (this._aaSession === 'active') {
+        if (typeof B.launchProjection === 'function') B.launchProjection('AA');
+        else if (typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_AA_PACKAGE);
+        return;
+      }
+      if (typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_NAV_PACKAGE);
+    } catch (e) {}
   }
 
   _tiresWidgetView(item) {
@@ -32020,11 +32755,7 @@ class Component extends DCLogic {
         this._openFocusedCard('power');
         break;
       case 'openNavigation':
-        try {
-          if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
-            window.AppLauncherBridge.launchAppInPopup(CAR_NAV_PACKAGE);
-          }
-        } catch (e) {}
+        this._openNavigationApp();
         break;
       case 'cycleDriveMode':
         this._cycleDriveRoadMode();
@@ -32069,7 +32800,8 @@ class Component extends DCLogic {
     const consumptionSummary = consumption.consumptionSource.indexOf('VEHICLE') === 0
       ? consumption.consumptionFuel + ' L/100 · ' + consumption.consumptionEv + ' kWh'
       : (this._demoPreview ? 'DEMO · ' + consumption.consumptionFuel + ' L/100' : 'No current vehicle data');
-    const navigation = this._navigationWidgetView({ type: 'navigation', w: 2, h: 1 });
+    // Rail tiles are wider than a 2-col widget: send remaining + time + ETA.
+    const navigation = this._navigationWidgetView({ type: 'navigation', w: 3, h: 1 });
     const range = this._rangeWidgetView({ type: 'range', w: 2, h: 1 });
     const power = this._powerWidgetView({ type: 'power', w: 2, h: 1 });
     const status = this._statusWidgetView({ type: 'status', w: 2, h: 1 });
@@ -32144,7 +32876,9 @@ class Component extends DCLogic {
       progress: Math.round((roofSun + roofShade) / 2),
     };
     const bottomValues = {
-      navigation: navigation.navigationDistance + ' · ' + navigation.navigationHint,
+      navigation: navigation.navigationStreet
+        ? (navigation.navigationDistance + ' · ' + navigation.navigationStreet)
+        : (navigation.navigationIdlePrimary + ' · ' + navigation.navigationIdleHint),
       climate: climateSummary,
       consumption: consumptionSummary,
       media: media.mediaTitle,
@@ -32166,11 +32900,21 @@ class Component extends DCLogic {
     // preserving compatibility with older native shells.
     const bottomVisuals = {
       navigation: {
-        primary: navigation.navigationDistance,
-        secondary: navigation.navigationHint,
-        metricA: navigation.navigationSource,
-        metricB: '',
-        progress: this._demoPreview ? 68 : 0,
+        primary: navigation.navigationShowTurn
+          ? navigation.navigationStreet
+          : navigation.navigationIdlePrimary,
+        secondary: navigation.navigationShowTurn
+          ? navigation.navigationTrip
+          : navigation.navigationIdleHint,
+        metricA: navigation.navigationDistance,
+        metricB: navigation.navigationEta,
+        navRemaining: navigation.navigationRemaining || '',
+        navDuration: navigation.navigationDuration || '',
+        navEta: navigation.navigationShowTurn ? (navigation.navigationEta || '') : '',
+        progress: this._demoPreview && navigation.navigationShowTurn ? 68 : 0,
+        state: navigation.navigationCardState,
+        glyph: navigation.navigationCardGlyph,
+        appPackage: navigation.navigationAppPackage || '',
       },
       climate: {
         primary: this._demoPreview ? '22°' : '—°',

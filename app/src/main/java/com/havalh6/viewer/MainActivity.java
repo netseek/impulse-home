@@ -185,7 +185,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v24-statusbig";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v47-aa-tbt-gmaps";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -561,6 +561,32 @@ public final class MainActivity extends Activity {
         @JavascriptInterface
         public void launchAppInPopup(String packageName) {
             launchAppForPackage(packageName, "");
+        }
+
+        /**
+         * Raise Android Auto / CarPlay without going through MediaCenter's
+         * MAIN activity (that path skips the current track).
+         */
+        @JavascriptInterface
+        public void launchProjection(String kind) {
+            mainHandler.post(() -> {
+                if ("AA".equalsIgnoreCase(kind) || "ANDROID_AUTO".equalsIgnoreCase(kind)) {
+                    MainActivity.this.launchProjection(ProjectionPresence.Kind.ANDROID_AUTO);
+                } else if ("CP".equalsIgnoreCase(kind) || "CARPLAY".equalsIgnoreCase(kind)) {
+                    MainActivity.this.launchProjection(ProjectionPresence.Kind.CARPLAY);
+                }
+            });
+        }
+
+        /** Package icon as a data URL; empty when the package is not installed. */
+        @JavascriptInterface
+        public String getAppIcon(String packageName) {
+            Bitmap bmp = iconBitmapForPackage(packageName);
+            if (bmp == null) return "";
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
+            return "data:image/png;base64,"
+                    + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
         }
 
         @JavascriptInterface
@@ -1051,6 +1077,12 @@ public final class MainActivity extends Activity {
         final String glyph;
         /** Short code drawn in place of a glyph (AWD's "4x4"); may be empty. */
         final String glyphText;
+        /** Navigation / media source package; used to stamp the live app icon. */
+        String appPackage = "";
+        /** TBT remaining distance / duration / arrival; empty when not guiding. */
+        String navRemaining = "";
+        String navDuration = "";
+        String navEta = "";
         /** Quick-menu rows; empty for a card whose body opens something directly. */
         final java.util.List<QuickMenuRow> menu;
 
@@ -1268,7 +1300,7 @@ public final class MainActivity extends Activity {
                 case "status": drawVehicleStatus(canvas, w, h, accent, muted, strong); break;
                 case "climate": drawClimate(canvas, w, h, accent, muted); break;
                 case "consumption": drawBars(canvas, w, h, accent, muted); break;
-                case "navigation": drawNavigation(canvas, w, h, accent, muted); break;
+                case "navigation": drawNavigation(canvas, w, h, accent, muted, strong); break;
                 case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
                 case "power": drawPower(canvas, w, h, accent, muted, strong); break;
                 case "clock": drawClock(canvas, w, h, accent, muted, strong); break;
@@ -1558,23 +1590,201 @@ public final class MainActivity extends Activity {
         }
 
         private void drawNavigation(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            android.graphics.Path route = new android.graphics.Path();
-            route.moveTo(w * .18f, h * .84f);
-            route.cubicTo(w * .22f, h * .54f, w * .45f, h * .69f, w * .48f, h * .43f);
-            route.cubicTo(w * .50f, h * .28f, w * .66f, h * .29f, w * .80f, h * .29f);
-            stroke(muted, Math.max(4f, w * .07f));
-            c.drawPath(route, paint);
-            stroke(accent, Math.max(2f, w * .035f));
-            c.drawPath(route, paint);
-            android.graphics.Path arrow = new android.graphics.Path();
-            arrow.moveTo(w * .67f, h * .15f);
-            arrow.lineTo(w * .83f, h * .29f);
-            arrow.lineTo(w * .67f, h * .43f);
-            stroke(accent, Math.max(3f, w * .045f));
-            c.drawPath(arrow, paint);
-            fill(accent);
-            c.drawCircle(w * .18f, h * .84f, Math.max(3f, w * .05f), paint);
+                int accent, int muted, int strong) {
+            String state = descriptor.state == null ? "" : descriptor.state;
+            boolean idle = "idle".equals(state) || "unavailable".equals(state) || state.isEmpty();
+            boolean showTurn = !idle && (("destination".equals(state) || "exit".equals(state)
+                    || tbtIconRes(state) != 0)
+                    || (descriptor.glyph != null && !descriptor.glyph.isEmpty()));
+            String street = descriptor.primary == null ? "" : descriptor.primary;
+            String maneuver = descriptor.metricA == null ? "" : descriptor.metricA;
+            String remaining = descriptor.navRemaining == null ? "" : descriptor.navRemaining;
+            String duration = descriptor.navDuration == null ? "" : descriptor.navDuration;
+            String eta = descriptor.navEta == null ? "" : descriptor.navEta;
+            float col = Math.min(w * .30f, h * .95f);
+            if (showTurn) {
+                float glyph = Math.min(col * .78f, h * .58f);
+                if (!drawTbtIcon(c, state, col * .5f, h * .36f, glyph, accent)
+                        && descriptor.glyph != null && !descriptor.glyph.isEmpty()) {
+                    drawGlyphPath(c, descriptor.glyph, col * .5f, h * .36f, glyph,
+                            accent, Math.max(2.4f, glyph * .08f));
+                }
+                if (!maneuver.isEmpty()) {
+                    paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+                    paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                            android.graphics.Typeface.NORMAL));
+                    paint.setTextSize(Math.max(11f, h * .16f));
+                    fill(strong);
+                    c.drawText(maneuver, col * .5f, h * .88f, paint);
+                }
+            } else {
+                int routeColor = "unavailable".equals(state) ? muted : accent;
+                float doodleW = col * .92f, doodleH = h * .78f;
+                float ox = col * .04f, oy = h * .12f;
+                android.graphics.Path route = new android.graphics.Path();
+                route.moveTo(ox + doodleW * .12f, oy + doodleH * .88f);
+                route.cubicTo(ox + doodleW * .18f, oy + doodleH * .48f,
+                        ox + doodleW * .48f, oy + doodleH * .66f,
+                        ox + doodleW * .52f, oy + doodleH * .32f);
+                route.cubicTo(ox + doodleW * .55f, oy + doodleH * .12f,
+                        ox + doodleW * .78f, oy + doodleH * .14f,
+                        ox + doodleW * .92f, oy + doodleH * .14f);
+                stroke(muted, Math.max(3.5f, w * .018f));
+                c.drawPath(route, paint);
+                stroke(routeColor, Math.max(1.8f, w * .01f));
+                c.drawPath(route, paint);
+                fill(routeColor);
+                c.drawCircle(ox + doodleW * .12f, oy + doodleH * .88f, Math.max(3f, w * .012f), paint);
+            }
+            float textX = col + w * .035f;
+            float textMax = w - textX - w * .03f;
+            if (textMax > 8f) {
+                paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                        android.graphics.Typeface.NORMAL));
+                if (!street.isEmpty()) {
+                    paint.setTextSize(Math.max(11f, h * .17f));
+                    fill(strong);
+                    c.drawText(ellipsizeNav(street, textMax), textX, h * .28f, paint);
+                }
+                if (showTurn) {
+                    drawNavMetricRow(c, textX, h * .46f, textMax, h,
+                            remaining, duration, eta, accent, muted, strong);
+                }
+            }
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+            drawNavigationAppBadge(c, w, h, accent);
+        }
+
+        private void drawNavMetricRow(android.graphics.Canvas c, float x, float top,
+                float maxW, float h, String remaining, String duration, String eta,
+                int accent, int muted, int strong) {
+            java.util.List<String[]> items = new java.util.ArrayList<>();
+            if (remaining != null && !remaining.isEmpty()) {
+                items.add(new String[] { remaining, "REMAINING" });
+            }
+            if (duration != null && !duration.isEmpty()) {
+                items.add(new String[] { duration, "TIME" });
+            }
+            if (eta != null && !eta.isEmpty()) {
+                items.add(new String[] { eta, "ETA" });
+            }
+            if (items.isEmpty() || maxW <= 0f) return;
+            android.graphics.Typeface medium = android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.NORMAL);
+            float valueSize = Math.max(13f, h * .24f);
+            float labelSize = Math.max(7f, h * .11f);
+            float gap = Math.max(10f, h * .08f);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(medium);
+            float[] widths = measureNavMetricWidths(items, valueSize, labelSize);
+            float total = sumNavMetricWidths(widths, gap);
+            if (total > maxW) {
+                for (int i = items.size() - 1; i >= 0; i--) {
+                    if ("TIME".equals(items.get(i)[1])) {
+                        items.remove(i);
+                        break;
+                    }
+                }
+                widths = measureNavMetricWidths(items, valueSize, labelSize);
+                total = sumNavMetricWidths(widths, gap);
+            }
+            while (total > maxW && valueSize > 11f) {
+                valueSize -= 1f;
+                widths = measureNavMetricWidths(items, valueSize, labelSize);
+                total = sumNavMetricWidths(widths, gap);
+            }
+            float valueY = top + h * .22f;
+            float labelY = top + h * .40f;
+            float cx = x;
+            for (int i = 0; i < items.size(); i++) {
+                float colW = widths[i];
+                boolean isEta = "ETA".equals(items.get(i)[1]);
+                paint.setTypeface(medium);
+                paint.setTextSize(valueSize);
+                fill(isEta ? accent : strong);
+                c.drawText(ellipsizeNav(items.get(i)[0], colW), cx, valueY, paint);
+                paint.setTextSize(labelSize);
+                fill(muted);
+                c.drawText(items.get(i)[1], cx, labelY, paint);
+                cx += colW + gap;
+            }
+        }
+
+        private float[] measureNavMetricWidths(java.util.List<String[]> items,
+                float valueSize, float labelSize) {
+            float[] widths = new float[items.size()];
+            for (int i = 0; i < items.size(); i++) {
+                paint.setTextSize(valueSize);
+                float valueW = paint.measureText(items.get(i)[0]);
+                paint.setTextSize(labelSize);
+                widths[i] = Math.max(valueW, paint.measureText(items.get(i)[1]));
+            }
+            return widths;
+        }
+
+        private float sumNavMetricWidths(float[] widths, float gap) {
+            float total = 0f;
+            for (int i = 0; i < widths.length; i++) {
+                total += widths[i];
+                if (i > 0) total += gap;
+            }
+            return total;
+        }
+
+        private int tbtIconRes(String state) {
+            if (state == null) return 0;
+            switch (state) {
+                case "turn_right": return R.drawable.ic_tbt_turn_right;
+                case "turn_left": return R.drawable.ic_tbt_turn_left;
+                case "straight": return R.drawable.ic_tbt_straight;
+                case "uturn": return R.drawable.ic_tbt_uturn;
+                case "roundabout": return R.drawable.ic_tbt_roundabout;
+                case "fork": return R.drawable.ic_tbt_fork;
+                case "merge": return R.drawable.ic_tbt_merge;
+                default: return 0;
+            }
+        }
+
+        private boolean drawTbtIcon(android.graphics.Canvas c, String state,
+                float cx, float cy, float size, int accent) {
+            int res = tbtIconRes(state);
+            if (res == 0) return false;
+            android.graphics.drawable.Drawable icon = getContext().getDrawable(res);
+            if (icon == null) return false;
+            icon = icon.mutate();
+            icon.setColorFilter(new PorterDuffColorFilter(accent, PorterDuff.Mode.SRC_IN));
+            int s = Math.max(12, Math.round(size));
+            int left = Math.round(cx - s / 2f);
+            int top = Math.round(cy - s / 2f);
+            icon.setBounds(left, top, left + s, top + s);
+            icon.draw(c);
+            icon.setColorFilter(null);
+            return true;
+        }
+
+        private String ellipsizeNav(String text, float maxWidth) {
+            if (text == null || text.isEmpty() || maxWidth <= 0f) return "";
+            if (paint.measureText(text) <= maxWidth) return text;
+            String ellipsis = "…";
+            int n = text.length();
+            while (n > 0 && paint.measureText(text.substring(0, n) + ellipsis) > maxWidth) n--;
+            return n <= 0 ? ellipsis : text.substring(0, n) + ellipsis;
+        }
+
+        private void drawNavigationAppBadge(android.graphics.Canvas c, float w, float h,
+                int accent) {
+            String pkg = descriptor.appPackage == null ? "" : descriptor.appPackage.trim();
+            if (pkg.isEmpty()) return;
+            Bitmap icon = iconBitmapForPackage(pkg);
+            if (icon == null) return;
+            float size = Math.min(h * .22f, 22f);
+            float pad = Math.max(3f, w * .05f);
+            android.graphics.RectF dest = new android.graphics.RectF(
+                    w - pad - size, pad, w - pad, pad + size);
+            paint.setAlpha(255);
+            c.drawBitmap(icon, null, dest, paint);
         }
 
         private void drawTires(android.graphics.Canvas c, float w, float h,
@@ -2057,6 +2267,11 @@ public final class MainActivity extends Activity {
     /** Launcher icons, left to right — the order the boot reveal staggers them in. */
     private final List<MotionTrailLayout> launcherItems = new ArrayList<>();
     private ProjectionPresence projectionPresence;
+    private PlaceGlance placeGlance;
+    private final java.util.Map<String, Bitmap> packageIconBitmaps =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> packageIconMiss =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
     private MotionTrailLayout projectionItem;
     private View projectionGap;
     /** Waiting for Impulse to resolve a projection display task id. */
@@ -2715,6 +2930,13 @@ public final class MainActivity extends Activity {
 
     private void launchAppForPackage(String packageName, String label) {
         if (packageName == null || packageName.isEmpty()) return;
+        // AA / CarPlay audio is published by MediaCenter, but starting
+        // MediaCenter MAIN skips the track. Raise the projection task instead.
+        if (ProjectionPresence.isProjectionPackage(packageName)) {
+            mainHandler.post(() -> launchProjection(
+                    ProjectionPresence.kindForPackage(packageName)));
+            return;
+        }
         if (emulatorStubPackages.contains(packageName)) {
             String msg = label != null && !label.isEmpty() ? label : packageName;
             android.widget.Toast.makeText(this, msg + " (emulator stub)", android.widget.Toast.LENGTH_SHORT).show();
@@ -5266,6 +5488,16 @@ public final class MainActivity extends Activity {
         webView.addJavascriptInterface(new AppLauncherBridge(), "AppLauncherBridge");
         webView.addJavascriptInterface(new MediaBridge(), "MediaBridge");
 
+        placeGlance = new PlaceGlance(this, mainHandler, json -> {
+            telemetryCache.put(PlaceGlance.KEY, json);
+            if (webView == null) return;
+            webView.evaluateJavascript(
+                    String.format("if(window.onCarDataUpdate){window.onCarDataUpdate('%s','%s');}",
+                            PlaceGlance.KEY.replace("'", "\\'"), json.replace("'", "\\'")),
+                    null);
+        });
+        placeGlance.start();
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(
@@ -7380,7 +7612,7 @@ public final class MainActivity extends Activity {
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
         boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id)
-                || "clock".equals(descriptor.id);
+                || "clock".equals(descriptor.id) || "navigation".equals(descriptor.id);
         if (fullGraphicCard) {
             graphic.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
@@ -9091,8 +9323,9 @@ public final class MainActivity extends Activity {
                             raw.optString("tireState", "unavailable")))
                     : ("status".equals(id) ? sanitizeStatusState(raw.optString("state", "unavailable"))
                             : ("power".equals(id) ? sanitizePowerState(raw.optString("state", "unavailable"))
+                            : ("navigation".equals(id) ? sanitizeNavigationState(raw.optString("state", "unavailable"))
                             : (DRIVING_CARD_IDS.contains(id)
-                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : "")));
+                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : ""))));
             String[] wheelStates = ("tires".equals(id) || "status".equals(id))
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))
@@ -9112,6 +9345,10 @@ public final class MainActivity extends Activity {
                     openingStates, seatBeltStates, sunroofLevel, curtainLevel, demo,
                     iconAction, longAction, glyph, glyphText, menu);
             descriptor.tirePressures = cleanBottomCardText(raw.optString("tirePressures", ""), 48);
+            descriptor.appPackage = cleanBottomCardText(raw.optString("appPackage", ""), 80);
+            descriptor.navRemaining = cleanBottomCardText(raw.optString("navRemaining", ""), 16);
+            descriptor.navDuration = cleanBottomCardText(raw.optString("navDuration", ""), 16);
+            descriptor.navEta = cleanBottomCardText(raw.optString("navEta", ""), 8);
             if ("clock".equals(id)) {
                 String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
                 descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
@@ -9245,6 +9482,28 @@ public final class MainActivity extends Activity {
             case "stale":
             case "warning":
             case "unavailable":
+                return normalized;
+            default:
+                return "unavailable";
+        }
+    }
+
+    private String sanitizeNavigationState(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US)
+                .replace('-', '_');
+        switch (normalized) {
+            case "idle":
+            case "demo":
+            case "unavailable":
+            case "turn_left":
+            case "turn_right":
+            case "straight":
+            case "uturn":
+            case "roundabout":
+            case "fork":
+            case "merge":
+            case "exit":
+            case "destination":
                 return normalized;
             default:
                 return "unavailable";
@@ -9401,6 +9660,14 @@ public final class MainActivity extends Activity {
                 description.append(". ").append(labels[i]).append(" ").append(state);
             }
             description.append(". Opens vehicle status details.");
+            return description.toString();
+        }
+        if ("navigation".equals(descriptor.id)) {
+            StringBuilder description = new StringBuilder("Navigation. ");
+            description.append(descriptor.primary.isEmpty() ? "No route data" : descriptor.primary);
+            if (!descriptor.secondary.isEmpty()) description.append(". ").append(descriptor.secondary);
+            if (!descriptor.metricA.isEmpty()) description.append(". ").append(descriptor.metricA);
+            description.append(". Opens navigation.");
             return description.toString();
         }
         if (!"tires".equals(descriptor.id)) {
@@ -9775,6 +10042,44 @@ public final class MainActivity extends Activity {
         }
         CharSequence label = info.loadLabel(pm);
         return label != null ? label.toString() : "";
+    }
+
+    private Bitmap iconBitmapForPackage(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return null;
+        Bitmap hit = packageIconBitmaps.get(packageName);
+        if (hit != null) return hit;
+        if (packageIconMiss.contains(packageName)) return null;
+        try {
+            Drawable icon = getPackageManager().getApplicationIcon(packageName);
+            icon = normalizeAdaptiveIcon(icon, 96);
+            if (icon != null) {
+                int w = Math.max(1, icon.getIntrinsicWidth());
+                int h = Math.max(1, icon.getIntrinsicHeight());
+                if (w > 128 || h > 128 || w <= 0 || h <= 0) { w = 96; h = 96; }
+                Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+                icon.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+                icon.draw(canvas);
+                packageIconBitmaps.put(packageName, bmp);
+                return bmp;
+            }
+        } catch (Exception ignored) {}
+        if (ProjectionPresence.isProjectionPackage(packageName)
+                && !packageName.toLowerCase().contains("carplay")) {
+            try {
+                Drawable fallback = getDrawable(R.drawable.ic_android_auto);
+                if (fallback != null) {
+                    Bitmap bmp = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888);
+                    android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+                    fallback.setBounds(0, 0, 96, 96);
+                    fallback.draw(canvas);
+                    packageIconBitmaps.put(packageName, bmp);
+                    return bmp;
+                }
+            } catch (Exception ignored) {}
+        }
+        packageIconMiss.add(packageName);
+        return null;
     }
 
     private Drawable launcherIconForPackage(String pkg) {
@@ -10683,6 +10988,7 @@ public final class MainActivity extends Activity {
         mediaNowPlaying.stop();
         dismissDockEditMenu();
         if (projectionPresence != null) projectionPresence.stop();
+        if (placeGlance != null) placeGlance.stop();
         if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
         if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
         if (raiseOverlayRunnable != null) mainHandler.removeCallbacks(raiseOverlayRunnable);

@@ -108,6 +108,17 @@ final class ProjectionPresence {
         return lastKind;
     }
 
+    static String androidAutoAppPackage() {
+        return AA_APP;
+    }
+
+    static Kind kindForPackage(String packageName) {
+        if (!isProjectionPackage(packageName)) return Kind.NONE;
+        String p = packageName.toLowerCase();
+        if (p.contains("carplay")) return Kind.CARPLAY;
+        return Kind.ANDROID_AUTO;
+    }
+
     static boolean isProjectionPackage(String packageName) {
         if (packageName == null) return false;
         String p = packageName.toLowerCase();
@@ -191,18 +202,10 @@ final class ProjectionPresence {
     Drawable iconFor(Kind kind) {
         if (kind == Kind.NONE) return null;
         // Display apps ship a car glyph; the projection services have no launcher
-        // icon (generic Android). Use Impulse's branded defaults instead.
-        int res = kind == Kind.ANDROID_AUTO
-                ? R.drawable.ic_android_auto_default
-                : R.drawable.ic_carplay_default;
+        // icon (generic Android). Use the bundled AA / CarPlay marks instead.
+        int res = kind == Kind.ANDROID_AUTO ? R.drawable.ic_android_auto : R.drawable.ic_carplay;
         try {
-            Drawable branded = app.getDrawable(res);
-            if (branded != null) return branded;
-        } catch (Throwable ignored) {
-        }
-        int fallback = kind == Kind.ANDROID_AUTO ? R.drawable.ic_android_auto : R.drawable.ic_carplay;
-        try {
-            return app.getDrawable(fallback);
+            return app.getDrawable(res);
         } catch (Throwable ignored) {
             return null;
         }

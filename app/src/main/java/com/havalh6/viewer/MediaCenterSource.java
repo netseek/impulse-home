@@ -187,7 +187,11 @@ final class MediaCenterSource {
 
     private MediaTrack toTrack(int source, MediaInfo info, PlayState state) {
         MediaTrack track = new MediaTrack(MediaTrack.SRC_MEDIA_CENTER);
-        track.packageName = PACKAGE;
+        // AA audio is MediaCenter source 402, but launching MediaCenter's MAIN
+        // activity skips tracks. Name the projection app so the card raises
+        // AapActivity instead (see launchAppForPackage).
+        track.packageName = source == SOURCE_ANDROID_AUTO
+                ? ProjectionPresence.androidAutoAppPackage() : PACKAGE;
         track.appLabel = source == SOURCE_ANDROID_AUTO ? "ANDROID AUTO" : "USB";
         if (info != null) {
             track.title = nz(info.title);
