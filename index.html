@@ -15454,9 +15454,68 @@ class Component extends DCLogic {
     }
 
     const flFirst = this._frontLeftWheels[0];
-    const pivot = flFirst._pivot;
+    const pivotRest = flFirst._pivot;
     const axle = flFirst._rollAxis;
-    if (!pivot || !axle) return;
+    if (!pivotRest || !axle) return;
+
+    // _pivot is the REST pose captured at init, but _applyWheelTransforms
+    // counter-shifts the wheels in WORLD space for ride height. Frame the
+    // capture where the rim ACTUALLY IS, or it lands off-centre in its own
+    // texture by exactly the ride height -- and because the sprite disc spins
+    // about its own centre, an off-centre rim image then ORBITS. That reads as
+    // "the wheel rotates about a point that is not the centre of the circle",
+    // which is a texture bug and looks nothing like one.
+    //
+    // Measured on the car 2026-09-11 at carHeightOffset -18 mm: the rim's
+    // extent centre sat 7.5 px out in a 256 px capture whose rim radius is
+    // 120 px -- 6.2% of a radius, ~19 mm, the ride height. Setting the height
+    // to 0 measured 0.0 px, restoring it brought -7.5 px straight back. dx was
+    // 0.00 in every arm: VERTICAL ONLY is the tell that this is the ride-height
+    // frame, not a centring, runout or normalisation problem. Same bug family
+    // as the swapped-rim note in CLAUDE.md, one frame further along.
+    //
+    // Frame on where the rim ACTUALLY IS, not on the pivot cached at init.
+    //
+    // A CUSTOM (swapped) rim sits `carHeightOffset` off its cached _pivot at
+    // capture time. Measured on the car 2026-09-11 with a hook on the capture's
+    // own render pass: at ride height -18 mm the three rendered FL meshes
+    // (Custom_Wheel_Mesh_fl_62_hu / _63_hu / _79_ca) were all exactly -18.0 mm
+    // below _pivot. That put the rim 7.5 px off-centre in a 256 px capture
+    // whose rim radius is 120 px -- 6.2% of a radius -- and because the sprite
+    // disc spins about its OWN centre, an off-centre rim image ORBITS. It reads
+    // as "the wheel turns about a point that is not the centre of the circle",
+    // which is a texture bug and looks nothing like one. Same family as the
+    // swapped-rim note in CLAUDE.md, one frame further along.
+    //
+    // Two things NOT to do, both tried and measured:
+    //   - shifting the camera by heightShiftY. The counter-shift is correct for
+    //     the STOCK meshes, so this moves the camera away from a rim that never
+    //     moved: capture radius fell 120.5 -> 116.5 -> 103.5 px as height grew
+    //     and dy got worse. It also does not apply to the custom clones, which
+    //     move the other way.
+    //   - measuring the rim's world position from OUTSIDE the capture. It reads
+    //     the corrected 0.3961 there and only shows the 18 mm offset inside the
+    //     capture's own render, which is why the first three attempts here
+    //     found nothing.
+    //
+    // Taking the centre from the geometry that is about to be drawn is immune
+    // to all of it: whatever frame the rim is in, it lands centred in its own
+    // texture. Only the IN-PLANE centre is adopted -- the depth along the axle
+    // is irrelevant to an ortho camera, and _pivot is the trustworthy value
+    // there.
+    let pivot = pivotRest;
+    {
+      const box = new THREE.Box3();
+      this._frontLeftWheels.forEach((m) => { m.updateWorldMatrix(true, false); box.expandByObject(m); });
+      if (!box.isEmpty()) {
+        const c = box.getCenter(new THREE.Vector3());
+        const ax = flFirst._rollAxis.clone().normalize();
+        // Keep _pivot's position along the axle, take the rest from the geometry.
+        const d = c.clone().sub(pivotRest);
+        c.copy(pivotRest).add(d).addScaledVector(ax, -d.dot(ax));
+        pivot = c;
+      }
+    }
 
     // Frame slightly wider than the rim. The frustum used to be exactly +-r, so
     // the lip landed on the very edge of the texture, where it gets cut by the
