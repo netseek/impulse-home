@@ -4687,7 +4687,12 @@ window.HavalSplash = (function () {
     /* Keep a small system-gesture margin on both outer edges. These invisible
        gutters are intentionally inset: the Android back/home gesture must
        remain available even when a widget fills an entire board. */
-    .hv-desktop-swipe-edge { position:absolute; z-index:31; top:72px; bottom:var(--hv-popup-bottom-inset, 190px); width:144px; opacity:0; touch-action:none; }
+    /* Below the widget board (z-index 20), not above it. The full-size board
+       reaches both panel edges, so at 31 these invisible strips swallowed every
+       tap on a widget in the outer ~160px -- a right-column widget's trash
+       button could not be pressed. The board only takes touches where a card
+       is, so a swipe that starts on empty board still falls through to here. */
+    .hv-desktop-swipe-edge { position:absolute; z-index:19; top:72px; bottom:var(--hv-popup-bottom-inset, 190px); width:144px; opacity:0; touch-action:none; }
     .hv-desktop-swipe-edge.left { left:16px; } .hv-desktop-swipe-edge.right { right:16px; }
 
     /* Persistent 2D controls beside the widget run. Their coordinates come
