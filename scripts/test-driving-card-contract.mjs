@@ -412,8 +412,20 @@ includesAll(blockFrom(html, '  _uiOnlySetState(patch) {', 'ui-only setState'),
 includesAll(blockFrom(html, '  componentDidUpdate() {', 'did update'),
   ['const uiOnly = this._uiOnlyStateWrite;', 'this._uiOnlyStateWrite = false;',
    'if (!uiOnly && this.requestRender)'], 'and skip the scene frame');
-assert.equal(html.split('this._uiOnlySetState({').length - 1, 3,
-  'every mode write must go through the UI-only path');
+// This used to pin the TOTAL number of _uiOnlySetState call sites at 3, so it
+// broke the moment the POWER card correctly adopted the same path for its
+// widgetRev write (336d8a2) -- a test failing because someone else did the
+// right thing. Assert the property instead: the two MODE writers never reach
+// bare setState, and the UI-only path is still in use.
+for (const fn of ['  _applyCarMode(stateKey, value) {', '  _setCarMode(stateKey, canKey, value) {']) {
+  const body = blockFrom(html, fn, 'mode write').replace(/^\s*\/\/.*$/gm, '');
+  assert.ok(!/this\.setState\(/.test(body),
+    `${fn.trim()} must write modes through _uiOnlySetState, not setState`);
+  assert.match(body, /this\._uiOnlySetState\(\{/,
+    `${fn.trim()} must go through the UI-only path`);
+}
+assert.ok(html.split('this._uiOnlySetState({').length - 1 >= 3,
+  'the UI-only path must still be in use (a floor, not an exact count)');
 // The popup centres on the band the dock leaves rather than hugging the top.
 includesAll(html, ['.hv-card-focus.fit.on { transform:translate(-50%,-50%) scale(1); }'],
   'the popup centres vertically');

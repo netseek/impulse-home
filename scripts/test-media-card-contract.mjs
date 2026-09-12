@@ -338,9 +338,25 @@ includesAll(positionDom, [
 ], 'the tick pokes the painted nodes');
 assert.ok(!positionDom.includes('setState'), 'the position tick must not call setState');
 
+// This used to pin the exact `>= 400` drift threshold. The threshold was the
+// BUG, not the fix -- it only ever protects a PAUSED player, and a playing one
+// crosses it on every tick (measured on the car: 23 commits in 15 s, React back
+// to 65.9% of wall). It was removed, and this assertion then failed on a
+// deliberate, documented change -- exactly the "pins literals, so it lies twice"
+// failure CLAUDE.md warns about. Assert the SHAPE: the position path writes the
+// live mirror and paints the DOM, and never reaches setState.
 const applyPosition = blockFrom(html, '  applyMediaPosition(ms) {', 'position apply');
-assert.match(applyPosition, /Math\.abs\(\(this\.state\.mediaPositionMs \|\| 0\) - pos\) >= 400/,
-  'a position setState needs a drift threshold, or it fires at the player rate');
+// Strip line comments before looking for the call. The block EXPLAINS at length
+// why it does not call setState, so a bare includes('setState') matches the
+// prose and fails on correct code -- the mirror image of the vacuous match
+// CLAUDE.md warns about. Negative-controlled against a reintroduced call.
+const applyPositionCode = applyPosition.replace(/^\s*\/\/.*$/gm, '');
+assert.ok(!/this\.setState\(/.test(applyPositionCode),
+  'applyMediaPosition must not call setState -- a playing player crosses any threshold every tick');
+assert.match(applyPosition, /this\._mediaPositionMs\s*=/,
+  'applyMediaPosition must write the live mirror renderVals reads');
+assert.match(applyPosition, /this\._syncMediaPositionDom\(/,
+  'applyMediaPosition must paint the bar straight into the DOM');
 
 // ---------------------------------------------------------------------------
 // 9. Native rail card.
