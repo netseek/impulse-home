@@ -35233,6 +35233,10 @@ class Component extends DCLogic {
       this._removeBottomCard(c.slice('railRemoveCard:'.length));
       return;
     }
+    if (c.indexOf('cardAction:') === 0) {
+      this._applyCardActionCommand(c);
+      return;
+    }
     switch (c) {
       case 'camera':
         this.toggleCameraRail();
@@ -35629,6 +35633,7 @@ class Component extends DCLogic {
       regen: regenVisual.secondary,
       roof: roofVisual.secondary,
     };
+    const railEditing = !!(s.desktopStudioOpen && s.desktopStudioTab === 'cards');
     const bottomCards = this._normalizeBottomCards(this._desktopBottomCards)
       .map((id) => H6_BOTTOM_CARD_CATALOG.filter((card) => card.id === id)[0])
       .filter(Boolean)
@@ -35644,6 +35649,8 @@ class Component extends DCLogic {
         glyphText: '',
         // Rows for the card's quick menu, empty for cards that have none.
         menu: this._drivingMenuRows(card.id),
+        // Rows for the ⋯ on a shaking rail card; only sent while editing.
+        editMenu: railEditing ? this._railEditMenuRows(card.id) : [],
       }, bottomVisuals[card.id] || {}));
     const payload = {
       model: this._currentTrim().label,
@@ -35726,6 +35733,57 @@ class Component extends DCLogic {
       width: Math.max(0, (b.r || 0) - (b.l || 0)) + 'px',
       height: Math.max(0, (b.b || 0) - (b.t || 0)) + 'px',
     };
+  }
+
+  /**
+   * Rows for the ⋯ on a shaking rail card (Layout manager → Cards open): where
+   * the card opens, and the clock face. Destinations are keyed on the workspace
+   * the card opens (H6_CARD_POPUP_TYPES), so the driving tiles share one.
+   * Commands are minted here and re-checked on arrival by
+   * _applyCardActionCommand; native only relays them.
+   */
+  _railEditMenuRows(cardId) {
+    const rows = [];
+    const focusType = H6_CARD_POPUP_TYPES[cardId] || '';
+    if (focusType) {
+      const list = this._desktops || [];
+      const current = list[this._desktopIndex || 0];
+      const action = this._cardAction(focusType);
+      const target = action.kind === 'desktop' && action.desktopId
+        ? list.filter((d) => d.id === action.desktopId)[0] : null;
+      rows.push({ label: 'Open as popup', command: 'cardAction:' + cardId + ':popup',
+        selected: !target || !!(current && target.id === current.id) });
+      list.forEach((d) => {
+        if (current && d.id === current.id) return;
+        rows.push({ label: 'Open ' + d.name, command: 'cardAction:' + cardId + ':desktop:' + d.id,
+          selected: !!(target && target.id === d.id) });
+      });
+      if (list.length < H6_MAX_DESKTOPS) {
+        rows.push({ label: 'New desktop for it', command: 'cardAction:' + cardId + ':new', selected: false });
+      }
+    }
+    if (cardId === 'clock') rows.push({ label: 'Clock face…', command: 'openClockSettings', selected: false });
+    return rows;
+  }
+
+  /** `cardAction:<cardId>:popup|new|desktop:<desktopId>`, from a rail card's ⋯. */
+  _applyCardActionCommand(command) {
+    const parts = String(command || '').split(':');
+    const focusType = H6_CARD_POPUP_TYPES[parts[1]];
+    if (!focusType) return;
+    if (parts[2] === 'popup' && parts.length === 3) {
+      this._setCardAction(focusType, { kind: 'popup' });
+    } else if (parts[2] === 'new' && parts.length === 3) {
+      this._createFocusedCardDesktop(focusType);
+      return;
+    } else if (parts[2] === 'desktop' && parts.length === 4
+        && (this._desktops || []).some((d) => d.id === parts[3])) {
+      this._setCardAction(focusType, { kind: 'desktop', desktopId: parts[3] });
+    } else {
+      return;
+    }
+    // The ticks in the rail's menu come from the payload.
+    this._syncDockIndicators();
   }
 
   /**

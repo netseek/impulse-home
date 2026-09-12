@@ -42,12 +42,17 @@ the whole card is one target.
 
 ### Editing the rail
 
-Layout manager → **Cards** lists the enabled cards in rail order as jiggling
-tiles: × removes, ⋯ picks where the card opens, **+** adds a card to the front,
-and a tile can be dragged to a new position. The same edit runs on the real
-rail at the same time: `_syncDockIndicators` sends `railEdit: true` while the
-Cards tab is open, and native jiggles the rail cards, draws a remove badge on
-each one's view overlay, and lets them be dragged.
+Layout manager → **Cards** lists the cards *not* on the rail; tapping one
+appends it (`_addBottomCardLast`) and the rail scrolls to it (`railFocus`).
+The editing itself happens on the real rail: while the Cards tab is open
+`_syncDockIndicators` sends `railEdit: true`, and native jiggles the rail
+cards, draws × (remove) and ⋯ (options) badges on each one's view overlay, and
+lets them be dragged. ⋯ opens a native menu built from the card's `editMenu`
+rows (`_railEditMenuRows`): where the card opens, and the clock face. Its
+commands (`cardAction:<card>:popup|new|desktop:<id>`) are checked natively by
+`isCardActionCommand` and again on the page by `_applyCardActionCommand`.
+`railEdit` is applied after the card list in `applyDockIndicators`, or the
+badges would be drawn before the menus arrive.
 
 **The page owns the order; native never reorders locally.** A drop reports
 `railMoveCard:<id>:<index>` and a badge tap `railRemoveCard:<id>` through
@@ -56,10 +61,6 @@ the desktop's cards, commit once, and the new `bottomCards` payload makes native
 rebuild the row — which re-enters edit mode in `rebuildQuickCardsRow`. Leaving
 edit mode rebuilds the row again, because entering it made every child view
 non-clickable so a press lands on the drag handler instead of a card action.
-
-The Layout manager's own drag is DOM-only between press and release (a
-transform on the tile, a class on the drop target) and commits once on drop. A
-`setState` per `pointermove` would be a full-tree commit per event.
 
 ## widget — the full-size board
 
@@ -109,10 +110,12 @@ One shared floating frame (`.hv-card-focus`) with a backdrop, opened by
 comes from the shared popup workspace variables so it cannot cover the launcher
 or the dock on Android.
 
-**Every popup sits on the left edge, nearest the driver** — the card popup, the
-Layout manager, the wallpaper picker and the vehicle-status popup all anchor at
-`--hv-popup-left` (`_popupLeftPx`, the widget board's inset). Do not centre a
-new one with `left: 50%; translateX(-50%)`.
+**Every popup is the size of a 3x2 widget, on the left edge nearest the
+driver** — the card popup, the Layout manager, the wallpaper picker and the
+vehicle-status popup all take `--hv-pop-left/top/width/height` from
+`_popupFrameRect`. The vars are set on `<html>` too, because the roof popup lives
+on `<body>`, outside `#hv-root`. Do not centre a new one with
+`left: 50%; translateX(-50%)`.
 
 The trick worth knowing: `_focusedCardRenderFields()` re-exports every key of
 the widget view whose name starts with the card type, prefixed with `focused`.
@@ -147,7 +150,7 @@ mode cannot read one way on the rail and another in the popup.
   2x2 widget, with the car beside it. `_createFocusedCardDesktop` builds one on
   demand.
 
-Editable in Layout manager → Cards → ⋯. The destination is keyed on the
+Editable from the ⋯ on a rail card while Layout manager → Cards is open. The destination is keyed on the
 **workspace** the card opens, not the card id (`H6_CARD_POPUP_TYPES`), so the
 three driving tiles share one setting instead of drifting apart.
 

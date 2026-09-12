@@ -1101,6 +1101,8 @@ public final class MainActivity extends Activity {
         String navIdleAction = "";
         /** Quick-menu rows; empty for a card whose body opens something directly. */
         final java.util.List<QuickMenuRow> menu;
+        /** Rows for the ⋯ shown on this card in rail edit mode; empty when it has none. */
+        java.util.List<QuickMenuRow> editMenu = java.util.Collections.emptyList();
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
@@ -8862,7 +8864,14 @@ public final class MainActivity extends Activity {
                 quickMediaArt.setImageDrawable(mediaArtPlaceholder(density));
             }
         }
-        dismissQuickMenu();
+        // Not on every call: this runs on every dock update, and the demo
+        // telemetry updates about once a second, which closed a menu (the rail
+        // ⋯ in edit mode, the driving cards' quick menus) before it was seen.
+        String themeSig = dockUiLight + "|" + dockAccentColor;
+        if (!themeSig.equals(quickMenuThemeSig)) {
+            quickMenuThemeSig = themeSig;
+            dismissQuickMenu();
+        }
         for (QuickCardGraphicView graphic : quickCardGraphics.values()) {
             if (graphic != null) graphic.invalidate();
         }
@@ -9673,7 +9682,6 @@ public final class MainActivity extends Activity {
             if (o.has("activeDesktopIndex")) {
                 activeDesktopIndex = Math.max(0, o.optInt("activeDesktopIndex", 0));
             }
-            if (o.has("railEdit")) setRailEditMode(o.optBoolean("railEdit", false));
             if (o.has("studioScreen")) {
                 String screen = o.optString("studioScreen", "");
                 if (!"desktops".equals(screen) && !"layout".equals(screen) && !"appearance".equals(screen)) {
@@ -9697,6 +9705,8 @@ public final class MainActivity extends Activity {
                 }
             }
             applyBottomCardsConfiguration(o);
+            // After the cards: edit mode reads each card's editMenu to draw its ⋯.
+            if (o.has("railEdit")) setRailEditMode(o.optBoolean("railEdit", false));
             if (o.has("railFocus")) {
                 String focus = cleanBottomCardText(o.optString("railFocus", ""), 32);
                 // After the configuration above, so a card added in the same
@@ -9839,6 +9849,7 @@ public final class MainActivity extends Activity {
             descriptor.navEta = cleanBottomCardText(raw.optString("navEta", ""), 8);
             descriptor.navIdleCity = cleanBottomCardText(raw.optString("navIdleCity", ""), 32);
             descriptor.navIdleAction = cleanBottomCardText(raw.optString("navIdleAction", ""), 48);
+            descriptor.editMenu = parseEditMenu(raw.optJSONArray("editMenu"));
             if ("clock".equals(id)) {
                 String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
                 descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
@@ -9914,6 +9925,33 @@ public final class MainActivity extends Activity {
             rows.add(new QuickMenuRow(label, command, item.optBoolean("selected", false)));
         }
         return rows;
+    }
+
+    /**
+     * Rows for a rail card's ⋯ in edit mode. Only two command shapes are
+     * relayed: a destination (cardAction:...) and the clock face. The page
+     * re-checks both; anything else is dropped here.
+     */
+    private java.util.List<QuickMenuRow> parseEditMenu(JSONArray raw) {
+        if (raw == null || raw.length() == 0) return java.util.Collections.emptyList();
+        java.util.List<QuickMenuRow> rows = new ArrayList<>();
+        int max = Math.min(raw.length(), 10);
+        for (int i = 0; i < max; i++) {
+            JSONObject item = raw.optJSONObject(i);
+            if (item == null) continue;
+            String label = cleanBottomCardText(item.optString("label", ""), 28);
+            String command = item.optString("command", "").trim();
+            if (label.isEmpty()) continue;
+            if (!isCardActionCommand(command) && !"openClockSettings".equals(command)) continue;
+            rows.add(new QuickMenuRow(label, command, item.optBoolean("selected", false)));
+        }
+        return rows;
+    }
+
+    /** cardAction:&lt;card&gt;:popup|new|desktop:&lt;desktopId&gt;; ids letters, digits, '_' and '-'. */
+    private boolean isCardActionCommand(String command) {
+        return command != null
+                && command.matches("cardAction:[A-Za-z0-9_]{1,32}:(popup|new|desktop:[A-Za-z0-9_-]{1,64})");
     }
 
     /** `drivingSet:&lt;group&gt;:&lt;value&gt;`, letters/digits/underscore only. */
@@ -10219,6 +10257,8 @@ public final class MainActivity extends Activity {
 
     private void rebuildQuickCardsRow() {
         if (quickCardsRow == null) return;
+        // The views an open menu is anchored to are about to be replaced.
+        dismissQuickMenu();
         populateQuickCardsRow(quickCardsRow, getResources().getDisplayMetrics().density);
         refreshQuickCardsTheme();
         // A reorder or remove comes back from the page as a new card list; the
@@ -10259,6 +10299,13 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private BottomCardDescriptor bottomCardById(String id) {
+        for (BottomCardDescriptor card : bottomCards) {
+            if (card.id.equals(id)) return card;
+        }
+        return null;
+    }
+
     private List<View> railCardViews() {
         List<View> out = new ArrayList<>();
         if (quickCardsRow == null) return out;
@@ -10287,13 +10334,20 @@ public final class MainActivity extends Activity {
             }
             final String id = ((String) card.getTag()).substring("bottomCard:".length());
             setSubtreeClickable(card, false);
-            final RailRemoveBadge badge = new RailRemoveBadge(density);
+            final RailBadge badge = new RailBadge(density, false);
+            BottomCardDescriptor desc = bottomCardById(id);
+            // ⋯ only on cards that have something to choose.
+            final RailBadge more = desc != null && !desc.editMenu.isEmpty() ? new RailBadge(density, true) : null;
             final int size = Math.round(26 * density);
+            final int moreSize = Math.round(30 * density);
             final int inset = Math.round(4 * density);
             card.getOverlay().add(badge);
+            if (more != null) card.getOverlay().add(more);
             card.post(() -> {
                 int w = card.getWidth();
+                int hh = card.getHeight();
                 badge.setBounds(w - size - inset, inset, w - inset, inset + size);
+                if (more != null) more.setBounds(w - moreSize - inset, hh - moreSize - inset, w - inset, hh - inset);
                 card.invalidate();
             });
             android.animation.ObjectAnimator jiggle =
@@ -10304,7 +10358,7 @@ public final class MainActivity extends Activity {
             jiggle.setStartDelay((i * 37L) % 90);
             jiggle.start();
             railJiggles.put(card, jiggle);
-            card.setOnTouchListener(new RailEditTouch(id, card, badge, density));
+            card.setOnTouchListener(new RailEditTouch(id, card, badge, more, density));
         }
     }
 
@@ -10331,16 +10385,18 @@ public final class MainActivity extends Activity {
     private final class RailEditTouch implements View.OnTouchListener {
         private final String id;
         private final View card;
-        private final RailRemoveBadge badge;
+        private final RailBadge badge;
+        private final RailBadge more;
         private final float density;
         private final int slop;
         private float downX;
         private boolean dragging;
 
-        RailEditTouch(String id, View card, RailRemoveBadge badge, float density) {
+        RailEditTouch(String id, View card, RailBadge badge, RailBadge more, float density) {
             this.id = id;
             this.card = card;
             this.badge = badge;
+            this.more = more;
             this.density = density;
             this.slop = android.view.ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
         }
@@ -10375,10 +10431,18 @@ public final class MainActivity extends Activity {
                         settle();
                         if (to >= 0 && to != from) callViewerDock("railMoveCard:" + id + ":" + to);
                     } else {
+                        int x = Math.round(e.getX());
+                        int y = Math.round(e.getY());
+                        int slack = -Math.round(10 * density);
                         Rect hit = new Rect(badge.getBounds());
-                        hit.inset(-Math.round(10 * density), -Math.round(10 * density));
-                        if (hit.contains(Math.round(e.getX()), Math.round(e.getY()))) {
+                        hit.inset(slack, slack);
+                        if (hit.contains(x, y)) {
                             callViewerDock("railRemoveCard:" + id);
+                        } else if (more != null) {
+                            Rect moreHit = new Rect(more.getBounds());
+                            moreHit.inset(slack, slack);
+                            BottomCardDescriptor d = bottomCardById(id);
+                            if (moreHit.contains(x, y) && d != null) showQuickMenuRows(card, d.editMenu, false);
                         }
                     }
                     return true;
@@ -10399,18 +10463,23 @@ public final class MainActivity extends Activity {
         }
     }
 
-    /** The × drawn on a rail card in edit mode (on the view overlay, so layout is untouched). */
-    private static final class RailRemoveBadge extends Drawable {
+    /** × (remove) or ⋯ (options) on a rail card in edit mode, drawn on the view overlay. */
+    private static final class RailBadge extends Drawable {
+        private final boolean dots;
         private final android.graphics.Paint fill =
                 new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         private final android.graphics.Paint stroke =
                 new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint dot =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
 
-        RailRemoveBadge(float density) {
+        RailBadge(float density, boolean dots) {
+            this.dots = dots;
             fill.setColor(0xF03B4148);
             stroke.setColor(0xFFFFFFFF);
             stroke.setStrokeWidth(2f * density);
             stroke.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            dot.setColor(0xFFFFFFFF);
         }
 
         @Override
@@ -10420,8 +10489,12 @@ public final class MainActivity extends Activity {
             float cx = b.exactCenterX();
             float cy = b.exactCenterY();
             float r = b.width() / 2f;
-            float k = r * 0.36f;
             c.drawCircle(cx, cy, r, fill);
+            if (dots) {
+                for (int i = -1; i <= 1; i++) c.drawCircle(cx + i * r * .42f, cy, Math.max(1.5f, r * .12f), dot);
+                return;
+            }
+            float k = r * 0.36f;
             c.drawLine(cx - k, cy - k, cx + k, cy + k, stroke);
             c.drawLine(cx + k, cy - k, cx - k, cy + k, stroke);
         }
@@ -10503,6 +10576,12 @@ public final class MainActivity extends Activity {
      * and a centred dialog would land under the hand.
      */
     private void showQuickMenu(View anchor, BottomCardDescriptor descriptor) {
+        showQuickMenuRows(anchor, descriptor.menu, true);
+    }
+
+    /** `lastIsExit`: the last row leaves the menu (the driving cards) and is styled apart. */
+    private void showQuickMenuRows(View anchor, java.util.List<QuickMenuRow> rows, boolean lastIsExit) {
+        if (rows == null || rows.isEmpty()) return;
         dismissQuickMenu();
         float density = getResources().getDisplayMetrics().density;
         android.widget.LinearLayout list = new android.widget.LinearLayout(this);
@@ -10512,9 +10591,9 @@ public final class MainActivity extends Activity {
         list.setBackground(makeDockPopupPanel(density));
         list.setElevation(12f * density);
 
-        for (QuickMenuRow row : descriptor.menu) {
+        for (QuickMenuRow row : rows) {
             final String command = row.command;
-            boolean last = row == descriptor.menu.get(descriptor.menu.size() - 1);
+            boolean last = lastIsExit && row == rows.get(rows.size() - 1);
             android.widget.TextView item = new android.widget.TextView(this);
             item.setText(row.label);
             item.setTextSize(last ? 13f : 15f);
@@ -10659,6 +10738,12 @@ public final class MainActivity extends Activity {
     }
 
     private android.widget.PopupWindow quickMenuWindow;
+    /**
+     * Theme the open quick menu was built for. refreshQuickCardsTheme runs on
+     * every dock update (applyDockIndicators → refreshDockSurfaceUi), so it may
+     * only close the menu when the theme it baked in has really changed.
+     */
+    private String quickMenuThemeSig = "";
 
     private void callViewerDock(String cmd) {
         if (webView == null || cmd == null) return;
