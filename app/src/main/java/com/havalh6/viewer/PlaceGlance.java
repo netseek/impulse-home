@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Best-effort city / street when Android Auto is not guiding.
+ * Best-effort neighborhood / city / street when Android Auto is not guiding.
  *
  * <p>Uses last-known GPS or network location and reverse geocoding. No
  * permission dialog from here: if the grant is missing the glance stays
@@ -65,13 +65,17 @@ final class PlaceGlance {
     /** Where the last SUCCESSFUL reverse geocode was taken, for the move gate. */
     private Location lastFixed;
 
-    /** City / street, either one possibly empty when it could not be resolved. */
+    /** Neighborhood / city / street, any of which may be empty when unresolved.
+     * neighborhood is the finer, suburb-level hit; city is the town/municipality
+     * that contains it — two different levels of the same reverse geocode, not
+     * a fallback chain into each other. */
     private static final class Place {
+        String neighborhood = "";
         String city = "";
         String street = "";
 
         boolean isEmpty() {
-            return city.isEmpty() && street.isEmpty();
+            return neighborhood.isEmpty() && city.isEmpty() && street.isEmpty();
         }
     }
 
@@ -169,6 +173,7 @@ final class PlaceGlance {
         String provider = best.getProvider() == null ? "gps" : best.getProvider();
         try {
             JSONObject o = new JSONObject();
+            o.put("neighborhood", place.neighborhood);
             o.put("city", place.city);
             o.put("street", place.street);
             o.put("provider", provider);
@@ -200,8 +205,9 @@ final class PlaceGlance {
             Address a = results.get(0);
             Place place = new Place();
             if (a.getSubLocality() != null && !a.getSubLocality().isEmpty()) {
-                place.city = a.getSubLocality();
-            } else if (a.getLocality() != null) {
+                place.neighborhood = a.getSubLocality();
+            }
+            if (a.getLocality() != null && !a.getLocality().isEmpty()) {
                 place.city = a.getLocality();
             } else if (a.getSubAdminArea() != null) {
                 place.city = a.getSubAdminArea();
@@ -259,9 +265,11 @@ final class PlaceGlance {
 
     /**
      * Nominatim's address object is not a fixed shape — which field carries
-     * "the place you are in" depends on how the area was mapped. Walk the keys
-     * from most local to least, the same order the platform path walks
-     * subLocality -> locality -> subAdminArea.
+     * "the place you are in" depends on how the area was mapped. neighborhood
+     * and city are two different LEVELS of the same address, not a fallback
+     * chain into each other: walk suburb-level keys for one and city-level keys
+     * for the other, same order the platform path walks subLocality then
+     * locality -> subAdminArea.
      */
     private Place parseNominatim(String body) {
         try {
@@ -269,10 +277,14 @@ final class PlaceGlance {
             JSONObject address = root.optJSONObject("address");
             if (address == null) return null;
             Place place = new Place();
-            for (String key : new String[]{
-                    "suburb", "neighbourhood", "city_district", "town",
-                    "village", "city", "municipality", "county"
-            }) {
+            for (String key : new String[]{"suburb", "neighbourhood", "city_district"}) {
+                String value = address.optString(key, "").trim();
+                if (!value.isEmpty()) {
+                    place.neighborhood = value;
+                    break;
+                }
+            }
+            for (String key : new String[]{"city", "town", "village", "municipality", "county"}) {
                 String value = address.optString(key, "").trim();
                 if (!value.isEmpty()) {
                     place.city = value;

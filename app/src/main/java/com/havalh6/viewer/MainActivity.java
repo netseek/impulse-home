@@ -93,6 +93,8 @@ public final class MainActivity extends Activity {
     /** Inset for the placeholder glyph when the source published no artwork. */
     private static final int MEDIA_ART_GLYPH_PAD_DP = 32;
     private static final int MEDIA_BTN_DP = 40;
+    /** Source-chip glyph (MEDIA's now-playing app, NAVIGATION's guiding app). */
+    private static final float SOURCE_CHIP_ICON_DP = 30f;
     private static final int MEDIA_BTN_PRIMARY_DP = 48;
 
     private static final java.util.Set<String> BOTTOM_CARD_ACTIONS =
@@ -977,7 +979,6 @@ public final class MainActivity extends Activity {
     private final java.util.List<android.widget.ImageView> quickMediaButtons = new java.util.ArrayList<>();
     private boolean quickMediaAvailable;
     private android.widget.ImageView quickMediaAppIcon;
-    private android.widget.TextView quickMediaAppName;
     private View quickMediaAppRow;
     private SourceChip quickMediaChip;
     /** Source chips owned by a bottom card's header, keyed by card id. */
@@ -1098,6 +1099,10 @@ public final class MainActivity extends Activity {
         String navRemaining = "";
         String navDuration = "";
         String navEta = "";
+        /** Idle-only glance: city (below the neighbourhood in primary) and a
+         * tiny "start navigation" hint. Both empty while a turn is showing. */
+        String navIdleCity = "";
+        String navIdleAction = "";
         /** Quick-menu rows; empty for a card whose body opens something directly. */
         final java.util.List<QuickMenuRow> menu;
 
@@ -1792,6 +1797,22 @@ public final class MainActivity extends Activity {
                 if (showTurn) {
                     drawNavMetricRow(c, textX, h * .46f, textMax, h,
                             remaining, duration, eta, accent, muted, strong);
+                } else {
+                    // Idle glance: city under the neighbourhood (street/primary,
+                    // above) and a tiny "start navigation" hint under that. The
+                    // metric row is not drawn here, so this space is free.
+                    String idleCity = descriptor.navIdleCity == null ? "" : descriptor.navIdleCity;
+                    String idleAction = descriptor.navIdleAction == null ? "" : descriptor.navIdleAction;
+                    if (!idleCity.isEmpty()) {
+                        paint.setTextSize(Math.max(9f, h * .12f));
+                        fill(muted);
+                        c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .46f, paint);
+                    }
+                    if (!idleAction.isEmpty()) {
+                        paint.setTextSize(Math.max(7f, h * .09f));
+                        fill(muted);
+                        c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .64f, paint);
+                    }
                 }
             }
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
@@ -7760,7 +7781,6 @@ public final class MainActivity extends Activity {
         quickMediaArtist = null;
         quickMediaPlayPause = null;
         quickMediaAppIcon = null;
-        quickMediaAppName = null;
         quickMediaAppRow = null;
         quickMediaChip = null;
         if (quickMediaBars != null) quickMediaBars.setPlaying(false);
@@ -7875,6 +7895,13 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout header = new android.widget.LinearLayout(this);
         header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        // NAVIGATION's source-chip icon (SOURCE_CHIP_ICON_DP) is taller than this
+        // 22dp strip. Grow the strip itself and NAVIGATION's graphic content below
+        // loses that height -- drawNavigation sizes every font off its own view
+        // height, so the whole card's type shrank. Let the icon overflow the
+        // header visually instead: the strip stays 22dp for everyone, so nothing
+        // downstream of it moves or resizes.
+        header.setClipChildren(false);
         header.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                 Math.round(22 * density)));
@@ -7911,26 +7938,36 @@ public final class MainActivity extends Activity {
 
         // Same slot the MEDIA card puts its chip in: after the weighted
         // heading, before the chevron, so both read as one rail.
-        if ("navigation".equals(descriptor.id)) {
+        boolean isNavigation = "navigation".equals(descriptor.id);
+        if (isNavigation) {
             SourceChip navChip = makeSourceChip(density);
             android.widget.LinearLayout.LayoutParams navChipLp =
                     new android.widget.LinearLayout.LayoutParams(
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            navChipLp.rightMargin = Math.round(6 * density);
+            // Bottom-align so the icon's overflow (it is taller than this 22dp
+            // strip) goes up into the card's own top padding, not down into the
+            // graphic content below -- which draws after this in Z-order and
+            // would paint over a downward overflow.
+            navChipLp.gravity = android.view.Gravity.BOTTOM;
             header.addView(navChip.row, navChipLp);
             quickCardSourceChips.put(descriptor.id, navChip);
             applyNavigationSourceChip(descriptor);
         }
 
-        android.widget.TextView affordance = new android.widget.TextView(this);
-        affordance.setTag("frostSecondary");
-        affordance.setText("›");
-        affordance.setTextSize(18f);
-        affordance.setGravity(android.view.Gravity.CENTER);
-        affordance.setTextColor(dockLabelColorMuted());
-        header.addView(affordance, new android.widget.LinearLayout.LayoutParams(
-                Math.round(18 * density), android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+        // NAVIGATION reads MEDIA's now-playing chip as "what is guiding" rather
+        // than "open route details", so like MEDIA it has nothing to disclose
+        // and skips the chevron every other CoffeeOS card shows.
+        if (!isNavigation) {
+            android.widget.TextView affordance = new android.widget.TextView(this);
+            affordance.setTag("frostSecondary");
+            affordance.setText("›");
+            affordance.setTextSize(18f);
+            affordance.setGravity(android.view.Gravity.CENTER);
+            affordance.setTextColor(dockLabelColorMuted());
+            header.addView(affordance, new android.widget.LinearLayout.LayoutParams(
+                    Math.round(18 * density), android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
         card.addView(header);
 
         android.widget.LinearLayout content = new android.widget.LinearLayout(this);
@@ -8385,26 +8422,24 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * The source app's icon and name, on a card's top right.
+     * The source app's icon, on a card's top right.
      *
-     * One chip, two cards: MEDIA names what is playing, NAVIGATION names what
+     * One chip, two cards: MEDIA marks what is playing, NAVIGATION marks what
      * is guiding. They used to disagree — NAVIGATION drew its own badge onto
      * the QuickCardGraphicView canvas, icon only and at its own size, so the
      * same rail showed two different Android Auto marks side by side. The
      * canvas badge is gone; both now build this and resolve through
-     * {@link #resolveSourceChipIcon} / {@link #resolveSourceChipLabel}, which
-     * were already keyed on package + label and needed nothing media-specific.
+     * {@link #resolveSourceChipIcon}, which was already keyed on package +
+     * label and needed nothing media-specific. It used to also carry a name
+     * TextView next to the icon; both cards now show the icon alone.
      */
     private static final class SourceChip {
         final android.widget.LinearLayout row;
         final android.widget.ImageView icon;
-        final android.widget.TextView name;
 
-        SourceChip(android.widget.LinearLayout row, android.widget.ImageView icon,
-                android.widget.TextView name) {
+        SourceChip(android.widget.LinearLayout row, android.widget.ImageView icon) {
             this.row = row;
             this.icon = icon;
-            this.name = name;
         }
     }
 
@@ -8419,49 +8454,31 @@ public final class MainActivity extends Activity {
         icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         android.widget.LinearLayout.LayoutParams iconLp =
                 new android.widget.LinearLayout.LayoutParams(
-                        Math.round(15 * density), Math.round(15 * density));
-        iconLp.rightMargin = Math.round(5 * density);
+                        Math.round(SOURCE_CHIP_ICON_DP * density), Math.round(SOURCE_CHIP_ICON_DP * density));
         icon.setLayoutParams(iconLp);
         row.addView(icon);
-
-        android.widget.TextView name = new android.widget.TextView(this);
-        name.setTag("frostSecondary");
-        name.setTextSize(8.5f);
-        name.setLetterSpacing(0.09f);
-        name.setMaxLines(1);
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        name.setMaxWidth(Math.round(96 * density));
-        row.addView(name);
-        return new SourceChip(row, icon, name);
+        return new SourceChip(row, icon);
     }
 
     /**
-     * Hidden outright when there is neither icon nor label, because an empty
-     * pill on an idle card reads as a control that has stopped working.
+     * Hidden outright when there is no icon, because an empty pill on an idle
+     * card reads as a control that has stopped working.
      */
-    private void applySourceChip(SourceChip chip, Drawable customIcon, Bitmap decoded,
-            String label) {
+    private void applySourceChip(SourceChip chip, Drawable customIcon, Bitmap decoded) {
         if (chip == null) return;
-        boolean show = customIcon != null || decoded != null
-                || (label != null && !label.isEmpty());
+        boolean show = customIcon != null || decoded != null;
         chip.row.setVisibility(show ? View.VISIBLE : View.GONE);
         if (!show) return;
         if (customIcon != null) {
-            chip.icon.setVisibility(View.VISIBLE);
             chip.icon.setImageDrawable(customIcon);
-        } else if (decoded != null) {
-            chip.icon.setVisibility(View.VISIBLE);
-            chip.icon.setImageBitmap(decoded);
         } else {
-            chip.icon.setVisibility(View.GONE);
+            chip.icon.setImageBitmap(decoded);
         }
-        chip.name.setText(label == null ? "" : label.toUpperCase(java.util.Locale.US));
     }
 
     private View makeQuickMediaAppChip(float density) {
         SourceChip chip = makeSourceChip(density);
         quickMediaAppIcon = chip.icon;
-        quickMediaAppName = chip.name;
         quickMediaChip = chip;
         return chip.row;
     }
@@ -8470,18 +8487,15 @@ public final class MainActivity extends Activity {
         if (quickMediaAppRow == null) return;
         String pkg = quickMediaPackage != null ? quickMediaPackage : "";
         Drawable customIcon = resolveSourceChipIcon(pkg, label);
-        applySourceChip(
-                quickMediaChip,
-                customIcon,
-                customIcon == null ? decodeDataUrlBitmap(iconDataUrl) : null,
-                resolveSourceChipLabel(pkg, label));
+        applySourceChip(quickMediaChip, customIcon,
+                customIcon == null ? decodeDataUrlBitmap(iconDataUrl) : null);
     }
 
     /**
      * Stamp the NAVIGATION card's chip from its descriptor.
      *
      * There is no icon payload here the way MediaNowPlaying supplies one, so
-     * the chip is whatever the shared resolvers make of the package — which
+     * the chip is whatever the shared resolver makes of the package — which
      * for a projection package is our own mark, the point of the exercise.
      */
     private void applyNavigationSourceChip(BottomCardDescriptor card) {
@@ -8489,11 +8503,10 @@ public final class MainActivity extends Activity {
         if (chip == null) return;
         String pkg = card.appPackage == null ? "" : card.appPackage.trim();
         if (pkg.isEmpty()) {
-            applySourceChip(chip, null, null, "");
+            applySourceChip(chip, null, null);
             return;
         }
-        applySourceChip(chip, resolveSourceChipIcon(pkg, null), null,
-                resolveSourceChipLabel(pkg, null));
+        applySourceChip(chip, resolveSourceChipIcon(pkg, null), null);
     }
 
     /**
@@ -8524,16 +8537,6 @@ public final class MainActivity extends Activity {
             try { return getDrawable(R.drawable.ic_carplay_default); } catch (Exception ignored) {}
         }
         return null;
-    }
-
-    private String resolveSourceChipLabel(String pkg, String stock) {
-        if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
-            String custom = dockAppOverrides.name(pkg);
-            if (custom != null) return custom;
-        }
-        if (isAndroidAutoMediaSource(pkg, stock)) return "Android Auto";
-        if (isCarPlayMediaSource(pkg, stock)) return "CarPlay";
-        return stock != null ? stock : "";
     }
 
     /** MediaCenter owns both AA and USB — only the AA label is projection. */
@@ -9839,6 +9842,8 @@ public final class MainActivity extends Activity {
             descriptor.navRemaining = cleanBottomCardText(raw.optString("navRemaining", ""), 16);
             descriptor.navDuration = cleanBottomCardText(raw.optString("navDuration", ""), 16);
             descriptor.navEta = cleanBottomCardText(raw.optString("navEta", ""), 8);
+            descriptor.navIdleCity = cleanBottomCardText(raw.optString("navIdleCity", ""), 32);
+            descriptor.navIdleAction = cleanBottomCardText(raw.optString("navIdleAction", ""), 48);
             if ("clock".equals(id)) {
                 String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
                 descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
@@ -10157,8 +10162,10 @@ public final class MainActivity extends Activity {
         if ("navigation".equals(descriptor.id)) {
             StringBuilder description = new StringBuilder("Navigation. ");
             description.append(descriptor.primary.isEmpty() ? "No route data" : descriptor.primary);
+            if (!descriptor.navIdleCity.isEmpty()) description.append(". ").append(descriptor.navIdleCity);
             if (!descriptor.secondary.isEmpty()) description.append(". ").append(descriptor.secondary);
             if (!descriptor.metricA.isEmpty()) description.append(". ").append(descriptor.metricA);
+            if (!descriptor.navIdleAction.isEmpty()) description.append(". ").append(descriptor.navIdleAction);
             description.append(". Opens navigation.");
             return description.toString();
         }
