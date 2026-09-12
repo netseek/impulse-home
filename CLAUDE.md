@@ -22,6 +22,31 @@ Both of these turned out to be wrong when finally measured:
 
 ### How to measure
 
+**Start here — one command, against the car or the emulator:**
+
+```bash
+npm run car:perf
+```
+
+`scripts/device-perf.mjs` runs `window.__diag()` and prints the table plus a
+verdict line. Use `--sec 20`, `--json` (for diffing A/B runs), `--watch`.
+
+`__diag(ms)` is the standing battery. It exists because the investigation that
+found the 197 ms React commit had to hand-roll five throwaway CDP probes to
+reach a one-line answer. **Read these as PAIRS, never in isolation** — every
+wrong turn in that session came from one number read alone:
+
+| Signal | Reading |
+|---|---|
+| `bareRafP50` **and** `timerLagP50` both high | main thread blocked by long tasks — look at `commitMsP50` and `setStateKeys` |
+| `bareRafP50` high, `timerLagP50` low | GPU / compositor bound — resolution, post-FX, other apps on the panel |
+| `bareRafPerSec: 0`, `timerLagP50 ≈ 1000` | the WebView is **hidden** — see below. Not a rendering problem at all |
+| `liveCommitsPerSec` > ~1 | a hot signal is passing `{ commit: true }` through the `_live` seam |
+
+`bareRafP50` is an **empty** rAF callback and `timerLagP50` a `setTimeout(0)`.
+Neither touches WebGL, which is exactly what makes them able to tell "our frame
+is expensive" apart from "we are never given a frame".
+
 `window.__perf()` exposes `fps`, `submitMs`, `cadenceMs`, `drawCalls`,
 `triangles`, `resTier`, `busPerSec`, `speedPerSec`, `rendersPerSec`. A debug
 build ships it to logcat every 2 s:
@@ -30,9 +55,14 @@ build ships it to logcat every 2 s:
 adb logcat -s H6Perf
 ```
 
+**`drawCalls` / `triangles` come from `_perf.mainCalls`, captured inside the
+loop before the overlay passes.** Do not read `renderer.info` yourself after a
+frame: `info.autoReset` resets it on every `render()`, so you get only the last
+pass — 1 call and 2 triangles for the shadow-overlay quad, which reads as an
+empty scene and has cost a real detour.
+
 For A/B work, drive the camera from devtools over CDP rather than by hand.
-The harness used for every number in this file is in the scratchpad pattern:
-forward `webview_devtools_remote_<pid>`, then `Runtime.evaluate`.
+The harness used for every number in this file is `scripts/device-cdp.mjs`.
 
 **Benchmark hygiene, learned the hard way:**
 
@@ -47,6 +77,25 @@ forward `webview_devtools_remote_<pid>`, then `Runtime.evaluate`.
   emergency resolution tier at a real ~19 fps.
 - **Check the window is actually on screen.** A collapsed or backgrounded viewer
   renders at 1x1, every frame is instant, and every derived number is garbage.
+- **This unit drifts ~2x over MINUTES, so sequential arms cannot be compared.**
+  Measured 2026-09-04: the same scene, same DPR, same tier, camera driven
+  identically, read 19-26 fps in one run and 31-39 fps eight minutes later. Two
+  back-to-back repeats of one arm differed by 11%. A "before" and an "after"
+  taken minutes apart are measuring the drift, not the change.
+  **Interleave the arms** (A,B,A,B...) and compare PAIRED deltas. A real effect
+  shows the same sign in every pair; the magnitude will still wander. This
+  produced one false finding before it was caught ("the wallpaper costs 7.4
+  ms/frame" — it costs nothing measurable) and explains an inexplicable
+  "pinning DPR halved the frame rate" result from the same session.
+
+- **The GPU is not the bottleneck, and `gl.finish()` proves it in one line.**
+  There is no `EXT_disjoint_timer_query` on this driver, so time `gl.finish()`
+  instead: it blocks until the GPU queue drains, so its duration IS the GPU
+  backlog. Measured **0.1 ms p50 across eight independent arms** — the GPU is
+  idle, waiting for us. Frame cost here is CPU-side: GL driver command
+  translation and Chromium compositing, both of which land in `(program)` in a
+  CPU profile (62% of wall). Before optimising anything for fill rate, re-run
+  that check; "it is fill-rate bound" has now been wrong twice in this file.
 
 ## Known performance characteristics
 
@@ -57,6 +106,13 @@ forward `webview_devtools_remote_<pid>`, then `Runtime.evaluate`.
 | All post-FX (bloom + streak) | +2.0 ms/frame |
 | MSAA | 4x, and `MAX_SAMPLES` is 4 — already at the driver ceiling |
 | Main pass | ~210 draw calls, ~374k triangles |
+
+**Measured 2026-09-04: the WebGL canvas costs ~19 ms/frame of MAIN-THREAD
+time** (median of 4 interleaved pairs, all positive: 11.5, 7.3, 19.0, 23.7),
+while the GPU backlog stays at 0.1 ms. With the canvas hidden the page runs
+at 16.6-25.7 ms/frame. So that 19 ms is CPU-side driver + compositing, not
+GPU execution — which is why moving the render off the main thread is worth
+considering, and why cutting resolution is not the lever it looks like.
 
 Resolution is close to linear in pixel count, so it IS fill-rate sensitive —
 but the frame also carries ~20-25 ms of `submitMs`, so neither axis alone
@@ -73,25 +129,84 @@ explains it. Measure the specific change; do not reason from this table.
   every hot signal handler with a change threshold — `_setMotionSpeed` had none
   and re-rendered per `vehicle_speed` frame; `_applyCarSteering` has a 0.5 deg
   deadband for exactly this reason.
-- **A change threshold is not enough on its own for speed.** `_setMotionSpeed`'s
-  0.005-unit (0.2 km/h) deadband only ever protected a parked or dead-steady
-  car; real driving crosses it on nearly every bus frame, so it went back to
-  setState at CAN rate — and each one is `componentDidUpdate` -> `requestRender()`
-  -> `_postFxDirty`, i.e. the whole React tree plus a post-FX rebuild. Simulated
-  at 20 Hz on the emulator:
+- **A hot CAN signal must never reach `setState` at all — throttling it is not
+  enough.** This one was got wrong twice, and the second time only because the
+  first fix was measured on the emulator.
 
-  | | postFX rebuilds/s | postFX cache hits/s | setState/s |
+  A React commit in this app costs **197 ms p50 / 250 ms p90, measured on the
+  car while driving** (2026-09-04, HEV, mixed centerFill). `renderVals()` is a
+  single ~554-line return expression that recomputes everything, and React then
+  reconciles the whole tree. So the arithmetic that matters is:
+
+  | | commits/s | ms each | share of wall clock |
   |---|---|---|---|
-  | rolling, quiet bus | 0.2 | 57.5 | 0 |
-  | rolling, speed @20 Hz | 16.8 | 38.1 | 18 |
-  | after the throttle | 5.0 | 54.5 | 5 |
+  | `_setMotionSpeed`, throttled to 4 Hz | 3.0 | 197 | **56%** |
+  | after moving it off React | 0 | — | 0% |
 
-  The wheels never needed it: the render loop reads `_liveMotionSpeed`, which is
-  written exactly on every bus frame. Only the km/h label needs the state, so the
-  setState is throttled to 4 Hz with a trailing commit (stops still apply
-  immediately). **If you add a signal handler that calls setState, throttle it
-  the same way** — the render cost is invisible parked and only bites on a
-  moving car.
+  At 56% of the main thread the render loop cannot get frames: rAF and
+  `setTimeout(0)` were both delayed ~210-250 ms and the panel sat at **4-5 fps
+  while `submitMs` was only 20.5 ms**. The renderer was never the problem.
+
+  The earlier note here claimed a commit cost ~2 ms (one post-FX rebuild) and
+  concluded that throttling to 4 Hz was sufficient. That 2 ms came from the
+  emulator. **There is no safe rate at which to re-render this tree from the
+  bus.**
+
+  The fix is the `_live*` seam (`_liveDefine` / `_liveSet` / `_liveGet`, next to
+  `_currentMotionSpeed`). A live value is written on every bus frame into
+  `this._live` — free, and what the render loop already read — and anything
+  visible is painted straight into the DOM by its declared `paint()`. React is
+  committed to only at settle points (`{ commit: true }`): drag end, nudge,
+  STOP, restore-from-saved.
+
+  **If you add a signal handler, route it through `_liveSet`, not `setState`.**
+  `__diag()` reports `commitsPerSec`, `commitMsP50` and the state keys driving
+  them, plus `liveCommitsPerSec` — which should stay near zero. The cost is
+  invisible parked and only bites on a moving car, so a driveway test will not
+  find this for you.
+
+  **This is not a one-off, and a "threshold" is the tell.** Within a day of
+  fixing the speed signal, the SAME failure was measured again on
+  `mediaPositionMs` — the media progress bar. It had a 400 ms threshold and the
+  comment "keep React state in sync so re-renders don't reset the bar to 0",
+  and both were wrong the same way the speed deadband was:
+
+  - a threshold only ever protects a PAUSED player / a PARKED car. Anything
+    actually running crosses it on every tick. Measured while driving: 23
+    commits in a 15 s window, React back to **65.9% of wall clock** at 105 ms
+    p50 / 957 ms p90.
+  - the state it was "keeping in sync" was already redundant — `renderVals`
+    prefers `this._mediaPositionMs` over `s.mediaPositionMs`, so a re-render
+    could not have reset the bar anyway.
+
+  Removing that one commit, measured on the car:
+
+  | | before | after |
+  |---|---|---|
+  | fps | 6.66 | **11.43** |
+  | React share of wall | 65.9% | **10.3%** |
+  | `timerLagP50` | 49.9 ms | **6.2 ms** |
+  | post-FX served from cache | 50% | **81%** |
+
+  So: when you find a per-tick `setState` guarded by a magnitude threshold,
+  the threshold is the bug, not the fix. Check whether `renderVals` already
+  reads a live mirror — twice now, it did.
+
+- **A hidden WebView is still on the panel, and its render loop is dead.** The
+  loop is driven only by `requestAnimationFrame`. When another app takes window
+  focus — a freeform app in a launcher slot, the OEM scene manager — Android
+  marks our window not-visible, the WebView sets `document.visibilityState =
+  'hidden'`, and **Chromium stops servicing rAF entirely and clamps timers to
+  1 Hz**. Measured on the car: `bareRafPerSec: 0`, `timerLagP50: 999.7 ms`,
+  while the car was plainly still drawn on screen.
+
+  This reads exactly like a rendering problem and is not one. `__diag()` reports
+  `visibility` and `rafAlive` so it can be told apart in one look. Note
+  `applyLauncherFocusPolicy()` (MainActivity) *deliberately* drops focus while a
+  freeform overlay is open, so this is reachable by design, not only by
+  accident. `componentDidUpdate` already documents the same hazard for the
+  splash hand-off, which is why that path has a timeout floor rather than
+  trusting rAF.
 
 - **`resScaleMode: 'off'` does not stop everything adapting.** It stops the
   MOTION tier reducing, but `_maybeAdaptDPR` still walks `_dprIdx` on its own,
@@ -124,6 +239,83 @@ explains it. Measure the specific change; do not reason from this table.
 - **Textures are KTX2/UASTC** and transcode to ASTC on the Adreno 640. This grew
   the models roughly 3x on disk (HEV 11.3 -> 34.6 MB) in exchange for 4 MB of
   VRAM per 2048 map instead of 16 MB.
+
+## Cold start: the download is not I/O bound, it is React bound
+
+**Measured 2026-09-11.** A cold boot had drifted to ~29 s against a splash clip
+that holds at ~18-22 s, i.e. the car arrived AFTER its own intro. Almost all of
+it was one line.
+
+The boot GLB is 13.5 MB. Its fetch measured **14.4-15.0 s** during boot, and
+**0.36 s** when the same file was re-fetched from the idle, already-booted app.
+So it was never I/O: the APK asset read runs at ~40 MB/s.
+
+The cause was the loader's `onProgress`, which called
+`setState({ progress, processing })` on every XHR chunk. A commit here costs
+~197 ms (see the `_live` seam section above), and the damage is not just the
+commit time — **each commit hands the main thread back mid-transfer**, so the
+transfer itself stretches. Interleaved A/B on the car, same file, same page:
+
+| | run 1 | run 2 | run 3 | progress events |
+|---|---|---|---|---|
+| plain XHR | 405 ms | 695 ms | 726 ms | 9-14 |
+| + `setState` per chunk | 8811 ms | 10053 ms | 9636 ms | 91-97 |
+
+Repeated later on a hot device: 758/1492/972 against 15432/18896/18432. Every
+pair the same sign; the ratio is 13-19x. Note the **event count** is itself the
+tell — yielding per chunk makes Chromium deliver ~7x more, smaller chunks.
+
+**Nothing about that readout needed React.** On Android the percent is drawn
+NATIVELY (`AppLauncherBridge.setBootProgress` — the splash `<video>`
+hole-punches through the page, so the HTML loader is not even on screen), and
+the HTML fallback is one bar's width. It now goes through the `_live` seam like
+every other hot signal: `_setLoadProgress` → `_liveSet('progress')` → a `paint`
+that writes the bar and calls `_syncBootHud`. React sees progress only at the
+settle points that already commit. Measured after: **70 HUD paints, 1 React
+commit** for a whole boot, against ~95 commits before.
+
+`_loadProgressPct()` / `_loadProcessing()` are the live readers, and
+`renderVals` uses them — same lesson as `mediaPositionMs`: if a re-render from
+some other cause reads `s.progress`, the bar snaps back.
+
+### The transfer also started 4 s late
+
+Even fixed, the GLB request could not be issued until three.js and GLTFLoader
+were on the page (~4.8 s), with the network idle until then. A `<head>` script
+(`window.__bootGlb`) now starts the fetch at ~0.9 s and the boot loader calls
+`loader.parse()` on **its buffer** rather than requesting the file again —
+WebViewAssetLoader sends no caching headers, so a second request is not
+guaranteed to be served from memory. Two things that matter:
+
+- the preload resolves the body the same way `_resolvedBootVariant()` does
+  (only a GT trim/variant is not the HEV body). A disagreement is not a bug:
+  the URLs will not match, and the loader falls through to its own fetch.
+- it reports bytes as **plain numbers** that the app samples on a 120 ms timer.
+  A per-chunk callback into the app is the exact regression above.
+
+### Numbers, and why they need pairing
+
+Interleaved before/after APK installs, three pairs, ready-to-drive in ms:
+
+| pair | before | after |
+|---|---|---|
+| 1 | 38662 | 27735 |
+| 2 | 46832 | 16111 |
+| 3 | 32266 | 18046 |
+
+On a rested unit the same build boots in **14.6-14.9 s**; the table above was
+taken after ~15 consecutive cold starts had pushed the MMI to 5.6/6.4 GB used
+with 223 MB swapped, and EVERYTHING slowed with it — the loader `<script>`s
+went from ~120 ms each to ~1.3 s. So: **a cold-start number taken after a
+string of restarts is measuring the memory pressure you just created.** Reboot
+or rest the unit before quoting an absolute, and compare arms in PAIRS
+regardless.
+
+`scripts/device-cdp.mjs` cannot see this on its own. What found it was a CDP
+probe installed with `Page.addScriptToEvaluateOnNewDocument` (NOT a plain
+evaluate — the WebView navigates after attach and wipes anything you injected
+into the first document), recording `performance.getEntriesByType('resource')`
+plus a `longtask` observer and a poll for `__app._viewerReady`.
 
 ## Card, widget, popup are three different surfaces
 
@@ -342,6 +534,133 @@ still reads as a transition instead of a one-frame blink.
 One thing NOT to gate chrome visibility on: `s.loading`. That is what made the
 config dock close and re-open on every rim swap;
 `!(s.loading && !this._viewerReady)` is the test the rest of the chrome uses.
+
+## X-ray mode is a second model, not a transparency effect
+
+`xray` is `state.powertrainOn`, and it does three separate expensive things.
+Measured on the car, interleaved pairs, rig confirmed visible in every ON arm:
+
+| | x-ray off | x-ray on |
+|---|---|---|
+| draw calls | 178 | **383** |
+| triangles | 344,716 | **497,362** |
+| `submitMs` | 27.3 | 35.9 |
+| GPU backlog (`gl.finish`) | 0.1 ms | 0.1 ms |
+
+1. **It adds the powertrain rig** — 131 meshes, 115,328 triangles. "The car is
+   almost transparent so it should be cheap" is backwards: transparency removes
+   early-Z and *adds* a whole drivetrain behind the shell.
+2. **It never lets the scene idle.** `_tickPowertrainFx` returns true whenever
+   the rig is animating, i.e. always. Camera still, nothing moving, three
+   interleaved pairs: **4.74 renders/s with x-ray off, 9.69 with it on**, and
+   `timerLagP50` 49.3 ms → 105.9 ms.
+3. **It used to rebuild post-FX on every single frame.** The tell is
+   `postFxPerSec` exactly equalling `rendersPerSec` (9.69 = 9.69 in all three
+   arms) while x-ray off ran 1.58 rebuilds against 4.74 renders.
+
+   **`requestRender()` sets `_postFxDirty` unconditionally**, so throttling at
+   the call site does nothing — the very next line undoes it. Measured with a
+   trap on the flag: `requestRender` was setting it 17.45x/s against the
+   throttle's intended 4.49x/s. Hence `requestRender(n, keepPostFx)`; the x-ray
+   tick passes `true` and a 5 Hz throttle (`PT_POSTFX_HZ`) is then the only
+   thing that invalidates the overlay.
+
+### The ghost body
+
+`_setBodyGhost` used to keep the whole body and clone all ~42 materials into
+transparent ones — full draw-call count, no early-Z, and ~44 transparent meshes
+in the per-frame depth sort. It is now a purpose-built asset,
+`scripts/build-xray-ghost.mjs` (`npm run build:xray-ghost`):
+
+| | draw calls | triangles | size |
+|---|---|---|---|
+| HEV ghost | 132 → **2** | 142,332 → 58,766 | 12.9 MB → **0.29 MB** |
+| GT ghost | 99 → **2** | 128,581 → 48,305 | 6.6 MB → **0.20 MB** |
+
+**Merging matters more than decimating.** The GPU is idle here (backlog
+0.1 ms), so the cost is CPU-side draw submission — a 5k-triangle ghost split
+across 40 draw calls would be WORSE than a 100k-triangle ghost in one. One
+material, no textures, Draco (legitimate: x-ray is not boot-critical).
+
+`window.__xrayGhost(false)` reverts to the material-clone path for A/B.
+
+Three classifier traps, all caught by `--dry` before anything was written:
+
+- a bare `/disc/` matches **"discoloration"** and threw three body panels out.
+- the HEV spells its brake discs **`Break_Disks`**, and its meshes are
+  **unnamed** — only the node name identifies them. The GT's wheels are
+  identifiable **only by material name** (`Wheel`).
+- consulting material names then breaks lamps: a GT rear cluster carries
+  `Chrome | BrakeLight | PositionLight_Rear`. Structural names decide first;
+  materials are a fallback, must ALL read as wheel parts, and a
+  `light|lamp|lens` match vetoes.
+
+And two integration bugs worth not repeating:
+
+- **hide the ghost unconditionally when x-ray closes**, not inside the
+  "did we hide the shell" branch — the asset arriving mid-toggle re-runs the
+  pair and leaves a second see-through car inside the real one.
+- **guard the "asset not ready yet" retry.** With `__xrayGhost(false)`,
+  `_useGhostBodyModel()` always returns false, the cached promise resolves
+  instantly, and the retry re-enters `_setBodyGhost(true)` forever. That hangs
+  the page and the WebView reloads under it — which reads as random crashes
+  during an A/B, not as a loop.
+
+## Anything Hz-denominated must run off the wall clock
+
+`_tickPowertrainFx` accumulated the render loop's `_dt`, which was clamped to
+`[8 ms, 50 ms]`. Below 20 fps — most of this panel's range — the clock advanced
+50 ms per frame while real time advanced 200+, so `cellEdgeHz: 7.0` was not
+7 Hz, and the rate it actually ran at moved with the frame rate. The symptom is
+"the blink is tied to fps, not time", and it applies to every Hz-denominated
+animation behind that clock. It now derives from `now` directly, seeded so the
+phase does not jump.
+
+Watch for the same shape anywhere a per-frame delta is clamped "for safety":
+the clamp is correct for tweens and physics and wrong for anything periodic.
+
+## X-ray is a draw-call problem, and rendering harder does not help
+
+Measured on the car 2026-09-11, parked, interleaved arms so drift cancels
+(`window.__xrayGhost(false)` reverts to the material-clone ghost):
+
+| | material ghost | single-mesh ghost |
+|---|---|---|
+| frame | 20.94 / 22.99 fps | **46.00 / 46.17 fps** |
+| submit | 23.5 / 41.0 ms | 8.0 / 10.9 ms |
+| draw calls | 380 | **118** |
+| triangles | 497,356 | 271,426 |
+
+The old ghost kept the whole body and cloned all 42 materials into
+transparent ones, so x-ray paid the full draw-call count AND lost early-Z AND
+added ~44 transparent meshes to the per-frame depth sort. The replacement is a
+purpose-built asset -- ONE mesh, ONE material, no textures
+(`scripts/build-xray-ghost.mjs`) -- and 141 shell meshes are hidden behind it.
+
+**Optimise draw calls here, not polygons.** `gl.finish()` measures 0.1 ms, so
+the GPU is idle and triangle throughput is not the constraint; a 5k-triangle
+ghost split across 40 draw calls would be WORSE than a 100k-triangle ghost in
+one.
+
+### "Make the loop infinite so it always renders at max FPS" does not work
+
+Frame rate is frame COST, not frame DEMAND. X-ray already renders continuously
+(`_tickPowertrainFx` returns true every frame, so the beads and glow keep
+asking), and it still sat at 21 fps with the old ghost -- asking more often
+could not have helped, because each frame genuinely cost ~45 ms.
+
+Measured the other way round too: parked and idle with x-ray off, a bare rAF
+ticks at **59/s with 16.7 ms p50 and 5.1 ms timer lag**. The browser is already
+offering ~60 frames a second; the on-demand loop uses one of them because
+nothing changed. There is no headroom to unlock by looping -- the frames are
+on offer and being declined on purpose.
+
+Rendering unconditionally would cost real things: the main thread is the
+bottleneck (GPU idle at 0.1 ms), this SoC is shared with Android Auto and
+navigation, and the unit already drifts ~2x thermally over minutes, so
+sustained load trades a stable frame rate for a decaying one. A continuous
+mode is a BENCH tool -- drive the camera so every frame renders and demand
+stops being a variable -- not a shipping mode.
 
 ## Things that look like wins and are not
 
@@ -851,6 +1170,35 @@ writes). Measured 2026-09-09: the car had NEITHER, so every command and every
 mode write was broadcast into the void. The classes were committed in Impulse
 all along; only `VehicleCommandReceiver` was declared in its manifest. Fixed
 upstream in `6d053976` on `feature/new-screen-enhancements-v8`.
+
+### Software mirror fold is a no-op on this MMI (2026-09-10)
+
+Status **read** works: `car.drive.setting.outside_view_mirror_fold_state`
+(`0` = folded, `1` = unfolded). The viewer hotspot / Impulse
+`fold_mirrors` / `unfold_mirrors` / `toggle_mirrors` path is wired end-to-end
+(viewer allowlist → `ACTION_VEHICLE_COMMAND` + caller PendingIntent →
+`VehicleCommandReceiver` → `IVehicle.setRearViewMirrorFoldState`), and Impulse
+logs `ok=true`, but the bus value never changes.
+
+What the OEM voice-adapter actually does:
+
+- `setRearViewMirrorFoldState(n)` →
+  `PlatformAdapterClient.requestCmdAsync("cmd.common.request.set",
+  "car.drive.setting.outside_view_mirror_fold_state", String.valueOf(n))`
+- `isSupportRearViewMirrorFold()` returns 1 only when
+  `persist.vendor.gwm.cfg.outside.rr.view.mirror` is in **1..5** (this car: **3**)
+  **and** `persist.vendor.gwm.cfg.osrvm.fold.virtual.sw.control == 1`
+  (this car shipped at **0**).
+
+Forcing the virtual-SW prop to `1` (persists across reboot) did **not** make
+the set actuate. Physical fold still updates the status key. The mirror
+hotspot and command allowlists are therefore commented out / hidden for
+reference until a working write path is found (likely deeper than IVehicle —
+`Its_IntelligentVehicleControlService` accepts the key in its subscribe list
+but ignores the set).
+
+**Do not** send a bare Android `stop` over the car's root telnet while probing
+— that tears down zygote; recover with `start`.
 
 **Installing that fix needs the release keystore.** Impulse on the car is signed
 `7e00ad11...`; a plain `assembleDebug` is signed with the Android debug key

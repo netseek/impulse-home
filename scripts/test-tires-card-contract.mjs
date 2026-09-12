@@ -18,6 +18,8 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const html = readFileSync(resolve(root, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const native = readFileSync(
   resolve(root, 'app/src/main/java/com/havalh6/viewer/MainActivity.java'), 'utf8').replace(/\r\n/g, '\n');
+const dockOverrides = readFileSync(
+  resolve(root, 'app/src/main/java/com/havalh6/viewer/DockAppOverrides.java'), 'utf8').replace(/\r\n/g, '\n');
 
 function blockFrom(source, token, label = token) {
   const start = source.indexOf(token);
@@ -282,7 +284,6 @@ assert.match(nativeTireColor, /if\s*\("demo"\.equals\(descriptor\.state\)\)\s*re
 // desktops, layouts, shell boot choice, launcher overrides, or native shell.
 includesAll(html, [
   "const H6_DESKTOPS_KEY = 'h6_desktops_v1';",
-  "const APP_OVERRIDES_KEY = 'h6_appOverrides';",
   "const SHELL_BOOT_KEY = 'hv_shell_boot_v1';",
   "localStorage.getItem('h6_widgets')",
   "localStorage.setItem('h6_widgets', json)",
@@ -292,5 +293,8 @@ includesAll(native, [
   '.putString("widgets",',
   '.getString("widgets", "")',
 ], 'native persistence keys');
+includesAll(dockOverrides, [
+  'static final String PREF_KEY = "dock_app_overrides";',
+], 'dock override persistence key');
 
 console.log('Tires card contracts: ok');

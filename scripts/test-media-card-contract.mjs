@@ -361,6 +361,12 @@ assert.match(mediaCard, /quickMediaAppRow = makeQuickMediaAppChip\(density\);/,
   "the rail card must carry the playing app's own chip");
 assert.match(native, /private void applyQuickMediaAppChip\(String iconDataUrl, String label\) \{[\s\S]*?setVisibility\(show \? View\.VISIBLE : View\.GONE\);/,
   'an empty app chip must be hidden, not left as a blank pill');
+assert.match(native, /resolveMediaChipIcon\(/,
+  'the media chip must prefer dock substitutes / branded AA-CarPlay icons');
+assert.match(native, /isAndroidAutoMediaSource\(/,
+  'Android Auto media must use our branded icon, not MediaCenter\'s generic one');
+assert.match(native, /isCarPlayMediaSource\(/,
+  'CarPlay media must use our branded icon');
 assert.match(native, /quickMediaCanLaunch = payload\.optBoolean\("canLaunch", false\);/,
   'the native card must read canLaunch from the payload');
 

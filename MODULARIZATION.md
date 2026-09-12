@@ -3,9 +3,25 @@
 > Companion to `CLAUDE.md`. That file says what the car does under load; this
 > one says where code goes. Read both before a structural change.
 
-## 1. What we actually have (measured, 2026-08-26)
+> **STATUS 2026-09-04 — none of §8 has been done, and the file has grown 45%
+> since this was written.** §1's measurements are stale: `index.html` is now
+> **28,908 lines / 1.28 MB**, not 19,881 / 922 KB. There is no `src/`. Re-measure
+> the block table before quoting it.
+>
+> One thing did land, and it is worth knowing about because it is the pattern
+> for hot-signal work: the **`_live*` seam** (`_liveDefine` / `_liveSet` /
+> `_liveGet`, beside `_currentMotionSpeed`). CAN signals that drive the scene no
+> longer travel through `setState` — see CLAUDE.md, "A hot CAN signal must never
+> reach `setState` at all". It is not part of this plan and does not depend on
+> it; it is a seam inside the monolith, not a step toward splitting it.
+>
+> **Step 1 (build harness, no code moves) is still the right next move** and is
+> the cheapest thing here: it is designed to be behaviour-preserving by
+> construction, and it de-risks everything after it.
 
-`index.html` is 19,881 lines / 922 KB in four blocks:
+## 1. What we actually have (measured, 2026-08-26 — see STATUS above, now stale)
+
+`index.html` was 19,881 lines / 922 KB in four blocks:
 
 | Lines | Block | Contents |
 |---|---|---|

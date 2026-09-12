@@ -145,6 +145,9 @@ public final class MainActivity extends Activity {
                     "close_sunroof",
                     "open_curtain",
                     "close_curtain"
+                    // Software mirror fold is a no-op on this MMI (see CLAUDE.md).
+                    // Keep the names for when OEM virtual-SW fold actually actuates:
+                    // "fold_mirrors", "unfold_mirrors", "toggle_mirrors"
             ));
     /** Vehicle commands that require a 0-100 opening level. */
     private static final java.util.Set<String> VEHICLE_LEVEL_COMMANDS =
@@ -519,38 +522,22 @@ public final class MainActivity extends Activity {
                 Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
                 mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
                 List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
+                java.util.Set<String> seen = new java.util.HashSet<>();
 
-                for (ResolveInfo info : apps) {
-                    String pkg = info.activityInfo.packageName;
-                    if (pkg.equals(getPackageName()) || IGNORED_PACKAGES.contains(pkg)
-                            || hiddenPackages.contains(pkg)) continue;
-
-                    String label = info.loadLabel(pm).toString();
-                    JSONObject appObj = new JSONObject();
-                    appObj.put("packageName", pkg);
-                    appObj.put("label", label);
-
-                    try {
-                        Drawable icon = normalizeAdaptiveIcon(info.loadIcon(pm), 96);
-                        if (icon != null) {
-                            int w = Math.max(1, icon.getIntrinsicWidth());
-                            int h = Math.max(1, icon.getIntrinsicHeight());
-                            if (w > 128 || h > 128 || w <= 0 || h <= 0) { w = 96; h = 96; }
-                            Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
-                            icon.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
-                            icon.draw(canvas);
-
-                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                            bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
-                            String b64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
-                            appObj.put("icon", "data:image/png;base64," + b64);
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error drawing icon for " + pkg, e);
+                if (apps != null) {
+                    for (ResolveInfo info : apps) {
+                        if (info == null || info.activityInfo == null) continue;
+                        String pkg = info.activityInfo.packageName;
+                        if (skipInAppsCatalog(pkg) || !seen.add(pkg)) continue;
+                        appsArray.put(appsCatalogEntry(pm, info, pkg));
                     }
-
-                    appsArray.put(appObj);
+                }
+                if (isEmulatorDevice()) {
+                    for (String[] stub : EMULATOR_EXTRA_GWM_STUBS) {
+                        String pkg = stub[0];
+                        if (skipInAppsCatalog(pkg) || !seen.add(pkg)) continue;
+                        appsArray.put(appsCatalogStubEntry(pkg, stub[1]));
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error getting installed apps", e);
@@ -819,6 +806,18 @@ public final class MainActivity extends Activity {
         }
 
         /**
+         * Viewer → shell: CSS box of the desktop switcher, in WebView client
+         * pixels. Native places a SYSTEM_ALERT_WINDOW proxy on that display
+         * rect so taps in the MMI StatusBar (y=0..60) reach the WebView.
+         */
+        @JavascriptInterface
+        public void reportDesktopSwitcherHit(float left, float top, float width,
+                float height, boolean visible) {
+            mainHandler.post(() -> updateDesktopSwitcherHitProxy(
+                    left, top, width, height, visible));
+        }
+
+        /**
          * Fetch Bing daily-wallpaper JSON from native code. WebView fetch() to
          * bing.com is blocked on some builds; this uses the same HTTPS endpoint
          * as Windows Spotlight (HPImageArchive).
@@ -978,6 +977,11 @@ public final class MainActivity extends Activity {
     private View quickMediaAppRow;
     private boolean quickMediaCanLaunch;
     private QuickMediaBarsView quickMediaBars;
+    /** Session-0 Visualizer probe for the MEDIA rail bars; null until first play. */
+    private MediaAudioVisualizer mediaAudioViz;
+    private static final int REQ_MEDIA_VIZ_AUDIO = 7101;
+    /** Avoid re-prompting every play/pause after the user denies RECORD_AUDIO. */
+    private boolean mediaVizPermissionAsked;
     /**
      * The last now-playing payload, replayed after the rail is rebuilt.
      *
@@ -1120,21 +1124,14 @@ public final class MainActivity extends Activity {
     /**
      * Ambient bars behind the MEDIA tile's copy.
      *
-     * <p><b>These do not follow the audio, and cannot.</b> The viewer has no
-     * audio input of any kind — no AnalyserNode, no native capture — which is
-     * the same limitation CLAUDE.md records for the web media visualisers.
-     * Real spectrum would need android.media.audiofx.Visualizer on session 0,
-     * which means RECORD_AUDIO, and the MMI is Android 9 so AudioPlaybackCapture
-     * (API 29+) is not available either.
-     *
-     * <p>What they ARE driven by is the one thing the payload actually reports:
-     * whether a track is playing. They move while it plays and settle when it
-     * pauses. That makes them a playing indicator wearing an equaliser's shape,
-     * not a readout — which is why they are kept faint and behind the copy
-     * rather than presented as data.
+     * <p>Prefer {@link MediaAudioVisualizer} (session 0 waveform) when it
+     * reports live energy. Otherwise fall back to the synthetic playing
+     * indicator — session 0 is often silent on OEM builds, and Android 9 has
+     * no AudioPlaybackCapture. Bars stay faint and behind the copy either way;
+     * they are not presented as a calibrated meter.
      */
     private final class QuickMediaBarsView extends View {
-        private static final int BARS = 24;
+        private static final int BARS = MediaAudioVisualizer.BARS;
         /** 15 Hz, not 60: this redraws on a panel that is already short of frames. */
         private static final long FRAME_MS = 66;
 
@@ -1142,6 +1139,7 @@ public final class MainActivity extends Activity {
                 new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         private final android.graphics.RectF bar = new android.graphics.RectF();
         private final float[] level = new float[BARS];
+        private final float[] liveTarget = new float[BARS];
         private boolean playing;
         private boolean visible = true;
         private long startedAt;
@@ -1150,11 +1148,21 @@ public final class MainActivity extends Activity {
         private final Runnable frame = new Runnable() {
             @Override
             public void run() {
-                if (!playing || !visible || !isAttachedToWindow()) return;
+                if (!visible || !isAttachedToWindow()) return;
+                boolean live = mediaAudioViz != null && mediaAudioViz.hasLiveAudio();
+                if (!playing && !live) return;
                 invalidate();
+                // Tick while the payload says playing OR session 0 still has
+                // energy — AA often reports paused while the mix is audible.
                 postDelayed(this, FRAME_MS);
             }
         };
+
+        void ensureTicking() {
+            if (!visible || !isAttachedToWindow()) return;
+            removeCallbacks(frame);
+            post(frame);
+        }
 
         QuickMediaBarsView(Context context) {
             super(context);
@@ -1172,7 +1180,8 @@ public final class MainActivity extends Activity {
          * The rail is hidden whenever the dock is in launcher mode, and the tile
          * can be scrolled off its row. Neither stops isAttachedToWindow() being
          * true, so without this the bars would keep redrawing off screen for as
-         * long as something was playing.
+         * long as something was playing. The Visualizer probe is separate — it
+         * tracks playback even while the rail is hidden.
          */
         @Override
         public void onVisibilityAggregated(boolean isVisible) {
@@ -1180,20 +1189,20 @@ public final class MainActivity extends Activity {
             if (visible == isVisible) return;
             visible = isVisible;
             removeCallbacks(frame);
-            if (visible && playing) { startedAt = android.os.SystemClock.uptimeMillis(); post(frame); }
+            if (visible) ensureTicking();
         }
 
         void setPlaying(boolean next) {
-            if (playing == next) return;
-            playing = next;
-            removeCallbacks(frame);
-            if (playing && visible) {
-                startedAt = android.os.SystemClock.uptimeMillis();
-                post(frame);
-            } else {
-                // One last frame so the bars settle rather than freeze mid-swing.
-                invalidate();
+            if (playing != next) {
+                playing = next;
+                if (playing) startedAt = android.os.SystemClock.uptimeMillis();
             }
+            removeCallbacks(frame);
+            // Probe follows audible music — not only the now-playing flag — so
+            // Android Auto's stale paused bit does not block the session-0 test.
+            syncMediaVisualizerWanted(mediaAudioWanted());
+            if (visible) ensureTicking();
+            else invalidate();
         }
 
         @Override
@@ -1221,24 +1230,36 @@ public final class MainActivity extends Activity {
             float travel = floor - ceiling;
             if (travel <= 0f) return;
 
+            // Prefer live FFT whenever session 0 has energy — not only when the
+            // now-playing payload says playing. AA/MediaCenter often publish
+            // paused while music is still audible, which used to flip the row
+            // back to the synthetic sine fallback.
+            boolean live = mediaAudioViz != null
+                    && mediaAudioViz.copyLiveLevels(liveTarget);
             float seconds = playing
                     ? (android.os.SystemClock.uptimeMillis() - startedAt) / 1000f : 0f;
             for (int i = 0; i < BARS; i++) {
                 float target;
-                if (playing) {
+                if (live) {
+                    target = liveTarget[i];
+                } else if (!playing) {
+                    target = 0.10f;
+                } else {
                     // Three incommensurate rates per bar, so the row never reads
                     // as one sine wave marching across it.
                     double a = Math.sin(seconds * 2.7 + i * 0.9);
                     double b = Math.sin(seconds * 1.3 + i * 2.1);
                     double c = Math.sin(seconds * 4.1 + i * 0.4);
                     target = (float) (0.46 + 0.26 * a + 0.18 * b + 0.10 * c);
-                } else {
-                    target = 0.10f;
                 }
-                if (target < 0.06f) target = 0.06f;
+                // Synthetic keeps a visible floor; live must be allowed to drop
+                // or calm passages read as a solid wall of bars.
+                float floorLevel = live ? 0.02f : 0.06f;
+                if (target < floorLevel) target = floorLevel;
                 if (target > 1f) target = 1f;
                 // Ease toward the target so a pause settles instead of snapping.
-                level[i] += (target - level[i]) * (playing ? 0.55f : 0.22f);
+                float ease = live ? 0.38f : (!playing ? 0.22f : 0.55f);
+                level[i] += (target - level[i]) * ease;
 
                 float x = left + i * (barW + gap);
                 float top = floor - travel * level[i];
@@ -1251,13 +1272,81 @@ public final class MainActivity extends Activity {
                 paint.setColor(withAlpha(tint, alpha));
                 canvas.drawRoundRect(bar, barW * 0.5f, barW * 0.5f, paint);
             }
-            if (!playing) {
+            if (!playing && !live) {
                 boolean settled = true;
                 for (int i = 0; i < BARS; i++) {
                     if (Math.abs(level[i] - 0.10f) > 0.01f) { settled = false; break; }
                 }
                 if (!settled) postDelayed(frame, FRAME_MS);
             }
+        }
+    }
+
+    private void syncMediaVisualizerWanted(boolean want) {
+        if (!want) {
+            if (mediaAudioViz != null) mediaAudioViz.setWanted(false);
+            return;
+        }
+        ensureMediaVisualizer();
+    }
+
+    /** Playing flag from now-playing, or any STREAM_MUSIC activity (AA often lies). */
+    private boolean mediaAudioWanted() {
+        if (quickMediaPlaying) return true;
+        try {
+            android.media.AudioManager am =
+                    (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+            return am != null && am.isMusicActive();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private final Runnable mediaVizPoll = new Runnable() {
+        @Override
+        public void run() {
+            boolean want = mediaAudioWanted();
+            syncMediaVisualizerWanted(want);
+            mainHandler.postDelayed(this, 1000);
+        }
+    };
+
+    private void ensureMediaVisualizer() {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (mediaVizPermissionAsked) return;
+            mediaVizPermissionAsked = true;
+            Log.w(MediaAudioVisualizer.TAG, "no-permission — requesting RECORD_AUDIO");
+            requestPermissions(
+                    new String[]{android.Manifest.permission.RECORD_AUDIO},
+                    REQ_MEDIA_VIZ_AUDIO);
+            return;
+        }
+        startMediaVisualizerIfNeeded();
+    }
+
+    private void startMediaVisualizerIfNeeded() {
+        if (mediaAudioViz == null) {
+            mediaAudioViz = new MediaAudioVisualizer();
+            mediaAudioViz.setOnUpdate(() -> {
+                if (quickMediaBars != null) quickMediaBars.ensureTicking();
+            });
+        }
+        mediaAudioViz.setWanted(true);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_MEDIA_VIZ_AUDIO) return;
+        boolean granted = grantResults.length > 0
+                && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (granted && mediaAudioWanted()) {
+            Log.w(MediaAudioVisualizer.TAG, "permission-granted");
+            startMediaVisualizerIfNeeded();
+        } else {
+            Log.w(MediaAudioVisualizer.TAG, "permission-denied — synthetic bars only");
         }
     }
 
@@ -1986,7 +2075,9 @@ public final class MainActivity extends Activity {
             java.util.Calendar now = java.util.Calendar.getInstance();
             int minute = now.get(java.util.Calendar.MINUTE);
             int hour24 = now.get(java.util.Calendar.HOUR_OF_DAY);
-            boolean twelve = "12h".equals(descriptor.clockFormat);
+            boolean twelve = "12h".equals(descriptor.clockFormat)
+                    || ("system".equals(descriptor.clockFormat)
+                    && !android.text.format.DateFormat.is24HourFormat(MainActivity.this));
             int hour = twelve ? (hour24 % 12 == 0 ? 12 : hour24 % 12) : hour24;
             String hh = String.format(java.util.Locale.US, "%02d", hour);
             String mm = String.format(java.util.Locale.US, "%02d", minute);
@@ -2273,17 +2364,22 @@ public final class MainActivity extends Activity {
     private final java.util.Set<String> packageIconMiss =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
     private MotionTrailLayout projectionItem;
-    private View projectionGap;
     /** Waiting for Impulse to resolve a projection display task id. */
     private ProjectionPresence.Kind pendingProjectionKind;
     private final java.util.Set<String> pendingProjectionPackages = new java.util.HashSet<>();
     private Runnable pendingProjectionTimeout;
-    private final MotionTrailLayout[] pinnedItems = new MotionTrailLayout[PINNED_PACKAGES.length];
-    /** Pinned slots with an installed app behind them — the rest stay GONE forever. */
+    /**
+     * Single GWM hub that opens a flyout of {@link #PINNED_PACKAGES}. Destinations
+     * still tracked in {@link #pinnedBound}; only the hub is drawn on the strip.
+     */
+    private MotionTrailLayout gwmHubItem;
+    /** Which pinned destinations are installed (or emulator-stubbed). */
     private final boolean[] pinnedBound = new boolean[PINNED_PACKAGES.length];
-    private View pinnedGap;
+    private android.widget.PopupWindow gwmHubMenu;
+    private android.widget.PopupWindow dockCustomizeSheet;
+    /** Impulse-style name/icon/color overrides for dock tiles. */
+    private DockAppOverrides dockAppOverrides = new DockAppOverrides(null);
     private final MotionTrailLayout[] recentItems = new MotionTrailLayout[3];
-    private View recentsGap;
     private final List<String> recentPackages = new ArrayList<>();
     /** User-hidden packages (long-press → Hide). Survives restarts. */
     private final java.util.Set<String> hiddenPackages = new java.util.HashSet<>();
@@ -2363,6 +2459,12 @@ public final class MainActivity extends Activity {
     private View appsFabScrim;
     private WindowManager.LayoutParams appsFabScrimLp;
     private boolean appsFabScrimAttached;
+    /** Last CSS-mapped screen rect of the desktop switcher; the accessibility overlay consumes it. */
+    private int desktopHitX;
+    private int desktopHitY;
+    private int desktopHitW;
+    private int desktopHitH;
+    private boolean desktopHitWanted;
     private Runnable pinMediaBoundsRunnable;
     private final MediaNowPlaying mediaNowPlaying = new MediaNowPlaying();
     /** Full-width 2px load line at display Y=655 (65px above the 720px panel). */
@@ -3306,6 +3408,37 @@ public final class MainActivity extends Activity {
                 android.graphics.PixelFormat.TRANSLUCENT);
         lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
         return lp;
+    }
+
+    private void updateDesktopSwitcherHitProxy(float cssLeft, float cssTop,
+            float cssWidth, float cssHeight, boolean visible) {
+        if (webView == null) return;
+        int[] loc = new int[2];
+        webView.getLocationOnScreen(loc);
+        float scale = webView.getScale();
+        if (scale <= 0f) scale = 1f;
+        desktopHitX = loc[0] + Math.round(cssLeft * scale);
+        desktopHitY = loc[1] + Math.round(cssTop * scale);
+        desktopHitW = Math.max(0, Math.round(cssWidth * scale));
+        desktopHitH = Math.max(0, Math.round(cssHeight * scale));
+        desktopHitWanted = visible && desktopHitW > 1 && desktopHitH > 1;
+        DesktopSwitcherHitService.applyFromViewer(this,
+                desktopHitX, desktopHitY, desktopHitW, desktopHitH, desktopHitWanted);
+    }
+
+    boolean dispatchDesktopSwitcherHit(android.view.MotionEvent ev) {
+        if (webView == null) return false;
+        int[] loc = new int[2];
+        webView.getLocationOnScreen(loc);
+        android.view.MotionEvent copy = android.view.MotionEvent.obtain(ev);
+        copy.offsetLocation(
+                ev.getRawX() - loc[0] - ev.getX(),
+                ev.getRawY() - loc[1] - ev.getY());
+        try {
+            return webView.dispatchTouchEvent(copy);
+        } finally {
+            copy.recycle();
+        }
     }
 
     private void ensureAppsFabBuilt() {
@@ -6216,11 +6349,12 @@ public final class MainActivity extends Activity {
         loadRecentApps();
         loadHiddenApps();
         loadWindowApps();
+        dockAppOverrides = DockAppOverrides.load(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
         dockSurfaceMode = normalizeDockSurfaceMode(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
                 .getString(PREF_DOCK_SURFACE, DOCK_SURFACE_LAUNCHER));
         float density = getResources().getDisplayMetrics().density;
         // Bigger than the old 52/78: dropping the captions freed vertical room in
-        // the dock band. GWM tiles use the full Impulse ic_gwm asset on black.
+        // the dock band. One GWM hub (ic_gwm on black) opens the four OEM shortcuts.
         int iconSizePx = Math.round(60 * density);
         int itemWidthPx = Math.round(84 * density);
         dockCellPx = itemWidthPx;
@@ -6328,56 +6462,35 @@ public final class MainActivity extends Activity {
             }
         }
 
-        int gapPx = Math.round(28 * density);
+        // Uniform spacing: every dock tile uses makeDockItem's rightMargin.
+        // Order only: projection (AA/CarPlay) → GWM hub → recents → remaining apps.
         projectionItem = makeDockItem(itemWidthPx, iconSizePx, density);
         projectionItem.setVisibility(View.GONE);
         iconsLayout.addView(projectionItem);
         launcherItems.add(projectionItem);
 
-        projectionGap = makeDockGap(gapPx);
-        projectionGap.setVisibility(View.GONE);
-        iconsLayout.addView(projectionGap);
-
-        int pinnedShown = 0;
         for (int i = 0; i < PINNED_PACKAGES.length; i++) {
             String pkg = PINNED_PACKAGES[i];
-            pinnedItems[i] = makeDockItem(itemWidthPx, iconSizePx, density);
-            pinnedItems[i].setVisibility(View.GONE);
-            iconsLayout.addView(pinnedItems[i]);
-            launcherItems.add(pinnedItems[i]);
+            pinnedBound[i] = false;
             ResolveInfo info = byPkg.get(pkg);
             if (info == null) {
                 if (isEmulatorDevice()) {
                     emulatorStubPackages.add(pkg);
-                    String labelStr = pinnedLabel(pkg, pm, null);
-                    bindDockItem(pinnedItems[i], launcherIconForPackage(pkg), labelStr,
-                            v -> launchAppForPackage(pkg, labelStr), pkg);
                     pinnedBound[i] = true;
-                    if (isUserHidden(pkg)) {
-                        pinnedItems[i].setVisibility(View.GONE);
-                        continue;
-                    }
-                    pinnedShown++;
-                    Log.w(TAG, "Launcher pinned stub " + pkg + " | " + labelStr);
+                    Log.w(TAG, "Launcher pinned stub " + pkg + " | " + pinnedLabel(pkg, pm, null));
                 }
                 continue;
             }
-            String labelStr = pinnedLabel(pkg, pm, info);
-            // Bind even when hidden — the slot stays GONE until "Unhide" flips it.
-            bindDockItem(pinnedItems[i], iconForLauncherApp(pm, info), labelStr,
-                    v -> launchAppForPackage(pkg, labelStr), pkg);
             pinnedBound[i] = true;
-            if (isUserHidden(pkg)) {
-                pinnedItems[i].setVisibility(View.GONE);
-                continue;
-            }
-            pinnedShown++;
-            Log.w(TAG, "Launcher pinned " + pkg + " | " + labelStr);
+            Log.w(TAG, "Launcher pinned " + pkg + " | " + pinnedLabel(pkg, pm, info));
         }
 
-        pinnedGap = makeDockGap(gapPx);
-        pinnedGap.setVisibility(pinnedShown > 0 ? View.VISIBLE : View.GONE);
-        iconsLayout.addView(pinnedGap);
+        gwmHubItem = makeDockItem(itemWidthPx, iconSizePx, density);
+        gwmHubItem.setVisibility(View.GONE);
+        iconsLayout.addView(gwmHubItem);
+        launcherItems.add(gwmHubItem);
+        bindGwmHub();
+        updatePinnedVisibility();
 
         for (int i = 0; i < recentItems.length; i++) {
             recentItems[i] = makeDockItem(itemWidthPx, iconSizePx, density);
@@ -6385,10 +6498,6 @@ public final class MainActivity extends Activity {
             iconsLayout.addView(recentItems[i]);
             launcherItems.add(recentItems[i]);
         }
-
-        recentsGap = makeDockGap(gapPx);
-        recentsGap.setVisibility(View.GONE);
-        iconsLayout.addView(recentsGap);
 
         seedRecentAppsFromSystem(apps);
         dockItemsByPackage.clear();
@@ -6549,21 +6658,22 @@ public final class MainActivity extends Activity {
         lp.leftMargin = Math.round(8 * density);
         drawer.setLayoutParams(lp);
 
-        // One clear dock affordance: Apps reveals the launcher; pressing it
-        // again returns to the glanceable Cards surface. Layout and settings
-        // deliberately live in the Workspace card, not a second hidden menu.
+        // One clear dock affordance: the stacked-cards glyph returns to the
+        // glanceable Cards surface. Layout and settings live in the Workspace
+        // card, not a second hidden menu.
         modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
-                dockGlyphCards(iconPx, dockGlyphColor(false)),
-                "Menu", v -> {
+                dockGlyphCards(cardsDockGlyphPx(iconPx, density), dockGlyphColor(false)),
+                "Cards", v -> {
                     toggleDockSurface();
                     selectStripMode(STRIP_APPS);
                 });
-        modeCollapsedBtn.setContentDescription("Switch between app launcher and cards");
+        modeCollapsedBtn.setContentDescription("Show quick cards");
         modeCollapsedBtn.setOnLongClickListener(v -> {
             callViewerDock("openDesktopStudio");
             return true;
         });
         modeCollapsedIcon = (android.widget.ImageView) modeCollapsedBtn.findViewWithTag("modeIcon");
+        styleCardsDockCell(modeCollapsedBtn, density, iconPx);
         drawer.addView(modeCollapsedBtn);
         modeAppsBtn = null;
         modeLayoutBtn = null;
@@ -6608,7 +6718,7 @@ public final class MainActivity extends Activity {
         ivLp.gravity = android.view.Gravity.CENTER;
         iv.setLayoutParams(ivLp);
         iv.setImageDrawable(glyph);
-        iv.setScaleType(android.widget.ImageView.ScaleType.CENTER);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         iv.setAdjustViewBounds(false);
         iconWrap.addView(iv);
         cell.addView(iconWrap);
@@ -6940,9 +7050,119 @@ public final class MainActivity extends Activity {
         return layers;
     }
 
+    /** Custom plate fill from Personalizar — hairline so black still reads on the dark dock. */
+    private android.graphics.drawable.Drawable makeLauncherIconPlateDrawable(
+            float density, int fillColor) {
+        int stroke = Math.max(1, Math.round(density));
+        float radius = 14f * density;
+        android.graphics.drawable.GradientDrawable fill =
+                new android.graphics.drawable.GradientDrawable();
+        fill.setCornerRadius(radius);
+        fill.setColor(fillColor);
+        fill.setStroke(stroke, 0x38FFFFFF);
+        return fill;
+    }
+
+    /** Saved plate colour when a substitute icon is in force; null keeps the default plate. */
+    private Integer dockOverridePlateColor(String pkg) {
+        if (pkg == null || dockAppOverrides == null) return null;
+        if (dockAppOverrides.icon(pkg) == null) return null;
+        String bg = dockAppOverrides.bg(pkg);
+        if (bg == null) return null;
+        return Integer.valueOf(DockAppOverrides.parseColor(bg, 0xFF3D4650));
+    }
+
+    /**
+     * Plate baked into APP+APP PNGs so a customized glyph matches the dock tile.
+     * Stock adaptive icons already fill the square; those stay unplated.
+     */
+    private Integer appsCatalogPlateColor(String pkg) {
+        Integer custom = dockOverridePlateColor(pkg);
+        if (custom != null) return custom;
+        boolean substitute = dockAppOverrides != null && dockAppOverrides.icon(pkg) != null;
+        if (!substitute && !usesDarkIconPlate(pkg)) return null;
+        boolean dark = usesDarkIconPlate(pkg);
+        int fill = dark
+                ? (dockUiLight ? 0xFF202733 : 0xF20A0D12)
+                : (dockUiLight ? 0xFFFCFDFE : 0xF8F3F6FA);
+        return Integer.valueOf(fill);
+    }
+
+    /** PNG data URL for APP+APP tiles — same glyph/plate the dock already resolved. */
+    private String encodeIconDataUrl(Drawable icon, int size, Integer plateColor) {
+        if (icon == null || size <= 0) return null;
+        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+        if (plateColor != null) {
+            android.graphics.Paint fill = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            fill.setColor(plateColor.intValue());
+            float r = size * 0.22f;
+            canvas.drawRoundRect(0, 0, size, size, r, r, fill);
+            int pad = Math.round(size * 0.16f);
+            icon.setBounds(pad, pad, size - pad, size - pad);
+        } else {
+            icon.setBounds(0, 0, size, size);
+        }
+        icon.draw(canvas);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
+        return "data:image/png;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+    }
+
     /** Square plate behind every dock icon — mode drawer + launcher row share this size. */
     private static int dockPlatePx(int iconPx, float density) {
         return iconPx + Math.round(10f * density);
+    }
+
+    /** Stacked-cards mark inside the round Cards plate — 32/72 from the HTML picker. */
+    private static int cardsDockGlyphPx(int iconPx, float density) {
+        return Math.round(dockPlatePx(iconPx, density) * (32f / 72f));
+    }
+
+    private void styleCardsDockCell(View cell, float density, int iconPx) {
+        if (cell == null) return;
+        View plate = cell.findViewWithTag("modePlate");
+        if (plate != null) plate.setBackground(makeCircleFrostDrawable(false, density));
+        android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
+        if (iv == null) return;
+        int glyphPx = cardsDockGlyphPx(iconPx, density);
+        android.view.ViewGroup.LayoutParams lp = iv.getLayoutParams();
+        lp.width = glyphPx;
+        lp.height = glyphPx;
+        iv.setLayoutParams(lp);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setImageDrawable(dockGlyphCards(glyphPx, dockGlyphColor(false)));
+    }
+
+    private android.graphics.drawable.Drawable makeCircleFrostDrawable(
+            boolean selected, float density) {
+        int inset = Math.max(1, Math.round(density));
+        android.graphics.drawable.GradientDrawable rim =
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        selected
+                                ? new int[] { withAlpha(dockAccentColor, 0xD8),
+                                        withAlpha(dockAccentColor, 0x60) }
+                                : (dockUiLight ? new int[] { 0xB8FFFFFF, 0x4F8A99A8 }
+                                        : new int[] { 0x70FFFFFF, 0x20FFFFFF }));
+        rim.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        int[] fillColors = dockUiLight
+                ? (selected
+                        ? new int[] { blendArgb(0xF8F8FAFC, dockAccentColor, 0.10f),
+                                blendArgb(0xF0E9EEF3, dockAccentColor, 0.06f) }
+                        : new int[] { 0xF2F7F9FB, 0xE9E9EFF4 })
+                : (selected
+                        ? new int[] { blendArgb(0xEB18232D, dockAccentColor, 0.08f), 0xE00E141B }
+                        : new int[] { 0xE01A222D, 0xD90E141B });
+        android.graphics.drawable.GradientDrawable fill =
+                new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                        fillColors);
+        fill.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        android.graphics.drawable.LayerDrawable layers =
+                new android.graphics.drawable.LayerDrawable(new Drawable[] { rim, fill });
+        layers.setLayerInset(1, inset, inset, inset, inset);
+        return layers;
     }
 
     /**
@@ -7011,13 +7231,15 @@ public final class MainActivity extends Activity {
                 : Math.round(60 * getResources().getDisplayMetrics().density);
         if (plate != null) {
             plate.setBackground(cell == modeCollapsedBtn
-                    ? makeFrostStateDrawable(selected, density)
+                    ? makeCircleFrostDrawable(selected, density)
                     : makeDockPlateDrawable(selected, density));
         }
         cell.setAlpha(dockUiLight ? 1f : (selected ? 1f : 0.78f));
         android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
         if (iv != null) {
-            Drawable glyph = glyphForModeCell(cell, iconPx, selected);
+            int glyphPx = cell == modeCollapsedBtn
+                    ? cardsDockGlyphPx(iconPx, density) : iconPx;
+            Drawable glyph = glyphForModeCell(cell, glyphPx, selected);
             if (glyph != null) iv.setImageDrawable(glyph);
         }
         android.widget.TextView label = findModeCellLabel(cell);
@@ -7051,24 +7273,80 @@ public final class MainActivity extends Activity {
             if (item == null) continue;
             View plate = item.findViewWithTag("iconPlate");
             if (plate == null) continue;
-            boolean dark = Boolean.TRUE.equals(item.getTag());
-            plate.setBackground(makeLauncherIconPlateDrawable(density, dark));
+            Object tag = item.getTag();
+            if (tag instanceof Integer) {
+                plate.setBackground(makeLauncherIconPlateDrawable(density, ((Integer) tag).intValue()));
+            } else {
+                boolean dark = Boolean.TRUE.equals(tag);
+                plate.setBackground(makeLauncherIconPlateDrawable(density, dark));
+            }
         }
     }
 
-    private Drawable dockGlyphCards(int sizePx, int color) {
-        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+    private android.graphics.Paint dockGlyphStroke(int color, int sizePx) {
+        return dockGlyphStroke(color, sizePx, 0.055f);
+    }
+
+    private android.graphics.Paint dockGlyphStroke(int color, int sizePx, float widthFrac) {
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         p.setColor(color);
         p.setStyle(android.graphics.Paint.Style.STROKE);
-        p.setStrokeWidth(Math.max(2f, sizePx * 0.075f));
+        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+        p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+        p.setStrokeWidth(Math.max(1.75f, sizePx * widthFrac));
+        return p;
+    }
+
+    private Drawable dockGlyphCards(int sizePx, int color) {
+        // HTML cards-stack in a 24 viewBox, shown at 32px inside a 72px circle.
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 1.7f / 24f);
         float s = sizePx;
-        c.drawRoundRect(s * 0.15f, s * 0.20f, s * 0.85f, s * 0.47f,
-                s * 0.08f, s * 0.08f, p);
-        c.drawRoundRect(s * 0.15f, s * 0.56f, s * 0.58f, s * 0.82f,
-                s * 0.08f, s * 0.08f, p);
-        c.drawCircle(s * 0.74f, s * 0.69f, s * 0.12f, p);
+        float rx = s * (2f / 24f);
+        c.drawRoundRect(s * (6.2f / 24f), s * (3.4f / 24f),
+                s * (20.4f / 24f), s * (13.8f / 24f), rx, rx, p);
+        c.drawRoundRect(s * (3.4f / 24f), s * (9.4f / 24f),
+                s * (17.6f / 24f), s * (20.6f / 24f), rx, rx, p);
+        return new BitmapDrawable(getResources(), bmp);
+    }
+
+    private Drawable dockGlyphAppTiles(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 0.05f);
+        float s = sizePx;
+        float inset = p.getStrokeWidth() * 0.5f + 0.5f;
+        float gap = s * 0.14f;
+        float tile = (s - 2f * inset - gap) / 2f;
+        float rx = s * 0.08f;
+        for (int row = 0; row < 2; row++) {
+            for (int col = 0; col < 2; col++) {
+                float l = inset + col * (tile + gap);
+                float t = inset + row * (tile + gap);
+                c.drawRoundRect(l, t, l + tile, t + tile, rx, rx, p);
+            }
+        }
+        return new BitmapDrawable(getResources(), bmp);
+    }
+
+    private Drawable dockGlyphMosaic(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 0.05f);
+        float s = sizePx;
+        float inset = p.getStrokeWidth() * 0.5f + 0.5f;
+        float gap = s * 0.12f;
+        float leftW = s * 0.42f;
+        float rightL = inset + leftW + gap;
+        float midY = s * 0.5f;
+        float rx = s * 0.08f;
+        c.drawRoundRect(inset, inset, inset + leftW, s - inset, rx, rx, p);
+        c.drawRoundRect(rightL, inset, s - inset, midY - gap * 0.5f, rx, rx, p);
+        c.drawRoundRect(rightL, midY + gap * 0.5f, s - inset, s - inset, rx, rx, p);
         return new BitmapDrawable(getResources(), bmp);
     }
 
@@ -7714,18 +7992,14 @@ public final class MainActivity extends Activity {
     }
 
     private View makeQuickWorkspaceCard(float density) {
-        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
-        card.setOrientation(android.widget.LinearLayout.VERTICAL);
-        card.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        int pad = Math.round(14 * density);
-        card.setPadding(pad, Math.round(10 * density), pad, Math.round(9 * density));
+        // Split card: two full-height hit targets, no inner chips. Heading sits
+        // behind the actions so it does not steal taps from the Apps half.
+        FrameLayout card = new FrameLayout(this);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 Math.round(242 * density), Math.round(124 * density));
         lp.rightMargin = Math.round(10 * density);
         card.setLayoutParams(lp);
         card.setContentDescription("Workspace: app launcher and layout manager");
-        // Workspace is navigation, not a selected mode.  Keep the same neutral
-        // frost treatment as Climate, Consumption and Media cards.
         card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
         quickCardViews.add(card);
@@ -7737,59 +8011,112 @@ public final class MainActivity extends Activity {
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         heading.setLetterSpacing(0.11f);
+        heading.setTextColor(dockLabelColorMuted());
+        heading.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        FrameLayout.LayoutParams headingLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        headingLp.leftMargin = Math.round(14 * density);
+        headingLp.topMargin = Math.round(10 * density);
+        heading.setLayoutParams(headingLp);
         card.addView(heading);
 
         android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        actions.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        android.widget.LinearLayout.LayoutParams actionsLp = new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        actionsLp.topMargin = Math.round(3 * density);
-        actions.setLayoutParams(actionsLp);
-        actions.addView(makeWorkspaceAction(density, "APP\nLAUNCHER", "Show app launcher",
+        actions.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        // Title band is ~10dp inset + 10.5sp caption. Pad the stacks (not the
+        // row) so APPS / LAYOUT centre in the leftover height and the halves
+        // still receive taps on the title.
+        int titleBand = Math.round(28 * density);
+        actions.addView(makeWorkspaceAction(density, true, "APPS", "Show app launcher",
                 v -> chooseDockSurface(DOCK_SURFACE_LAUNCHER, true)));
-        actions.addView(makeWorkspaceAction(density, "LAYOUT\nMANAGER", "Open layout manager",
+
+        View divider = new View(this);
+        divider.setTag("workspaceSplit");
+        android.widget.LinearLayout.LayoutParams dividerLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        Math.max(1, Math.round(density)),
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+        dividerLp.topMargin = titleBand;
+        dividerLp.bottomMargin = Math.round(14 * density);
+        divider.setLayoutParams(dividerLp);
+        divider.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
+        actions.addView(divider);
+
+        actions.addView(makeWorkspaceAction(density, false, "LAYOUT", "Open layout manager",
                 v -> callViewerDock("openDesktopStudio")));
         card.addView(actions);
         return card;
     }
 
-    private View makeWorkspaceAction(float density, String label, String description,
-            View.OnClickListener click) {
-        android.widget.TextView button = new android.widget.TextView(this);
-        button.setText(label);
-        button.setContentDescription(description);
-        button.setGravity(android.view.Gravity.CENTER);
-        button.setTextSize(9.5f);
-        button.setMaxLines(2);
-        button.setLineSpacing(0f, 0.92f);
-        button.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                android.graphics.Typeface.NORMAL));
-        button.setLetterSpacing(0.07f);
-        button.setClickable(true);
-        button.setFocusable(true);
-        button.setOnClickListener(click);
-        button.setTextColor(dockGlyphColor(true));
-        // Give each action a visual cue as well as a precise label.  A small
-        // icon above the two-line caption reads as an action, not a second
-        // mode selector.
-        Drawable actionGlyph = label.startsWith("APP")
-                ? dockGlyphSwitcher(Math.round(22 * density), dockGlyphColor(true))
-                : dockGlyphLayout(Math.round(22 * density), dockGlyphColor(true));
-        actionGlyph.setBounds(0, 0, Math.round(22 * density), Math.round(22 * density));
-        button.setCompoundDrawables(null, actionGlyph, null, null);
-        button.setCompoundDrawablePadding(Math.round(1 * density));
-        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        bg.setCornerRadius(8f * density);
-        bg.setColor(dockUiLight ? 0x55FFFFFF : 0x22FFFFFF);
-        bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0x8A));
-        button.setBackground(bg);
+    private View makeWorkspaceAction(float density, boolean apps, String label,
+            String description, View.OnClickListener click) {
+        // Icon + caption centred as one stack. A TextView compound-drawable
+        // centres the label and parks the glyph above it, which is why
+        // WORKSPACE sat on the Apps tiles in the first car capture.
+        android.widget.LinearLayout cell = new android.widget.LinearLayout(this);
+        cell.setOrientation(android.widget.LinearLayout.VERTICAL);
+        cell.setGravity(android.view.Gravity.CENTER);
+        cell.setTag(apps ? "workspaceApps" : "workspaceLayout");
+        cell.setContentDescription(description);
+        cell.setClickable(true);
+        cell.setFocusable(true);
+        cell.setOnClickListener(click);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                0, Math.round(62 * density), 1f);
-        lp.rightMargin = Math.round(5 * density);
-        button.setLayoutParams(lp);
-        return button;
+                0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+        cell.setLayoutParams(lp);
+        cell.setPadding(0, Math.round(28 * density), 0, 0);
+
+        android.widget.ImageView glyph = new android.widget.ImageView(this);
+        glyph.setTag("workspaceGlyph");
+        int size = Math.round(32 * density);
+        android.widget.LinearLayout.LayoutParams glyphLp =
+                new android.widget.LinearLayout.LayoutParams(size, size);
+        glyph.setLayoutParams(glyphLp);
+        glyph.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        cell.addView(glyph);
+
+        android.widget.TextView caption = new android.widget.TextView(this);
+        caption.setText(label);
+        caption.setTag("workspaceLabel");
+        caption.setGravity(android.view.Gravity.CENTER);
+        caption.setTextSize(10.5f);
+        caption.setMaxLines(1);
+        caption.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        caption.setLetterSpacing(0.11f);
+        android.widget.LinearLayout.LayoutParams captionLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        captionLp.topMargin = Math.round(6 * density);
+        caption.setLayoutParams(captionLp);
+        cell.addView(caption);
+
+        applyWorkspaceActionGlyph(cell);
+        return cell;
+    }
+
+    private void applyWorkspaceActionGlyph(View cell) {
+        if (cell == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        int size = Math.round(32 * density);
+        int color = dockLabelColor();
+        android.widget.ImageView glyph = cell.findViewWithTag("workspaceGlyph");
+        if (glyph != null) {
+            glyph.setImageDrawable("workspaceApps".equals(cell.getTag())
+                    ? dockGlyphAppTiles(size, color)
+                    : dockGlyphMosaic(size, color));
+        }
+        android.widget.TextView caption = cell.findViewWithTag("workspaceLabel");
+        if (caption != null) caption.setTextColor(color);
+        android.graphics.drawable.GradientDrawable mask =
+                new android.graphics.drawable.GradientDrawable();
+        mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        mask.setColor(0xFFFFFFFF);
+        cell.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(withAlpha(color, 0x33)),
+                null, mask));
     }
 
     private View makeQuickTextCard(float density, int widthDp, String title, String value,
@@ -8039,17 +8366,86 @@ public final class MainActivity extends Activity {
 
     private void applyQuickMediaAppChip(String iconDataUrl, String label) {
         if (quickMediaAppRow == null) return;
-        Bitmap icon = decodeDataUrlBitmap(iconDataUrl);
-        boolean show = icon != null || (label != null && !label.isEmpty());
+        String pkg = quickMediaPackage != null ? quickMediaPackage : "";
+        String chipLabel = resolveMediaChipLabel(pkg, label);
+        Drawable customIcon = resolveMediaChipIcon(pkg, label);
+        Bitmap decoded = customIcon == null ? decodeDataUrlBitmap(iconDataUrl) : null;
+        boolean show = customIcon != null || decoded != null
+                || (chipLabel != null && !chipLabel.isEmpty());
         quickMediaAppRow.setVisibility(show ? View.VISIBLE : View.GONE);
         if (!show) return;
         if (quickMediaAppIcon != null) {
-            quickMediaAppIcon.setVisibility(icon != null ? View.VISIBLE : View.GONE);
-            if (icon != null) quickMediaAppIcon.setImageBitmap(icon);
+            if (customIcon != null) {
+                quickMediaAppIcon.setVisibility(View.VISIBLE);
+                quickMediaAppIcon.setImageDrawable(customIcon);
+            } else if (decoded != null) {
+                quickMediaAppIcon.setVisibility(View.VISIBLE);
+                quickMediaAppIcon.setImageBitmap(decoded);
+            } else {
+                quickMediaAppIcon.setVisibility(View.GONE);
+            }
         }
         if (quickMediaAppName != null) {
-            quickMediaAppName.setText(label == null ? "" : label.toUpperCase(java.util.Locale.US));
+            quickMediaAppName.setText(chipLabel == null ? ""
+                    : chipLabel.toUpperCase(java.util.Locale.US));
         }
+    }
+
+    /**
+     * Icon for the MEDIA card's source chip: dock substitute first, then our
+     * AA/CarPlay assets (the system packages ship a generic glyph), then the
+     * launcher icon MediaNowPlaying encoded into the payload.
+     */
+    private Drawable resolveMediaChipIcon(String pkg, String label) {
+        if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
+            String slug = dockAppOverrides.icon(pkg);
+            if (slug != null) {
+                Drawable sub = DockAppOverrides.drawableFor(this, slug, dockAppOverrides.color(pkg));
+                if (sub != null) return sub;
+            }
+        }
+        if (isAndroidAutoMediaSource(pkg, label)) {
+            if (projectionPresence != null) {
+                Drawable branded = projectionPresence.iconFor(ProjectionPresence.Kind.ANDROID_AUTO);
+                if (branded != null) return branded;
+            }
+            try { return getDrawable(R.drawable.ic_android_auto_default); } catch (Exception ignored) {}
+        }
+        if (isCarPlayMediaSource(pkg, label)) {
+            if (projectionPresence != null) {
+                Drawable branded = projectionPresence.iconFor(ProjectionPresence.Kind.CARPLAY);
+                if (branded != null) return branded;
+            }
+            try { return getDrawable(R.drawable.ic_carplay_default); } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    private String resolveMediaChipLabel(String pkg, String stock) {
+        if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
+            String custom = dockAppOverrides.name(pkg);
+            if (custom != null) return custom;
+        }
+        if (isAndroidAutoMediaSource(pkg, stock)) return "Android Auto";
+        if (isCarPlayMediaSource(pkg, stock)) return "CarPlay";
+        return stock != null ? stock : "";
+    }
+
+    /** MediaCenter owns both AA and USB — only the AA label is projection. */
+    private static boolean isAndroidAutoMediaSource(String pkg, String label) {
+        if (label != null && label.equalsIgnoreCase("ANDROID AUTO")) return true;
+        if (pkg == null || pkg.isEmpty()) return false;
+        String p = pkg.toLowerCase(java.util.Locale.US);
+        return p.contains("androidauto") || p.contains("projection.gearhead");
+    }
+
+    private static boolean isCarPlayMediaSource(String pkg, String label) {
+        if (label != null) {
+            String l = label.trim();
+            if (l.equalsIgnoreCase("CARPLAY") || l.equalsIgnoreCase("CarPlay")) return true;
+        }
+        if (pkg == null || pkg.isEmpty()) return false;
+        return pkg.toLowerCase(java.util.Locale.US).contains("carplay");
     }
 
     /** Shared decode for the base64 payloads the media bridge sends. */
@@ -8202,31 +8598,16 @@ public final class MainActivity extends Activity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
-    /** Hamburger affordance for the single launcher/cards control. */
-    private Drawable dockGlyphSwitcher(int sizePx, int color) {
-        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
-        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(color);
-        p.setStyle(android.graphics.Paint.Style.STROKE);
-        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
-        p.setStrokeWidth(Math.max(2f, sizePx * 0.085f));
-        float s = sizePx;
-        float left = s * 0.18f, right = s * 0.82f;
-        float y1 = s * 0.28f, y2 = s * 0.50f, y3 = s * 0.72f;
-        c.drawLine(left, y1, right, y1, p);
-        c.drawLine(left, y2, right, y2, p);
-        c.drawLine(left, y3, right, y3, p);
-        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
-    }
-
     private void updateQuickMediaCard(JSONObject payload) {
         if (payload == null) return;
         lastMediaPayload = payload;
         quickMediaPackage = payload.optString("packageName", "");
         quickMediaPlaying = payload.optBoolean("playing", false);
         quickMediaCanLaunch = payload.optBoolean("canLaunch", false);
-        if (quickMediaBars != null) quickMediaBars.setPlaying(quickMediaPlaying);
+        if (quickMediaBars != null) {
+            quickMediaBars.setPlaying(quickMediaPlaying);
+        }
+        syncMediaVisualizerWanted(mediaAudioWanted());
         boolean hasTrack = payload.optBoolean("hasTrack", false);
         quickMediaAvailable = hasTrack && mediaNowPlaying != null;
         for (android.widget.ImageView button : quickMediaButtons) {
@@ -8325,8 +8706,10 @@ public final class MainActivity extends Activity {
     }
 
     private void tintFrostText(View view) {
-        if (view instanceof android.widget.TextView) {
-            Object tag = view.getTag();
+        Object tag = view.getTag();
+        if ("workspaceApps".equals(tag) || "workspaceLayout".equals(tag)) {
+            applyWorkspaceActionGlyph(view);
+        } else if (view instanceof android.widget.TextView) {
             boolean accent = "frostAccent".equals(tag) || "frostActionAccent".equals(tag);
             ((android.widget.TextView) view).setTextColor(accent ? dockAccentColor
                     : ("frostSecondary".equals(tag) ? dockLabelColorMuted() : dockLabelColor()));
@@ -8337,8 +8720,10 @@ public final class MainActivity extends Activity {
                 view.setBackground(makeDockPlateDrawable(false,
                         getResources().getDisplayMetrics().density));
             }
-        } else if ("quickAccentRail".equals(view.getTag())) {
+        } else if ("quickAccentRail".equals(tag)) {
             view.setBackgroundColor(withAlpha(dockAccentColor, 0xD8));
+        } else if ("workspaceSplit".equals(tag)) {
+            view.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
         }
         if (view instanceof android.view.ViewGroup) {
             android.view.ViewGroup group = (android.view.ViewGroup) view;
@@ -9352,7 +9737,8 @@ public final class MainActivity extends Activity {
             if ("clock".equals(id)) {
                 String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
                 descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
-                descriptor.clockFormat = "12h".equals(raw.optString("clockFormat", "24h")) ? "12h" : "24h";
+                String format = raw.optString("clockFormat", "system");
+                descriptor.clockFormat = "12h".equals(format) ? "12h" : ("24h".equals(format) ? "24h" : "system");
             }
             next.add(descriptor);
         }
@@ -9807,15 +10193,7 @@ public final class MainActivity extends Activity {
         list.setOrientation(android.widget.LinearLayout.VERTICAL);
         int pad = Math.round(6 * density);
         list.setPadding(pad, pad, pad, pad);
-        android.graphics.drawable.GradientDrawable panel =
-                new android.graphics.drawable.GradientDrawable();
-        panel.setCornerRadius(14f * density);
-        // Near-opaque on purpose: this sits over a widget board full of text,
-        // not over the scene, and a car UI has to be readable at a glance.
-        panel.setColor(dockUiLight ? 0xFCF7FAFC : 0xFA0B1016);
-        panel.setStroke(Math.max(1, Math.round(density)),
-                dockUiLight ? 0x2225303B : 0x26FFFFFF);
-        list.setBackground(panel);
+        list.setBackground(makeDockPopupPanel(density));
         list.setElevation(12f * density);
 
         for (QuickMenuRow row : descriptor.menu) {
@@ -9905,6 +10283,59 @@ public final class MainActivity extends Activity {
         return states;
     }
 
+    private android.graphics.drawable.GradientDrawable makeDockPopupPanel(float density) {
+        android.graphics.drawable.GradientDrawable panel =
+                new android.graphics.drawable.GradientDrawable();
+        panel.setCornerRadius(14f * density);
+        panel.setColor(dockUiLight ? 0xFCF7FAFC : 0xFA0B1016);
+        panel.setStroke(Math.max(1, Math.round(density)),
+                dockUiLight ? 0x2225303B : 0x26FFFFFF);
+        return panel;
+    }
+
+    private android.graphics.drawable.Drawable makeDockPopupFieldBackground(float density) {
+        android.graphics.drawable.GradientDrawable field =
+                new android.graphics.drawable.GradientDrawable();
+        field.setCornerRadius(10f * density);
+        field.setColor(dockUiLight ? 0x0F25303B : 0x14FFFFFF);
+        field.setStroke(Math.max(1, Math.round(density)),
+                dockUiLight ? 0x1A25303B : 0x1AFFFFFF);
+        return field;
+    }
+
+    private android.widget.TextView makeDockPopupKicker(String text, float density) {
+        android.widget.TextView t = new android.widget.TextView(this);
+        t.setText(text);
+        t.setTextColor(dockLabelColorMuted());
+        t.setTextSize(11f);
+        t.setLetterSpacing(0.08f);
+        t.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        t.setPadding(0, 0, 0, Math.round(6 * density));
+        return t;
+    }
+
+    private android.widget.TextView makeDockPopupAction(String label, boolean primary,
+            float density, Runnable action) {
+        android.widget.TextView t = new android.widget.TextView(this);
+        t.setText(label);
+        t.setTextSize(14f);
+        t.setGravity(android.view.Gravity.CENTER);
+        t.setPadding(Math.round(16 * density), Math.round(12 * density),
+                Math.round(16 * density), Math.round(12 * density));
+        t.setTextColor(primary ? dockAccentColor : dockLabelColor());
+        t.setBackground(makeQuickMenuItemBackground(primary, !primary, density));
+        t.setClickable(true);
+        t.setFocusable(true);
+        t.setOnClickListener(v -> action.run());
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(0,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.setMargins(Math.round(4 * density), 0, Math.round(4 * density), 0);
+        t.setLayoutParams(lp);
+        return t;
+    }
+
     private void dismissQuickMenu() {
         if (quickMenuWindow == null) return;
         try { quickMenuWindow.dismiss(); } catch (RuntimeException ignored) {}
@@ -9965,16 +10396,6 @@ public final class MainActivity extends Activity {
         return item;
     }
 
-    private View makeDockGap(int widthPx) {
-        View gap = new View(this);
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                widthPx, android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
-        gap.setLayoutParams(lp);
-        gap.setClickable(false);
-        gap.setFocusable(false);
-        return gap;
-    }
-
     private boolean isPinnedPackage(String packageName) {
         if (packageName == null) return false;
         for (String pinned : PINNED_PACKAGES) {
@@ -10004,6 +10425,46 @@ public final class MainActivity extends Activity {
     /** Hidden from the scrolling app row (pinned apps live in their own slots). */
     private boolean skipInAppRow(String pkg) {
         return excludedFromAppRow(pkg) || isUserHidden(pkg);
+    }
+
+    /**
+     * APP+APP catalog: the same packages the launcher actually shows — scroll-row
+     * apps plus visible GWM hub destinations — with the same hide list. Pinned
+     * packages stay in the catalog because they are on the launcher (hub flyout);
+     * ignored / projection / this viewer / user-hidden stay out.
+     */
+    private boolean skipInAppsCatalog(String pkg) {
+        if (pkg == null || pkg.isEmpty()) return true;
+        if (pkg.equals(getPackageName())) return true;
+        if (IGNORED_PACKAGES.contains(pkg)) return true;
+        if (ProjectionPresence.isProjectionPackage(pkg)) return true;
+        return isUserHidden(pkg);
+    }
+
+    private JSONObject appsCatalogEntry(PackageManager pm, ResolveInfo info, String pkg)
+            throws JSONException {
+        String stockLabel = isPinnedPackage(pkg) ? pinnedLabel(pkg, pm, info) : launcherLabel(pm, info);
+        Drawable stockIcon = isPinnedPackage(pkg) ? flyoutIconForPinned(pkg) : iconForLauncherApp(pm, info);
+        return appsCatalogObject(pkg, resolveDockLabel(pkg, stockLabel), resolveDockIcon(pkg, stockIcon));
+    }
+
+    private JSONObject appsCatalogStubEntry(String pkg, String stubLabel) throws JSONException {
+        return appsCatalogObject(pkg, resolveDockLabel(pkg, stubLabel),
+                resolveDockIcon(pkg, launcherIconForPackage(pkg)));
+    }
+
+    private JSONObject appsCatalogObject(String pkg, String label, Drawable icon) throws JSONException {
+        JSONObject appObj = new JSONObject();
+        appObj.put("packageName", pkg);
+        appObj.put("label", label != null ? label : "");
+        try {
+            Drawable drawn = normalizeAdaptiveIcon(icon, 96);
+            String dataUrl = encodeIconDataUrl(drawn, 96, appsCatalogPlateColor(pkg));
+            if (dataUrl != null) appObj.put("icon", dataUrl);
+        } catch (Exception e) {
+            Log.e(TAG, "Error drawing icon for " + pkg, e);
+        }
+        return appObj;
     }
 
     private boolean skipInRecents(String pkg) {
@@ -10233,10 +10694,159 @@ public final class MainActivity extends Activity {
         return isGwmApp(pkg) && !"com.beantechs.energyassistant".equalsIgnoreCase(pkg);
     }
 
-    /** Rounded plate behind launcher icons — dark for GWM emblem + Energy Assistant. */
+    /** Rounded plate behind launcher icons — dark for GWM emblem + Energy + gwm substitute. */
     private boolean usesDarkIconPlate(String pkg) {
+        if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
+            String slug = dockAppOverrides != null ? dockAppOverrides.icon(pkg) : null;
+            return slug == null || DockAppOverrides.isDarkPlateSlug(slug);
+        }
+        String slug = dockAppOverrides != null ? dockAppOverrides.icon(pkg) : null;
+        if (slug != null) return DockAppOverrides.isDarkPlateSlug(slug);
         return usesGwmEmblem(pkg)
                 || "com.beantechs.energyassistant".equalsIgnoreCase(pkg);
+    }
+
+    private String resolveDockLabel(String pkg, String stock) {
+        if (pkg == null) return stock != null ? stock : "";
+        String custom = dockAppOverrides != null ? dockAppOverrides.name(pkg) : null;
+        if (custom != null) return custom;
+        if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) return "GWM";
+        return stock != null ? stock : "";
+    }
+
+    private Drawable resolveDockIcon(String pkg, Drawable stock) {
+        if (pkg == null || dockAppOverrides == null) return stock;
+        String slug = dockAppOverrides.icon(pkg);
+        if (slug == null) {
+            if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
+                try {
+                    return getDrawable(R.drawable.ic_gwm);
+                } catch (Exception e) {
+                    return stock;
+                }
+            }
+            return stock;
+        }
+        Drawable sub = DockAppOverrides.drawableFor(this, slug, dockAppOverrides.color(pkg));
+        return sub != null ? sub : stock;
+    }
+
+    private void bindGwmHub() {
+        if (gwmHubItem == null) return;
+        Drawable icon = resolveDockIcon(DockAppOverrides.GWM_HUB_PKG, launcherIconForPackage("com.beantechs.vehiclecenter"));
+        if (icon == null) {
+            try { icon = getDrawable(R.drawable.ic_gwm); } catch (Exception ignored) {}
+        }
+        String label = resolveDockLabel(DockAppOverrides.GWM_HUB_PKG, "GWM");
+        bindDockItem(gwmHubItem, icon, label,
+                v -> showGwmHubMenu(v), DockAppOverrides.GWM_HUB_PKG);
+    }
+
+    private void showGwmHubMenu(View anchor) {
+        if (anchor == null) return;
+        dismissGwmHubMenu();
+        dismissDockEditMenu();
+        float d = getResources().getDisplayMetrics().density;
+        PackageManager pm = getPackageManager();
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setBackgroundColor(0xF2141820);
+        box.setElevation(14f * d);
+        int pad = Math.round(18 * d);
+        box.setPadding(pad, Math.round(12 * d), pad, Math.round(12 * d));
+        box.setMinimumWidth(Math.round(280 * d));
+
+        int shown = 0;
+        int iconPx = Math.round(40 * d);
+        for (int i = 0; i < PINNED_PACKAGES.length; i++) {
+            if (!pinnedBound[i]) continue;
+            String pkg = PINNED_PACKAGES[i];
+            if (isUserHidden(pkg)) continue;
+            String label = resolveDockLabel(pkg, pinnedLabel(pkg, pm, null));
+            Drawable icon = flyoutIconForPinned(pkg);
+
+            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(Math.round(8 * d), Math.round(14 * d), Math.round(8 * d), Math.round(14 * d));
+            row.setMinimumHeight(Math.round(56 * d));
+            row.setClickable(true);
+            row.setFocusable(true);
+
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            iv.setImageDrawable(icon);
+            android.widget.LinearLayout.LayoutParams ilp =
+                    new android.widget.LinearLayout.LayoutParams(iconPx, iconPx);
+            ilp.rightMargin = Math.round(14 * d);
+            row.addView(iv, ilp);
+
+            android.widget.TextView tv = new android.widget.TextView(this);
+            tv.setText(label);
+            tv.setTextColor(0xFFFFFFFF);
+            tv.setTextSize(17f);
+            row.addView(tv);
+
+            final String targetPkg = pkg;
+            final String targetLabel = label;
+            row.setOnClickListener(v -> {
+                dismissGwmHubMenu();
+                launchAppForPackage(targetPkg, targetLabel);
+            });
+            box.addView(row);
+            shown++;
+        }
+        if (shown == 0) {
+            android.widget.TextView empty = new android.widget.TextView(this);
+            empty.setText("Nenhum app GWM");
+            empty.setTextColor(0x99FFFFFF);
+            empty.setTextSize(15f);
+            empty.setPadding(Math.round(8 * d), Math.round(10 * d), Math.round(8 * d), Math.round(10 * d));
+            box.addView(empty);
+        }
+
+        android.widget.PopupWindow popup = new android.widget.PopupWindow(
+                box,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                true);
+        popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
+        popup.setOnDismissListener(() -> {
+            if (gwmHubMenu == popup) gwmHubMenu = null;
+        });
+        gwmHubMenu = popup;
+        box.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        int xOff = (anchor.getWidth() - box.getMeasuredWidth()) / 2;
+        int yOff = -(box.getMeasuredHeight() + anchor.getHeight() + Math.round(10 * d));
+        popup.showAsDropDown(anchor, xOff, yOff);
+    }
+    private void dismissGwmHubMenu() {
+        if (gwmHubMenu == null) return;
+        try { gwmHubMenu.dismiss(); } catch (Exception ignored) {}
+        gwmHubMenu = null;
+    }
+
+    /** Small leading glyph for each GWM flyout row. */
+    private Drawable flyoutIconForPinned(String pkg) {
+        if ("com.beantechs.energyassistant".equalsIgnoreCase(pkg)) {
+            try {
+                Drawable d = getDrawable(R.drawable.ic_energy_assistant);
+                if (d != null) return d;
+            } catch (Exception ignored) {}
+        }
+        if ("com.beantechs.settings".equals(pkg)) {
+            Drawable sub = DockAppOverrides.drawableFor(this, "settings", "#FFFFFF");
+            if (sub != null) return sub;
+        }
+        try {
+            Drawable emblem = getDrawable(R.drawable.ic_gwm_emblem);
+            if (emblem != null) return emblem;
+        } catch (Exception ignored) {}
+        try {
+            return getDrawable(R.drawable.ic_gwm);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void bindDockItem(MotionTrailLayout item, Drawable icon, String label,
@@ -10251,18 +10861,25 @@ public final class MainActivity extends Activity {
         android.widget.TextView tv = (android.widget.TextView) item.findViewWithTag("label");
         float density = getResources().getDisplayMetrics().density;
         int iconPx = dockIconPx > 0 ? dockIconPx : Math.round(60 * density);
-        if (iv != null) iv.setImageDrawable(normalizeAdaptiveIcon(icon, iconPx));
+        Drawable drawn = editPackage != null ? resolveDockIcon(editPackage, icon) : icon;
+        String caption = editPackage != null ? resolveDockLabel(editPackage, label) : (label != null ? label : "");
+        if (iv != null) iv.setImageDrawable(normalizeAdaptiveIcon(drawn, iconPx));
         View plate = item.findViewWithTag("iconPlate");
         if (plate != null) {
-            boolean darkPlate = editPackage != null && usesDarkIconPlate(editPackage);
-            item.setTag(Boolean.valueOf(darkPlate));
-            plate.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
+            Integer plateColor = editPackage != null ? dockOverridePlateColor(editPackage) : null;
+            if (plateColor != null) {
+                item.setTag(plateColor);
+                plate.setBackground(makeLauncherIconPlateDrawable(density, plateColor.intValue()));
+            } else {
+                boolean darkPlate = editPackage != null && usesDarkIconPlate(editPackage);
+                item.setTag(Boolean.valueOf(darkPlate));
+                plate.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
+            }
             int platePx = dockPlatePx(iconPx, density);
             int inset = Math.round(platePx * launcherIconInsetFrac());
             plate.setPadding(inset, inset, inset, inset);
         }
         if (tv != null) {
-            String caption = label != null ? label : "";
             tv.setText(caption);
             tv.setVisibility(caption.isEmpty() ? View.GONE : View.VISIBLE);
         }
@@ -10288,13 +10905,11 @@ public final class MainActivity extends Activity {
         if (projectionItem == null) return;
         if (kind == null || kind == ProjectionPresence.Kind.NONE) {
             projectionItem.setVisibility(View.GONE);
-            if (projectionGap != null) projectionGap.setVisibility(View.GONE);
             return;
         }
         Drawable icon = projectionPresence != null ? projectionPresence.iconFor(kind) : null;
         String label = projectionPresence != null ? projectionPresence.labelFor(kind) : "";
         bindDockItem(projectionItem, icon, label, v -> launchProjection(kind));
-        if (projectionGap != null) projectionGap.setVisibility(View.VISIBLE);
     }
 
     private void bindRecentSlots(PackageManager pm, List<ResolveInfo> apps) {
@@ -10324,7 +10939,6 @@ public final class MainActivity extends Activity {
         for (int i = shown; i < recentItems.length; i++) {
             if (recentItems[i] != null) recentItems[i].setVisibility(View.GONE);
         }
-        if (recentsGap != null) recentsGap.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
         hideRecentDuplicatesFromStrip(shownRecents);
     }
 
@@ -10400,6 +11014,7 @@ public final class MainActivity extends Activity {
 
     private void dismissDockEditMenu() {
         dismissUnhidePicker();
+        dismissDockCustomizeSheet();
         if (dockEditMenu == null) return;
         try {
             dockEditMenu.dismiss();
@@ -10410,20 +11025,31 @@ public final class MainActivity extends Activity {
     private void showDockEditMenu(View anchor, String pkg) {
         if (anchor == null || pkg == null || pkg.isEmpty()) return;
         dismissDockEditMenu();
+        dismissGwmHubMenu();
         float d = getResources().getDisplayMetrics().density;
         android.widget.LinearLayout box = new android.widget.LinearLayout(this);
         box.setOrientation(android.widget.LinearLayout.VERTICAL);
         box.setBackgroundColor(0xF2141820);
         box.setElevation(12f * d);
-        int padH = Math.round(14 * d);
-        int padV = Math.round(8 * d);
+        int padH = Math.round(18 * d);
+        int padV = Math.round(12 * d);
         box.setPadding(padH, padV, padH, padV);
+        box.setMinimumWidth(Math.round(220 * d));
 
+        final boolean isHub = DockAppOverrides.GWM_HUB_PKG.equals(pkg);
+        box.addView(makeDockMenuRow("Customize…", () -> {
+            dismissDockEditMenu();
+            showDockCustomizeSheet(anchor, pkg);
+        }));
         box.addView(makeDockMenuRow("Hide", () -> {
             dismissDockEditMenu();
-            removeDockPackage(pkg, true);
+            if (isHub) {
+                hideGwmHub();
+            } else {
+                removeDockPackage(pkg, true);
+            }
         }));
-        if (canToggleOpenAsWindow(pkg)) {
+        if (!isHub && canToggleOpenAsWindow(pkg)) {
             boolean on = prefersWindow(pkg);
             box.addView(makeDockMenuRow(on ? "✓ Open as window" : "Open as window", () -> {
                 dismissDockEditMenu();
@@ -10436,7 +11062,7 @@ public final class MainActivity extends Activity {
                 showUnhidePicker();
             }));
         }
-        if (canUninstallPackage(pkg)) {
+        if (!isHub && canUninstallPackage(pkg)) {
             box.addView(makeDockMenuRow("Uninstall", () -> {
                 dismissDockEditMenu();
                 try {
@@ -10464,6 +11090,429 @@ public final class MainActivity extends Activity {
         int xOff = (anchor.getWidth() - box.getMeasuredWidth()) / 2;
         int yOff = -(box.getMeasuredHeight() + anchor.getHeight() + Math.round(8 * d));
         popup.showAsDropDown(anchor, xOff, yOff);
+    }
+
+    private void hideGwmHub() {
+        for (String pinned : PINNED_PACKAGES) {
+            hiddenPackages.add(pinned);
+        }
+        saveHiddenApps();
+        updatePinnedVisibility();
+        refreshRecentSlots();
+        notifyAppsCatalogChanged();
+    }
+
+    private void dismissDockCustomizeSheet() {
+        if (dockCustomizeSheet == null) return;
+        try { dockCustomizeSheet.dismiss(); } catch (Exception ignored) {}
+        dockCustomizeSheet = null;
+    }
+
+    private void addDockIconGridCell(
+            android.widget.LinearLayout grid,
+            android.widget.LinearLayout[] currentRow,
+            int[] col,
+            java.util.List<View> iconCells,
+            int cols, int cellPx, int gap, View cell) {
+        if (currentRow[0] == null || col[0] >= cols) {
+            currentRow[0] = new android.widget.LinearLayout(this);
+            currentRow[0].setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            android.widget.LinearLayout.LayoutParams rowLp =
+                    new android.widget.LinearLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            rowLp.bottomMargin = gap;
+            currentRow[0].setLayoutParams(rowLp);
+            grid.addView(currentRow[0]);
+            col[0] = 0;
+        }
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(cellPx, cellPx);
+        lp.rightMargin = gap;
+        cell.setLayoutParams(lp);
+        currentRow[0].addView(cell);
+        col[0]++;
+        iconCells.add(cell);
+    }
+
+    private void addDockColorSwatches(android.widget.LinearLayout row, int swatchPx, int gapPx, float d) {
+        String[] colors = DockAppOverrides.COLORS;
+        for (int i = 0; i < colors.length; i++) {
+            String hex = colors[i];
+            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+            android.widget.LinearLayout.LayoutParams lp =
+                    new android.widget.LinearLayout.LayoutParams(swatchPx, swatchPx);
+            if (i < colors.length - 1) lp.rightMargin = gapPx;
+            cell.setLayoutParams(lp);
+            cell.setTag(hex);
+            android.graphics.drawable.GradientDrawable oval =
+                    new android.graphics.drawable.GradientDrawable();
+            oval.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            oval.setColor(DockAppOverrides.parseColor(hex, 0xFFFFFFFF));
+            oval.setStroke(Math.round(d), 0x38FFFFFF);
+            cell.setBackground(oval);
+            row.addView(cell);
+        }
+    }
+
+    /**
+     * Rename + substitute icon + tint + plate. Saves into {@link DockAppOverrides}.
+     */
+    private void showDockCustomizeSheet(View anchor, String pkg) {
+        if (anchor == null || pkg == null || pkg.isEmpty()) return;
+        dismissDockCustomizeSheet();
+        float d = getResources().getDisplayMetrics().density;
+        String stockLabel;
+        if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
+            stockLabel = "GWM";
+        } else if (isPinnedPackage(pkg)) {
+            stockLabel = pinnedLabel(pkg, getPackageManager(), null);
+        } else {
+            String fromCaption = null;
+            MotionTrailLayout row = dockItemsByPackage.get(pkg);
+            if (row != null) {
+                android.widget.TextView tv = (android.widget.TextView) row.findViewWithTag("label");
+                if (tv != null && tv.getText() != null) {
+                    fromCaption = tv.getText().toString().trim();
+                }
+            }
+            String resolved = fromCaption != null ? fromCaption : pkg;
+            try {
+                PackageManager pm = getPackageManager();
+                android.content.pm.ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+                CharSequence lab = pm.getApplicationLabel(ai);
+                if (lab != null) resolved = lab.toString();
+            } catch (Exception ignored) {}
+            stockLabel = resolved;
+        }
+        final String curName = dockAppOverrides != null ? dockAppOverrides.name(pkg) : null;
+        final String[] selectedIcon = {
+                dockAppOverrides != null ? dockAppOverrides.icon(pkg) : null
+        };
+        final String[] selectedColor = {
+                dockAppOverrides != null && dockAppOverrides.color(pkg) != null
+                        ? dockAppOverrides.color(pkg) : DockAppOverrides.COLOR_DEFAULT
+        };
+        final String[] selectedBg = {
+                dockAppOverrides != null && dockAppOverrides.bg(pkg) != null
+                        ? dockAppOverrides.bg(pkg) : DockAppOverrides.BG_DEFAULT
+        };
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setBackground(makeDockPopupPanel(d));
+        scroll.setClipToOutline(true);
+        scroll.setElevation(12f * d);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Math.round(16 * d);
+        box.setPadding(pad, pad, pad, pad);
+        scroll.addView(box, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        box.addView(makeDockPopupKicker("PERSONALIZAR", d));
+
+        android.widget.EditText nameField = new android.widget.EditText(this);
+        nameField.setHint(stockLabel);
+        nameField.setText(curName != null ? curName : "");
+        nameField.setHintTextColor(dockLabelColorMuted());
+        nameField.setTextColor(dockLabelColor());
+        nameField.setTextSize(16f);
+        nameField.setSingleLine(true);
+        nameField.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        nameField.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+        nameField.setBackground(makeDockPopupFieldBackground(d));
+        nameField.setPadding(Math.round(12 * d), Math.round(10 * d),
+                Math.round(12 * d), Math.round(10 * d));
+        box.addView(nameField);
+
+        android.widget.TextView iconLabel = makeDockPopupKicker("ÍCONE", d);
+        iconLabel.setPadding(0, Math.round(12 * d), 0, Math.round(6 * d));
+        box.addView(iconLabel);
+
+        final int cellPx = Math.round(48 * d);
+        final int cellPad = Math.round(7 * d);
+        final int gap = Math.round(6 * d);
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int availInner = screenW - Math.round(24 * d) - 2 * pad;
+        final int cols = Math.max(7, Math.min(14, (availInner + gap) / (cellPx + gap)));
+        final int maxW = 2 * pad + cols * (cellPx + gap);
+        android.widget.LinearLayout iconGrid = new android.widget.LinearLayout(this);
+        iconGrid.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.addView(iconGrid);
+
+        final java.util.List<View> iconCells = new ArrayList<>();
+        final android.widget.LinearLayout[] currentRow = { null };
+        final int[] col = { 0 };
+
+        Runnable paintIconCells = () -> {
+            int plate = DockAppOverrides.parseColor(selectedBg[0], 0xFF3D4650);
+            for (View cell : iconCells) {
+                Object tag = cell.getTag();
+                boolean on = (tag == null && selectedIcon[0] == null)
+                        || (tag != null && tag.equals(selectedIcon[0]));
+                android.graphics.drawable.GradientDrawable bg =
+                        new android.graphics.drawable.GradientDrawable();
+                bg.setCornerRadius(10f * d);
+                bg.setColor(tag == null
+                        ? (dockUiLight ? 0x0F25303B : 0x14FFFFFF)
+                        : plate);
+                bg.setStroke(Math.round((on ? 2.5f : 1f) * d), on ? dockAccentColor
+                        : (dockUiLight ? 0x2225303B : 0x33FFFFFF));
+                cell.setBackground(bg);
+                if (tag instanceof String && cell instanceof android.widget.FrameLayout) {
+                    android.widget.FrameLayout fl = (android.widget.FrameLayout) cell;
+                    if (fl.getChildCount() > 0) {
+                        View child = fl.getChildAt(0);
+                        if (child instanceof android.widget.ImageView) {
+                            ((android.widget.ImageView) child).setImageDrawable(
+                                    DockAppOverrides.drawableFor(this, (String) tag, selectedColor[0]));
+                        }
+                    }
+                }
+            }
+        };
+
+        {
+            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+            cell.setPadding(cellPad, cellPad, cellPad, cellPad);
+            cell.setTag(null);
+            android.widget.TextView t = new android.widget.TextView(this);
+            t.setText("Padrão");
+            t.setTextColor(dockLabelColor());
+            t.setTextSize(8f);
+            t.setGravity(android.view.Gravity.CENTER);
+            cell.addView(t, new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            cell.setOnClickListener(v -> {
+                selectedIcon[0] = null;
+                paintIconCells.run();
+                View host = box.findViewWithTag("dockColorHost");
+                View tint = box.findViewWithTag("dockTintBlock");
+                View bgv = box.findViewWithTag("dockBgBlock");
+                int vis = View.GONE;
+                if (host != null) host.setVisibility(vis);
+                if (tint != null) tint.setVisibility(vis);
+                if (bgv != null) bgv.setVisibility(vis);
+            });
+            addDockIconGridCell(iconGrid, currentRow, col, iconCells, cols, cellPx, gap, cell);
+        }
+        for (String[] pair : DockAppOverrides.SUBSTITUTE_ICONS) {
+            final String slug = pair[0];
+            android.widget.FrameLayout cell = new android.widget.FrameLayout(this);
+            cell.setPadding(cellPad, cellPad, cellPad, cellPad);
+            cell.setTag(slug);
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            Drawable preview = DockAppOverrides.drawableFor(this, slug, selectedColor[0]);
+            if (preview == null && "gwm".equals(slug)) {
+                try { preview = getDrawable(R.drawable.ic_gwm); } catch (Exception ignored) {}
+            }
+            iv.setImageDrawable(preview);
+            iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            cell.addView(iv, new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            cell.setOnClickListener(v -> {
+                selectedIcon[0] = slug;
+                paintIconCells.run();
+                View host = box.findViewWithTag("dockColorHost");
+                View tint = box.findViewWithTag("dockTintBlock");
+                View bgv = box.findViewWithTag("dockBgBlock");
+                int vis = View.VISIBLE;
+                if (host != null) host.setVisibility(vis);
+                if (tint != null) tint.setVisibility(vis);
+                if (bgv != null) bgv.setVisibility(vis);
+            });
+            addDockIconGridCell(iconGrid, currentRow, col, iconCells, cols, cellPx, gap, cell);
+        }
+        paintIconCells.run();
+
+        android.widget.LinearLayout colorHost = new android.widget.LinearLayout(this);
+        colorHost.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        colorHost.setTag("dockColorHost");
+        colorHost.setPadding(0, Math.round(8 * d), 0, 0);
+        box.addView(colorHost);
+
+        android.widget.LinearLayout tintBlock = new android.widget.LinearLayout(this);
+        tintBlock.setOrientation(android.widget.LinearLayout.VERTICAL);
+        tintBlock.setTag("dockTintBlock");
+        android.widget.LinearLayout.LayoutParams tintLp =
+                new android.widget.LinearLayout.LayoutParams(0,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tintLp.rightMargin = Math.round(12 * d);
+        colorHost.addView(tintBlock, tintLp);
+        android.widget.TextView colorLabel = makeDockPopupKicker("COR", d);
+        tintBlock.addView(colorLabel);
+        android.widget.LinearLayout colorRow = new android.widget.LinearLayout(this);
+        colorRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        tintBlock.addView(colorRow);
+
+        android.widget.LinearLayout bgBlock = new android.widget.LinearLayout(this);
+        bgBlock.setOrientation(android.widget.LinearLayout.VERTICAL);
+        bgBlock.setTag("dockBgBlock");
+        android.widget.LinearLayout.LayoutParams bgLp =
+                new android.widget.LinearLayout.LayoutParams(0,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        colorHost.addView(bgBlock, bgLp);
+        android.widget.TextView bgLabel = makeDockPopupKicker("FUNDO", d);
+        bgBlock.addView(bgLabel);
+        android.widget.LinearLayout bgRow = new android.widget.LinearLayout(this);
+        bgRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        bgBlock.addView(bgRow);
+
+        int colorVis = selectedIcon[0] == null ? View.GONE : View.VISIBLE;
+        colorHost.setVisibility(colorVis);
+        tintBlock.setVisibility(colorVis);
+        bgBlock.setVisibility(colorVis);
+
+        int swatchCount = DockAppOverrides.COLORS.length;
+        int swatchGap = Math.round(5 * d);
+        int halfInner = Math.max(1, (maxW - 2 * pad - Math.round(12 * d)) / 2);
+        int swatchPx = Math.min(Math.round(28 * d),
+                (halfInner - (swatchCount - 1) * swatchGap) / swatchCount);
+        swatchPx = Math.max(Math.round(20 * d), swatchPx);
+        addDockColorSwatches(colorRow, swatchPx, swatchGap, d);
+        addDockColorSwatches(bgRow, swatchPx, swatchGap, d);
+
+        Runnable refreshSwatchSel = () -> {
+            for (int i = 0; i < colorRow.getChildCount(); i++) {
+                View cell = colorRow.getChildAt(i);
+                boolean on = selectedColor[0] != null
+                        && selectedColor[0].equalsIgnoreCase(String.valueOf(cell.getTag()));
+                cell.setAlpha(on ? 1f : 0.5f);
+                if (cell instanceof android.widget.FrameLayout) {
+                    ((android.widget.FrameLayout) cell).setForeground(
+                            on ? new android.graphics.drawable.ColorDrawable(0x66FFFFFF) : null);
+                }
+            }
+            for (int i = 0; i < bgRow.getChildCount(); i++) {
+                View cell = bgRow.getChildAt(i);
+                boolean on = selectedBg[0] != null
+                        && selectedBg[0].equalsIgnoreCase(String.valueOf(cell.getTag()));
+                cell.setAlpha(on ? 1f : 0.5f);
+                if (cell instanceof android.widget.FrameLayout) {
+                    ((android.widget.FrameLayout) cell).setForeground(
+                            on ? new android.graphics.drawable.ColorDrawable(0x66FFFFFF) : null);
+                }
+            }
+        };
+        for (int i = 0; i < colorRow.getChildCount(); i++) {
+            View cell = colorRow.getChildAt(i);
+            cell.setOnClickListener(v -> {
+                selectedColor[0] = String.valueOf(v.getTag());
+                refreshSwatchSel.run();
+                paintIconCells.run();
+            });
+        }
+        for (int i = 0; i < bgRow.getChildCount(); i++) {
+            View cell = bgRow.getChildAt(i);
+            cell.setOnClickListener(v -> {
+                selectedBg[0] = String.valueOf(v.getTag());
+                refreshSwatchSel.run();
+                paintIconCells.run();
+            });
+        }
+        refreshSwatchSel.run();
+
+        android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
+        actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        actions.setPadding(0, Math.round(14 * d), 0, 0);
+        box.addView(actions);
+
+        actions.addView(makeDockPopupAction("RESET", false, d, () -> {
+            if (dockAppOverrides != null) {
+                dockAppOverrides.clear(pkg);
+                dockAppOverrides.save(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
+            }
+            dismissDockCustomizeSheet();
+            rebindDockPackage(pkg);
+        }));
+        actions.addView(makeDockPopupAction("SAVE", true, d, () -> {
+            if (dockAppOverrides == null) {
+                dockAppOverrides = new DockAppOverrides(null);
+            }
+            String name = nameField.getText() != null ? nameField.getText().toString() : "";
+            dockAppOverrides.put(pkg, name, selectedIcon[0], selectedColor[0], selectedBg[0]);
+            dockAppOverrides.save(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
+            dismissDockCustomizeSheet();
+            rebindDockPackage(pkg);
+        }));
+
+        android.widget.PopupWindow popup = new android.widget.PopupWindow(
+                scroll, maxW, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
+        popup.setFocusable(true);
+        popup.setOnDismissListener(() -> {
+            if (dockCustomizeSheet == popup) dockCustomizeSheet = null;
+        });
+        dockCustomizeSheet = popup;
+        scroll.measure(
+                View.MeasureSpec.makeMeasureSpec(maxW, View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.UNSPECIFIED);
+        int yOff = -(Math.min(scroll.getMeasuredHeight(), Math.round(520 * d))
+                + anchor.getHeight() + Math.round(8 * d));
+        int[] loc = new int[2];
+        anchor.getLocationOnScreen(loc);
+        int margin = Math.round(12 * d);
+        int xOff = 0;
+        if (loc[0] + maxW > screenW - margin) {
+            xOff = (screenW - margin) - maxW - loc[0];
+        }
+        if (loc[0] + xOff < margin) {
+            xOff = margin - loc[0];
+        }
+        popup.showAsDropDown(anchor, xOff, yOff);
+    }
+
+    /** Re-apply icon/label after a customize save (hub or a scroll-row package). */
+    private void rebindDockPackage(String pkg) {
+        if (DockAppOverrides.GWM_HUB_PKG.equals(pkg)) {
+            bindGwmHub();
+            updatePinnedVisibility();
+            notifyAppsCatalogChanged();
+            return;
+        }
+        MotionTrailLayout row = dockItemsByPackage.get(pkg);
+        if (row != null) {
+            PackageManager pm = getPackageManager();
+            Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
+            mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+            ResolveInfo info = null;
+            List<ResolveInfo> apps = pm.queryIntentActivities(mainIntent, 0);
+            if (apps != null) {
+                for (ResolveInfo ri : apps) {
+                    if (ri != null && ri.activityInfo != null
+                            && pkg.equals(ri.activityInfo.packageName)) {
+                        info = ri;
+                        break;
+                    }
+                }
+            }
+            String label = info != null ? launcherLabel(pm, info) : pinnedLabel(pkg, pm, null);
+            Drawable icon = info != null ? iconForLauncherApp(pm, info) : launcherIconForPackage(pkg);
+            final String targetPkg = pkg;
+            final String targetLabel = label;
+            bindDockItem(row, icon, label,
+                    v -> launchAppForPackage(targetPkg, targetLabel), targetPkg);
+            if (isUserHidden(pkg)) row.setVisibility(View.GONE);
+        }
+        // Recents may show the same package.
+        refreshRecentSlots();
+        // MEDIA chip may be showing this package — refresh so a substitute
+        // icon/name lands without waiting for the next track change.
+        if (pkg != null && pkg.equals(quickMediaPackage)) replayMediaPayload();
+        notifyAppsCatalogChanged();
+    }
+
+    private void notifyAppsCatalogChanged() {
+        if (webView == null) return;
+        webView.post(() -> webView.evaluateJavascript(
+                "try{if(window.__app&&typeof window.__app._invalidateAppsCatalog==='function'){"
+                        + "window.__app._invalidateAppsCatalog();}}catch(e){}",
+                null));
     }
 
     /**
@@ -10497,7 +11546,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView title = new android.widget.TextView(this);
         title.setText("Hidden apps");
         title.setTextColor(0x99FFFFFF);
-        title.setTextSize(11f);
+        title.setTextSize(14f);
         title.setPadding(Math.round(6 * d), 0, Math.round(6 * d), Math.round(6 * d));
         box.addView(title);
 
@@ -10505,7 +11554,7 @@ public final class MainActivity extends Activity {
         // is a HashSet).
         List<String> pkgs = new ArrayList<>(hiddenPackages);
         java.util.Collections.sort(pkgs);
-        int iconPx = Math.round(28 * d);
+        int iconPx = Math.round(36 * d);
         for (String hidden : pkgs) {
             final String target = hidden;
             ResolveInfo info = byPkg.get(hidden);
@@ -10515,7 +11564,8 @@ public final class MainActivity extends Activity {
             android.widget.LinearLayout row = new android.widget.LinearLayout(this);
             row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
             row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            row.setPadding(Math.round(6 * d), Math.round(8 * d), Math.round(6 * d), Math.round(8 * d));
+            row.setPadding(Math.round(8 * d), Math.round(12 * d), Math.round(8 * d), Math.round(12 * d));
+            row.setMinimumHeight(Math.round(52 * d));
             row.setClickable(true);
             row.setFocusable(true);
 
@@ -10534,7 +11584,7 @@ public final class MainActivity extends Activity {
             android.widget.TextView tv = new android.widget.TextView(this);
             tv.setText(label);
             tv.setTextColor(0xFFFFFFFF);
-            tv.setTextSize(13f);
+            tv.setTextSize(16f);
             tv.setSingleLine(true);
             tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
             tv.setMaxWidth(Math.round(240 * d));
@@ -10589,29 +11639,29 @@ public final class MainActivity extends Activity {
         // Rebinds recents and settles app-row visibility from the hide list.
         refreshRecentSlots();
         Log.w(TAG, "Launcher unhidden " + pkg);
+        notifyAppsCatalogChanged();
     }
 
-    /** Pinned slots follow the hide list; the trailing gap follows the slots. */
+    /** Hub follows the hide list; gap follows the hub. */
     private void updatePinnedVisibility() {
-        int pinnedVisible = 0;
+        boolean anyVisible = false;
         for (int i = 0; i < PINNED_PACKAGES.length; i++) {
-            if (pinnedItems[i] == null) continue;
-            if (isUserHidden(PINNED_PACKAGES[i])) {
-                pinnedItems[i].setVisibility(View.GONE);
-                continue;
-            }
-            // Never revive a slot with no app behind it.
             if (!pinnedBound[i]) continue;
-            pinnedItems[i].setVisibility(View.VISIBLE);
-            if (launcherRevealed) {
-                pinnedItems[i].setAlpha(1f);
-                pinnedItems[i].setTranslationX(0f);
-                pinnedItems[i].setTrailPx(0f);
-            }
-            pinnedVisible++;
+            if (isUserHidden(PINNED_PACKAGES[i])) continue;
+            anyVisible = true;
+            break;
         }
-        if (pinnedGap != null) {
-            pinnedGap.setVisibility(pinnedVisible > 0 ? View.VISIBLE : View.GONE);
+        if (gwmHubItem != null) {
+            if (anyVisible) {
+                gwmHubItem.setVisibility(View.VISIBLE);
+                if (launcherRevealed) {
+                    gwmHubItem.setAlpha(1f);
+                    gwmHubItem.setTranslationX(0f);
+                    gwmHubItem.setTrailPx(0f);
+                }
+            } else {
+                gwmHubItem.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -10620,8 +11670,10 @@ public final class MainActivity extends Activity {
         android.widget.TextView row = new android.widget.TextView(this);
         row.setText(title);
         row.setTextColor(0xFFFFFFFF);
-        row.setTextSize(13f);
-        row.setPadding(Math.round(6 * d), Math.round(8 * d), Math.round(6 * d), Math.round(8 * d));
+        row.setTextSize(16f);
+        row.setMinHeight(Math.round(48 * d));
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(Math.round(10 * d), Math.round(12 * d), Math.round(10 * d), Math.round(12 * d));
         row.setClickable(true);
         row.setFocusable(true);
         row.setOnClickListener(v -> action.run());
@@ -10650,12 +11702,8 @@ public final class MainActivity extends Activity {
                 }
             }
             for (int i = 0; i < PINNED_PACKAGES.length; i++) {
-                if (!PINNED_PACKAGES[i].equals(pkg) || pinnedItems[i] == null) continue;
+                if (!PINNED_PACKAGES[i].equals(pkg)) continue;
                 pinnedBound[i] = false;
-                pinnedItems[i].setOnClickListener(null);
-                pinnedItems[i].setClickable(false);
-                pinnedItems[i].setOnLongClickListener(null);
-                pinnedItems[i].setVisibility(View.GONE);
             }
             // Also drop it from the hide list so it stops haunting the unhide picker.
             if (hiddenPackages.remove(pkg)) saveHiddenApps();
@@ -10663,6 +11711,7 @@ public final class MainActivity extends Activity {
         }
         updatePinnedVisibility();
         refreshRecentSlots();
+        notifyAppsCatalogChanged();
     }
 
     /** Recents already occupy the left slots — drop the same package from the main row. */
@@ -10964,7 +12013,14 @@ public final class MainActivity extends Activity {
         webView.onResume();
         enterImmersiveMode();
         mediaNowPlaying.start();
+        // Permission may have been granted via adb while we were paused; retry.
+        mainHandler.removeCallbacks(mediaVizPoll);
+        mainHandler.post(mediaVizPoll);
         notifyViewerShellLayout();
+        if (desktopHitWanted) {
+            DesktopSwitcherHitService.applyFromViewer(this,
+                    desktopHitX, desktopHitY, desktopHitW, desktopHitH, true);
+        }
         keepOverlayTasksOnTop();
         syncOverlaySlots(false);
         mainHandler.postDelayed(() -> syncOverlaySlots(true), 500);
@@ -10978,6 +12034,7 @@ public final class MainActivity extends Activity {
         // Freeform on top keeps our window visible. A fullscreen app covering
         // the MMI hides it — that's when we close both slots.
         if (decor != null && decor.getWindowVisibility() == View.VISIBLE) return;
+        DesktopSwitcherHitService.applyFromViewer(this, 0, 0, 0, 0, false);
         dismissAllOverlays();
     }
 
@@ -10985,6 +12042,11 @@ public final class MainActivity extends Activity {
     protected void onDestroy() {
         stopOverlayWatchdog();
         unregisterOverlayTaskListener();
+        if (mediaAudioViz != null) {
+            mediaAudioViz.release();
+            mediaAudioViz = null;
+        }
+        mainHandler.removeCallbacks(mediaVizPoll);
         mediaNowPlaying.stop();
         dismissDockEditMenu();
         if (projectionPresence != null) projectionPresence.stop();
@@ -10993,6 +12055,7 @@ public final class MainActivity extends Activity {
         if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
         if (raiseOverlayRunnable != null) mainHandler.removeCallbacks(raiseOverlayRunnable);
         dismissAppsFabOverlay();
+        DesktopSwitcherHitService.applyFromViewer(this, 0, 0, 0, 0, false);
         try {
             unregisterReceiver(telemetryReceiver);
         } catch (Exception ignored) {}
