@@ -34,9 +34,10 @@ if (!source.includes('alignQuickCardsToWidgetBoard()')
 }
 if (!html.includes('}, 0, 10);')
     || !html.includes('const stageControlLeft = boardLeft + (occupiedCols > 0 ? occupiedWidth + 10 : 0);')
-    || !html.includes('stageControlBottom - 92')
-    || !html.includes('stageControlBottom - 42')) {
-  throw new Error('Widget offset and dynamic config/camera stack contract is missing.');
+    || !/stageAestheticStyle: 'left:' \+ Math\.round\(stageControlLeft\) \+ 'px;top:'\s*\+ Math\.round\(stageControlBottom - 42\)/.test(html)
+    || !/stageCameraStyle: 'left:' \+ Math\.round\(stageControlLeft \+ \d+\) \+ 'px;top:'\s*\+ Math\.round\(stageControlBottom - 42\)/.test(html)) {
+  // Config sits at the widget edge; camera shares its row, offset to the right.
+  throw new Error('Widget offset and dynamic config/camera row contract is missing.');
 }
 if (!source.includes('class QuickCardGraphicView extends View')
     || !source.includes('case "navigation": drawNavigation')

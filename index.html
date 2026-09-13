@@ -5654,7 +5654,7 @@ window.HavalSplash = (function () {
     <button type="button" class="hv-desktop-arrow" onClick="{{ nextDesktop }}" aria-label="Next desktop" title="Next desktop · Ctrl+Right">›</button>
   </div>
 
-  <!-- Config and camera form one bottom-aligned stack beside the occupied widgets. -->
+  <!-- Config and camera form one bottom-aligned row beside the occupied widgets: config left, camera right. -->
   <button type="button" class="hv-car-stage-action" style="display: {{ stageAestheticDisplay }}; {{ stageAestheticStyle }}" onClick="{{ openStageAesthetics }}" title="Vehicle appearance" aria-label="Vehicle appearance">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.84 5.34 10.09 2.18a10 10 0 0 1 3.82 0l.25 3.16c.35.12.69.26 1.02.42l2.41-2.05a10 10 0 0 1 2.7 2.7l-2.05 2.41c.16.33.3.67.42 1.02l3.16.25a10 10 0 0 1 0 3.82l-3.16.25c-.12.35-.26.69-.42 1.02l2.05 2.41a10 10 0 0 1-2.7 2.7l-2.41-2.05c-.33.16-.67.3-1.02.42l-.25 3.16a10 10 0 0 1-3.82 0l-.25-3.16a7 7 0 0 1-1.02-.42l-2.41 2.05a10 10 0 0 1-2.7-2.7l2.05-2.41a7 7 0 0 1-.42-1.02l-3.16-.25a10 10 0 0 1 0-3.82l3.16-.25c.12-.35.26-.69.42-1.02L3.71 6.41a10 10 0 0 1 2.7-2.7l2.41 2.05c.33-.16.67-.3 1.02-.42Z"></path><circle cx="12" cy="12" r="3.1"></circle></svg>
   </button>
@@ -6673,6 +6673,22 @@ window.HavalSplash = (function () {
         </label>
       </div>
 
+      <!-- Per-tint finish: saved against the selected colour only. -->
+      <div class="hv-config-section-label">FINISH · {{ paintFinishName }}</div>
+      <div class="hv-config-row-head">
+        <span>METALNESS</span>
+        <span class="hv-config-val">{{ paintMetalnessLabel }}</span>
+      </div>
+      <input type="range" min="0" max="1" step="0.01" value="{{ paintMetalness }}" onChange="{{ onPaintMetalness }}" onInput="{{ onPaintMetalness }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 10px;" />
+      <div class="hv-config-row-head">
+        <span>ROUGHNESS</span>
+        <span class="hv-config-val">{{ paintRoughnessLabel }}</span>
+      </div>
+      <input type="range" min="0" max="1" step="0.01" value="{{ paintRoughness }}" onChange="{{ onPaintRoughness }}" onInput="{{ onPaintRoughness }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 10px;" />
+      <sc-if value="{{ paintFinishCustom }}" hint-placeholder-val="{{ false }}">
+        <button type="button" onClick="{{ resetPaintFinish }}" title="Back to the built-in finish for this colour" style="width: 100%; padding: 8px 10px; margin-bottom: 12px; border-radius: 8px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); color: inherit;">RESET FINISH</button>
+      </sc-if>
+
       <div class="hv-config-section-label">RIM FINISH</div>
       <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 12px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; opacity: .85; min-height: 36px;">
         <input type="checkbox" checked="{{ wheelTintOverride }}" onChange="{{ onWheelTintOverride }}" style="accent-color: #4fd6e8; width: 18px; height: 18px; cursor: pointer;" />
@@ -6826,6 +6842,17 @@ window.HavalSplash = (function () {
           <input type="range" min="0" max="95" step="1" value="{{ vignetteIntensity }}" onChange="{{ onVignetteIntensity }}" onInput="{{ onVignetteIntensity }}" style="width: 100%; accent-color: #4fd6e8;" />
         </div>
       </div>
+      <div class="hv-config-section-label">TONE</div>
+      <div class="hv-config-row-head">
+        <span>CONTRAST</span>
+        <span class="hv-config-val">{{ gradeContrast }}%</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ gradeContrast }}" onChange="{{ onGradeContrast }}" onInput="{{ onGradeContrast }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 10px;" />
+      <div class="hv-config-row-head">
+        <span>WHITES</span>
+        <span class="hv-config-val">{{ gradeWhites }}%</span>
+      </div>
+      <input type="range" min="0" max="100" step="1" value="{{ gradeWhites }}" onChange="{{ onGradeWhites }}" onInput="{{ onGradeWhites }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 10px;" />
       <!-- GRAIN EFFECT removed from UI; grainEnabled state kept for saves -->
     </sc-if>
 
@@ -7653,6 +7680,10 @@ const POOL_LAYER = 3;
 // Night shadow is composited after the pool pass on this layer. dirLight only
 // shares it for that one quad — Three.js won't apply shadow maps across layers.
 const SHADOW_OVERLAY_LAYER = 4;
+// The floor is redrawn on this layer into stencil only, so the tone grade can
+// leave it alone -- see _applyGrade.
+const GRADE_MASK_LAYER = 5;
+const GRADE_STENCIL_FLOOR = 1;
 // Contact shadow under the car — dirLight PCFSoft penumbra + catcher opacity.
 const CAR_SHADOW_RADIUS = 19;   // was 15; subtle edge softening only
 const CAR_SHADOW_OPACITY = 0.80;
@@ -7963,6 +7994,11 @@ class Component extends DCLogic {
     dayBg: '#efefef',
     nightBg: '#060606',
     vignette: { color: '#000000', intensity: 30 },
+    // Output tone grade, 0-100 each. 0/0 skips both passes -- see _applyGrade.
+    grade: { contrast: 0, whites: 0 },
+    // Per-tint body finish overrides, keyed by _paintFinishKey:
+    // { '#8B0000': { metalness, roughness }, stock: {...} }. Absent = built-in.
+    paintFinish: {},
     grainEnabled: false,
     showGlassTweaks: false,
     glassTweaks: { opacity: 0.1, iridescence: 0, iridIOR: 1.8, thickMin: 100, thickMax: 400, clearcoat: 1.0, envMap: 1.0, color: '#ffffff', fresnel: 0 },
@@ -8665,6 +8701,7 @@ class Component extends DCLogic {
       s.modelVariant = saved.modelVariant;
     }
     if (typeof saved.carColor === 'string' || saved.carColor === null) s.carColor = saved.carColor;
+    if (saved.paintFinish && typeof saved.paintFinish === 'object') s.paintFinish = { ...saved.paintFinish };
     if (typeof saved.lightIntensity === 'number') s.lightIntensity = saved.lightIntensity;
     if (typeof saved.exposure === 'number') s.exposure = saved.exposure;
     if (typeof saved.hdriKey === 'string') s.hdriKey = saved.hdriKey;
@@ -8672,6 +8709,7 @@ class Component extends DCLogic {
     if (typeof saved.nightBg === 'string') s.nightBg = saved.nightBg;
     if (typeof saved.nightKeepDayLighting === 'boolean') s.nightKeepDayLighting = saved.nightKeepDayLighting;
     if (saved.vignette && typeof saved.vignette === 'object') s.vignette = { ...s.vignette, ...saved.vignette };
+    if (saved.grade && typeof saved.grade === 'object') s.grade = { ...s.grade, ...saved.grade };
     if (typeof saved.grainEnabled === 'boolean') s.grainEnabled = saved.grainEnabled;
     if (saved.lights && typeof saved.lights === 'object') s.lights = { ...s.lights, ...saved.lights };
     if (typeof saved.motionSpeed === 'number') s.motionSpeed = saved.motionSpeed;
@@ -12539,6 +12577,7 @@ class Component extends DCLogic {
       modelVariant: s.modelVariant,
       modelTrim: s.modelTrim || 'phev34',
       carColor: s.carColor,
+      paintFinish: { ...s.paintFinish },
       lightIntensity: s.lightIntensity,
       exposure: s.exposure,
       hdriKey: s.hdriKey,
@@ -12546,6 +12585,7 @@ class Component extends DCLogic {
       nightBg: s.nightBg,
       nightKeepDayLighting: !!s.nightKeepDayLighting,
       vignette: { ...s.vignette },
+      grade: { ...s.grade },
       grainEnabled: s.grainEnabled,
       lights: { ...s.lights },
       motionSpeed: this._currentMotionSpeed(),
@@ -13029,6 +13069,22 @@ class Component extends DCLogic {
       toggleModelVariant: () => this._cycleTrim(),
       currentCarPaintHex: activeKey,
       swatches,
+      ...(() => {
+        const eff = this._bodyPaintParams(s.carColor);
+        const pk = this._paintFinishKey(s.carColor);
+        const named = palette.find((p) => p.key === pk);
+        return {
+          paintFinishName: s.carColor == null ? 'STOCK' : (named ? named.title.toUpperCase() : pk),
+          paintMetalness: eff.metalness,
+          paintRoughness: eff.roughness,
+          paintMetalnessLabel: eff.metalness.toFixed(2),
+          paintRoughnessLabel: eff.roughness.toFixed(2),
+          paintFinishCustom: !!(s.paintFinish && s.paintFinish[pk]),
+          onPaintMetalness: (e) => this._setPaintFinish('metalness', e.target.value),
+          onPaintRoughness: (e) => this._setPaintFinish('roughness', e.target.value),
+          resetPaintFinish: () => this._resetPaintFinish(),
+        };
+      })(),
       onCustomCarColor: (e) => {
         const color = e && e.target ? e.target.value : null;
         if (color) this.setColor(color);
@@ -13206,6 +13262,10 @@ class Component extends DCLogic {
       onNightKeepDayLighting: (e) => this._setNightKeepDayLighting(e.target.checked),
       onVignetteColor:    (e) => this._setVignette('color',     e.target.value),
       onVignetteIntensity:(e) => this._setVignette('intensity', e.target.value),
+      gradeContrast: Math.round((s.grade && s.grade.contrast) || 0),
+      gradeWhites: Math.round((s.grade && s.grade.whites) || 0),
+      onGradeContrast: (e) => this._setGrade('contrast', e.target.value),
+      onGradeWhites: (e) => this._setGrade('whites', e.target.value),
       onGrain:            (e) => this._setGrain(e.target.checked),
       // onInput aliases so color pickers update live in all browsers
       onDayBgInput:         (e) => this._setBg('day',   e.target.value),
@@ -13429,6 +13489,76 @@ class Component extends DCLogic {
     const v = { ...s.vignette, [key]: key === 'intensity' ? parseFloat(val) : val };
     this.setState({ vignette: v });
     this._applyBackground(s.nightMode, s.dayBg, s.nightBg, v, s.grainEnabled);
+  }
+
+  _setGrade(key, val) {
+    const g = { ...this.state.grade, [key]: Math.max(0, Math.min(100, parseFloat(val) || 0)) };
+    // Uniforms first so the next frame shows it; the commit only persists it.
+    this._applyGrade(g);
+    this.setState({ grade: g });
+  }
+
+  /**
+   * Output tone grade: contrast about mid-grey plus a white-point gain, i.e.
+   * Levels. It costs two constant-colour full-screen draws and NO texture read.
+   *
+   * The main scene renders straight into the default framebuffer, where the
+   * context grants real 4x MSAA. A conventional grade samples the frame from a
+   * render target, which forfeits that MSAA (the same reason FXAA is a loss
+   * here) and adds a full-frame copy. Levels is affine -- out = (in - K) * G --
+   * and an affine map can be done entirely by the BLEND stage over whatever is
+   * already in the framebuffer:
+   *
+   *   lift: REVERSE_SUBTRACT, (DST_ALPHA, ONE)  dst - K*dst.a
+   *   gain: ADD,              (DST_COLOR, ONE)  dst + (G-1)*dst = dst*G
+   *
+   * Order matters: subtracting after the gain would clip highlights at 1 first
+   * and then pull every white down to 1-K. Lift first crushes blacks at 0,
+   * gain then clips whites at 1, which is exactly what Levels does.
+   *
+   * The lift is scaled by dst alpha so premultiplied edges in mixed centerFill
+   * darken in proportion, and background pixels (rgb 0, alpha 0) stay 0. Both
+   * passes keep alpha untouched (ZERO, ONE) -- see setAdditiveKeepAlpha for what
+   * writing alpha does to the wallpaper.
+   *
+   * A fixed-point blend source is clamped to [0,1], so one gain pass tops out at
+   * 2x. The slider mapping is chosen so G never exceeds that.
+   *
+   * Only the car is graded, through two masks that need no material changes:
+   *
+   *  - DEPTH. The quads sit at depth 1.0 with GREATER, so they pass only where
+   *    something wrote depth. The background, shadow catcher, contact shadow,
+   *    night pools and wheel-blur sprites all have depthWrite off and are
+   *    skipped (a sprite still grades where the tyre behind it wrote depth).
+   *  - STENCIL, for the floor, which does write depth. Just before the grade the
+   *    floor alone is redrawn into stencil (colour off, LEQUAL, a small polygon
+   *    offset), marking only the pixels where it is the visible surface. A pass
+   *    of its own rather than a flag on the floor's material, because that would
+   *    depend on draw order: part roots carry renderOrder (lit lamps go to 14),
+   *    so car parts drawn after the floor would inherit its mark.
+   *
+   * Three draw calls while on; none at 0/0.
+   */
+  _applyGrade(grade) {
+    const g = grade || (this.state && this.state.grade) || {};
+    const c = Math.max(0, Math.min(100, +g.contrast || 0)) / 100;
+    const h = Math.max(0, Math.min(100, +g.whites || 0)) / 100;
+    const slope = 1 + 0.5 * c;            // contrast slope about 0.5
+    const gain = slope / (1 - 0.25 * h);  // white point down to 0.75; max 1.5/0.75 = 2
+    const lift = 0.5 * (slope - 1) / slope;
+    const liftOn = lift > 0.001;
+    const gainOn = gain - 1 > 0.001;
+    if (this.gradeLiftMat) {
+      this.gradeLiftMat.uniforms.uValue.value = lift;
+      this.gradeLiftMesh.visible = liftOn;
+    }
+    if (this.gradeGainMat) {
+      this.gradeGainMat.uniforms.uValue.value = Math.min(1, gain - 1);
+      this.gradeGainMesh.visible = gainOn;
+    }
+    this._gradeActive = liftOn || gainOn;
+    // Applied after the bloom/streak overlay, so post-FX never needs a rebuild.
+    if (this.requestRender) this.requestRender(2, true);
   }
 
   _setGrain(enabled) {
@@ -17757,12 +17887,67 @@ class Component extends DCLogic {
       if (luma < 0.15) { metalness = 0.85; roughness = 0.3; envMapIntensity = 0.4; }
       else if (luma < 0.30) { metalness = 0.75; roughness = 0.34; envMapIntensity = 0.45; }
     }
+    // Per-tint tuning from the paint panel wins over the luma defaults above.
+    const fin = this._paintFinishMap()[this._paintFinishKey(hex)];
+    if (fin) {
+      if (Number.isFinite(fin.metalness)) metalness = fin.metalness;
+      if (Number.isFinite(fin.roughness)) roughness = fin.roughness;
+    }
     // Night mode (classic dim): zeroes the hemisphere + directional lights, so
     // IBL reflections become the paint's only remaining light source — boost
     // envMapIntensity to compensate. Keep-day night passes nightMode=false here
     // (see _applyNightMode) and leaves the day dial alone.
     if (nightMode) envMapIntensity = Math.min(envMapIntensity * 1.8, 1.0);
     return { metalness, roughness, envMapIntensity };
+  }
+
+  // Catalog keys are uppercase hex, the custom picker hands back lowercase, and
+  // stock is null -- normalise so one tint always maps to one entry.
+  _paintFinishKey(hex) {
+    return hex ? String(hex).toUpperCase() : 'stock';
+  }
+
+  // Live mirror: the slider writes it synchronously so the material updates on
+  // the same event, before the React commit that only persists it.
+  _paintFinishMap() {
+    return this._paintFinish || (this.state && this.state.paintFinish) || {};
+  }
+
+  _setPaintFinish(prop, val) {
+    const v = Math.max(0, Math.min(1, parseFloat(val)));
+    if (!Number.isFinite(v)) return;
+    const hex = this.state.carColor;
+    const key = this._paintFinishKey(hex);
+    const map = this._paintFinishMap();
+    // Seed the untouched property from what the tint shows now, so moving one
+    // slider never snaps the other one.
+    const cur = this._bodyPaintParams(hex);
+    const entry = { metalness: cur.metalness, roughness: cur.roughness, ...map[key], [prop]: v };
+    const next = { ...map, [key]: entry };
+    this._paintFinish = next;
+    this._applyBodyPaintFinish();
+    this.setState({ paintFinish: next });
+  }
+
+  _resetPaintFinish() {
+    const key = this._paintFinishKey(this.state.carColor);
+    const next = { ...this._paintFinishMap() };
+    delete next[key];
+    this._paintFinish = next;
+    this._applyBodyPaintFinish();
+    this.setState({ paintFinish: next });
+  }
+
+  // Metalness and roughness are plain uniforms: no needsUpdate, so no program
+  // re-check per slider tick. envMapIntensity is left to its existing writers.
+  _applyBodyPaintFinish() {
+    if (!this.bodyMats) return;
+    const { metalness, roughness } = this._bodyPaintParams(this.state.carColor);
+    this.bodyMats.forEach((m) => {
+      m.metalness = metalness;
+      m.roughness = roughness;
+    });
+    if (this.requestRender) this.requestRender(2);
   }
 
   applyCarColor(hex) {
@@ -19761,7 +19946,10 @@ class Component extends DCLogic {
         this._cancelCenterHold();
         return;
       }
-      this._hsPtDown = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+      const t = performance.now();
+      const wasVisible = (this._hsPressT && t - this._hsPressT < 100)
+        ? this._hsPressWasVisible : this._hotspotsShown();
+      this._hsPtDown = { x: e.clientX, y: e.clientY, t, id: e.pointerId, wasVisible };
       if (this._canCenterHoldAdd() && this._pointInWidgetHoldZone(e.clientX, e.clientY)) {
         this._onAddWidgetHoldStart(e);
       }
@@ -19795,6 +19983,12 @@ class Component extends DCLogic {
         }
       }
       if (this._shouldShowCar() && this._raycastCarBody(e)) {
+        this._closeCameraPanel();
+        this._pulseHotspots();
+      } else if (!d.wasVisible && this._shouldShowCar()) {
+        // A tap that finds the chrome hidden reveals it for the same 10 s an
+        // orbit does. It used to fall through to the safe-tap dismiss, so the
+        // press showed the buttons and the release hid them 350 ms later.
         this._closeCameraPanel();
         this._pulseHotspots();
       } else {
@@ -20532,11 +20726,18 @@ class Component extends DCLogic {
     }, 10000);
   }
 
+  /** True while the dots are up and NOT already fading out. */
+  _hotspotsShown() {
+    return !!this._hotspotsVisible && !this._hsFadeOutTimer;
+  }
+
   /** Show dots (fade in) and optionally start the auto-hide countdown. */
   _pulseHotspots(opts) {
     if (!this._shouldShowCar()) return;
     const deferHide = opts && opts.deferHide;
-    if (!this._hotspotsVisible) this._showHotspots({ deferHide: true });
+    // During the 350 ms fade-out _hotspotsVisible is still true; only
+    // _showHotspots cancels the pending _finishHideHotspots.
+    if (!this._hotspotsShown()) this._showHotspots({ deferHide: true });
     else if (this._hsLayer) this._hsLayer.classList.add('lit');
     if (!deferHide) this._armHotspotHideTimer();
     if (this.requestRender) this.requestRender(4);
@@ -20546,6 +20747,7 @@ class Component extends DCLogic {
     if (!this._shouldShowCar()) return;
     const deferHide = opts && opts.deferHide;
     clearTimeout(this._hsFadeOutTimer);
+    this._hsFadeOutTimer = null;
     this._hotspotsVisible = true;
     this._hsOpenId = null;
     this._setRoofLevelPopup(false);
@@ -20565,6 +20767,7 @@ class Component extends DCLogic {
   }
 
   _finishHideHotspots() {
+    this._hsFadeOutTimer = null;
     this._hotspotsVisible = false;
     this._hsOpenId = null;
     this._setRoofLevelPopup(false);
@@ -24918,6 +25121,11 @@ class Component extends DCLogic {
         Object.values(this._hsEls || {}).forEach((el) => { if (el) el.classList.remove('open'); });
         this._hsOpenId = null;
         if (this._hsLayer) this._hsLayer.classList.remove('menu-open');
+        // OrbitControls fires 'start' from ITS pointerdown listener, which is
+        // registered before ours, so by the time _onHsPointerDown runs the
+        // chrome is already up. Record what the press found.
+        this._hsPressWasVisible = this._hotspotsShown();
+        this._hsPressT = performance.now();
         this._pulseHotspots({ deferHide: true });
       });
       controls.addEventListener('end', () => {
@@ -25759,6 +25967,59 @@ class Component extends DCLogic {
       this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg,
         this.state.vignette, this.state.grainEnabled);
 
+      // Tone grade — two constant-colour quads whose whole effect is in the
+      // blend state. See _applyGrade for why this is not a render-target pass.
+      // At depth 1.0 with GREATER the quad passes only where something wrote
+      // depth; NOTEQUAL skips pixels the floor mask marked.
+      const makeGradeMat = (equation, srcFactor) => new THREE.ShaderMaterial({
+        uniforms: { uValue: { value: 0 } },
+        vertexShader: `void main(){ gl_Position = vec4(position.xy, 1.0, 1.0); }`,
+        fragmentShader: `uniform float uValue; void main(){ gl_FragColor = vec4(vec3(uValue), 1.0); }`,
+        transparent: true,
+        depthTest: true,
+        depthFunc: THREE.GreaterDepth,
+        depthWrite: false,
+        stencilWrite: true,          // enables the stencil TEST in three
+        stencilWriteMask: 0,
+        stencilFunc: THREE.NotEqualStencilFunc,
+        stencilRef: GRADE_STENCIL_FLOOR,
+        blending: THREE.CustomBlending,
+        blendEquation: equation,
+        blendSrc: srcFactor,
+        blendDst: THREE.OneFactor,
+        blendEquationAlpha: THREE.AddEquation,
+        blendSrcAlpha: THREE.ZeroFactor,
+        blendDstAlpha: THREE.OneFactor,
+      });
+      const gradeScene = new THREE.Scene();
+      this.gradeLiftMat = makeGradeMat(THREE.ReverseSubtractEquation, THREE.DstAlphaFactor);
+      this.gradeGainMat = makeGradeMat(THREE.AddEquation, THREE.DstColorFactor);
+      this.gradeLiftMesh = new THREE.Mesh(quad, this.gradeLiftMat);
+      this.gradeGainMesh = new THREE.Mesh(quad, this.gradeGainMat);
+      // Lift must run before gain; transparent objects sort on renderOrder first.
+      this.gradeLiftMesh.renderOrder = 0;
+      this.gradeGainMesh.renderOrder = 1;
+      this.gradeLiftMesh.frustumCulled = false;
+      this.gradeGainMesh.frustumCulled = false;
+      gradeScene.add(this.gradeLiftMesh, this.gradeGainMesh);
+      this.gradeScene = gradeScene;
+      // Floor -> stencil, nothing else. LEQUAL plus a pull toward the camera so
+      // it marks exactly the pixels where the floor is the visible surface,
+      // despite this override running a different program than the floor's own.
+      this.gradeMaskMat = new THREE.MeshBasicMaterial({
+        colorWrite: false,
+        depthWrite: false,
+        depthFunc: THREE.LessEqualDepth,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -4,
+        stencilWrite: true,
+        stencilRef: GRADE_STENCIL_FLOOR,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilZPass: THREE.ReplaceStencilOp,
+      });
+      this._applyGrade(this.state.grade);
+
       // --- Render loop (on-demand: only draws when something actually changes) ---
       let _lastT = performance.now();
       let _fpsT = _lastT, _fpsCount = 0;
@@ -26250,6 +26511,27 @@ class Component extends DCLogic {
           this.streakMat.visible = !!(anyStreak && this.streakComposer);
           renderer.autoClear = false;
           renderer.render(this.overlayScene, this.orthoCamera);
+          renderer.autoClear = true;
+        }
+
+        // Tone grade — after bloom so highlights get it, before the vignette so
+        // the vignette's tuned darkness is not re-contrasted. Skipped at 0/0.
+        // Car only: the floor is marked into stencil first (+1 draw call).
+        if (this._gradeActive && this.gradeScene) {
+          renderer.autoClear = false;
+          const fm = this.floorMesh;
+          if (fm && fm.visible && this.gradeMaskMat) {
+            const savedBg = scene.background;
+            const prevMask = camera.layers.mask;
+            scene.background = null;
+            scene.overrideMaterial = this.gradeMaskMat;
+            camera.layers.set(GRADE_MASK_LAYER);
+            renderer.render(scene, camera);
+            camera.layers.mask = prevMask;
+            scene.overrideMaterial = null;
+            scene.background = savedBg;
+          }
+          renderer.render(this.gradeScene, this.orthoCamera);
           renderer.autoClear = true;
         }
 
@@ -29890,6 +30172,7 @@ class Component extends DCLogic {
         fm.envMapIntensity = 0.25;
         c.material = fm;
         this.floorMesh = c;
+        c.layers.enable(GRADE_MASK_LAYER);
         return;
       }
 
@@ -38453,9 +38736,12 @@ class Component extends DCLogic {
       centerSlotHeight: centerRect.height,
       stageAestheticDisplay: stageControlsVisible,
       stageCameraDisplay: stageControlsVisible,
+      // One row: config takes the slot nearest the widgets, camera sits to its
+      // right. The camera moves rather than the config, because stageControlLeft
+      // is already the leftmost x that does not cover a card.
       stageAestheticStyle: 'left:' + Math.round(stageControlLeft) + 'px;top:'
-        + Math.round(stageControlBottom - 92) + 'px;',
-      stageCameraStyle: 'left:' + Math.round(stageControlLeft) + 'px;top:'
+        + Math.round(stageControlBottom - 42) + 'px;',
+      stageCameraStyle: 'left:' + Math.round(stageControlLeft + 50) + 'px;top:'
         + Math.round(stageControlBottom - 42) + 'px;',
       openStageAesthetics: () => this._toggleConfigSection('paint', {
         activeGroup: 'tuning', tuningSubTab: 'paint',
