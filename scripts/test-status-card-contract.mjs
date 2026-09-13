@@ -103,9 +103,17 @@ all(statusView, ['statusAriaLabel', 'onStatusOpen', 'statusMetrics', 'statusRoof
 assert.match(statusView, /statusOpenRoofControls: .*_openRoofLevelPopup\(\)/, 'roof area must reuse the canonical roof popup');
 assert.match(statusView, /statusSunroofInput: roofInput\('sunroof'\)/, 'large status surface must reuse the canonical sunroof range handler');
 assert.match(statusView, /statusCurtainInput: roofInput\('curtain'\)/, 'large status surface must reuse the canonical sunshade range handler');
+all(statusView, ['statusIsFull', 'statusIsCompact', 'statusDoorStat', 'statusGlassStat', 'statusBeltStat', 'statusTireStat'],
+  'status view must expose one canonical full console and a compact fallback');
+assert.match(statusView, /'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'/,
+  'full console tire data must carry the short positional classes used around the car');
 assert.match(html, /case 'openVehicleStatus':\s*this\._openRoofLevelPopup\(\)/, 'status action must use the canonical roof popup directly');
 const popupMarkup = html.slice(html.indexOf('roofPop.innerHTML ='), html.indexOf('// Keep this control surface'));
 assert.equal((popupMarkup.match(/vehicle-status\/base\.png/g) || []).length, 1, 'popup must contain exactly one base car');
+assert.equal((popupMarkup.match(/data-hs-vehicle-source/g) || []).length, 1,
+  'popup must expose exactly one provenance badge beside its title');
+all(popupMarkup, ['STATUS DO VEÍCULO', 'VIDROS', 'DIANTEIRA ESQ.', 'DIANTEIRA DIR.', 'TRASEIRA ESQ.', 'TRASEIRA DIR.', 'TETO SOLAR', 'CORTINA', 'FECHAR', 'ABRIR'],
+  'canonical popup must present its controls in PT-BR');
 assert.ok(!popupMarkup.includes('roof-top-view-v1.png'), 'popup must not contain a second roof-only car');
 assert.ok(!popupMarkup.includes('hv-hs-unified'), 'popup must not retain the old two-panel/two-car layout');
 all(popupMarkup, ['hv-vehicle-window-panel', 'data-hs-window-key="fl"', 'data-hs-window-key="fr"', 'data-hs-window-key="rl"', 'data-hs-window-key="rr"', 'data-hs-window-all="close"', 'data-hs-window-all="open"'], 'left-side window console');
@@ -220,6 +228,10 @@ assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-\d+%/,
 // small. Pressure scales with the panel; nothing draws a card behind it.
 assert.match(html, /\.hv-hs-vehicle-tire strong \{[^}]*font:[^;}]*clamp\(/,
   'popup tire pressure must scale with the panel');
+assert.match(html, /\.hv-hs-vehicle-tire small \{[^}]*11px/,
+  'popup tire temperature must remain legible beneath pressure');
+assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-52%/,
+  'popup tire pressure must stay close to the vehicle while remaining outside');
 assert.ok(!/\.hv-hs-vehicle-tire \{[^}]*background:/.test(html),
   'popup tire readouts must not sit on a plate');
 // Pins that the revision is BUMPED, not that it holds one literal: the WebView
