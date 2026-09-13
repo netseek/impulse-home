@@ -97,7 +97,7 @@ public final class MainActivity extends Activity {
 
     private static final java.util.Set<String> BOTTOM_CARD_ACTIONS =
             new java.util.HashSet<>(java.util.Arrays.asList(
-                    "ac", "addWidget", "openDesktopStudio", "openClockSettings", "previousDesktop", "nextDesktop",
+                    "ac", "addWidget", "openDesktopStudio", "openClockSettings", "openClockCardSettings", "previousDesktop", "nextDesktop",
                     "toggleDockMode", "showLauncher", "showCards", "cycleWidgetTheme",
                     "toggleCenterFill", "configureWallpaper", "closePanel",
                     // Navigation-only commands implemented by the web shell. They do not
@@ -263,6 +263,26 @@ public final class MainActivity extends Activity {
                         null
                 ));
             }
+        }
+    };
+
+    /** Keep both the native rail and the WebView clock on the device clock. */
+    private final BroadcastReceiver clockEnvironmentReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null) return;
+            String action = intent.getAction();
+            if (!Intent.ACTION_TIME_TICK.equals(action)
+                    && !Intent.ACTION_TIME_CHANGED.equals(action)
+                    && !Intent.ACTION_TIMEZONE_CHANGED.equals(action)
+                    && !Intent.ACTION_LOCALE_CHANGED.equals(action)) return;
+            mainHandler.post(() -> {
+                for (QuickClockCardView clock : quickClockCards.values()) clock.refreshNow();
+                if (webView != null) {
+                    webView.evaluateJavascript(
+                            "window.dispatchEvent(new Event('h6-clock-environment'))", null);
+                }
+            });
         }
     };
 
@@ -514,6 +534,34 @@ public final class MainActivity extends Activity {
     ));
 
     public class AppLauncherBridge {
+        @JavascriptInterface
+        public String getClockEnvironment() {
+            JSONObject environment = new JSONObject();
+            try {
+                java.util.Locale locale = getResources().getConfiguration().locale;
+                environment.put("locale", locale == null ? "en-US" : locale.toLanguageTag());
+                environment.put("timeZone", java.util.TimeZone.getDefault().getID());
+                environment.put("system24", android.text.format.DateFormat.is24HourFormat(MainActivity.this));
+            } catch (Exception e) {
+                Log.w(TAG, "getClockEnvironment failed", e);
+            }
+            return environment.toString();
+        }
+
+        /**
+         * Receives the canonical SVG face after the WebView has rasterized it.
+         * The sequence prevents an older asynchronous canvas conversion from
+         * repainting a newer face; a fresh WebView revision resets that order.
+         */
+        @JavascriptInterface
+        public void updateClockCardFace(String revision, int sequence, String dataUrl) {
+            if (dataUrl == null || dataUrl.length() > 1200000) return;
+            final Bitmap bitmap = decodeDataUrlBitmap(dataUrl);
+            if (bitmap == null) return;
+            final String safeRevision = revision == null ? "" : revision;
+            mainHandler.post(() -> applyQuickClockFace(safeRevision, sequence, bitmap));
+        }
+
         @JavascriptInterface
         public String getInstalledApps() {
             JSONArray appsArray = new JSONArray();
@@ -933,6 +981,13 @@ public final class MainActivity extends Activity {
             new java.util.HashMap<>();
     private final java.util.Map<String, QuickCardGraphicView> quickCardGraphics =
             new java.util.HashMap<>();
+    /** Clock cards are self-scheduling: minute ticks do not rebuild the rail. */
+    private final java.util.Map<String, QuickClockCardView> quickClockCards =
+            new java.util.HashMap<>();
+    /** Latest canonical WebView clock face, shared by every rebuilt rail card. */
+    private Bitmap quickClockFaceBitmap;
+    private String quickClockFaceRevision = "";
+    private int quickClockFaceSequence = -1;
     /** Accent DEMO markers in web-configured card headers, keyed by card id. */
     private final java.util.Map<String, android.widget.TextView> quickCardDemoBadges =
             new java.util.HashMap<>();
@@ -1055,6 +1110,11 @@ public final class MainActivity extends Activity {
         final String glyph;
         /** Short code drawn in place of a glyph (AWD's "4x4"); may be empty. */
         final String glyphText;
+        final String clockHourFormat;
+        final String dialMarks;
+        final String splitPlates;
+        final String dateSpineFormat;
+        final String dateWording;
         /** Quick-menu rows; empty for a card whose body opens something directly. */
         final java.util.List<QuickMenuRow> menu;
 
@@ -1063,7 +1123,8 @@ public final class MainActivity extends Activity {
                 String state, String[] wheelStates, String[] openingStates,
                 String[] seatBeltStates, int sunroofLevel, int curtainLevel, boolean demo,
                 String iconAction, String longAction, String glyph, String glyphText,
-                java.util.List<QuickMenuRow> menu) {
+                String clockFace, String clockHourFormat, String dialMarks, String splitPlates,
+                String dateSpineFormat, String dateWording, java.util.List<QuickMenuRow> menu) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -1084,7 +1145,242 @@ public final class MainActivity extends Activity {
             this.longAction = longAction == null ? "" : longAction;
             this.glyph = glyph == null ? "" : glyph;
             this.glyphText = glyphText == null ? "" : glyphText;
+            this.clockFace = clockFace == null ? "panorama" : clockFace;
+            this.clockFormat = "12".equals(clockHourFormat) ? "12h" : ("24".equals(clockHourFormat) ? "24h" : "system");
+            this.clockHourFormat = clockHourFormat == null ? "system" : clockHourFormat;
+            this.dialMarks = dialMarks == null ? "index" : dialMarks;
+            this.splitPlates = splitPlates == null ? "frost" : splitPlates;
+            this.dateSpineFormat = dateSpineFormat == null ? "month-name" : dateSpineFormat;
+            this.dateWording = dateWording == null ? "short" : dateWording;
             this.menu = menu == null ? java.util.Collections.emptyList() : menu;
+        }
+    }
+
+    /**
+     * Self-contained native bottom-card clock. It owns one minute-boundary
+     * callback and one cached snapshot; the WebView is never asked to re-render
+     * its 3D scene merely because time advanced.
+     */
+    private final class QuickClockCardView extends View {
+        private BottomCardDescriptor descriptor;
+        private final android.graphics.Paint paint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG
+                        | android.graphics.Paint.FILTER_BITMAP_FLAG);
+        private ClockSnapshot snapshot;
+        private Bitmap renderedFace;
+        private final Runnable minuteTick = new Runnable() {
+            @Override public void run() {
+                refreshNow();
+                scheduleMinuteTick();
+            }
+        };
+
+        QuickClockCardView(Context context, BottomCardDescriptor descriptor) {
+            super(context);
+            this.descriptor = descriptor;
+            setWillNotDraw(false);
+            setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            refreshNow();
+        }
+
+        void setDescriptor(BottomCardDescriptor next) {
+            descriptor = next;
+            refreshNow();
+        }
+
+        void setRenderedFace(Bitmap next) {
+            renderedFace = next;
+            invalidate();
+        }
+
+        void refreshNow() {
+            snapshot = ClockSnapshot.from(descriptor, getContext());
+            invalidate();
+        }
+
+        private void scheduleMinuteTick() {
+            mainHandler.removeCallbacks(minuteTick);
+            long delay = 60000L - (System.currentTimeMillis() % 60000L) + 20L;
+            mainHandler.postDelayed(minuteTick, delay);
+        }
+
+        @Override protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            refreshNow();
+            scheduleMinuteTick();
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            mainHandler.removeCallbacks(minuteTick);
+            super.onDetachedFromWindow();
+        }
+
+        @Override protected void onDraw(android.graphics.Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth(), h = getHeight();
+            if (w <= 0f || h <= 0f) return;
+            if (renderedFace != null) {
+                canvas.drawBitmap(renderedFace, null,
+                        new android.graphics.RectF(0f, 0f, w, h), paint);
+                return;
+            }
+            if (snapshot == null || descriptor == null) return;
+            int strong = dockLabelColor();
+            int muted = dockUiLight ? 0x99536171 : 0xB8B6C2CE;
+            int accent = dockAccentColor;
+            if ("meridian".equals(descriptor.clockFace)) drawMeridian(canvas, w, h, strong, muted, accent);
+            else if ("split".equals(descriptor.clockFace)) drawSplit(canvas, w, h, strong, muted, accent);
+            else if ("date-spine".equals(descriptor.clockFace)) drawDateSpine(canvas, w, h, strong, muted, accent);
+            else drawPanorama(canvas, w, h, strong, muted, accent);
+        }
+
+        private void type(int color, float px, android.graphics.Paint.Align align, boolean medium) {
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(color);
+            paint.setTextSize(px);
+            paint.setTextAlign(align);
+            paint.setTypeface(android.graphics.Typeface.create(medium ? "sans-serif-medium" : "sans-serif",
+                    android.graphics.Typeface.NORMAL));
+        }
+
+        private float fit(String value, float intended, float available) {
+            float size = intended;
+            while (size > 10f) {
+                paint.setTextSize(size);
+                if (paint.measureText(value) <= available) return size;
+                size -= 1f;
+            }
+            return 10f;
+        }
+
+        private void drawPanorama(android.graphics.Canvas c, float w, float h, int strong, int muted, int accent) {
+            // Mirror the rail Web Component: digital time above, small dial at
+            // lower left, and the weekday/date occupying the lower right.
+            type(strong, fit(snapshot.time, h * .48f, w * .78f), android.graphics.Paint.Align.LEFT, true);
+            c.drawText(snapshot.time, w * .04f, h * .38f, paint);
+            if (!snapshot.period.isEmpty()) {
+                type(muted, h * .16f, android.graphics.Paint.Align.RIGHT, true);
+                c.drawText(snapshot.period, w * .96f, h * .48f, paint);
+            }
+            type(muted, h * .12f, android.graphics.Paint.Align.LEFT, false);
+            float dialR = Math.min(24f, h * .28f);
+            drawDial(c, dialR + 8f, h - dialR - 4f, dialR, strong, muted, accent);
+            c.drawText(snapshot.weekday, dialR * 2f + 20f, h * .78f, paint);
+            c.drawText(snapshot.dateShort, dialR * 2f + 20f, h * .96f, paint);
+        }
+
+        private void drawMeridian(android.graphics.Canvas c, float w, float h, int strong, int muted, int accent) {
+            float dialR = Math.min(h * .43f, w * .25f);
+            drawDial(c, dialR + 8f, h * .50f, dialR, strong, muted, accent);
+            float stackLeft = Math.max(dialR * 2f + 22f, w * .58f);
+            float stackRight = w - 8f;
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(withAlpha(muted, 0x70));
+            c.drawRect(stackLeft, h * .50f - .5f, stackRight, h * .50f + .5f, paint);
+            float stackCenter = (stackLeft + stackRight) * .5f;
+            type(strong, fit(snapshot.hour, h * .42f, stackRight - stackLeft), android.graphics.Paint.Align.CENTER, true);
+            c.drawText(snapshot.hour, stackCenter, h * .43f, paint);
+            type(strong, fit(snapshot.minute, h * .42f, stackRight - stackLeft), android.graphics.Paint.Align.CENTER, true);
+            c.drawText(snapshot.minute, stackCenter, h * .82f, paint);
+            // The Web Component places a small colon over the divider. Keep it
+            // as a real glyph rather than relying on the line to imply time.
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(dockUiLight ? 0xFFE1E5EA : 0xFF0E141B);
+            c.drawRect(stackCenter - h * .10f, h * .46f, stackCenter + h * .10f, h * .58f, paint);
+            type(muted, h * .20f, android.graphics.Paint.Align.CENTER, false);
+            c.drawText(":", stackCenter, h * .58f, paint);
+            type(muted, h * .11f, android.graphics.Paint.Align.RIGHT, false);
+            if (!snapshot.period.isEmpty()) c.drawText(snapshot.period, stackRight, h * .97f, paint);
+        }
+
+        private void drawSplit(android.graphics.Canvas c, float w, float h, int strong, int muted, int accent) {
+            float gap = Math.max(18f, w * .075f), plateW = (w * .82f - gap) / 2f, plateH = h * .57f, x = w * .09f, y = h * .12f;
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor("flat".equals(descriptor.splitPlates) ? (dockUiLight ? 0x12536171 : 0x18FFFFFF) : (dockUiLight ? 0x21536171 : 0x28FFFFFF));
+            c.drawRoundRect(new android.graphics.RectF(x, y, x + plateW, y + plateH), h * .09f, h * .09f, paint);
+            c.drawRoundRect(new android.graphics.RectF(x + plateW + gap, y, x + plateW * 2f + gap, y + plateH), h * .09f, h * .09f, paint);
+            type(strong, fit(snapshot.hour, plateH * .70f, plateW * .78f), android.graphics.Paint.Align.CENTER, true);
+            c.drawText(snapshot.hour, x + plateW * .5f, y + plateH * .74f, paint);
+            c.drawText(snapshot.minute, x + plateW + gap + plateW * .5f, y + plateH * .74f, paint);
+            type(muted, plateH * .34f, android.graphics.Paint.Align.CENTER, false);
+            c.drawText(":", x + plateW + gap * .5f, y + plateH * .63f, paint);
+            type(muted, h * .12f, android.graphics.Paint.Align.CENTER, false);
+            c.drawText(snapshot.weekday + " · " + snapshot.dateShort + (snapshot.period.isEmpty() ? "" : " · " + snapshot.period), w * .5f, h * .90f, paint);
+        }
+
+        private void drawDateSpine(android.graphics.Canvas c, float w, float h, int strong, int muted, int accent) {
+            float band = w * .29f;
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(withAlpha(accent, dockUiLight ? 0x24 : 0x32));
+            c.drawRoundRect(new android.graphics.RectF(0f, 0f, band, h), h * .10f, h * .10f, paint);
+            type(strong, h * .17f, android.graphics.Paint.Align.CENTER, true);
+            c.drawText(snapshot.spineTop, band * .5f, h * .33f, paint);
+            type(strong, h * .29f, android.graphics.Paint.Align.CENTER, true);
+            c.drawText(snapshot.day, band * .5f, h * .64f, paint);
+            type(muted, h * .10f, android.graphics.Paint.Align.CENTER, false);
+            c.drawText(snapshot.weekday, band * .5f, h * .84f, paint);
+            paint.setColor(accent);
+            c.drawRect(band * .40f, h * .94f, band * .60f, h * .98f, paint);
+            type(strong, fit(snapshot.time, h * .52f, w - band - w * .12f), android.graphics.Paint.Align.LEFT, true);
+            c.drawText(snapshot.time, band + w * .06f, h * .60f, paint);
+            if (!snapshot.period.isEmpty()) {
+                type(muted, h * .12f, android.graphics.Paint.Align.LEFT, true);
+                c.drawText(snapshot.period, band + w * .07f, h * .80f, paint);
+            }
+        }
+
+        private void drawDial(android.graphics.Canvas c, float cx, float cy, float r, int strong, int muted, int accent) {
+            paint.setStyle(android.graphics.Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(1.5f, r * .04f));
+            paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            paint.setColor(muted);
+            c.drawCircle(cx, cy, r, paint);
+            if (!"plain".equals(descriptor.dialMarks)) {
+                for (int i = 0; i < 12; i++) {
+                    double a = Math.toRadians(i * 30d - 90d);
+                    float outer = r * .88f, inner = r * (i % 3 == 0 ? .70f : .78f);
+                    c.drawLine(cx + (float) Math.cos(a) * inner, cy + (float) Math.sin(a) * inner,
+                            cx + (float) Math.cos(a) * outer, cy + (float) Math.sin(a) * outer, paint);
+                }
+            }
+            double minute = Math.toRadians(snapshot.minuteAngle - 90f);
+            double hour = Math.toRadians(snapshot.hourAngle - 90f);
+            paint.setColor(accent); paint.setStrokeWidth(Math.max(1.8f, r * .055f));
+            c.drawLine(cx, cy, cx + (float) Math.cos(minute) * r * .70f, cy + (float) Math.sin(minute) * r * .70f, paint);
+            paint.setColor(strong); paint.setStrokeWidth(Math.max(2.4f, r * .075f));
+            c.drawLine(cx, cy, cx + (float) Math.cos(hour) * r * .48f, cy + (float) Math.sin(hour) * r * .48f, paint);
+            paint.setStyle(android.graphics.Paint.Style.FILL); paint.setColor(accent); c.drawCircle(cx, cy, Math.max(2f, r * .08f), paint);
+        }
+    }
+
+    private static final class ClockSnapshot {
+        final String time, hour, minute, period, weekday, dateShort, day, spineTop;
+        final float minuteAngle, hourAngle;
+        ClockSnapshot(String time, String hour, String minute, String period, String weekday,
+                String dateShort, String day, String spineTop, float minuteAngle, float hourAngle) {
+            this.time = time; this.hour = hour; this.minute = minute; this.period = period;
+            this.weekday = weekday; this.dateShort = dateShort; this.day = day; this.spineTop = spineTop;
+            this.minuteAngle = minuteAngle; this.hourAngle = hourAngle;
+        }
+        static ClockSnapshot from(BottomCardDescriptor d, Context context) {
+            java.util.Calendar now = java.util.Calendar.getInstance();
+            java.util.Locale locale = context.getResources().getConfiguration().locale;
+            int minute = now.get(java.util.Calendar.MINUTE);
+            int hour24 = now.get(java.util.Calendar.HOUR_OF_DAY);
+            boolean use24 = "24".equals(d.clockHourFormat) || ("system".equals(d.clockHourFormat)
+                    && android.text.format.DateFormat.is24HourFormat(context));
+            int shownHour = use24 ? hour24 : (hour24 % 12 == 0 ? 12 : hour24 % 12);
+            String hour = String.format(java.util.Locale.US, "%02d", shownHour);
+            String mins = String.format(java.util.Locale.US, "%02d", minute);
+            String period = use24 ? "" : new java.text.SimpleDateFormat("a", locale).format(now.getTime());
+            String weekday = new java.text.SimpleDateFormat("EEE", locale).format(now.getTime());
+            String date = new java.text.SimpleDateFormat("dd MMM", locale).format(now.getTime());
+            String day = String.format(java.util.Locale.US, "%02d", now.get(java.util.Calendar.DAY_OF_MONTH));
+            String spine = "numeric".equals(d.dateSpineFormat)
+                    ? new java.text.SimpleDateFormat("MM", locale).format(now.getTime())
+                    : new java.text.SimpleDateFormat("MMM", locale).format(now.getTime()).toUpperCase(locale);
+            return new ClockSnapshot(hour + ":" + mins, hour, mins, period, weekday, date, day, spine,
+                    minute * 6f, (hour24 % 12) * 30f + minute * .5f);
         }
     }
 
@@ -5526,6 +5822,16 @@ public final class MainActivity extends Activity {
         } catch (Exception e) {
             Log.w(TAG, "Car telemetry receiver not registered", e);
         }
+        try {
+            IntentFilter clockFilter = new IntentFilter();
+            clockFilter.addAction(Intent.ACTION_TIME_TICK);
+            clockFilter.addAction(Intent.ACTION_TIME_CHANGED);
+            clockFilter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+            clockFilter.addAction(Intent.ACTION_LOCALE_CHANGED);
+            registerReceiver(clockEnvironmentReceiver, clockFilter);
+        } catch (Exception e) {
+            Log.w(TAG, "Clock environment receiver not registered", e);
+        }
         scheduleTelemetrySnapshotRequests();
         try {
             registerReceiver(taskResolvedReceiver, new IntentFilter(ACTION_TASK_RESOLVED));
@@ -7483,6 +7789,7 @@ public final class MainActivity extends Activity {
         quickCardValues.clear();
         quickCardDetails.clear();
         quickCardGraphics.clear();
+        quickClockCards.clear();
         quickCardDemoBadges.clear();
         quickMediaArt = null;
         quickMediaHasArt = false;
@@ -7568,6 +7875,12 @@ public final class MainActivity extends Activity {
      */
     private View makeQuickVisualCard(float density, BottomCardDescriptor descriptor,
             View.OnClickListener click) {
+        // Clock faces are designed on a 224 x 124 canvas. Giving them the
+        // generic header/padding would make the card a different composition
+        // from the Studio preview, so it owns the entire card surface.
+        if ("clock".equals(descriptor.id)) {
+            return makeQuickClockCard(density, descriptor, click);
+        }
         android.widget.LinearLayout card = new android.widget.LinearLayout(this);
         card.setOrientation(android.widget.LinearLayout.VERTICAL);
         card.setGravity(android.view.Gravity.TOP);
@@ -7657,8 +7970,7 @@ public final class MainActivity extends Activity {
         content.setLayoutParams(contentLp);
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
-        boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id)
-                || "clock".equals(descriptor.id);
+        boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id);
         if (fullGraphicCard) {
             graphic.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
@@ -7757,6 +8069,43 @@ public final class MainActivity extends Activity {
         if ("range".equals(id) || "consumption".equals(id)) return 258;
         if ("clock".equals(id)) return 224;
         return 238;
+    }
+
+    private View makeQuickClockCard(float density, BottomCardDescriptor descriptor,
+            View.OnClickListener click) {
+        FrameLayout card = new FrameLayout(this);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                Math.round(224 * density), Math.round(124 * density));
+        lp.rightMargin = Math.round(10 * density);
+        card.setLayoutParams(lp);
+        card.setMinimumHeight(Math.round(112 * density));
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setContentDescription(bottomCardAccessibilityDescription(descriptor));
+        card.setOnClickListener(click);
+        if (!descriptor.longAction.isEmpty()) {
+            final String longCommand = descriptor.longAction;
+            card.setLongClickable(true);
+            card.setOnLongClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                callViewerDock(longCommand);
+                return true;
+            });
+        }
+        card.setBackground(makeFrostStateDrawable(false, density,
+                drivingWashColor(descriptor.state)));
+        card.setElevation(3f * density);
+        quickCardViews.add(card);
+        quickCardHosts.put(descriptor.id, card);
+        lastDrivingWash.put(descriptor.id, drivingWashColor(descriptor.state));
+
+        QuickClockCardView clock = new QuickClockCardView(this, descriptor);
+        clock.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        if (quickClockFaceBitmap != null) clock.setRenderedFace(quickClockFaceBitmap);
+        card.addView(clock);
+        quickClockCards.put(descriptor.id, clock);
+        return card;
     }
 
     private View makeQuickWorkspaceCard(float density) {
@@ -8470,6 +8819,20 @@ public final class MainActivity extends Activity {
         dismissQuickMenu();
         for (QuickCardGraphicView graphic : quickCardGraphics.values()) {
             if (graphic != null) graphic.invalidate();
+        }
+        for (QuickClockCardView clock : quickClockCards.values()) {
+            if (clock != null) clock.invalidate();
+        }
+    }
+
+    private void applyQuickClockFace(String revision, int sequence, Bitmap bitmap) {
+        if (bitmap == null) return;
+        if (revision.equals(quickClockFaceRevision) && sequence < quickClockFaceSequence) return;
+        quickClockFaceRevision = revision;
+        quickClockFaceSequence = sequence;
+        quickClockFaceBitmap = bitmap;
+        for (QuickClockCardView clock : quickClockCards.values()) {
+            if (clock != null) clock.setRenderedFace(bitmap);
         }
     }
 
@@ -9470,6 +9833,18 @@ public final class MainActivity extends Activity {
             if (!BOTTOM_CARD_ACTIONS.contains(longAction)) longAction = "";
             String glyph = sanitizeGlyphPath(raw.optString("glyph", ""));
             String glyphText = cleanBottomCardText(raw.optString("glyphText", ""), 6);
+            String clockFace = sanitizeClockOption(raw.optString("clockFace", "panorama"),
+                    new String[] {"panorama", "meridian", "split", "date-spine"}, "panorama");
+            String clockHourFormat = sanitizeClockOption(raw.optString("clockHourFormat", "system"),
+                    new String[] {"system", "24", "12"}, "system");
+            String dialMarks = sanitizeClockOption(raw.optString("dialMarks", "index"),
+                    new String[] {"index", "plain"}, "index");
+            String splitPlates = sanitizeClockOption(raw.optString("splitPlates", "frost"),
+                    new String[] {"frost", "flat"}, "frost");
+            String dateSpineFormat = sanitizeClockOption(raw.optString("dateSpineFormat", "month-name"),
+                    new String[] {"month-name", "numeric"}, "month-name");
+            String dateWording = sanitizeClockOption(raw.optString("dateWording", "short"),
+                    new String[] {"short", "long"}, "short");
             java.util.List<QuickMenuRow> menu = parseQuickMenu(raw.optJSONArray("menu"));
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
@@ -9495,14 +9870,9 @@ public final class MainActivity extends Activity {
             BottomCardDescriptor descriptor = new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
                     action, primary, secondary, metricA, metricB, progress, state, wheelStates,
                     openingStates, seatBeltStates, sunroofLevel, curtainLevel, demo,
-                    iconAction, longAction, glyph, glyphText, menu);
+                    iconAction, longAction, glyph, glyphText, clockFace, clockHourFormat,
+                    dialMarks, splitPlates, dateSpineFormat, dateWording, menu);
             descriptor.tirePressures = cleanBottomCardText(raw.optString("tirePressures", ""), 48);
-            if ("clock".equals(id)) {
-                String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
-                descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
-                String format = raw.optString("clockFormat", "system");
-                descriptor.clockFormat = "12h".equals(format) ? "12h" : ("24h".equals(format) ? "24h" : "system");
-            }
             next.add(descriptor);
         }
 
@@ -9529,6 +9899,12 @@ public final class MainActivity extends Activity {
     private String cleanBottomCardText(String value, int maxLength) {
         String clean = cleanIndicator(value);
         return clean.length() > maxLength ? clean.substring(0, maxLength) : clean;
+    }
+
+    private String sanitizeClockOption(String value, String[] allowed, String fallback) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US);
+        for (String option : allowed) if (option.equals(normalized)) return normalized;
+        return fallback;
     }
 
     /**
@@ -9715,7 +10091,13 @@ public final class MainActivity extends Activity {
             BottomCardDescriptor left = a.get(i);
             BottomCardDescriptor right = b.get(i);
             if (!left.id.equals(right.id) || !left.title.equals(right.title)
-                    || !left.action.equals(right.action)) {
+                    || !left.action.equals(right.action)
+                    || ("clock".equals(left.id) && (!left.clockFace.equals(right.clockFace)
+                    || !left.clockHourFormat.equals(right.clockHourFormat)
+                    || !left.dialMarks.equals(right.dialMarks)
+                    || !left.splitPlates.equals(right.splitPlates)
+                    || !left.dateSpineFormat.equals(right.dateSpineFormat)
+                    || !left.dateWording.equals(right.dateWording)))) {
                 return false;
             }
         }
@@ -9738,6 +10120,8 @@ public final class MainActivity extends Activity {
             if (demoBadge != null) demoBadge.setVisibility(card.demo ? View.VISIBLE : View.GONE);
             QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
             if (graphic != null) graphic.setDescriptor(card);
+            QuickClockCardView clock = quickClockCards.get(card.id);
+            if (clock != null) clock.setDescriptor(card);
             // The rail is patched in place rather than rebuilt, so a mode change
             // has to repaint the card's own background too.
             View host = quickCardHosts.get(card.id);
@@ -9747,7 +10131,7 @@ public final class MainActivity extends Activity {
                 float density = getResources().getDisplayMetrics().density;
                 host.setBackground(makeFrostStateDrawable(false, density, wash));
             }
-            updateBottomCardAccessibility(value != null ? value : graphic, card);
+            updateBottomCardAccessibility(value != null ? value : (clock != null ? clock : graphic), card);
         }
     }
 
@@ -11752,6 +12136,9 @@ public final class MainActivity extends Activity {
         DesktopSwitcherHitService.applyFromViewer(this, 0, 0, 0, 0, false);
         try {
             unregisterReceiver(telemetryReceiver);
+        } catch (Exception ignored) {}
+        try {
+            unregisterReceiver(clockEnvironmentReceiver);
         } catch (Exception ignored) {}
         try {
             unregisterReceiver(taskResolvedReceiver);

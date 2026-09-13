@@ -8,6 +8,7 @@
 <script src="./telemetryClient.js"></script>
 <script src="./appLauncherClient.js"></script>
 <script src="./assets/clock-core.js"></script>
+<script src="./assets/clock-faces.js"></script>
 <script src="./assets/clock-elements.js"></script>
 <script>
 /* Boot GLB preload.
@@ -5780,7 +5781,7 @@ window.HavalSplash = (function () {
             <div class="hv-profile {{ wg.profileSizeClass }}" onClick="{{ wg.onProfileOpen }}"><div class="hv-profile-stage" style="{{ wg.profileStyle }}"><div class="hv-profile-meta"><span>{{ wg.profileTrim }} · {{ wg.profileScene }}</span><span>{{ wg.profileTheme }}</span></div><div class="hv-profile-copy"><small>VEHICLE PROFILE</small><strong>{{ wg.profilePaintName }}</strong><small>{{ wg.profilePaint }} · TAP TO CUSTOMIZE</small></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isClock }}" hint-placeholder-val="{{ false }}">
-            <h6-clock class="hv-widget-clock" surface="widget" size="{{ wg.clockSize }}" clock-style="{{ wg.clockStyle }}" hour-format="{{ wg.clockHourFormat }}"></h6-clock>
+            <h6-clock class="hv-widget-clock" surface="widget" size="{{ wg.clockSize }}" clock-style="{{ wg.clockStyle }}" hour-format="{{ wg.clockHourFormat }}" onClick="{{ wg.onClockConfigure }}"></h6-clock>
           </sc-if>
           <sc-if value="{{ wg.isNavigation }}" hint-placeholder-val="{{ false }}">
             <div class="hv-navigation {{ wg.navigationSizeClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><small>{{ wg.navigationSource }}</small></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-turn"><svg viewBox="0 0 24 24"><path d="M7 18V11a4 4 0 0 1 4-4h7"></path><path d="m15 4 3 3-3 3"></path></svg></div><div class="hv-navigation-copy"><strong>{{ wg.navigationDistance }}</strong><span>{{ wg.navigationHint }}</span></div></div></div>
@@ -5985,7 +5986,7 @@ window.HavalSplash = (function () {
             <div class="hv-profile {{ wg.profileSizeClass }}" onClick="{{ wg.onProfileOpen }}"><div class="hv-profile-stage" style="{{ wg.profileStyle }}"><div class="hv-profile-meta"><span>{{ wg.profileTrim }} · {{ wg.profileScene }}</span><span>{{ wg.profileTheme }}</span></div><div class="hv-profile-copy"><small>VEHICLE PROFILE</small><strong>{{ wg.profilePaintName }}</strong><small>{{ wg.profilePaint }} · TAP TO CUSTOMIZE</small></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isClock }}" hint-placeholder-val="{{ false }}">
-            <h6-clock class="hv-widget-clock" surface="widget" size="{{ wg.clockSize }}" clock-style="{{ wg.clockStyle }}" hour-format="{{ wg.clockHourFormat }}"></h6-clock>
+            <h6-clock class="hv-widget-clock" surface="widget" size="{{ wg.clockSize }}" clock-style="{{ wg.clockStyle }}" hour-format="{{ wg.clockHourFormat }}" onClick="{{ wg.onClockConfigure }}"></h6-clock>
           </sc-if>
           <sc-if value="{{ wg.isNavigation }}" hint-placeholder-val="{{ false }}">
             <div class="hv-navigation {{ wg.navigationSizeClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVIGATION</span><small>{{ wg.navigationSource }}</small></div><div class="hv-navigation-map"><svg class="hv-navigation-route" viewBox="0 0 180 82" preserveAspectRatio="none" aria-hidden="true"><path class="track" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path><path class="route" d="M8 73C35 64 29 31 62 36S103 67 119 37 148 18 173 9"></path></svg><div class="hv-navigation-turn"><svg viewBox="0 0 24 24"><path d="M7 18V11a4 4 0 0 1 4-4h7"></path><path d="m15 4 3 3-3 3"></path></svg></div><div class="hv-navigation-copy"><strong>{{ wg.navigationDistance }}</strong><span>{{ wg.navigationHint }}</span></div></div></div>
@@ -7310,10 +7311,10 @@ const H6_CLOCK_WIDGET_OPTIONS = [
   { key: 'datebook', label: 'Datebook', hint: 'Time with local date context' },
 ];
 const H6_CLOCK_RAIL_OPTIONS = [
-  { key: 'panorama', label: 'Panorama', hint: 'Full-width time and instrument footer' },
-  { key: 'meridian', label: 'Meridian', hint: 'Full-height dial and vertical digits' },
-  { key: 'split', label: 'Split', hint: 'Two static instrument plates' },
-  { key: 'date-spine', label: 'Date Spine', hint: 'Editorial date band and oversized time' },
+  { key: 'meridian', label: 'Chronograph', hint: 'Precision dial with digital time' },
+  { key: 'panorama', label: 'Orbit', hint: 'Bold time with a live seconds sweep' },
+  { key: 'split', label: 'Monogram', hint: 'Sculpted digits and a date column' },
+  { key: 'date-spine', label: 'Dashboard', hint: 'Wide time with your week at a glance' },
 ];
 const H6_BOTTOM_CARD_CATALOG = [
   { id: 'navigation', title: 'Navigation', action: 'openNavigation' },
@@ -32639,30 +32640,40 @@ class Component extends DCLogic {
     const widget = s.clockConfigScope === 'widget';
     const scope = widget ? 'widget' : 'bottom';
     const config = widget ? this._normalizeWidgetClock(this._widgetClockConfig) : this._normalizeBottomClock(this._bottomClockConfig);
-    const names = widget ? ['twin', 'atelier', 'signal', 'datebook'] : ['panorama', 'meridian', 'split', 'date-spine'];
-    const hints = widget ? ['Time and dial', 'Analog focus', 'Digital focus', 'Date focus'] : ['Wide time', 'Dial and stacked time', 'Paired digit plates', 'Date band'];
+    const options = widget ? H6_CLOCK_WIDGET_OPTIONS : H6_CLOCK_RAIL_OPTIONS;
+    const detailOptions = !widget && config.face === 'meridian'
+      ? { label: 'Dial', key: 'dialMarks', values: [{ key: 'index', label: 'Index' }, { key: 'plain', label: 'Plain' }] }
+      : null;
+    const clockEnvironment = window.H6ClockRuntime ? window.H6ClockRuntime.environment : {};
     return {
       clockScopeWidgetClass: widget ? 'on' : '', clockScopeBottomClass: widget ? '' : 'on',
       clockScopeWidgetSelected: widget, clockScopeBottomSelected: !widget,
       clockScopeWidget: () => this._setClockConfigScope('widget'), clockScopeBottom: () => this._setClockConfigScope('bottom'),
-      clockGalleryLabel: widget ? 'Widget style' : 'Bottom card face',
-      clockGalleryItems: names.map((name, i) => ({
-        label: name.charAt(0).toUpperCase() + name.slice(1).replace('-', ' '), hint: hints[i],
-        cls: (widget ? config.style : config.face) === name ? 'on' : '', checked: (widget ? config.style : config.face) === name,
-        surface: widget ? 'widget' : 'rail', size: '2x1', widgetStyle: widget ? name : 'twin', railFace: widget ? 'panorama' : name,
+      clockGalleryLabel: widget ? 'Widget clock style' : 'Bottom clock face',
+      clockGalleryItems: options.map((option) => ({
+        label: option.label, hint: option.hint,
+        cls: (widget ? config.style : config.face) === option.key ? 'on' : '',
+        checked: (widget ? config.style : config.face) === option.key,
+        surface: widget ? 'widget' : 'rail', size: widget ? '2x1' : 'rail',
+        widgetStyle: widget ? option.key : 'twin', railFace: widget ? 'panorama' : option.key,
         hourFormat: config.hourFormat, dialMarks: config.dialMarks || 'index', splitPlates: config.splitPlates || 'frost',
         spineFormat: config.dateSpineFormat || 'month-name', dateWording: config.dateWording || 'short',
-        onClick: () => this._setClockConfig(scope, widget ? 'style' : 'face', name),
+        onClick: () => this._setClockConfig(scope, widget ? 'style' : 'face', option.key),
       })),
       clockFormatItems: ['system', '24', '12'].map((format, i) => ({label: ['Device', '24 hour', '12 hour'][i],
         cls: config.hourFormat === format ? 'on' : '', checked: config.hourFormat === format,
         onClick: () => this._setClockConfig(scope, 'hourFormat', format)})),
-      clockShowDetail: false, clockDetailItems: [],
-      clockDeviceZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Device time zone',
+      clockShowDetail: !!detailOptions,
+      clockDetailLabel: detailOptions ? detailOptions.label : '',
+      clockDetailItems: detailOptions ? detailOptions.values.map((option) => ({
+        label: option.label, cls: config[detailOptions.key] === option.key ? 'on' : '',
+        checked: config[detailOptions.key] === option.key,
+        onClick: () => this._setClockConfig('bottom', detailOptions.key, option.key),
+      })) : [],
+      clockDeviceZone: 'Device time zone: ' + (clockEnvironment.timeZone || 'Local device time'),
       clockUndo: () => this._undoClockConfig(),
     };
   }
-
   _setClockConfigScope(scope) {
     const next = scope === 'widget' ? 'widget' : 'bottom';
     if (this.state.clockConfigScope === next) return;
@@ -33159,6 +33170,8 @@ class Component extends DCLogic {
     const index = Math.max(0, Math.min(list.length - 1, this._desktopIndex || 0));
     const current = list[index] || { name: 'Drive' };
     const tab = s.desktopStudioTab || 'desktop';
+    const studioIsClock = tab === 'clock';
+    const bottomClock = this._normalizeBottomClock(this._bottomClockConfig);
     const self = this;
     const mode = s.shellMode || 'triple';
     const grid = this._normalizeDesktopGrid(this._desktopGrid)[mode] || { cols: 2, rows: 2 };
@@ -33187,6 +33200,8 @@ class Component extends DCLogic {
       // Frost pill is always on; no idle colour override.
       desktopSwitcherStyle: '',
       desktopName: current.name,
+      desktopStudioKicker: studioIsClock ? ((s.clockConfigScope === 'bottom' ? 'BOTTOM CARD · ' : 'WIDGET · ') + current.name) : 'DESKTOP STUDIO',
+      desktopStudioTitle: studioIsClock ? 'Customize clock' : current.name,
       desktopCountLabel: (index + 1) + ' / ' + Math.max(1, list.length),
       desktopDots: list.map((d, i) => ({
         cls: i === index ? 'on' : '',
@@ -33209,8 +33224,9 @@ class Component extends DCLogic {
         if (this._desktopClickSuppressed()) return;
         this._openDesktopStudio('desktop');
       },
-      desktopStudioClass: s.desktopStudioOpen ? 'on' : '',
+      desktopStudioClass: (s.desktopStudioOpen ? 'on' : '') + (studioIsClock ? ' clock-config' : ''),
       desktopStudioBackdropClass: s.desktopStudioOpen ? 'on' : '',
+      studioTabsDisplay: studioIsClock ? 'none' : 'flex',
       closeDesktopStudio: () => this._closeDesktopStudio(),
       studioTabDesktopClass: tab === 'desktop' ? 'on' : '',
       studioTabLayoutClass: (tab === 'layout' || tab === 'widgets') ? 'on' : '',
@@ -33280,7 +33296,9 @@ class Component extends DCLogic {
         return {
           label: card.title,
           isClock: card.id === 'clock',
-          clockFaceLabel: this._normalizeBottomClock(this._bottomClockConfig).face,
+          clockFaceLabel: card.id === 'clock'
+            ? ((H6_CLOCK_RAIL_OPTIONS.filter((option) => option.key === bottomClock.face)[0] || {}).label || 'Panorama')
+            : '',
           onCustomizeClock: () => this._openClockSettings('bottom'),
           state: enabled ? ('Shown · position ' + (cardIndex + 1)) : 'Available to add',
           toggleLabel: enabled ? 'Remove' : 'Add',
@@ -34749,6 +34767,7 @@ class Component extends DCLogic {
         this._openDesktopStudio('desktop');
         break;
       case 'openClockSettings':
+      case 'openClockCardSettings':
         this._openClockSettings('bottom');
         break;
       case 'toggleDockMode':
@@ -34848,6 +34867,7 @@ class Component extends DCLogic {
     const tires = this._tiresWidgetView({ type: 'tires', w: 2, h: 1 });
     const clock = this._clockWidgetView({ type: 'clock', w: 1, h: 1 });
     const media = this._mediaWidgetView({ type: 'media', w: 2, h: 1 });
+    const bottomClock = this._normalizeBottomClock(this._bottomClockConfig);
     const activeDesktopIndex = Math.max(0, this._desktopIndex || 0);
     const desktopCount = Math.max(1, this._desktops ? this._desktops.length : 1);
     const activeDesktopName = this._desktops && this._desktops[activeDesktopIndex]
@@ -35006,9 +35026,14 @@ class Component extends DCLogic {
         metricA: clock.clockZone,
         metricB: '',
         progress: percent(clock.clockTime.split(':')[1], 0),
-        clockFace: this._normalizeBottomClock(this._bottomClockConfig).face,
         clockFormat: this._normalizeBottomClock(this._bottomClockConfig).hourFormat === '12' ? '12h'
           : (this._normalizeBottomClock(this._bottomClockConfig).hourFormat === '24' ? '24h' : 'system'),
+        clockFace: bottomClock.face,
+        clockHourFormat: bottomClock.hourFormat,
+        dialMarks: bottomClock.dialMarks,
+        splitPlates: bottomClock.splitPlates,
+        dateSpineFormat: bottomClock.dateSpineFormat,
+        dateWording: bottomClock.dateWording,
       },
       desktops: {
         primary: activeDesktopName,
@@ -35060,6 +35085,17 @@ class Component extends DCLogic {
         // Rows for the card's quick menu, empty for cards that have none.
         menu: this._drivingMenuRows(card.id),
       }, bottomVisuals[card.id] || {}));
+    // The native rail receives the exact same canonical SVG that draws the
+    // Studio preview. It is rasterized once at the WebView boundary so Android
+    // does not maintain a second, approximate clock-face implementation.
+    try {
+      if (window.H6ClockRuntime && typeof window.H6ClockRuntime.setNativeCardConfig === 'function') {
+        window.H6ClockRuntime.setNativeCardConfig(bottomClock, {
+          accent: this._effectiveAccentColor(),
+          light: effTheme === 'light',
+        });
+      }
+    } catch (e) {}
     const payload = {
       model: this._currentTrim().label,
       perf: this._perfModeInfo(s.resScaleMode).icon,
@@ -35288,11 +35324,11 @@ class Component extends DCLogic {
       menuOpen: menuOpen,
       showEdit: item.type === 'profile' || item.type === 'graphs' || item.type === 'climate'
         || item.type === 'consumption' || item.type === 'tires' || item.type === 'status'
-        || item.type === 'driving' || item.type === 'media' || item.type === 'power',
+        || item.type === 'driving' || item.type === 'media' || item.type === 'power' || item.type === 'clock',
       editLabel: item.type === 'profile' ? 'CUSTOMIZE'
-        : ((item.type === 'climate' || item.type === 'consumption' || item.type === 'tires'
+        : (item.type === 'clock' ? 'CUSTOMIZE' : ((item.type === 'climate' || item.type === 'consumption' || item.type === 'tires'
           || item.type === 'status' || item.type === 'driving' || item.type === 'media'
-          || item.type === 'power') ? 'OPEN' : 'CONFIGURE'),
+          || item.type === 'power') ? 'OPEN' : 'CONFIGURE')),
       showResize: this._widgetResizeSizes(item).length > 0,
       showMove: this._widgetCanMove(item, side),
       cardClass: (moving ? 'moving' : (menuOpen ? 'editing' : ''))
@@ -35305,6 +35341,11 @@ class Component extends DCLogic {
       onHoldCancel: (ev) => this._onWidgetHoldCancel(side, item, ev),
       onContextMenu: (ev) => { if (ev && ev.preventDefault) ev.preventDefault(); },
       onEdit: () => {},
+      onClockConfigure: (ev) => {
+        this._cardControlEvent(ev);
+        if (this._widgetSuppressClick || this.state.widgetMenuId) return;
+        this._openClockSettings('widget');
+      },
       onResize: (ev) => {
         if (ev && ev.stopPropagation) ev.stopPropagation();
         this._startWidgetResize(side, item);
@@ -35339,7 +35380,9 @@ class Component extends DCLogic {
     if (item.type === 'power') Object.assign(view, this._powerWidgetView(item));
     if (item.type === 'climate') Object.assign(view, this._climateWidgetView(item, side));
     if (item.type === 'consumption') Object.assign(view, this._consumptionWidgetView(item, side));
-    if (item.type === 'profile') {
+    if (item.type === 'clock') {
+      view.onEdit = view.onClockConfigure;
+    } else if (item.type === 'profile') {
       view.onEdit = view.onProfileOpen;
     } else if (item.type === 'climate' || item.type === 'consumption' || item.type === 'tires' || item.type === 'status' || item.type === 'power') {
       view.onEdit = (ev) => {
@@ -35723,6 +35766,8 @@ class Component extends DCLogic {
           thumbClass: 'thumb-' + key,
           previewProfile: key === 'profile',
           previewClock: key === 'clock',
+          clockStyle: this._normalizeWidgetClock(this._widgetClockConfig).style,
+          clockHourFormat: this._normalizeWidgetClock(this._widgetClockConfig).hourFormat,
           previewNavigation: key === 'navigation',
           previewMedia: key === 'media',
           previewTires: key === 'tires',
@@ -35760,6 +35805,8 @@ class Component extends DCLogic {
         thumbClass: '',
         previewProfile: false,
         previewClock: false,
+        clockStyle: this._normalizeWidgetClock(this._widgetClockConfig).style,
+        clockHourFormat: this._normalizeWidgetClock(this._widgetClockConfig).hourFormat,
         previewNavigation: false,
         previewMedia: false,
         previewTires: false,
@@ -36967,7 +37014,6 @@ class Component extends DCLogic {
     clearTimeout(this._tireFreshTimer);
     clearInterval(this._demoDoorTicker);
     this._demoDoorTicker = 0;
-    clearInterval(this._widgetClockTimer);
     clearInterval(this._perfReportTimer);
     this._hdriRequestId = (this._hdriRequestId || 0) + 1;
     if (this._raf) cancelAnimationFrame(this._raf);
