@@ -99,6 +99,8 @@ assert.doesNotMatch(snapshot, /const\s+demoOpen\s*=\s*\{\s*fl\s*:\s*true\s*,\s*t
 
 all(html, ['this._carDoorSlots = slots.slice()', 'this._carDoorSlots = null;', 'CAR_DOOR_SLOTS.trunk'], 'canonical parsed door vector retention');
 const statusView = block(html, '  _statusWidgetView(');
+assert.ok(!html.includes('Estados alternados automaticamente'),
+  'demo mode must not show redundant automatic-state explanatory copy');
 all(statusView, ['statusAriaLabel', 'onStatusOpen', 'statusMetrics', 'statusRoof', 'statusWindows', 'statusSeatBelts', 'statusTires', 'statusWindowControls', 'statusSunroofInput', 'statusCurtainInput', 'this._openRoofLevelPopup()'], 'widget accessibility, unified data, and opening');
 assert.match(statusView, /statusOpenRoofControls: .*_openRoofLevelPopup\(\)/, 'roof area must reuse the canonical roof popup');
 assert.match(statusView, /statusSunroofInput: roofInput\('sunroof'\)/, 'large status surface must reuse the canonical sunroof range handler');
