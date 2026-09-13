@@ -1021,6 +1021,8 @@ public final class MainActivity extends Activity {
         private final android.graphics.RectF oval = new android.graphics.RectF();
         private Bitmap tiresTopViewBitmap;
         private boolean tiresTopViewDecodeAttempted;
+        private final java.util.Map<String, Bitmap> powerGhostBitmaps =
+                new java.util.HashMap<>();
         private final java.util.Map<String, Bitmap> statusVehicleBitmaps =
                 new java.util.HashMap<>();
 
@@ -1321,84 +1323,139 @@ public final class MainActivity extends Activity {
             drawTiresFallback(c, w, h, accent, muted, strong);
         }
 
-        /**
-         * Compact propulsion map for the native rail.  It intentionally uses
-         * the same vocabulary as the web Power family, but stays vector-only:
-         * no extracted OEM art and no animation loop in the native dock.
-         */
+        /** Ghost-car projection shared with the web Power card; no animation loop. */
         private void drawPower(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
-            String state = descriptor.state == null ? "unavailable" : descriptor.state;
-            boolean known = !"unavailable".equals(state) && !"stale".equals(state);
-            boolean regen = "regen".equals(state);
-            boolean activeFlow = "ev".equals(state) || "hybrid".equals(state)
-                    || "ice".equals(state) || regen || "charge".equals(state);
-            int flow = regen || "charge".equals(state) ? 0xFF3EE08A
-                    : (activeFlow ? accent : muted);
-            float cy = h * .50f;
-            float batteryL = w * .08f, batteryR = w * .31f;
-            float motorL = w * .61f, motorR = w * .84f;
-            float nodeT = h * .32f, nodeB = h * .68f;
-
-            fill(withAlpha(flow, known ? 0x22 : 0x12));
-            c.drawRoundRect(batteryL, nodeT, batteryR, nodeB, w * .045f, w * .045f, paint);
-            stroke(flow, Math.max(1.5f, w * .026f));
-            c.drawRoundRect(batteryL, nodeT, batteryR, nodeB, w * .045f, w * .045f, paint);
-            fill(withAlpha(flow, known ? 0xA8 : 0x38));
-            float fillR = batteryL + (batteryR - batteryL) * descriptor.progress / 100f;
-            c.drawRoundRect(batteryL + w * .025f, nodeT + h * .07f,
-                    Math.max(batteryL + w * .025f, fillR - w * .025f), nodeB - h * .07f,
-                    w * .025f, w * .025f, paint);
-            fill(flow);
-            c.drawRect(batteryR, cy - h * .07f, batteryR + w * .025f, cy + h * .07f, paint);
-
-            float motorCx = (motorL + motorR) * .5f;
-            stroke(flow, Math.max(1.5f, w * .026f));
-            c.drawCircle(motorCx, cy, w * .105f, paint);
-            c.drawCircle(motorCx, cy, w * .04f, paint);
-
-            int engine = "hybrid".equals(state) || "ice".equals(state) || "idle".equals(state)
-                    ? 0xFFF0BD65 : muted;
-            fill(withAlpha(engine, known ? 0x2A : 0x12));
-            c.drawRoundRect(w * .42f, h * .10f, w * .58f, h * .27f,
-                    w * .025f, w * .025f, paint);
-            stroke(engine, Math.max(1.3f, w * .022f));
-            c.drawRoundRect(w * .42f, h * .10f, w * .58f, h * .27f,
-                    w * .025f, w * .025f, paint);
-
-            if (activeFlow) {
-                stroke(withAlpha(flow, known ? 0xD8 : 0x38), Math.max(1.4f, w * .024f));
-                if (regen) {
-                    c.drawLine(motorL, cy, batteryR + w * .02f, cy, paint);
-                } else {
-                    c.drawLine(batteryR + w * .02f, cy, motorL, cy, paint);
-                }
-            }
-            if ("hybrid".equals(state) || "ice".equals(state)) {
-                stroke(0xFFF0BD65, Math.max(1.3f, w * .022f));
-                c.drawLine(w * .50f, h * .27f, motorCx, cy - w * .10f, paint);
-            }
+            Bitmap car = getPowerGhostBitmap();
+            if (car == null) return; // Metric text remains available if the optional art is absent.
+            String state = sanitizePowerState(descriptor.state);
+            String token = sanitizePowerDirections(descriptor.glyphText);
+            boolean known = !"stale".equals(state) && !"unavailable".equals(state)
+                    && !token.isEmpty();
+            int front = 0, rear = 0, ice = 0;
             if (known) {
-                android.graphics.Path arrow = new android.graphics.Path();
-                float ax = regen ? batteryR + w * .06f : motorL - w * .03f;
-                arrow.moveTo(ax, cy - h * .07f);
-                arrow.lineTo(ax + (regen ? -w * .06f : w * .06f), cy);
-                arrow.lineTo(ax, cy + h * .07f);
-                stroke(flow, Math.max(1.4f, w * .024f));
-                c.drawPath(arrow, paint);
+                String[] parts = token.split(",");
+                front = Integer.parseInt(parts[0]);
+                rear = Integer.parseInt(parts[1]);
+                ice = Integer.parseInt(parts[2]);
             }
 
-            stroke(withAlpha(strong, known ? 0xA0 : 0x48), Math.max(1.2f, w * .02f));
-            c.drawCircle(w * .67f, h * .84f, w * .045f, paint);
-            c.drawCircle(w * .78f, h * .84f, w * .045f, paint);
-            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                    android.graphics.Typeface.NORMAL));
-            paint.setTextSize(Math.max(7f, Math.min(w, h) * .085f));
-            fill(withAlpha(known ? strong : muted, 0xD8));
-            c.drawText(state.toUpperCase(java.util.Locale.US), w * .5f, h * .98f, paint);
-            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+            // Fit the actual raster without stretching, then map normalized 1000 x 500 anchors.
+            float fit = Math.min(w / car.getWidth(), h / car.getHeight());
+            float imageW = car.getWidth() * fit, imageH = car.getHeight() * fit;
+            float left = (w - imageW) * .5f, top = (h - imageH) * .5f;
+            oval.set(left, top, left + imageW, top + imageH);
+            fill(0xFFFFFFFF);
+            paint.setFilterBitmap(true);
+            c.drawBitmap(car, null, oval, paint);
+            paint.setFilterBitmap(false);
+            int saved = c.save();
+            c.translate(left, top);
+            c.scale(imageW / 1000f, imageH / 500f);
+
+            // h6-ghost-layout.json anchors in the shared 1000 x 500 projection:
+            // front (248,340), rear (747,313), engine (239,299), battery (529,333).
+            // Axles are subtle geometry only, never per-wheel traction indicators.
+            stroke(withAlpha(muted, 0x45), 3f);
+            c.drawLine(209.012f, 309.426f, 286.760f, 370.330f, paint);
+            c.drawLine(708.319f, 281.474f, 786.373f, 343.797f, paint);
+            int engine = ice == 1 ? 0xFFF0BD65 : muted;
+            stroke(engine, 4f);
+            c.drawLine(239f, 299f, 248f, 340f, paint);
+            fill(withAlpha(engine, ice == 1 ? 0x55 : 0x22));
+            c.drawRoundRect(215f, 284f, 263f, 314f, 7f, 7f, paint);
+            stroke(engine, 4f);
+            c.drawRoundRect(215f, 284f, 263f, 314f, 7f, 7f, paint);
+
+            // Angled battery top and 15-unit visible thickness match the raster projection.
+            int batteryColor = !known ? muted
+                    : ("regen".equals(state) || "charge".equals(state) ? 0xFF3EE08A
+                    : ("ev".equals(state) || "hybrid".equals(state) ? accent : muted));
+            android.graphics.Path battery = new android.graphics.Path();
+            battery.moveTo(372f, 300f);
+            battery.lineTo(422f, 339f);
+            battery.lineTo(687f, 324f);
+            battery.lineTo(687f, 339f);
+            battery.lineTo(422f, 354f);
+            battery.lineTo(372f, 315f);
+            battery.close();
+            fill(withAlpha(muted, 0x35));
+            c.drawPath(battery, paint);
+            stroke(muted, 3f);
+            c.drawPath(battery, paint);
+            battery.rewind();
+            battery.moveTo(372f, 300f);
+            battery.lineTo(637f, 285f);
+            battery.lineTo(687f, 324f);
+            battery.lineTo(422f, 339f);
+            battery.close();
+            fill(withAlpha(muted, 0x35));
+            c.drawPath(battery, paint);
+            // SOC fills along the long projected edge, with an inset on every side.
+            if (known && descriptor.progress > 0) {
+                fill(withAlpha(batteryColor, 0xB0));
+                float soc = Math.max(0, Math.min(100, descriptor.progress)) / 100f;
+                android.graphics.Path charge = new android.graphics.Path();
+                charge.moveTo(385f, 304f);
+                charge.lineTo(385f + 249f * soc, 304f - 14f * soc);
+                charge.lineTo(423f + 249f * soc, 333f - 14f * soc);
+                charge.lineTo(423f, 333f);
+                charge.close();
+                c.drawPath(charge, paint);
+            }
+            stroke(muted, 3f);
+            c.drawPath(battery, paint);
+            drawPowerMotorFlow(c, 390f, 327f, 248f, 340f, front, accent);
+            drawPowerMotorFlow(c, 665f, 318f, 747f, 313f, rear, accent);
+            drawPowerMotor(c, 248f, 340f, front, accent, muted);
+            drawPowerMotor(c, 747f, 313f, rear, accent, muted);
+            c.restoreToCount(saved);
+        }
+
+        private void drawPowerMotor(android.graphics.Canvas c, float x, float y,
+                int direction, int accent, int muted) {
+            int color = direction > 0 ? accent : direction < 0 ? 0xFF3EE08A : muted;
+            fill(withAlpha(color, direction == 0 ? 0x22 : 0x55));
+            c.drawRoundRect(x - 20f, y - 12f, x + 20f, y + 12f, 6f, 6f, paint);
+            stroke(color, 4f);
+            c.drawRoundRect(x - 20f, y - 12f, x + 20f, y + 12f, 6f, 6f, paint);
+        }
+
+        private void drawPowerMotorFlow(android.graphics.Canvas c, float batteryX, float batteryY,
+                float motorX, float motorY, int direction, int accent) {
+            if (direction == 0) return;
+            float dx = motorX - batteryX, dy = motorY - batteryY;
+            float length = (float) Math.hypot(dx, dy);
+            if (length <= 24f) return;
+            float ux = dx / length, uy = dy / length;
+            // Stop outside the small motor; reverse the same path for regeneration.
+            float edgeX = motorX - ux * 24f, edgeY = motorY - uy * 24f;
+            float fromX = direction > 0 ? batteryX : edgeX;
+            float fromY = direction > 0 ? batteryY : edgeY;
+            float toX = direction > 0 ? edgeX : batteryX;
+            float toY = direction > 0 ? edgeY : batteryY;
+            ux *= direction;
+            uy *= direction;
+            stroke(direction > 0 ? accent : 0xFF3EE08A, 4f);
+            c.drawLine(fromX, fromY, toX, toY, paint);
+            float tailX = toX - ux * 12f, tailY = toY - uy * 12f;
+            c.drawLine(tailX - uy * 8f, tailY + ux * 8f, toX, toY, paint);
+            c.drawLine(tailX + uy * 8f, tailY - ux * 8f, toX, toY, paint);
+        }
+
+        /** Cache successful and failed loads independently for each theme, once per view. */
+        private Bitmap getPowerGhostBitmap() {
+            String theme = dockUiLight ? "light" : "dark";
+            if (powerGhostBitmaps.containsKey(theme)) return powerGhostBitmaps.get(theme);
+            Bitmap bitmap = null;
+            try (InputStream stream = getAssets().open(
+                    "www/assets/power/h6-ghost-" + theme + ".png")) {
+                bitmap = BitmapFactory.decodeStream(stream);
+            } catch (IOException | RuntimeException error) {
+                Log.w(TAG, "Optional Power ghost-car asset unavailable", error);
+            }
+            powerGhostBitmaps.put(theme, bitmap);
+            return bitmap;
         }
 
         /** Lazy and failure-tolerant: a missing optional raster never blanks the card. */
@@ -6991,7 +7048,7 @@ public final class MainActivity extends Activity {
             return card;
         }
         android.widget.LinearLayout.LayoutParams graphicLp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(76 * density),
+                Math.round(("power".equals(descriptor.id) ? 156 : 76) * density),
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         graphicLp.rightMargin = Math.round(10 * density);
         graphic.setLayoutParams(graphicLp);
@@ -7030,7 +7087,7 @@ public final class MainActivity extends Activity {
         // The source badge is long and must never ellipsise into something that
         // reads like a different claim ("DEMO · SIMULATED · NOT VEHICLE..." is
         // not the same statement).
-        detail.setMaxLines(3);
+        detail.setMaxLines("power".equals(descriptor.id) ? 4 : 3);
         detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
@@ -7048,6 +7105,9 @@ public final class MainActivity extends Activity {
     }
 
     private String quickVisualDetail(BottomCardDescriptor descriptor) {
+        if ("power".equals(descriptor.id)) {
+            return descriptor.metricA + "\n" + descriptor.metricB + "\n" + descriptor.secondary;
+        }
         if ("tires".equals(descriptor.id)) {
             String rear = labelTirePair("RL", "RR", descriptor.metricA);
             if (descriptor.secondary.isEmpty()) return rear;
@@ -7074,6 +7134,7 @@ public final class MainActivity extends Activity {
     }
 
     private int quickVisualCardWidthDp(String id) {
+        if ("power".equals(id)) return 318;
         if ("navigation".equals(id)) return 286;
         if ("roof".equals(id)) return 286;
         if ("status".equals(id) || "tires".equals(id)) return 270;
@@ -8417,6 +8478,7 @@ public final class MainActivity extends Activity {
             if (!BOTTOM_CARD_ACTIONS.contains(longAction)) longAction = "";
             String glyph = sanitizeGlyphPath(raw.optString("glyph", ""));
             String glyphText = cleanBottomCardText(raw.optString("glyphText", ""), 6);
+            if ("power".equals(id)) glyphText = sanitizePowerDirections(raw.optString("glyphText", ""));
             java.util.List<QuickMenuRow> menu = parseQuickMenu(raw.optJSONArray("menu"));
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
@@ -8566,6 +8628,11 @@ public final class MainActivity extends Activity {
             default:
                 return "unavailable";
         }
+    }
+
+    private String sanitizePowerDirections(String value) {
+        // Reject the whole token, including trailing content; never truncate it into valid data.
+        return value != null && value.matches("(?:-1|0|1),(?:-1|0|1),[01]") ? value : "";
     }
 
     private String sanitizePowerState(String value) {

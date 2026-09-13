@@ -29,7 +29,8 @@ assert.ok(html.includes("[3, 2]"), '3x2 Power widget size is required');
 assert.equal((html.match(/value="\{\{ wg\.isPower \}\}"/g) || []).length, 2,
   'Power widget markup must exist on both boards');
 assert.ok(html.includes('focusedCardIsPower'));
-assert.ok(html.includes('class="hv-power-focus"'));
+assert.ok(html.includes('data-power-size="popup"'));
+assert.equal((html.match(/class="hv-power-overlay"/g) || []).length, 3, 'both boards and popup share the vehicle overlay');
 assert.ok(html.includes("case 'openPower':\n        this._openFocusedCard('power');"));
 
 for (const key of [
@@ -41,7 +42,7 @@ for (const key of [
 
 const powerStatus = method(html, '_powerStatus');
 for (const label of [
-  "'LIVE · VEHICLE POWER FLOW'",
+  "'LIVE · REPORTED FLOW'",
   "'PARTIAL · VEHICLE POWER SIGNALS'",
   "'STALE · POWER SIGNAL'",
   "'UNAVAILABLE · NO POWER SIGNAL'",
