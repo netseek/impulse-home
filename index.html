@@ -4870,7 +4870,7 @@ window.HavalSplash = (function () {
     .hv-consumption-body { height:calc(100% - 60px); display:grid; grid-template-columns:minmax(130px,.8fr) minmax(120px,1.2fr); gap:14px; align-items:center; }
     .hv-consumption-kpis { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .hv-consumption-kpis > div { min-width:0; }
-    .hv-consumption-kpis span,.hv-consumption-kpis small { display:block; font:7px/1.2 'Space Mono',monospace; letter-spacing:.08em; opacity:.48; }
+    .hv-consumption-kpis > div > span,.hv-consumption-kpis small { display:block; font:7px/1.2 'Space Mono',monospace; letter-spacing:.08em; opacity:.48; }
     .hv-consumption-kpis strong { display:block; margin:4px 0 2px; font-size:25px; line-height:1; font-weight:560; }
     .hv-consumption-kpis > div:last-child strong { color:var(--hv-accent); }
     .hv-consumption-chart { min-width:0; align-self:stretch; position:relative; padding-top:3px; }
@@ -4878,8 +4878,8 @@ window.HavalSplash = (function () {
     .hv-consumption-chart .grid { stroke:currentColor; opacity:.12; stroke-width:.6; }
     .hv-consumption-chart .line { fill:none; stroke:var(--hv-accent); stroke-width:1.8; vector-effect:non-scaling-stroke; }
     .hv-consumption-chart .area { fill:none; stroke:var(--hv-accent); stroke-width:8; opacity:.08; vector-effect:non-scaling-stroke; }
-    .hv-consumption-chart span,.hv-consumption-chart strong { display:block; font-size:8px; line-height:1.4; }
-    .hv-consumption-chart span { opacity:.48; } .hv-consumption-chart strong { color:var(--hv-accent); }
+    .hv-consumption-chart > span,.hv-consumption-chart strong { display:block; font-size:8px; line-height:1.4; }
+    .hv-consumption-chart > span { opacity:.48; } .hv-consumption-chart strong { color:var(--hv-accent); }
     .hv-consumption-1x1 .hv-consumption-head small { max-width:120px; }
     .hv-consumption-1x1 .hv-consumption-body { grid-template-columns:1fr; gap:0; }
     .hv-consumption-1x1 .hv-consumption-chart { display:none; }
@@ -5424,9 +5424,9 @@ window.HavalSplash = (function () {
     .hv-climate button.on,.hv-consumption-periods button.on { color:var(--hv-widget-fg); }
     .hv-consumption-periods { height:48px; }
     .hv-consumption-periods button { min-height:44px; font-size:12px; }
-    .hv-consumption-kpis span,.hv-consumption-kpis small { font-size:11px; opacity:.78; letter-spacing:0; }
-    .hv-consumption-chart span,.hv-consumption-chart strong { font-size:12px; }
-    .hv-consumption-chart span { opacity:.78; }
+    .hv-consumption-kpis > div > span,.hv-consumption-kpis small { font-size:11px; opacity:.78; letter-spacing:0; }
+    .hv-consumption-chart > span,.hv-consumption-chart strong { font-size:12px; }
+    .hv-consumption-chart > span { opacity:.78; }
     .hv-consumption-kpis > div:last-child strong,.hv-consumption-chart strong,
     .hv-consumption-head small.live { color:var(--hv-readable-accent); }
     .hv-climate button:disabled,.hv-climate [aria-disabled="true"],
@@ -6932,6 +6932,8 @@ const PT_BADGE_PX_PER_M = 420;
 // GRAPHS widget — same derivation Impulse uses for evPowerKw.
 const CAR_GRAPH_SPAN_MS = 20000;
 const CAR_GRAPH_KPI_SPAN_MS = 180000;
+/** A consumption aggregate older than this is shown as unavailable, not live. UI guard, not a protocol claim. */
+const CONSUMPTION_FRESH_MS = 120000;
 const CAR_GRAPH_AVG_MS = 180000;
 const CAR_GRAPH_VARS = [
   { key: 'evPowerKw', label: 'EV POWER', unit: 'kW', min: -40, max: 80, signed: true },
@@ -9371,34 +9373,90 @@ class Component extends DCLogic {
     if (!this._graphLiveAt) this._graphLiveAt = {};
     this._graphLiveAt[key] = Date.now();
     this._graphAnyLive = true;
-    if (key === 'evTrip' || key === 'fuelAvg') {
-      this._scheduleConsumptionRefresh();
-      this._scheduleConsumptionFreshnessRefresh(key);
+    if (key === 'evTrip' || key === 'fuelAvg') this._queueConsumptionRefresh();
+  }
+
+  /**
+   * Consumption readouts are painted, never committed.
+   *
+   * This used to bump `consumptionRev` through setState 220 ms after every
+   * evTrip / fuelAvg write. evTrip is not only a bus value: until the car sends
+   * a non-zero avg_energy_consume_info_since_startup, _graphDeriveConsumption
+   * writes it EVERY FRAME whenever the graph loop runs (a GRAPHS, POWER or RANGE
+   * widget on the board). With a CONSUMPTION widget beside one of those, that was
+   * a React commit every 220 ms -- the exact shape CLAUDE.md measured at
+   * 197 ms p50 per commit on the car, i.e. most of the main thread. Throttling
+   * does not fix that; not committing does. Same pattern as _commitPowerRefresh.
+   *
+   * Not yet measured on the car -- read `commitsPerSec` / `setStateKeys` from
+   * `npm run car:perf` before and after, interleaved.
+   */
+  _queueConsumptionRefresh() {
+    if (this._unmounted || this._consumptionRefreshTimer) return;
+    this._consumptionRefreshTimer = setTimeout(() => {
+      this._consumptionRefreshTimer = 0;
+      if (!this._unmounted) this._commitConsumptionRefresh();
+    }, 250);
+  }
+
+  _commitConsumptionRefresh() {
+    const view = this._consumptionWidgetView({ type: 'consumption', w: 1, h: 1 }, 'left');
+    const sig = [view.consumptionFuel, view.consumptionEv, view.consumptionSource,
+      view.consumptionSourceClass, view.consumptionDistance, view.consumptionTrend].join('|');
+    if (sig !== this._consumptionPaintedSig) {
+      this._consumptionPaintedSig = sig;
+      this._paintConsumptionCards(view);
+      // Pushes to the native rail only; reads state, does not set it.
+      this._syncDockIndicators();
+    }
+    // Re-evaluate once the newest aggregate ages out, even if the car has
+    // stopped publishing, so a parked card cannot keep reading VEHICLE.
+    clearTimeout(this._consumptionFreshTimer);
+    const at = this._graphLiveAt || {};
+    const newest = Math.max(at.evTrip || 0, at.fuelAvg || 0);
+    const expiresIn = newest + CONSUMPTION_FRESH_MS + 250 - Date.now();
+    if (newest && expiresIn > 0) {
+      this._consumptionFreshTimer = setTimeout(() => {
+        this._consumptionFreshTimer = 0;
+        if (!this._unmounted) this._commitConsumptionRefresh();
+      }, expiresIn);
     }
   }
 
-  _scheduleConsumptionRefresh() {
-    if (this._consumptionRefreshTimer || this._unmounted) return;
-    const mode = this._shellMode || this.state.shellMode || 'appCar';
-    if (!this._hasWidgetType(mode, 'consumption')) return;
-    this._consumptionRefreshTimer = setTimeout(() => {
-      this._consumptionRefreshTimer = 0;
-      if (this._unmounted) return;
-      this.setState((s) => ({ consumptionRev: (s.consumptionRev || 0) + 1 }), () => {
-        this._syncDockIndicators();
-      });
-    }, 220);
-  }
-
-  _scheduleConsumptionFreshnessRefresh(key) {
-    if (!this._consumptionFreshnessTimers) this._consumptionFreshnessTimers = {};
-    clearTimeout(this._consumptionFreshnessTimers[key]);
-    // Re-render as this individual aggregate expires, even if the vehicle has
-    // stopped publishing.  This prevents a parked card from remaining LIVE.
-    this._consumptionFreshnessTimers[key] = setTimeout(() => {
-      delete this._consumptionFreshnessTimers[key];
-      this._scheduleConsumptionRefresh();
-    }, 120250);
+  /**
+   * Writes the widget and popup copies in place. Both render `.hv-consumption`.
+   *
+   * The template engine wraps each {{ value }} in <span class="sc-interp">,
+   * which React owns. Replacing the PARENT's textContent would detach that span
+   * and a later commit would update a node no longer on screen, so the text is
+   * written inside the interpolation span instead.
+   */
+  _paintConsumptionCards(view) {
+    const cards = document.querySelectorAll('.hv-consumption');
+    if (!cards.length) return;
+    const write = (el, text) => {
+      if (!el) return;
+      const target = el.querySelector('.sc-interp') || el;
+      const node = target.firstChild;
+      if (node && node.nodeType === 3 && !node.nextSibling) {
+        if (node.nodeValue !== text) node.nodeValue = text;
+      } else if (target.textContent !== text) {
+        target.textContent = text;
+      }
+    };
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const source = card.querySelector('.hv-consumption-head small');
+      if (source) {
+        if (source.className !== view.consumptionSourceClass) source.className = view.consumptionSourceClass;
+        write(source, view.consumptionSource);
+      }
+      const kpis = card.querySelectorAll('.hv-consumption-kpis strong');
+      write(kpis[0], view.consumptionFuel);
+      write(kpis[1], view.consumptionEv);
+      write(card.querySelector('.hv-consumption-chart > span'), view.consumptionDistance);
+      write(card.querySelector('.hv-consumption-chart > strong'), view.consumptionTrend);
+    }
   }
 
   _pushGraphSample(key, now, value) {
@@ -33916,35 +33974,49 @@ class Component extends DCLogic {
     return item.consumption;
   }
 
-  _setConsumptionPeriod(side, item, period, ev) {
-    this._cardControlEvent(ev);
-    item.consumption = { period: period };
-    this._persistWidgets();
-    this.setState({ widgetRev: (this.state.widgetRev || 0) + 1 });
-  }
-
   _consumptionWidgetView(item, side) {
     const c = this._consumptionConfig(item);
     const evRaw = this._graphDisplay.evTrip != null ? this._graphDisplay.evTrip : this._graphValues.evTrip;
     const kmLRaw = this._graphDisplay.fuelAvg != null ? this._graphDisplay.fuelAvg : this._graphValues.fuelAvg;
     const now = Date.now();
     const fresh = (key) => !!(this._graphLiveAt && this._graphLiveAt[key]
-      && now - this._graphLiveAt[key] <= 120000);
-    const liveEv = fresh('evTrip') && isFinite(evRaw) && evRaw > 0;
+      && now - this._graphLiveAt[key] <= CONSUMPTION_FRESH_MS);
+    const evFresh = fresh('evTrip') && isFinite(evRaw) && evRaw > 0;
+    // evTrip has two writers. The car's avg_energy_consume_info_since_startup is
+    // a vehicle aggregate; until that arrives non-zero, _graphDeriveConsumption
+    // fills the same key with a 3-minute mean of pack kW / speed. Only the first
+    // may be labelled VEHICLE.
+    const liveEv = evFresh && !!this._graphBusEvTrip;
+    const estEv = evFresh && !this._graphBusEvTrip;
     const liveFuel = fresh('fuelAvg') && isFinite(kmLRaw) && kmLRaw > .1;
     const liveBoth = liveEv && liveFuel;
     const liveMixed = liveEv || liveFuel;
-    const demo = !!this._demoPreview && !liveMixed;
+    const demo = !!this._demoPreview && !liveMixed && !estEv;
+    let source = 'UNAVAILABLE · no vehicle data';
+    let detail = 'Vehicle consumption data unavailable';
+    if (liveBoth) {
+      source = 'VEHICLE · aggregate signals';
+      detail = 'Vehicle aggregate · received within 2 min';
+    } else if (liveMixed && estEv) {
+      source = 'PARTIAL · energy estimated';
+      detail = 'Fuel from vehicle · energy estimated from pack power';
+    } else if (liveMixed) {
+      source = 'PARTIAL · vehicle signal';
+      detail = 'Partial vehicle aggregate · received within 2 min';
+    } else if (estEv) {
+      source = 'ESTIMATE · pack power ÷ speed';
+      detail = 'Energy estimated from pack power · not a vehicle aggregate';
+    } else if (demo) {
+      source = 'DEMO · SIMULATED · NOT VEHICLE';
+      detail = 'Demo trip · simulated values';
+    }
     return {
       consumptionSizeClass: 'hv-consumption-' + (item.w || 1) + 'x' + (item.h || 1),
-      consumptionEv: liveEv ? evRaw.toFixed(1) : (demo ? '1.8' : '—'),
+      consumptionEv: liveEv || estEv ? evRaw.toFixed(1) : (demo ? '1.8' : '—'),
       consumptionFuel: liveFuel ? (100 / kmLRaw).toFixed(1) : (demo ? '6.4' : '—'),
-      consumptionDistance: liveBoth ? 'Vehicle aggregate · received within 2 min'
-        : (liveMixed ? 'Partial vehicle aggregate · received within 2 min'
-          : (demo ? 'Demo trip · simulated values' : 'Vehicle consumption data unavailable')),
+      consumptionDistance: detail,
       consumptionTrend: demo ? 'Preview history · not vehicle data' : 'History not supplied by vehicle',
-      consumptionSource: liveBoth ? 'VEHICLE · aggregate signals'
-        : (liveMixed ? 'PARTIAL · vehicle signal' : (demo ? 'DEMO · SIMULATED · NOT VEHICLE' : 'UNAVAILABLE · no vehicle data')),
+      consumptionSource: source,
       consumptionSourceClass: liveBoth ? 'live' : 'demo',
       consumptionPoints: '',
       consumptionPeriods: demo ? ['TRIP', 'TODAY', 'WEEK', 'MONTH'].map((label, i) => ({
@@ -37848,6 +37920,7 @@ class Component extends DCLogic {
     clearTimeout(this._desktopDotHoldTimer);
     clearTimeout(this._camSlotHoldTimer);
     clearTimeout(this._consumptionRefreshTimer);
+    clearTimeout(this._consumptionFreshTimer);
     clearTimeout(this._tireFreshTimer);
     clearInterval(this._demoDoorTicker);
     this._demoDoorTicker = 0;
