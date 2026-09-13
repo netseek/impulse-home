@@ -93,8 +93,6 @@ public final class MainActivity extends Activity {
     /** Inset for the placeholder glyph when the source published no artwork. */
     private static final int MEDIA_ART_GLYPH_PAD_DP = 32;
     private static final int MEDIA_BTN_DP = 40;
-    /** Source-chip glyph (MEDIA's now-playing app, NAVIGATION's guiding app). */
-    private static final float SOURCE_CHIP_ICON_DP = 30f;
     private static final int MEDIA_BTN_PRIMARY_DP = 48;
 
     private static final java.util.Set<String> BOTTOM_CARD_ACTIONS =
@@ -190,7 +188,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v47-aa-tbt-gmaps";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v41-hide-mirror-fold";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -455,10 +453,6 @@ public final class MainActivity extends Activity {
                 } catch (Throwable t) {
                     Log.w(TAG, "mediaNowPlaying.start failed", t);
                 }
-                // Here rather than at WebView setup: a permission dialog raised
-                // during onCreate lands on top of the boot splash clip, which
-                // holds for ~18-22 s. This fires once the car is on screen.
-                ensurePlaceLocationPermission();
             });
         }
 
@@ -604,32 +598,6 @@ public final class MainActivity extends Activity {
             launchAppForPackage(packageName, "");
         }
 
-        /**
-         * Raise Android Auto / CarPlay without going through MediaCenter's
-         * MAIN activity (that path skips the current track).
-         */
-        @JavascriptInterface
-        public void launchProjection(String kind) {
-            mainHandler.post(() -> {
-                if ("AA".equalsIgnoreCase(kind) || "ANDROID_AUTO".equalsIgnoreCase(kind)) {
-                    MainActivity.this.launchProjection(ProjectionPresence.Kind.ANDROID_AUTO);
-                } else if ("CP".equalsIgnoreCase(kind) || "CARPLAY".equalsIgnoreCase(kind)) {
-                    MainActivity.this.launchProjection(ProjectionPresence.Kind.CARPLAY);
-                }
-            });
-        }
-
-        /** Package icon as a data URL; empty when the package is not installed. */
-        @JavascriptInterface
-        public String getAppIcon(String packageName) {
-            Bitmap bmp = iconBitmapForPackage(packageName);
-            if (bmp == null) return "";
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
-            return "data:image/png;base64,"
-                    + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
-        }
-
         @JavascriptInterface
         public void closeApp(String packageName) {
             closePopupApp(packageName);
@@ -725,12 +693,6 @@ public final class MainActivity extends Activity {
         @JavascriptInterface
         public String loadWidgets() {
             return getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).getString("widgets", "");
-        }
-
-        /** A thumbnail of the desktop on screen; answered via __app.onDesktopSnapshot. */
-        @JavascriptInterface
-        public void captureDesktopSnapshot(String token, int width, int height) {
-            mainHandler.post(() -> captureDesktopSnapshotNow(token, width, height));
         }
 
         /**
@@ -990,6 +952,9 @@ public final class MainActivity extends Activity {
     private View layoutContentRow;
     private View configContentScroll;
     private View contentHost;
+    private View layoutTripleChip;
+    private View layoutAppCarChip;
+    private View layoutAppsChip;
     private View layoutAddWidgetChip;
     private View layoutCenterFillChip;
     private android.widget.ImageView layoutCenterFillIcon;
@@ -1037,20 +1002,15 @@ public final class MainActivity extends Activity {
     private final java.util.List<android.widget.ImageView> quickMediaButtons = new java.util.ArrayList<>();
     private boolean quickMediaAvailable;
     private android.widget.ImageView quickMediaAppIcon;
+    private android.widget.TextView quickMediaAppName;
     private View quickMediaAppRow;
-    private SourceChip quickMediaChip;
-    /** Source chips owned by a bottom card's header, keyed by card id. */
-    private final java.util.Map<String, SourceChip> quickCardSourceChips =
-            new java.util.HashMap<>();
     private boolean quickMediaCanLaunch;
     private QuickMediaBarsView quickMediaBars;
     /** Session-0 Visualizer probe for the MEDIA rail bars; null until first play. */
     private MediaAudioVisualizer mediaAudioViz;
-    /** Log the missing RECORD_AUDIO grant once, not on every play/pause. */
-    private boolean mediaVizPermissionLogged;
-    private static final int REQ_PLACE_LOCATION = 7102;
-    /** onViewerReady fires again on post-boot loads; ask for location only once. */
-    private boolean placeLocationAsked;
+    private static final int REQ_MEDIA_VIZ_AUDIO = 7101;
+    /** Avoid re-prompting every play/pause after the user denies RECORD_AUDIO. */
+    private boolean mediaVizPermissionAsked;
     /**
      * The last now-playing payload, replayed after the rail is rebuilt.
      *
@@ -1150,28 +1110,13 @@ public final class MainActivity extends Activity {
         final String glyph;
         /** Short code drawn in place of a glyph (AWD's "4x4"); may be empty. */
         final String glyphText;
-<<<<<<< ours
-        /** Navigation / media source package; used to stamp the live app icon. */
-        String appPackage = "";
-        /** TBT remaining distance / duration / arrival; empty when not guiding. */
-        String navRemaining = "";
-        String navDuration = "";
-        String navEta = "";
-        /** Idle-only glance: city (below the neighbourhood in primary) and a
-         * tiny "start navigation" hint. Both empty while a turn is showing. */
-        String navIdleCity = "";
-        String navIdleAction = "";
-=======
         final String clockHourFormat;
         final String dialMarks;
         final String splitPlates;
         final String dateSpineFormat;
         final String dateWording;
->>>>>>> theirs
         /** Quick-menu rows; empty for a card whose body opens something directly. */
         final java.util.List<QuickMenuRow> menu;
-        /** Rows for the ⋯ shown on this card in rail edit mode; empty when it has none. */
-        java.util.List<QuickMenuRow> editMenu = java.util.Collections.emptyList();
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
@@ -1631,17 +1576,14 @@ public final class MainActivity extends Activity {
     };
 
     private void ensureMediaVisualizer() {
-        // Never prompt. The bars are decoration, and a system dialog over the
-        // panel the first time something plays is worse than synthetic bars.
-        // Deploy grants RECORD_AUDIO over adb (Grant-CarMediaAccess); without
-        // that grant the rail keeps its synthetic bars. The 1 s poll re-checks,
-        // so a grant made while the app runs is picked up.
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            if (!mediaVizPermissionLogged) {
-                mediaVizPermissionLogged = true;
-                Log.w(MediaAudioVisualizer.TAG, "no RECORD_AUDIO grant — synthetic bars only");
-            }
+            if (mediaVizPermissionAsked) return;
+            mediaVizPermissionAsked = true;
+            Log.w(MediaAudioVisualizer.TAG, "no-permission — requesting RECORD_AUDIO");
+            requestPermissions(
+                    new String[]{android.Manifest.permission.RECORD_AUDIO},
+                    REQ_MEDIA_VIZ_AUDIO);
             return;
         }
         startMediaVisualizerIfNeeded();
@@ -1657,51 +1599,18 @@ public final class MainActivity extends Activity {
         mediaAudioViz.setWanted(true);
     }
 
-    /**
-     * Ask for location, once, for the navigation card's idle city line.
-     *
-     * targetSdk is 28, so ACCESS_*_LOCATION is a RUNTIME grant — declaring it
-     * in the manifest is not enough. It was declared and never requested, so
-     * PlaceGlance returned on its first line on every 45 s tick and the card
-     * sat at an em dash forever. Measured on the car 2026-09-11: the only
-     * runtime permission the viewer held was RECORD_AUDIO.
-     *
-     * A denial is not retried — the glance is a nicety, and re-prompting on
-     * every launch would be worse than the em dash.
-     */
-    private void ensurePlaceLocationPermission() {
-        if (placeLocationAsked) return;
-        placeLocationAsked = true;
-        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
-                == android.content.pm.PackageManager.PERMISSION_GRANTED
-                || checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
-                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-        try {
-            requestPermissions(new String[]{
-                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
-            }, REQ_PLACE_LOCATION);
-        } catch (Throwable t) {
-            Log.w(TAG, "location permission request failed", t);
-        }
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions,
             int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_PLACE_LOCATION) {
-            boolean granted = false;
-            for (int result : grantResults) {
-                if (result == android.content.pm.PackageManager.PERMISSION_GRANTED) granted = true;
-            }
-            Log.w(TAG, "PlaceGlance location permission " + (granted ? "granted" : "denied"));
-            // The worker is already ticking; poke it so the city does not wait
-            // out the remainder of the current 45 s gap.
-            if (granted && placeGlance != null) placeGlance.pokeNow();
-            return;
+        if (requestCode != REQ_MEDIA_VIZ_AUDIO) return;
+        boolean granted = grantResults.length > 0
+                && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (granted && mediaAudioWanted()) {
+            Log.w(MediaAudioVisualizer.TAG, "permission-granted");
+            startMediaVisualizerIfNeeded();
+        } else {
+            Log.w(MediaAudioVisualizer.TAG, "permission-denied — synthetic bars only");
         }
     }
 
@@ -1744,7 +1653,7 @@ public final class MainActivity extends Activity {
                 case "status": drawVehicleStatus(canvas, w, h, accent, muted, strong); break;
                 case "climate": drawClimate(canvas, w, h, accent, muted); break;
                 case "consumption": drawBars(canvas, w, h, accent, muted); break;
-                case "navigation": drawNavigation(canvas, w, h, accent, muted, strong); break;
+                case "navigation": drawNavigation(canvas, w, h, accent, muted); break;
                 case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
                 case "power": drawPower(canvas, w, h, accent, muted, strong); break;
                 case "clock": drawClock(canvas, w, h, accent, muted, strong); break;
@@ -2034,207 +1943,23 @@ public final class MainActivity extends Activity {
         }
 
         private void drawNavigation(android.graphics.Canvas c, float w, float h,
-                int accent, int muted, int strong) {
-            String state = descriptor.state == null ? "" : descriptor.state;
-            boolean idle = "idle".equals(state) || "unavailable".equals(state) || state.isEmpty();
-            boolean showTurn = !idle && (("destination".equals(state) || "exit".equals(state)
-                    || tbtIconRes(state) != 0)
-                    || (descriptor.glyph != null && !descriptor.glyph.isEmpty()));
-            String street = descriptor.primary == null ? "" : descriptor.primary;
-            String maneuver = descriptor.metricA == null ? "" : descriptor.metricA;
-            String remaining = descriptor.navRemaining == null ? "" : descriptor.navRemaining;
-            String duration = descriptor.navDuration == null ? "" : descriptor.navDuration;
-            String eta = descriptor.navEta == null ? "" : descriptor.navEta;
-            float col = Math.min(w * .30f, h * .95f);
-            if (showTurn) {
-                float glyph = Math.min(col * .78f, h * .58f);
-                if (!drawTbtIcon(c, state, col * .5f, h * .36f, glyph, accent)
-                        && descriptor.glyph != null && !descriptor.glyph.isEmpty()) {
-                    drawGlyphPath(c, descriptor.glyph, col * .5f, h * .36f, glyph,
-                            accent, Math.max(2.4f, glyph * .08f));
-                }
-                if (!maneuver.isEmpty()) {
-                    paint.setTextAlign(android.graphics.Paint.Align.CENTER);
-                    paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                            android.graphics.Typeface.NORMAL));
-                    paint.setTextSize(Math.max(11f, h * .16f));
-                    fill(strong);
-                    c.drawText(maneuver, col * .5f, h * .88f, paint);
-                }
-            } else {
-                int routeColor = "unavailable".equals(state) ? muted : accent;
-                float doodleW = col * .92f, doodleH = h * .78f;
-                float ox = col * .04f, oy = h * .12f;
-                android.graphics.Path route = new android.graphics.Path();
-                route.moveTo(ox + doodleW * .12f, oy + doodleH * .88f);
-                route.cubicTo(ox + doodleW * .18f, oy + doodleH * .48f,
-                        ox + doodleW * .48f, oy + doodleH * .66f,
-                        ox + doodleW * .52f, oy + doodleH * .32f);
-                route.cubicTo(ox + doodleW * .55f, oy + doodleH * .12f,
-                        ox + doodleW * .78f, oy + doodleH * .14f,
-                        ox + doodleW * .92f, oy + doodleH * .14f);
-                stroke(muted, Math.max(3.5f, w * .018f));
-                c.drawPath(route, paint);
-                stroke(routeColor, Math.max(1.8f, w * .01f));
-                c.drawPath(route, paint);
-                fill(routeColor);
-                c.drawCircle(ox + doodleW * .12f, oy + doodleH * .88f, Math.max(3f, w * .012f), paint);
-            }
-            float textX = col + w * .035f;
-            float textMax = w - textX - w * .03f;
-            if (textMax > 8f) {
-                paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                        android.graphics.Typeface.NORMAL));
-                if (!street.isEmpty()) {
-                    paint.setTextSize(Math.max(13f, h * .21f));
-                    fill(strong);
-                    c.drawText(ellipsizeNav(street, textMax), textX, h * .30f, paint);
-                }
-                if (showTurn) {
-                    drawNavMetricRow(c, textX, h * .46f, textMax, h,
-                            remaining, duration, eta, accent, muted, strong);
-                } else {
-                    // Idle glance: city under the neighbourhood (street/primary,
-                    // above) and a tiny "start navigation" hint under that. The
-                    // metric row is not drawn here, so this space is free.
-                    String idleCity = descriptor.navIdleCity == null ? "" : descriptor.navIdleCity;
-                    String idleAction = descriptor.navIdleAction == null ? "" : descriptor.navIdleAction;
-                    if (!idleCity.isEmpty()) {
-                        paint.setTextSize(Math.max(9f, h * .12f));
-                        fill(muted);
-                        c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .46f, paint);
-                    }
-                    if (!idleAction.isEmpty()) {
-                        paint.setTextSize(Math.max(7f, h * .09f));
-                        fill(muted);
-                        c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .64f, paint);
-                    }
-                }
-            }
-            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setTypeface(android.graphics.Typeface.DEFAULT);
-        }
-
-        private void drawNavMetricRow(android.graphics.Canvas c, float x, float top,
-                float maxW, float h, String remaining, String duration, String eta,
-                int accent, int muted, int strong) {
-            java.util.List<String[]> items = new java.util.ArrayList<>();
-            if (remaining != null && !remaining.isEmpty()) {
-                items.add(new String[] { remaining, "REMAINING" });
-            }
-            if (duration != null && !duration.isEmpty()) {
-                items.add(new String[] { duration, "TIME" });
-            }
-            if (eta != null && !eta.isEmpty()) {
-                items.add(new String[] { eta, "ETA" });
-            }
-            if (items.isEmpty() || maxW <= 0f) return;
-            android.graphics.Typeface medium = android.graphics.Typeface.create("sans-serif-medium",
-                    android.graphics.Typeface.NORMAL);
-            float valueSize = Math.max(13f, h * .24f);
-            float labelSize = Math.max(7f, h * .11f);
-            float gap = Math.max(10f, h * .08f);
-            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setTypeface(medium);
-            float[] widths = measureNavMetricWidths(items, valueSize, labelSize);
-            float total = sumNavMetricWidths(widths, gap);
-            if (total > maxW) {
-                for (int i = items.size() - 1; i >= 0; i--) {
-                    if ("TIME".equals(items.get(i)[1])) {
-                        items.remove(i);
-                        break;
-                    }
-                }
-                widths = measureNavMetricWidths(items, valueSize, labelSize);
-                total = sumNavMetricWidths(widths, gap);
-            }
-            while (total > maxW && valueSize > 11f) {
-                valueSize -= 1f;
-                widths = measureNavMetricWidths(items, valueSize, labelSize);
-                total = sumNavMetricWidths(widths, gap);
-            }
-            float valueY = top + h * .22f;
-            float labelY = top + h * .40f;
-            // ETA sits a little further right than the other columns, so the
-            // clock reads as its own figure rather than part of the distance.
-            float etaNudge = Math.max(8f, h * .08f);
-            if (total + etaNudge > maxW) etaNudge = Math.max(0f, maxW - total);
-            float cx = x;
-            for (int i = 0; i < items.size(); i++) {
-                float colW = widths[i];
-                boolean isEta = "ETA".equals(items.get(i)[1]);
-                if (isEta && i > 0) cx += etaNudge;
-                paint.setTypeface(medium);
-                paint.setTextSize(valueSize);
-                fill(isEta ? accent : strong);
-                c.drawText(ellipsizeNav(items.get(i)[0], colW), cx, valueY, paint);
-                paint.setTextSize(labelSize);
-                fill(muted);
-                c.drawText(items.get(i)[1], cx, labelY, paint);
-                cx += colW + gap;
-            }
-        }
-
-        private float[] measureNavMetricWidths(java.util.List<String[]> items,
-                float valueSize, float labelSize) {
-            float[] widths = new float[items.size()];
-            for (int i = 0; i < items.size(); i++) {
-                paint.setTextSize(valueSize);
-                float valueW = paint.measureText(items.get(i)[0]);
-                paint.setTextSize(labelSize);
-                widths[i] = Math.max(valueW, paint.measureText(items.get(i)[1]));
-            }
-            return widths;
-        }
-
-        private float sumNavMetricWidths(float[] widths, float gap) {
-            float total = 0f;
-            for (int i = 0; i < widths.length; i++) {
-                total += widths[i];
-                if (i > 0) total += gap;
-            }
-            return total;
-        }
-
-        private int tbtIconRes(String state) {
-            if (state == null) return 0;
-            switch (state) {
-                case "turn_right": return R.drawable.ic_tbt_turn_right;
-                case "turn_left": return R.drawable.ic_tbt_turn_left;
-                case "straight": return R.drawable.ic_tbt_straight;
-                case "uturn": return R.drawable.ic_tbt_uturn;
-                case "roundabout": return R.drawable.ic_tbt_roundabout;
-                case "fork": return R.drawable.ic_tbt_fork;
-                case "merge": return R.drawable.ic_tbt_merge;
-                default: return 0;
-            }
-        }
-
-        private boolean drawTbtIcon(android.graphics.Canvas c, String state,
-                float cx, float cy, float size, int accent) {
-            int res = tbtIconRes(state);
-            if (res == 0) return false;
-            android.graphics.drawable.Drawable icon = getContext().getDrawable(res);
-            if (icon == null) return false;
-            icon = icon.mutate();
-            icon.setColorFilter(new PorterDuffColorFilter(accent, PorterDuff.Mode.SRC_IN));
-            int s = Math.max(12, Math.round(size));
-            int left = Math.round(cx - s / 2f);
-            int top = Math.round(cy - s / 2f);
-            icon.setBounds(left, top, left + s, top + s);
-            icon.draw(c);
-            icon.setColorFilter(null);
-            return true;
-        }
-
-        private String ellipsizeNav(String text, float maxWidth) {
-            if (text == null || text.isEmpty() || maxWidth <= 0f) return "";
-            if (paint.measureText(text) <= maxWidth) return text;
-            String ellipsis = "…";
-            int n = text.length();
-            while (n > 0 && paint.measureText(text.substring(0, n) + ellipsis) > maxWidth) n--;
-            return n <= 0 ? ellipsis : text.substring(0, n) + ellipsis;
+                int accent, int muted) {
+            android.graphics.Path route = new android.graphics.Path();
+            route.moveTo(w * .18f, h * .84f);
+            route.cubicTo(w * .22f, h * .54f, w * .45f, h * .69f, w * .48f, h * .43f);
+            route.cubicTo(w * .50f, h * .28f, w * .66f, h * .29f, w * .80f, h * .29f);
+            stroke(muted, Math.max(4f, w * .07f));
+            c.drawPath(route, paint);
+            stroke(accent, Math.max(2f, w * .035f));
+            c.drawPath(route, paint);
+            android.graphics.Path arrow = new android.graphics.Path();
+            arrow.moveTo(w * .67f, h * .15f);
+            arrow.lineTo(w * .83f, h * .29f);
+            arrow.lineTo(w * .67f, h * .43f);
+            stroke(accent, Math.max(3f, w * .045f));
+            c.drawPath(arrow, paint);
+            fill(accent);
+            c.drawCircle(w * .18f, h * .84f, Math.max(3f, w * .05f), paint);
         }
 
         private void drawTires(android.graphics.Canvas c, float w, float h,
@@ -2719,11 +2444,6 @@ public final class MainActivity extends Activity {
     /** Launcher icons, left to right — the order the boot reveal staggers them in. */
     private final List<MotionTrailLayout> launcherItems = new ArrayList<>();
     private ProjectionPresence projectionPresence;
-    private PlaceGlance placeGlance;
-    private final java.util.Map<String, Bitmap> packageIconBitmaps =
-            new java.util.concurrent.ConcurrentHashMap<>();
-    private final java.util.Set<String> packageIconMiss =
-            java.util.concurrent.ConcurrentHashMap.newKeySet();
     private MotionTrailLayout projectionItem;
     /** Waiting for Impulse to resolve a projection display task id. */
     private ProjectionPresence.Kind pendingProjectionKind;
@@ -2734,21 +2454,6 @@ public final class MainActivity extends Activity {
      * still tracked in {@link #pinnedBound}; only the hub is drawn on the strip.
      */
     private MotionTrailLayout gwmHubItem;
-    /** Launcher tile that enters Side by Side (the two-app split). Not a package. */
-    private MotionTrailLayout sideBySideItem;
-    /** Layout manager → Cards is open on the page: the rail jiggles and can be dragged. */
-    private boolean railEditMode;
-    /** Card the Layout manager just added; the rail scrolls to it once. */
-    private String railFocusId = "";
-    /** The Workspace rail card is showing its Layout face (2x2 Layout manager shortcuts). */
-    private boolean workspaceLayoutMode;
-    /** Layout manager screen open on the page: "desktops", "layout", "appearance" or "". */
-    private String studioScreen = "";
-    private View workspaceActionsFace;
-    private View workspaceLayoutFace;
-    private android.widget.TextView workspaceHeading;
-    private final java.util.List<android.widget.TextView> workspaceLayoutCells = new ArrayList<>();
-    private final java.util.Map<View, android.animation.Animator> railJiggles = new java.util.HashMap<>();
     /** Which pinned destinations are installed (or emulator-stubbed). */
     private final boolean[] pinnedBound = new boolean[PINNED_PACKAGES.length];
     private android.widget.PopupWindow gwmHubMenu;
@@ -2800,7 +2505,7 @@ public final class MainActivity extends Activity {
         }
     };
     private FrameLayout rootLayout;
-    private String shellMode = SHELL_APP_CAR;
+    private String shellMode = SHELL_TRIPLE;
     private String launchSidePref = "auto";
     private boolean nextLaunchLeft = true;
     /** Side that most recently received a freeform launch (for L/R HUD). */
@@ -2831,7 +2536,7 @@ public final class MainActivity extends Activity {
     /** Button top (screen coords) while the menu is closed — anchor when opening upward. */
     private int appsFabBtnAnchorY = Integer.MIN_VALUE;
     /** Boot default when APP+APP is active but not explicitly saved. */
-    private String lastNonAppsShellMode = SHELL_APP_CAR;
+    private String lastNonAppsShellMode = SHELL_TRIPLE;
     private View appsFabScrim;
     private WindowManager.LayoutParams appsFabScrimLp;
     private boolean appsFabScrimAttached;
@@ -2875,6 +2580,7 @@ public final class MainActivity extends Activity {
     /** Right media slot (idle now-playing + music apps share these bounds). */
     private static final Rect RIGHT_APP_BOUNDS = new Rect(1180, 100, 1872, 530);
     private static final Rect RIGHT_IDLE_BOUNDS = RIGHT_APP_BOUNDS;
+    private static final String SHELL_TRIPLE = "triple";
     private static final String SHELL_APP_CAR = "appCar";
     private static final String SHELL_APPS = "appsOnly";
     private static final String PREFS_SHELL = "h6_shell";
@@ -3407,13 +3113,6 @@ public final class MainActivity extends Activity {
 
     private void launchAppForPackage(String packageName, String label) {
         if (packageName == null || packageName.isEmpty()) return;
-        // AA / CarPlay audio is published by MediaCenter, but starting
-        // MediaCenter MAIN skips the track. Raise the projection task instead.
-        if (ProjectionPresence.isProjectionPackage(packageName)) {
-            mainHandler.post(() -> launchProjection(
-                    ProjectionPresence.kindForPackage(packageName)));
-            return;
-        }
         if (emulatorStubPackages.contains(packageName)) {
             String msg = label != null && !label.isEmpty() ? label : packageName;
             android.widget.Toast.makeText(this, msg + " (emulator stub)", android.widget.Toast.LENGTH_SHORT).show();
@@ -3473,11 +3172,15 @@ public final class MainActivity extends Activity {
 
     private void loadShellPrefs() {
         android.content.SharedPreferences prefs = getSharedPreferences(PREFS_SHELL, MODE_PRIVATE);
-        // One car layout remains ("full size", stored as appCar). A saved
-        // "triple", or anything unknown, boots into it; Side by Side stays.
-        String mode = prefs.getString("mode", SHELL_APP_CAR);
-        if (!SHELL_APPS.equals(mode)) mode = SHELL_APP_CAR;
-        lastNonAppsShellMode = SHELL_APP_CAR;
+        String mode = prefs.getString("mode", SHELL_TRIPLE);
+        if (!SHELL_TRIPLE.equals(mode) && !SHELL_APP_CAR.equals(mode) && !SHELL_APPS.equals(mode)) {
+            mode = SHELL_TRIPLE;
+        }
+        String lastNonApps = prefs.getString("lastNonAppsMode", SHELL_TRIPLE);
+        if (!SHELL_TRIPLE.equals(lastNonApps) && !SHELL_APP_CAR.equals(lastNonApps)) {
+            lastNonApps = SHELL_TRIPLE;
+        }
+        lastNonAppsShellMode = lastNonApps;
         shellMode = mode;
         launchSidePref = prefs.getString("launchSide", "auto");
         nextLaunchLeft = prefs.getBoolean("nextLeft", true);
@@ -3549,9 +3252,15 @@ public final class MainActivity extends Activity {
 
     private void applyShellMode(String mode) {
         if (mode == null) return;
-        if (!SHELL_APPS.equals(mode)) mode = SHELL_APP_CAR;
+        if (!SHELL_TRIPLE.equals(mode) && !SHELL_APP_CAR.equals(mode) && !SHELL_APPS.equals(mode)) {
+            mode = SHELL_TRIPLE;
+        }
         String prev = shellMode;
-        lastNonAppsShellMode = SHELL_APP_CAR;
+        if (SHELL_APPS.equals(mode) && !SHELL_APPS.equals(prev)) {
+            lastNonAppsShellMode = prev;
+        } else if (!SHELL_APPS.equals(mode)) {
+            lastNonAppsShellMode = mode;
+        }
         shellMode = mode;
         saveShellPrefs();
         loadSlotUsesForMode();
@@ -4096,8 +3805,9 @@ public final class MainActivity extends Activity {
         layoutCol.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
-        // Side by Side is entered from its launcher tile; this is the way back.
-        layoutCol.addView(makeAppsFabLayoutTextBtn(SHELL_APP_CAR, "Exit Side by Side", d));
+        layoutCol.addView(makeAppsFabLayoutTextBtn(SHELL_TRIPLE, "Car in the middle", d));
+        layoutCol.addView(makeAppsFabLayoutTextBtn(SHELL_APP_CAR, "Car on the right", d));
+        layoutCol.addView(makeAppsFabLayoutTextBtn(SHELL_APPS, "Dual App Split Screen", d));
         menu.addView(layoutCol);
 
         android.widget.LinearLayout actionRow = new android.widget.LinearLayout(this);
@@ -4210,6 +3920,63 @@ public final class MainActivity extends Activity {
             if (!mode.equals(shellMode)) applyShellMode(mode);
         });
         return t;
+    }
+
+    private View makeAppsFabLayoutBtn(String mode, int kind, float d) {
+        FrameLayout cell = new FrameLayout(this);
+        int sizeW = Math.round(110 * d);
+        int sizeH = Math.round(58 * d);
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(sizeW, sizeH);
+        lp.setMargins(Math.round(4 * d), 0, Math.round(4 * d), 0);
+        cell.setLayoutParams(lp);
+        cell.setClickable(true);
+        cell.setOnClickListener(v -> {
+            setAppsFabMenuOpen(false);
+            applyShellMode(mode);
+        });
+        cell.addView(makeLayoutGlyphView(kind, d));
+        styleAppsFabIconCell(cell, false, d);
+        return cell;
+    }
+
+    private View makeLayoutGlyphView(int kind, float d) {
+        // kind 3 = app+car+app, kind 2 = app+car
+        android.widget.LinearLayout g = new android.widget.LinearLayout(this);
+        g.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        g.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams glp = new FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(24 * d));
+        glp.gravity = android.view.Gravity.CENTER;
+        g.setLayoutParams(glp);
+        int gap = Math.round(4 * d);
+        g.addView(makeLayoutGlyphBlock(Math.round(12 * d), Math.round(24 * d), 0xD9EAF2F8, d));
+        g.addView(spacer(gap));
+        g.addView(makeLayoutGlyphBlock(Math.round(20 * d), Math.round(16 * d), 0x8CEAF2F8, d));
+        if (kind == 3) {
+            g.addView(spacer(gap));
+            g.addView(makeLayoutGlyphBlock(Math.round(12 * d), Math.round(24 * d), 0xD9EAF2F8, d));
+        }
+        return g;
+    }
+
+    private View makeLayoutGlyphBlock(int w, int h, int color, float d) {
+        View v = new View(this);
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(w, h);
+        v.setLayoutParams(lp);
+        android.graphics.drawable.GradientDrawable gd =
+                new android.graphics.drawable.GradientDrawable();
+        gd.setColor(color);
+        gd.setCornerRadius(2 * d);
+        v.setBackground(gd);
+        return v;
+    }
+
+    private View spacer(int w) {
+        View v = new View(this);
+        v.setLayoutParams(new android.widget.LinearLayout.LayoutParams(w, 1));
+        return v;
     }
 
     private android.widget.TextView makeAppsFabTextBtn(String label, float d, Runnable action) {
@@ -4366,7 +4133,7 @@ public final class MainActivity extends Activity {
         ed.putString("uiMode", uiMode);
         ed.apply();
         try {
-            android.widget.Toast.makeText(this, "Side by Side saved as default", android.widget.Toast.LENGTH_SHORT).show();
+            android.widget.Toast.makeText(this, "APP+APP saved as default", android.widget.Toast.LENGTH_SHORT).show();
         } catch (Exception ignored) {}
         Log.w(TAG, "Saved APP+APP default ratio=" + splitRatio
                 + " left=" + activePopupPackage + " right=" + activeMediaPackage);
@@ -5928,16 +5695,6 @@ public final class MainActivity extends Activity {
         webView.addJavascriptInterface(new AppLauncherBridge(), "AppLauncherBridge");
         webView.addJavascriptInterface(new MediaBridge(), "MediaBridge");
 
-        placeGlance = new PlaceGlance(this, mainHandler, json -> {
-            telemetryCache.put(PlaceGlance.KEY, json);
-            if (webView == null) return;
-            webView.evaluateJavascript(
-                    String.format("if(window.onCarDataUpdate){window.onCarDataUpdate('%s','%s');}",
-                            PlaceGlance.KEY.replace("'", "\\'"), json.replace("'", "\\'")),
-                    null);
-        });
-        placeGlance.start();
-
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(
@@ -6808,11 +6565,6 @@ public final class MainActivity extends Activity {
         launcherItems.add(gwmHubItem);
         bindGwmHub();
         updatePinnedVisibility();
-
-        sideBySideItem = makeDockItem(itemWidthPx, iconSizePx, density);
-        iconsLayout.addView(sideBySideItem);
-        launcherItems.add(sideBySideItem);
-        bindSideBySideItem();
 
         for (int i = 0; i < recentItems.length; i++) {
             recentItems[i] = makeDockItem(itemWidthPx, iconSizePx, density);
@@ -7832,8 +7584,7 @@ public final class MainActivity extends Activity {
         View cards = cardsScrollView;
         View layout = layoutContentRow;
         View config = configContentScroll;
-        // Editing the cards needs them on screen, whichever surface is chosen.
-        View show = (railEditMode || DOCK_SURFACE_CARDS.equals(dockSurfaceMode)) ? cards : apps;
+        View show = DOCK_SURFACE_CARDS.equals(dockSurfaceMode) ? cards : apps;
         if (STRIP_LAYOUT.equals(mode)) show = layout;
         else if (STRIP_CONFIG.equals(mode)) show = config;
         View[] all = { apps, cards, layout, config };
@@ -8046,8 +7797,8 @@ public final class MainActivity extends Activity {
         quickMediaArtist = null;
         quickMediaPlayPause = null;
         quickMediaAppIcon = null;
+        quickMediaAppName = null;
         quickMediaAppRow = null;
-        quickMediaChip = null;
         if (quickMediaBars != null) quickMediaBars.setPlaying(false);
         quickMediaBars = null;
         quickMediaButtons.clear();
@@ -8166,13 +7917,6 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout header = new android.widget.LinearLayout(this);
         header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         header.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        // NAVIGATION's source-chip icon (SOURCE_CHIP_ICON_DP) is taller than this
-        // 22dp strip. Grow the strip itself and NAVIGATION's graphic content below
-        // loses that height -- drawNavigation sizes every font off its own view
-        // height, so the whole card's type shrank. Let the icon overflow the
-        // header visually instead: the strip stays 22dp for everyone, so nothing
-        // downstream of it moves or resizes.
-        header.setClipChildren(false);
         header.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                 Math.round(22 * density)));
@@ -8207,38 +7951,14 @@ public final class MainActivity extends Activity {
                 0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         header.addView(heading);
 
-        // Same slot the MEDIA card puts its chip in: after the weighted
-        // heading, before the chevron, so both read as one rail.
-        boolean isNavigation = "navigation".equals(descriptor.id);
-        if (isNavigation) {
-            SourceChip navChip = makeSourceChip(density);
-            android.widget.LinearLayout.LayoutParams navChipLp =
-                    new android.widget.LinearLayout.LayoutParams(
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            // Bottom-align so the icon's overflow (it is taller than this 22dp
-            // strip) goes up into the card's own top padding, not down into the
-            // graphic content below -- which draws after this in Z-order and
-            // would paint over a downward overflow.
-            navChipLp.gravity = android.view.Gravity.BOTTOM;
-            header.addView(navChip.row, navChipLp);
-            quickCardSourceChips.put(descriptor.id, navChip);
-            applyNavigationSourceChip(descriptor);
-        }
-
-        // NAVIGATION reads MEDIA's now-playing chip as "what is guiding" rather
-        // than "open route details", so like MEDIA it has nothing to disclose
-        // and skips the chevron every other CoffeeOS card shows.
-        if (!isNavigation) {
-            android.widget.TextView affordance = new android.widget.TextView(this);
-            affordance.setTag("frostSecondary");
-            affordance.setText("›");
-            affordance.setTextSize(18f);
-            affordance.setGravity(android.view.Gravity.CENTER);
-            affordance.setTextColor(dockLabelColorMuted());
-            header.addView(affordance, new android.widget.LinearLayout.LayoutParams(
-                    Math.round(18 * density), android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
-        }
+        android.widget.TextView affordance = new android.widget.TextView(this);
+        affordance.setTag("frostSecondary");
+        affordance.setText("›");
+        affordance.setTextSize(18f);
+        affordance.setGravity(android.view.Gravity.CENTER);
+        affordance.setTextColor(dockLabelColorMuted());
+        header.addView(affordance, new android.widget.LinearLayout.LayoutParams(
+                Math.round(18 * density), android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
         card.addView(header);
 
         android.widget.LinearLayout content = new android.widget.LinearLayout(this);
@@ -8250,12 +7970,7 @@ public final class MainActivity extends Activity {
         content.setLayoutParams(contentLp);
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
-<<<<<<< ours
-        boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id)
-                || "clock".equals(descriptor.id) || "navigation".equals(descriptor.id);
-=======
         boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id);
->>>>>>> theirs
         if (fullGraphicCard) {
             graphic.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
@@ -8407,7 +8122,7 @@ public final class MainActivity extends Activity {
         quickCardViews.add(card);
 
         android.widget.TextView heading = new android.widget.TextView(this);
-        heading.setText(workspaceLayoutMode ? "LAYOUT" : "WORKSPACE");
+        heading.setText("WORKSPACE");
         heading.setTag("frostSecondary");
         heading.setTextSize(10.5f);
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
@@ -8421,7 +8136,6 @@ public final class MainActivity extends Activity {
         headingLp.topMargin = Math.round(10 * density);
         heading.setLayoutParams(headingLp);
         card.addView(heading);
-        workspaceHeading = heading;
 
         android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -8446,117 +8160,10 @@ public final class MainActivity extends Activity {
         divider.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
         actions.addView(divider);
 
-        actions.addView(makeWorkspaceAction(density, false, "LAYOUT", "Show layout shortcuts",
-                v -> setWorkspaceLayoutMode(true)));
+        actions.addView(makeWorkspaceAction(density, false, "LAYOUT", "Open layout manager",
+                v -> callViewerDock("openDesktopStudio")));
         card.addView(actions);
-        workspaceActionsFace = actions;
-        View layoutFace = makeWorkspaceLayoutFace(density);
-        card.addView(layoutFace);
-        workspaceLayoutFace = layoutFace;
-        // A rebuild keeps whichever face was up.
-        actions.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
-        layoutFace.setVisibility(workspaceLayoutMode ? View.VISIBLE : View.GONE);
         return card;
-    }
-
-    /**
-     * The Workspace card's Layout face: the three Layout manager screens and the
-     * way back, as a 2x2 in the same card. LAYOUT flips to it, Return flips back
-     * (and closes whatever screen was open).
-     */
-    private View makeWorkspaceLayoutFace(float density) {
-        workspaceLayoutCells.clear();
-        android.widget.LinearLayout grid = new android.widget.LinearLayout(this);
-        grid.setOrientation(android.widget.LinearLayout.VERTICAL);
-        grid.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        int pad = Math.round(6 * density);
-        grid.setPadding(pad, Math.round(28 * density), pad, pad);
-        final String[][] cells = {
-                {"desktops", "Desktops", "openLayoutDesktops"},
-                {"layout", "Cards & widgets", "openLayoutCards"},
-                {"appearance", "Appearance", "openLayoutAppearance"},
-                {"return", "Return", ""},
-        };
-        for (int r = 0; r < 2; r++) {
-            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
-            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-            row.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-            for (int c = 0; c < 2; c++) {
-                final String[] def = cells[r * 2 + c];
-                android.widget.TextView cell = new android.widget.TextView(this);
-                cell.setText(def[1]);
-                cell.setTag("workspaceLayoutCell:" + def[0]);
-                cell.setGravity(android.view.Gravity.CENTER);
-                cell.setTextSize(11.5f);
-                cell.setMaxLines(1);
-                cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                cell.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                        android.graphics.Typeface.NORMAL));
-                cell.setContentDescription("return".equals(def[0]) ? "Return to workspace" : "Open " + def[1]);
-                android.widget.LinearLayout.LayoutParams cellLp = new android.widget.LinearLayout.LayoutParams(
-                        0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
-                int m = Math.round(2 * density);
-                cellLp.setMargins(m, m, m, m);
-                cell.setLayoutParams(cellLp);
-                cell.setClickable(true);
-                cell.setFocusable(true);
-                cell.setOnClickListener(v -> {
-                    if ("return".equals(def[0])) {
-                        setWorkspaceLayoutMode(false);
-                        if (desktopStudioOpen) callViewerDock("closeDesktopStudio");
-                    } else {
-                        callViewerDock(def[2]);
-                    }
-                });
-                workspaceLayoutCells.add(cell);
-                row.addView(cell);
-            }
-            grid.addView(row);
-        }
-        styleWorkspaceLayoutCells();
-        return grid;
-    }
-
-    /** Colours and the "this screen is open" mark; re-run on theme and screen changes. */
-    private void styleWorkspaceLayoutCells() {
-        float density = getResources().getDisplayMetrics().density;
-        for (android.widget.TextView cell : workspaceLayoutCells) {
-            String key = String.valueOf(cell.getTag()).substring("workspaceLayoutCell:".length());
-            boolean on = !"return".equals(key) && key.equals(studioScreen);
-            cell.setTextColor(on ? dockAccentColor : dockLabelColor());
-            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setCornerRadius(9 * density);
-            bg.setColor(on ? withAlpha(dockAccentColor, 0x2E) : (dockUiLight ? 0x0F000000 : 0x12FFFFFF));
-            if (on) bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0xA0));
-            cell.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(withAlpha(dockLabelColor(), 0x33)), bg, null));
-        }
-    }
-
-    private void setWorkspaceLayoutMode(boolean on) {
-        if (workspaceLayoutMode == on) return;
-        workspaceLayoutMode = on;
-        if (workspaceHeading != null) workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
-        crossfadeFaces(on ? workspaceActionsFace : workspaceLayoutFace,
-                on ? workspaceLayoutFace : workspaceActionsFace);
-    }
-
-    private void crossfadeFaces(View out, View in) {
-        if (in != null) {
-            in.animate().cancel();
-            in.setAlpha(0f);
-            in.setVisibility(View.VISIBLE);
-            in.animate().alpha(1f).setDuration(160).start();
-        }
-        if (out != null) {
-            out.animate().cancel();
-            out.animate().alpha(0f).setDuration(120).withEndAction(() -> {
-                out.setVisibility(View.GONE);
-                out.setAlpha(1f);
-            }).start();
-        }
     }
 
     private View makeWorkspaceAction(float density, boolean apps, String label,
@@ -8842,99 +8449,71 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * The source app's icon, on a card's top right.
+     * The source app's icon and name, on the card's top right.
      *
-     * One chip, two cards: MEDIA marks what is playing, NAVIGATION marks what
-     * is guiding. They used to disagree — NAVIGATION drew its own badge onto
-     * the QuickCardGraphicView canvas, icon only and at its own size, so the
-     * same rail showed two different Android Auto marks side by side. The
-     * canvas badge is gone; both now build this and resolve through
-     * {@link #resolveSourceChipIcon}, which was already keyed on package +
-     * label and needed nothing media-specific. It used to also carry a name
-     * TextView next to the icon; both cards now show the icon alone.
+     * Hidden outright when the payload carries neither, because an empty pill
+     * on an idle card reads as a control that has stopped working.
      */
-    private static final class SourceChip {
-        final android.widget.LinearLayout row;
-        final android.widget.ImageView icon;
+    private View makeQuickMediaAppChip(float density) {
+        android.widget.LinearLayout chip = new android.widget.LinearLayout(this);
+        chip.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        chip.setPadding(0, 0, 0, 0);
+        chip.setVisibility(View.GONE);
 
-        SourceChip(android.widget.LinearLayout row, android.widget.ImageView icon) {
-            this.row = row;
-            this.icon = icon;
-        }
-    }
-
-    private SourceChip makeSourceChip(float density) {
-        android.widget.LinearLayout row = new android.widget.LinearLayout(this);
-        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPadding(0, 0, 0, 0);
-        row.setVisibility(View.GONE);
-
-        android.widget.ImageView icon = new android.widget.ImageView(this);
-        icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        quickMediaAppIcon = new android.widget.ImageView(this);
+        quickMediaAppIcon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         android.widget.LinearLayout.LayoutParams iconLp =
                 new android.widget.LinearLayout.LayoutParams(
-                        Math.round(SOURCE_CHIP_ICON_DP * density), Math.round(SOURCE_CHIP_ICON_DP * density));
-        icon.setLayoutParams(iconLp);
-        row.addView(icon);
-        return new SourceChip(row, icon);
-    }
+                        Math.round(15 * density), Math.round(15 * density));
+        iconLp.rightMargin = Math.round(5 * density);
+        quickMediaAppIcon.setLayoutParams(iconLp);
+        chip.addView(quickMediaAppIcon);
 
-    /**
-     * Hidden outright when there is no icon, because an empty pill on an idle
-     * card reads as a control that has stopped working.
-     */
-    private void applySourceChip(SourceChip chip, Drawable customIcon, Bitmap decoded) {
-        if (chip == null) return;
-        boolean show = customIcon != null || decoded != null;
-        chip.row.setVisibility(show ? View.VISIBLE : View.GONE);
-        if (!show) return;
-        if (customIcon != null) {
-            chip.icon.setImageDrawable(customIcon);
-        } else {
-            chip.icon.setImageBitmap(decoded);
-        }
-    }
-
-    private View makeQuickMediaAppChip(float density) {
-        SourceChip chip = makeSourceChip(density);
-        quickMediaAppIcon = chip.icon;
-        quickMediaChip = chip;
-        return chip.row;
+        quickMediaAppName = new android.widget.TextView(this);
+        quickMediaAppName.setTag("frostSecondary");
+        quickMediaAppName.setTextSize(8.5f);
+        quickMediaAppName.setLetterSpacing(0.09f);
+        quickMediaAppName.setMaxLines(1);
+        quickMediaAppName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        quickMediaAppName.setMaxWidth(Math.round(96 * density));
+        chip.addView(quickMediaAppName);
+        return chip;
     }
 
     private void applyQuickMediaAppChip(String iconDataUrl, String label) {
         if (quickMediaAppRow == null) return;
         String pkg = quickMediaPackage != null ? quickMediaPackage : "";
-        Drawable customIcon = resolveSourceChipIcon(pkg, label);
-        applySourceChip(quickMediaChip, customIcon,
-                customIcon == null ? decodeDataUrlBitmap(iconDataUrl) : null);
-    }
-
-    /**
-     * Stamp the NAVIGATION card's chip from its descriptor.
-     *
-     * There is no icon payload here the way MediaNowPlaying supplies one, so
-     * the chip is whatever the shared resolver makes of the package — which
-     * for a projection package is our own mark, the point of the exercise.
-     */
-    private void applyNavigationSourceChip(BottomCardDescriptor card) {
-        SourceChip chip = quickCardSourceChips.get(card.id);
-        if (chip == null) return;
-        String pkg = card.appPackage == null ? "" : card.appPackage.trim();
-        if (pkg.isEmpty()) {
-            applySourceChip(chip, null, null);
-            return;
+        String chipLabel = resolveMediaChipLabel(pkg, label);
+        Drawable customIcon = resolveMediaChipIcon(pkg, label);
+        Bitmap decoded = customIcon == null ? decodeDataUrlBitmap(iconDataUrl) : null;
+        boolean show = customIcon != null || decoded != null
+                || (chipLabel != null && !chipLabel.isEmpty());
+        quickMediaAppRow.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show) return;
+        if (quickMediaAppIcon != null) {
+            if (customIcon != null) {
+                quickMediaAppIcon.setVisibility(View.VISIBLE);
+                quickMediaAppIcon.setImageDrawable(customIcon);
+            } else if (decoded != null) {
+                quickMediaAppIcon.setVisibility(View.VISIBLE);
+                quickMediaAppIcon.setImageBitmap(decoded);
+            } else {
+                quickMediaAppIcon.setVisibility(View.GONE);
+            }
         }
-        applySourceChip(chip, resolveSourceChipIcon(pkg, null), null);
+        if (quickMediaAppName != null) {
+            quickMediaAppName.setText(chipLabel == null ? ""
+                    : chipLabel.toUpperCase(java.util.Locale.US));
+        }
     }
 
     /**
-     * Icon for a card's source chip: dock substitute first, then our own
+     * Icon for the MEDIA card's source chip: dock substitute first, then our
      * AA/CarPlay assets (the system packages ship a generic glyph), then the
-     * caller's own payload icon if it has one (MEDIA does; NAVIGATION does not).
+     * launcher icon MediaNowPlaying encoded into the payload.
      */
-    private Drawable resolveSourceChipIcon(String pkg, String label) {
+    private Drawable resolveMediaChipIcon(String pkg, String label) {
         if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
             String slug = dockAppOverrides.icon(pkg);
             if (slug != null) {
@@ -8957,6 +8536,16 @@ public final class MainActivity extends Activity {
             try { return getDrawable(R.drawable.ic_carplay_default); } catch (Exception ignored) {}
         }
         return null;
+    }
+
+    private String resolveMediaChipLabel(String pkg, String stock) {
+        if (pkg != null && !pkg.isEmpty() && dockAppOverrides != null) {
+            String custom = dockAppOverrides.name(pkg);
+            if (custom != null) return custom;
+        }
+        if (isAndroidAutoMediaSource(pkg, stock)) return "Android Auto";
+        if (isCarPlayMediaSource(pkg, stock)) return "CarPlay";
+        return stock != null ? stock : "";
     }
 
     /** MediaCenter owns both AA and USB — only the AA label is projection. */
@@ -9227,14 +8816,7 @@ public final class MainActivity extends Activity {
                 quickMediaArt.setImageDrawable(mediaArtPlaceholder(density));
             }
         }
-        // Not on every call: this runs on every dock update, and the demo
-        // telemetry updates about once a second, which closed a menu (the rail
-        // ⋯ in edit mode, the driving cards' quick menus) before it was seen.
-        String themeSig = dockUiLight + "|" + dockAccentColor;
-        if (!themeSig.equals(quickMenuThemeSig)) {
-            quickMenuThemeSig = themeSig;
-            dismissQuickMenu();
-        }
+        dismissQuickMenu();
         for (QuickCardGraphicView graphic : quickCardGraphics.values()) {
             if (graphic != null) graphic.invalidate();
         }
@@ -9258,8 +8840,6 @@ public final class MainActivity extends Activity {
         Object tag = view.getTag();
         if ("workspaceApps".equals(tag) || "workspaceLayout".equals(tag)) {
             applyWorkspaceActionGlyph(view);
-        } else if (tag instanceof String && ((String) tag).startsWith("workspaceLayoutCell:")) {
-            styleWorkspaceLayoutCells();
         } else if (view instanceof android.widget.TextView) {
             boolean accent = "frostAccent".equals(tag) || "frostActionAccent".equals(tag);
             ((android.widget.TextView) view).setTextColor(accent ? dockAccentColor
@@ -9339,6 +8919,24 @@ public final class MainActivity extends Activity {
         customize.setContentDescription("Customize desktop");
         desktopControls.addView(customize);
         row.addView(makeLayoutGroup(density, "DESKTOP", desktopControls));
+        row.addView(makeLayoutDivider(density));
+
+        android.widget.LinearLayout viewControls = new android.widget.LinearLayout(this);
+        viewControls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        viewControls.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        layoutTripleChip = makeWideLayoutChip(density, Math.round(156 * density), iconPx,
+                SHELL_TRIPLE, dockGlyphLayout(Math.round(iconPx * 0.48f), dockGlyphColor(true)),
+                "Car + panels");
+        layoutAppCarChip = makeWideLayoutChip(density, Math.round(138 * density), iconPx,
+                SHELL_APP_CAR, makeSimpleLayoutGlyph(Math.round(iconPx * 0.48f), 2),
+                "Car focus");
+        layoutAppsChip = makeWideLayoutChip(density, Math.round(126 * density), iconPx,
+                SHELL_APPS, makeSimpleLayoutGlyph(Math.round(iconPx * 0.48f), 3),
+                "Two apps");
+        viewControls.addView(layoutTripleChip);
+        viewControls.addView(layoutAppCarChip);
+        viewControls.addView(layoutAppsChip);
+        row.addView(makeLayoutGroup(density, "VIEW", viewControls));
         row.addView(makeLayoutDivider(density));
 
         android.widget.LinearLayout bottomControls = new android.widget.LinearLayout(this);
@@ -9631,6 +9229,67 @@ public final class MainActivity extends Activity {
         return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
+    /** Wide layout option: glyph + explanation label (same plate language as Add Widget). */
+    private View makeWideLayoutChip(float density, int widthPx, int iconPx, String mode,
+            Drawable glyph, String title) {
+        FrameLayout cell = new FrameLayout(this);
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(widthPx,
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+        lp.rightMargin = Math.round(8 * density);
+        cell.setLayoutParams(lp);
+        cell.setClickable(true);
+        cell.setFocusable(true);
+        cell.setContentDescription(title);
+        cell.setOnClickListener(v -> {
+            applyShellMode(mode);
+            refreshLayoutChipSelection();
+        });
+        cell.setTag(mode);
+
+        int plateH = Math.round(iconPx + 10 * density);
+        View plate = new View(this);
+        FrameLayout.LayoutParams plateLp = new FrameLayout.LayoutParams(
+                widthPx - Math.round(4 * density), plateH);
+        plateLp.gravity = android.view.Gravity.CENTER;
+        plate.setLayoutParams(plateLp);
+        plate.setTag("modePlate");
+        plate.setBackground(makeDockPlateDrawable(false, density));
+        cell.addView(plate);
+
+        android.widget.LinearLayout inner = new android.widget.LinearLayout(this);
+        inner.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        inner.setGravity(android.view.Gravity.CENTER);
+        FrameLayout.LayoutParams innerLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, plateH);
+        innerLp.gravity = android.view.Gravity.CENTER;
+        inner.setLayoutParams(innerLp);
+        inner.setPadding(Math.round(12 * density), 0, Math.round(14 * density), 0);
+
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        int g = Math.round(iconPx * 0.48f);
+        android.widget.LinearLayout.LayoutParams ivLp =
+                new android.widget.LinearLayout.LayoutParams(g, g);
+        ivLp.rightMargin = Math.round(10 * density);
+        iv.setLayoutParams(ivLp);
+        iv.setImageDrawable(glyph);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        inner.addView(iv);
+
+        android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText(title);
+        tv.setTextColor(dockLabelColor());
+        tv.setTextSize(11f);
+        tv.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        tv.setLetterSpacing(0.04f);
+        tv.setMaxLines(1);
+        tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        inner.addView(tv);
+        cell.addView(inner);
+        return cell;
+    }
+
     private View makeWideDockChip(float density, int widthPx, int iconPx, String label,
             View.OnClickListener click) {
         FrameLayout cell = new FrameLayout(this);
@@ -9716,6 +9375,12 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshLayoutChipSelection() {
+        setModeCellSelected(layoutTripleChip, SHELL_TRIPLE.equals(shellMode));
+        setModeCellSelected(layoutAppCarChip, SHELL_APP_CAR.equals(shellMode));
+        setModeCellSelected(layoutAppsChip, SHELL_APPS.equals(shellMode));
+        styleLayoutChipLabel(layoutTripleChip);
+        styleLayoutChipLabel(layoutAppCarChip);
+        styleLayoutChipLabel(layoutAppsChip);
         refreshCenterFillChip();
         refreshLayoutThemeChip();
         refreshDockSurfaceUi(false);
@@ -10059,19 +9724,6 @@ public final class MainActivity extends Activity {
             if (o.has("activeDesktopIndex")) {
                 activeDesktopIndex = Math.max(0, o.optInt("activeDesktopIndex", 0));
             }
-            if (o.has("studioScreen")) {
-                String screen = o.optString("studioScreen", "");
-                if (!"desktops".equals(screen) && !"layout".equals(screen) && !"appearance".equals(screen)) {
-                    screen = "";
-                }
-                if (!screen.equals(studioScreen)) {
-                    studioScreen = screen;
-                    // A screen opened from anywhere (the header pill, a rail card)
-                    // flips the card to its Layout face, one tap from the others.
-                    if (!screen.isEmpty()) setWorkspaceLayoutMode(true);
-                    styleWorkspaceLayoutCells();
-                }
-            }
             boolean accentChanged = false;
             if (o.has("accent")) {
                 String accent = o.optString("accent", "");
@@ -10082,17 +9734,6 @@ public final class MainActivity extends Activity {
                 }
             }
             applyBottomCardsConfiguration(o);
-            // After the cards: edit mode reads each card's editMenu to draw its ⋯.
-            if (o.has("railEdit")) setRailEditMode(o.optBoolean("railEdit", false));
-            if (o.has("railFocus")) {
-                String focus = cleanBottomCardText(o.optString("railFocus", ""), 32);
-                // After the configuration above, so a card added in the same
-                // payload already has its view in the rebuilt row.
-                if (!focus.equals(railFocusId)) {
-                    railFocusId = focus;
-                    if (!focus.isEmpty()) scrollRailToCard(focus);
-                }
-            }
             // Icons and graphics bake the accent in when they are built, and
             // refreshQuickCardsTheme only repaints backgrounds and text -- so an
             // accent change has to rebuild the rail or tinted children keep the
@@ -10210,9 +9851,8 @@ public final class MainActivity extends Activity {
                             raw.optString("tireState", "unavailable")))
                     : ("status".equals(id) ? sanitizeStatusState(raw.optString("state", "unavailable"))
                             : ("power".equals(id) ? sanitizePowerState(raw.optString("state", "unavailable"))
-                            : ("navigation".equals(id) ? sanitizeNavigationState(raw.optString("state", "unavailable"))
                             : (DRIVING_CARD_IDS.contains(id)
-                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : ""))));
+                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : "")));
             String[] wheelStates = ("tires".equals(id) || "status".equals(id))
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))
@@ -10233,22 +9873,6 @@ public final class MainActivity extends Activity {
                     iconAction, longAction, glyph, glyphText, clockFace, clockHourFormat,
                     dialMarks, splitPlates, dateSpineFormat, dateWording, menu);
             descriptor.tirePressures = cleanBottomCardText(raw.optString("tirePressures", ""), 48);
-<<<<<<< ours
-            descriptor.appPackage = cleanBottomCardText(raw.optString("appPackage", ""), 80);
-            descriptor.navRemaining = cleanBottomCardText(raw.optString("navRemaining", ""), 16);
-            descriptor.navDuration = cleanBottomCardText(raw.optString("navDuration", ""), 16);
-            descriptor.navEta = cleanBottomCardText(raw.optString("navEta", ""), 8);
-            descriptor.navIdleCity = cleanBottomCardText(raw.optString("navIdleCity", ""), 32);
-            descriptor.navIdleAction = cleanBottomCardText(raw.optString("navIdleAction", ""), 48);
-            descriptor.editMenu = parseEditMenu(raw.optJSONArray("editMenu"));
-            if ("clock".equals(id)) {
-                String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
-                descriptor.clockFace = ("meridian".equals(face) || "split".equals(face) || "date-spine".equals(face)) ? face : "panorama";
-                String format = raw.optString("clockFormat", "system");
-                descriptor.clockFormat = "12h".equals(format) ? "12h" : ("24h".equals(format) ? "24h" : "system");
-            }
-=======
->>>>>>> theirs
             next.add(descriptor);
         }
 
@@ -10326,33 +9950,6 @@ public final class MainActivity extends Activity {
         return rows;
     }
 
-    /**
-     * Rows for a rail card's ⋯ in edit mode. Only two command shapes are
-     * relayed: a destination (cardAction:...) and the clock face. The page
-     * re-checks both; anything else is dropped here.
-     */
-    private java.util.List<QuickMenuRow> parseEditMenu(JSONArray raw) {
-        if (raw == null || raw.length() == 0) return java.util.Collections.emptyList();
-        java.util.List<QuickMenuRow> rows = new ArrayList<>();
-        int max = Math.min(raw.length(), 10);
-        for (int i = 0; i < max; i++) {
-            JSONObject item = raw.optJSONObject(i);
-            if (item == null) continue;
-            String label = cleanBottomCardText(item.optString("label", ""), 28);
-            String command = item.optString("command", "").trim();
-            if (label.isEmpty()) continue;
-            if (!isCardActionCommand(command) && !"openClockSettings".equals(command)) continue;
-            rows.add(new QuickMenuRow(label, command, item.optBoolean("selected", false)));
-        }
-        return rows;
-    }
-
-    /** cardAction:&lt;card&gt;:popup|new|desktop:&lt;desktopId&gt;; ids letters, digits, '_' and '-'. */
-    private boolean isCardActionCommand(String command) {
-        return command != null
-                && command.matches("cardAction:[A-Za-z0-9_]{1,32}:(popup|new|desktop:[A-Za-z0-9_-]{1,64})");
-    }
-
     /** `drivingSet:&lt;group&gt;:&lt;value&gt;`, letters/digits/underscore only. */
     private boolean isDrivingSetCommand(String command) {
         if (!command.startsWith(DRIVING_SET_PREFIX)) return false;
@@ -10410,28 +10007,6 @@ public final class MainActivity extends Activity {
             case "stale":
             case "warning":
             case "unavailable":
-                return normalized;
-            default:
-                return "unavailable";
-        }
-    }
-
-    private String sanitizeNavigationState(String value) {
-        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US)
-                .replace('-', '_');
-        switch (normalized) {
-            case "idle":
-            case "demo":
-            case "unavailable":
-            case "turn_left":
-            case "turn_right":
-            case "straight":
-            case "uturn":
-            case "roundabout":
-            case "fork":
-            case "merge":
-            case "exit":
-            case "destination":
                 return normalized;
             default:
                 return "unavailable";
@@ -10545,12 +10120,8 @@ public final class MainActivity extends Activity {
             if (demoBadge != null) demoBadge.setVisibility(card.demo ? View.VISIBLE : View.GONE);
             QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
             if (graphic != null) graphic.setDescriptor(card);
-<<<<<<< ours
-            applyNavigationSourceChip(card);
-=======
             QuickClockCardView clock = quickClockCards.get(card.id);
             if (clock != null) clock.setDescriptor(card);
->>>>>>> theirs
             // The rail is patched in place rather than rebuilt, so a mode change
             // has to repaint the card's own background too.
             View host = quickCardHosts.get(card.id);
@@ -10600,16 +10171,6 @@ public final class MainActivity extends Activity {
                 description.append(". ").append(labels[i]).append(" ").append(state);
             }
             description.append(". Opens vehicle status details.");
-            return description.toString();
-        }
-        if ("navigation".equals(descriptor.id)) {
-            StringBuilder description = new StringBuilder("Navigation. ");
-            description.append(descriptor.primary.isEmpty() ? "No route data" : descriptor.primary);
-            if (!descriptor.navIdleCity.isEmpty()) description.append(". ").append(descriptor.navIdleCity);
-            if (!descriptor.secondary.isEmpty()) description.append(". ").append(descriptor.secondary);
-            if (!descriptor.metricA.isEmpty()) description.append(". ").append(descriptor.metricA);
-            if (!descriptor.navIdleAction.isEmpty()) description.append(". ").append(descriptor.navIdleAction);
-            description.append(". Opens navigation.");
             return description.toString();
         }
         if (!"tires".equals(descriptor.id)) {
@@ -10667,293 +10228,8 @@ public final class MainActivity extends Activity {
 
     private void rebuildQuickCardsRow() {
         if (quickCardsRow == null) return;
-        // The views an open menu is anchored to are about to be replaced.
-        dismissQuickMenu();
         populateQuickCardsRow(quickCardsRow, getResources().getDisplayMetrics().density);
         refreshQuickCardsTheme();
-        // A reorder or remove comes back from the page as a new card list; the
-        // rebuilt tiles have to rejoin edit mode.
-        if (railEditMode) applyRailEdit(true);
-    }
-
-    /**
-     * Layout manager → Cards, mirrored onto the real rail. While it is open the
-     * cards jiggle, carry a remove badge, and can be dragged into a new order.
-     * The page owns the order: a drop or a remove is reported to it, and the rail
-     * is rebuilt from its answer rather than reordered here.
-     */
-    private void setRailEditMode(boolean on) {
-        if (railEditMode == on) return;
-        railEditMode = on;
-        refreshDockSurfaceUi(true);
-        if (on) {
-            applyRailEdit(true);
-        } else {
-            applyRailEdit(false);
-            // Rebuilding restores every click listener edit mode took away.
-            rebuildQuickCardsRow();
-        }
-    }
-
-    /**
-     * A downscaled copy of this window for the Desktops strip. PixelCopy reads
-     * the composited surface, so the WebGL car, the HTML widgets and the native
-     * rail come out as drawn; other apps' freeform windows are separate windows
-     * and do not. The render thread scales straight into a thumbnail-sized
-     * bitmap, and the JPEG encode runs off the UI thread. Cost on the MMI is
-     * not measured yet -- it runs a few seconds after a desktop settles, never
-     * per frame.
-     */
-    private void captureDesktopSnapshotNow(String token, int width, int height) {
-        final String safeToken = token == null ? "" : token.replaceAll("[^A-Za-z0-9_-]", "");
-        if (safeToken.isEmpty() || webView == null
-                || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return;
-        View decor = getWindow().getDecorView();
-        if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
-        final int w = Math.max(64, Math.min(960, width));
-        final int h = Math.max(24, Math.min(360, height));
-        final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-        try {
-            android.view.PixelCopy.request(getWindow(), new Rect(0, 0, decor.getWidth(), decor.getHeight()), bmp,
-                    result -> {
-                        if (result != android.view.PixelCopy.SUCCESS) {
-                            bmp.recycle();
-                            Log.w(TAG, "desktop snapshot failed: " + result);
-                            return;
-                        }
-                        new Thread(() -> {
-                            ByteArrayOutputStream out = new ByteArrayOutputStream();
-                            bmp.compress(Bitmap.CompressFormat.JPEG, 72, out);
-                            bmp.recycle();
-                            final String js = "try{window.__app&&window.__app.onDesktopSnapshot('" + safeToken
-                                    + "','data:image/jpeg;base64,"
-                                    + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP) + "');}catch(e){}";
-                            webView.post(() -> webView.evaluateJavascript(js, null));
-                        }, "desktop-snapshot").start();
-                    }, mainHandler);
-        } catch (RuntimeException e) {
-            bmp.recycle();
-            Log.w(TAG, "desktop snapshot failed", e);
-        }
-    }
-
-    private void scrollRailToCard(String id) {
-        if (!(cardsScrollView instanceof android.widget.HorizontalScrollView) || quickCardsRow == null) return;
-        final android.widget.HorizontalScrollView scroll = (android.widget.HorizontalScrollView) cardsScrollView;
-        // Posted: a rebuild this payload triggered has not been laid out yet.
-        scroll.post(() -> {
-            View card = quickCardsRow.findViewWithTag("bottomCard:" + id);
-            if (card == null) return;
-            scroll.smoothScrollTo(Math.max(0, card.getLeft() + card.getWidth() / 2 - scroll.getWidth() / 2), 0);
-            // A short pulse says which card just arrived.
-            card.animate().scaleX(1.07f).scaleY(1.07f).setDuration(170).withEndAction(() ->
-                    card.animate().scaleX(1f).scaleY(1f).setDuration(220).start()).start();
-        });
-    }
-
-    private BottomCardDescriptor bottomCardById(String id) {
-        for (BottomCardDescriptor card : bottomCards) {
-            if (card.id.equals(id)) return card;
-        }
-        return null;
-    }
-
-    private List<View> railCardViews() {
-        List<View> out = new ArrayList<>();
-        if (quickCardsRow == null) return out;
-        for (int i = 0; i < quickCardsRow.getChildCount(); i++) {
-            View child = quickCardsRow.getChildAt(i);
-            Object tag = child.getTag();
-            if (tag instanceof String && ((String) tag).startsWith("bottomCard:")) out.add(child);
-        }
-        return out;
-    }
-
-    private void applyRailEdit(boolean on) {
-        for (android.animation.Animator a : railJiggles.values()) a.cancel();
-        railJiggles.clear();
-        float density = getResources().getDisplayMetrics().density;
-        List<View> cards = railCardViews();
-        for (int i = 0; i < cards.size(); i++) {
-            final View card = cards.get(i);
-            card.getOverlay().clear();
-            card.setRotation(0f);
-            card.setTranslationX(0f);
-            card.setAlpha(1f);
-            if (!on) {
-                card.setOnTouchListener(null);
-                continue;
-            }
-            final String id = ((String) card.getTag()).substring("bottomCard:".length());
-            setSubtreeClickable(card, false);
-            final RailBadge badge = new RailBadge(density, false);
-            BottomCardDescriptor desc = bottomCardById(id);
-            // ⋯ only on cards that have something to choose.
-            final RailBadge more = desc != null && !desc.editMenu.isEmpty() ? new RailBadge(density, true) : null;
-            final int size = Math.round(26 * density);
-            final int moreSize = Math.round(30 * density);
-            final int inset = Math.round(4 * density);
-            card.getOverlay().add(badge);
-            if (more != null) card.getOverlay().add(more);
-            card.post(() -> {
-                int w = card.getWidth();
-                int hh = card.getHeight();
-                badge.setBounds(w - size - inset, inset, w - inset, inset + size);
-                if (more != null) more.setBounds(w - moreSize - inset, hh - moreSize - inset, w - inset, hh - inset);
-                card.invalidate();
-            });
-            android.animation.ObjectAnimator jiggle =
-                    android.animation.ObjectAnimator.ofFloat(card, View.ROTATION, -1.1f, 1.1f);
-            jiggle.setDuration(i % 2 == 0 ? 130 : 150);
-            jiggle.setRepeatMode(android.animation.ValueAnimator.REVERSE);
-            jiggle.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-            jiggle.setStartDelay((i * 37L) % 90);
-            jiggle.start();
-            railJiggles.put(card, jiggle);
-            card.setOnTouchListener(new RailEditTouch(id, card, badge, more, density));
-        }
-    }
-
-    private static void setSubtreeClickable(View v, boolean clickable) {
-        v.setClickable(clickable);
-        v.setLongClickable(clickable);
-        if (v instanceof android.view.ViewGroup) {
-            android.view.ViewGroup g = (android.view.ViewGroup) v;
-            for (int i = 0; i < g.getChildCount(); i++) setSubtreeClickable(g.getChildAt(i), clickable);
-        }
-    }
-
-    /** Index the dragged card would take once removed and re-inserted. */
-    private int railDropIndex(View dragged) {
-        float center = dragged.getLeft() + dragged.getTranslationX() + dragged.getWidth() / 2f;
-        int index = 0;
-        for (View c : railCardViews()) {
-            if (c == dragged) continue;
-            if (center > c.getLeft() + c.getWidth() / 2f) index++;
-        }
-        return index;
-    }
-
-    private final class RailEditTouch implements View.OnTouchListener {
-        private final String id;
-        private final View card;
-        private final RailBadge badge;
-        private final RailBadge more;
-        private final float density;
-        private final int slop;
-        private float downX;
-        private boolean dragging;
-
-        RailEditTouch(String id, View card, RailBadge badge, RailBadge more, float density) {
-            this.id = id;
-            this.card = card;
-            this.badge = badge;
-            this.more = more;
-            this.density = density;
-            this.slop = android.view.ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
-        }
-
-        @Override
-        public boolean onTouch(View v, MotionEvent e) {
-            switch (e.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                    downX = e.getRawX();
-                    dragging = false;
-                    // A press that starts on a card drags it; the rail scrolls
-                    // from the gaps between cards.
-                    if (v.getParent() != null) v.getParent().requestDisallowInterceptTouchEvent(true);
-                    return true;
-                case MotionEvent.ACTION_MOVE: {
-                    float dx = e.getRawX() - downX;
-                    if (!dragging && Math.abs(dx) > slop) {
-                        dragging = true;
-                        android.animation.Animator jiggle = railJiggles.get(card);
-                        if (jiggle != null) jiggle.pause();
-                        card.setRotation(0f);
-                        card.setAlpha(0.92f);
-                        card.setTranslationZ(8f * density);
-                    }
-                    if (dragging) card.setTranslationX(dx);
-                    return true;
-                }
-                case MotionEvent.ACTION_UP: {
-                    if (dragging) {
-                        int to = railDropIndex(card);
-                        int from = railCardViews().indexOf(card);
-                        settle();
-                        if (to >= 0 && to != from) callViewerDock("railMoveCard:" + id + ":" + to);
-                    } else {
-                        int x = Math.round(e.getX());
-                        int y = Math.round(e.getY());
-                        int slack = -Math.round(10 * density);
-                        Rect hit = new Rect(badge.getBounds());
-                        hit.inset(slack, slack);
-                        if (hit.contains(x, y)) {
-                            callViewerDock("railRemoveCard:" + id);
-                        } else if (more != null) {
-                            Rect moreHit = new Rect(more.getBounds());
-                            moreHit.inset(slack, slack);
-                            BottomCardDescriptor d = bottomCardById(id);
-                            if (moreHit.contains(x, y) && d != null) showQuickMenuRows(card, d.editMenu, false);
-                        }
-                    }
-                    return true;
-                }
-                case MotionEvent.ACTION_CANCEL:
-                    if (dragging) settle();
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private void settle() {
-            dragging = false;
-            card.animate().translationX(0f).translationZ(0f).alpha(1f).setDuration(120).start();
-            android.animation.Animator jiggle = railJiggles.get(card);
-            if (jiggle != null) jiggle.resume();
-        }
-    }
-
-    /** × (remove) or ⋯ (options) on a rail card in edit mode, drawn on the view overlay. */
-    private static final class RailBadge extends Drawable {
-        private final boolean dots;
-        private final android.graphics.Paint fill =
-                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.Paint stroke =
-                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.Paint dot =
-                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-
-        RailBadge(float density, boolean dots) {
-            this.dots = dots;
-            fill.setColor(0xF03B4148);
-            stroke.setColor(0xFFFFFFFF);
-            stroke.setStrokeWidth(2f * density);
-            stroke.setStrokeCap(android.graphics.Paint.Cap.ROUND);
-            dot.setColor(0xFFFFFFFF);
-        }
-
-        @Override
-        public void draw(android.graphics.Canvas c) {
-            Rect b = getBounds();
-            if (b.isEmpty()) return;
-            float cx = b.exactCenterX();
-            float cy = b.exactCenterY();
-            float r = b.width() / 2f;
-            c.drawCircle(cx, cy, r, fill);
-            if (dots) {
-                for (int i = -1; i <= 1; i++) c.drawCircle(cx + i * r * .42f, cy, Math.max(1.5f, r * .12f), dot);
-                return;
-            }
-            float k = r * 0.36f;
-            c.drawLine(cx - k, cy - k, cx + k, cy + k, stroke);
-            c.drawLine(cx + k, cy - k, cx - k, cy + k, stroke);
-        }
-
-        @Override public void setAlpha(int alpha) {}
-        @Override public void setColorFilter(android.graphics.ColorFilter cf) {}
-        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
     }
 
     private void applyQuickCardIndicators(JSONObject o) {
@@ -11028,12 +10304,6 @@ public final class MainActivity extends Activity {
      * and a centred dialog would land under the hand.
      */
     private void showQuickMenu(View anchor, BottomCardDescriptor descriptor) {
-        showQuickMenuRows(anchor, descriptor.menu, true);
-    }
-
-    /** `lastIsExit`: the last row leaves the menu (the driving cards) and is styled apart. */
-    private void showQuickMenuRows(View anchor, java.util.List<QuickMenuRow> rows, boolean lastIsExit) {
-        if (rows == null || rows.isEmpty()) return;
         dismissQuickMenu();
         float density = getResources().getDisplayMetrics().density;
         android.widget.LinearLayout list = new android.widget.LinearLayout(this);
@@ -11043,9 +10313,9 @@ public final class MainActivity extends Activity {
         list.setBackground(makeDockPopupPanel(density));
         list.setElevation(12f * density);
 
-        for (QuickMenuRow row : rows) {
+        for (QuickMenuRow row : descriptor.menu) {
             final String command = row.command;
-            boolean last = lastIsExit && row == rows.get(rows.size() - 1);
+            boolean last = row == descriptor.menu.get(descriptor.menu.size() - 1);
             android.widget.TextView item = new android.widget.TextView(this);
             item.setText(row.label);
             item.setTextSize(last ? 13f : 15f);
@@ -11190,12 +10460,6 @@ public final class MainActivity extends Activity {
     }
 
     private android.widget.PopupWindow quickMenuWindow;
-    /**
-     * Theme the open quick menu was built for. refreshQuickCardsTheme runs on
-     * every dock update (applyDockIndicators → refreshDockSurfaceUi), so it may
-     * only close the menu when the theme it baked in has really changed.
-     */
-    private String quickMenuThemeSig = "";
 
     private void callViewerDock(String cmd) {
         if (webView == null || cmd == null) return;
@@ -11356,91 +10620,6 @@ public final class MainActivity extends Activity {
         }
         CharSequence label = info.loadLabel(pm);
         return label != null ? label.toString() : "";
-    }
-
-    /**
-     * Our bundled mark for a projection package, or null for anything else.
-     *
-     * CarPlay is matched first because ProjectionPresence.isProjectionPackage
-     * answers true for both families, so an unordered test would hand a CarPlay
-     * package the Android Auto drawable.
-     */
-    private Bitmap projectionIconBitmap(String packageName) {
-        if (!ProjectionPresence.isProjectionPackage(packageName)) return null;
-        boolean carPlay = packageName.toLowerCase().contains("carplay");
-        Drawable icon = null;
-        if (projectionPresence != null) {
-            icon = projectionPresence.iconFor(
-                    carPlay ? ProjectionPresence.Kind.CARPLAY
-                            : ProjectionPresence.Kind.ANDROID_AUTO);
-        }
-        if (icon == null) {
-            try {
-                icon = getDrawable(carPlay ? R.drawable.ic_carplay_default
-                        : R.drawable.ic_android_auto_default);
-            } catch (Exception ignored) {}
-        }
-        if (icon == null) return null;
-        try {
-            Bitmap bmp = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888);
-            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
-            icon.setBounds(0, 0, 96, 96);
-            icon.draw(canvas);
-            return bmp;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private Bitmap iconBitmapForPackage(String packageName) {
-        if (packageName == null || packageName.isEmpty()) return null;
-        Bitmap hit = packageIconBitmaps.get(packageName);
-        if (hit != null) return hit;
-        if (packageIconMiss.contains(packageName)) return null;
-        // Our own branding wins for projection packages, BEFORE the package
-        // manager is asked. The OEM Autolink icon resolves perfectly well, so
-        // it used to win everywhere this is called and the bundled drawable was
-        // only ever reached when the lookup FAILED. That put the OEM badge on
-        // the navigation card while the media card — which resolves through
-        // ProjectionPresence — showed ours, two different Android Auto marks on
-        // one rail. This is also what AppLauncherBridge.getAppIcon serves, so
-        // the web widget and popup pick the same icon up for free.
-        Bitmap branded = projectionIconBitmap(packageName);
-        if (branded != null) {
-            packageIconBitmaps.put(packageName, branded);
-            return branded;
-        }
-        try {
-            Drawable icon = getPackageManager().getApplicationIcon(packageName);
-            icon = normalizeAdaptiveIcon(icon, 96);
-            if (icon != null) {
-                int w = Math.max(1, icon.getIntrinsicWidth());
-                int h = Math.max(1, icon.getIntrinsicHeight());
-                if (w > 128 || h > 128 || w <= 0 || h <= 0) { w = 96; h = 96; }
-                Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
-                icon.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
-                icon.draw(canvas);
-                packageIconBitmaps.put(packageName, bmp);
-                return bmp;
-            }
-        } catch (Exception ignored) {}
-        if (ProjectionPresence.isProjectionPackage(packageName)
-                && !packageName.toLowerCase().contains("carplay")) {
-            try {
-                Drawable fallback = getDrawable(R.drawable.ic_android_auto);
-                if (fallback != null) {
-                    Bitmap bmp = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888);
-                    android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
-                    fallback.setBounds(0, 0, 96, 96);
-                    fallback.draw(canvas);
-                    packageIconBitmaps.put(packageName, bmp);
-                    return bmp;
-                }
-            } catch (Exception ignored) {}
-        }
-        packageIconMiss.add(packageName);
-        return null;
     }
 
     private Drawable launcherIconForPackage(String pkg) {
@@ -11640,44 +10819,6 @@ public final class MainActivity extends Activity {
         String label = resolveDockLabel(DockAppOverrides.GWM_HUB_PKG, "GWM");
         bindDockItem(gwmHubItem, icon, label,
                 v -> showGwmHubMenu(v), DockAppOverrides.GWM_HUB_PKG);
-    }
-
-    /**
-     * "Side by Side" launcher tile. The two-app split used to be one of three
-     * layout choices; now it opens like an app, and is left from its own
-     * floating menu (Exit Side by Side).
-     */
-    private void bindSideBySideItem() {
-        if (sideBySideItem == null) return;
-        float density = getResources().getDisplayMetrics().density;
-        int iconPx = dockIconPx > 0 ? dockIconPx : Math.round(60 * density);
-        bindDockItem(sideBySideItem, makeSideBySideGlyph(iconPx), "Side by Side",
-                v -> applyShellMode(SHELL_APPS));
-        // Dark plate, light glyph: the same treatment as the GWM hub tile, so it
-        // reads on either dock theme.
-        View plate = sideBySideItem.findViewWithTag("iconPlate");
-        if (plate != null) {
-            sideBySideItem.setTag(Boolean.TRUE);
-            plate.setBackground(makeLauncherIconPlateDrawable(density, true));
-        }
-        sideBySideItem.setContentDescription("Side by Side: two apps split the screen");
-    }
-
-    private Drawable makeSideBySideGlyph(int sizePx) {
-        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
-        android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        paint.setColor(0xFFEAF2F8);
-        float s = sizePx;
-        float padX = s * 0.2f;
-        float padY = s * 0.27f;
-        float gap = s * 0.07f;
-        float w = (s - 2f * padX - gap) / 2f;
-        float r = s * 0.05f;
-        c.drawRoundRect(padX, padY, padX + w, s - padY, r, r, paint);
-        paint.setAlpha(190);
-        c.drawRoundRect(padX + w + gap, padY, s - padX, s - padY, r, r, paint);
-        return new BitmapDrawable(getResources(), bmp);
     }
 
     private void showGwmHubMenu(View anchor) {
@@ -12988,7 +12129,6 @@ public final class MainActivity extends Activity {
         mediaNowPlaying.stop();
         dismissDockEditMenu();
         if (projectionPresence != null) projectionPresence.stop();
-        if (placeGlance != null) placeGlance.stop();
         if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
         if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
         if (raiseOverlayRunnable != null) mainHandler.removeCallbacks(raiseOverlayRunnable);
