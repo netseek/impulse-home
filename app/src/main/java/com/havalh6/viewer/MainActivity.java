@@ -1076,6 +1076,8 @@ public final class MainActivity extends Activity {
          * "unavailable" on all four corners while TPMS was live.
          */
         String tirePressures = "";
+        /** ENERGY card: the last seven days' distance, 0-100 each, oldest first. */
+        int[] energyBars = new int[0];
         /** Status opening order: FL, FR, RL, RR, tailgate. */
         final String[] openingStates;
         /** Status restraint order: driver, front passenger, rear left/centre/right. */
@@ -1444,7 +1446,7 @@ public final class MainActivity extends Activity {
                 case "range": drawRing(canvas, w, h, accent, muted, true); break;
                 case "status": drawVehicleStatus(canvas, w, h, accent, muted, strong); break;
                 case "climate": drawClimate(canvas, w, h, accent, muted); break;
-                case "consumption": drawBars(canvas, w, h, accent, muted); break;
+                case "consumption": drawEnergy(canvas, w, h, accent, muted, strong); break;
                 case "navigation": drawNavigation(canvas, w, h, accent, muted, strong); break;
                 case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
                 case "power": drawPower(canvas, w, h, accent, muted, strong); break;
@@ -1720,18 +1722,41 @@ public final class MainActivity extends Activity {
             }
         }
 
-        private void drawBars(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            float base = h * .83f, gap = w * .055f, bw = w * .09f;
-            for (int i = 0; i < 6; i++) {
-                float ratio = new float[] {.28f, .48f, .38f, .70f, .56f, .86f}[i];
-                float left = w * .15f + i * (bw + gap);
-                float top = base - h * .62f * ratio;
-                fill(i >= 3 ? accent : muted);
-                c.drawRoundRect(left, top, left + bw, base, bw * .35f, bw * .35f, paint);
+        /**
+         * ENERGY rail card graphic: the last seven days' distance as bars (today
+         * in the accent) and the trip's EV share as a rule underneath.
+         *
+         * Numbers stay in the card's own text column (primary / secondary /
+         * metricA · metricB), which every visual card already has beside its
+         * graphic. Measured on the emulator 2026-09-13: drawing the figure here
+         * as well duplicated it into this narrow slot and truncated both copies.
+         */
+        private void drawEnergy(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            int[] bars = descriptor.energyBars;
+            int n = bars == null ? 0 : bars.length;
+            float left = w * .10f, right = w * .90f, top = h * .14f, bottom = h * .74f;
+            stroke(muted, Math.max(1f, w * .012f));
+            c.drawLine(left, bottom, right, bottom, paint);
+            if (n > 0) {
+                float gap = Math.max(1.5f, w * .03f);
+                float bw = Math.max(1f, ((right - left) - gap * (n - 1)) / n);
+                for (int i = 0; i < n; i++) {
+                    float ratio = Math.max(0f, Math.min(1f, bars[i] / 100f));
+                    float l = left + i * (bw + gap);
+                    float t = bottom - Math.max(h * .025f, (bottom - top) * ratio);
+                    fill(i == n - 1 ? accent : withAlpha(strong, ratio > 0f ? 0x66 : 0x22));
+                    c.drawRoundRect(l, t, l + bw, bottom, bw * .3f, bw * .3f, paint);
+                }
             }
-            stroke(muted, Math.max(1f, w * .018f));
-            c.drawLine(w * .10f, base, w * .91f, base, paint);
+            float railY = h * .88f;
+            float railW = Math.max(2f, h * .035f);
+            stroke(withAlpha(strong, 0x2A), railW);
+            c.drawLine(left, railY, right, railY, paint);
+            if (descriptor.progress > 0) {
+                stroke(accent, railW);
+                c.drawLine(left, railY, left + (right - left) * descriptor.progress / 100f, railY, paint);
+            }
         }
 
         private void drawNavigation(android.graphics.Canvas c, float w, float h,
@@ -2421,6 +2446,7 @@ public final class MainActivity extends Activity {
     private final List<MotionTrailLayout> launcherItems = new ArrayList<>();
     private ProjectionPresence projectionPresence;
     private PlaceGlance placeGlance;
+    private TripRecorder tripRecorder;
     private final java.util.Map<String, Bitmap> packageIconBitmaps =
             new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<String> packageIconMiss =
@@ -5628,6 +5654,9 @@ public final class MainActivity extends Activity {
         webView.addJavascriptInterface(new TelemetryBridge(), "TelemetryBridge");
         webView.addJavascriptInterface(new AppLauncherBridge(), "AppLauncherBridge");
         webView.addJavascriptInterface(new MediaBridge(), "MediaBridge");
+        // Process-scoped and fed by its own receiver: see TripRecorder.get.
+        tripRecorder = TripRecorder.get(this);
+        webView.addJavascriptInterface(new TripBridge(tripRecorder), "TripBridge");
 
         placeGlance = new PlaceGlance(this, mainHandler, json -> {
             telemetryCache.put(PlaceGlance.KEY, json);
@@ -7786,8 +7815,8 @@ public final class MainActivity extends Activity {
         quickClimateValue = (android.widget.TextView) climate.findViewWithTag("quickValue");
         row.addView(climate);
 
-        View consumption = makeQuickTextCard(density, 196, "CONSUMPTION", "—",
-                "Consumption summary. Opens the consumption view",
+        View consumption = makeQuickTextCard(density, 196, "ENERGIA", "—",
+                "Resumo de energia. Abre a tela de energia",
                 v -> callViewerDock("openConsumption"));
         quickConsumptionValue = (android.widget.TextView) consumption.findViewWithTag("quickValue");
         row.addView(consumption);
@@ -8025,6 +8054,21 @@ public final class MainActivity extends Activity {
         String[] values = pair.split("\\s*[·/]\\s*", 2);
         if (values.length != 2) return pair;
         return leftLabel + " " + values[0] + "   " + rightLabel + " " + values[1];
+    }
+
+    /** "12,40,0,..." from the page, clamped to 0-100 and at most 31 values. */
+    private static int[] parseEnergyBars(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return new int[0];
+        String[] parts = raw.split(",");
+        int[] out = new int[Math.min(parts.length, 31)];
+        for (int i = 0; i < out.length; i++) {
+            try {
+                out[i] = Math.max(0, Math.min(100, Integer.parseInt(parts[i].trim())));
+            } catch (NumberFormatException e) {
+                out[i] = 0;
+            }
+        }
+        return out;
     }
 
     private int quickVisualCardWidthDp(String id) {
@@ -9855,6 +9899,7 @@ public final class MainActivity extends Activity {
             descriptor.navEta = cleanBottomCardText(raw.optString("navEta", ""), 8);
             descriptor.navIdleCity = cleanBottomCardText(raw.optString("navIdleCity", ""), 32);
             descriptor.navIdleAction = cleanBottomCardText(raw.optString("navIdleAction", ""), 48);
+            if ("consumption".equals(id)) descriptor.energyBars = parseEnergyBars(raw.optString("energyBars", ""));
             descriptor.editMenu = parseEditMenu(raw.optJSONArray("editMenu"));
             if ("clock".equals(id)) {
                 String face = raw.optString("clockFace", "panorama").trim().toLowerCase(java.util.Locale.US);
@@ -12585,6 +12630,10 @@ public final class MainActivity extends Activity {
         dismissDockEditMenu();
         if (projectionPresence != null) projectionPresence.stop();
         if (placeGlance != null) placeGlance.stop();
+        // Not stopped: the recorder outlives this activity. An activity
+        // recreation (measured on the emulator 2026-09-13) must not reset the
+        // open trip; only make sure what it holds is on disk.
+        if (tripRecorder != null) tripRecorder.persistSoon();
         if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
         if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
         if (raiseOverlayRunnable != null) mainHandler.removeCallbacks(raiseOverlayRunnable);

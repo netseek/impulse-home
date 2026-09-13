@@ -40,6 +40,14 @@ desktop (`_desktopBottomCards`, normalised by `_normalizeBottomCards`).
 Both go through the same native allow-list. `iconAction` is optional; without it
 the whole card is one target.
 
+**A visual card already has a text column.** `makeQuickVisualCard` lays the
+graphic out beside native TextViews that show `primary`, `secondary` and
+`metricA · metricB`. The `QuickCardGraphicView` case should draw a *graphic* —
+a ring, bars, a diagram — not the same numbers again. The first ENERGY painter
+drew its figure and unit inside the graphic slot too; on the emulator both copies
+truncated (`1…k…` beside `11.8`). ENERGY now draws seven-day bars and an EV-share
+rule, and the text column carries every number.
+
 ### Editing the rail
 
 Layout manager → **Cards** lists the cards *not* on the rail; tapping one
