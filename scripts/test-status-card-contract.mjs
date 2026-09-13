@@ -105,8 +105,12 @@ all(statusView, ['statusAriaLabel', 'onStatusOpen', 'statusMetrics', 'statusRoof
 assert.match(statusView, /statusOpenRoofControls: .*_openRoofLevelPopup\(\)/, 'roof area must reuse the canonical roof popup');
 assert.match(statusView, /statusSunroofInput: roofInput\('sunroof'\)/, 'large status surface must reuse the canonical sunroof range handler');
 assert.match(statusView, /statusCurtainInput: roofInput\('curtain'\)/, 'large status surface must reuse the canonical sunshade range handler');
-all(statusView, ['statusIsFull', 'statusIsCompact', 'statusDoorStat', 'statusGlassStat', 'statusBeltStat', 'statusTireStat'],
-  'status view must expose one canonical full console and a compact fallback');
+all(statusView, ['statusIsFull: false', 'statusIsCompact: true', 'statusDoorStat', 'statusGlassStat', 'statusBeltStat', 'statusTireStat'],
+  'status widgets must stay within the compact catalog sizes');
+all(statusView, ['statusWindowsToggleAll', 'statusRoofToggleAll', 'statusTrunkToggle'],
+  'unified status surfaces must expose contextual whole-vehicle toggles');
+assert.match(statusView, /statusTrunkToggle:[\s\S]*?_toggleStatusTrunk/,
+  'tailgate toggle must use the synchronized popup/model path');
 assert.match(statusView, /'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'/,
   'full console tire data must carry the short positional classes used around the car');
 assert.match(html, /case 'openVehicleStatus':\s*this\._openRoofLevelPopup\(\)/, 'status action must use the canonical roof popup directly');
@@ -120,8 +124,14 @@ assert.ok(!popupMarkup.includes('roof-top-view-v1.png'), 'popup must not contain
 assert.ok(!popupMarkup.includes('hv-hs-unified'), 'popup must not retain the old two-panel/two-car layout');
 all(popupMarkup, ['hv-vehicle-window-panel', 'data-hs-window-key="fl"', 'data-hs-window-key="fr"', 'data-hs-window-key="rl"', 'data-hs-window-key="rr"', 'data-hs-window-all="close"', 'data-hs-window-all="open"'], 'left-side window console');
 assert.equal((popupMarkup.match(/data-hs-vehicle-tire=/g) || []).length, 4, 'popup must render all four tire positions around the one car');
-assert.equal((popupMarkup.match(/data-hs-vehicle-tire="[^"]+"><strong>—<\/strong><small>—<\/small>/g) || []).length, 4,
+assert.equal((popupMarkup.match(/data-hs-vehicle-tire="[^"]+"><strong>—<\/strong><em><\/em><small>—<\/small>/g) || []).length, 4,
   'popup tire positions must show pressure over temperature without redundant corner initials');
+assert.equal((popupMarkup.match(/class="hv-hs-roof-quick-range"/g) || []).length, 2,
+  'popup must reuse both fat-finger roof hotspot sliders');
+assert.equal((popupMarkup.match(/data-hs-toggle-all=/g) || []).length, 3,
+  'popup footer must contain window, roof and tailgate toggles');
+assert.ok(!popupMarkup.includes('data-hs-roof-close-all') && !popupMarkup.includes('data-hs-roof-open-all'),
+  'popup must not retain separate one-way roof footer buttons');
 const envelope = block(html, '  _statusEnvelopeSnapshot(');
 all(envelope, ['CAR_SIGNALS.sunroof', 'CAR_SIGNALS.curtain', "'unfastened'", "'fastened'", "'unknown'", 'DEMO', 'this._tiresWidgetView', 'tires.wheels'], 'envelope telemetry, seatbelt, and tire semantics');
 assert.match(envelope, /if \(!demo && !doors\.open\.length && beltAttention\.length\)/,
@@ -230,10 +240,25 @@ assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-\d+%/,
 // small. Pressure scales with the panel; nothing draws a card behind it.
 assert.match(html, /\.hv-hs-vehicle-tire strong \{[^}]*font:[^;}]*clamp\(/,
   'popup tire pressure must scale with the panel');
-assert.match(html, /\.hv-hs-vehicle-tire small \{[^}]*11px/,
+assert.match(html, /\.hv-hs-vehicle-tire small \{[^}]*15px/,
   'popup tire temperature must remain legible beneath pressure');
-assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-52%/,
+assert.match(html, /\.hv-hs-vehicle-tire em \{[^}]*8px/,
+  'popup pressure unit must be visually secondary to the value');
+assert.match(html, /\.hv-hs-vehicle-tire\.fl \{ left:-48%/,
   'popup tire pressure must stay close to the vehicle while remaining outside');
+assert.match(html, /\.hv-hs-roof-stack > \.hv-hs-roof-card \{ grid-column:2;/,
+  'roof controls must occupy the center popup column');
+assert.match(html, /\.hv-hs-roof-stack > \.hv-hs-vehicle-stage \{ grid-column:3;/,
+  'vehicle must occupy the right popup column');
+const widgetSizes = block(html, '  _widgetSizes(');
+assert.ok(!widgetSizes.includes('concat([[cols, rows]])'),
+  'the 6x2 board size must not be injected into every widget');
+const fitFullGrid = block(html, '  _fitFullGridItems(');
+all(fitFullGrid, ["this._widgetSizes(it.type, 'appCar')", 'const fitting = allowed.filter', 'it.w = choices[0][0]', 'it.h = choices[0][1]'],
+  'saved oversized widgets must migrate to an allowed catalog size');
+const trunkToggle = block(html, '  _toggleStatusTrunk(');
+all(trunkToggle, ['DEMO_DOOR_SEQUENCE.findIndex', 'this._demoDoorSequenceIndex', 'this._setTrunkOpen(next)', "this._sendCarCommand('toggle_trunk'"],
+  'tailgate toggle must keep demo artwork, 3D state and live command semantics aligned');
 assert.ok(!/\.hv-hs-vehicle-tire \{[^}]*background:/.test(html),
   'popup tire readouts must not sit on a plate');
 // Pins that the revision is BUMPED, not that it holds one literal: the WebView
