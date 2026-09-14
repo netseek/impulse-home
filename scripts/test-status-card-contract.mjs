@@ -128,6 +128,10 @@ assert.equal((popupMarkup.match(/data-hs-vehicle-tire="[^"]+"><strong>—<\/stro
   'popup tire positions must show pressure over temperature without redundant corner initials');
 assert.equal((popupMarkup.match(/class="hv-hs-roof-quick-range"/g) || []).length, 2,
   'popup must reuse both fat-finger roof hotspot sliders');
+assert.equal((popupMarkup.match(/data-hs-roof-context=/g) || []).length, 4,
+  'popup must expose exactly two contextual actions below each roof slider');
+assert.ok(!popupMarkup.includes('data-hs-roof-toggle='),
+  'popup must not retain the redundant fourth roof control beside either slider');
 assert.equal((popupMarkup.match(/data-hs-toggle-all=/g) || []).length, 3,
   'popup footer must contain window, roof and tailgate toggles');
 assert.ok(!popupMarkup.includes('data-hs-roof-close-all') && !popupMarkup.includes('data-hs-roof-open-all'),
@@ -250,6 +254,12 @@ assert.match(html, /\.hv-hs-roof-stack > \.hv-hs-roof-card \{ grid-column:2;/,
   'roof controls must occupy the center popup column');
 assert.match(html, /\.hv-hs-roof-stack > \.hv-hs-vehicle-stage \{ grid-column:3;/,
   'vehicle must occupy the right popup column');
+assert.match(html, /\.hv-hs-roof-footer \{[^}]*width:\s*66\.666%/,
+  'popup footer actions must stop before the vehicle column');
+assert.match(html, /\.hv-status-full-footer \{[^}]*width:66\.666%/,
+  'focused status footer actions must preserve the vehicle third');
+all(statusView, ['contextualRoofActions', "pct <= 2", "pct >= 98", "action('open', 'ABRIR')", "action('close', 'FECHAR')", 'midpointLabel'],
+  'roof and curtain controls must select their two actions from current position');
 const widgetSizes = block(html, '  _widgetSizes(');
 assert.ok(!widgetSizes.includes('concat([[cols, rows]])'),
   'the 6x2 board size must not be injected into every widget');
