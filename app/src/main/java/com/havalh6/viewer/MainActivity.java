@@ -1827,6 +1827,13 @@ public final class MainActivity extends Activity {
             imageW = Math.min(imageW, w * .42f);
             float left = (w - imageW) * .5f;
             float top = -h * .019f;
+            String[] openings = descriptor.openingStates == null ? new String[0]
+                    : descriptor.openingStates;
+            // The raster overflows the card at the bottom, which is where the
+            // open tailgate sits. Lift the car so the open trunk is on screen.
+            if (openings.length > 4 && "open".equals(openings[4])) {
+                top -= imageH - h * 1.02f;
+            }
             android.graphics.RectF vehicleRect = new android.graphics.RectF(
                     left, top, left + imageW, top + imageH);
             if (base != null) {
@@ -1839,8 +1846,6 @@ public final class MainActivity extends Activity {
                 drawStatusVehicleFallback(c, w, h, muted, strong);
                 c.restore();
             }
-            String[] openings = descriptor.openingStates == null ? new String[0]
-                    : descriptor.openingStates;
             // Darken only the matching door footprint before drawing an open panel.
             // The repository's doorless base retains bright pillar/rocker pixels which
             // otherwise resemble a second, closed door at compact card size.
@@ -2079,7 +2084,7 @@ public final class MainActivity extends Activity {
                     paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                     paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                             android.graphics.Typeface.NORMAL));
-                    paint.setTextSize(Math.max(11f, h * .16f));
+                    paint.setTextSize(Math.max(13f, h * .20f));
                     fill(strong);
                     c.drawText(maneuver, col * .5f, h * .88f, paint);
                 }
@@ -2109,9 +2114,9 @@ public final class MainActivity extends Activity {
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.NORMAL));
                 if (!street.isEmpty()) {
-                    paint.setTextSize(Math.max(13f, h * .21f));
+                    paint.setTextSize(Math.max(16f, h * .26f));
                     fill(strong);
-                    c.drawText(ellipsizeNav(street, textMax), textX, h * .30f, paint);
+                    c.drawText(ellipsizeNav(street, textMax), textX, h * .32f, paint);
                 }
                 if (showTurn) {
                     drawNavMetricRow(c, textX, h * .46f, textMax, h,
@@ -2123,14 +2128,14 @@ public final class MainActivity extends Activity {
                     String idleCity = descriptor.navIdleCity == null ? "" : descriptor.navIdleCity;
                     String idleAction = descriptor.navIdleAction == null ? "" : descriptor.navIdleAction;
                     if (!idleCity.isEmpty()) {
-                        paint.setTextSize(Math.max(9f, h * .12f));
+                        paint.setTextSize(Math.max(12f, h * .17f));
                         fill(muted);
-                        c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .46f, paint);
+                        c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .54f, paint);
                     }
                     if (!idleAction.isEmpty()) {
-                        paint.setTextSize(Math.max(7f, h * .09f));
+                        paint.setTextSize(Math.max(10f, h * .13f));
                         fill(muted);
-                        c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .64f, paint);
+                        c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .76f, paint);
                     }
                 }
             }
@@ -2154,8 +2159,8 @@ public final class MainActivity extends Activity {
             if (items.isEmpty() || maxW <= 0f) return;
             android.graphics.Typeface medium = android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL);
-            float valueSize = Math.max(13f, h * .24f);
-            float labelSize = Math.max(7f, h * .11f);
+            float valueSize = Math.max(15f, h * .28f);
+            float labelSize = Math.max(9f, h * .13f);
             float gap = Math.max(10f, h * .08f);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(medium);
