@@ -5143,6 +5143,8 @@ window.HavalSplash = (function () {
     .hv-energy-wshead > .hv-energy-unitsbtn { margin-left:auto; min-height:44px; padding:0 14px; border:0; border-radius:12px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:600 12px/1 'Space Mono',monospace; letter-spacing:.06em; cursor:pointer; }
     .hv-energy-wshead > .hv-energy-unitsbtn.on { color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(255,255,255,.14); }
     .hv-energy-wide > .hv-energy-unitsheet { top:56px; right:13px; }
+    /* In the popup the header sits outside the workspace, so the sheet stays at its top. */
+    .hv-card-focus .hv-energy-wide > .hv-energy-unitsheet { top:2px; right:2px; }
     .hv-energy-wide .hv-energy-trips { grid-template-columns:minmax(200px,.3fr) minmax(0,2fr); }
     .hv-energy-wide .hv-energy-detail { flex-direction:row; gap:12px; }
     .hv-energy-wide .hv-energy-mappane { flex:1.3; min-width:0; }
@@ -6455,7 +6457,7 @@ window.HavalSplash = (function () {
       </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}">
-      <div class="hv-energy hv-energy-focus">
+      <div class="hv-energy hv-energy-focus {{ focusedConsumptionWideClass }}">
         <div class="hv-energy-bar">
           <div class="hv-energy-tabs" role="tablist" aria-label="Visões de energia">
             <button type="button" role="tab" class="{{ focusedConsumptionTabNowClass }}" aria-selected="{{ focusedConsumptionTabNowOn }}" onClick="{{ focusedConsumptionTabNow }}">AGORA</button>
@@ -35757,6 +35759,8 @@ class Component extends DCLogic {
       // MAPA | DADOS and GRÁFICO | DADOS pick one pane in the 3x2 popup; a wide
       // widget has room for both, so it shows both and no toggle.
       consumptionShowToggles: !wide,
+      // The maximised popup takes the wide widget's side-by-side layout.
+      consumptionWideClass: wide ? 'hv-energy-wide' : '',
       consumptionTripMapClass: on(tripView === 'map'),
       consumptionTripDataClass: on(tripView === 'data'),
       consumptionTripViewMap: (ev) => this._setEnergyTripView('map', ev),
@@ -36499,8 +36503,33 @@ class Component extends DCLogic {
       el.removeEventListener('wheel', wheel);
       clearTiles();
     };
+    // The pane can change size under the map (the popup maximised or restored,
+    // a widget resized): an untouched view refits, a moved one keeps its place.
+    let lastW = 0;
+    let lastH = 0;
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+      const s = size();
+      if (Math.abs(s.w - lastW) < 2 && Math.abs(s.h - lastH) < 2) return;
+      const refit = !moved();
+      lastW = s.w;
+      lastH = s.h;
+      if (refit) {
+        fit();
+        clearTiles();
+      }
+      schedule();
+    }) : null;
+    const destroyMap = st.destroy;
+    st.destroy = () => {
+      if (resize) resize.disconnect();
+      destroyMap();
+    };
     fit();
     render();
+    const s0 = size();
+    lastW = s0.w;
+    lastH = s0.h;
+    if (resize) resize.observe(el);
     return st;
   }
 
