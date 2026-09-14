@@ -1131,6 +1131,8 @@ public final class MainActivity extends Activity {
          * "unavailable" on all four corners while TPMS was live.
          */
         String tirePressures = "";
+        String tireTemperatures = "";
+        String tirePressureUnit = "";
         /** ENERGY card: the last seven days' distance, 0-100 each, oldest first. */
         int[] energyBars = new int[0];
         /** Status opening order: FL, FR, RL, RR, tailgate. */
@@ -1713,6 +1715,8 @@ public final class MainActivity extends Activity {
         private final android.graphics.RectF oval = new android.graphics.RectF();
         private Bitmap tiresTopViewBitmap;
         private boolean tiresTopViewDecodeAttempted;
+        private float statusLift;
+        private long statusLiftLastMs;
         private final java.util.Map<String, Bitmap> statusVehicleBitmaps =
                 new java.util.HashMap<>();
 
@@ -1831,9 +1835,22 @@ public final class MainActivity extends Activity {
                     : descriptor.openingStates;
             // The raster overflows the card at the bottom, which is where the
             // open tailgate sits. Lift the car so the open trunk is on screen.
-            if (openings.length > 4 && "open".equals(openings[4])) {
-                top -= imageH - h * 1.02f;
+            // Eased over ~320 ms each way instead of snapping.
+            float liftTarget = openings.length > 4 && "open".equals(openings[4]) ? 1f : 0f;
+            long nowMs = android.os.SystemClock.uptimeMillis();
+            float stepMs = statusLiftLastMs == 0L ? 0f : Math.min(64f, nowMs - statusLiftLastMs);
+            statusLiftLastMs = nowMs;
+            float delta = liftTarget - statusLift;
+            if (Math.abs(delta) > .001f) {
+                float move = stepMs / 320f;
+                statusLift += Math.signum(delta) * Math.min(Math.abs(delta), move);
+                postInvalidateOnAnimation();
+            } else {
+                statusLift = liftTarget;
+                statusLiftLastMs = 0L;
             }
+            float eased = statusLift * statusLift * (3f - 2f * statusLift);
+            top -= (imageH - h * 1.02f) * eased;
             android.graphics.RectF vehicleRect = new android.graphics.RectF(
                     left, top, left + imageW, top + imageH);
             if (base != null) {
@@ -1891,20 +1908,53 @@ public final class MainActivity extends Activity {
             // overflow off the bottom: at imageH 1.34x the lower baseline
             // computed to 83.4 in an 81px view. X still tracks the vehicle,
             // which is the whole point of flanking it.
-            float[] tireYs = {h * .29f, h * .29f, h * .78f, h * .78f};
+            float[] tireYs = {h * .24f, h * .24f, h * .70f, h * .70f};
             String[] pressureReadings = tireReadings(descriptor);
+            String[] temps = descriptor.tireTemperatures.split("\\s*/\\s*", -1);
+            String unit = descriptor.tirePressureUnit;
+            android.graphics.Typeface valueFace = android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.BOLD);
+            android.graphics.Typeface unitFace = android.graphics.Typeface.create("sans-serif",
+                    android.graphics.Typeface.NORMAL);
+            android.graphics.Typeface tempFace = android.graphics.Typeface.create("sans-serif-light",
+                    android.graphics.Typeface.NORMAL);
+            float valueSize = Math.max(16f, Math.min(w, h) * .245f);
+            float smallSize = Math.max(9f, valueSize * .5f);
             for (int i = 0; i < 4; i++) {
                 String wheelState = descriptor.wheelStates != null
                         && i < descriptor.wheelStates.length
                         ? descriptor.wheelStates[i] : "unavailable";
+                boolean leftSide = i == 0 || i == 2;
+                String value = pressureReadings[i];
+                boolean hasValue = !"unavailable".equals(value) && !"—".equals(value);
+                String unitText = hasValue && !unit.isEmpty() ? " " + unit : "";
+                paint.setTypeface(unitFace);
+                paint.setTextSize(smallSize);
+                float unitW = paint.measureText(unitText);
+                paint.setTypeface(valueFace);
+                paint.setTextSize(valueSize);
+                float valueW = paint.measureText(value);
+                // Left-side readouts end at the car; right-side ones start there.
+                float x = leftSide ? tireXs[i] - valueW - unitW : tireXs[i];
+                float baseline = tireYs[i] + valueSize * .34f;
+                paint.setTextAlign(android.graphics.Paint.Align.LEFT);
                 fill(tireSignalColor(wheelState, muted));
-                paint.setTextAlign(i == 0 || i == 2
-                        ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
-                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                        android.graphics.Typeface.BOLD));
-                paint.setTextSize(Math.max(16f, Math.min(w, h) * .245f));
-                c.drawText(pressureReadings[i], tireXs[i],
-                        tireYs[i] + paint.getTextSize() * .34f, paint);
+                c.drawText(value, x, baseline, paint);
+                if (!unitText.isEmpty()) {
+                    paint.setTypeface(unitFace);
+                    paint.setTextSize(smallSize);
+                    fill(withAlpha(muted, 0xC8));
+                    c.drawText(unitText, x + valueW, baseline, paint);
+                }
+                String temp = i < temps.length ? temps[i].trim() : "";
+                if (!temp.isEmpty()) {
+                    paint.setTypeface(tempFace);
+                    paint.setTextSize(smallSize * 1.1f);
+                    paint.setTextAlign(leftSide
+                            ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
+                    fill(0xFF8F949B);
+                    c.drawText(temp, tireXs[i], baseline + smallSize * 1.35f, paint);
+                }
             }
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
@@ -1942,7 +1992,7 @@ public final class MainActivity extends Activity {
                 android.graphics.RectF vehicleRect) {
             String[] states = descriptor.seatBeltStates == null
                     ? new String[0] : descriptor.seatBeltStates;
-            float[] xs = {.455f, .545f, .445f, .5f, .555f};
+            float[] xs = {.425f, .575f, .405f, .5f, .595f};
             float[] ys = {.49f, .49f, .60f, .60f, .60f};
             for (int i = 0; i < 5 && i < states.length; i++) {
                 if (!"unfastened".equals(states[i])) continue;
@@ -10276,6 +10326,8 @@ public final class MainActivity extends Activity {
                     iconAction, longAction, glyph, glyphText, clockFace, clockHourFormat,
                     dialMarks, splitPlates, dateSpineFormat, dateWording, menu);
             descriptor.tirePressures = cleanBottomCardText(raw.optString("tirePressures", ""), 48);
+            descriptor.tireTemperatures = cleanBottomCardText(raw.optString("tireTemperatures", ""), 48);
+            descriptor.tirePressureUnit = cleanBottomCardText(raw.optString("tirePressureUnit", ""), 6);
             descriptor.appPackage = cleanBottomCardText(raw.optString("appPackage", ""), 80);
             descriptor.navRemaining = cleanBottomCardText(raw.optString("navRemaining", ""), 16);
             descriptor.navDuration = cleanBottomCardText(raw.optString("navDuration", ""), 16);
