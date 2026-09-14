@@ -91,6 +91,14 @@ const CHECKS = {
       && pop.includes("consumptionHistShowData: wide || histView === 'data'")
       && html.includes("this._consumptionWidgetView(entry.item, 'popup')");
   },
+  // FINALIZAR VIAGEM ends a trip for good: the button only opens a confirmation.
+  'finishing a trip asks for confirmation': ({ html }) => {
+    const ask = method(html, '_finishEnergyTrip') || '';
+    const confirm = method(html, '_confirmFinishEnergyTrip') || '';
+    return /energyFinishConfirm: true/.test(ask) && !/finishTrip\(\)/.test(ask)
+      && /b\.finishTrip\(\)/.test(confirm)
+      && html.includes('FinishConfirm }}">FINALIZAR</button>');
+  },
 };
 
 const MUTANTS = {
@@ -124,6 +132,8 @@ const MUTANTS = {
     "credit.textContent = '© OpenStreetMap contributors';", "credit.textContent = '';") }),
   'wide widget shows both panes': (s) => ({ ...s, html: s.html.replace(
     "consumptionTripShowData: !!t && (wide || tripView === 'data')", "consumptionTripShowData: !!t && tripView === 'data'") }),
+  'finishing a trip asks for confirmation': (s) => ({ ...s, html: s.html.replace(
+    '    this._uiOnlySetState({ energyFinishConfirm: true });', '    this._confirmFinishEnergyTrip(ev);') }),
 };
 
 const changed = (a, b) => Object.keys(a).some((k) => a[k] !== b[k]);

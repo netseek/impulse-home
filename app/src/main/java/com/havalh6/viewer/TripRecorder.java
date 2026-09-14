@@ -12,6 +12,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.util.Log;
 
 import org.json.JSONObject;
@@ -53,6 +54,8 @@ final class TripRecorder implements TripEngine.Listener {
     /** The MMI can lose power with no warning; lose at most this much. */
     private static final long CHECKPOINT_MS = 15_000L;
     private static final int POINT_FLUSH = 30;
+    private static final String ACTION_REQUEST_SNAPSHOT = "com.haval.vehicle.REQUEST_SNAPSHOT";
+    private static final String IMPULSE_PACKAGE = "br.com.redesurftank.havalshisuku";
     private static final long GPS_MIN_MS = 1_000L;
 
     private static final Set<String> KEYS = new HashSet<>(Arrays.asList(
@@ -71,6 +74,8 @@ final class TripRecorder implements TripEngine.Listener {
     private final List<TripPoint> pending = new ArrayList<>();
     private long pendingStartMs;
     private long lastCheckpointAt;
+    private long lastTickElapsed;
+    private String lastReadyRaw;
     private volatile String liveJson = "";
     private boolean gpsOn;
 
@@ -157,6 +162,19 @@ final class TripRecorder implements TripEngine.Listener {
     /** Called when the activity goes away: put what is held on disk, keep recording. */
     void persistSoon() {
         worker.post(() -> persist(now()));
+    }
+
+    /** FINALIZAR VIAGEM from the page: end the open trip now; keep recording if still READY. */
+    void finishTrip() {
+        worker.post(() -> {
+            if (engine == null) return;
+            long t = now();
+            Log.w(TAG, "trip finished by the driver");
+            engine.finishNow(t);
+            TripSummary live = engine.live(t);
+            liveJson = live == null ? "" : TripStore.summaryJson(live);
+            persist(t);
+        });
     }
 
     String liveJson() {
@@ -255,6 +273,11 @@ final class TripRecorder implements TripEngine.Listener {
             onNavigation(value, t);
             return;
         }
+        if (TripEngine.KEY_READY.equals(key) && !value.equals(lastReadyRaw)) {
+            // The car publishes more than 0 / 1; the raw values are what a drive log needs.
+            lastReadyRaw = value;
+            Log.w(TAG, "ready " + value);
+        }
         boolean wasOpen = engine.isOpen();
         engine.onSignal(key, value, t);
         // READY edges are exactly when the power may be about to go.
@@ -280,11 +303,35 @@ final class TripRecorder implements TripEngine.Listener {
 
     private void onTick(long t) {
         if (engine == null) return;
+        // Ticks are 1 s apart. elapsedRealtime keeps counting through deep sleep and
+        // ignores wall-clock corrections, so a gap here means the head unit slept:
+        // end a trip left open across it, and ask Impulse to replay its values so
+        // READY is current again.
+        long elapsed = SystemClock.elapsedRealtime();
+        if (lastTickElapsed > 0 && elapsed - lastTickElapsed >= TripEngine.MERGE_GAP_MS) {
+            Log.w(TAG, "woke after " + (elapsed - lastTickElapsed) / 1000 + " s");
+            engine.closeInterrupted(t);
+            requestSnapshot("woke from sleep");
+        }
+        lastTickElapsed = elapsed;
         engine.tick(t);
         TripSummary live = engine.live(t);
         liveJson = live == null ? "" : TripStore.summaryJson(live);
         setGps(engine.isOpen());
         if (engine.isOpen() && t - lastCheckpointAt >= CHECKPOINT_MS) persist(t);
+    }
+
+    /** Asks Impulse to re-broadcast every cached car value. */
+    private void requestSnapshot(String why) {
+        try {
+            Intent request = new Intent(ACTION_REQUEST_SNAPSHOT);
+            request.setPackage(IMPULSE_PACKAGE);
+            request.putExtra("requester", app.getPackageName());
+            app.sendBroadcast(request);
+            Log.w(TAG, "snapshot requested: " + why);
+        } catch (Exception e) {
+            Log.w(TAG, "snapshot request failed", e);
+        }
     }
 
     private void persist(long t) {

@@ -74,4 +74,10 @@ final class TripBridge {
     public String getTotals() {
         return recorder.totalsJson();
     }
+
+    /** FINALIZAR VIAGEM: ends the open trip; a new one starts at once if the car is still READY. */
+    @JavascriptInterface
+    public void finishTrip() {
+        recorder.finishTrip();
+    }
 }

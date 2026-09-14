@@ -31,6 +31,25 @@ final class TripSignals {
         return "1".equals(s) || "true".equalsIgnoreCase(s);
     }
 
+    /**
+     * {@code car.basic.driving_ready_state} read the way Impulse reads it
+     * (ServiceManager.isVehicleReadyStateOff / On): "0" and "-1" are off and
+     * any other value is on. The car publishes more than 0 / 1, so treating
+     * only "1" as READY would misread it.
+     */
+    static Boolean parseReady(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim();
+        if (s.startsWith("{")) {
+            s = stripBraces(s);
+            int comma = s.indexOf(',');
+            if (comma >= 0) s = s.substring(0, comma);
+            s = s.trim();
+        }
+        if (s.isEmpty()) return null;
+        return !("0".equals(s) || "-1".equals(s));
+    }
+
     /** Mirrors index.html {@code _carNumber}: a braced pair reads its second slot. */
     static double parseNumber(String raw) {
         if (raw == null) return Double.NaN;

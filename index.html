@@ -4944,6 +4944,17 @@ window.HavalSplash = (function () {
     .hv-energy-detail { min-width:0; min-height:0; padding:10px; border-radius:16px; background:rgba(255,255,255,.035); display:flex; flex-direction:column; }
     .hv-energy-mappane { flex:1; min-height:0; display:flex; flex-direction:column; gap:8px; }
     .hv-energy-mappane > .hv-energy-empty { margin:auto; text-align:center; }
+    .hv-energy-livebox { margin:auto; display:flex; flex-direction:column; align-items:center; gap:14px; padding:0 12px; text-align:center; }
+    .hv-energy-livebox > .hv-energy-empty { margin:0; }
+    .hv-energy-finish { min-height:48px; padding:0 20px; border:1px solid rgba(229,72,77,.6); border-radius:14px; background:rgba(229,72,77,.12); color:inherit; font:600 13px/1 'Space Mono',monospace; letter-spacing:.06em; cursor:pointer; }
+    .hv-energy-confirm { position:absolute; inset:0; z-index:8; display:flex; align-items:center; justify-content:center; border-radius:16px; background:rgba(4,8,12,.55); }
+    .hv-energy-confirm-box { width:min(440px,90%); padding:20px 22px; border:1px solid var(--hv-frost-edge,rgba(255,255,255,.18)); border-radius:18px; background:var(--hv-frost-bg,rgba(12,18,24,.96)); box-shadow:0 18px 50px rgba(0,0,0,.45); }
+    .hv-energy-confirm-box > strong { display:block; font-size:20px; font-weight:600; }
+    .hv-energy-confirm-box > p { margin:8px 0 18px; font-size:15px; line-height:1.4; opacity:.85; }
+    .hv-energy-confirm-actions { display:flex; justify-content:flex-end; gap:12px; }
+    .hv-energy-confirm-actions > button { min-height:52px; padding:0 22px; border:0; border-radius:14px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:600 14px/1 'Space Mono',monospace; letter-spacing:.06em; cursor:pointer; }
+    .hv-energy-confirm-actions > button.danger { background:#e5484d; color:#fff; }
+    .hv-energy-datapane > .hv-energy-finish { align-self:flex-start; }
     .hv-energy-datapane { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
     /* The interactive map fills the pane edge to edge (owner, 2026-09-14). */
     .hv-energy-mapwrap > .hv-energy-livemap { position:absolute; inset:0; height:auto; border-radius:0; }
@@ -5933,6 +5944,15 @@ window.HavalSplash = (function () {
                     <div class="hv-energy-seg hv-energy-period" role="group" aria-label="Período"><button type="button" class="{{ wg.consumptionRange7Class }}" onClick="{{ wg.consumptionRange7 }}">7 DIAS</button><button type="button" class="{{ wg.consumptionRange30Class }}" onClick="{{ wg.consumptionRange30 }}">30 DIAS</button><button type="button" class="{{ wg.consumptionRange12Class }}" onClick="{{ wg.consumptionRange12 }}">12 MESES</button><button type="button" class="{{ wg.consumptionRangeAllClass }}" onClick="{{ wg.consumptionRangeAll }}">TUDO</button></div>
                   </sc-if>
                 </div>
+                <sc-if value="{{ wg.consumptionFinishConfirmOpen }}" hint-placeholder-val="{{ false }}">
+                  <div class="hv-energy-confirm" role="alertdialog" aria-label="Finalizar viagem">
+                    <div class="hv-energy-confirm-box">
+                      <strong>Finalizar viagem?</strong>
+                      <p>A viagem atual é salva agora. Se o carro continuar ligado, uma nova viagem começa em seguida.</p>
+                      <div class="hv-energy-confirm-actions"><button type="button" onClick="{{ wg.consumptionFinishCancel }}">CANCELAR</button><button type="button" class="danger" onClick="{{ wg.consumptionFinishConfirm }}">FINALIZAR</button></div>
+                    </div>
+                  </div>
+                </sc-if>
                 <sc-if value="{{ wg.consumptionUnitsOpen }}" hint-placeholder-val="{{ false }}">
                   <div class="hv-energy-unitsheet" role="group" aria-label="Unidades">
                     <div class="hv-energy-unitrow"><small>COMBUSTÍVEL</small><div class="hv-energy-seg"><button type="button" class="{{ wg.consumptionFuelKmlClass }}" onClick="{{ wg.consumptionSetFuelKml }}">km/L</button><button type="button" class="{{ wg.consumptionFuelL100Class }}" onClick="{{ wg.consumptionSetFuelL100 }}">L/100 km</button></div></div>
@@ -5983,11 +6003,12 @@ window.HavalSplash = (function () {
                                 <ul class="hv-energy-legend"><sc-for list="{{ wg.consumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
                               </div>
                             </sc-if>
-                            <sc-if value="{{ wg.consumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">{{ wg.consumptionDetailNote }}</p></sc-if>
+                            <sc-if value="{{ wg.consumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livebox"><p class="hv-energy-empty">{{ wg.consumptionDetailNote }}</p><sc-if value="{{ wg.consumptionCanFinish }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish" onClick="{{ wg.consumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if></div></sc-if>
                           </div>
                         </sc-if>
                         <sc-if value="{{ wg.consumptionTripShowData }}" hint-placeholder-val="{{ false }}">
                           <div class="hv-energy-datapane slim-scrollbar">
+                            <sc-if value="{{ wg.consumptionFinishInData }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish" onClick="{{ wg.consumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if>
                             <sc-if value="{{ wg.consumptionDetailHasInsights }}" hint-placeholder-val="{{ false }}">
                               <ul class="hv-energy-insights"><sc-for list="{{ wg.consumptionDetailInsights }}" as="ins" hint-placeholder-count="3"><li class="{{ ins.cls }}">{{ ins.text }}</li></sc-for></ul>
                             </sc-if>
@@ -6308,6 +6329,15 @@ window.HavalSplash = (function () {
             <div class="hv-energy-seg hv-energy-period" role="group" aria-label="Período"><button type="button" class="{{ focusedConsumptionRange7Class }}" onClick="{{ focusedConsumptionRange7 }}">7 DIAS</button><button type="button" class="{{ focusedConsumptionRange30Class }}" onClick="{{ focusedConsumptionRange30 }}">30 DIAS</button><button type="button" class="{{ focusedConsumptionRange12Class }}" onClick="{{ focusedConsumptionRange12 }}">12 MESES</button><button type="button" class="{{ focusedConsumptionRangeAllClass }}" onClick="{{ focusedConsumptionRangeAll }}">TUDO</button></div>
           </sc-if>
         </div>
+        <sc-if value="{{ focusedConsumptionFinishConfirmOpen }}" hint-placeholder-val="{{ false }}">
+          <div class="hv-energy-confirm" role="alertdialog" aria-label="Finalizar viagem">
+            <div class="hv-energy-confirm-box">
+              <strong>Finalizar viagem?</strong>
+              <p>A viagem atual é salva agora. Se o carro continuar ligado, uma nova viagem começa em seguida.</p>
+              <div class="hv-energy-confirm-actions"><button type="button" onClick="{{ focusedConsumptionFinishCancel }}">CANCELAR</button><button type="button" class="danger" onClick="{{ focusedConsumptionFinishConfirm }}">FINALIZAR</button></div>
+            </div>
+          </div>
+        </sc-if>
         <sc-if value="{{ focusedConsumptionUnitsOpen }}" hint-placeholder-val="{{ false }}">
           <div class="hv-energy-unitsheet" role="group" aria-label="Unidades">
             <div class="hv-energy-unitrow"><small>COMBUSTÍVEL</small><div class="hv-energy-seg"><button type="button" class="{{ focusedConsumptionFuelKmlClass }}" onClick="{{ focusedConsumptionSetFuelKml }}">km/L</button><button type="button" class="{{ focusedConsumptionFuelL100Class }}" onClick="{{ focusedConsumptionSetFuelL100 }}">L/100 km</button></div></div>
@@ -6358,11 +6388,12 @@ window.HavalSplash = (function () {
                         <ul class="hv-energy-legend"><sc-for list="{{ focusedConsumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
                       </div>
                     </sc-if>
-                    <sc-if value="{{ focusedConsumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">{{ focusedConsumptionDetailNote }}</p></sc-if>
+                    <sc-if value="{{ focusedConsumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livebox"><p class="hv-energy-empty">{{ focusedConsumptionDetailNote }}</p><sc-if value="{{ focusedConsumptionCanFinish }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish" onClick="{{ focusedConsumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if></div></sc-if>
                   </div>
                 </sc-if>
                 <sc-if value="{{ focusedConsumptionTripShowData }}" hint-placeholder-val="{{ false }}">
                   <div class="hv-energy-datapane slim-scrollbar">
+                    <sc-if value="{{ focusedConsumptionFinishInData }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish" onClick="{{ focusedConsumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if>
                     <sc-if value="{{ focusedConsumptionDetailHasInsights }}" hint-placeholder-val="{{ false }}">
                       <ul class="hv-energy-insights"><sc-for list="{{ focusedConsumptionDetailInsights }}" as="ins" hint-placeholder-count="3"><li class="{{ ins.cls }}">{{ ins.text }}</li></sc-for></ul>
                     </sc-if>
@@ -8201,6 +8232,7 @@ class Component extends DCLogic {
     energyRouteMetric: 'speed',
     energyStopSel: -1,
     energyUnitsOpen: false,
+    energyFinishConfirm: false,
     energyTripView: 'map',
     energyHistoryView: 'chart',
     energyRev: 0,
@@ -10109,7 +10141,8 @@ class Component extends DCLogic {
       || t.closest('.hv-energy-livemap')
       || t.closest('.hv-energy-list')
       || t.closest('.hv-energy-datapane')
-      || t.closest('.hv-energy-histdata'));
+      || t.closest('.hv-energy-histdata')
+      || t.closest('.hv-energy-confirm'));
   }
 
   _onWidgetSuppressClick(e) {
@@ -33941,7 +33974,7 @@ class Component extends DCLogic {
     this.setState({ focusedCardType: type, desktopStudioOpen: false, panelOpen: false });
   }
 
-  _closeFocusedCard() { if (this.state.focusedCardType) this.setState({ focusedCardType: null, energyUnitsOpen: false }); }
+  _closeFocusedCard() { if (this.state.focusedCardType) this.setState({ focusedCardType: null, energyUnitsOpen: false, energyFinishConfirm: false }); }
 
   _createFocusedCardDesktop(type) {
     if (!this._desktops || this._desktops.length >= H6_MAX_DESKTOPS) return;
@@ -34677,7 +34710,7 @@ class Component extends DCLogic {
     this._cardControlEvent(ev);
     if (tab !== 'now' && tab !== 'trips' && tab !== 'history') return;
     if (tab !== 'now') this._energyFetchHistory(false);
-    this._uiOnlySetState({ energyTab: tab, energyUnitsOpen: false });
+    this._uiOnlySetState({ energyTab: tab, energyUnitsOpen: false, energyFinishConfirm: false });
   }
 
   _setEnergyRange(range, ev) {
@@ -35163,6 +35196,12 @@ class Component extends DCLogic {
       consumptionDetailProfile: '',
       consumptionDetailNote: '',
       consumptionShowDetail: false,
+      consumptionCanFinish: false,
+      consumptionFinishInData: false,
+      consumptionFinishConfirmOpen: false,
+      consumptionFinishTrip: (ev) => this._finishEnergyTrip(ev),
+      consumptionFinishConfirm: (ev) => this._confirmFinishEnergyTrip(ev),
+      consumptionFinishCancel: (ev) => this._cancelFinishEnergyTrip(ev),
       consumptionTripShowMap: false,
       consumptionTripShowData: false,
       consumptionMapKey: '',
@@ -35293,6 +35332,10 @@ class Component extends DCLogic {
     if (t && !row.live && t.detailKept === 0) note += ' Os dados por segundo ficam guardados nas últimas 30 viagens; a rota fica guardada para sempre.';
     const places = t && !row.live ? this._energyPlaces(t) : '';
     const on = (x) => (x ? 'on' : '');
+    // FINALIZAR VIAGEM (owner, 2026-09-14): only for the trip being recorded,
+    // and only when the recorder can do it; a dialog confirms.
+    const bridge = this._energyBridge();
+    const canFinish = !!(row && row.live && !m.demo && bridge && typeof bridge.finishTrip === 'function');
     return {
       consumptionTrips: list,
       consumptionTripsEmptyShow: !list.length,
@@ -35329,6 +35372,10 @@ class Component extends DCLogic {
       consumptionDetailProfile: detail ? detail.profile : '',
       consumptionDetailNote: note,
       consumptionShowDetail: !!t,
+      consumptionCanFinish: canFinish,
+      consumptionFinishInData: canFinish && !wide && tripView === 'data',
+      consumptionFinishConfirmOpen: canFinish && !!this.state.energyFinishConfirm,
+      consumptionFinishTrip: (ev) => this._finishEnergyTrip(ev),
       consumptionTripShowMap: !!t && (wide || tripView === 'map'),
       consumptionTripShowData: !!t && (wide || tripView === 'data'),
       consumptionMapKey: mapKey,
@@ -35818,6 +35865,39 @@ class Component extends DCLogic {
       out.profile = samples.map((p) => (p[9] * 100 / maxKm).toFixed(1) + ',' + (23 - p[4] * 21 / maxKmh).toFixed(1)).join(' ');
     }
     return out;
+  }
+
+  /** FINALIZAR VIAGEM opens a confirmation first (owner, 2026-09-14): ending a trip cannot be undone. */
+  _finishEnergyTrip(ev) {
+    this._cardControlEvent(ev);
+    this._uiOnlySetState({ energyFinishConfirm: true });
+  }
+
+  _cancelFinishEnergyTrip(ev) {
+    this._cardControlEvent(ev);
+    this._uiOnlySetState({ energyFinishConfirm: false });
+  }
+
+  /**
+   * Ends the trip in the recorder. If the car is still READY the recorder starts
+   * the next trip at that moment, so driving on is recorded from there.
+   */
+  _confirmFinishEnergyTrip(ev) {
+    this._cardControlEvent(ev);
+    this._uiOnlySetState({ energyFinishConfirm: false });
+    const b = this._energyBridge();
+    if (!b || typeof b.finishTrip !== 'function') return;
+    const closedStart = this._energyLive ? String(this._energyLive.startMs) : '';
+    try { b.finishTrip(); } catch (e) { return; }
+    // The recorder closes on its own thread; read back once it has, and show
+    // the trip that just ended (one too short to keep falls back to the list head).
+    setTimeout(() => {
+      if (this._unmounted) return;
+      this._energyLiveAt = 0;
+      this._energyReadLive(Date.now());
+      this._energyFetchHistory(false);
+      this._uiOnlySetState((s) => ({ energyTripStart: closedStart, energyStopSel: -1, energyRev: (s.energyRev || 0) + 1 }));
+    }, 500);
   }
 
   _setEnergyUnitsOpen(open, ev) {

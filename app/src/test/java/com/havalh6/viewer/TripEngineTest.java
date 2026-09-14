@@ -91,6 +91,140 @@ public class TripEngineTest {
     }
 
     @Test
+    public void aTripLeftOpenAcrossASleepClosesWhereItsDataStopped() {
+        // Parked at home: the head unit slept before READY=0 reached the
+        // recorder, so its thread froze believing the car was still READY.
+        signal(TripEngine.KEY_ODOMETER, "100.0", T0 - 1000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        cruise(60, T0, 120_000, 100.0);
+        long wake = T0 + 120_000 + 8 * 3_600_000L;   // next morning
+        engine.closeInterrupted(wake);               // the recorder saw its ticks stop
+        engine.tick(wake);
+        assertEquals(1, closed.size());
+        assertEquals(T0 + 120_000, closed.get(0).endMs);
+        assertFalse(engine.isOpen());
+        engine.tick(wake + 1000);
+        assertFalse("no trip until READY is heard again", engine.isOpen());
+        signal(TripEngine.KEY_READY, "1", wake + 1500);   // Impulse replays READY
+        assertTrue(engine.isOpen());
+        assertEquals(2, opened);
+    }
+
+    @Test
+    public void guidanceHoldsTheTripAcrossALongStop() {
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        engine.onNavigation(true, 30_000, 1800, false, T0);
+        cruise(60, T0, 120_000, 400.0);
+        engine.onNavigation(true, 28_000, 1700, false, T0 + 120_000);
+        long off = T0 + 121_000;
+        signal(TripEngine.KEY_SPEED, "0", off);
+        signal(TripEngine.KEY_READY, "0", off);
+        for (long t = off; t <= off + 40 * 60_000L; t += 5000) engine.tick(t);   // 40 min rest stop
+        assertTrue("guiding and not arrived: the stop does not end the trip", engine.isOpen());
+        assertTrue(closed.isEmpty());
+        signal(TripEngine.KEY_READY, "1", off + 40 * 60_000L + 1000);
+        assertEquals("the same trip carries on", 1, opened);
+        assertTrue(engine.isOpen());
+    }
+
+    @Test
+    public void endingGuidanceWhileParkedLetsTheUsualRuleEndTheTrip() {
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        engine.onNavigation(true, 30_000, 1800, false, T0);
+        cruise(60, T0, 120_000, 500.0);
+        long off = T0 + 121_000;
+        signal(TripEngine.KEY_READY, "0", off);
+        for (long t = off; t <= off + 20 * 60_000L; t += 5000) engine.tick(t);
+        assertTrue(engine.isOpen());
+        long cancel = off + 20 * 60_000L;
+        engine.onNavigation(false, Double.NaN, Double.NaN, false, cancel);   // cancelled in Android Auto
+        engine.tick(cancel + 1000);
+        assertEquals(1, closed.size());
+        assertEquals("ends when the car was switched off", off, closed.get(0).endMs);
+        assertFalse(closed.get(0).arrived);
+    }
+
+    @Test
+    public void parkedAtTheDestinationIsNotHeld() {
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "30", T0);
+        engine.onNavigation(true, 3000, 400, false, T0);
+        cruise(30, T0, 120_000, 800.0);
+        engine.onNavigation(true, 250, 30, false, T0 + 120_000);             // at the door, guidance not cleared
+        long off = T0 + 121_000;
+        signal(TripEngine.KEY_READY, "0", off);
+        closeAfterGap(off);
+        assertEquals(1, closed.size());
+        assertTrue(closed.get(0).arrived);
+    }
+
+    @Test
+    public void guidanceThatWentSilentStopsHoldingTheTrip() {
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        engine.onNavigation(true, 30_000, 1800, false, T0);
+        cruise(60, T0, 120_000, 600.0);
+        long off = T0 + 121_000;
+        signal(TripEngine.KEY_READY, "0", off);
+        for (long t = off; t <= T0 + TripEngine.GUIDANCE_HOLD_MAX_MS - 1000; t += 10_000) engine.tick(t);
+        assertTrue(engine.isOpen());
+        engine.tick(T0 + TripEngine.GUIDANCE_HOLD_MAX_MS + 1000);
+        assertEquals(1, closed.size());
+        assertEquals(off, closed.get(0).endMs);
+    }
+
+    @Test
+    public void aShortSleepWhileGuidingKeepsTheTrip() {
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        engine.onNavigation(true, 30_000, 1800, false, T0);
+        cruise(60, T0, 120_000, 700.0);
+        long wake = T0 + 120_000 + 15 * 60_000L;   // the head unit slept at a stop
+        engine.closeInterrupted(wake);
+        assertTrue(engine.isOpen());
+        signal(TripEngine.KEY_READY, "1", wake + 500);
+        assertEquals(1, opened);
+        assertTrue(engine.isOpen());
+    }
+
+    @Test
+    public void finishingWhileReadyStartsTheNextTripThere() {
+        signal(TripEngine.KEY_ODOMETER, "200.0", T0 - 1000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        double o = cruise(60, T0, 120_000, 200.0);
+        long tap = T0 + 120_000;
+        engine.finishNow(tap);
+        assertEquals(1, closed.size());
+        assertEquals(tap, closed.get(0).endMs);
+        assertEquals(2.0, closed.get(0).km, 1e-9);
+        assertTrue("still READY: a new trip starts at the tap", engine.isOpen());
+        cruise(60, tap, 120_000, o);
+        signal(TripEngine.KEY_READY, "0", tap + 120_000);
+        closeAfterGap(tap + 120_000);
+        assertEquals(2, closed.size());
+        assertEquals(tap, closed.get(1).startMs);
+        assertEquals(2.0, closed.get(1).km, 1e-9);
+    }
+
+    @Test
+    public void finishingAfterReadyOffEndsAtReadyOffAndStartsNothing() {
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        cruise(60, T0, 120_000, 300.0);
+        signal(TripEngine.KEY_SPEED, "0", T0 + 121_000);
+        signal(TripEngine.KEY_READY, "0", T0 + 122_000);
+        engine.finishNow(T0 + 180_000);
+        assertEquals(1, closed.size());
+        assertEquals(T0 + 122_000, closed.get(0).endMs);
+        assertFalse(engine.isOpen());
+        assertEquals(1, opened);
+    }
+
+    @Test
     public void shortStopKeepsOneTripAndExcludesThePause() {
         signal(TripEngine.KEY_ODOMETER, "500.0", T0 - 1000);
         signal(TripEngine.KEY_READY, "1", T0);
