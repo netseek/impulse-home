@@ -31,13 +31,15 @@ function load(html) {
   // eslint-disable-next-line no-new-func
   const fn = (name) => new Function(`return function ${methodText(html, name)}`)();
   const self = {};
-  for (const name of ['_energyMercator', '_energyFitZoom', '_energyOverlayFrame', '_energyRouteSegments', '_energyRangeEstimates']) {
+  for (const name of ['_energyMercator', '_energyFitZoom', '_energyOverlayFrame', '_energyRouteSegments', '_energyRangeEstimates', '_energyMapView', '_energyTrackAppend']) {
     self[name] = fn(name);
   }
   const bind = (name) => (...a) => self[name].apply(self, a);
   return {
     mercator: bind('_energyMercator'),
     fit: bind('_energyFitZoom'),
+    mapView: bind('_energyMapView'),
+    trackAppend: bind('_energyTrackAppend'),
     frame: bind('_energyOverlayFrame'),
     segments: bind('_energyRouteSegments'),
     range: bind('_energyRangeEstimates'),
@@ -50,6 +52,31 @@ const L100 = { fuel: 'l100', ev: 'kmkwh' };
 const pt = (i, kmh, kw, mode, rate) => [-22.9 - i * 0.001, -43.1, kmh, kw, mode, rate];
 
 const SCENARIOS = {
+  'a finished route is framed whole; a live one follows the car once it outgrows zoom 13': ({ mapView, fit, mercator }) => {
+    const short = [[-22.9, -43.1], [-22.9003, -43.1003]];
+    const done = mapView(short, 600, 400, false, 3, 18);
+    assert.equal(done.z, fit(short, 600, 400, 32, 3, 18));
+    assert.ok(done.z > 16, 'fixture must zoom past the live cap');
+    const a = mercator(short[0][0], short[0][1], done.z);
+    const b = mercator(short[1][0], short[1][1], done.z);
+    assert.equal(Math.round(done.cx), Math.round((a[0] + b[0]) / 2));
+    assert.equal(mapView(short, 600, 400, true, 3, 18).z, 16);
+    const long = [[-22.9, -43.1], [-23.5, -46.6]];
+    assert.ok(mapView(long, 600, 400, false, 3, 18).z < 13);
+    const follow = mapView(long, 600, 400, true, 3, 18);
+    const car = mercator(-23.5, -46.6, 13);
+    assert.deepEqual([follow.z, Math.round(follow.cx), Math.round(follow.cy)], [13, Math.round(car[0]), Math.round(car[1])]);
+  },
+  'the live track appends only newer points and thins its older half': ({ trackAppend }) => {
+    const pt = (t) => [t, -22.9, -43.1, 0, 30, 1, 1, 5, 0, t / 1000];
+    let tr = trackAppend([], [pt(1000), pt(2000)], 100);
+    tr = trackAppend(tr, [pt(2000), pt(3000)], 100);
+    assert.deepEqual(tr.map((p) => p[0]), [1000, 2000, 3000]);
+    const thin = trackAppend([], Array.from({ length: 300 }, (_, i) => pt((i + 1) * 1000)), 100);
+    assert.ok(thin.length <= 100);
+    assert.equal(thin[0][0], 1000);
+    assert.deepEqual(thin.slice(-20).map((p) => p[0]), Array.from({ length: 20 }, (_, i) => (281 + i) * 1000), 'the newest points stay at full rate');
+  },
   'projection follows the slippy-map convention': ({ mercator }) => {
     assert.deepEqual(mercator(0, 0, 0).map((v) => +v.toFixed(9)), [128, 128]);
     assert.equal(+mercator(0, 180, 0)[0].toFixed(9), 256);
@@ -145,6 +172,10 @@ const clean = run(SOURCE);
 assert.deepEqual(clean, [], `map scenarios failed: ${clean.join(', ')}`);
 
 const MUTANTS = {
+  'live view never follows the car': ['if (live && z < FOLLOW_Z) {', 'if (live && z < 0) {'],
+  'live view not capped at 16': ['live ? Math.min(maxZ, 16) : maxZ', 'maxZ'],
+  'old points appended again': ['.filter((p) => p && p[0] > last)', '.filter((p) => p)'],
+  'thinning drops the newest points too': ['out = out.slice(0, half).filter((p, i) => i % 2 === 0).concat(out.slice(half));', 'out = out.filter((p, i) => i % 2 === 0);'],
   'latitude clamp removed': ['const r = Math.max(-85.05112878, Math.min(85.05112878, lat)) * Math.PI / 180;', 'const r = lat * Math.PI / 180;'],
   'longitude scale wrong': ['return [(lon + 180) / 360 * scale,', 'return [(lon + 180) / 180 * scale,'],
   'fit never zooms in': ['for (let z = maxZ; z > minZ; z--) {\n      const nw = this._energyMercator(maxLat, minLon, z);', 'for (let z = minZ; z > minZ; z--) {\n      const nw = this._energyMercator(maxLat, minLon, z);'],

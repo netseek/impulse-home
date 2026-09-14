@@ -517,40 +517,98 @@ final class TripStore extends SQLiteOpenHelper {
                 int i = 0;
                 while (c.moveToNext()) {
                     if (i++ % stride != 0 && !c.isLast()) continue;
-                    JSONArray p = new JSONArray();
-                    p.put(c.getLong(0));
-                    for (int col = 1; col <= 5; col++) p.put(real(c, col));
-                    p.put(c.getInt(6));
-                    p.put(real(c, 7));
-                    p.put(c.getInt(8));
-                    p.put(real(c, 9));
-                    pts.put(p);
+                    pts.put(pointRow(c));
                 }
             }
             trip.put("pointFields", new JSONArray(
                     "[\"t\",\"lat\",\"lon\",\"alt\",\"kmh\",\"kw\",\"fuelMode\",\"fuelRate\",\"ice\",\"km\"]"));
             trip.put("points", pts);
-            JSONArray stops = new JSONArray();
-            try (Cursor c = getReadableDatabase().rawQuery(
-                    "SELECT kind, t, lat, lon, level_before, level_after, amount FROM trip_stops WHERE start_ms = ? ORDER BY t",
-                    new String[]{String.valueOf(startMs)})) {
-                while (c.moveToNext()) {
-                    JSONObject o = new JSONObject();
-                    o.put("kind", c.getString(0));
-                    o.put("t", c.getLong(1));
-                    o.put("lat", real(c, 2));
-                    o.put("lon", real(c, 3));
-                    o.put("before", real(c, 4));
-                    o.put("after", real(c, 5));
-                    o.put("amount", real(c, 6));
-                    stops.put(o);
-                }
-            }
-            trip.put("stops", stops);
+            trip.put("stops", stopsArray(startMs));
             return trip.toString();
         } catch (JSONException e) {
             return "null";
         }
+    }
+
+    /**
+     * The open trip's points after {@code afterT}, for the live map: what is saved
+     * (thinned by stride to {@code maxPoints}) followed by what the recorder still
+     * holds, so the route is a second behind rather than a flush (30 points) behind.
+     * {@code held} was copied BEFORE this query: a flush in between shows the same
+     * points in both, and they are dropped by time here instead of being lost.
+     */
+    String livePointsJson(long startMs, long afterT, int maxPoints, List<TripPoint> held) {
+        try {
+            JSONArray pts = new JSONArray();
+            long lastT = afterT;
+            try (Cursor c = getReadableDatabase().rawQuery(
+                    "SELECT t, lat, lon, alt, kmh, kw, fuel_mode, fuel_rate, ice, km FROM trip_points"
+                            + " WHERE start_ms = ? AND t > ? ORDER BY t",
+                    new String[]{String.valueOf(startMs), String.valueOf(afterT)})) {
+                int n = c.getCount();
+                int stride = Math.max(1, (int) Math.ceil(n / (double) Math.max(1, maxPoints)));
+                int i = 0;
+                while (c.moveToNext()) {
+                    if (i++ % stride != 0 && !c.isLast()) continue;
+                    pts.put(pointRow(c));
+                    lastT = c.getLong(0);
+                }
+            }
+            for (TripPoint p : held) {
+                if (p.t <= lastT) continue;
+                JSONArray row = new JSONArray();
+                row.put(p.t);
+                row.put(num(p.lat));
+                row.put(num(p.lon));
+                row.put(num(p.alt));
+                row.put(num(p.kmh));
+                row.put(num(p.kw));
+                row.put(p.fuelMode);
+                row.put(num(p.fuelRate));
+                row.put(p.ice);
+                row.put(num(p.km));
+                pts.put(row);
+                lastT = p.t;
+            }
+            JSONObject out = new JSONObject();
+            out.put("points", pts);
+            out.put("stops", stopsArray(startMs));
+            return out.toString();
+        } catch (JSONException e) {
+            return "null";
+        }
+    }
+
+    /** [t, lat, lon, alt, kmh, kw, fuelMode, fuelRate, ice, km], as the page reads a point. */
+    private static JSONArray pointRow(Cursor c) {
+        JSONArray p = new JSONArray();
+        p.put(c.getLong(0));
+        for (int col = 1; col <= 5; col++) p.put(real(c, col));
+        p.put(c.getInt(6));
+        p.put(real(c, 7));
+        p.put(c.getInt(8));
+        p.put(real(c, 9));
+        return p;
+    }
+
+    private JSONArray stopsArray(long startMs) throws JSONException {
+        JSONArray stops = new JSONArray();
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT kind, t, lat, lon, level_before, level_after, amount FROM trip_stops WHERE start_ms = ? ORDER BY t",
+                new String[]{String.valueOf(startMs)})) {
+            while (c.moveToNext()) {
+                JSONObject o = new JSONObject();
+                o.put("kind", c.getString(0));
+                o.put("t", c.getLong(1));
+                o.put("lat", real(c, 2));
+                o.put("lon", real(c, 3));
+                o.put("before", real(c, 4));
+                o.put("after", real(c, 5));
+                o.put("amount", real(c, 6));
+                stops.put(o);
+            }
+        }
+        return stops;
     }
 
     String daysJson(String fromDay, String toDay) {

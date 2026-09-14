@@ -5072,6 +5072,9 @@ window.HavalSplash = (function () {
     .hv-energy-livemap-route .seg { fill:none; stroke-width:4.5; stroke-linecap:round; stroke-linejoin:round; }
     .hv-energy-livemap-route .start { fill:#2e9d57; stroke:#fff; stroke-width:2.5; }
     .hv-energy-livemap-route .end { fill:#22262b; stroke:#fff; stroke-width:2.5; }
+    .hv-energy-livemap-route .car { fill:#1e88e5; stroke:#fff; stroke-width:3; }
+    /* Over map tiles the translucent button disappears: solid, like the map controls. */
+    .hv-energy-mapwrap > .hv-energy-finish-map { position:absolute; left:12px; bottom:12px; z-index:3; margin:0; border-color:#fff; background:#d93a40; color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.35); }
     .hv-energy-livemap-controls { position:absolute; right:10px; top:10px; display:flex; flex-direction:column; gap:6px; }
     .hv-energy-livemap-controls > button { width:44px; height:44px; border:0; border-radius:12px; background:rgba(20,26,32,.82); color:#fff; font:600 20px/1 sans-serif; cursor:pointer; }
     .hv-energy-livemap-credit { position:absolute; right:0; bottom:0; padding:2px 6px; background:rgba(255,255,255,.82); color:#333; font:11px/1.3 sans-serif; }
@@ -6101,7 +6104,7 @@ window.HavalSplash = (function () {
                   <sc-if value="{{ wg.consumptionBarShowSource }}" hint-placeholder-val="{{ false }}"><small class="{{ wg.consumptionSourceClass }}" data-en="source">{{ wg.consumptionSource }}</small></sc-if>
                   <sc-if value="{{ wg.consumptionShowTrips }}" hint-placeholder-val="{{ false }}">
                     <sc-if value="{{ wg.consumptionShowToggles }}" hint-placeholder-val="{{ true }}"><div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ wg.consumptionTripMapClass }}" onClick="{{ wg.consumptionTripViewMap }}">MAPA</button><button type="button" class="{{ wg.consumptionTripDataClass }}" onClick="{{ wg.consumptionTripViewData }}">DADOS</button></div></sc-if>
-                    <sc-if value="{{ wg.consumptionHasDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle"><strong>{{ wg.consumptionDetailTitle }}</strong><small>{{ wg.consumptionDetailMeta }}</small></div></sc-if>
+                    <sc-if value="{{ wg.consumptionHasDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle"><strong>{{ wg.consumptionDetailTitle }}</strong><small data-en-live="{{ wg.consumptionDetailLiveMeta }}">{{ wg.consumptionDetailMeta }}</small></div></sc-if>
                   </sc-if>
                   <sc-if value="{{ wg.consumptionShowHistory }}" hint-placeholder-val="{{ false }}">
                     <sc-if value="{{ wg.consumptionShowToggles }}" hint-placeholder-val="{{ true }}"><div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ wg.consumptionHistChartClass }}" onClick="{{ wg.consumptionHistViewChart }}">GRÁFICO</button><button type="button" class="{{ wg.consumptionHistDataClass }}" onClick="{{ wg.consumptionHistViewData }}">DADOS</button></div></sc-if>
@@ -6184,7 +6187,7 @@ window.HavalSplash = (function () {
                 <sc-if value="{{ wg.consumptionShowTrips }}" hint-placeholder-val="{{ false }}">
                   <div class="hv-energy-trips">
                     <div class="hv-energy-list slim-scrollbar">
-                      <sc-for list="{{ wg.consumptionTrips }}" as="tr" hint-placeholder-count="5"><button type="button" class="{{ tr.cls }}" onClick="{{ tr.onClick }}"><strong>{{ tr.title }}</strong><small>{{ tr.meta }}</small></button></sc-for>
+                      <sc-for list="{{ wg.consumptionTrips }}" as="tr" hint-placeholder-count="5"><button type="button" class="{{ tr.cls }}" onClick="{{ tr.onClick }}"><strong data-en-live="{{ tr.liveTitle }}">{{ tr.title }}</strong><small data-en-live="{{ tr.liveMeta }}">{{ tr.meta }}</small></button></sc-for>
                       <sc-if value="{{ wg.consumptionTripsEmptyShow }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">{{ wg.consumptionTripsEmpty }}</p></sc-if>
                     </div>
                     <sc-if value="{{ wg.consumptionShowDetail }}" hint-placeholder-val="{{ false }}">
@@ -6193,7 +6196,7 @@ window.HavalSplash = (function () {
                           <div class="hv-energy-mappane">
                             <sc-if value="{{ wg.consumptionDetailHasMapView }}" hint-placeholder-val="{{ false }}">
                               <div class="hv-energy-mapwrap">
-                                <sc-if value="{{ wg.consumptionDetailLiveMap }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livemap" data-trip="{{ wg.consumptionMapKey }}"></div></sc-if>
+                                <sc-if value="{{ wg.consumptionDetailLiveMap }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livemap" data-trip="{{ wg.consumptionMapKey }}"></div></sc-if><sc-if value="{{ wg.consumptionFinishOnMap }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish hv-energy-finish-map" onClick="{{ wg.consumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if>
                                 <sc-if value="{{ wg.consumptionDetailSnapshot }}" hint-placeholder-val="{{ false }}">
                                   <svg class="hv-energy-overlay" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa da rota"><rect class="bg" x="0" y="0" width="640" height="400"></rect><sc-if value="{{ wg.consumptionDetailHasMap }}" hint-placeholder-val="{{ false }}"><image class="hv-energy-map" href="{{ wg.consumptionDetailMap }}" x="0" y="0" width="640" height="400" preserveAspectRatio="none"></image></sc-if><sc-for list="{{ wg.consumptionDetailSegments }}" as="sg" hint-placeholder-count="3"><polyline class="{{ sg.cls }}" points="{{ sg.points }}"></polyline></sc-for><circle class="start" cx="{{ wg.consumptionDetailStartX }}" cy="{{ wg.consumptionDetailStartY }}" r="7"></circle><circle class="end" cx="{{ wg.consumptionDetailEndX }}" cy="{{ wg.consumptionDetailEndY }}" r="7"></circle><sc-for list="{{ wg.consumptionDetailPins }}" as="sp" hint-placeholder-count="1"><g class="{{ sp.cls }}" transform="{{ sp.transform }}" aria-label="{{ sp.label }}" onClick="{{ sp.onClick }}"><circle r="22"></circle><sc-if value="{{ sp.charge }}" hint-placeholder-val="{{ false }}"><path transform="translate(-12 -12)" d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V9c0-.69-.28-1.32-.73-1.77zM18 10c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM8 18v-4.5H6L10 6v5h2l-4 7z"></path></sc-if><sc-if value="{{ sp.refuel }}" hint-placeholder-val="{{ true }}"><path transform="translate(-12 -12)" d="m19.77 7.23.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V9c0-.69-.28-1.32-.73-1.77zM12 10H6V5h6v5zm6 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path></sc-if></g></sc-for></svg>
                                   <sc-if value="{{ wg.consumptionDetailHasStopInfo }}" hint-placeholder-val="{{ false }}">
@@ -6206,7 +6209,7 @@ window.HavalSplash = (function () {
                                 <ul class="hv-energy-legend"><sc-for list="{{ wg.consumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
                               </div>
                             </sc-if>
-                            <sc-if value="{{ wg.consumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livebox"><p class="hv-energy-empty">{{ wg.consumptionDetailNote }}</p><sc-if value="{{ wg.consumptionCanFinish }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish" onClick="{{ wg.consumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if></div></sc-if>
+                            <sc-if value="{{ wg.consumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livebox"><p class="hv-energy-empty" data-en-live="{{ wg.consumptionDetailLiveWait }}">{{ wg.consumptionDetailNote }}</p><sc-if value="{{ wg.consumptionCanFinish }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish" onClick="{{ wg.consumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if></div></sc-if>
                           </div>
                         </sc-if>
                         <sc-if value="{{ wg.consumptionTripShowData }}" hint-placeholder-val="{{ false }}">
@@ -6215,9 +6218,9 @@ window.HavalSplash = (function () {
                             <sc-if value="{{ wg.consumptionDetailHasInsights }}" hint-placeholder-val="{{ false }}">
                               <ul class="hv-energy-insights"><sc-for list="{{ wg.consumptionDetailInsights }}" as="ins" hint-placeholder-count="3"><li class="{{ ins.cls }}">{{ ins.text }}</li></sc-for></ul>
                             </sc-if>
-                            <ul class="hv-energy-kv"><sc-for list="{{ wg.consumptionDetailStats }}" as="kv" hint-placeholder-count="12"><li><small>{{ kv.k }}</small><b>{{ kv.v }}</b></li></sc-for></ul>
+                            <ul class="hv-energy-kv" data-en-live="{{ wg.consumptionDetailLiveStats }}"><sc-for list="{{ wg.consumptionDetailStats }}" as="kv" hint-placeholder-count="12"><li><small>{{ kv.k }}</small><b>{{ kv.v }}</b></li></sc-for></ul>
                             <sc-if value="{{ wg.consumptionDetailHasProfile }}" hint-placeholder-val="{{ false }}">
-                              <svg class="hv-energy-profile" viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label="Velocidade ao longo da viagem"><polyline points="{{ wg.consumptionDetailProfile }}"></polyline></svg>
+                              <svg class="hv-energy-profile" viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label="Velocidade ao longo da viagem"><polyline points="{{ wg.consumptionDetailProfile }}" data-en-live="{{ wg.consumptionDetailLiveProfile }}"></polyline></svg>
                             </sc-if>
                             <p class="hv-energy-note">{{ wg.consumptionDetailNote }}</p>
                           </div>
@@ -6539,7 +6542,7 @@ window.HavalSplash = (function () {
           <sc-if value="{{ focusedConsumptionBarShowSource }}" hint-placeholder-val="{{ false }}"><small class="{{ focusedConsumptionSourceClass }}" data-en="source">{{ focusedConsumptionSource }}</small></sc-if>
           <sc-if value="{{ focusedConsumptionShowTrips }}" hint-placeholder-val="{{ false }}">
             <sc-if value="{{ focusedConsumptionShowToggles }}" hint-placeholder-val="{{ true }}"><div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ focusedConsumptionTripMapClass }}" onClick="{{ focusedConsumptionTripViewMap }}">MAPA</button><button type="button" class="{{ focusedConsumptionTripDataClass }}" onClick="{{ focusedConsumptionTripViewData }}">DADOS</button></div></sc-if>
-            <sc-if value="{{ focusedConsumptionHasDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle"><strong>{{ focusedConsumptionDetailTitle }}</strong><small>{{ focusedConsumptionDetailMeta }}</small></div></sc-if>
+            <sc-if value="{{ focusedConsumptionHasDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle"><strong>{{ focusedConsumptionDetailTitle }}</strong><small data-en-live="{{ focusedConsumptionDetailLiveMeta }}">{{ focusedConsumptionDetailMeta }}</small></div></sc-if>
           </sc-if>
           <sc-if value="{{ focusedConsumptionShowHistory }}" hint-placeholder-val="{{ false }}">
             <sc-if value="{{ focusedConsumptionShowToggles }}" hint-placeholder-val="{{ true }}"><div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ focusedConsumptionHistChartClass }}" onClick="{{ focusedConsumptionHistViewChart }}">GRÁFICO</button><button type="button" class="{{ focusedConsumptionHistDataClass }}" onClick="{{ focusedConsumptionHistViewData }}">DADOS</button></div></sc-if>
@@ -6622,7 +6625,7 @@ window.HavalSplash = (function () {
         <sc-if value="{{ focusedConsumptionShowTrips }}" hint-placeholder-val="{{ false }}">
           <div class="hv-energy-trips">
             <div class="hv-energy-list slim-scrollbar">
-              <sc-for list="{{ focusedConsumptionTrips }}" as="tr" hint-placeholder-count="5"><button type="button" class="{{ tr.cls }}" onClick="{{ tr.onClick }}"><strong>{{ tr.title }}</strong><small>{{ tr.meta }}</small></button></sc-for>
+              <sc-for list="{{ focusedConsumptionTrips }}" as="tr" hint-placeholder-count="5"><button type="button" class="{{ tr.cls }}" onClick="{{ tr.onClick }}"><strong data-en-live="{{ tr.liveTitle }}">{{ tr.title }}</strong><small data-en-live="{{ tr.liveMeta }}">{{ tr.meta }}</small></button></sc-for>
               <sc-if value="{{ focusedConsumptionTripsEmptyShow }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">{{ focusedConsumptionTripsEmpty }}</p></sc-if>
             </div>
             <sc-if value="{{ focusedConsumptionShowDetail }}" hint-placeholder-val="{{ false }}">
@@ -6631,7 +6634,7 @@ window.HavalSplash = (function () {
                   <div class="hv-energy-mappane">
                     <sc-if value="{{ focusedConsumptionDetailHasMapView }}" hint-placeholder-val="{{ false }}">
                       <div class="hv-energy-mapwrap">
-                        <sc-if value="{{ focusedConsumptionDetailLiveMap }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livemap" data-trip="{{ focusedConsumptionMapKey }}"></div></sc-if>
+                        <sc-if value="{{ focusedConsumptionDetailLiveMap }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livemap" data-trip="{{ focusedConsumptionMapKey }}"></div></sc-if><sc-if value="{{ focusedConsumptionFinishOnMap }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish hv-energy-finish-map" onClick="{{ focusedConsumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if>
                         <sc-if value="{{ focusedConsumptionDetailSnapshot }}" hint-placeholder-val="{{ false }}">
                           <svg class="hv-energy-overlay" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa da rota"><rect class="bg" x="0" y="0" width="640" height="400"></rect><sc-if value="{{ focusedConsumptionDetailHasMap }}" hint-placeholder-val="{{ false }}"><image class="hv-energy-map" href="{{ focusedConsumptionDetailMap }}" x="0" y="0" width="640" height="400" preserveAspectRatio="none"></image></sc-if><sc-for list="{{ focusedConsumptionDetailSegments }}" as="sg" hint-placeholder-count="3"><polyline class="{{ sg.cls }}" points="{{ sg.points }}"></polyline></sc-for><circle class="start" cx="{{ focusedConsumptionDetailStartX }}" cy="{{ focusedConsumptionDetailStartY }}" r="7"></circle><circle class="end" cx="{{ focusedConsumptionDetailEndX }}" cy="{{ focusedConsumptionDetailEndY }}" r="7"></circle><sc-for list="{{ focusedConsumptionDetailPins }}" as="sp" hint-placeholder-count="1"><g class="{{ sp.cls }}" transform="{{ sp.transform }}" aria-label="{{ sp.label }}" onClick="{{ sp.onClick }}"><circle r="22"></circle><sc-if value="{{ sp.charge }}" hint-placeholder-val="{{ false }}"><path transform="translate(-12 -12)" d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V9c0-.69-.28-1.32-.73-1.77zM18 10c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM8 18v-4.5H6L10 6v5h2l-4 7z"></path></sc-if><sc-if value="{{ sp.refuel }}" hint-placeholder-val="{{ true }}"><path transform="translate(-12 -12)" d="m19.77 7.23.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V9c0-.69-.28-1.32-.73-1.77zM12 10H6V5h6v5zm6 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path></sc-if></g></sc-for></svg>
                           <sc-if value="{{ focusedConsumptionDetailHasStopInfo }}" hint-placeholder-val="{{ false }}">
@@ -6644,7 +6647,7 @@ window.HavalSplash = (function () {
                         <ul class="hv-energy-legend"><sc-for list="{{ focusedConsumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
                       </div>
                     </sc-if>
-                    <sc-if value="{{ focusedConsumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livebox"><p class="hv-energy-empty">{{ focusedConsumptionDetailNote }}</p><sc-if value="{{ focusedConsumptionCanFinish }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish" onClick="{{ focusedConsumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if></div></sc-if>
+                    <sc-if value="{{ focusedConsumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livebox"><p class="hv-energy-empty" data-en-live="{{ focusedConsumptionDetailLiveWait }}">{{ focusedConsumptionDetailNote }}</p><sc-if value="{{ focusedConsumptionCanFinish }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-finish" onClick="{{ focusedConsumptionFinishTrip }}">FINALIZAR VIAGEM</button></sc-if></div></sc-if>
                   </div>
                 </sc-if>
                 <sc-if value="{{ focusedConsumptionTripShowData }}" hint-placeholder-val="{{ false }}">
@@ -6653,9 +6656,9 @@ window.HavalSplash = (function () {
                     <sc-if value="{{ focusedConsumptionDetailHasInsights }}" hint-placeholder-val="{{ false }}">
                       <ul class="hv-energy-insights"><sc-for list="{{ focusedConsumptionDetailInsights }}" as="ins" hint-placeholder-count="3"><li class="{{ ins.cls }}">{{ ins.text }}</li></sc-for></ul>
                     </sc-if>
-                    <ul class="hv-energy-kv"><sc-for list="{{ focusedConsumptionDetailStats }}" as="kv" hint-placeholder-count="12"><li><small>{{ kv.k }}</small><b>{{ kv.v }}</b></li></sc-for></ul>
+                    <ul class="hv-energy-kv" data-en-live="{{ focusedConsumptionDetailLiveStats }}"><sc-for list="{{ focusedConsumptionDetailStats }}" as="kv" hint-placeholder-count="12"><li><small>{{ kv.k }}</small><b>{{ kv.v }}</b></li></sc-for></ul>
                     <sc-if value="{{ focusedConsumptionDetailHasProfile }}" hint-placeholder-val="{{ false }}">
-                      <svg class="hv-energy-profile" viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label="Velocidade ao longo da viagem"><polyline points="{{ focusedConsumptionDetailProfile }}"></polyline></svg>
+                      <svg class="hv-energy-profile" viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label="Velocidade ao longo da viagem"><polyline points="{{ focusedConsumptionDetailProfile }}" data-en-live="{{ focusedConsumptionDetailLiveProfile }}"></polyline></svg>
                     </sc-if>
                     <p class="hv-energy-note">{{ focusedConsumptionDetailNote }}</p>
                   </div>
@@ -35613,10 +35616,11 @@ class Component extends DCLogic {
 
   _energyTick() {
     if (this._unmounted) return;
-    this._energyMapSync();
     const now = Date.now();
     this._energySample(now);
     const m = this._energyModel(now);
+    this._energyLiveTripTick(m, now);
+    this._energyMapSync();
     const sig = ['source', 'sourceClass', 'nowFuel', 'nowFuelUnit', 'nowFuelNote', 'nowEv', 'nowEvUnit', 'nowKw', 'nowKwClass',
       'tripLabel', 'tripFuel', 'tripFuelUnit', 'tripKm', 'tripTime', 'tripEvShare'].concat(H6_ENERGY_NOW_KEYS)
       .map((k) => m[k]).join('|');
@@ -36235,6 +36239,11 @@ class Component extends DCLogic {
       consumptionShowDetail: false,
       consumptionCanFinish: false,
       consumptionFinishInData: false,
+      consumptionFinishOnMap: false,
+      consumptionDetailLiveMeta: '',
+      consumptionDetailLiveStats: '',
+      consumptionDetailLiveProfile: '',
+      consumptionDetailLiveWait: '',
       consumptionFinishConfirmOpen: false,
       consumptionFinishTrip: (ev) => this._finishEnergyTrip(ev),
       consumptionFinishConfirm: (ev) => this._confirmFinishEnergyTrip(ev),
@@ -36267,36 +36276,16 @@ class Component extends DCLogic {
     return view;
   }
 
-  _energyTripsView(m, wide) {
-    const units = m.units;
-    const rows = [];
-    const live = m.demo ? this._energyDemoLive(Date.now()) : this._energyLive;
-    if (live) rows.push({ key: 'live', trip: live, live: true });
-    (m.hist.trips || []).slice(0, 30).forEach((t) => rows.push({ key: String(t.startMs), trip: t, live: false }));
-    let selected = this.state.energyTripStart;
-    if (!rows.some((r) => r.key === selected)) selected = rows.length ? rows[0].key : '';
-    const span = (t) => this._energyDuration((t.driveMs || 0) + (t.idleMs || 0));
-    // Short rows (owner, 2026-09-13): the economy figure moved out of the list so
-    // the column can shrink and the map can grow.
-    const list = rows.map((r) => {
-      const places = r.live ? '' : this._energyPlaces(r.trip);
-      return {
-        cls: (r.key === selected ? 'on' : '') + (r.live ? ' live' : ''),
-        title: r.live ? 'Agora · ' + span(r.trip) : (places || this._energyWhen(r.trip.startMs)),
-        meta: (r.live ? '' : (places ? this._energyWhen(r.trip.startMs) : span(r.trip)) + ' · ') + this._energyKm(r.trip.km),
-        onClick: (ev) => this._selectEnergyTrip(r.key, ev),
-      };
-    });
-    const row = rows.find((r) => r.key === selected) || null;
-    const t = row ? row.trip : null;
-    const detail = row && !row.live ? this._energyTripDetail(row.trip, m.demo) : null;
-    const dist = t ? (t.kmIntegrated != null ? t.kmIntegrated : t.km) : NaN;
-    const avg = t && t.driveMs > 0 ? dist / (t.driveMs / 3600000) : NaN;
+  /** VIAGENS → DADOS for one trip; repainted each second for the trip being recorded. */
+  _energyTripStats(t, detail, units) {
+    if (!t) return [];
+    const dist = t.kmIntegrated != null ? t.kmIntegrated : t.km;
+    const avg = t.driveMs > 0 ? dist / (t.driveMs / 3600000) : NaN;
     const withUnit = (text, label) => (text === '—' ? '—' : text + ' ' + label);
     const allStops = detail ? detail.stops || [] : [];
     const refuelL = allStops.filter((sp) => sp.kind !== 'charge').reduce((a, sp) => a + (Number(sp.amount) || 0), 0);
     const chargePct = allStops.filter((sp) => sp.kind === 'charge').reduce((a, sp) => a + (Number(sp.amount) || 0), 0);
-    const stats = !t ? [] : [
+    return [
       { k: 'DISTÂNCIA', v: this._energyKm(t.km) },
       { k: 'TEMPO DIRIGINDO', v: this._energyDuration(t.driveMs) },
       { k: 'VELOC. MÉDIA', v: isFinite(avg) && avg > 0 ? Math.round(avg) + ' km/h' : '—' },
@@ -36315,6 +36304,36 @@ class Component extends DCLogic {
       { k: 'GUIADO', v: this._energyKm(t.guidedKm) + ' · ' + this._energyDuration((t.guidedS || 0) * 1000) },
     ] : []).concat(refuelL > 0 ? [{ k: 'ABASTECIDO', v: refuelL.toFixed(1) + ' L' }] : [])
       .concat(chargePct > 0 ? [{ k: 'CARREGADO', v: '+' + Math.round(chargePct) + '% de bateria' }] : []);
+  }
+
+  _energyTripsView(m, wide) {
+    const units = m.units;
+    const rows = [];
+    const live = m.demo ? this._energyDemoLive(Date.now()) : this._energyLive;
+    if (live) rows.push({ key: 'live', trip: live, live: true });
+    (m.hist.trips || []).slice(0, 30).forEach((t) => rows.push({ key: String(t.startMs), trip: t, live: false }));
+    let selected = this.state.energyTripStart;
+    if (!rows.some((r) => r.key === selected)) selected = rows.length ? rows[0].key : '';
+    const span = (t) => this._energyDuration((t.driveMs || 0) + (t.idleMs || 0));
+    // Short rows (owner, 2026-09-13): the economy figure moved out of the list so
+    // the column can shrink and the map can grow.
+    const list = rows.map((r) => {
+      const places = r.live ? '' : this._energyPlaces(r.trip);
+      return {
+        cls: (r.key === selected ? 'on' : '') + (r.live ? ' live' : ''),
+        title: r.live ? this._energyLiveTripTexts(r.trip, m.demo).rowTitle : (places || this._energyWhen(r.trip.startMs)),
+        meta: r.live ? this._energyLiveTripTexts(r.trip, m.demo).rowMeta
+          : (places ? this._energyWhen(r.trip.startMs) : span(r.trip)) + ' · ' + this._energyKm(r.trip.km),
+        liveTitle: r.live ? 'rowTitle' : '',
+        liveMeta: r.live ? 'rowMeta' : '',
+        onClick: (ev) => this._selectEnergyTrip(r.key, ev),
+      };
+    });
+    const row = rows.find((r) => r.key === selected) || null;
+    const t = row ? row.trip : null;
+    const detail = !row ? null : (row.live ? this._energyLiveDetail(row.trip, m.demo, Date.now()) : this._energyTripDetail(row.trip, m.demo));
+    const allStops = detail ? detail.stops || [] : [];
+    const stats = this._energyTripStats(t, detail, units);
     const insights = t ? this._energyTripInsights(t, m.hist.trips) : [];
 
     // Online, the pane IS the interactive OSM map (owner decision: online map
@@ -36324,7 +36343,8 @@ class Component extends DCLogic {
     const frame = detail ? detail.frame : null;
     const hasView = !!(frame && detail.fixes && detail.fixes.length >= 2);
     const online = typeof navigator === 'undefined' || navigator.onLine !== false;
-    const liveMap = !!(t && !row.live && hasView && online);
+    // The trip being recorded draws live, offline too: a tile that fails hides and the route stays.
+    const liveMap = !!(t && hasView && (online || row.live));
     const snapshot = hasView && !liveMap;
     const colored = snapshot ? this._energyRouteSegments(detail.route, metric, units) : { segments: [], legend: [] };
     const legend = hasView ? this._energyRouteSegments([], metric, units).legend : [];
@@ -36354,12 +36374,12 @@ class Component extends DCLogic {
     });
     const stopText = selStop ? this._energyStopText(selStop) : null;
     const tripView = this.state.energyTripView === 'data' ? 'data' : 'map';
-    const mapKey = liveMap ? String(t.startMs) + '|' + metric : '';
+    const mapKey = liveMap ? (row.live ? 'live:' : '') + String(t.startMs) + '|' + metric : '';
     // The map element is created by React; the tiles are mounted into it right
     // after this render (and again by the 1 Hz tick if this one is missed).
     if (liveMap) setTimeout(() => this._energyMapSync(), 0);
     let note = '';
-    if (t && row.live) note = 'Gravando. A rota aparece quando a viagem terminar.';
+    if (t && row.live && !hasView) note = 'Gravando. A rota aparece assim que houver posições de GPS.';
     else if (t && !hasView) note = 'Nenhuma posição de GPS foi gravada nesta viagem.';
     else if (t && (liveMap || detail.map)) note = 'Mapa © OpenStreetMap contributors.';
     else if (t) note = 'Rota sobre fundo neutro: o mapa é baixado quando a central estiver online.';
@@ -36378,8 +36398,8 @@ class Component extends DCLogic {
         : 'As viagens são gravadas pelo app do carro na central.',
       consumptionHasDetail: !!t,
       consumptionDetailTitle: !t ? '' : (row.live ? 'Viagem atual' : (places || this._energyWhen(t.startMs))),
-      consumptionDetailMeta: !t ? '' : (places ? this._energyWhen(t.startMs) + ' · ' : '')
-        + this._energyKm(t.km) + ' · ' + span(t) + (m.demo ? ' · DEMO' : ''),
+      consumptionDetailMeta: !t ? '' : (row.live ? this._energyLiveTripTexts(t, m.demo).detailMeta
+        : (places ? this._energyWhen(t.startMs) + ' · ' : '') + this._energyKm(t.km) + ' · ' + span(t) + (m.demo ? ' · DEMO' : '')),
       consumptionDetailStats: stats,
       consumptionDetailInsights: insights.map((i) => ({ cls: i.tone, text: i.text })),
       consumptionDetailHasInsights: insights.length > 0,
@@ -36410,6 +36430,12 @@ class Component extends DCLogic {
       consumptionFinishInData: canFinish && !wide && tripView === 'data',
       consumptionFinishConfirmOpen: canFinish && !!this.state.energyFinishConfirm,
       consumptionFinishTrip: (ev) => this._finishEnergyTrip(ev),
+      consumptionFinishOnMap: canFinish && liveMap,
+      // What _energyLiveTripTick repaints in place while this trip is the one recording.
+      consumptionDetailLiveMeta: row && row.live ? 'detailMeta' : '',
+      consumptionDetailLiveStats: row && row.live ? 'stats' : '',
+      consumptionDetailLiveProfile: row && row.live ? 'profile' : '',
+      consumptionDetailLiveWait: row && row.live && !hasView ? 'wait' : '',
       consumptionTripShowMap: !!t && (wide || tripView === 'map'),
       consumptionTripShowData: !!t && (wide || tripView === 'data'),
       consumptionMapKey: mapKey,
@@ -36625,15 +36651,174 @@ class Component extends DCLogic {
    * (the popup and a wide board widget can both show one); a no-op for an
    * element already showing the same trip and colouring.
    */
+  /**
+   * The trip being recorded, as a detail the map and DADOS draw: its points so
+   * far, pulled at most once a second and only the new ones after the first
+   * read (TripBridge.getTripPointsSince). `rev` moves when the route changed.
+   */
+  _energyLiveDetail(live, demo, now) {
+    let tr = this._energyLiveTrack;
+    if (!tr || tr.startMs !== live.startMs || tr.demo !== demo) {
+      tr = this._energyLiveTrack = { startMs: live.startMs, demo: demo, points: [], stops: [], at: 0, rev: 0, detail: null };
+    }
+    if (tr.detail && now - tr.at < 1000) return tr.detail;
+    tr.at = now;
+    const lastT = tr.points.length ? tr.points[tr.points.length - 1][0] : 0;
+    let fresh = [];
+    let stops = tr.stops;
+    if (demo) {
+      fresh = this._energyDemoLivePoints(live, now);
+    } else {
+      const b = this._energyBridge();
+      if (b && typeof b.getTripPointsSince === 'function') {
+        try {
+          const d = JSON.parse(b.getTripPointsSince(String(live.startMs), String(lastT), 1500));
+          fresh = d && Array.isArray(d.points) ? d.points : [];
+          if (d && Array.isArray(d.stops)) stops = d.stops;
+        } catch (e) {
+          fresh = [];
+        }
+      }
+    }
+    const points = this._energyTrackAppend(tr.points, fresh, 3000);
+    if (tr.detail && points.length === tr.points.length && stops.length === tr.stops.length) return tr.detail;
+    tr.points = points;
+    tr.stops = stops;
+    const detail = this._energyShapes(points);
+    detail.route = points.filter((p) => p[1] != null && p[2] != null).map((p) => [p[1], p[2], p[4], p[5], p[6], p[7]]);
+    detail.fixes = detail.route.map((p) => [p[0], p[1]]);
+    detail.stops = stops;
+    detail.frame = this._energyOverlayFrame(detail.fixes, '');
+    detail.live = true;
+    detail.rev = ++tr.rev;
+    tr.detail = detail;
+    return detail;
+  }
+
+  /** Appends the points newer than the track's last; past `cap` the older half is thinned, the newest kept at full rate. */
+  _energyTrackAppend(points, fresh, cap) {
+    const limit = Math.max(16, cap);
+    const last = points.length ? points[points.length - 1][0] : -Infinity;
+    let out = points.concat((fresh || []).filter((p) => p && p[0] > last));
+    while (out.length > limit) {
+      const half = Math.floor(out.length / 2);
+      out = out.slice(0, half).filter((p, i) => i % 2 === 0).concat(out.slice(half));
+    }
+    return out;
+  }
+
+  /**
+   * Where the map looks. A finished route is framed whole. The trip being
+   * recorded is framed whole too while that still shows streets (zoom 13 or
+   * closer, never past 16 so a route just begun is not one blurred block), and
+   * past that the view follows the car at zoom 13.
+   */
+  _energyMapView(fixes, w, h, live, minZ, maxZ) {
+    const FOLLOW_Z = 13;
+    const z = this._energyFitZoom(fixes, w, h, 32, minZ, live ? Math.min(maxZ, 16) : maxZ);
+    if (live && z < FOLLOW_Z) {
+      const last = fixes[fixes.length - 1];
+      const q = this._energyMercator(last[0], last[1], FOLLOW_Z);
+      return { z: FOLLOW_Z, cx: q[0], cy: q[1] };
+    }
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    fixes.forEach((p) => {
+      const q = this._energyMercator(p[0], p[1], z);
+      minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]);
+      minY = Math.min(minY, q[1]); maxY = Math.max(maxY, q[1]);
+    });
+    return { z: z, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+  }
+
+  /** The recording trip's list row and header, exactly as _energyTripsView writes them. */
+  _energyLiveTripTexts(live, demo) {
+    const span = this._energyDuration((live.driveMs || 0) + (live.idleMs || 0));
+    const km = this._energyKm(live.km);
+    return { rowTitle: 'Agora · ' + span, rowMeta: km, detailMeta: km + ' · ' + span + (demo ? ' · DEMO' : '') };
+  }
+
+  /**
+   * Once a second while VIAGENS shows the trip being recorded: pulls its new
+   * points (the map updates in _energyMapSync) and repaints the list row, the
+   * header and DADOS in place. The only commit is the moment the route first has
+   * two fixes, so the pane can swap its waiting note for the map.
+   */
+  _energyLiveTripTick(m, now) {
+    const live = m.demo ? this._energyDemoLive(now) : this._energyLive;
+    if (!live) {
+      this._energyLiveTrack = null;
+      return;
+    }
+    const nodes = document.querySelectorAll('.hv-energy [data-en-live]');
+    let wantsTrack = !!document.querySelector('.hv-energy-livemap[data-trip^="live:"]');
+    for (let i = 0; i < nodes.length && !wantsTrack; i++) {
+      const k = nodes[i].getAttribute('data-en-live');
+      wantsTrack = !!k && k !== 'rowTitle' && k !== 'rowMeta';
+    }
+    if (!wantsTrack && !nodes.length) return;
+    const prev = this._energyLiveTrack;
+    const hadView = !!(prev && prev.startMs === live.startMs && prev.detail && prev.detail.fixes.length >= 2);
+    const detail = wantsTrack ? this._energyLiveDetail(live, m.demo, now) : null;
+    if (detail && !hadView && detail.fixes.length >= 2) {
+      this._uiOnlySetState((s) => ({ energyRev: (s.energyRev || 0) + 1 }));
+      return;
+    }
+    const texts = this._energyLiveTripTexts(live, m.demo);
+    const stats = detail ? this._energyTripStats(live, detail, m.units) : null;
+    const text = (el, v) => {
+      const target = el.querySelector('.sc-interp') || el;
+      if (target.textContent !== v) target.textContent = v;
+    };
+    for (let i = 0; i < nodes.length; i++) {
+      const el = nodes[i];
+      const k = el.getAttribute('data-en-live');
+      if (k === 'rowTitle' || k === 'rowMeta' || k === 'detailMeta') {
+        text(el, texts[k]);
+      } else if (k === 'profile' && detail && detail.profile) {
+        if (el.getAttribute('points') !== detail.profile) el.setAttribute('points', detail.profile);
+      } else if (k === 'stats' && stats) {
+        const items = el.querySelectorAll('li');
+        // A row appeared (a stop, guidance): the next commit adds it; until then leave the list alone.
+        if (items.length !== stats.length) continue;
+        for (let j = 0; j < items.length; j++) {
+          const b = items[j].querySelector('b');
+          if (b) text(b, stats[j].v);
+        }
+      }
+    }
+  }
+
+  /** The demo trip's route so far: one point every 5 s along a 40 min loop. */
+  _energyDemoLivePoints(live, now) {
+    const STEP = 5000;
+    const TOTAL = 480;
+    const n = Math.max(0, Math.min(TOTAL, Math.floor((now - live.startMs) / STEP) + 1));
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const a = i / TOTAL * Math.PI * 1.6;
+      pts.push([live.startMs + i * STEP, -22.9 - 0.02 * Math.sin(a) - 0.004 * i / TOTAL, -43.1 + 0.03 * (1 - Math.cos(a)), 10,
+        20 + 45 * Math.abs(Math.sin(i / 9)), 5, 1, 6, i % 3 ? 0 : 1, live.km * i / TOTAL]);
+    }
+    return pts;
+  }
+
   _energyMapSync() {
     const els = document.querySelectorAll('.hv-energy-livemap');
     for (let i = 0; i < els.length; i++) {
       const el = els[i];
       const key = el.getAttribute('data-trip') || '';
-      if (el.__energyMap && el.__energyMap.key === key) continue;
       const parts = key.split('|');
-      const detail = this._energyDetailCache && this._energyDetailCache[parts[0]];
+      // "live:<start>" is the trip being recorded: its route grows, so its map is updated, not rebuilt.
+      const liveId = parts[0].indexOf('live:') === 0 ? parts[0].slice(5) : '';
+      const track = this._energyLiveTrack;
+      const detail = liveId
+        ? (track && String(track.startMs) === liveId ? track.detail : null)
+        : this._energyDetailCache && this._energyDetailCache[parts[0]];
       if (!detail || !detail.fixes || detail.fixes.length < 2) continue;
+      if (el.__energyMap && el.__energyMap.key === key) {
+        if (el.__energyMap.rev !== detail.rev) el.__energyMap.update(detail);
+        continue;
+      }
       if (el.__energyMap) el.__energyMap.destroy();
       el.__energyMap = this._energyMapCreate(el, key, detail, parts[1] || 'speed');
     }
@@ -36647,7 +36832,8 @@ class Component extends DCLogic {
     // opens the full-size map, and an expand button appears once the view has moved.
     // Max, over the whole workspace: pan, pinch, zoom in / out / fit, and collapse to go back.
     const maxMode = el.getAttribute('data-mode') === 'max';
-    const fixes = detail.fixes;
+    let fixes = detail.fixes;
+    const live = !!detail.live;
     const svgNs = 'http://www.w3.org/2000/svg';
     const make = (tag, cls, ns) => {
       const node = ns ? document.createElementNS(ns, tag) : document.createElement(tag);
@@ -36670,18 +36856,25 @@ class Component extends DCLogic {
     const svg = make('svg', 'hv-energy-livemap-route', svgNs);
     const casing = make('polyline', 'casing', svgNs);
     svg.appendChild(casing);
-    const colored = this._energyRouteSegments(detail.route, metric, this._energyUnits());
-    const segs = colored.segments.map((sg) => {
-      const node = make('polyline', 'seg ' + sg.cls, svgNs);
-      svg.appendChild(node);
-      return { node: node, pts: sg.pts };
-    });
     const start = make('circle', 'start', svgNs);
     const end = make('circle', 'end', svgNs);
     start.setAttribute('r', '7');
     end.setAttribute('r', '7');
     svg.appendChild(start);
-    svg.appendChild(end);
+    // The trip being recorded ends at the car.
+    const car = make('circle', 'car', svgNs);
+    car.setAttribute('r', '9');
+    svg.appendChild(live ? car : end);
+    let segs = [];
+    const buildSegs = (d) => {
+      segs.forEach((sg) => sg.node.remove());
+      segs = this._energyRouteSegments(d.route, metric, this._energyUnits()).segments.map((sg) => {
+        const node = make('polyline', 'seg ' + sg.cls, svgNs);
+        svg.insertBefore(node, start);
+        return { node: node, pts: sg.pts };
+      });
+    };
+    buildSegs(detail);
     const stopLayer = make('div', 'hv-energy-livemap-stops');
     const bubble = make('div', 'hv-energy-livemap-bubble');
     bubble.hidden = true;
@@ -36696,41 +36889,41 @@ class Component extends DCLogic {
     el.appendChild(controls);
     el.appendChild(credit);
 
-    const placed = (detail.stops || []).filter((sp) => sp.lat != null && sp.lon != null && isFinite(sp.lat) && isFinite(sp.lon));
-    const stopButtons = placed.map((sp) => {
-      const b = make('button', 'hv-energy-stop ' + (sp.kind === 'charge' ? 'charge' : 'refuel'));
-      b.type = 'button';
-      b.appendChild(icon(sp.kind === 'charge' ? H6_ENERGY_ICONS.evStation : H6_ENERGY_ICONS.gasStation));
-      const text = this._energyStopText(sp);
-      b.setAttribute('aria-label', text.title);
-      b.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const showing = !bubble.hidden && bubble.__stop === sp;
-        bubble.hidden = showing;
-        bubble.__stop = showing ? null : sp;
-        bubble.textContent = text.title + ' · ' + text.detail;
+    let stopButtons = [];
+    const buildStops = (d) => {
+      stopButtons.forEach((sb) => sb.node.remove());
+      const placed = (d.stops || []).filter((sp) => sp.lat != null && sp.lon != null && isFinite(sp.lat) && isFinite(sp.lon));
+      stopButtons = placed.map((sp) => {
+        const b = make('button', 'hv-energy-stop ' + (sp.kind === 'charge' ? 'charge' : 'refuel'));
+        b.type = 'button';
+        b.appendChild(icon(sp.kind === 'charge' ? H6_ENERGY_ICONS.evStation : H6_ENERGY_ICONS.gasStation));
+        const text = this._energyStopText(sp);
+        b.setAttribute('aria-label', text.title);
+        b.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const showing = !bubble.hidden && bubble.__stop === sp;
+          bubble.hidden = showing;
+          bubble.__stop = showing ? null : sp;
+          bubble.textContent = text.title + ' · ' + text.detail;
+        });
+        stopLayer.appendChild(b);
+        return { node: b, stop: sp };
       });
-      stopLayer.appendChild(b);
-      return { node: b, stop: sp };
-    });
+    };
+    buildStops(detail);
 
-    const st = { key: key, z: MIN_Z, cx: 0, cy: 0, fitZ: MIN_Z, fitCx: 0, fitCy: 0, imgs: new Map(), raf: 0, destroy: null };
+    const st = { key: key, rev: detail.rev, z: MIN_Z, cx: 0, cy: 0, fitZ: MIN_Z, fitCx: 0, fitCy: 0, imgs: new Map(), raf: 0, destroy: null, update: null };
     const size = () => {
       const r = el.getBoundingClientRect();
       return { w: Math.max(1, r.width), h: Math.max(1, r.height) };
     };
     const fit = () => {
       const s = size();
-      st.z = this._energyFitZoom(fixes, s.w, s.h, 32, MIN_Z, MAX_Z);
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      fixes.forEach((p) => {
-        const q = this._energyMercator(p[0], p[1], st.z);
-        minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]);
-        minY = Math.min(minY, q[1]); maxY = Math.max(maxY, q[1]);
-      });
-      st.cx = (minX + maxX) / 2;
-      st.cy = (minY + maxY) / 2;
+      const v = this._energyMapView(fixes, s.w, s.h, live, MIN_Z, MAX_Z);
+      st.z = v.z;
+      st.cx = v.cx;
+      st.cy = v.cy;
       st.fitZ = st.z;
       st.fitCx = st.cx;
       st.fitCy = st.cy;
@@ -36740,6 +36933,7 @@ class Component extends DCLogic {
       st.imgs.clear();
     };
     let expandBtn = null;
+    let followBtn = null;
     const moved = () => st.z !== st.fitZ || Math.abs(st.cx - st.fitCx) > 12 || Math.abs(st.cy - st.fitCy) > 12;
     const render = () => {
       st.raf = 0;
@@ -36789,12 +36983,15 @@ class Component extends DCLogic {
       start.setAttribute('cy', a[1].toFixed(1));
       end.setAttribute('cx', b[0].toFixed(1));
       end.setAttribute('cy', b[1].toFixed(1));
+      car.setAttribute('cx', b[0].toFixed(1));
+      car.setAttribute('cy', b[1].toFixed(1));
       stopButtons.forEach((sb) => {
         const q = xy(sb.stop.lat, sb.stop.lon);
         sb.node.style.left = Math.round(q[0]) + 'px';
         sb.node.style.top = Math.round(q[1]) + 'px';
       });
       if (expandBtn) expandBtn.style.display = moved() ? '' : 'none';
+      if (followBtn) followBtn.style.display = moved() ? '' : 'none';
     };
     const schedule = () => { if (!st.raf) st.raf = requestAnimationFrame(render); };
     // Whole zoom levels about a point of the view (its centre by default), which stays put.
@@ -36827,11 +37024,16 @@ class Component extends DCLogic {
     if (maxMode) {
       button(H6_ENERGY_ICONS.add, 'Aproximar', () => zoomAt(1));
       button(H6_ENERGY_ICONS.remove, 'Afastar', () => zoomAt(-1));
-      button(H6_ENERGY_ICONS.fitScreen, 'Enquadrar a rota', () => { fit(); clearTiles(); schedule(); });
+      button(H6_ENERGY_ICONS.fitScreen, live ? 'Seguir o carro' : 'Enquadrar a rota', () => { fit(); clearTiles(); schedule(); });
       button(H6_ENERGY_ICONS.fullscreenExit, 'Reduzir o mapa', () => this._setEnergyMapMax(false));
     } else {
       expandBtn = button(H6_ENERGY_ICONS.fullscreen, 'Expandir o mapa', () => this._setEnergyMapMax(true));
       expandBtn.style.display = 'none';
+      // Moved away from a live route: one press follows the car again.
+      if (live) {
+        followBtn = button(H6_ENERGY_ICONS.fitScreen, 'Seguir o carro', () => { fit(); clearTiles(); schedule(); });
+        followBtn.style.display = 'none';
+      }
     }
 
     // One finger pans; two pinch (zoom about the fingers) and pan together; a
@@ -36954,6 +37156,20 @@ class Component extends DCLogic {
     st.destroy = () => {
       if (resize) resize.disconnect();
       destroyMap();
+    };
+    // The live route grew: new line and stops, and the view follows unless the driver moved it.
+    st.update = (next) => {
+      const following = !moved();
+      fixes = next.fixes;
+      st.rev = next.rev;
+      buildSegs(next);
+      buildStops(next);
+      if (following) {
+        const z = st.z;
+        fit();
+        if (st.z !== z) clearTiles();
+      }
+      schedule();
     };
     fit();
     render();
@@ -37424,7 +37640,8 @@ class Component extends DCLogic {
 
   _energyDemoLive(now) {
     return {
-      open: true, startMs: now - 1380000, km: 12.4, kmIntegrated: 12.7, driveMs: 1260000, idleMs: 120000,
+      // One start per session, so the demo route can grow like a real one.
+      open: true, startMs: this._energyDemoLiveStart || (this._energyDemoLiveStart = now - 1380000), km: 12.4, kmIntegrated: 12.7, driveMs: 1260000, idleMs: 120000,
       kmPerL: 16.2, kwhPer100Km: 11.8, evShare: 0.64, fuelL: 0.77, kwhOut: 1.9, kwhIn: 0.4,
       maxKmh: 72, stops: 6, harshAccel: 1, harshBrake: 0, climbM: 38,
       socStart: 72, socEnd: 58, fuelPctStart: 64, fuelPctEnd: 62,

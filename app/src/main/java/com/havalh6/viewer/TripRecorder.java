@@ -71,6 +71,7 @@ final class TripRecorder implements TripEngine.Listener {
     private volatile TripStore store;
     private volatile TripMapWorker maps;
     private TripEngine engine;
+    /** Points not saved yet. The bridge thread copies them for the live map, so both are guarded by the list. */
     private final List<TripPoint> pending = new ArrayList<>();
     private long pendingStartMs;
     private long lastCheckpointAt;
@@ -191,6 +192,17 @@ final class TripRecorder implements TripEngine.Listener {
         return s == null ? "null" : s.tripJson(startMs, maxPoints);
     }
 
+    /** The open trip's route so far, saved and still held (TripStore.livePointsJson). */
+    String livePointsJson(long startMs, long afterT, int maxPoints) {
+        TripStore s = store;
+        if (s == null) return "null";
+        List<TripPoint> held;
+        synchronized (pending) {
+            held = pendingStartMs == startMs ? new ArrayList<>(pending) : new ArrayList<>();
+        }
+        return s.livePointsJson(startMs, afterT, maxPoints, held);
+    }
+
     String daysJson(String from, String to) {
         TripStore s = store;
         return s == null ? "[]" : s.daysJson(from, to);
@@ -220,19 +232,25 @@ final class TripRecorder implements TripEngine.Listener {
 
     @Override
     public void onTripOpened(long startMs) {
-        pending.clear();
-        pendingStartMs = startMs;
+        synchronized (pending) {
+            pending.clear();
+            pendingStartMs = startMs;
+        }
         Log.w(TAG, "trip opened " + startMs);
     }
 
     @Override
     public void onPoint(long startMs, TripPoint point) {
-        if (startMs != pendingStartMs) {
-            pending.clear();
-            pendingStartMs = startMs;
+        boolean full;
+        synchronized (pending) {
+            if (startMs != pendingStartMs) {
+                pending.clear();
+                pendingStartMs = startMs;
+            }
+            pending.add(point);
+            full = pending.size() >= POINT_FLUSH;
         }
-        pending.add(point);
-        if (pending.size() >= POINT_FLUSH) flushPoints();
+        if (full) flushPoints();
     }
 
     @Override
@@ -263,7 +281,9 @@ final class TripRecorder implements TripEngine.Listener {
     @Override
     public void onTripDiscarded(long startMs) {
         TripStore s = store;
-        pending.clear();
+        synchronized (pending) {
+            pending.clear();
+        }
         if (s == null) return;
         s.deletePoints(startMs);
         s.clearCheckpoint();
@@ -351,9 +371,19 @@ final class TripRecorder implements TripEngine.Listener {
 
     private void flushPoints() {
         TripStore s = store;
-        if (s == null || pending.isEmpty()) return;
-        s.appendPoints(pendingStartMs, new ArrayList<>(pending));
-        pending.clear();
+        if (s == null) return;
+        List<TripPoint> batch;
+        long startMs;
+        synchronized (pending) {
+            if (pending.isEmpty()) return;
+            batch = new ArrayList<>(pending);
+            startMs = pendingStartMs;
+        }
+        // Saved before it leaves the buffer, so a live read always finds it in one or the other.
+        s.appendPoints(startMs, batch);
+        synchronized (pending) {
+            pending.subList(0, Math.min(batch.size(), pending.size())).clear();
+        }
     }
 
     private void setGps(boolean on) {
