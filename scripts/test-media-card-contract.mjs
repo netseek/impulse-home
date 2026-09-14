@@ -373,9 +373,24 @@ assert.match(mediaCard, /final String longCommand = descriptor\.longAction;[\s\S
   'a hold on the rail card must reach the MEDIA popup');
 assert.match(mediaCard, /quickMediaAppRow = makeQuickMediaAppChip\(density\);/,
   "the rail card must carry the playing app's own chip");
-assert.match(native, /private void applyQuickMediaAppChip\(String iconDataUrl, String label\) \{[\s\S]*?setVisibility\(show \? View\.VISIBLE : View\.GONE\);/,
-  'an empty app chip must be hidden, not left as a blank pill');
-assert.match(native, /resolveMediaChipIcon\(/,
+// The chip is shared with NAVIGATION (2bb5f71), so the hide rule may live in
+// the shared applier rather than inline. Follow the delegation instead of
+// pinning which method holds the line, then assert the property itself: the
+// row's visibility is a flag derived from having something to draw.
+const mediaChipApply = blockFrom(native, '    private void applyQuickMediaAppChip(',
+  'media chip applier');
+const chipApply = /\bapplySourceChip\(/.test(mediaChipApply)
+  ? blockFrom(native, '    private void applySourceChip(', 'shared source chip applier')
+  : mediaChipApply;
+const chipHide = chipApply.match(/\.setVisibility\(\s*(\w+)\s*\?\s*View\.VISIBLE\s*:\s*View\.GONE\s*\)/);
+assert.ok(chipHide, 'an empty app chip must be hidden, not left as a blank pill');
+assert.match(chipApply, new RegExp(`boolean ${chipHide[1]} = [^;]*!= null`),
+  'the app chip must be shown only when it has an icon (or label) to draw');
+// Resolver name is free; what it consults is the contract.
+const chipResolverName = (mediaChipApply.match(/Drawable \w+ = (resolve\w+)\(/) || [])[1];
+assert.ok(chipResolverName, 'the media chip must resolve its icon through a shared resolver');
+includesAll(blockFrom(native, `    private Drawable ${chipResolverName}(`, 'chip icon resolver'),
+  ['dockAppOverrides', 'isAndroidAutoMediaSource(', 'isCarPlayMediaSource('],
   'the media chip must prefer dock substitutes / branded AA-CarPlay icons');
 assert.match(native, /isAndroidAutoMediaSource\(/,
   'Android Auto media must use our branded icon, not MediaCenter\'s generic one');

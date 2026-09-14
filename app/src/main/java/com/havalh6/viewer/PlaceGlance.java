@@ -13,11 +13,6 @@ import android.util.Log;
 
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.List;
 import java.util.Locale;
 
@@ -37,9 +32,9 @@ import java.util.Locale;
  * location provider and {@code dumpsys location} reports
  * {@code Overlay Provider Packages: network: null} — GMS here is
  * ReVanced-patched and registers neither. So the platform call is tried once
- * and, on failure, latched off ({@link #platformGeocoderDead}) in favour of an
- * HTTP reverse geocode. The platform path is kept because it is free and
- * offline on a normal ROM; the HTTP path is what actually answers on this one.
+ * and, on failure, latched off ({@link #platformGeocoderDead}) in favour of
+ * {@link ReverseGeocoder}'s HTTP path. The platform path is kept because it is
+ * free and offline on a normal ROM; the HTTP path is what answers on this one.
  */
 final class PlaceGlance {
     static final String KEY = "app.location.place";
@@ -47,9 +42,6 @@ final class PlaceGlance {
     private static final long PERIOD_MS = 45_000L;
     /** Below this, the car has not left the block; skip the network round trip. */
     private static final float REGEOCODE_MIN_MOVE_M = 120f;
-    private static final int HTTP_TIMEOUT_MS = 8_000;
-    /** Nominatim's usage policy requires an identifying User-Agent. */
-    private static final String HTTP_UA = "HavalH6Viewer/1.0 (head-unit navigation glance)";
 
     interface Listener {
         void onPlace(String json);
@@ -64,20 +56,6 @@ final class PlaceGlance {
     private boolean platformGeocoderDead;
     /** Where the last SUCCESSFUL reverse geocode was taken, for the move gate. */
     private Location lastFixed;
-
-    /** Neighborhood / city / street, any of which may be empty when unresolved.
-     * neighborhood is the finer, suburb-level hit; city is the town/municipality
-     * that contains it — two different levels of the same reverse geocode, not
-     * a fallback chain into each other. */
-    private static final class Place {
-        String neighborhood = "";
-        String city = "";
-        String street = "";
-
-        boolean isEmpty() {
-            return neighborhood.isEmpty() && city.isEmpty() && street.isEmpty();
-        }
-    }
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -167,7 +145,7 @@ final class PlaceGlance {
                 && best.distanceTo(lastFixed) < REGEOCODE_MIN_MOVE_M) {
             return;
         }
-        Place place = reverseGeocode(best);
+        ReverseGeocoder.Place place = reverseGeocode(best);
         if (place == null || place.isEmpty()) return;
         lastFixed = best;
         String provider = best.getProvider() == null ? "gps" : best.getProvider();
@@ -185,15 +163,15 @@ final class PlaceGlance {
     }
 
     /** Platform geocoder while it still answers, HTTP once it has proved it will not. */
-    private Place reverseGeocode(Location at) {
+    private ReverseGeocoder.Place reverseGeocode(Location at) {
         if (!platformGeocoderDead) {
-            Place local = geocodePlatform(at);
+            ReverseGeocoder.Place local = geocodePlatform(at);
             if (local != null && !local.isEmpty()) return local;
         }
-        return geocodeHttp(at);
+        return ReverseGeocoder.lookup(at.getLatitude(), at.getLongitude());
     }
 
-    private Place geocodePlatform(Location at) {
+    private ReverseGeocoder.Place geocodePlatform(Location at) {
         if (!Geocoder.isPresent()) {
             platformGeocoderDead = true;
             return null;
@@ -203,7 +181,7 @@ final class PlaceGlance {
                     .getFromLocation(at.getLatitude(), at.getLongitude(), 1);
             if (results == null || results.isEmpty()) return null;
             Address a = results.get(0);
-            Place place = new Place();
+            ReverseGeocoder.Place place = new ReverseGeocoder.Place();
             if (a.getSubLocality() != null && !a.getSubLocality().isEmpty()) {
                 place.neighborhood = a.getSubLocality();
             }
@@ -220,87 +198,6 @@ final class PlaceGlance {
             platformGeocoderDead = true;
             Log.w(TAG, "PlaceGlance platform geocoder unavailable ("
                     + e.getMessage() + ") — using HTTP reverse geocode");
-            return null;
-        }
-    }
-
-    /**
-     * Nominatim reverse geocode. One request per poll at most, gated further by
-     * {@link #REGEOCODE_MIN_MOVE_M}, which keeps this well inside the service's
-     * 1 req/s policy even at motorway speed.
-     */
-    private Place geocodeHttp(Location at) {
-        HttpURLConnection conn = null;
-        try {
-            URL url = new URL(String.format(Locale.US,
-                    "https://nominatim.openstreetmap.org/reverse?format=jsonv2"
-                            + "&lat=%.6f&lon=%.6f&zoom=17&addressdetails=1&accept-language=pt-BR",
-                    at.getLatitude(), at.getLongitude()));
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", HTTP_UA);
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setConnectTimeout(HTTP_TIMEOUT_MS);
-            conn.setReadTimeout(HTTP_TIMEOUT_MS);
-            int code = conn.getResponseCode();
-            if (code != 200) {
-                Log.w(TAG, "PlaceGlance reverse geocode HTTP " + code);
-                return null;
-            }
-            StringBuilder body = new StringBuilder();
-            try (InputStream in = conn.getInputStream();
-                 BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"))) {
-                String line;
-                while ((line = reader.readLine()) != null) body.append(line);
-            }
-            return parseNominatim(body.toString());
-        } catch (Exception e) {
-            // Offline, or the car's link is down. Silent is the honest state.
-            Log.w(TAG, "PlaceGlance reverse geocode failed: " + e.getMessage());
-            return null;
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
-    }
-
-    /**
-     * Nominatim's address object is not a fixed shape — which field carries
-     * "the place you are in" depends on how the area was mapped. neighborhood
-     * and city are two different LEVELS of the same address, not a fallback
-     * chain into each other: walk suburb-level keys for one and city-level keys
-     * for the other, same order the platform path walks subLocality then
-     * locality -> subAdminArea.
-     */
-    private Place parseNominatim(String body) {
-        try {
-            JSONObject root = new JSONObject(body);
-            JSONObject address = root.optJSONObject("address");
-            if (address == null) return null;
-            Place place = new Place();
-            for (String key : new String[]{"suburb", "neighbourhood", "city_district"}) {
-                String value = address.optString(key, "").trim();
-                if (!value.isEmpty()) {
-                    place.neighborhood = value;
-                    break;
-                }
-            }
-            for (String key : new String[]{"city", "town", "village", "municipality", "county"}) {
-                String value = address.optString(key, "").trim();
-                if (!value.isEmpty()) {
-                    place.city = value;
-                    break;
-                }
-            }
-            for (String key : new String[]{"road", "pedestrian", "footway"}) {
-                String value = address.optString(key, "").trim();
-                if (!value.isEmpty()) {
-                    place.street = value;
-                    break;
-                }
-            }
-            return place;
-        } catch (Exception e) {
-            Log.w(TAG, "PlaceGlance reverse geocode parse failed: " + e.getMessage());
             return null;
         }
     }
