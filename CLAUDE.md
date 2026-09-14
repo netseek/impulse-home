@@ -729,6 +729,28 @@ stops being a variable -- not a shipping mode.
   sprite is the cheap equivalent: 8 discs, 256 triangles total, against 374k in
   the main pass.
 
+## A tone grade does not need a render target
+
+ENV → TONE (contrast, whites) is Levels, and Levels is affine, so it runs
+entirely in the BLEND stage over the default framebuffer: a REVERSE_SUBTRACT
+quad lifts the black point, then a `(DST_COLOR, ONE)` quad multiplies. No
+texture read, so the 4x MSAA that FXAA would forfeit survives, and the cost is
+three cheap draws. See `_applyGrade` for the pass order (lift BEFORE gain, or
+every white is clipped then pulled down), the alpha handling for mixed
+centerFill, and the 2x ceiling on one gain pass. Anything non-affine (an S-curve,
+saturation) cannot be done this way and would need a real target.
+
+It grades the car only. The quads sit at depth 1.0 with `GREATER`, so anything
+with `depthWrite: false` (background, shadow planes, night pools) is skipped for
+free. The floor does write depth, so it is re-rasterised into stencil on
+`GRADE_MASK_LAYER` just before the grade. **Do not replace that pass with a
+stencil flag on the floor material:** part roots carry `renderOrder` (lit lamps
+go to 14), so car parts drawn after the floor would inherit its mark. A new
+ground-like surface that writes depth has to join `GRADE_MASK_LAYER`.
+
+**Not yet measured on the car.** Verified visually on desktop only. Ships at
+0/0, which skips every pass.
+
 ## Wheel spin is a sampling problem, not a throughput one
 
 A rendered wheel is a strobe. The eye only ever sees it at the frame rate, so

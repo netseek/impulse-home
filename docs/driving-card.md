@@ -357,7 +357,7 @@ shared card rules and shrinks their values the same way:
 | --- | --- | --- |
 | `.hv-status-cell span` | Vehicle Status | BATTERY / GEAR / STATE |
 | `.hv-range-stat span` | Range | EV / GAS km |
-| `.hv-consumption-kpis span` | Consumption | FUEL / ENERGY |
+| ~~`.hv-consumption-kpis span`~~ | Consumption | fixed 2026-09-13 (`> div > span`, and `.hv-consumption-chart > span`) |
 
 Confirmed visually for Vehicle Status on the emulator (the cell values render
 at 7px instead of 14px). Left alone deliberately: those cards are owned by

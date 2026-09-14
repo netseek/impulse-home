@@ -24,6 +24,12 @@ android {
 
     sourceSets.main.assets.srcDir("$buildDir/generated/viewerAssets")
 
+    testOptions {
+        // TripEngine and friends are pure Java; nothing in the JVM tests may
+        // silently touch an Android stub.
+        unitTests.returnDefaultValues = false
+    }
+
     // NOTE: do NOT add "glb"/"hdr" to androidResources.noCompress. It was tried
     // and it is measurably worse. Storing assets uncompressed lets them be read
     // without an inflate pass, but on this head unit the bottleneck is flash
@@ -79,3 +85,8 @@ tasks.configureEach { task ->
 // Android Studio sync asks for this Kotlin IDE model task even on Java-only
 // modules. Provide a no-op so Sync/Run from the IDE does not fail.
 tasks.register("prepareKotlinBuildScriptModel") {}
+
+dependencies {
+    // JVM tests for the pure-Java trip engine (TripEngineTest, TripSignalsTest).
+    testImplementation "junit:junit:4.13.2"
+}
