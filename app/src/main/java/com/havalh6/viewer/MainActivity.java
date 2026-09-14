@@ -10946,6 +10946,45 @@ public final class MainActivity extends Activity {
         /** Finger offset plus however far the rail has scrolled under it. */
         private void follow() {
             card.setTranslationX(lastRawX - downX + (scrollX() - downScrollX));
+            shiftNeighbours(railDropIndex(card));
+        }
+
+        private int shownTo = -1;
+        /** Where the dragged card lands if dropped now: its offset to the open slot. */
+        private float slotOffset;
+
+        /**
+         * Live swap feedback: the cards between the dragged card's origin and
+         * its drop index slide over by one slot. railDropIndex reads getLeft(),
+         * which translation does not move, so this cannot feed back on itself.
+         */
+        private void shiftNeighbours(int to) {
+            if (to == shownTo) return;
+            shownTo = to;
+            List<View> cards = railCardViews();
+            int from = cards.indexOf(card);
+            float slot = card.getWidth() + marginRight(card);
+            slotOffset = 0f;
+            for (int i = 0; i < cards.size(); i++) {
+                View c = cards.get(i);
+                if (c == card) continue;
+                float shift = 0f;
+                if (from < to && i > from && i <= to) {
+                    shift = -slot;
+                    slotOffset += c.getWidth() + marginRight(c);
+                } else if (to < from && i >= to && i < from) {
+                    shift = slot;
+                    slotOffset -= c.getWidth() + marginRight(c);
+                }
+                c.animate().translationX(shift).setDuration(160)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            }
+        }
+
+        private int marginRight(View v) {
+            android.view.ViewGroup.LayoutParams lp = v.getLayoutParams();
+            return lp instanceof android.view.ViewGroup.MarginLayoutParams
+                    ? ((android.view.ViewGroup.MarginLayoutParams) lp).rightMargin : 0;
         }
 
         private void armDrag() {
@@ -10988,7 +11027,8 @@ public final class MainActivity extends Activity {
                     if (dragging) {
                         int to = railDropIndex(card);
                         int from = railCardViews().indexOf(card);
-                        settle();
+                        shiftNeighbours(to);
+                        settle(to >= 0 && to != from);
                         if (to >= 0 && to != from) callViewerDock("railMoveCard:" + id + ":" + to);
                     } else {
                         int x = Math.round(e.getX());
@@ -11018,8 +11058,23 @@ public final class MainActivity extends Activity {
         }
 
         private void settle() {
+            settle(false);
+        }
+
+        /** moved: glide into the open slot and leave neighbours shifted until the rebuild. */
+        private void settle(boolean moved) {
             dragging = false;
-            card.animate().translationX(0f).translationZ(0f).alpha(1f).setDuration(120).start();
+            armed = false;
+            card.removeCallbacks(autoScroll);
+            if (!moved) {
+                for (View c : railCardViews()) {
+                    if (c != card) c.animate().translationX(0f).setDuration(160).start();
+                }
+            }
+            float target = moved ? slotOffset : 0f;
+            shownTo = -1;
+            card.animate().translationX(target).translationZ(0f).alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(120).start();
             android.animation.Animator jiggle = railJiggles.get(card);
             if (jiggle != null) jiggle.resume();
         }
