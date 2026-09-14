@@ -1,6 +1,7 @@
 /*
  * Behavioural test for the rail clock faces (assets/clock-faces.js): the date
- * labels keep their natural glyph proportions.
+ * labels keep their natural glyph proportions, and Dashboard's date column
+ * lines up with the time beside it.
  *
  * textLength + lengthAdjust="spacingAndGlyphs" stretches a short label to a
  * fixed width, and "MON 14 SEP" read as widened type on Orbit and Dashboard
@@ -52,6 +53,18 @@ const SCENARIOS = {
     const el = textFor(render('meridian', snap()), 'MON 14 SEP');
     assert.ok(el && !/textLength|lengthAdjust/.test(el), el);
   },
+  'Dashboard date column spans the height of the time': ({ render }) => {
+    const svg = render('date-spine', snap());
+    const num = (el, name) => Number((el.match(new RegExp(' ' + name + '="([\\d.]+)"')) || [])[1]);
+    const capTop = (el) => num(el, 'y') - num(el, 'font-size') * 0.716;   // Arial cap / digit height
+    const time = textFor(svg, '03:07');
+    const mon = textFor(svg, 'MON');
+    const am = textFor(svg, 'AM');
+    const pill = (svg.match(/<rect x="163" y="[\d.]+" width="47" height="24"[^>]*>/) || [''])[0];
+    assert.ok(time && mon && am && pill, 'time, weekday, AM and month pill rendered');
+    assert.ok(Math.abs(capTop(mon) - capTop(time)) <= 1.5, `weekday top ${capTop(mon)} vs time top ${capTop(time)}`);
+    assert.ok(Math.abs(num(pill, 'y') + num(pill, 'height') - num(am, 'y')) <= 1, 'month pill bottom on the AM baseline');
+  },
   'a label too long for its pill shrinks instead of overflowing': ({ render }) => {
     const el = textFor(render('panorama', snap({ weekdayShort: 'Wednesday', monthShort: 'September' })), 'WEDNESDAY 14 SEPTEMBER');
     assert.ok(el, 'long label rendered');
@@ -74,7 +87,9 @@ assert.deepEqual(clean, [], `clock label scenarios failed: ${clean.join(', ')}`)
 
 const MUTANTS = {
   'Orbit date stretched again': ["label(dateLabel, 112, 101, 10, muted, 600, 'middle', 94);", "text(dateLabel, 112, 101, 10, muted, 600, 'middle', 94);"],
-  'Dashboard month stretched again': ["label(String(snap.monthShort).toUpperCase(), 186.5, 58, 11, ground, 700, 'middle', 31);", "text(String(snap.monthShort).toUpperCase(), 186.5, 58, 11, ground, 700, 'middle', 31);"],
+  'Dashboard month stretched again': ["label(String(snap.monthShort).toUpperCase(), 186.5, 70, 11, ground, 700, 'middle', 31);", "text(String(snap.monthShort).toUpperCase(), 186.5, 70, 11, ground, 700, 'middle', 31);"],
+  'Dashboard date back up': ['rect(163, 54, 47, 24, 8, accent);', 'rect(163, 42, 47, 24, 8, accent);'],
+  'Dashboard weekday back up': ["186, 41, 10, muted, 600, 'middle', 47);", "186, 30, 10, muted, 600, 'middle', 47);"],
   'long labels never shrink': ['var fitted = em > 0 && em * size > maxWidth ?', 'var fitted = false ?'],
 };
 
