@@ -80,6 +80,17 @@ const CHECKS = {
   // OSM licence: attribution on the interactive map too, not only on the snapshot.
   'live map carries OSM attribution': ({ html }) =>
     /credit\.textContent = '© OpenStreetMap contributors';/.test(method(html, '_energyMapCreate') || ''),
+  // Owner, 2026-09-14: a board widget 4x2 or wider shows map / graph and data
+  // side by side with no toggle; the 3x2 popup keeps its toggles.
+  'wide widget shows both panes': ({ html }) => {
+    const trips = method(html, '_energyTripsView') || '';
+    const pop = method(html, '_energyPopupView') || '';
+    return /const wide = !popup && w >= 4 && h >= 2;/.test(method(html, '_consumptionWidgetView') || '')
+      && trips.includes("consumptionTripShowMap: !!t && (wide || tripView === 'map')")
+      && trips.includes("consumptionTripShowData: !!t && (wide || tripView === 'data')")
+      && pop.includes("consumptionHistShowData: wide || histView === 'data'")
+      && html.includes("this._consumptionWidgetView(entry.item, 'popup')");
+  },
 };
 
 const MUTANTS = {
@@ -111,6 +122,8 @@ const MUTANTS = {
     '    const schedule = () => { this.setState({ x: 1 }); if (!st.raf) st.raf = requestAnimationFrame(render); };') }),
   'live map carries OSM attribution': (s) => ({ ...s, html: s.html.replace(
     "credit.textContent = '© OpenStreetMap contributors';", "credit.textContent = '';") }),
+  'wide widget shows both panes': (s) => ({ ...s, html: s.html.replace(
+    "consumptionTripShowData: !!t && (wide || tripView === 'data')", "consumptionTripShowData: !!t && tripView === 'data'") }),
 };
 
 const changed = (a, b) => Object.keys(a).some((k) => a[k] !== b[k]);

@@ -4945,10 +4945,8 @@ window.HavalSplash = (function () {
     .hv-energy-mappane { flex:1; min-height:0; display:flex; flex-direction:column; gap:8px; }
     .hv-energy-mappane > .hv-energy-empty { margin:auto; text-align:center; }
     .hv-energy-datapane { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
-    .hv-energy-explore-btn,.hv-energy-explore-close { position:absolute; top:10px; z-index:3; min-height:44px; padding:0 14px; border:0; border-radius:12px; background:rgba(20,26,32,.82); color:#fff; font:600 12px/1 'Space Mono',monospace; letter-spacing:.06em; cursor:pointer; }
-    .hv-energy-explore-btn { right:10px; }
-    .hv-energy-explore-close { left:10px; }
-    .hv-energy-explore { position:relative; min-width:0; min-height:0; }
+    /* The interactive map fills the pane edge to edge (owner, 2026-09-14). */
+    .hv-energy-mapwrap > .hv-energy-livemap { position:absolute; inset:0; height:auto; border-radius:0; }
     .hv-energy-livemap { position:relative; height:100%; border-radius:16px; overflow:hidden; background:#dcd9d2; touch-action:none; user-select:none; cursor:grab; }
     .hv-energy-livemap-tiles { position:absolute; inset:0; }
     .hv-energy-livemap-tiles > img { position:absolute; left:0; top:0; width:256px; height:256px; max-width:none; pointer-events:none; }
@@ -5016,7 +5014,20 @@ window.HavalSplash = (function () {
     .hv-energy-profile polyline { fill:none; stroke:currentColor; opacity:.6; stroke-width:1.4; vector-effect:non-scaling-stroke; }
     .hv-energy-datapane > .hv-energy-note,.hv-energy-histdata > .hv-energy-note { white-space:normal; }
     .hv-energy-history { flex:1; min-height:0; display:flex; flex-direction:column; gap:10px; }
-    .hv-energy-history > .hv-energy-chart { flex:1; height:auto; min-height:0; }
+    .hv-energy-chartpane { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:8px; }
+    .hv-energy-chartpane > .hv-energy-chart { flex:1; height:auto; min-height:0; }
+    /* Wide board widget (>= 4x2): the workspace with both panes side by side, no toggles. */
+    .hv-energy.hv-energy-wide { position:relative; gap:10px; }
+    .hv-energy-wshead { display:flex; align-items:center; gap:10px; min-height:44px; flex-shrink:0; font:600 12px/1 'Space Mono',monospace; letter-spacing:.14em; }
+    .hv-energy-wshead > .hv-energy-unitsbtn { margin-left:auto; min-height:44px; padding:0 14px; border:0; border-radius:12px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:600 12px/1 'Space Mono',monospace; letter-spacing:.06em; cursor:pointer; }
+    .hv-energy-wshead > .hv-energy-unitsbtn.on { color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(255,255,255,.14); }
+    .hv-energy-wide > .hv-energy-unitsheet { top:56px; right:13px; }
+    .hv-energy-wide .hv-energy-trips { grid-template-columns:minmax(200px,.3fr) minmax(0,2fr); }
+    .hv-energy-wide .hv-energy-detail { flex-direction:row; gap:12px; }
+    .hv-energy-wide .hv-energy-mappane { flex:1.3; min-width:0; }
+    .hv-energy-wide .hv-energy-datapane { flex:1; min-width:0; }
+    .hv-energy-wide .hv-energy-history { flex-direction:row; gap:12px; }
+    .hv-energy-wide .hv-energy-histdata { flex:1; min-width:0; }
     .hv-energy-histdata { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
     .hv-energy-insights { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
     .hv-energy-insights > li { position:relative; padding:7px 10px 7px 26px; border-radius:10px; background:rgba(255,255,255,.05); font-size:13px; line-height:1.35; }
@@ -5864,26 +5875,150 @@ window.HavalSplash = (function () {
             </div>
           </sc-if>
           <sc-if value="{{ wg.isConsumption }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-energy {{ wg.consumptionSizeClass }}">
-              <div class="hv-energy-head"><span>ENERGIA</span><sc-if value="{{ wg.consumptionShowSource }}" hint-placeholder-val="{{ false }}"><small class="{{ wg.consumptionSourceClass }}" data-en="source">{{ wg.consumptionSource }}</small></sc-if></div>
-              <div class="hv-energy-grid">
-                <div class="hv-energy-now">
-                  <p class="hv-energy-kicker">AGORA</p>
-                  <div class="hv-energy-hero"><strong data-en="nowFuel">{{ wg.consumptionNowFuel }}</strong><em data-en="nowFuelUnit">{{ wg.consumptionNowFuelUnit }}</em></div>
-                  <small class="hv-energy-note" data-en="nowFuelNote">{{ wg.consumptionNowFuelNote }}</small>
-                  <div class="hv-energy-ev"><b data-en="nowEv">{{ wg.consumptionNowEv }}</b><em data-en="nowEvUnit">{{ wg.consumptionNowEvUnit }}</em><i class="{{ wg.consumptionNowKwClass }}" data-en="nowKw">{{ wg.consumptionNowKw }}</i></div>
-                </div>
-                <div class="hv-energy-trip">
-                  <p class="hv-energy-kicker" data-en="tripLabel">{{ wg.consumptionTripLabel }}</p>
-                  <div class="hv-energy-hero"><strong data-en="tripFuel">{{ wg.consumptionTripFuel }}</strong><em data-en="tripFuelUnit">{{ wg.consumptionTripFuelUnit }}</em></div>
-                  <ul class="hv-energy-stats"><li><small>DIST</small><b data-en="tripKm">{{ wg.consumptionTripKm }}</b></li><li><small>TEMPO</small><b data-en="tripTime">{{ wg.consumptionTripTime }}</b></li><li><small>EV</small><b data-en="tripEvShare">{{ wg.consumptionTripEvShare }}</b></li></ul>
-                </div>
-                <div class="hv-energy-week">
-                  <p class="hv-energy-kicker">{{ wg.consumptionBarsLabel }}</p>
-                  <div class="hv-energy-bars" aria-hidden="true"><sc-for list="{{ wg.consumptionBars }}" as="eb" hint-placeholder-count="7"><i class="{{ eb.cls }}" style="{{ eb.style }}"></i></sc-for></div>
+            <sc-if value="{{ wg.consumptionGlance }}" hint-placeholder-val="{{ true }}">
+              <div class="hv-energy {{ wg.consumptionSizeClass }}">
+                <div class="hv-energy-head"><span>ENERGIA</span><sc-if value="{{ wg.consumptionShowSource }}" hint-placeholder-val="{{ false }}"><small class="{{ wg.consumptionSourceClass }}" data-en="source">{{ wg.consumptionSource }}</small></sc-if></div>
+                <div class="hv-energy-grid">
+                  <div class="hv-energy-now">
+                    <p class="hv-energy-kicker">AGORA</p>
+                    <div class="hv-energy-hero"><strong data-en="nowFuel">{{ wg.consumptionNowFuel }}</strong><em data-en="nowFuelUnit">{{ wg.consumptionNowFuelUnit }}</em></div>
+                    <small class="hv-energy-note" data-en="nowFuelNote">{{ wg.consumptionNowFuelNote }}</small>
+                    <div class="hv-energy-ev"><b data-en="nowEv">{{ wg.consumptionNowEv }}</b><em data-en="nowEvUnit">{{ wg.consumptionNowEvUnit }}</em><i class="{{ wg.consumptionNowKwClass }}" data-en="nowKw">{{ wg.consumptionNowKw }}</i></div>
+                  </div>
+                  <div class="hv-energy-trip">
+                    <p class="hv-energy-kicker" data-en="tripLabel">{{ wg.consumptionTripLabel }}</p>
+                    <div class="hv-energy-hero"><strong data-en="tripFuel">{{ wg.consumptionTripFuel }}</strong><em data-en="tripFuelUnit">{{ wg.consumptionTripFuelUnit }}</em></div>
+                    <ul class="hv-energy-stats"><li><small>DIST</small><b data-en="tripKm">{{ wg.consumptionTripKm }}</b></li><li><small>TEMPO</small><b data-en="tripTime">{{ wg.consumptionTripTime }}</b></li><li><small>EV</small><b data-en="tripEvShare">{{ wg.consumptionTripEvShare }}</b></li></ul>
+                  </div>
+                  <div class="hv-energy-week">
+                    <p class="hv-energy-kicker">{{ wg.consumptionBarsLabel }}</p>
+                    <div class="hv-energy-bars" aria-hidden="true"><sc-for list="{{ wg.consumptionBars }}" as="eb" hint-placeholder-count="7"><i class="{{ eb.cls }}" style="{{ eb.style }}"></i></sc-for></div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </sc-if>
+            <sc-if value="{{ wg.consumptionWide }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-energy hv-energy-focus hv-energy-wide">
+                <div class="hv-energy-wshead"><span>ENERGIA</span><sc-if value="{{ wg.consumptionDemoBadge }}" hint-placeholder-val="{{ false }}"><small class="demo">DEMO</small></sc-if><button type="button" class="hv-energy-unitsbtn {{ wg.consumptionUnitsClass }}" onClick="{{ wg.consumptionUnitsToggle }}" aria-expanded="{{ wg.consumptionUnitsOpen }}">UNIDADES</button></div>
+                <div class="hv-energy-bar">
+                  <div class="hv-energy-tabs" role="tablist" aria-label="Visões de energia">
+                    <button type="button" role="tab" class="{{ wg.consumptionTabNowClass }}" aria-selected="{{ wg.consumptionTabNowOn }}" onClick="{{ wg.consumptionTabNow }}">AGORA</button>
+                    <button type="button" role="tab" class="{{ wg.consumptionTabTripsClass }}" aria-selected="{{ wg.consumptionTabTripsOn }}" onClick="{{ wg.consumptionTabTrips }}">VIAGENS</button>
+                    <button type="button" role="tab" class="{{ wg.consumptionTabHistoryClass }}" aria-selected="{{ wg.consumptionTabHistoryOn }}" onClick="{{ wg.consumptionTabHistory }}">HISTÓRICO</button>
+                  </div>
+                  <sc-if value="{{ wg.consumptionBarShowSource }}" hint-placeholder-val="{{ false }}"><small class="{{ wg.consumptionSourceClass }}" data-en="source">{{ wg.consumptionSource }}</small></sc-if>
+                  <sc-if value="{{ wg.consumptionShowTrips }}" hint-placeholder-val="{{ false }}">
+                    <sc-if value="{{ wg.consumptionShowToggles }}" hint-placeholder-val="{{ true }}"><div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ wg.consumptionTripMapClass }}" onClick="{{ wg.consumptionTripViewMap }}">MAPA</button><button type="button" class="{{ wg.consumptionTripDataClass }}" onClick="{{ wg.consumptionTripViewData }}">DADOS</button></div></sc-if>
+                    <sc-if value="{{ wg.consumptionHasDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle"><strong>{{ wg.consumptionDetailTitle }}</strong><small>{{ wg.consumptionDetailMeta }}</small></div></sc-if>
+                  </sc-if>
+                  <sc-if value="{{ wg.consumptionShowHistory }}" hint-placeholder-val="{{ false }}">
+                    <sc-if value="{{ wg.consumptionShowToggles }}" hint-placeholder-val="{{ true }}"><div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ wg.consumptionHistChartClass }}" onClick="{{ wg.consumptionHistViewChart }}">GRÁFICO</button><button type="button" class="{{ wg.consumptionHistDataClass }}" onClick="{{ wg.consumptionHistViewData }}">DADOS</button></div></sc-if>
+                    <div class="hv-energy-seg hv-energy-period" role="group" aria-label="Período"><button type="button" class="{{ wg.consumptionRange7Class }}" onClick="{{ wg.consumptionRange7 }}">7 DIAS</button><button type="button" class="{{ wg.consumptionRange30Class }}" onClick="{{ wg.consumptionRange30 }}">30 DIAS</button><button type="button" class="{{ wg.consumptionRange12Class }}" onClick="{{ wg.consumptionRange12 }}">12 MESES</button><button type="button" class="{{ wg.consumptionRangeAllClass }}" onClick="{{ wg.consumptionRangeAll }}">TUDO</button></div>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ wg.consumptionUnitsOpen }}" hint-placeholder-val="{{ false }}">
+                  <div class="hv-energy-unitsheet" role="group" aria-label="Unidades">
+                    <div class="hv-energy-unitrow"><small>COMBUSTÍVEL</small><div class="hv-energy-seg"><button type="button" class="{{ wg.consumptionFuelKmlClass }}" onClick="{{ wg.consumptionSetFuelKml }}">km/L</button><button type="button" class="{{ wg.consumptionFuelL100Class }}" onClick="{{ wg.consumptionSetFuelL100 }}">L/100 km</button></div></div>
+                    <div class="hv-energy-unitrow"><small>ELÉTRICO</small><div class="hv-energy-seg"><button type="button" class="{{ wg.consumptionEvKwhClass }}" onClick="{{ wg.consumptionSetEvKwh }}">kWh/100 km</button><button type="button" class="{{ wg.consumptionEvKmClass }}" onClick="{{ wg.consumptionSetEvKm }}">km/kWh</button></div></div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ wg.consumptionShowNow }}" hint-placeholder-val="{{ true }}">
+                  <div class="hv-energy-grid">
+                    <div class="hv-energy-now">
+                      <p class="hv-energy-kicker">AGORA</p>
+                      <div class="hv-energy-hero"><strong data-en="nowFuel">{{ wg.consumptionNowFuel }}</strong><em data-en="nowFuelUnit">{{ wg.consumptionNowFuelUnit }}</em></div>
+                      <small class="hv-energy-note" data-en="nowFuelNote">{{ wg.consumptionNowFuelNote }}</small>
+                      <div class="hv-energy-ev"><b data-en="nowEv">{{ wg.consumptionNowEv }}</b><em data-en="nowEvUnit">{{ wg.consumptionNowEvUnit }}</em><i class="{{ wg.consumptionNowKwClass }}" data-en="nowKw">{{ wg.consumptionNowKw }}</i></div>
+                    </div>
+                    <div class="hv-energy-trip">
+                      <p class="hv-energy-kicker" data-en="tripLabel">{{ wg.consumptionTripLabel }}</p>
+                      <div class="hv-energy-hero"><strong data-en="tripFuel">{{ wg.consumptionTripFuel }}</strong><em data-en="tripFuelUnit">{{ wg.consumptionTripFuelUnit }}</em></div>
+                      <ul class="hv-energy-stats"><li><small>DIST</small><b data-en="tripKm">{{ wg.consumptionTripKm }}</b></li><li><small>TEMPO</small><b data-en="tripTime">{{ wg.consumptionTripTime }}</b></li><li><small>EV</small><b data-en="tripEvShare">{{ wg.consumptionTripEvShare }}</b></li></ul>
+                    </div>
+                    <div class="hv-energy-week">
+                      <p class="hv-energy-kicker">{{ wg.consumptionBarsLabel }}</p>
+                      <div class="hv-energy-bars" aria-hidden="true"><sc-for list="{{ wg.consumptionBars }}" as="eb" hint-placeholder-count="7"><i class="{{ eb.cls }}" style="{{ eb.style }}"></i></sc-for></div>
+                    </div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ wg.consumptionShowTrips }}" hint-placeholder-val="{{ false }}">
+                  <div class="hv-energy-trips">
+                    <div class="hv-energy-list slim-scrollbar">
+                      <sc-for list="{{ wg.consumptionTrips }}" as="tr" hint-placeholder-count="5"><button type="button" class="{{ tr.cls }}" onClick="{{ tr.onClick }}"><strong>{{ tr.title }}</strong><small>{{ tr.meta }}</small></button></sc-for>
+                      <sc-if value="{{ wg.consumptionTripsEmptyShow }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">{{ wg.consumptionTripsEmpty }}</p></sc-if>
+                    </div>
+                    <sc-if value="{{ wg.consumptionShowDetail }}" hint-placeholder-val="{{ false }}">
+                      <div class="hv-energy-detail">
+                        <sc-if value="{{ wg.consumptionTripShowMap }}" hint-placeholder-val="{{ false }}">
+                          <div class="hv-energy-mappane">
+                            <sc-if value="{{ wg.consumptionDetailHasMapView }}" hint-placeholder-val="{{ false }}">
+                              <div class="hv-energy-mapwrap">
+                                <sc-if value="{{ wg.consumptionDetailLiveMap }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livemap" data-trip="{{ wg.consumptionMapKey }}"></div></sc-if>
+                                <sc-if value="{{ wg.consumptionDetailSnapshot }}" hint-placeholder-val="{{ false }}">
+                                  <svg class="hv-energy-overlay" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa da rota"><rect class="bg" x="0" y="0" width="640" height="400"></rect><sc-if value="{{ wg.consumptionDetailHasMap }}" hint-placeholder-val="{{ false }}"><image class="hv-energy-map" href="{{ wg.consumptionDetailMap }}" x="0" y="0" width="640" height="400" preserveAspectRatio="none"></image></sc-if><sc-for list="{{ wg.consumptionDetailSegments }}" as="sg" hint-placeholder-count="3"><polyline class="{{ sg.cls }}" points="{{ sg.points }}"></polyline></sc-for><circle class="start" cx="{{ wg.consumptionDetailStartX }}" cy="{{ wg.consumptionDetailStartY }}" r="7"></circle><circle class="end" cx="{{ wg.consumptionDetailEndX }}" cy="{{ wg.consumptionDetailEndY }}" r="7"></circle><sc-for list="{{ wg.consumptionDetailPins }}" as="sp" hint-placeholder-count="1"><g class="{{ sp.cls }}" transform="{{ sp.transform }}" aria-label="{{ sp.label }}" onClick="{{ sp.onClick }}"><circle r="22"></circle><sc-if value="{{ sp.charge }}" hint-placeholder-val="{{ false }}"><text y="8">⚡</text></sc-if><sc-if value="{{ sp.refuel }}" hint-placeholder-val="{{ true }}"><text y="8">⛽</text></sc-if></g></sc-for></svg>
+                                  <sc-if value="{{ wg.consumptionDetailHasStopInfo }}" hint-placeholder-val="{{ false }}">
+                                    <div class="hv-energy-stopinfo"><strong>{{ wg.consumptionDetailStopTitle }}</strong><small>{{ wg.consumptionDetailStopDetail }}</small></div>
+                                  </sc-if>
+                                </sc-if>
+                              </div>
+                              <div class="hv-energy-mapbar">
+                                <div class="hv-energy-seg" role="group" aria-label="Colorir a rota por"><button type="button" class="{{ wg.consumptionRouteSpeedClass }}" onClick="{{ wg.consumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ wg.consumptionRouteEvClass }}" onClick="{{ wg.consumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ wg.consumptionRouteFuelClass }}" onClick="{{ wg.consumptionRouteFuel }}">COMBUSTÍVEL</button></div>
+                                <ul class="hv-energy-legend"><sc-for list="{{ wg.consumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
+                              </div>
+                            </sc-if>
+                            <sc-if value="{{ wg.consumptionDetailNoMapView }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">{{ wg.consumptionDetailNote }}</p></sc-if>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ wg.consumptionTripShowData }}" hint-placeholder-val="{{ false }}">
+                          <div class="hv-energy-datapane slim-scrollbar">
+                            <sc-if value="{{ wg.consumptionDetailHasInsights }}" hint-placeholder-val="{{ false }}">
+                              <ul class="hv-energy-insights"><sc-for list="{{ wg.consumptionDetailInsights }}" as="ins" hint-placeholder-count="3"><li class="{{ ins.cls }}">{{ ins.text }}</li></sc-for></ul>
+                            </sc-if>
+                            <ul class="hv-energy-kv"><sc-for list="{{ wg.consumptionDetailStats }}" as="kv" hint-placeholder-count="12"><li><small>{{ kv.k }}</small><b>{{ kv.v }}</b></li></sc-for></ul>
+                            <sc-if value="{{ wg.consumptionDetailHasProfile }}" hint-placeholder-val="{{ false }}">
+                              <svg class="hv-energy-profile" viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label="Velocidade ao longo da viagem"><polyline points="{{ wg.consumptionDetailProfile }}"></polyline></svg>
+                            </sc-if>
+                            <p class="hv-energy-note">{{ wg.consumptionDetailNote }}</p>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ wg.consumptionShowHistory }}" hint-placeholder-val="{{ false }}">
+                  <div class="hv-energy-history">
+                    <sc-if value="{{ wg.consumptionHistShowChart }}" hint-placeholder-val="{{ true }}">
+                      <div class="hv-energy-chartpane">
+                        <p class="hv-energy-kicker">{{ wg.consumptionHistorySummary }}</p>
+                        <div class="hv-energy-chart" role="img" aria-label="Distância por período"><sc-for list="{{ wg.consumptionHistoryBars }}" as="hb" hint-placeholder-count="7"><div class="hv-energy-col"><i class="{{ hb.cls }}" style="{{ hb.style }}"></i><small>{{ hb.label }}</small></div></sc-for></div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ wg.consumptionHistShowData }}" hint-placeholder-val="{{ false }}">
+                      <div class="hv-energy-histdata slim-scrollbar">
+                        <sc-if value="{{ wg.consumptionShowCompare }}" hint-placeholder-val="{{ true }}">
+                          <div class="hv-energy-compare">
+                            <p class="hv-energy-kicker">{{ wg.consumptionCompareLabel }}</p>
+                            <ul><sc-for list="{{ wg.consumptionCompare }}" as="cm" hint-placeholder-count="4"><li><small>{{ cm.k }}</small><b>{{ cm.v }}</b><em class="{{ cm.cls }}">{{ cm.d }}</em></li></sc-for></ul>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ wg.consumptionShowAllTime }}" hint-placeholder-val="{{ false }}">
+                          <div class="hv-energy-alltime">
+                            <p class="hv-energy-kicker">{{ wg.consumptionSplitLabel }}</p>
+                            <div class="hv-energy-split" aria-hidden="true"><i class="ev" style="{{ wg.consumptionSplitEvStyle }}"></i><i class="fuel" style="{{ wg.consumptionSplitFuelStyle }}"></i></div>
+                            <ul class="hv-energy-ranges"><sc-for list="{{ wg.consumptionRangeCells }}" as="rc" hint-placeholder-count="2"><li><small>{{ rc.k }}</small><b>{{ rc.v }}</b><em>{{ rc.sub }}</em></li></sc-for></ul>
+                          </div>
+                        </sc-if>
+                        <ul class="hv-energy-kv"><sc-for list="{{ wg.consumptionHistoryTiles }}" as="kv" hint-placeholder-count="9"><li><small>{{ kv.k }}</small><b>{{ kv.v }}</b></li></sc-for></ul>
+                        <sc-if value="{{ wg.consumptionHasBestWorst }}" hint-placeholder-val="{{ false }}">
+                          <div class="hv-energy-bestworst"><sc-for list="{{ wg.consumptionBestWorst }}" as="bw" hint-placeholder-count="2"><button type="button" class="{{ bw.cls }}" onClick="{{ bw.onClick }}"><small>{{ bw.label }}</small><strong>{{ bw.title }}</strong><b>{{ bw.value }}</b></button></sc-for></div>
+                        </sc-if>
+                        <p class="hv-energy-note">{{ wg.consumptionHistoryNote }}</p>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
           </sc-if>
           <sc-if value="{{ wg.isPower }}" hint-placeholder-val="{{ false }}">
             <div class="hv-power {{ wg.powerSizeClass }} {{ wg.powerTone }}" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}" role="button" aria-label="{{ wg.powerAriaLabel }}">
@@ -6148,11 +6283,11 @@ window.HavalSplash = (function () {
           </div>
           <sc-if value="{{ focusedConsumptionBarShowSource }}" hint-placeholder-val="{{ false }}"><small class="{{ focusedConsumptionSourceClass }}" data-en="source">{{ focusedConsumptionSource }}</small></sc-if>
           <sc-if value="{{ focusedConsumptionShowTrips }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ focusedConsumptionTripMapClass }}" onClick="{{ focusedConsumptionTripViewMap }}">MAPA</button><button type="button" class="{{ focusedConsumptionTripDataClass }}" onClick="{{ focusedConsumptionTripViewData }}">DADOS</button></div>
+            <sc-if value="{{ focusedConsumptionShowToggles }}" hint-placeholder-val="{{ true }}"><div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ focusedConsumptionTripMapClass }}" onClick="{{ focusedConsumptionTripViewMap }}">MAPA</button><button type="button" class="{{ focusedConsumptionTripDataClass }}" onClick="{{ focusedConsumptionTripViewData }}">DADOS</button></div></sc-if>
             <sc-if value="{{ focusedConsumptionHasDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle"><strong>{{ focusedConsumptionDetailTitle }}</strong><small>{{ focusedConsumptionDetailMeta }}</small></div></sc-if>
           </sc-if>
           <sc-if value="{{ focusedConsumptionShowHistory }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ focusedConsumptionHistChartClass }}" onClick="{{ focusedConsumptionHistViewChart }}">GRÁFICO</button><button type="button" class="{{ focusedConsumptionHistDataClass }}" onClick="{{ focusedConsumptionHistViewData }}">DADOS</button></div>
+            <sc-if value="{{ focusedConsumptionShowToggles }}" hint-placeholder-val="{{ true }}"><div class="hv-energy-seg" role="group" aria-label="Mostrar"><button type="button" class="{{ focusedConsumptionHistChartClass }}" onClick="{{ focusedConsumptionHistViewChart }}">GRÁFICO</button><button type="button" class="{{ focusedConsumptionHistDataClass }}" onClick="{{ focusedConsumptionHistViewData }}">DADOS</button></div></sc-if>
             <div class="hv-energy-seg hv-energy-period" role="group" aria-label="Período"><button type="button" class="{{ focusedConsumptionRange7Class }}" onClick="{{ focusedConsumptionRange7 }}">7 DIAS</button><button type="button" class="{{ focusedConsumptionRange30Class }}" onClick="{{ focusedConsumptionRange30 }}">30 DIAS</button><button type="button" class="{{ focusedConsumptionRange12Class }}" onClick="{{ focusedConsumptionRange12 }}">12 MESES</button><button type="button" class="{{ focusedConsumptionRangeAllClass }}" onClick="{{ focusedConsumptionRangeAll }}">TUDO</button></div>
           </sc-if>
         </div>
@@ -6193,12 +6328,12 @@ window.HavalSplash = (function () {
                   <div class="hv-energy-mappane">
                     <sc-if value="{{ focusedConsumptionDetailHasMapView }}" hint-placeholder-val="{{ false }}">
                       <div class="hv-energy-mapwrap">
-                        <svg class="hv-energy-overlay" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa da rota"><rect class="bg" x="0" y="0" width="640" height="400"></rect><sc-if value="{{ focusedConsumptionDetailHasMap }}" hint-placeholder-val="{{ false }}"><image class="hv-energy-map" href="{{ focusedConsumptionDetailMap }}" x="0" y="0" width="640" height="400" preserveAspectRatio="none"></image></sc-if><sc-for list="{{ focusedConsumptionDetailSegments }}" as="sg" hint-placeholder-count="3"><polyline class="{{ sg.cls }}" points="{{ sg.points }}"></polyline></sc-for><circle class="start" cx="{{ focusedConsumptionDetailStartX }}" cy="{{ focusedConsumptionDetailStartY }}" r="7"></circle><circle class="end" cx="{{ focusedConsumptionDetailEndX }}" cy="{{ focusedConsumptionDetailEndY }}" r="7"></circle><sc-for list="{{ focusedConsumptionDetailPins }}" as="sp" hint-placeholder-count="1"><g class="{{ sp.cls }}" transform="{{ sp.transform }}" aria-label="{{ sp.label }}" onClick="{{ sp.onClick }}"><circle r="22"></circle><sc-if value="{{ sp.charge }}" hint-placeholder-val="{{ false }}"><text y="8">⚡</text></sc-if><sc-if value="{{ sp.refuel }}" hint-placeholder-val="{{ true }}"><text y="8">⛽</text></sc-if></g></sc-for></svg>
-                        <sc-if value="{{ focusedConsumptionDetailCanExplore }}" hint-placeholder-val="{{ false }}">
-                          <button type="button" class="hv-energy-explore-btn" onClick="{{ focusedConsumptionOpenMap }}">EXPLORAR MAPA</button>
-                        </sc-if>
-                        <sc-if value="{{ focusedConsumptionDetailHasStopInfo }}" hint-placeholder-val="{{ false }}">
-                          <div class="hv-energy-stopinfo"><strong>{{ focusedConsumptionDetailStopTitle }}</strong><small>{{ focusedConsumptionDetailStopDetail }}</small></div>
+                        <sc-if value="{{ focusedConsumptionDetailLiveMap }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-livemap" data-trip="{{ focusedConsumptionMapKey }}"></div></sc-if>
+                        <sc-if value="{{ focusedConsumptionDetailSnapshot }}" hint-placeholder-val="{{ false }}">
+                          <svg class="hv-energy-overlay" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa da rota"><rect class="bg" x="0" y="0" width="640" height="400"></rect><sc-if value="{{ focusedConsumptionDetailHasMap }}" hint-placeholder-val="{{ false }}"><image class="hv-energy-map" href="{{ focusedConsumptionDetailMap }}" x="0" y="0" width="640" height="400" preserveAspectRatio="none"></image></sc-if><sc-for list="{{ focusedConsumptionDetailSegments }}" as="sg" hint-placeholder-count="3"><polyline class="{{ sg.cls }}" points="{{ sg.points }}"></polyline></sc-for><circle class="start" cx="{{ focusedConsumptionDetailStartX }}" cy="{{ focusedConsumptionDetailStartY }}" r="7"></circle><circle class="end" cx="{{ focusedConsumptionDetailEndX }}" cy="{{ focusedConsumptionDetailEndY }}" r="7"></circle><sc-for list="{{ focusedConsumptionDetailPins }}" as="sp" hint-placeholder-count="1"><g class="{{ sp.cls }}" transform="{{ sp.transform }}" aria-label="{{ sp.label }}" onClick="{{ sp.onClick }}"><circle r="22"></circle><sc-if value="{{ sp.charge }}" hint-placeholder-val="{{ false }}"><text y="8">⚡</text></sc-if><sc-if value="{{ sp.refuel }}" hint-placeholder-val="{{ true }}"><text y="8">⛽</text></sc-if></g></sc-for></svg>
+                          <sc-if value="{{ focusedConsumptionDetailHasStopInfo }}" hint-placeholder-val="{{ false }}">
+                            <div class="hv-energy-stopinfo"><strong>{{ focusedConsumptionDetailStopTitle }}</strong><small>{{ focusedConsumptionDetailStopDetail }}</small></div>
+                          </sc-if>
                         </sc-if>
                       </div>
                       <div class="hv-energy-mapbar">
@@ -6223,19 +6358,15 @@ window.HavalSplash = (function () {
                 </sc-if>
               </div>
             </sc-if>
-            <sc-if value="{{ focusedConsumptionMapOpen }}" hint-placeholder-val="{{ false }}">
-              <div class="hv-energy-explore">
-                <div class="hv-energy-livemap" data-trip="{{ focusedConsumptionMapKey }}"></div>
-                <button type="button" class="hv-energy-explore-close" onClick="{{ focusedConsumptionCloseMap }}">VOLTAR</button>
-              </div>
-            </sc-if>
           </div>
         </sc-if>
         <sc-if value="{{ focusedConsumptionShowHistory }}" hint-placeholder-val="{{ false }}">
           <div class="hv-energy-history">
             <sc-if value="{{ focusedConsumptionHistShowChart }}" hint-placeholder-val="{{ true }}">
-              <p class="hv-energy-kicker">{{ focusedConsumptionHistorySummary }}</p>
-              <div class="hv-energy-chart" role="img" aria-label="Distância por período"><sc-for list="{{ focusedConsumptionHistoryBars }}" as="hb" hint-placeholder-count="7"><div class="hv-energy-col"><i class="{{ hb.cls }}" style="{{ hb.style }}"></i><small>{{ hb.label }}</small></div></sc-for></div>
+              <div class="hv-energy-chartpane">
+                <p class="hv-energy-kicker">{{ focusedConsumptionHistorySummary }}</p>
+                <div class="hv-energy-chart" role="img" aria-label="Distância por período"><sc-for list="{{ focusedConsumptionHistoryBars }}" as="hb" hint-placeholder-count="7"><div class="hv-energy-col"><i class="{{ hb.cls }}" style="{{ hb.style }}"></i><small>{{ hb.label }}</small></div></sc-for></div>
+              </div>
             </sc-if>
             <sc-if value="{{ focusedConsumptionHistShowData }}" hint-placeholder-val="{{ false }}">
               <div class="hv-energy-histdata slim-scrollbar">
@@ -8050,7 +8181,6 @@ class Component extends DCLogic {
     energyTab: 'now',
     energyTripStart: '',
     energyRange: '7d',
-    energyMapOpen: false,
     energyRouteMetric: 'speed',
     energyStopSel: -1,
     energyUnitsOpen: false,
@@ -9957,7 +10087,12 @@ class Component extends DCLogic {
       || t.closest('.hv-graph-editor')
       || t.closest('.hv-graphs-viz-btn')
       || t.closest('.hv-climate button')
-      || t.closest('.hv-energy button'));
+      || t.closest('.hv-energy button')
+      // Dragging the map or scrolling a list must not open the widget menu.
+      || t.closest('.hv-energy-livemap')
+      || t.closest('.hv-energy-list')
+      || t.closest('.hv-energy-datapane')
+      || t.closest('.hv-energy-histdata'));
   }
 
   _onWidgetSuppressClick(e) {
@@ -34163,7 +34298,7 @@ class Component extends DCLogic {
               : (type === 'driving' ? this._drivingWidgetView(entry.item)
                 : (type === 'media' ? this._mediaWidgetView(entry.item)
                   : (type === 'power' ? this._powerWidgetView(entry.item)
-                    : this._consumptionWidgetView(entry.item)))))));
+                    : this._consumptionWidgetView(entry.item, 'popup')))))));
     Object.keys(view).forEach((key) => {
       if (key.indexOf(type) === 0) base['focused' + key.charAt(0).toUpperCase() + key.slice(1)] = view[key];
     });
@@ -34525,7 +34660,7 @@ class Component extends DCLogic {
     this._cardControlEvent(ev);
     if (tab !== 'now' && tab !== 'trips' && tab !== 'history') return;
     if (tab !== 'now') this._energyFetchHistory(false);
-    this._uiOnlySetState({ energyTab: tab, energyMapOpen: false, energyUnitsOpen: false });
+    this._uiOnlySetState({ energyTab: tab, energyUnitsOpen: false });
   }
 
   _setEnergyRange(range, ev) {
@@ -34536,7 +34671,7 @@ class Component extends DCLogic {
 
   _selectEnergyTrip(key, ev) {
     this._cardControlEvent(ev);
-    this._uiOnlySetState({ energyTripStart: String(key), energyMapOpen: false, energyStopSel: -1 });
+    this._uiOnlySetState({ energyTripStart: String(key), energyStopSel: -1 });
   }
 
   // ── formatting ──
@@ -34885,15 +35020,22 @@ class Component extends DCLogic {
     };
   }
 
-  _consumptionWidgetView(item) {
+  _consumptionWidgetView(item, surface) {
     const now = Date.now();
     const m = this._energyModel(now);
     const w = Math.max(1, (item && item.w) || 1);
     const h = Math.max(1, (item && item.h) || 1);
     const series = this._energyDaySeries(m.hist, 7, now);
     const weekKm = series.reduce((s, e) => s + (e.row ? Number(e.row.km) || 0 : 0), 0);
+    // A board widget 4x2 or wider is the whole workspace, with map / graph and
+    // data side by side (owner, 2026-09-14). The popup keeps its 3x2 frame and
+    // its MAPA | DADOS toggles whatever size the board widget has.
+    const popup = surface === 'popup';
+    const wide = !popup && w >= 4 && h >= 2;
     const view = {
       consumptionSizeClass: 'hv-energy-' + Math.min(3, w) + 'x' + Math.min(2, h),
+      consumptionGlance: !wide,
+      consumptionWide: wide,
       consumptionSource: m.source,
       consumptionSourceClass: m.sourceClass,
       // Hidden while recording normally (owner, 2026-09-13); DEMO / UNAVAILABLE / READY states still say so.
@@ -34914,11 +35056,11 @@ class Component extends DCLogic {
       consumptionBars: this._energyBarsFrom(series, (e) => 'DSTQQSS'.charAt(e.date.getDay())),
       consumptionBarsLabel: '7 DIAS · ' + this._energyKm(weekKm),
     };
-    if (this.state.focusedCardType === 'consumption') Object.assign(view, this._energyPopupView(m, now));
+    if (popup || wide) Object.assign(view, this._energyPopupView(m, now, wide));
     return view;
   }
 
-  _energyPopupView(m, now) {
+  _energyPopupView(m, now, wide) {
     const s = this.state;
     const tab = s.energyTab === 'trips' || s.energyTab === 'history' ? s.energyTab : 'now';
     const units = m.units;
@@ -34927,6 +35069,7 @@ class Component extends DCLogic {
     const histView = s.energyHistoryView === 'data' ? 'data' : 'chart';
     const view = {
       consumptionDemo: m.demo,
+      consumptionDemoBadge: m.demo,
       consumptionTabNowClass: on(tab === 'now'),
       consumptionTabTripsClass: on(tab === 'trips'),
       consumptionTabHistoryClass: on(tab === 'history'),
@@ -34940,7 +35083,7 @@ class Component extends DCLogic {
       consumptionShowTrips: tab === 'trips',
       consumptionShowHistory: tab === 'history',
       // The tab bar is full on VIAGENS / HISTÓRICO, so the source line stays on
-      // AGORA; DEMO is stated in the popup header badge instead.
+      // AGORA; DEMO is stated in the header badge instead.
       consumptionBarShowSource: tab === 'now' && m.sourceClass !== 'live' && !m.demo,
       // Units (owner, 2026-09-13): a header button opens explicit choices.
       consumptionUnitsOpen: !!s.energyUnitsOpen,
@@ -34954,7 +35097,9 @@ class Component extends DCLogic {
       consumptionSetFuelL100: (ev) => this._setEnergyUnit('fuel', 'l100', ev),
       consumptionSetEvKwh: (ev) => this._setEnergyUnit('ev', 'kwh100', ev),
       consumptionSetEvKm: (ev) => this._setEnergyUnit('ev', 'kmkwh', ev),
-      // MAPA | DADOS and GRÁFICO | DADOS: one pane at a time, each filling the popup.
+      // MAPA | DADOS and GRÁFICO | DADOS pick one pane in the 3x2 popup; a wide
+      // widget has room for both, so it shows both and no toggle.
+      consumptionShowToggles: !wide,
       consumptionTripMapClass: on(tripView === 'map'),
       consumptionTripDataClass: on(tripView === 'data'),
       consumptionTripViewMap: (ev) => this._setEnergyTripView('map', ev),
@@ -34963,8 +35108,8 @@ class Component extends DCLogic {
       consumptionHistDataClass: on(histView === 'data'),
       consumptionHistViewChart: (ev) => this._setEnergyHistoryView('chart', ev),
       consumptionHistViewData: (ev) => this._setEnergyHistoryView('data', ev),
-      consumptionHistShowChart: histView === 'chart',
-      consumptionHistShowData: histView === 'data',
+      consumptionHistShowChart: wide || histView === 'chart',
+      consumptionHistShowData: wide || histView === 'data',
       // Defaults for the panels that are not showing; the template binds them all.
       consumptionTrips: [],
       consumptionTripsEmpty: '',
@@ -34977,6 +35122,8 @@ class Component extends DCLogic {
       consumptionDetailHasInsights: false,
       consumptionDetailHasMapView: false,
       consumptionDetailNoMapView: false,
+      consumptionDetailLiveMap: false,
+      consumptionDetailSnapshot: false,
       consumptionDetailHasMap: false,
       consumptionDetailMap: '',
       consumptionDetailSegments: [],
@@ -34998,14 +35145,10 @@ class Component extends DCLogic {
       consumptionDetailHasProfile: false,
       consumptionDetailProfile: '',
       consumptionDetailNote: '',
-      consumptionDetailCanExplore: false,
-      consumptionMapOpen: false,
       consumptionShowDetail: false,
       consumptionTripShowMap: false,
       consumptionTripShowData: false,
       consumptionMapKey: '',
-      consumptionOpenMap: (ev) => this._setEnergyMapOpen(true, ev),
-      consumptionCloseMap: (ev) => this._setEnergyMapOpen(false, ev),
       consumptionRange7Class: '',
       consumptionRange30Class: '',
       consumptionRange12Class: '',
@@ -35029,12 +35172,12 @@ class Component extends DCLogic {
       consumptionHasBestWorst: false,
       consumptionBestWorst: [],
     };
-    if (tab === 'trips') Object.assign(view, this._energyTripsView(m));
+    if (tab === 'trips') Object.assign(view, this._energyTripsView(m, wide));
     if (tab === 'history') Object.assign(view, this._energyHistoryView(m, now));
     return view;
   }
 
-  _energyTripsView(m) {
+  _energyTripsView(m, wide) {
     const units = m.units;
     const rows = [];
     const live = m.demo ? this._energyDemoLive(Date.now()) : this._energyLive;
@@ -35084,13 +35227,17 @@ class Component extends DCLogic {
       .concat(chargePct > 0 ? [{ k: 'CARREGADO', v: '+' + Math.round(chargePct) + '% de bateria' }] : []);
     const insights = t ? this._energyTripInsights(t, m.hist.trips) : [];
 
-    // The route, coloured, drawn in ONE svg with the tiles-only snapshot, so the
-    // popup can give the map any size and the route, markers and tiles still
-    // letterbox together (preserveAspectRatio meet on the 640 x 400 frame).
+    // Online, the pane IS the interactive OSM map (owner decision: online map
+    // first), so it fills whatever width the pane has. Offline, the tiles-only
+    // snapshot with the route drawn over it letterboxes in the same place.
     const metric = this.state.energyRouteMetric === 'ev' || this.state.energyRouteMetric === 'fuel' ? this.state.energyRouteMetric : 'speed';
     const frame = detail ? detail.frame : null;
     const hasView = !!(frame && detail.fixes && detail.fixes.length >= 2);
-    const colored = hasView ? this._energyRouteSegments(detail.route, metric, units) : { segments: [], legend: [] };
+    const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+    const liveMap = !!(t && !row.live && hasView && online);
+    const snapshot = hasView && !liveMap;
+    const colored = snapshot ? this._energyRouteSegments(detail.route, metric, units) : { segments: [], legend: [] };
+    const legend = hasView ? this._energyRouteSegments([], metric, units).legend : [];
     const toXY = (lat, lon) => {
       const q = this._energyMercator(lat, lon, frame.z);
       return [q[0] - frame.ox, q[1] - frame.oy];
@@ -35099,9 +35246,9 @@ class Component extends DCLogic {
       const q = toXY(p[0], p[1]);
       return q[0].toFixed(1) + ',' + q[1].toFixed(1);
     }).join(' ');
-    const first = hasView ? toXY(detail.fixes[0][0], detail.fixes[0][1]) : [0, 0];
-    const last = hasView ? toXY(detail.fixes[detail.fixes.length - 1][0], detail.fixes[detail.fixes.length - 1][1]) : [0, 0];
-    const placed = hasView ? allStops.filter((sp) => sp.lat != null && sp.lon != null && isFinite(sp.lat) && isFinite(sp.lon)) : [];
+    const first = snapshot ? toXY(detail.fixes[0][0], detail.fixes[0][1]) : [0, 0];
+    const last = snapshot ? toXY(detail.fixes[detail.fixes.length - 1][0], detail.fixes[detail.fixes.length - 1][1]) : [0, 0];
+    const placed = snapshot ? allStops.filter((sp) => sp.lat != null && sp.lon != null && isFinite(sp.lat) && isFinite(sp.lon)) : [];
     const selStop = placed[this.state.energyStopSel] || null;
     const pins = placed.map((sp, i) => {
       const q = toXY(sp.lat, sp.lon);
@@ -35117,12 +35264,14 @@ class Component extends DCLogic {
     });
     const stopText = selStop ? this._energyStopText(selStop) : null;
     const tripView = this.state.energyTripView === 'data' ? 'data' : 'map';
-    const explorable = !!(t && !row.live && hasView);
-    const mapOpen = explorable && tripView === 'map' && !!this.state.energyMapOpen;
+    const mapKey = liveMap ? String(t.startMs) + '|' + metric : '';
+    // The map element is created by React; the tiles are mounted into it right
+    // after this render (and again by the 1 Hz tick if this one is missed).
+    if (liveMap) setTimeout(() => this._energyMapSync(), 0);
     let note = '';
     if (t && row.live) note = 'Gravando. A rota aparece quando a viagem terminar.';
     else if (t && !hasView) note = 'Nenhuma posição de GPS foi gravada nesta viagem.';
-    else if (t && detail.map) note = 'Mapa © OpenStreetMap contributors.';
+    else if (t && (liveMap || detail.map)) note = 'Mapa © OpenStreetMap contributors.';
     else if (t) note = 'Rota sobre fundo neutro: o mapa é baixado quando a central estiver online.';
     if (t && !row.live && t.detailKept === 0) note += ' Os dados por segundo ficam guardados nas últimas 30 viagens; a rota fica guardada para sempre.';
     const places = t && !row.live ? this._energyPlaces(t) : '';
@@ -35142,15 +35291,17 @@ class Component extends DCLogic {
       consumptionDetailHasInsights: insights.length > 0,
       consumptionDetailHasMapView: hasView,
       consumptionDetailNoMapView: !!t && !hasView,
-      consumptionDetailHasMap: !!(hasView && detail.map),
-      consumptionDetailMap: hasView && detail.map ? detail.map : '',
+      consumptionDetailLiveMap: liveMap,
+      consumptionDetailSnapshot: snapshot,
+      consumptionDetailHasMap: !!(snapshot && detail.map),
+      consumptionDetailMap: snapshot && detail.map ? detail.map : '',
       consumptionDetailSegments: colored.segments.map((sg) => ({ cls: 'seg ' + sg.cls, points: polyline(sg.pts) })),
       consumptionDetailStartX: +first[0].toFixed(1),
       consumptionDetailStartY: +first[1].toFixed(1),
       consumptionDetailEndX: +last[0].toFixed(1),
       consumptionDetailEndY: +last[1].toFixed(1),
       consumptionDetailPins: pins,
-      consumptionDetailLegend: colored.legend,
+      consumptionDetailLegend: legend,
       consumptionDetailHasStopInfo: !!stopText,
       consumptionDetailStopTitle: stopText ? stopText.title : '',
       consumptionDetailStopDetail: stopText ? stopText.detail : '',
@@ -35160,12 +35311,10 @@ class Component extends DCLogic {
       consumptionDetailHasProfile: !!(detail && detail.profile),
       consumptionDetailProfile: detail ? detail.profile : '',
       consumptionDetailNote: note,
-      consumptionDetailCanExplore: explorable,
-      consumptionMapOpen: mapOpen,
-      consumptionShowDetail: !!t && !mapOpen,
-      consumptionTripShowMap: !!t && !mapOpen && tripView === 'map',
-      consumptionTripShowData: !!t && tripView === 'data',
-      consumptionMapKey: explorable ? String(t.startMs) + '|' + metric : '',
+      consumptionShowDetail: !!t,
+      consumptionTripShowMap: !!t && (wide || tripView === 'map'),
+      consumptionTripShowData: !!t && (wide || tripView === 'data'),
+      consumptionMapKey: mapKey,
     };
   }
 
@@ -35335,7 +35484,7 @@ class Component extends DCLogic {
 
   _openEnergyTrip(startMs, ev) {
     this._cardControlEvent(ev);
-    this._uiOnlySetState({ energyTab: 'trips', energyTripStart: String(startMs), energyMapOpen: false });
+    this._uiOnlySetState({ energyTab: 'trips', energyTripStart: String(startMs) });
   }
 
   // ── ENERGY interactive map (Phase 4) ──────────────────────────────────────
@@ -35372,23 +35521,23 @@ class Component extends DCLogic {
     return minZ;
   }
 
-  _setEnergyMapOpen(open, ev) {
-    this._cardControlEvent(ev);
-    this._uiOnlySetState({ energyMapOpen: !!open });
-    if (open) setTimeout(() => this._energyMapSync(), 50);
-  }
-
-  /** Mounts the map into a freshly rendered `.hv-energy-livemap`; a no-op while the same trip is showing. */
+  /**
+   * Mounts the interactive map into every freshly rendered `.hv-energy-livemap`
+   * (the popup and a wide board widget can both show one); a no-op for an
+   * element already showing the same trip and colouring.
+   */
   _energyMapSync() {
-    const el = document.querySelector('.hv-energy-livemap');
-    if (!el) return;
-    const key = el.getAttribute('data-trip') || '';
-    if (el.__energyMap && el.__energyMap.key === key) return;
-    const parts = key.split('|');
-    const detail = this._energyDetailCache && this._energyDetailCache[parts[0]];
-    if (!detail || !detail.fixes || detail.fixes.length < 2) return;
-    if (el.__energyMap) el.__energyMap.destroy();
-    el.__energyMap = this._energyMapCreate(el, key, detail, parts[1] || 'speed');
+    const els = document.querySelectorAll('.hv-energy-livemap');
+    for (let i = 0; i < els.length; i++) {
+      const el = els[i];
+      const key = el.getAttribute('data-trip') || '';
+      if (el.__energyMap && el.__energyMap.key === key) continue;
+      const parts = key.split('|');
+      const detail = this._energyDetailCache && this._energyDetailCache[parts[0]];
+      if (!detail || !detail.fixes || detail.fixes.length < 2) continue;
+      if (el.__energyMap) el.__energyMap.destroy();
+      el.__energyMap = this._energyMapCreate(el, key, detail, parts[1] || 'speed');
+    }
   }
 
   _energyMapCreate(el, key, detail, metric) {
@@ -35663,7 +35812,7 @@ class Component extends DCLogic {
   _setEnergyTripView(view, ev) {
     this._cardControlEvent(ev);
     if (view !== 'map' && view !== 'data') return;
-    this._uiOnlySetState({ energyTripView: view, energyMapOpen: false });
+    this._uiOnlySetState({ energyTripView: view });
   }
 
   /** GRÁFICO | DADOS in HISTÓRICO. */
@@ -38204,7 +38353,9 @@ class Component extends DCLogic {
         + (item.type === 'driving' ? ' has-controls' : '')
         // Media is the other card that is mostly buttons. Its own clause, so
         // neither card's contract test is asserting on the other's wiring.
-        + (item.type === 'media' ? ' has-controls' : ''),
+        + (item.type === 'media' ? ' has-controls' : '')
+        // The wide ENERGIA widget is the whole workspace: tabs, map, lists.
+        + (item.type === 'consumption' && item.w >= 4 && item.h >= 2 ? ' has-controls' : ''),
       onHoldStart: (ev) => this._onWidgetHoldStart(side, item, ev),
       onHoldEnd: (ev) => this._onWidgetHoldEnd(side, item, ev),
       onHoldCancel: (ev) => this._onWidgetHoldCancel(side, item, ev),
