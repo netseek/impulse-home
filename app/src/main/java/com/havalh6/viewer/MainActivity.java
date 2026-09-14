@@ -1131,6 +1131,8 @@ public final class MainActivity extends Activity {
          * "unavailable" on all four corners while TPMS was live.
          */
         String tirePressures = "";
+        String tireTemperatures = "";
+        String tirePressureUnit = "";
         /** ENERGY card: the last seven days' distance, 0-100 each, oldest first. */
         int[] energyBars = new int[0];
         /** Status opening order: FL, FR, RL, RR, tailgate. */
@@ -1713,6 +1715,8 @@ public final class MainActivity extends Activity {
         private final android.graphics.RectF oval = new android.graphics.RectF();
         private Bitmap tiresTopViewBitmap;
         private boolean tiresTopViewDecodeAttempted;
+        private float statusLift;
+        private long statusLiftLastMs;
         private final java.util.Map<String, Bitmap> statusVehicleBitmaps =
                 new java.util.HashMap<>();
 
@@ -1827,6 +1831,26 @@ public final class MainActivity extends Activity {
             imageW = Math.min(imageW, w * .42f);
             float left = (w - imageW) * .5f;
             float top = -h * .019f;
+            String[] openings = descriptor.openingStates == null ? new String[0]
+                    : descriptor.openingStates;
+            // The raster overflows the card at the bottom, which is where the
+            // open tailgate sits. Lift the car so the open trunk is on screen.
+            // Eased over ~320 ms each way instead of snapping.
+            float liftTarget = openings.length > 4 && "open".equals(openings[4]) ? 1f : 0f;
+            long nowMs = android.os.SystemClock.uptimeMillis();
+            float stepMs = statusLiftLastMs == 0L ? 0f : Math.min(64f, nowMs - statusLiftLastMs);
+            statusLiftLastMs = nowMs;
+            float delta = liftTarget - statusLift;
+            if (Math.abs(delta) > .001f) {
+                float move = stepMs / 320f;
+                statusLift += Math.signum(delta) * Math.min(Math.abs(delta), move);
+                postInvalidateOnAnimation();
+            } else {
+                statusLift = liftTarget;
+                statusLiftLastMs = 0L;
+            }
+            float eased = statusLift * statusLift * (3f - 2f * statusLift);
+            top -= (imageH - h * 1.02f) * eased;
             android.graphics.RectF vehicleRect = new android.graphics.RectF(
                     left, top, left + imageW, top + imageH);
             if (base != null) {
@@ -1839,8 +1863,6 @@ public final class MainActivity extends Activity {
                 drawStatusVehicleFallback(c, w, h, muted, strong);
                 c.restore();
             }
-            String[] openings = descriptor.openingStates == null ? new String[0]
-                    : descriptor.openingStates;
             // Darken only the matching door footprint before drawing an open panel.
             // The repository's doorless base retains bright pillar/rocker pixels which
             // otherwise resemble a second, closed door at compact card size.
@@ -1886,20 +1908,53 @@ public final class MainActivity extends Activity {
             // overflow off the bottom: at imageH 1.34x the lower baseline
             // computed to 83.4 in an 81px view. X still tracks the vehicle,
             // which is the whole point of flanking it.
-            float[] tireYs = {h * .29f, h * .29f, h * .78f, h * .78f};
+            float[] tireYs = {h * .24f, h * .24f, h * .70f, h * .70f};
             String[] pressureReadings = tireReadings(descriptor);
+            String[] temps = descriptor.tireTemperatures.split("\\s*/\\s*", -1);
+            String unit = descriptor.tirePressureUnit;
+            android.graphics.Typeface valueFace = android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.BOLD);
+            android.graphics.Typeface unitFace = android.graphics.Typeface.create("sans-serif",
+                    android.graphics.Typeface.NORMAL);
+            android.graphics.Typeface tempFace = android.graphics.Typeface.create("sans-serif-light",
+                    android.graphics.Typeface.NORMAL);
+            float valueSize = Math.max(16f, Math.min(w, h) * .245f);
+            float smallSize = Math.max(9f, valueSize * .5f);
             for (int i = 0; i < 4; i++) {
                 String wheelState = descriptor.wheelStates != null
                         && i < descriptor.wheelStates.length
                         ? descriptor.wheelStates[i] : "unavailable";
+                boolean leftSide = i == 0 || i == 2;
+                String value = pressureReadings[i];
+                boolean hasValue = !"unavailable".equals(value) && !"—".equals(value);
+                String unitText = hasValue && !unit.isEmpty() ? " " + unit : "";
+                paint.setTypeface(unitFace);
+                paint.setTextSize(smallSize);
+                float unitW = paint.measureText(unitText);
+                paint.setTypeface(valueFace);
+                paint.setTextSize(valueSize);
+                float valueW = paint.measureText(value);
+                // Left-side readouts end at the car; right-side ones start there.
+                float x = leftSide ? tireXs[i] - valueW - unitW : tireXs[i];
+                float baseline = tireYs[i] + valueSize * .34f;
+                paint.setTextAlign(android.graphics.Paint.Align.LEFT);
                 fill(tireSignalColor(wheelState, muted));
-                paint.setTextAlign(i == 0 || i == 2
-                        ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
-                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                        android.graphics.Typeface.BOLD));
-                paint.setTextSize(Math.max(16f, Math.min(w, h) * .245f));
-                c.drawText(pressureReadings[i], tireXs[i],
-                        tireYs[i] + paint.getTextSize() * .34f, paint);
+                c.drawText(value, x, baseline, paint);
+                if (!unitText.isEmpty()) {
+                    paint.setTypeface(unitFace);
+                    paint.setTextSize(smallSize);
+                    fill(withAlpha(muted, 0xC8));
+                    c.drawText(unitText, x + valueW, baseline, paint);
+                }
+                String temp = i < temps.length ? temps[i].trim() : "";
+                if (!temp.isEmpty()) {
+                    paint.setTypeface(tempFace);
+                    paint.setTextSize(smallSize * 1.1f);
+                    paint.setTextAlign(leftSide
+                            ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
+                    fill(0xFF8F949B);
+                    c.drawText(temp, tireXs[i], baseline + smallSize * 1.35f, paint);
+                }
             }
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
@@ -1937,7 +1992,7 @@ public final class MainActivity extends Activity {
                 android.graphics.RectF vehicleRect) {
             String[] states = descriptor.seatBeltStates == null
                     ? new String[0] : descriptor.seatBeltStates;
-            float[] xs = {.455f, .545f, .445f, .5f, .555f};
+            float[] xs = {.425f, .575f, .405f, .5f, .595f};
             float[] ys = {.49f, .49f, .60f, .60f, .60f};
             for (int i = 0; i < 5 && i < states.length; i++) {
                 if (!"unfastened".equals(states[i])) continue;
@@ -2079,7 +2134,7 @@ public final class MainActivity extends Activity {
                     paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                     paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                             android.graphics.Typeface.NORMAL));
-                    paint.setTextSize(Math.max(11f, h * .16f));
+                    paint.setTextSize(Math.max(13f, h * .20f));
                     fill(strong);
                     c.drawText(maneuver, col * .5f, h * .88f, paint);
                 }
@@ -2109,9 +2164,9 @@ public final class MainActivity extends Activity {
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.NORMAL));
                 if (!street.isEmpty()) {
-                    paint.setTextSize(Math.max(13f, h * .21f));
+                    paint.setTextSize(Math.max(16f, h * .26f));
                     fill(strong);
-                    c.drawText(ellipsizeNav(street, textMax), textX, h * .30f, paint);
+                    c.drawText(ellipsizeNav(street, textMax), textX, h * .32f, paint);
                 }
                 if (showTurn) {
                     drawNavMetricRow(c, textX, h * .46f, textMax, h,
@@ -2123,14 +2178,14 @@ public final class MainActivity extends Activity {
                     String idleCity = descriptor.navIdleCity == null ? "" : descriptor.navIdleCity;
                     String idleAction = descriptor.navIdleAction == null ? "" : descriptor.navIdleAction;
                     if (!idleCity.isEmpty()) {
-                        paint.setTextSize(Math.max(9f, h * .12f));
+                        paint.setTextSize(Math.max(12f, h * .17f));
                         fill(muted);
-                        c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .46f, paint);
+                        c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .54f, paint);
                     }
                     if (!idleAction.isEmpty()) {
-                        paint.setTextSize(Math.max(7f, h * .09f));
+                        paint.setTextSize(Math.max(10f, h * .13f));
                         fill(muted);
-                        c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .64f, paint);
+                        c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .76f, paint);
                     }
                 }
             }
@@ -2154,8 +2209,8 @@ public final class MainActivity extends Activity {
             if (items.isEmpty() || maxW <= 0f) return;
             android.graphics.Typeface medium = android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL);
-            float valueSize = Math.max(13f, h * .24f);
-            float labelSize = Math.max(7f, h * .11f);
+            float valueSize = Math.max(15f, h * .28f);
+            float labelSize = Math.max(9f, h * .13f);
             float gap = Math.max(10f, h * .08f);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(medium);
@@ -8047,6 +8102,7 @@ public final class MainActivity extends Activity {
                 Math.round(24 * density), Math.round(6 * density));
         quickCardsRow = row;
         populateQuickCardsRow(row, density);
+        bindRailEditLongPress();
 
         scroll.addView(row, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -8457,6 +8513,7 @@ public final class MainActivity extends Activity {
         headingLp.leftMargin = Math.round(14 * density);
         headingLp.topMargin = Math.round(10 * density);
         heading.setLayoutParams(headingLp);
+        heading.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
         card.addView(heading);
         workspaceHeading = heading;
 
@@ -8508,7 +8565,9 @@ public final class MainActivity extends Activity {
         grid.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         int pad = Math.round(6 * density);
-        grid.setPadding(pad, Math.round(28 * density), pad, pad);
+        // No title band: the LAYOUT heading is hidden on this face, so the four
+        // cells take the whole card.
+        grid.setPadding(pad, pad, pad, pad);
         final String[][] cells = {
                 {"desktops", "Desktops", "openLayoutDesktops"},
                 {"layout", "Cards & widgets", "openLayoutCards"},
@@ -8526,7 +8585,7 @@ public final class MainActivity extends Activity {
                 cell.setText(def[1]);
                 cell.setTag("workspaceLayoutCell:" + def[0]);
                 cell.setGravity(android.view.Gravity.CENTER);
-                cell.setTextSize(11.5f);
+                cell.setTextSize(13f);
                 cell.setMaxLines(1);
                 cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 cell.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
@@ -8561,21 +8620,62 @@ public final class MainActivity extends Activity {
         float density = getResources().getDisplayMetrics().density;
         for (android.widget.TextView cell : workspaceLayoutCells) {
             String key = String.valueOf(cell.getTag()).substring("workspaceLayoutCell:".length());
-            boolean on = !"return".equals(key) && key.equals(studioScreen);
+            boolean isReturn = "return".equals(key);
+            boolean on = !isReturn && key.equals(studioScreen);
+            // The three screens stay neutral (accent only marks the open one);
+            // Return wears the accent and carries a back arrow.
             cell.setTextColor(on ? dockAccentColor : dockLabelColor());
             android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
             bg.setCornerRadius(9 * density);
-            bg.setColor(on ? withAlpha(dockAccentColor, 0x2E) : (dockUiLight ? 0x0F000000 : 0x12FFFFFF));
+            bg.setColor(isReturn ? withAlpha(dockAccentColor, 0x33)
+                    : on ? withAlpha(dockAccentColor, 0x2E) : (dockUiLight ? 0x0F000000 : 0x12FFFFFF));
             if (on) bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0xA0));
+            android.graphics.drawable.Drawable content = bg;
+            if (isReturn) {
+                // Drawn as a centred background layer, not a compound drawable:
+                // an empty TextView still reserves a text line under a top
+                // compound, which pushed the arrow above the middle.
+                cell.setText("");
+                android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
+                        new android.graphics.drawable.Drawable[] {
+                                bg, workspaceBackGlyph(density, dockAccentColor) });
+                layers.setLayerGravity(1, android.view.Gravity.CENTER);
+                content = layers;
+            }
             cell.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(withAlpha(dockLabelColor(), 0x33)), bg, null));
+                    android.content.res.ColorStateList.valueOf(withAlpha(dockLabelColor(), 0x33)), content, null));
         }
+    }
+
+    /** A left arrow (shaft + chevron) for the Layout face's Return cell. */
+    private android.graphics.drawable.Drawable workspaceBackGlyph(float density, int color) {
+        int box = Math.max(8, Math.round(22 * density));
+        Bitmap bmp = Bitmap.createBitmap(box, box, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+        p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+        p.setStrokeWidth(2.2f * box / 24f);
+        p.setColor(color);
+        float u = box / 24f;
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(19 * u, 12 * u);
+        path.lineTo(5 * u, 12 * u);
+        path.moveTo(11 * u, 6 * u);
+        path.lineTo(5 * u, 12 * u);
+        path.lineTo(11 * u, 18 * u);
+        c.drawPath(path, p);
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
     private void setWorkspaceLayoutMode(boolean on) {
         if (workspaceLayoutMode == on) return;
         workspaceLayoutMode = on;
-        if (workspaceHeading != null) workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
+        if (workspaceHeading != null) {
+            workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
+            workspaceHeading.setVisibility(on ? View.GONE : View.VISIBLE);
+        }
         crossfadeFaces(on ? workspaceActionsFace : workspaceLayoutFace,
                 on ? workspaceLayoutFace : workspaceActionsFace);
     }
@@ -8802,8 +8902,11 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
         copy.setOrientation(android.widget.LinearLayout.VERTICAL);
         copy.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        copy.setPadding(Math.round(13 * density), Math.round(8 * density),
-                Math.round(11 * density), Math.round(8 * density));
+        // 4dp, not 8: measured on the car the column needs ~116dp (30dp source
+        // chip row, title, artist, 48dp play) and 8dp padding left 108, so the
+        // play circle drew 38dp tall -- clipped top and bottom.
+        copy.setPadding(Math.round(13 * density), Math.round(4 * density),
+                Math.round(11 * density), Math.round(4 * density));
         copy.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
@@ -8854,7 +8957,7 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout.LayoutParams controlsLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        controlsLp.topMargin = Math.round(3 * density);
+        controlsLp.topMargin = 0;
         controls.setLayoutParams(controlsLp);
         controls.addView(makeQuickMediaButton(density, false, "prev", "Previous track",
                 v -> mediaNowPlaying.prev()));
@@ -10270,6 +10373,8 @@ public final class MainActivity extends Activity {
                     iconAction, longAction, glyph, glyphText, clockFace, clockHourFormat,
                     dialMarks, splitPlates, dateSpineFormat, dateWording, menu);
             descriptor.tirePressures = cleanBottomCardText(raw.optString("tirePressures", ""), 48);
+            descriptor.tireTemperatures = cleanBottomCardText(raw.optString("tireTemperatures", ""), 48);
+            descriptor.tirePressureUnit = cleanBottomCardText(raw.optString("tirePressureUnit", ""), 6);
             descriptor.appPackage = cleanBottomCardText(raw.optString("appPackage", ""), 80);
             descriptor.navRemaining = cleanBottomCardText(raw.optString("navRemaining", ""), 16);
             descriptor.navDuration = cleanBottomCardText(raw.optString("navDuration", ""), 16);
@@ -10696,6 +10801,7 @@ public final class MainActivity extends Activity {
         // The views an open menu is anchored to are about to be replaced.
         dismissQuickMenu();
         populateQuickCardsRow(quickCardsRow, getResources().getDisplayMetrics().density);
+        bindRailEditLongPress();
         refreshQuickCardsTheme();
         // A reorder or remove comes back from the page as a new card list; the
         // rebuilt tiles have to rejoin edit mode.
@@ -10860,6 +10966,28 @@ public final class MainActivity extends Activity {
         return index;
     }
 
+    /**
+     * Long press on any rail card opens card edit. Set after every build, so it
+     * replaces a card's own longAction; edit mode clears it again.
+     */
+    private void bindRailEditLongPress() {
+        for (View card : railCardViews()) {
+            card.setLongClickable(true);
+            card.setOnLongClickListener(v -> {
+                if (railEditMode) return false;
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                callViewerDock("openRailEdit");
+                return true;
+            });
+        }
+    }
+
+    /**
+     * Edit-mode gesture. A quick swipe is left to the scroll view, which
+     * intercepts it past touch slop. Only a hold arms the drag; once armed the
+     * rail may no longer intercept, and holding the card near either edge
+     * scrolls the rail so it can travel past the visible cards.
+     */
     private final class RailEditTouch implements View.OnTouchListener {
         private final String id;
         private final View card;
@@ -10868,7 +10996,32 @@ public final class MainActivity extends Activity {
         private final float density;
         private final int slop;
         private float downX;
+        private float lastRawX;
+        private int downScrollX;
         private boolean dragging;
+        private boolean armed;
+        private final Runnable arm = this::armDrag;
+        private final Runnable autoScroll = new Runnable() {
+            @Override
+            public void run() {
+                if (!dragging) return;
+                android.widget.HorizontalScrollView scroll = railScroll();
+                if (scroll == null) return;
+                int[] loc = new int[2];
+                scroll.getLocationOnScreen(loc);
+                float edge = 90f * density;
+                float left = lastRawX - loc[0];
+                float right = loc[0] + scroll.getWidth() - lastRawX;
+                int step = 0;
+                if (left < edge) step = -Math.round(Math.min(1f, (edge - left) / edge) * 22f * density);
+                else if (right < edge) step = Math.round(Math.min(1f, (edge - right) / edge) * 22f * density);
+                if (step != 0) {
+                    scroll.scrollBy(step, 0);
+                    follow();
+                }
+                card.postOnAnimation(this);
+            }
+        };
 
         RailEditTouch(String id, View card, RailBadge badge, RailBadge more, float density) {
             this.id = id;
@@ -10879,34 +11032,102 @@ public final class MainActivity extends Activity {
             this.slop = android.view.ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
         }
 
+        private android.widget.HorizontalScrollView railScroll() {
+            return cardsScrollView instanceof android.widget.HorizontalScrollView
+                    ? (android.widget.HorizontalScrollView) cardsScrollView : null;
+        }
+
+        private int scrollX() {
+            android.widget.HorizontalScrollView s = railScroll();
+            return s == null ? 0 : s.getScrollX();
+        }
+
+        /** Finger offset plus however far the rail has scrolled under it. */
+        private void follow() {
+            card.setTranslationX(lastRawX - downX + (scrollX() - downScrollX));
+            shiftNeighbours(railDropIndex(card));
+        }
+
+        private int shownTo = -1;
+        /** Where the dragged card lands if dropped now: its offset to the open slot. */
+        private float slotOffset;
+
+        /**
+         * Live swap feedback: the cards between the dragged card's origin and
+         * its drop index slide over by one slot. railDropIndex reads getLeft(),
+         * which translation does not move, so this cannot feed back on itself.
+         */
+        private void shiftNeighbours(int to) {
+            if (to == shownTo) return;
+            shownTo = to;
+            List<View> cards = railCardViews();
+            int from = cards.indexOf(card);
+            float slot = card.getWidth() + marginRight(card);
+            slotOffset = 0f;
+            for (int i = 0; i < cards.size(); i++) {
+                View c = cards.get(i);
+                if (c == card) continue;
+                float shift = 0f;
+                if (from < to && i > from && i <= to) {
+                    shift = -slot;
+                    slotOffset += c.getWidth() + marginRight(c);
+                } else if (to < from && i >= to && i < from) {
+                    shift = slot;
+                    slotOffset -= c.getWidth() + marginRight(c);
+                }
+                c.animate().translationX(shift).setDuration(160)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            }
+        }
+
+        private int marginRight(View v) {
+            android.view.ViewGroup.LayoutParams lp = v.getLayoutParams();
+            return lp instanceof android.view.ViewGroup.MarginLayoutParams
+                    ? ((android.view.ViewGroup.MarginLayoutParams) lp).rightMargin : 0;
+        }
+
+        private void armDrag() {
+            armed = true;
+            dragging = true;
+            if (card.getParent() != null) card.getParent().requestDisallowInterceptTouchEvent(true);
+            card.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            android.animation.Animator jiggle = railJiggles.get(card);
+            if (jiggle != null) jiggle.pause();
+            card.setRotation(0f);
+            card.setAlpha(0.92f);
+            card.setScaleX(1.04f);
+            card.setScaleY(1.04f);
+            card.setTranslationZ(8f * density);
+            card.postOnAnimation(autoScroll);
+        }
+
         @Override
         public boolean onTouch(View v, MotionEvent e) {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    downX = e.getRawX();
+                    downX = lastRawX = e.getRawX();
+                    downScrollX = scrollX();
                     dragging = false;
-                    // A press that starts on a card drags it; the rail scrolls
-                    // from the gaps between cards.
-                    if (v.getParent() != null) v.getParent().requestDisallowInterceptTouchEvent(true);
+                    armed = false;
+                    card.postDelayed(arm, android.view.ViewConfiguration.getLongPressTimeout());
                     return true;
                 case MotionEvent.ACTION_MOVE: {
-                    float dx = e.getRawX() - downX;
-                    if (!dragging && Math.abs(dx) > slop) {
-                        dragging = true;
-                        android.animation.Animator jiggle = railJiggles.get(card);
-                        if (jiggle != null) jiggle.pause();
-                        card.setRotation(0f);
-                        card.setAlpha(0.92f);
-                        card.setTranslationZ(8f * density);
+                    lastRawX = e.getRawX();
+                    if (!armed) {
+                        // Moved before the hold completed: a swipe, not a drag.
+                        if (Math.abs(lastRawX - downX) > slop) card.removeCallbacks(arm);
+                        return true;
                     }
-                    if (dragging) card.setTranslationX(dx);
+                    follow();
                     return true;
                 }
                 case MotionEvent.ACTION_UP: {
+                    card.removeCallbacks(arm);
                     if (dragging) {
                         int to = railDropIndex(card);
                         int from = railCardViews().indexOf(card);
-                        settle();
+                        shiftNeighbours(to);
+                        settle(to >= 0 && to != from);
                         if (to >= 0 && to != from) callViewerDock("railMoveCard:" + id + ":" + to);
                     } else {
                         int x = Math.round(e.getX());
@@ -10926,6 +11147,8 @@ public final class MainActivity extends Activity {
                     return true;
                 }
                 case MotionEvent.ACTION_CANCEL:
+                    // Also what the rail sends when it takes a quick swipe.
+                    card.removeCallbacks(arm);
                     if (dragging) settle();
                     return true;
                 default:
@@ -10934,8 +11157,23 @@ public final class MainActivity extends Activity {
         }
 
         private void settle() {
+            settle(false);
+        }
+
+        /** moved: glide into the open slot and leave neighbours shifted until the rebuild. */
+        private void settle(boolean moved) {
             dragging = false;
-            card.animate().translationX(0f).translationZ(0f).alpha(1f).setDuration(120).start();
+            armed = false;
+            card.removeCallbacks(autoScroll);
+            if (!moved) {
+                for (View c : railCardViews()) {
+                    if (c != card) c.animate().translationX(0f).setDuration(160).start();
+                }
+            }
+            float target = moved ? slotOffset : 0f;
+            shownTo = -1;
+            card.animate().translationX(target).translationZ(0f).alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(120).start();
             android.animation.Animator jiggle = railJiggles.get(card);
             if (jiggle != null) jiggle.resume();
         }

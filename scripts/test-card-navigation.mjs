@@ -317,8 +317,20 @@ assert.ok(drawNav.includes('drawTbtIcon'),
   'live navigation graphic must paint the filled minimalist TBT icon');
 assert.ok(drawNav.includes('drawGlyphPath'),
   'drawNavigation must keep the stroke glyph as fallback for exit/destination');
-assert.ok(drawNav.includes('drawNavigationAppBadge'),
-  'drawNavigation must stamp the live nav app icon');
+// The live nav app icon is the MEDIA card's source chip in the card header
+// (2bb5f71), not a badge painted on the canvas. Assert where the icon comes
+// from and that it follows the live payload, not which view draws it.
+const navChipApplyAt = java.indexOf('private void applyNavigationSourceChip(');
+assert.ok(navChipApplyAt >= 0, 'missing applyNavigationSourceChip');
+const navChipApply = java.slice(navChipApplyAt, java.indexOf('\n    }\n', navChipApplyAt));
+assert.ok(navChipApply.includes('card.appPackage') && /resolve\w*Icon\(pkg/.test(navChipApply),
+  'the navigation card must show the live nav app icon from its appPackage');
+assert.ok(/quickCardSourceChips\.put\(descriptor\.id, \w+\);\s*applyNavigationSourceChip\(descriptor\);/.test(java),
+  'the navigation card must build its source chip and stamp it on creation');
+assert.ok(/graphic\.setDescriptor\(card\);\s*applyNavigationSourceChip\(card\);/.test(java),
+  'the in-place rail patch must re-stamp the nav app icon when the payload changes');
+assert.ok(!drawNav.includes('iconBitmapForPackage'),
+  'the nav app icon must not also be painted on the canvas -- one Android Auto mark per card');
 assert.ok(drawNav.includes('descriptor.metricA'),
   'manoeuvre distance is drawn under the glyph');
 assert.ok(drawNav.includes('drawNavMetricRow'),

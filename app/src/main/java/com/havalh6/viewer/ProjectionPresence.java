@@ -229,12 +229,16 @@ final class ProjectionPresence {
                 viewState.putExtra("state", 1);
                 app.sendBroadcast(viewState);
             } catch (Throwable ignored) {}
-            sendAaTransact(0x16);
+            // LinkCommand$Stub codes, read from the MMI's AndroidAutoService.apk:
+            // 0x16 notifyBtDevicesDisconnected, 0x17 showMirrorHmi, 0x18 next,
+            // 0x19 previous. Only showMirrorHmi is a "show" call; sending 0x18
+            // too skipped the track on every AA open.
             sendAaTransact(0x17);
-            sendAaTransact(0x18);
         } else if (kind == Kind.CARPLAY) {
-            sendCpTransact(30);
-            sendCpTransact(31);
+            // Nothing to send: ICarPlayService 30 is getVideoLastUserMode and 31
+            // setSongElapsedTime (it could rewind the song). The only show-type
+            // call, requestUi (0x14), takes arguments we do not know, so the
+            // task resolve + launch intents in MainActivity do the showing.
         }
     }
 
