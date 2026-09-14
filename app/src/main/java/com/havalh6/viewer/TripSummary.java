@@ -62,7 +62,14 @@ final class TripSummary {
         this.odoJumps = s.odoJumps;
         this.driveMs = s.driveMs;
         this.idleMs = s.idleMs;
-        this.evKm = s.evKm;
+        // The EV share compares like with like: distance integrated with the engine
+        // off against distance integrated with the engine state known. Distance
+        // before the state was first heard is shared out in that proportion, and
+        // the result is expressed in the distance of record (the odometer). Owner
+        // report 2026-09-14: an all-electric drive read 99%, because integrated EV
+        // km was divided by odometer km and the first metres had no engine state.
+        double knownKm = s.evKm + s.iceKm;
+        this.evKm = knownKm > 0 ? Math.min(1.0, s.evKm / knownKm) * km : 0;
         this.evMs = s.evMs;
         this.kwhOut = s.kwhOut;
         this.kwhIn = s.kwhIn;

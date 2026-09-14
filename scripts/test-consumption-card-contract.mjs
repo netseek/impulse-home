@@ -85,11 +85,17 @@ const CHECKS = {
   'wide widget shows both panes': ({ html }) => {
     const trips = method(html, '_energyTripsView') || '';
     const pop = method(html, '_energyPopupView') || '';
-    return /const wide = !popup && w >= 4 && h >= 2;/.test(method(html, '_consumptionWidgetView') || '')
+    return (method(html, '_consumptionWidgetView') || '').includes('const wide = popup ? this._energyPopupWideOn() : (w >= 4 && h >= 2);')
       && trips.includes("consumptionTripShowMap: !!t && (wide || tripView === 'map')")
       && trips.includes("consumptionTripShowData: !!t && (wide || tripView === 'data')")
       && pop.includes("consumptionHistShowData: wide || histView === 'data'")
       && html.includes("this._consumptionWidgetView(entry.item, 'popup')");
+  },
+  // Owner, 2026-09-14: zoom buttons only on the maximised map; the pane pans,
+  // pinches and opens the full map on a tap.
+  'zoom buttons only on the maximised map': ({ html }) => {
+    const body = method(html, '_energyMapCreate') || '';
+    return /if \(maxMode\) \{\s*button\('\+'/.test(body) && /if \(tap && !maxMode\) this\._setEnergyMapMax\(true\);/.test(body);
   },
   // FINALIZAR VIAGEM ends a trip for good: the button only opens a confirmation.
   'finishing a trip asks for confirmation': ({ html }) => {
@@ -132,6 +138,7 @@ const MUTANTS = {
     "credit.textContent = '© OpenStreetMap contributors';", "credit.textContent = '';") }),
   'wide widget shows both panes': (s) => ({ ...s, html: s.html.replace(
     "consumptionTripShowData: !!t && (wide || tripView === 'data')", "consumptionTripShowData: !!t && tripView === 'data'") }),
+  'zoom buttons only on the maximised map': (s) => ({ ...s, html: s.html.replace('    if (maxMode) {\n      button(', '    if (true) {\n      button(') }),
   'finishing a trip asks for confirmation': (s) => ({ ...s, html: s.html.replace(
     '    this._uiOnlySetState({ energyFinishConfirm: true });', '    this._confirmFinishEnergyTrip(ev);') }),
 };

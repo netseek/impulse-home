@@ -36,6 +36,8 @@ final class TripState {
     long driveMs;
     long idleMs;
     double evKm;
+    /** Distance driven with the engine known to be on; with evKm, the share's denominator. */
+    double iceKm;
     long evMs;
     double kwhOut;
     double kwhIn;
@@ -100,6 +102,7 @@ final class TripState {
         put(b, "driveMs", driveMs);
         put(b, "idleMs", idleMs);
         put(b, "evKm", evKm);
+        put(b, "iceKm", iceKm);
         put(b, "evMs", evMs);
         put(b, "kwhOut", kwhOut);
         put(b, "kwhIn", kwhIn);
@@ -162,6 +165,7 @@ final class TripState {
                     case "driveMs": s.driveMs = Long.parseLong(v); break;
                     case "idleMs": s.idleMs = Long.parseLong(v); break;
                     case "evKm": s.evKm = Double.parseDouble(v); break;
+                    case "iceKm": s.iceKm = Double.parseDouble(v); break;
                     case "evMs": s.evMs = Long.parseLong(v); break;
                     case "kwhOut": s.kwhOut = Double.parseDouble(v); break;
                     case "kwhIn": s.kwhIn = Double.parseDouble(v); break;

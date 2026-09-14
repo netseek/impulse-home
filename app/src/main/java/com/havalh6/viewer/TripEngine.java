@@ -556,6 +556,8 @@ final class TripEngine {
             if (moving && Boolean.FALSE.equals(ice)) {
                 st.evKm += km;
                 st.evMs += dt;
+            } else if (moving && Boolean.TRUE.equals(ice)) {
+                st.iceKm += km;
             }
             if (fuelMode == TripSignals.FUEL_RUNNING && fuelRate > 0) st.fuelL += fuelRate / 100.0 * km;
         }

@@ -4898,6 +4898,8 @@ window.HavalSplash = (function () {
     }
     #hv-root .hv-card-focus.fit { transform: translate(0,18px) scale(.985); }
     #hv-root .hv-card-focus.fit.on { transform: translate(0,0) scale(1); }
+    /* ENERGIA maximised (⤢ beside ×): the board's full width, same height. */
+    #hv-root .hv-card-focus.wide { width: var(--hv-pop-wide-width, calc(100vw - 52px)); }
     #hv-root .hv-desktop-studio .hv-clock-config-gallery { grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); }
     .hv-studio-title { font-size: 16px; font-weight: 650; white-space: nowrap; }
     .hv-studio-explain { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.05); font-size: 13px; line-height: 1.45; opacity: .88; }
@@ -5026,6 +5028,7 @@ window.HavalSplash = (function () {
     .hv-card-focus-head .hv-card-focus-action { width:auto; margin-left:auto; padding:0 14px; font:600 12px/1 'Space Mono',monospace; letter-spacing:.06em; }
     .hv-card-focus-head .hv-card-focus-action.on { color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(255,255,255,.14); }
     .hv-card-focus-head.with-action > button:last-child { margin-left:18px; }
+    .hv-card-focus-head .hv-card-focus-action.hv-card-focus-max { margin-left:10px; width:44px; padding:0; font:400 20px/1 sans-serif; letter-spacing:0; }
     .hv-energy-unitsheet { position:absolute; right:2px; top:2px; z-index:6; display:flex; flex-direction:column; gap:10px; padding:14px; border:1px solid var(--hv-frost-edge,rgba(255,255,255,.18)); border-radius:16px; background:var(--hv-frost-bg,rgba(12,18,24,.96)); box-shadow:0 12px 30px rgba(0,0,0,.4); }
     .hv-energy-unitrow { display:flex; align-items:center; justify-content:space-between; gap:16px; }
     .hv-energy-unitrow > small { font:10px/1.2 'Space Mono',monospace; letter-spacing:.08em; opacity:.75; }
@@ -5060,6 +5063,11 @@ window.HavalSplash = (function () {
     .hv-energy-datapane { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
     /* The interactive map fills the pane edge to edge (owner, 2026-09-14). */
     .hv-energy-mapwrap > .hv-energy-livemap { position:absolute; inset:0; height:auto; border-radius:0; }
+    .hv-energy-livemap-layer { position:absolute; inset:0; transform-origin:0 0; }
+    /* The map at full size over the whole workspace (tap the map, or ⤢). */
+    .hv-energy-mapmax { position:absolute; inset:0; z-index:7; display:flex; flex-direction:column; gap:8px; padding:2px; border-radius:16px; background:var(--hv-frost-bg,rgba(12,18,24,.97)); }
+    .hv-energy-mapmax > .hv-energy-livemap { flex:1; height:auto; min-height:0; }
+    .hv-energy-mapmax > .hv-energy-mapbar { flex-shrink:0; }
     .hv-energy-livemap { position:relative; height:100%; border-radius:16px; overflow:hidden; background:#dcd9d2; touch-action:none; user-select:none; cursor:grab; }
     .hv-energy-livemap-tiles { position:absolute; inset:0; }
     .hv-energy-livemap-tiles > img { position:absolute; left:0; top:0; width:256px; height:256px; max-width:none; pointer-events:none; }
@@ -6046,6 +6054,15 @@ window.HavalSplash = (function () {
                     <div class="hv-energy-seg hv-energy-period" role="group" aria-label="Período"><button type="button" class="{{ wg.consumptionRange7Class }}" onClick="{{ wg.consumptionRange7 }}">7 DIAS</button><button type="button" class="{{ wg.consumptionRange30Class }}" onClick="{{ wg.consumptionRange30 }}">30 DIAS</button><button type="button" class="{{ wg.consumptionRange12Class }}" onClick="{{ wg.consumptionRange12 }}">12 MESES</button><button type="button" class="{{ wg.consumptionRangeAllClass }}" onClick="{{ wg.consumptionRangeAll }}">TUDO</button></div>
                   </sc-if>
                 </div>
+                <sc-if value="{{ wg.consumptionMapMaxOpen }}" hint-placeholder-val="{{ false }}">
+                  <div class="hv-energy-mapmax">
+                    <div class="hv-energy-livemap" data-trip="{{ wg.consumptionMapKey }}" data-mode="max"></div>
+                    <div class="hv-energy-mapbar">
+                      <div class="hv-energy-seg" role="group" aria-label="Colorir a rota por"><button type="button" class="{{ wg.consumptionRouteSpeedClass }}" onClick="{{ wg.consumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ wg.consumptionRouteEvClass }}" onClick="{{ wg.consumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ wg.consumptionRouteFuelClass }}" onClick="{{ wg.consumptionRouteFuel }}">COMBUSTÍVEL</button></div>
+                      <ul class="hv-energy-legend"><sc-for list="{{ wg.consumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
+                    </div>
+                  </div>
+                </sc-if>
                 <sc-if value="{{ wg.consumptionFinishConfirmOpen }}" hint-placeholder-val="{{ false }}">
                   <div class="hv-energy-confirm" role="alertdialog" aria-label="Finalizar viagem">
                     <div class="hv-energy-confirm-box">
@@ -6424,7 +6441,7 @@ window.HavalSplash = (function () {
        CSS variables so it cannot cover the launcher/dock on Android. -->
   <div class="hv-card-focus-backdrop {{ focusedCardBackdropClass }}" onClick="{{ closeFocusedCard }}"></div>
   <section class="hv-card-focus {{ focusedCardPopupClass }}" role="dialog" aria-label="{{ focusedCardTitle }}">
-    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-card-focus-action {{ focusedConsumptionUnitsClass }}" onClick="{{ focusedConsumptionUnitsToggle }}" aria-expanded="{{ focusedConsumptionUnitsOpen }}">UNIDADES</button></sc-if><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
+    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-card-focus-action {{ focusedConsumptionUnitsClass }}" onClick="{{ focusedConsumptionUnitsToggle }}" aria-expanded="{{ focusedConsumptionUnitsOpen }}">UNIDADES</button><button type="button" class="hv-card-focus-action hv-card-focus-max" onClick="{{ focusedConsumptionWideToggle }}" aria-label="{{ focusedConsumptionWideLabel }}">{{ focusedConsumptionWideGlyph }}</button></sc-if><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
     <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}">
       <div class="hv-climate hv-climate-2x2">
         <div class="hv-climate-head"><span>CLIMATE</span><small>{{ focusedClimateCurrent }}</small></div><div role="status" style="font:7px/1.25 'Space Mono',monospace;letter-spacing:.06em;color:#f0bd65;margin:-1px 0 3px;">{{ focusedClimateHelper }}</div>
@@ -6455,6 +6472,15 @@ window.HavalSplash = (function () {
             <div class="hv-energy-seg hv-energy-period" role="group" aria-label="Período"><button type="button" class="{{ focusedConsumptionRange7Class }}" onClick="{{ focusedConsumptionRange7 }}">7 DIAS</button><button type="button" class="{{ focusedConsumptionRange30Class }}" onClick="{{ focusedConsumptionRange30 }}">30 DIAS</button><button type="button" class="{{ focusedConsumptionRange12Class }}" onClick="{{ focusedConsumptionRange12 }}">12 MESES</button><button type="button" class="{{ focusedConsumptionRangeAllClass }}" onClick="{{ focusedConsumptionRangeAll }}">TUDO</button></div>
           </sc-if>
         </div>
+        <sc-if value="{{ focusedConsumptionMapMaxOpen }}" hint-placeholder-val="{{ false }}">
+          <div class="hv-energy-mapmax">
+            <div class="hv-energy-livemap" data-trip="{{ focusedConsumptionMapKey }}" data-mode="max"></div>
+            <div class="hv-energy-mapbar">
+              <div class="hv-energy-seg" role="group" aria-label="Colorir a rota por"><button type="button" class="{{ focusedConsumptionRouteSpeedClass }}" onClick="{{ focusedConsumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ focusedConsumptionRouteEvClass }}" onClick="{{ focusedConsumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ focusedConsumptionRouteFuelClass }}" onClick="{{ focusedConsumptionRouteFuel }}">COMBUSTÍVEL</button></div>
+              <ul class="hv-energy-legend"><sc-for list="{{ focusedConsumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
+            </div>
+          </div>
+        </sc-if>
         <sc-if value="{{ focusedConsumptionFinishConfirmOpen }}" hint-placeholder-val="{{ false }}">
           <div class="hv-energy-confirm" role="alertdialog" aria-label="Finalizar viagem">
             <div class="hv-energy-confirm-box">
@@ -8414,6 +8440,7 @@ class Component extends DCLogic {
     energyStopSel: -1,
     energyUnitsOpen: false,
     energyFinishConfirm: false,
+    energyMapMax: false,
     energyTripView: 'map',
     energyHistoryView: 'chart',
     energyRev: 0,
@@ -10350,7 +10377,8 @@ class Component extends DCLogic {
       || t.closest('.hv-energy-list')
       || t.closest('.hv-energy-datapane')
       || t.closest('.hv-energy-histdata')
-      || t.closest('.hv-energy-confirm'));
+      || t.closest('.hv-energy-confirm')
+      || t.closest('.hv-energy-mapmax'));
   }
 
   _onWidgetSuppressClick(e) {
@@ -34536,7 +34564,7 @@ class Component extends DCLogic {
     this.setState({ focusedCardType: type, desktopStudioOpen: false, panelOpen: false, energyUnitsOpen: false });
   }
 
-  _closeFocusedCard() { if (this.state.focusedCardType) this.setState({ focusedCardType: null, energyUnitsOpen: false, energyFinishConfirm: false }); }
+  _closeFocusedCard() { if (this.state.focusedCardType) this.setState({ focusedCardType: null, energyUnitsOpen: false, energyFinishConfirm: false, energyMapMax: false }); }
 
   _createFocusedCardDesktop(type) {
     if (!this._desktops || this._desktops.length >= H6_MAX_DESKTOPS) return;
@@ -34884,7 +34912,8 @@ class Component extends DCLogic {
       // Driving sizes to its content now that it fits; the others keep the
       // fixed frame their layouts were built against.
       focusedCardPopupClass: (type ? 'on' : '') + (type === 'driving' || type === 'media' ? ' fit' : '')
-        + (type === 'media' ? ' narrow' : ''),
+        + (type === 'media' ? ' narrow' : '')
+        + (type === 'consumption' && this._energyPopupWideOn() ? ' wide' : ''),
       focusedCardBackdropClass: type ? 'on' : '',
       focusedCardTitle: type === 'range' ? 'RANGE'
         : (type === 'consumption' ? 'ENERGIA'
@@ -35284,7 +35313,7 @@ class Component extends DCLogic {
     this._cardControlEvent(ev);
     if (tab !== 'now' && tab !== 'trips' && tab !== 'history') return;
     if (tab !== 'now') this._energyFetchHistory(false);
-    this._uiOnlySetState({ energyTab: tab, energyUnitsOpen: false, energyFinishConfirm: false });
+    this._uiOnlySetState({ energyTab: tab, energyUnitsOpen: false, energyFinishConfirm: false, energyMapMax: false });
   }
 
   _setEnergyRange(range, ev) {
@@ -35295,7 +35324,7 @@ class Component extends DCLogic {
 
   _selectEnergyTrip(key, ev) {
     this._cardControlEvent(ev);
-    this._uiOnlySetState({ energyTripStart: String(key), energyStopSel: -1 });
+    this._uiOnlySetState({ energyTripStart: String(key), energyStopSel: -1, energyMapMax: false });
   }
 
   // ── formatting ──
@@ -35652,10 +35681,10 @@ class Component extends DCLogic {
     const series = this._energyDaySeries(m.hist, 7, now);
     const weekKm = series.reduce((s, e) => s + (e.row ? Number(e.row.km) || 0 : 0), 0);
     // A board widget 4x2 or wider is the whole workspace, with map / graph and
-    // data side by side (owner, 2026-09-14). The popup keeps its 3x2 frame and
-    // its MAPA | DADOS toggles whatever size the board widget has.
+    // data side by side (owner, 2026-09-14). The popup is 3x2 with MAPA | DADOS
+    // toggles, or that same full workspace once maximised to the board's width.
     const popup = surface === 'popup';
-    const wide = !popup && w >= 4 && h >= 2;
+    const wide = popup ? this._energyPopupWideOn() : (w >= 4 && h >= 2);
     const view = {
       consumptionSizeClass: 'hv-energy-' + Math.min(3, w) + 'x' + Math.min(2, h),
       consumptionGlance: !wide,
@@ -35713,6 +35742,10 @@ class Component extends DCLogic {
       consumptionUnitsOpen: !!s.energyUnitsOpen,
       consumptionUnitsClass: on(!!s.energyUnitsOpen),
       consumptionUnitsToggle: (ev) => this._setEnergyUnitsOpen(!this.state.energyUnitsOpen, ev),
+      // ⤢ / ⤡ beside the popup's × (owner, 2026-09-14).
+      consumptionWideToggle: (ev) => this._toggleEnergyPopupWide(ev),
+      consumptionWideGlyph: this._energyPopupWideOn() ? '⤡' : '⤢',
+      consumptionWideLabel: this._energyPopupWideOn() ? 'Reduzir' : 'Maximizar',
       consumptionFuelKmlClass: on(units.fuel === 'kml'),
       consumptionFuelL100Class: on(units.fuel === 'l100'),
       consumptionEvKwhClass: on(units.ev === 'kwh100'),
@@ -35779,6 +35812,7 @@ class Component extends DCLogic {
       consumptionTripShowMap: false,
       consumptionTripShowData: false,
       consumptionMapKey: '',
+      consumptionMapMaxOpen: false,
       consumptionRange7Class: '',
       consumptionRange30Class: '',
       consumptionRange12Class: '',
@@ -35953,6 +35987,7 @@ class Component extends DCLogic {
       consumptionTripShowMap: !!t && (wide || tripView === 'map'),
       consumptionTripShowData: !!t && (wide || tripView === 'data'),
       consumptionMapKey: mapKey,
+      consumptionMapMaxOpen: liveMap && !!this.state.energyMapMax,
     };
   }
 
@@ -36182,6 +36217,10 @@ class Component extends DCLogic {
     const TILE = 256;
     const MIN_Z = 3;
     const MAX_Z = 18;
+    // Two modes (owner, 2026-09-14). Inline, in the pane: pan and pinch, a tap
+    // opens the full-size map, and ⤢ appears once the view has been moved.
+    // Max, over the whole workspace: pan, pinch, + / − / fit, and ⤡ to go back.
+    const maxMode = el.getAttribute('data-mode') === 'max';
     const fixes = detail.fixes;
     const svgNs = 'http://www.w3.org/2000/svg';
     const make = (tag, cls, ns) => {
@@ -36190,6 +36229,8 @@ class Component extends DCLogic {
       return node;
     };
     while (el.firstChild) el.removeChild(el.firstChild);
+    // Tiles, route and stops move together, so a pinch can preview by one transform.
+    const layer = make('div', 'hv-energy-livemap-layer');
     const tiles = make('div', 'hv-energy-livemap-tiles');
     const svg = make('svg', 'hv-energy-livemap-route', svgNs);
     const casing = make('polyline', 'casing', svgNs);
@@ -36212,9 +36253,10 @@ class Component extends DCLogic {
     const controls = make('div', 'hv-energy-livemap-controls');
     const credit = make('div', 'hv-energy-livemap-credit');
     credit.textContent = '© OpenStreetMap contributors';
-    el.appendChild(tiles);
-    el.appendChild(svg);
-    el.appendChild(stopLayer);
+    layer.appendChild(tiles);
+    layer.appendChild(svg);
+    layer.appendChild(stopLayer);
+    el.appendChild(layer);
     el.appendChild(bubble);
     el.appendChild(controls);
     el.appendChild(credit);
@@ -36238,7 +36280,7 @@ class Component extends DCLogic {
       return { node: b, stop: sp };
     });
 
-    const st = { key: key, z: MIN_Z, cx: 0, cy: 0, imgs: new Map(), raf: 0, destroy: null };
+    const st = { key: key, z: MIN_Z, cx: 0, cy: 0, fitZ: MIN_Z, fitCx: 0, fitCy: 0, imgs: new Map(), raf: 0, destroy: null };
     const size = () => {
       const r = el.getBoundingClientRect();
       return { w: Math.max(1, r.width), h: Math.max(1, r.height) };
@@ -36254,11 +36296,16 @@ class Component extends DCLogic {
       });
       st.cx = (minX + maxX) / 2;
       st.cy = (minY + maxY) / 2;
+      st.fitZ = st.z;
+      st.fitCx = st.cx;
+      st.fitCy = st.cy;
     };
     const clearTiles = () => {
       st.imgs.forEach((img) => img.remove());
       st.imgs.clear();
     };
+    let expandBtn = null;
+    const moved = () => st.z !== st.fitZ || Math.abs(st.cx - st.fitCx) > 12 || Math.abs(st.cy - st.fitCy) > 12;
     const render = () => {
       st.raf = 0;
       const s = size();
@@ -36312,14 +36359,19 @@ class Component extends DCLogic {
         sb.node.style.left = Math.round(q[0]) + 'px';
         sb.node.style.top = Math.round(q[1]) + 'px';
       });
+      if (expandBtn) expandBtn.style.display = moved() ? '' : 'none';
     };
     const schedule = () => { if (!st.raf) st.raf = requestAnimationFrame(render); };
-    const zoomBy = (delta) => {
+    // Whole zoom levels about a point of the view (its centre by default), which stays put.
+    const zoomAt = (delta, px, py) => {
       const z = Math.max(MIN_Z, Math.min(MAX_Z, st.z + delta));
       if (z === st.z) return;
+      const s = size();
+      const fx = px == null ? s.w / 2 : px;
+      const fy = py == null ? s.h / 2 : py;
       const k = Math.pow(2, z - st.z);
-      st.cx *= k;
-      st.cy *= k;
+      st.cx = (st.cx - s.w / 2 + fx) * k - fx + s.w / 2;
+      st.cy = (st.cy - s.h / 2 + fy) * k - fy + s.h / 2;
       st.z = z;
       clearTiles();
       schedule();
@@ -36335,33 +36387,103 @@ class Component extends DCLogic {
         onPress();
       });
       controls.appendChild(btn);
+      return btn;
     };
-    button('+', 'Aproximar', () => zoomBy(1));
-    button('−', 'Afastar', () => zoomBy(-1));
-    button('⤢', 'Enquadrar a rota', () => { fit(); clearTiles(); schedule(); });
+    if (maxMode) {
+      button('+', 'Aproximar', () => zoomAt(1));
+      button('−', 'Afastar', () => zoomAt(-1));
+      button('◎', 'Enquadrar a rota', () => { fit(); clearTiles(); schedule(); });
+      button('⤡', 'Reduzir o mapa', () => this._setEnergyMapMax(false));
+    } else {
+      expandBtn = button('⤢', 'Expandir o mapa', () => this._setEnergyMapMax(true));
+      expandBtn.style.display = 'none';
+    }
 
-    let drag = null;
+    // One finger pans; two pinch (zoom about the fingers) and pan together; a
+    // short touch that never moved is a tap. Moves repaint in place and never
+    // commit to React -- only a tap or a button does.
+    const pointers = new Map();
+    let gesture = null;
+    const local = (x, y) => {
+      const r = el.getBoundingClientRect();
+      return [x - r.left, y - r.top];
+    };
+    const startPan = (p, fresh) => {
+      gesture = { kind: 'pan', x: p.x, y: p.y, cx: st.cx, cy: st.cy, t0: Date.now(), moved: !fresh };
+    };
+    const startPinch = () => {
+      const pair = Array.from(pointers.values());
+      const m = local((pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+      gesture = { kind: 'pinch', d0: Math.max(1, Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y)), m0: m, m: m, scale: 1 };
+    };
+    const endPinch = () => {
+      const g = gesture;
+      layer.style.transform = '';
+      const s = size();
+      const z = Math.max(MIN_Z, Math.min(MAX_Z, st.z + Math.round(Math.log2(g.scale))));
+      const k = Math.pow(2, z - st.z);
+      // The map point under the fingers when the pinch began ends under them now.
+      st.cx = (st.cx - s.w / 2 + g.m0[0]) * k - g.m[0] + s.w / 2;
+      st.cy = (st.cy - s.h / 2 + g.m0[1]) * k - g.m[1] + s.h / 2;
+      if (z !== st.z) {
+        st.z = z;
+        clearTiles();
+      }
+      schedule();
+    };
     const down = (e) => {
       if (e.target && e.target.closest && e.target.closest('button')) return;
-      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: st.cx, cy: st.cy };
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       try { el.setPointerCapture(e.pointerId); } catch (err) {}
       e.stopPropagation();
+      if (pointers.size === 1) startPan(pointers.get(e.pointerId), true);
+      else if (pointers.size === 2) startPinch();
     };
     const move = (e) => {
-      if (!drag || e.pointerId !== drag.id) return;
-      st.cx = drag.cx - (e.clientX - drag.x);
-      st.cy = drag.cy - (e.clientY - drag.y);
-      schedule();
+      const p = pointers.get(e.pointerId);
+      if (!p || !gesture) return;
+      p.x = e.clientX;
+      p.y = e.clientY;
       e.preventDefault();
       e.stopPropagation();
+      if (gesture.kind === 'pan') {
+        const dx = p.x - gesture.x;
+        const dy = p.y - gesture.y;
+        if (Math.abs(dx) + Math.abs(dy) > 8) gesture.moved = true;
+        st.cx = gesture.cx - dx;
+        st.cy = gesture.cy - dy;
+        schedule();
+      } else if (pointers.size >= 2) {
+        const pair = Array.from(pointers.values());
+        const lo = Math.pow(2, MIN_Z - st.z);
+        const hi = Math.pow(2, MAX_Z - st.z);
+        gesture.scale = Math.max(lo, Math.min(hi, Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y) / gesture.d0));
+        gesture.m = local((pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+        // Preview with one transform; tiles are fetched at the new level on release.
+        layer.style.transform = 'translate(' + (gesture.m[0] - gesture.m0[0] * gesture.scale).toFixed(1) + 'px,'
+          + (gesture.m[1] - gesture.m0[1] * gesture.scale).toFixed(1) + 'px) scale(' + gesture.scale.toFixed(3) + ')';
+      }
     };
     const up = (e) => {
-      if (drag && e.pointerId === drag.id) drag = null;
+      if (!pointers.has(e.pointerId)) return;
+      pointers.delete(e.pointerId);
+      if (!gesture) return;
+      if (gesture.kind === 'pinch') {
+        endPinch();
+        const rest = Array.from(pointers.values())[0];
+        if (rest) startPan(rest, false);
+        else gesture = null;
+        return;
+      }
+      const tap = e.type === 'pointerup' && !gesture.moved && Date.now() - gesture.t0 < 500;
+      gesture = null;
+      if (tap && !maxMode) this._setEnergyMapMax(true);
     };
     const wheel = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      zoomBy(e.deltaY < 0 ? 1 : -1);
+      const p = local(e.clientX, e.clientY);
+      zoomAt(e.deltaY < 0 ? 1 : -1, p[0], p[1]);
     };
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
@@ -36474,6 +36596,27 @@ class Component extends DCLogic {
     }, 500);
   }
 
+  _energyPopupWideOn() {
+    if (this._energyPopupWide == null) {
+      try { this._energyPopupWide = localStorage.getItem('h6_energy_popup_wide') === '1'; } catch (e) { this._energyPopupWide = false; }
+    }
+    return this._energyPopupWide;
+  }
+
+  /** ⤢ / ⤡ beside the popup's ×: the 3x2 frame or the board's full width, remembered. */
+  _toggleEnergyPopupWide(ev) {
+    this._cardControlEvent(ev);
+    this._energyPopupWide = !this._energyPopupWideOn();
+    try { localStorage.setItem('h6_energy_popup_wide', this._energyPopupWide ? '1' : '0'); } catch (e) {}
+    this._uiOnlySetState((s) => ({ energyRev: (s.energyRev || 0) + 1 }));
+  }
+
+  /** The route map at full size over the whole workspace (a tap on the map, or ⤢), or back. */
+  _setEnergyMapMax(open, ev) {
+    this._cardControlEvent(ev);
+    this._uiOnlySetState({ energyMapMax: !!open });
+  }
+
   _setEnergyUnitsOpen(open, ev) {
     this._cardControlEvent(ev);
     this._uiOnlySetState({ energyUnitsOpen: !!open });
@@ -36483,7 +36626,7 @@ class Component extends DCLogic {
   _setEnergyTripView(view, ev) {
     this._cardControlEvent(ev);
     if (view !== 'map' && view !== 'data') return;
-    this._uiOnlySetState({ energyTripView: view });
+    this._uiOnlySetState({ energyTripView: view, energyMapMax: false });
   }
 
   /** GRÁFICO | DADOS in HISTÓRICO. */
@@ -39721,6 +39864,8 @@ class Component extends DCLogic {
       top: Math.round(b.t + 10),
       width: Math.round(cellW * 3 + gap * 2),
       height: Math.max(240, Math.round(b.b - b.t)),
+      // The maximised ENERGIA popup spans the board's six columns.
+      wideWidth: Math.max(240, Math.round(b.r - b.l)),
     };
   }
 
@@ -39731,6 +39876,7 @@ class Component extends DCLogic {
       '--hv-pop-left': f.left + 'px',
       '--hv-pop-top': f.top + 'px',
       '--hv-pop-width': f.width + 'px',
+      '--hv-pop-wide-width': f.wideWidth + 'px',
       '--hv-pop-height': f.height + 'px',
     };
   }

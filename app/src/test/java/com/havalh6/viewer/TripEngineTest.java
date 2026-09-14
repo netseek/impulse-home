@@ -315,6 +315,24 @@ public class TripEngineTest {
     }
 
     @Test
+    public void anAllElectricDriveReadsAllElectric() {
+        // Owner report 2026-09-14: the engine never ran and the trip read 99%.
+        signal(TripEngine.KEY_ODOMETER, "900.0", T0 - 1000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "57", T0);                  // speedometer reads under the odometer
+        long t = T0;
+        for (; t <= T0 + 20_000; t += 1000) engine.tick(t);     // engine state not heard yet
+        signal(TripEngine.KEY_FLOW, "v1|ev|0|1|0", t);
+        cruise(60, t, 300_000, 900.0);
+        signal(TripEngine.KEY_READY, "0", t + 300_000);
+        closeAfterGap(t + 300_000);
+        assertEquals(1, closed.size());
+        TripSummary s = closed.get(0);
+        assertEquals(1.0, s.evShare(), 1e-9);
+        assertEquals(s.km, s.evKm, 1e-9);
+    }
+
+    @Test
     public void clockJumpsAreNotIntegrated() {
         signal(TripEngine.KEY_READY, "1", T0);
         signal(TripEngine.KEY_SPEED, "60", T0);
