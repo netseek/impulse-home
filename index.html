@@ -1795,10 +1795,92 @@ window.HavalSplash = (function () {
       background: var(--hv-widget-border);
       border-radius: 999px;
     }
-    .hv-wallpaper-thumb {
+    .hv-wallpaper-src-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .hv-wallpaper-src-tab {
+      flex: 1;
+      min-height: 32px;
+      padding: 7px 4px;
+      border-radius: 7px;
+      border: 1px solid var(--hv-widget-border);
+      background: var(--hv-config-chip-bg);
+      color: var(--hv-widget-fg);
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .08em;
+      font-weight: 600;
+      touch-action: manipulation;
+    }
+    .hv-wallpaper-web-search {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .hv-wallpaper-web-input {
+      flex: 1;
+      min-width: 0;
+      min-height: 36px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1px solid var(--hv-widget-border);
+      background: var(--hv-widget-bg);
+      color: var(--hv-widget-fg);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 12px;
+    }
+    .hv-wallpaper-web-go {
+      flex: none;
+      min-width: 52px;
+      min-height: 36px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1px solid var(--hv-widget-border);
+      background: var(--hv-config-chip-on-bg);
+      color: var(--hv-config-chip-on-fg);
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: .08em;
+      font-weight: 600;
+      touch-action: manipulation;
+    }
+    .hv-wallpaper-random-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 11px;
+      border-radius: 8px;
+      border: 1px solid var(--hv-widget-border);
+      background: var(--hv-widget-bg);
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: .05em;
+      color: var(--hv-widget-fg);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .hv-wallpaper-random-toggle input {
+      margin: 0;
+      width: 14px;
+      height: 14px;
+      accent-color: var(--hv-accent);
+    }
+    .hv-wallpaper-thumb-wrap {
       flex: 0 0 128px;
       width: 128px;
       height: 72px;
+      position: relative;
+      scroll-snap-align: start;
+    }
+    .hv-wallpaper-thumb {
+      width: 100%;
+      height: 100%;
       border-radius: 10px;
       border: 2px solid transparent;
       background-size: cover;
@@ -1807,7 +1889,6 @@ window.HavalSplash = (function () {
       cursor: pointer;
       padding: 0;
       position: relative;
-      scroll-snap-align: start;
       touch-action: manipulation;
       box-shadow: 0 2px 8px rgba(0,0,0,.18);
       transition: border-color .15s ease, transform .12s ease;
@@ -1815,6 +1896,27 @@ window.HavalSplash = (function () {
     .hv-wallpaper-thumb.on {
       border-color: var(--hv-config-thumb);
       transform: scale(1.02);
+    }
+    .hv-wallpaper-thumb-star {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0,0,0,.45);
+      color: rgba(255,255,255,.65);
+      font-size: 12px;
+      line-height: 22px;
+      text-align: center;
+      padding: 0;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .hv-wallpaper-thumb-star.on {
+      color: #ffd24a;
+      background: rgba(0,0,0,.55);
     }
     .hv-wallpaper-thumb-date {
       position: absolute;
@@ -5933,22 +6035,46 @@ window.HavalSplash = (function () {
       <div class="hv-wallpaper-pop-title">WALLPAPER</div>
       <button type="button" class="hv-wallpaper-pop-close" onClick="{{ closeWallpaperPopup }}" title="Close">×</button>
     </div>
-    <div class="hv-wallpaper-pop-sub">Microsoft Bing daily images — same feed as Windows Spotlight.</div>
+    <div class="hv-wallpaper-src-row">
+      <sc-for list="{{ wallpaperSourceTabs }}" as="wst" hint-placeholder-count="4">
+        <button type="button" class="hv-wallpaper-src-tab {{ wst.onClass }}" onClick="{{ wst.onClick }}" style="border-color: {{ wst.border }}; background: {{ wst.bg }}; color: {{ wst.col }};">{{ wst.label }}</button>
+      </sc-for>
+    </div>
+    <div class="hv-wallpaper-pop-sub">{{ wallpaperSourceSub }}</div>
+    <sc-if value="{{ wallpaperShowWebSearch }}" hint-placeholder-val="{{ false }}">
+    <div class="hv-wallpaper-web-search">
+      <input type="text" class="hv-wallpaper-web-input" placeholder="Search Wallhaven: cars, landscape, abstract…" value="{{ wallpaperWebQuery }}" onInput="{{ setWallpaperWebQuery }}" onKeyDown="{{ wallpaperWebKeyDown }}" />
+      <button type="button" class="hv-wallpaper-web-go" onClick="{{ wallpaperWebSearch }}">GO</button>
+    </div>
+    </sc-if>
     <div class="hv-wallpaper-pop-meta">
+      <sc-if value="{{ wallpaperShowRotationBadge }}" hint-placeholder-val="{{ false }}">
       <div class="hv-wallpaper-pop-badge" title="Today's image is applied automatically each morning">
         <span class="hv-wallpaper-pop-badge-dot"></span>
         {{ wallpaperRotationLabel }}
       </div>
+      </sc-if>
       <sc-if value="{{ wallpaperShowTodayBtn }}" hint-placeholder-val="{{ false }}">
       <button type="button" class="hv-wallpaper-pop-today" onClick="{{ wallpaperUseToday }}" title="Restore daily rotation">TODAY</button>
+      </sc-if>
+      <sc-if value="{{ wallpaperShowRandomToggle }}" hint-placeholder-val="{{ false }}">
+      <label class="hv-wallpaper-random-toggle">
+        <input type="checkbox" checked="{{ wallpaperRandomChecked }}" onChange="{{ toggleWallpaperRandomOnStart }}" />
+        <span>Random on start</span>
+      </label>
       </sc-if>
     </div>
     <div class="hv-wallpaper-pop-strip-label">{{ wallpaperStripLabel }}</div>
     <div class="hv-wallpaper-pop-strip slim-scrollbar">
       <sc-for list="{{ wallpaperStripItems }}" as="wt" hint-placeholder-count="6">
-        <button type="button" class="hv-wallpaper-thumb {{ wt.onClass }}" onClick="{{ wt.onClick }}" title="{{ wt.title }}" style="background-image: url('{{ wt.url }}'); opacity: {{ wt.opacity }};">
-          <span class="hv-wallpaper-thumb-date">{{ wt.date }}</span>
-        </button>
+        <div class="hv-wallpaper-thumb-wrap">
+          <button type="button" class="hv-wallpaper-thumb {{ wt.onClass }}" onClick="{{ wt.onClick }}" title="{{ wt.title }}" style="background-image: url('{{ wt.url }}'); opacity: {{ wt.opacity }};">
+            <span class="hv-wallpaper-thumb-date">{{ wt.date }}</span>
+          </button>
+          <sc-if value="{{ wt.showStar }}" hint-placeholder-val="{{ false }}">
+          <button type="button" class="hv-wallpaper-thumb-star {{ wt.starClass }}" onClick="{{ wt.onStar }}" title="{{ wt.starTitle }}">★</button>
+          </sc-if>
+        </div>
       </sc-for>
     </div>
     <div class="hv-wallpaper-pop-credit">{{ wallpaperCredit }}</div>
@@ -6427,7 +6553,7 @@ window.HavalSplash = (function () {
       <div class="hv-layout-fill-row">
         <button type="button" onClick="{{ setCenterFillCar }}" style="border: 1px solid {{ centerFillCarBorder }}; background: {{ centerFillCarBg }}; color: {{ centerFillCarCol }};">3D</button>
         <button type="button" onClick="{{ setCenterFillWallpaper }}" style="border: 1px solid {{ centerFillWallBorder }}; background: {{ centerFillWallBg }}; color: {{ centerFillWallCol }};">WALL</button>
-        <button type="button" onClick="{{ setCenterFillMixed }}" title="Experimental: car over Bing wallpaper" style="border: 1px solid {{ centerFillMixedBorder }}; background: {{ centerFillMixedBg }}; color: {{ centerFillMixedCol }};">MIX</button>
+        <button type="button" onClick="{{ setCenterFillMixed }}" title="Experimental: car over the wallpaper" style="border: 1px solid {{ centerFillMixedBorder }}; background: {{ centerFillMixedBg }}; color: {{ centerFillMixedCol }};">MIX</button>
       </div>
       <sc-if value="{{ showWallpaperConfigureBtn }}" hint-placeholder-val="{{ false }}">
       <button type="button" onClick="{{ openWallpaperPopup }}" style="width: 100%; margin-bottom: 12px; padding: 9px 8px; border-radius: 7px; border: 1px solid {{ wallpaperConfigureBorder }}; background: {{ wallpaperConfigureBg }}; color: {{ wallpaperConfigureCol }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600;">CONFIGURE WALLPAPER</button>
@@ -7539,6 +7665,47 @@ const BING_WALLPAPER_PAGES = 2; // 16 recent images — scroll for older
 // Microsoft Bing daily wallpaper — same image pool as Windows Spotlight.
 const BING_WALLPAPER_CACHE_KEY = 'h6_wallpaper_cache_v1';
 
+// Curated wallpaper pack — the same 20 Wallhaven picks bundled by the Impulse
+// companion app (StudioProjects/haval-app-tool-multimidia, assets/backgrounds/
+// PRESET tab), shipped locally so this source needs no connectivity.
+const CURATED_WALLPAPERS = [
+  { id: '0151j3', res: '1920x1080' },
+  { id: '0jxevy', res: '2560x1600' },
+  { id: '3kkrj9', res: '1920x1200' },
+  { id: '3lg189', res: '5120x2880' },
+  { id: '47j39o', res: '2560x1600' },
+  { id: '483k3k', res: '2560x1600' },
+  { id: '4djkzj', res: '1920x1080' },
+  { id: '4gvpk7', res: '1920x1080' },
+  { id: '737r1v', res: '1708x805' },
+  { id: '96zqpw', res: '1920x1080' },
+  { id: 'd6o77l', res: '3840x2160' },
+  { id: 'jxqv85', res: '5120x2880' },
+  { id: 'k81kk6', res: '3840x2160' },
+  { id: 'lyyddq', res: '3000x2003' },
+  { id: 'mlzl11', res: '1920x1080' },
+  { id: 'n6rv2w', res: '1920x1080' },
+  { id: 'nrk7r1', res: '2200x1375' },
+  { id: 'nzvyev', res: '1920x1080' },
+  { id: 'yx3vj7', res: '5120x2880' },
+  { id: 'zmg7zw', res: '3840x2160' },
+].map((w) => ({
+  url: 'assets/backgrounds/wallhaven-' + w.id + '.jpg',
+  title: w.res,
+  sourcePage: 'https://wallhaven.cc/w/' + w.id,
+}));
+
+// Live, key-free search — same provider and endpoint Impulse's Web tab uses.
+const WALLHAVEN_SEARCH_API = 'https://wallhaven.cc/api/v1/search';
+const WALLPAPER_FAVORITES_KEY = 'h6_wallpaper_favorites_v1';
+const WALLPAPER_SOURCE_LABELS = { bing: 'BING', curated: 'CURATED', web: 'WEB', favorites: 'FAVORITES' };
+const WALLPAPER_SOURCE_SUB = {
+  bing: 'Microsoft Bing daily images — same feed as Windows Spotlight.',
+  curated: 'A hand-picked set bundled with the app — works offline.',
+  web: 'Live search on Wallhaven — no account needed.',
+  favorites: 'Images you’ve starred from Bing, Curated or Web.',
+};
+
 /**
  * Additive in RGB, but leaves the destination ALPHA untouched.
  *
@@ -7722,8 +7889,22 @@ class Component extends DCLogic {
     mediaCanLaunch: false,
     shellMode: BOOT_SHELL.mode,
     centerFill: readUrlCenterFill() || 'car', // 'car' | 'wallpaper' | 'mixed' (experimental)
+    wallpaperSource: 'bing', // 'bing' | 'curated' | 'web' | 'favorites'
     wallpaperAuto: true,
     wallpaperIdx: 0,
+    wallpaperCuratedIdx: 0,
+    wallpaperFavoritesIdx: 0,
+    wallpaperFavoritesRev: 0,
+    wallpaperRandomBing: false,
+    wallpaperRandomCurated: false,
+    wallpaperRandomFavorites: false,
+    wallpaperWebQuery: '',
+    wallpaperWebLoading: false,
+    wallpaperWebError: '',
+    wallpaperWebUrl: '',
+    wallpaperWebTitle: '',
+    wallpaperWebCredit: '',
+    wallpaperWebSourcePage: '',
     wallpaperLoading: false,
     wallpaperPopupOpen: false,
     focusedCardType: null,
@@ -8125,6 +8306,19 @@ class Component extends DCLogic {
     this._wallpaperEntries = [];
     this._wallpaperUrl = '';
     this._wallpaperFetchPromise = null;
+    this._curatedWallpaperEntries = CURATED_WALLPAPERS;
+    this._favoriteWallpapers = this._loadWallpaperFavorites();
+    this._webSearchResults = [];
+    this._webSearchPage = 0;
+    this._webSearchHasMore = false;
+    this._webSearchFetchPromise = null;
+    this._bingRandomAppliedThisBoot = false;
+    if (this.state.wallpaperRandomCurated && this._curatedWallpaperEntries.length) {
+      this.state.wallpaperCuratedIdx = Math.floor(Math.random() * this._curatedWallpaperEntries.length);
+    }
+    if (this.state.wallpaperRandomFavorites && this._favoriteWallpapers.length) {
+      this.state.wallpaperFavoritesIdx = Math.floor(Math.random() * this._favoriteWallpapers.length);
+    }
     this._loadDesktops();
     this._loadDesktopShots();
   }
@@ -8407,8 +8601,22 @@ class Component extends DCLogic {
     else if (saved.centerFill === 'car' || saved.centerFill === 'wallpaper' || saved.centerFill === 'mixed') {
       s.centerFill = saved.centerFill;
     }
+    if (['bing', 'curated', 'web', 'favorites'].indexOf(saved.wallpaperSource) !== -1) {
+      s.wallpaperSource = saved.wallpaperSource;
+    }
     if (typeof saved.wallpaperAuto === 'boolean') s.wallpaperAuto = saved.wallpaperAuto;
     if (typeof saved.wallpaperIdx === 'number' && saved.wallpaperIdx >= 0) s.wallpaperIdx = saved.wallpaperIdx;
+    if (typeof saved.wallpaperCuratedIdx === 'number' && saved.wallpaperCuratedIdx >= 0) s.wallpaperCuratedIdx = saved.wallpaperCuratedIdx;
+    if (typeof saved.wallpaperFavoritesIdx === 'number' && saved.wallpaperFavoritesIdx >= 0) s.wallpaperFavoritesIdx = saved.wallpaperFavoritesIdx;
+    if (typeof saved.wallpaperRandomBing === 'boolean') s.wallpaperRandomBing = saved.wallpaperRandomBing;
+    if (typeof saved.wallpaperRandomCurated === 'boolean') s.wallpaperRandomCurated = saved.wallpaperRandomCurated;
+    if (typeof saved.wallpaperRandomFavorites === 'boolean') s.wallpaperRandomFavorites = saved.wallpaperRandomFavorites;
+    if (typeof saved.wallpaperWebUrl === 'string' && saved.wallpaperWebUrl) {
+      s.wallpaperWebUrl = saved.wallpaperWebUrl;
+      s.wallpaperWebTitle = typeof saved.wallpaperWebTitle === 'string' ? saved.wallpaperWebTitle : '';
+      s.wallpaperWebCredit = typeof saved.wallpaperWebCredit === 'string' ? saved.wallpaperWebCredit : '';
+      s.wallpaperWebSourcePage = typeof saved.wallpaperWebSourcePage === 'string' ? saved.wallpaperWebSourcePage : '';
+    }
     if (Array.isArray(saved.wallpaperEntries) && saved.wallpaperEntries.length) {
       this._wallpaperEntries = saved.wallpaperEntries;
     }
@@ -12302,8 +12510,18 @@ class Component extends DCLogic {
       camOrbitEnabled: !!s.camOrbitEnabled,
       camOrthoEnabled: !!s.camOrthoEnabled,
       centerFill: (s.centerFill === 'wallpaper' || s.centerFill === 'mixed') ? s.centerFill : 'car',
+      wallpaperSource: ['bing', 'curated', 'web', 'favorites'].indexOf(s.wallpaperSource) !== -1 ? s.wallpaperSource : 'bing',
       wallpaperAuto: !!s.wallpaperAuto,
       wallpaperIdx: Math.max(0, s.wallpaperIdx || 0),
+      wallpaperCuratedIdx: Math.max(0, s.wallpaperCuratedIdx || 0),
+      wallpaperFavoritesIdx: Math.max(0, s.wallpaperFavoritesIdx || 0),
+      wallpaperRandomBing: !!s.wallpaperRandomBing,
+      wallpaperRandomCurated: !!s.wallpaperRandomCurated,
+      wallpaperRandomFavorites: !!s.wallpaperRandomFavorites,
+      wallpaperWebUrl: s.wallpaperWebUrl || '',
+      wallpaperWebTitle: s.wallpaperWebTitle || '',
+      wallpaperWebCredit: s.wallpaperWebCredit || '',
+      wallpaperWebSourcePage: s.wallpaperWebSourcePage || '',
       wallpaperEntries: Array.isArray(this._wallpaperEntries) ? this._wallpaperEntries : [],
       // Builtins / debug overrides only — per-desktop homes live in H6_DESKTOPS.
       layoutCameras: this._layoutCameras || {},
@@ -13274,6 +13492,15 @@ class Component extends DCLogic {
     return this._fetchBingWallpapersDirect();
   }
 
+  // Applies once per cold boot — the first time Bing entries are available —
+  // then gets out of the way so browsing the strip afterward isn't fighting it.
+  _takeBingRandomStartIdx(entries) {
+    if (this._bingRandomAppliedThisBoot || !this.state.wallpaperRandomBing) return null;
+    if (!entries || !entries.length) return null;
+    this._bingRandomAppliedThisBoot = true;
+    return Math.floor(Math.random() * entries.length);
+  }
+
   async _ensureWallpapers(force) {
     if (this._wallpaperFetchPromise && !force) return this._wallpaperFetchPromise;
     const today = this._todayWallpaperKey();
@@ -13285,7 +13512,10 @@ class Component extends DCLogic {
       || (auto && cached.fetched !== today);
     if (!needFetch) {
       this._wallpaperEntries = cached.entries;
-      if (auto && this.state.wallpaperIdx !== 0) {
+      const randomIdx = this._takeBingRandomStartIdx(cached.entries);
+      if (randomIdx != null) {
+        this.setState({ wallpaperIdx: randomIdx, wallpaperAuto: false }, () => this._syncWallpaperLayer());
+      } else if (auto && this.state.wallpaperIdx !== 0) {
         this.setState({ wallpaperIdx: 0 }, () => this._syncWallpaperLayer());
       } else {
         this._syncWallpaperLayer();
@@ -13298,8 +13528,11 @@ class Component extends DCLogic {
         const entries = await this._fetchBingWallpapers();
         this._wallpaperEntries = entries;
         this._saveWallpaperCache(today, entries);
-        const idx = auto ? 0 : Math.min(this.state.wallpaperIdx || 0, entries.length - 1);
-        this.setState({ wallpaperIdx: idx, wallpaperLoading: false }, () => {
+        const randomIdx = this._takeBingRandomStartIdx(entries);
+        const idx = randomIdx != null ? randomIdx : (auto ? 0 : Math.min(this.state.wallpaperIdx || 0, entries.length - 1));
+        const patch = { wallpaperIdx: idx, wallpaperLoading: false };
+        if (randomIdx != null) patch.wallpaperAuto = false;
+        this.setState(patch, () => {
           this._syncWallpaperLayer();
         });
       } catch (e) {
@@ -13315,10 +13548,208 @@ class Component extends DCLogic {
     return this._wallpaperFetchPromise;
   }
 
+  // ── Curated / Favorites / Web sources ─────────────────────────────────────
+  // Bing keeps its own entries array + wallpaperIdx (unchanged, above). These
+  // three other sources share the same "list + index" shape so the popup can
+  // reuse one strip UI across all four tabs.
+
+  _sourceEntries(source) {
+    if (source === 'bing') return this._wallpaperEntries || [];
+    if (source === 'curated') return this._curatedWallpaperEntries || [];
+    if (source === 'favorites') return this._favoriteWallpapers || [];
+    if (source === 'web') return this._webSearchResults || [];
+    return [];
+  }
+
+  _sourceIdxKey(source) {
+    if (source === 'bing') return 'wallpaperIdx';
+    if (source === 'curated') return 'wallpaperCuratedIdx';
+    if (source === 'favorites') return 'wallpaperFavoritesIdx';
+    return null;
+  }
+
+  _sourceRandomKey(source) {
+    if (source === 'bing') return 'wallpaperRandomBing';
+    if (source === 'curated') return 'wallpaperRandomCurated';
+    if (source === 'favorites') return 'wallpaperRandomFavorites';
+    return null;
+  }
+
+  _loadWallpaperFavorites() {
+    try {
+      const raw = localStorage.getItem(WALLPAPER_FAVORITES_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((e) => e && e.url) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  _saveWallpaperFavorites() {
+    try { localStorage.setItem(WALLPAPER_FAVORITES_KEY, JSON.stringify(this._favoriteWallpapers || [])); } catch (e) {}
+  }
+
+  _isWallpaperFavorited(url) {
+    if (!url) return false;
+    return (this._favoriteWallpapers || []).some((e) => e.url === url);
+  }
+
+  _toggleWallpaperFavorite(entry) {
+    if (!entry || !entry.url) return;
+    const list = this._favoriteWallpapers || (this._favoriteWallpapers = []);
+    const i = list.findIndex((e) => e.url === entry.url);
+    let clampIdx = false;
+    if (i >= 0) {
+      list.splice(i, 1);
+      if ((this.state.wallpaperFavoritesIdx || 0) >= list.length) clampIdx = true;
+    } else {
+      list.push({
+        url: entry.url,
+        title: entry.title || '',
+        credit: entry.credit || '',
+        sourcePage: entry.sourcePage || '',
+        source: entry.source || '',
+        addedAt: Date.now(),
+      });
+    }
+    this._saveWallpaperFavorites();
+    const patch = { wallpaperFavoritesRev: (this.state.wallpaperFavoritesRev || 0) + 1 };
+    if (clampIdx) patch.wallpaperFavoritesIdx = Math.max(0, list.length - 1);
+    this.setState(patch, () => {
+      if (this.state.wallpaperSource === 'favorites') this._syncWallpaperLayer();
+      this.saveSettings();
+    });
+  }
+
+  _setWallpaperSource(source) {
+    if (['bing', 'curated', 'web', 'favorites'].indexOf(source) === -1) return;
+    if (this.state.wallpaperSource === source) return;
+    this.setState({ wallpaperSource: source }, () => {
+      this._syncWallpaperLayer();
+      this.saveSettings();
+    });
+  }
+
+  _selectSourceIdx(source, i) {
+    const entries = this._sourceEntries(source);
+    const key = this._sourceIdxKey(source);
+    if (!entries.length || !key) return;
+    const next = Math.max(0, Math.min(entries.length - 1, i | 0));
+    if (this.state[key] === next) return;
+    this.setState({ [key]: next }, () => {
+      this._syncWallpaperLayer();
+      this.saveSettings();
+    });
+  }
+
+  _toggleWallpaperRandomOnStart(source) {
+    const key = this._sourceRandomKey(source);
+    if (!key) return;
+    this.setState({ [key]: !this.state[key] }, () => this.saveSettings());
+  }
+
+  _selectWebResult(entry) {
+    if (!entry || !entry.url) return;
+    this.setState({
+      wallpaperWebUrl: entry.url,
+      wallpaperWebTitle: entry.title || '',
+      wallpaperWebCredit: entry.credit || '',
+      wallpaperWebSourcePage: entry.sourcePage || '',
+    }, () => {
+      this._syncWallpaperLayer();
+      this.saveSettings();
+    });
+  }
+
+  _wallhavenSearchUrl(query, page) {
+    const q = (query || '').trim();
+    const params = new URLSearchParams({
+      categories: '100',
+      purity: '100',
+      atleast: '1280x600',
+      order: 'desc',
+      page: String(Math.max(1, page | 0)),
+    });
+    if (q) {
+      params.set('sorting', 'relevance');
+      params.set('q', q);
+    } else {
+      params.set('sorting', 'toplist');
+      params.set('topRange', '1M');
+    }
+    return WALLHAVEN_SEARCH_API + '?' + params.toString();
+  }
+
+  async _fetchWallhavenPage(query, page) {
+    const url = this._wallhavenSearchUrl(query, page);
+    const bridge = window.AppLauncherBridge;
+    let data = null;
+    if (bridge && typeof bridge.fetchJson === 'function') {
+      try {
+        const raw = bridge.fetchJson(url);
+        if (raw) data = JSON.parse(raw);
+      } catch (e) {
+        console.warn('[Wallpaper] wallhaven native fetch failed', e);
+      }
+    }
+    if (!data) {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) throw new Error('Wallhaven HTTP ' + res.status);
+      data = await res.json();
+    }
+    const list = (data && data.data) || [];
+    const images = list.map((o) => {
+      const full = o && o.path;
+      if (!full) return null;
+      return {
+        url: full,
+        thumbUrl: (o.thumbs && (o.thumbs.large || o.thumbs.small)) || full,
+        title: o.resolution || o.id || '',
+        credit: 'Wallhaven',
+        sourcePage: o.url || '',
+      };
+    }).filter(Boolean);
+    const meta = data && data.meta;
+    const hasMore = !!(meta && meta.current_page < meta.last_page);
+    return { images, hasMore };
+  }
+
+  _wallpaperWebSearch(reset) {
+    if (this._webSearchFetchPromise) return this._webSearchFetchPromise;
+    const query = this.state.wallpaperWebQuery || '';
+    const page = reset ? 1 : (this._webSearchPage || 0) + 1;
+    this.setState({ wallpaperWebLoading: true, wallpaperWebError: '' });
+    this._webSearchFetchPromise = this._fetchWallhavenPage(query, page)
+      .then((result) => {
+        this._webSearchResults = reset ? result.images : (this._webSearchResults || []).concat(result.images);
+        this._webSearchPage = page;
+        this._webSearchHasMore = result.hasMore;
+        this.setState({ wallpaperWebLoading: false });
+      })
+      .catch((e) => {
+        console.warn('[Wallpaper] wallhaven search failed', e);
+        this.setState({ wallpaperWebLoading: false, wallpaperWebError: 'Search failed — check the car’s Wi-Fi.' });
+      })
+      .then(() => { this._webSearchFetchPromise = null; });
+    return this._webSearchFetchPromise;
+  }
+
   _currentWallpaperEntry() {
-    const entries = this._wallpaperEntries || [];
-    if (!entries.length) return null;
-    const idx = Math.max(0, Math.min(entries.length - 1, this.state.wallpaperIdx || 0));
+    const source = this.state.wallpaperSource || 'bing';
+    if (source === 'web') {
+      if (!this.state.wallpaperWebUrl) return null;
+      return {
+        url: this.state.wallpaperWebUrl,
+        title: this.state.wallpaperWebTitle || '',
+        copyright: this.state.wallpaperWebCredit || '',
+        sourcePage: this.state.wallpaperWebSourcePage || '',
+      };
+    }
+    const entries = this._sourceEntries(source);
+    const key = this._sourceIdxKey(source);
+    if (!entries.length || !key) return null;
+    const idx = Math.max(0, Math.min(entries.length - 1, this.state[key] || 0));
     return entries[idx];
   }
 
@@ -13327,7 +13758,7 @@ class Component extends DCLogic {
       && (this._shellMode || this.state.shellMode || 'appCar') !== 'appsOnly';
     const entry = show ? this._currentWallpaperEntry() : null;
     this._wallpaperUrl = entry ? entry.url : '';
-    if (show && !entry && !this._wallpaperFetchPromise) {
+    if (show && !entry && this.state.wallpaperSource === 'bing' && !this._wallpaperFetchPromise) {
       this._ensureWallpapers(false);
     }
     this._syncCarSceneForShell();
@@ -13436,6 +13867,19 @@ class Component extends DCLogic {
     this._selectWallpaperIdx((this.state.wallpaperIdx || 0) + delta);
   }
 
+  _wallpaperStarFields(url, entryForFavorite) {
+    const on = this._isWallpaperFavorited(url);
+    return {
+      showStar: true,
+      starClass: on ? 'on' : '',
+      starTitle: on ? 'Remove from Favorites' : 'Add to Favorites',
+      onStar: (ev) => {
+        if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+        this._toggleWallpaperFavorite(entryForFavorite);
+      },
+    };
+  }
+
   _wallpaperRenderFields(s) {
     const fill = this._normalizeCenterFill(s.centerFill);
     const carOn = fill === 'car';
@@ -13446,20 +13890,98 @@ class Component extends DCLogic {
     const mixedBtn = this._hvBtn(mixedOn);
     const appsOnly = (s.shellMode || '') === 'appsOnly';
     const showWall = this._centerFillUsesWallpaper(s) && !appsOnly;
+    const source = ['bing', 'curated', 'web', 'favorites'].indexOf(s.wallpaperSource) !== -1 ? s.wallpaperSource : 'bing';
     const entry = showWall ? this._currentWallpaperEntry() : null;
-    const entries = this._wallpaperEntries || [];
-    const idx = Math.max(0, Math.min(entries.length - 1, s.wallpaperIdx || 0));
     const url = entry ? entry.url : '';
     const cfgBtn = this._hvBtn(!!s.wallpaperPopupOpen);
-    const autoOn = s.wallpaperAuto !== false && idx === 0;
-    const stripItems = entries.map((e, i) => ({
-      url: e.url,
-      date: this._formatWallpaperDate(e.date) || (i === 0 ? 'Today' : ''),
-      title: e.title || e.copyright || '',
-      onClass: i === idx ? 'on' : '',
-      opacity: s.wallpaperLoading ? '0.45' : '1',
-      onClick: () => this._selectWallpaperIdx(i),
-    }));
+
+    const bingEntries = this._wallpaperEntries || [];
+    const bingIdx = Math.max(0, Math.min(bingEntries.length - 1, s.wallpaperIdx || 0));
+    const bingAutoOn = s.wallpaperAuto !== false && bingIdx === 0;
+
+    let stripLabel = '';
+    let stripItems = [];
+    let creditText = '';
+
+    if (source === 'bing') {
+      stripLabel = s.wallpaperLoading
+        ? 'LOADING RECENT IMAGES…'
+        : (bingEntries.length ? `RECENT (${bingEntries.length}) · SCROLL FOR OLDER` : 'NO IMAGES YET');
+      stripItems = bingEntries.map((e, i) => ({
+        url: e.url,
+        date: this._formatWallpaperDate(e.date) || (i === 0 ? 'Today' : ''),
+        title: e.title || e.copyright || '',
+        onClass: i === bingIdx ? 'on' : '',
+        opacity: s.wallpaperLoading ? '0.45' : '1',
+        onClick: () => this._selectWallpaperIdx(i),
+        ...this._wallpaperStarFields(e.url, { url: e.url, title: e.title, credit: e.copyright, sourcePage: '', source: 'bing' }),
+      }));
+      creditText = entry
+        ? ((entry.title ? entry.title + ' — ' : '') + (entry.copyright || '© Microsoft Bing'))
+        : (s.wallpaperLoading ? 'Fetching from Microsoft Bing…' : 'Connect to Wi‑Fi to load Bing wallpaper');
+    } else if (source === 'curated') {
+      const entries = this._curatedWallpaperEntries || [];
+      const idx = Math.max(0, Math.min(entries.length - 1, s.wallpaperCuratedIdx || 0));
+      stripLabel = `CURATED (${entries.length})`;
+      stripItems = entries.map((e, i) => ({
+        url: e.url,
+        date: '',
+        title: e.title || '',
+        onClass: i === idx ? 'on' : '',
+        opacity: '1',
+        onClick: () => this._selectSourceIdx('curated', i),
+        ...this._wallpaperStarFields(e.url, { url: e.url, title: e.title, credit: '', sourcePage: e.sourcePage, source: 'curated' }),
+      }));
+      creditText = entry ? (entry.title || 'Curated wallpaper') : 'Bundled with the app — no connection needed.';
+    } else if (source === 'web') {
+      const results = this._webSearchResults || [];
+      stripLabel = s.wallpaperWebLoading
+        ? 'SEARCHING WALLHAVEN…'
+        : (s.wallpaperWebError || (results.length ? `RESULTS (${results.length})` : 'SEARCH TO SEE RESULTS'));
+      stripItems = results.map((e) => ({
+        url: e.thumbUrl || e.url,
+        date: '',
+        title: e.title || '',
+        onClass: s.wallpaperWebUrl === e.url ? 'on' : '',
+        opacity: s.wallpaperWebLoading ? '0.6' : '1',
+        onClick: () => this._selectWebResult(e),
+        ...this._wallpaperStarFields(e.url, { url: e.url, title: e.title, credit: e.credit, sourcePage: e.sourcePage, source: 'web' }),
+      }));
+      creditText = entry
+        ? ((entry.title ? entry.title + ' — ' : '') + (entry.copyright || 'Wallhaven'))
+        : 'Search Wallhaven above, then tap an image.';
+    } else if (source === 'favorites') {
+      const entries = this._favoriteWallpapers || [];
+      const idx = Math.max(0, Math.min(entries.length - 1, s.wallpaperFavoritesIdx || 0));
+      stripLabel = entries.length ? `FAVORITES (${entries.length})` : 'NO FAVORITES YET';
+      stripItems = entries.map((e, i) => ({
+        url: e.url,
+        date: '',
+        title: e.title || '',
+        onClass: i === idx ? 'on' : '',
+        opacity: '1',
+        onClick: () => this._selectSourceIdx('favorites', i),
+        ...this._wallpaperStarFields(e.url, e),
+      }));
+      creditText = entry
+        ? ((entry.title ? entry.title + ' — ' : '') + (entry.credit || ''))
+        : 'Star an image from Bing, Curated or Web to add it here.';
+    }
+
+    const randomKey = this._sourceRandomKey(source);
+    const sourceTabs = ['bing', 'curated', 'web', 'favorites'].map((src) => {
+      const isBrowsing = source === src;
+      const btn = this._hvBtn(isBrowsing);
+      return {
+        label: WALLPAPER_SOURCE_LABELS[src],
+        onClass: isBrowsing ? 'on' : '',
+        border: btn.border,
+        bg: btn.bg,
+        col: btn.col,
+        onClick: () => this._setWallpaperSource(src),
+      };
+    });
+
     return {
       wallpaperClass: showWall && url ? 'on' : '',
       wallpaperUrl: url || '',
@@ -13468,13 +13990,20 @@ class Component extends DCLogic {
       layoutSectionVisible: !appsOnly,
       layoutSectionHidden: appsOnly,
       showWallpaperConfigureBtn: showWall,
-      wallpaperRotationLabel: autoOn ? 'Daily rotation · today' : 'Manual pick',
-      wallpaperShowTodayBtn: !autoOn,
-      wallpaperStripLabel: s.wallpaperLoading
-        ? 'LOADING RECENT IMAGES…'
-        : (entries.length
-          ? `RECENT (${entries.length}) · SCROLL FOR OLDER`
-          : 'NO IMAGES YET'),
+      wallpaperSourceTabs: sourceTabs,
+      wallpaperSourceSub: WALLPAPER_SOURCE_SUB[source] || '',
+      wallpaperShowWebSearch: source === 'web',
+      wallpaperWebQuery: s.wallpaperWebQuery || '',
+      setWallpaperWebQuery: (ev) => this.setState({ wallpaperWebQuery: (ev && ev.target && ev.target.value) || '' }),
+      wallpaperWebSearch: () => this._wallpaperWebSearch(true),
+      wallpaperWebKeyDown: (ev) => { if (ev && ev.key === 'Enter') this._wallpaperWebSearch(true); },
+      wallpaperShowRotationBadge: source === 'bing',
+      wallpaperRotationLabel: bingAutoOn ? 'Daily rotation · today' : 'Manual pick',
+      wallpaperShowTodayBtn: source === 'bing' && !bingAutoOn,
+      wallpaperShowRandomToggle: !!randomKey,
+      wallpaperRandomChecked: randomKey ? !!s[randomKey] : false,
+      toggleWallpaperRandomOnStart: () => this._toggleWallpaperRandomOnStart(source),
+      wallpaperStripLabel: stripLabel,
       wallpaperStripItems: stripItems,
       wallpaperUseToday: () => this._useTodayWallpaper(),
       centerFillCarBorder: carBtn.border,
@@ -13489,9 +14018,7 @@ class Component extends DCLogic {
       wallpaperConfigureBorder: cfgBtn.border,
       wallpaperConfigureBg: cfgBtn.bg,
       wallpaperConfigureCol: cfgBtn.col,
-      wallpaperCredit: entry
-        ? ((entry.title ? entry.title + ' — ' : '') + (entry.copyright || '© Microsoft Bing'))
-        : (s.wallpaperLoading ? 'Fetching from Microsoft Bing…' : 'Connect to Wi‑Fi to load Bing wallpaper'),
+      wallpaperCredit: creditText,
       setCenterFillCar: () => this._setCenterFill('car'),
       setCenterFillWallpaper: () => this._setCenterFill('wallpaper'),
       setCenterFillMixed: () => this._setCenterFill('mixed'),
@@ -32513,8 +33040,15 @@ class Component extends DCLogic {
       // from the launcher, not a property of a desktop.
       shellMode: 'appCar',
       centerFill: ['car', 'wallpaper', 'mixed'].indexOf(s.centerFill) >= 0 ? s.centerFill : 'car',
+      wallpaperSource: ['bing', 'curated', 'web', 'favorites'].indexOf(s.wallpaperSource) >= 0 ? s.wallpaperSource : 'bing',
       wallpaperAuto: s.wallpaperAuto !== false,
       wallpaperIdx: Math.max(0, parseInt(s.wallpaperIdx, 10) || 0),
+      wallpaperCuratedIdx: Math.max(0, parseInt(s.wallpaperCuratedIdx, 10) || 0),
+      wallpaperFavoritesIdx: Math.max(0, parseInt(s.wallpaperFavoritesIdx, 10) || 0),
+      wallpaperWebUrl: s.wallpaperWebUrl || '',
+      wallpaperWebTitle: s.wallpaperWebTitle || '',
+      wallpaperWebCredit: s.wallpaperWebCredit || '',
+      wallpaperWebSourcePage: s.wallpaperWebSourcePage || '',
       wallpaperCustomUrl: (s.wallpaperCustomUrl || (this._savedSettings && this._savedSettings.wallpaperCustomUrl) || ''),
       widgetThemeMode: ['dark', 'light', 'auto'].indexOf(s.widgetThemeMode) >= 0 ? s.widgetThemeMode : 'dark',
       accentKey: accent.key,
@@ -32540,8 +33074,15 @@ class Component extends DCLogic {
     const accent = this._desktopAccent(d.accentKey, d.accentColor);
     base.name = String(d.name || fallbackName || 'Desktop').trim().slice(0, 24) || 'Desktop';
     if (['car', 'wallpaper', 'mixed'].indexOf(d.centerFill) >= 0) base.centerFill = d.centerFill;
+    if (['bing', 'curated', 'web', 'favorites'].indexOf(d.wallpaperSource) >= 0) base.wallpaperSource = d.wallpaperSource;
     base.wallpaperAuto = d.wallpaperAuto !== false;
     base.wallpaperIdx = Math.max(0, parseInt(d.wallpaperIdx, 10) || 0);
+    base.wallpaperCuratedIdx = Math.max(0, parseInt(d.wallpaperCuratedIdx, 10) || 0);
+    base.wallpaperFavoritesIdx = Math.max(0, parseInt(d.wallpaperFavoritesIdx, 10) || 0);
+    base.wallpaperWebUrl = typeof d.wallpaperWebUrl === 'string' ? d.wallpaperWebUrl.slice(0, 2048) : '';
+    base.wallpaperWebTitle = typeof d.wallpaperWebTitle === 'string' ? d.wallpaperWebTitle.slice(0, 256) : '';
+    base.wallpaperWebCredit = typeof d.wallpaperWebCredit === 'string' ? d.wallpaperWebCredit.slice(0, 256) : '';
+    base.wallpaperWebSourcePage = typeof d.wallpaperWebSourcePage === 'string' ? d.wallpaperWebSourcePage.slice(0, 2048) : '';
     base.wallpaperCustomUrl = typeof d.wallpaperCustomUrl === 'string' ? d.wallpaperCustomUrl.slice(0, 2048) : '';
     if (['dark', 'light', 'auto'].indexOf(d.widgetThemeMode) >= 0) base.widgetThemeMode = d.widgetThemeMode;
     base.accentKey = accent.key;
@@ -32622,8 +33163,15 @@ class Component extends DCLogic {
       desktopIndex: active,
       shellMode: current.shellMode,
       centerFill: current.centerFill,
+      wallpaperSource: current.wallpaperSource,
       wallpaperAuto: current.wallpaperAuto,
       wallpaperIdx: current.wallpaperIdx,
+      wallpaperCuratedIdx: current.wallpaperCuratedIdx,
+      wallpaperFavoritesIdx: current.wallpaperFavoritesIdx,
+      wallpaperWebUrl: current.wallpaperWebUrl,
+      wallpaperWebTitle: current.wallpaperWebTitle,
+      wallpaperWebCredit: current.wallpaperWebCredit,
+      wallpaperWebSourcePage: current.wallpaperWebSourcePage,
       wallpaperCustomUrl: current.wallpaperCustomUrl,
       widgetThemeMode: current.widgetThemeMode,
       accentKey: current.accentKey,
@@ -32688,8 +33236,15 @@ class Component extends DCLogic {
       focusedCardType: null,
       shellMode: d.shellMode,
       centerFill: d.centerFill,
+      wallpaperSource: d.wallpaperSource,
       wallpaperAuto: d.wallpaperAuto,
       wallpaperIdx: d.wallpaperIdx,
+      wallpaperCuratedIdx: d.wallpaperCuratedIdx,
+      wallpaperFavoritesIdx: d.wallpaperFavoritesIdx,
+      wallpaperWebUrl: d.wallpaperWebUrl,
+      wallpaperWebTitle: d.wallpaperWebTitle,
+      wallpaperWebCredit: d.wallpaperWebCredit,
+      wallpaperWebSourcePage: d.wallpaperWebSourcePage,
       wallpaperCustomUrl: d.wallpaperCustomUrl,
       widgetThemeMode: d.widgetThemeMode,
       accentKey: d.accentKey,
@@ -33350,7 +33905,8 @@ class Component extends DCLogic {
     this._captureActiveDesktop();
     const at = this._desktopIndex || 0;
     const src = this._desktops[at];
-    const keys = ['widgetThemeMode', 'accentKey', 'accentColor', 'centerFill', 'wallpaperAuto', 'wallpaperIdx', 'wallpaperCustomUrl'];
+    const keys = ['widgetThemeMode', 'accentKey', 'accentColor', 'centerFill', 'wallpaperSource', 'wallpaperAuto', 'wallpaperIdx',
+      'wallpaperCuratedIdx', 'wallpaperFavoritesIdx', 'wallpaperWebUrl', 'wallpaperWebTitle', 'wallpaperWebCredit', 'wallpaperWebSourcePage', 'wallpaperCustomUrl'];
     this._desktops.forEach((d, i) => {
       if (i !== at) keys.forEach((key) => { d[key] = src[key]; });
     });
@@ -33657,10 +34213,21 @@ class Component extends DCLogic {
     // car.webp is a side profile, ~2.3:1.
     const carW = Math.min(gapW * 0.8, bandH * 0.62 * 2.3);
     const carH = carW / 2.3;
-    const entries = this._wallpaperEntries || [];
-    const wall = fill !== 'car' && entries.length
-      ? entries[d.wallpaperAuto !== false ? 0 : Math.max(0, Math.min(entries.length - 1, parseInt(d.wallpaperIdx, 10) || 0))]
-      : null;
+    const dSource = ['bing', 'curated', 'web', 'favorites'].indexOf(d.wallpaperSource) >= 0 ? d.wallpaperSource : 'bing';
+    let wall = null;
+    if (fill !== 'car') {
+      if (dSource === 'web') {
+        wall = d.wallpaperWebUrl ? { url: d.wallpaperWebUrl } : null;
+      } else {
+        const entries = this._sourceEntries(dSource);
+        if (entries.length) {
+          const dIdx = dSource === 'bing'
+            ? (d.wallpaperAuto !== false ? 0 : Math.max(0, Math.min(entries.length - 1, parseInt(d.wallpaperIdx, 10) || 0)))
+            : Math.max(0, Math.min(entries.length - 1, parseInt(d[this._sourceIdxKey(dSource)], 10) || 0));
+          wall = entries[dIdx];
+        }
+      }
+    }
     const theme = (d.widgetThemeMode === 'light' || d.widgetThemeMode === 'dark')
       ? d.widgetThemeMode : this._effectiveWidgetTheme();
     const shot = this._desktopShots && this._desktopShots[d.id];
