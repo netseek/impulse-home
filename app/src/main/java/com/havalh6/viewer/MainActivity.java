@@ -8513,6 +8513,7 @@ public final class MainActivity extends Activity {
         headingLp.leftMargin = Math.round(14 * density);
         headingLp.topMargin = Math.round(10 * density);
         heading.setLayoutParams(headingLp);
+        heading.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
         card.addView(heading);
         workspaceHeading = heading;
 
@@ -8564,7 +8565,9 @@ public final class MainActivity extends Activity {
         grid.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         int pad = Math.round(6 * density);
-        grid.setPadding(pad, Math.round(28 * density), pad, pad);
+        // No title band: the LAYOUT heading is hidden on this face, so the four
+        // cells take the whole card.
+        grid.setPadding(pad, pad, pad, pad);
         final String[][] cells = {
                 {"desktops", "Desktops", "openLayoutDesktops"},
                 {"layout", "Cards & widgets", "openLayoutCards"},
@@ -8582,7 +8585,7 @@ public final class MainActivity extends Activity {
                 cell.setText(def[1]);
                 cell.setTag("workspaceLayoutCell:" + def[0]);
                 cell.setGravity(android.view.Gravity.CENTER);
-                cell.setTextSize(11.5f);
+                cell.setTextSize(13f);
                 cell.setMaxLines(1);
                 cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 cell.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
@@ -8617,21 +8620,62 @@ public final class MainActivity extends Activity {
         float density = getResources().getDisplayMetrics().density;
         for (android.widget.TextView cell : workspaceLayoutCells) {
             String key = String.valueOf(cell.getTag()).substring("workspaceLayoutCell:".length());
-            boolean on = !"return".equals(key) && key.equals(studioScreen);
+            boolean isReturn = "return".equals(key);
+            boolean on = !isReturn && key.equals(studioScreen);
+            // The three screens stay neutral (accent only marks the open one);
+            // Return wears the accent and carries a back arrow.
             cell.setTextColor(on ? dockAccentColor : dockLabelColor());
             android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
             bg.setCornerRadius(9 * density);
-            bg.setColor(on ? withAlpha(dockAccentColor, 0x2E) : (dockUiLight ? 0x0F000000 : 0x12FFFFFF));
+            bg.setColor(isReturn ? withAlpha(dockAccentColor, 0x33)
+                    : on ? withAlpha(dockAccentColor, 0x2E) : (dockUiLight ? 0x0F000000 : 0x12FFFFFF));
             if (on) bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0xA0));
+            android.graphics.drawable.Drawable content = bg;
+            if (isReturn) {
+                // Drawn as a centred background layer, not a compound drawable:
+                // an empty TextView still reserves a text line under a top
+                // compound, which pushed the arrow above the middle.
+                cell.setText("");
+                android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
+                        new android.graphics.drawable.Drawable[] {
+                                bg, workspaceBackGlyph(density, dockAccentColor) });
+                layers.setLayerGravity(1, android.view.Gravity.CENTER);
+                content = layers;
+            }
             cell.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(withAlpha(dockLabelColor(), 0x33)), bg, null));
+                    android.content.res.ColorStateList.valueOf(withAlpha(dockLabelColor(), 0x33)), content, null));
         }
+    }
+
+    /** A left arrow (shaft + chevron) for the Layout face's Return cell. */
+    private android.graphics.drawable.Drawable workspaceBackGlyph(float density, int color) {
+        int box = Math.max(8, Math.round(22 * density));
+        Bitmap bmp = Bitmap.createBitmap(box, box, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+        p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+        p.setStrokeWidth(2.2f * box / 24f);
+        p.setColor(color);
+        float u = box / 24f;
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(19 * u, 12 * u);
+        path.lineTo(5 * u, 12 * u);
+        path.moveTo(11 * u, 6 * u);
+        path.lineTo(5 * u, 12 * u);
+        path.lineTo(11 * u, 18 * u);
+        c.drawPath(path, p);
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
     private void setWorkspaceLayoutMode(boolean on) {
         if (workspaceLayoutMode == on) return;
         workspaceLayoutMode = on;
-        if (workspaceHeading != null) workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
+        if (workspaceHeading != null) {
+            workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
+            workspaceHeading.setVisibility(on ? View.GONE : View.VISIBLE);
+        }
         crossfadeFaces(on ? workspaceActionsFace : workspaceLayoutFace,
                 on ? workspaceLayoutFace : workspaceActionsFace);
     }
@@ -8858,8 +8902,11 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
         copy.setOrientation(android.widget.LinearLayout.VERTICAL);
         copy.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        copy.setPadding(Math.round(13 * density), Math.round(8 * density),
-                Math.round(11 * density), Math.round(8 * density));
+        // 4dp, not 8: measured on the car the column needs ~116dp (30dp source
+        // chip row, title, artist, 48dp play) and 8dp padding left 108, so the
+        // play circle drew 38dp tall -- clipped top and bottom.
+        copy.setPadding(Math.round(13 * density), Math.round(4 * density),
+                Math.round(11 * density), Math.round(4 * density));
         copy.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
@@ -8910,7 +8957,7 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout.LayoutParams controlsLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        controlsLp.topMargin = Math.round(3 * density);
+        controlsLp.topMargin = 0;
         controls.setLayoutParams(controlsLp);
         controls.addView(makeQuickMediaButton(density, false, "prev", "Previous track",
                 v -> mediaNowPlaying.prev()));
