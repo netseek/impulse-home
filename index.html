@@ -10482,7 +10482,11 @@ class Component extends DCLogic {
       widgetPlaceFromSide: side,
       widgetPlaceW: one ? sizes[0][0] : 0,
       widgetPlaceH: one ? sizes[0][1] : 0,
-      widgetPlaceSide: null,
+      // The size picker is positioned on this board; cleared again once a
+      // size is chosen and the board takes over picking the slot.
+      widgetPlaceSide: one ? null : side,
+      widgetPlaceAnchorX: null,
+      widgetPlaceAnchorY: null,
     });
   }
 
@@ -39371,9 +39375,16 @@ class Component extends DCLogic {
       const ax = s.widgetPlaceAnchorX;
       const ay = s.widgetPlaceAnchorY;
       const type = s.widgetPlaceType;
-      const sizes = (ax != null && ay != null && type)
-        ? this._sizesForSlot(side, ax, ay, type, modeKey)
-        : [];
+      // A resize has no anchor cell (it was never tapped on the board), so
+      // its sizes come from the widget itself; the board then picks the slot.
+      // Reading _sizesForSlot here with a null anchor listed nothing, and
+      // RESIZE opened an empty picker for every widget with 2+ sizes.
+      const resizing = s.widgetPlaceMode === 'resize' ? this._findWidget(s.widgetPlaceId, modeKey) : null;
+      const sizes = resizing
+        ? this._widgetResizeSizes(resizing.item, modeKey)
+        : ((ax != null && ay != null && type)
+          ? this._sizesForSlot(side, ax, ay, type, modeKey)
+          : []);
       const isFull = (sz) => sz[0] === this._gridColsForMode(modeKey) && sz[1] === this._gridRowsForMode(modeKey);
       pickerItems = sizes.map((sz) => ({
         label: isFull(sz) ? 'FULL SIZE' : (sz[0] + ' × ' + sz[1]),
@@ -40007,6 +40018,7 @@ class Component extends DCLogic {
     }
     this.setState({
       widgetPickerStep: null,
+      widgetPlaceSide: null,
       widgetPlaceType: nextType,
       widgetPlaceMode: this.state.widgetPlaceMode || 'add',
       widgetPlaceW: w,
