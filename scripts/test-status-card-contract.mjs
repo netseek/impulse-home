@@ -269,6 +269,8 @@ all(roofSnap, ["kind === 'sunroof'", '_snapSunroofVentLevel', "kind === 'curtain
   'roof sliders must snap to ventilation and curtain half-open presets');
 assert.match(popupMarkup, /<small>ABERTURAS<\/small><strong data-hs-vehicle-doors>/,
   'vehicle status strip must render a two-row label and larger value');
+assert.match(html, /\.hv-hs-vehicle-stats \{[^}]*bottom:-39px/,
+  'vehicle status cards must align vertically with the three popup footer actions');
 const widgetSizes = block(html, '  _widgetSizes(');
 assert.ok(!widgetSizes.includes('concat([[cols, rows]])'),
   'the 6x2 board size must not be injected into every widget');
