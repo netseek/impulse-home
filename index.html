@@ -1973,539 +1973,133 @@ window.HavalSplash = (function () {
       letter-spacing: .1em;
       font-weight: 600;
     }
-    .hv-power {
-      position: absolute;
-      inset: 0;
-      min-height: 0;
-      overflow: hidden;
-      padding: 10px 12px;
-      box-sizing: border-box;
-      display: grid;
-      gap: 8px;
-      color: #eaf2f8;
-    }
-    .hv-power-1x1 {
-      padding: 8px 10px;
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr);
-      gap: 0;
-    }
-    .hv-power-1x2 {
-      padding: 10px 12px;
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr) auto;
-      gap: 10px;
-    }
-    .hv-power-2x1,
-    .hv-power-3x1,
-    .hv-power-2x2 {
-      grid-template-rows: minmax(0, 1fr);
-      column-gap: 14px;
-      row-gap: 0;
-    }
-    .hv-power-2x1 { grid-template-columns: minmax(0, 1fr) 132px; }
-    .hv-power-3x1 { grid-template-columns: minmax(0, 1fr) 156px; }
-    .hv-power-2x2 {
-      grid-template-columns: minmax(0, 1fr) 168px;
-      padding: 12px 14px;
-    }
-    .hv-power-3x2 { grid-template-columns: minmax(0, 1fr) 188px; padding: 14px 16px; }
-    .hv-power-1x1 .hv-power-stage,
-    .hv-power-1x2 .hv-power-stage,
-    .hv-power-2x1 .hv-power-stage,
-    .hv-power-3x1 .hv-power-stage,
-    .hv-power-2x2 .hv-power-stage,
-    .hv-power-3x2 .hv-power-stage {
-      grid-column: 1;
-      grid-row: 1;
-    }
-    .hv-power-1x2 .hv-power-ranges { grid-column: 1; grid-row: 2; }
-    .hv-power-2x1 .hv-power-ranges,
-    .hv-power-3x1 .hv-power-ranges,
-    .hv-power-2x2 .hv-power-ranges,
-    .hv-power-3x2 .hv-power-ranges {
-      grid-column: 2;
-      grid-row: 1;
-    }
-    .hv-power-stage {
-      min-width: 0;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-end;
-    }
-    .hv-power-source { position:absolute; top:5px; left:50%; transform:translateX(-50%); z-index:9; max-width:92%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 5px; border-radius:5px; background:rgba(8,14,20,.82); font:6px/1 'Space Mono',monospace; letter-spacing:.08em; color:#f0bd65; }
+    /* Shared top-down power stage. PNG and live SVG use the kit's 3:5 canvas. */
+    .hv-power { position:absolute; inset:0; box-sizing:border-box; display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) auto; gap:6px; padding:12px; color:var(--hv-widget-fg,#edf5fa); overflow:hidden; --ef-neutral:#93a7b6; --ef-fill:rgba(13,28,39,.78); --hv-power-ev:#4fd6e8; --hv-power-regen:#3ee08a; --hv-power-engine:#f0bd65; }
+    .hv-power[role="button"] { cursor:pointer; }
+    .hv-power { --hv-power-ev:var(--hv-accent,#4fd6e8); }
+    .hv-power[role="button"]:focus-visible { outline:2px solid var(--hv-power-ev); outline-offset:-3px; border-radius:inherit; }
+    .hv-power-head { grid-column:1 / -1; min-width:0; display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+    .hv-power-title { font-size:clamp(14px,1.4vw,22px); font-weight:550; letter-spacing:-.035em; line-height:1.15; }
+    .hv-power-source { color:var(--hv-widget-muted,#a8b7c2); font-size:11px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .hv-power-source.live { color:var(--hv-power-ev); }
-    .hv-power-source.demo { color:#f0bd65; }
-    .hv-power-source.partial { color:#f0bd65; }
-    .hv-power-source.stale,.hv-power-source.unavailable { color:#b9c5cf; opacity:.78; }
-    .hv-power-car {
-      flex: 1 1 auto;
-      min-height: 0;
-      width: 100%;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
+    .hv-power-source.demo,.hv-power-source.partial { color:var(--hv-power-engine); }
+    .hv-power-stage { min-width:0; min-height:0; display:flex; align-items:center; justify-content:center; }
+    .hv-power-canvas { position:relative; height:100%; width:auto; max-width:100%; aspect-ratio:350 / 770; isolation:isolate; }
+    @supports not (aspect-ratio:350 / 770) { .hv-power-canvas { width:min(100%,180px); } .hv-power-canvas::before { content:''; display:block; padding-top:220%; } }
+    .hv-power-art { position:absolute; inset:0; overflow:hidden; border-radius:8px; }
+    .hv-power-canvas:not([data-graphic-key]) .hv-power-art { visibility:hidden; }
+    .hv-power-art .hv-power-chassis { max-width:none; object-fit:fill; }
+    .hv-power-chassis,.hv-power-overlay { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none; }
+    .hv-power-chassis { z-index:0; }
+    .hv-power-overlay { z-index:1; overflow:visible; }
+    .hv-power-canvas.is-unavailable .hv-power-chassis { display:none; }
+    .hv-power-battery-outline { fill:#52616c; fill-opacity:.28; stroke:#87959f; stroke-width:3; }
+    .hv-power-cell-empty { fill:#141d22; stroke:#929a9f; stroke-width:1.3; }
+    .hv-power-cell-fill { fill:#65ec55; opacity:var(--cell-level,0); }
+    .hv-power-cell-fill.discharging { fill:#22c9ff; }
+    .hv-power-cell-pulse { animation:hv-power-cell-breathe 1.8s linear infinite; animation-delay:var(--cell-delay,0s); animation-play-state:paused; }
+    .hv-power-canvas.is-running .hv-power-cell-pulse { animation-play-state:running; }
+    @keyframes hv-power-cell-breathe { 0%,100% { opacity:0; } 50% { opacity:var(--cell-level,1); } }
+    .hv-power-battery-caption { fill:#f2f5f7; font:500 9px/1 Arial,sans-serif; text-anchor:middle; dominant-baseline:middle; }
+    .hv-power-component-label { fill:#f2f5f7; font:600 12px/1 Arial,sans-serif; text-anchor:middle; dominant-baseline:middle; }
+    .hv-power-pack-edge { fill:none; stroke:#8b9ba6; stroke-width:4; opacity:.65; }
+    .hv-power-pack-edge.receiving { stroke:#53ed91; opacity:.95; }
+    .hv-power-pack-edge.supplying { stroke:#22c9ff; opacity:.95; }
+    .hv-power-pack-terminal { fill:none; stroke:#87959f; stroke-width:4; }
+    .hv-power-canvas.soc-stale .hv-power-cell-fill { transition:none; }
+    .hv-power-cell-divider { stroke:#1b2931; stroke-width:2; }
+    .hv-power-highlight { opacity:0; transition:opacity .15s linear; }
+    .hv-power-highlight.active { opacity:1; }
+    .hv-power-highlight.engine { fill:#ffb65c; stroke:#ffb65c; }
+    .hv-power-highlight.drive { fill:#22c9ff; stroke:#22c9ff; }
+    .hv-power-highlight.regen { fill:#53ed91; stroke:#53ed91; }
+    .hv-power-highlight { fill-opacity:.24; stroke-width:3; }
+    .hv-power-charging { fill:none; stroke:#53ed91; stroke-width:5; opacity:0; transition:opacity .15s linear; }
+    .hv-power-charging.active { opacity:1; }
+    .hv-power-route { opacity:0; transition:opacity .15s linear; }
+    .hv-power-route.active { opacity:1; }
+    .hv-power-flow-glow,.hv-power-flow-ribbon,.hv-power-flow-track { fill:none; stroke-linecap:round; stroke-linejoin:round; }
+    .hv-power-flow-glow { stroke-width:48; opacity:.24; filter:blur(4px); }
+    .hv-power-flow-ribbon { stroke-width:34; opacity:.42; }
+    .hv-power-flow-track { stroke-width:7; stroke-dasharray:12 36; opacity:.94; animation:hv-power-march 1s linear infinite; animation-play-state:paused; }
+    .hv-power-route.drive .hv-power-flow-glow,.hv-power-route.drive .hv-power-flow-ribbon,.hv-power-route.drive .hv-power-flow-track { stroke:#22c9ff; }
+    .hv-power-route.regen .hv-power-flow-glow,.hv-power-route.regen .hv-power-flow-ribbon,.hv-power-route.regen .hv-power-flow-track { stroke:#53ed91; }
+    .hv-power-canvas.is-running .hv-power-route.active .hv-power-flow-track { animation-play-state:running; }
+    .hv-power-soc-plate { fill:rgba(10,19,25,.82); stroke:rgba(180,189,197,.55); stroke-width:2; }
+    .hv-power-soc-label { fill:#edf5fa; font:600 27px/1 'Space Mono',monospace; text-anchor:middle; dominant-baseline:middle; }
+    .hv-power-variant-label { position:absolute; z-index:2; right:2px; bottom:2px; padding:2px 5px; border-radius:5px; background:rgba(10,19,25,.72); color:#c6d3dc; font:8px/1.3 'Space Mono',monospace; letter-spacing:.06em; pointer-events:none; }
+    @keyframes hv-power-march { from { stroke-dashoffset:48; } to { stroke-dashoffset:0; } }
+    .hv-power-metrics { min-width:0; display:grid; grid-template-columns:1fr 1fr; align-content:center; gap:12px; }
+    .hv-power-metric { min-width:0; }
+    .hv-power-metric > span,.hv-power-axles span { display:block; font-size:11px; line-height:1.35; color:var(--hv-widget-muted,#a8b7c2); }
+    .hv-power-metric strong { font-size:clamp(21px,2.2vw,34px); font-weight:500; line-height:1.2; letter-spacing:-.045em; font-variant-numeric:tabular-nums; }
+    .hv-power-metric small { margin-left:4px; font-size:11px; color:var(--hv-widget-muted,#a8b7c2); }
+    .hv-power-secondary strong { font-size:17px; }
+    .hv-power-axles { display:flex; justify-content:space-between; gap:12px; grid-column:1 / -1; border-top:1px solid var(--hv-widget-border,rgba(255,255,255,.12)); padding-top:8px; }
+    .hv-power-axles strong { display:block; margin-top:3px; font-size:11px; font-weight:500; }
+    .hv-power[data-power-size="1x1"] { padding:9px 10px; gap:2px; }
+    .hv-power[data-power-size="1x1"] .hv-power-title { font-size:14px; }
+    .hv-power[data-power-size="1x1"] .hv-power-source { max-width:52px; font-size:10px; flex-shrink:0; }
+    .hv-power[data-power-size="1x1"] .hv-power-secondary,.hv-power[data-power-size="1x1"] .hv-power-axles { display:none; }
+    .hv-power-overlay .ef-axles { fill:none; stroke:var(--ef-neutral); stroke-width:3; opacity:.24; }
+    .hv-power[data-power-size="1x1"] .hv-power-metric strong { font-size:21px; }
+    .hv-power[data-power-size="1x2"] .hv-power-head { flex-direction:column; gap:4px; }
+    .hv-power[data-power-size="1x2"] { grid-template-rows:auto minmax(0,1fr) auto; gap:12px; }
+    .hv-power[data-power-size="1x2"] .hv-power-axles { display:none; }
+    .hv-power[data-power-size="2x1"],.hv-power[data-power-size="3x1"],.hv-power[data-power-size="2x2"],.hv-power[data-power-size="3x2"] { grid-template-columns:minmax(0,1fr) minmax(112px,28%); grid-template-rows:auto minmax(0,1fr); }
+    .hv-power[data-power-size="2x1"] .hv-power-metrics,.hv-power[data-power-size="3x1"] .hv-power-metrics { gap:8px; }
+    .hv-power[data-power-size="2x1"] .hv-power-secondary,.hv-power[data-power-size="3x1"] .hv-power-secondary { display:none; }
+    .hv-power[data-power-size="2x2"],.hv-power[data-power-size="3x2"] { padding:16px; gap:16px; }
+    .hv-power[data-power-size="2x2"] .hv-power-metrics,.hv-power[data-power-size="3x2"] .hv-power-metrics { grid-template-columns:1fr 1fr; gap:18px 12px; }
+    .hv-power[data-power-size="2x1"] .hv-power-metrics { grid-template-columns:1fr; gap:10px; }
+    .hv-power[data-power-size="2x1"] .hv-power-metric strong { font-size:24px; }
+    .hv-power[data-power-size="2x1"] .hv-power-axles { display:none; }
+    .hv-power[data-power-size="1x1"] .hv-power-variant-label { display:none; }
+    .hv-power[data-power-size="2x2"] { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr) auto; gap:8px; }
+    .hv-power[data-power-size="2x2"] .hv-power-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+    .hv-power[data-power-size="2x2"] .hv-power-metric strong { font-size:24px; }
+    .hv-power[data-power-size="2x2"] .hv-power-secondary strong { font-size:17px; }
+    .hv-power[data-power-size="2x2"] .hv-power-axles { padding-top:6px; }
+    .hv-card-focus.power-popup { width:min(1000px,calc(100vw - 32px)); }
+    #hv-root .hv-card-focus.power-popup { background:#172129; }
+    #hv-root.hv-widgets-light .hv-card-focus.power-popup { background:#f1f5f7; }
+    .hv-card-focus.power-popup .hv-card-focus-head .hv-card-focus-badge { display:none; }
+    .hv-power[data-power-size="popup"] { position:relative; inset:auto; grid-template-columns:minmax(0,1.7fr) minmax(240px,1fr); grid-template-rows:auto auto; gap:20px; padding:12px 6px; overflow:visible; }
+    .hv-power[data-power-size="popup"] .hv-power-title { font-size:clamp(24px,3vw,36px); }
+    .hv-power[data-power-size="popup"] .hv-power-stage { grid-column:1; grid-row:2; align-self:center; }
+    .hv-power[data-power-size="popup"] .hv-power-canvas { height:min(52vh,360px); }
+    .hv-power[data-power-size="popup"] .hv-power-metrics { grid-column:2; grid-row:2; gap:20px 16px; padding:18px; border:1px solid var(--hv-widget-border,rgba(255,255,255,.12)); border-radius:16px; background:var(--hv-frost-inner,rgba(255,255,255,.025)); }
+    .hv-power[data-power-size="popup"] .hv-power-metric > span,.hv-power[data-power-size="popup"] .hv-power-axles span { font-size:13px; }
+    .hv-power[data-power-size="popup"] .hv-power-axles strong { font-size:13px; }
+    .hv-power[data-power-size="popup"] { gap:10px; padding:0 4px; }
+    .hv-power[data-power-size="popup"] .hv-power-metrics { gap:8px 14px; padding:12px 16px; }
+    .hv-power[data-power-size="popup"] .hv-power-history { padding-top:8px; }
+    .hv-power[data-power-size="popup"] .hv-power-history svg { height:58px; }
+    .hv-power-electrical { grid-column:1 / -1; font-size:11px; color:var(--hv-widget-muted); }
+    .hv-power-electrical summary { cursor:pointer; padding:4px 0; }
+    .hv-power-electrical-values { display:flex; gap:24px; padding:8px 0; }
+    .hv-power-history { grid-column:1 / -1; min-width:0; border-top:1px solid var(--hv-widget-border,rgba(255,255,255,.12)); padding-top:14px; }
+    .hv-power-history-head { display:flex; justify-content:space-between; gap:10px; font-size:11px; line-height:1.4; }
+    .hv-power-history svg { display:block; width:100%; height:76px; margin:4px 0; overflow:hidden; }
+    .hv-power-history-scale { display:flex; justify-content:space-between; gap:8px; font-size:11px; line-height:1.4; color:var(--hv-widget-muted,#a8b7c2); }
+    .hv-power-history-baseline { stroke:var(--hv-widget-border,rgba(255,255,255,.16)); stroke-width:1; vector-effect:non-scaling-stroke; }
+    .hv-power-flow-note { grid-column:1 / -1; margin:0; font-size:11px; line-height:1.45; color:var(--hv-widget-muted,#a8b7c2); }
+    .hv-power-history-path { fill:none; stroke:var(--hv-power-ev); stroke-width:2; vector-effect:non-scaling-stroke; stroke-linecap:round; stroke-linejoin:round; }
+    .hv-power-history-note,.hv-power-history-empty { font-size:11px; line-height:1.45; color:var(--hv-widget-muted,#a8b7c2); }
+    .hv-power-history-empty { padding:14px 0; }
+    #hv-root.hv-widgets-light .hv-power { --ef-neutral:#647886; --ef-fill:rgba(239,247,249,.88); --hv-power-ev:#087d90; --hv-power-regen:#168044; --hv-power-engine:#9a611c; }
+    #hv-root.hv-widgets-light .hv-power-chassis { filter:none; }
+    #hv-root.hv-widgets-light .hv-power-soc-plate { fill:rgba(239,247,249,.92); }
+    #hv-root.hv-widgets-light .hv-power-variant-label { background:rgba(239,247,249,.88); color:#314957; }
+    #hv-root.hv-widgets-light .hv-power-soc-label { fill:#edf5fa; }
+    @media (max-width:640px) {
+      .hv-power[data-power-size="popup"] { grid-template-columns:1fr; gap:12px; }
+      .hv-power[data-power-size="popup"] .hv-power-head { align-items:flex-start; flex-direction:column; }
+      .hv-power[data-power-size="popup"] .hv-power-stage { grid-column:1; grid-row:2; }
+      .hv-power[data-power-size="popup"] .hv-power-canvas { max-width:460px; }
+      .hv-power[data-power-size="popup"] .hv-power-metrics { grid-column:1; grid-row:3; gap:12px; padding:12px; }
     }
-    .hv-power-car-frame {
-      position: relative;
-      height: 100%;
-      aspect-ratio: 550 / 260;
-      max-width: 100%;
-      isolation: isolate;
-    }
-    .hv-power-car-img {
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      height: 86%;
-      display: block;
-      width: 100%;
-      object-fit: contain;
-      object-position: center bottom;
-      pointer-events: none;
-      z-index: 2;
-    }
-    .hv-power-ice,
-    .hv-power-motor {
-      position: absolute;
-      pointer-events: none;
-      /* Keep opacity at 1 — opacity < 1 breaks z-order vs pipes (same Chromium issue as filter). */
-      opacity: 1;
-      transition: opacity .2s ease, filter .2s ease;
-      z-index: 4;
-    }
-    .hv-power-batt {
-      position: absolute;
-      pointer-events: none;
-      opacity: 1;
-      transition: opacity .2s ease, filter .2s ease;
-      z-index: 4;
-    }
-    .hv-power-ice {
-      left: 11%;
-      top: 28%;
-      width: 11%;
-    }
-    .hv-power-motor.front {
-      left: 13%;
-      top: 54%;
-      width: 9.5%;
-    }
-    .hv-power-motor.rear {
-      left: 81%;
-      top: 54%;
-      width: 9.5%;
-      transform: scaleX(-1);
-      transform-origin: center center;
-    }
-    .hv-power-batt {
-      left: 34%;
-      top: 54%;
-      width: 38%;
-      overflow: hidden;
-      transform: scaleY(0.72);
-      transform-origin: center center;
-    }
-    .hv-power-ice,
-    .hv-power-motor {
-      display: block;
-      height: auto;
-    }
-    .hv-power-batt-base {
-      display: block;
-      width: 100%;
-      height: auto;
-    }
-    .hv-power-batt-fill {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      /* clip-path set inline — WebView 91 ignores var() inside polygon(). */
-      background: transparent;
-    }
-    .hv-power-batt-fill svg {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-    .hv-power-batt-para {
-      fill: #3ee08a;
-    }
-    .hv-power-batt-para.low {
-      fill: #ff4d5e;
-    }
-    .hv-power-ice.on,
-    .hv-power-motor.on,
-    .hv-power-batt.on { opacity: 1; }
-    /* No CSS filter on motors/batt — filter creates a compositing layer that
-       paints UNDER unfiltered pipes regardless of z-index (Chromium). */
-    .hv-power-ice.on { filter: none; }
-    .hv-power-motor.on { filter: none; }
-    .hv-power-motor.on.regen { filter: none; }
-    .hv-power-batt.on.ev,
-    .hv-power-batt.on,
-    .hv-power-batt.on.regen,
-    .hv-power-batt.on.charge { filter: none; }
-    .hv-power-floor {
-      position: absolute;
-      left: -8%;
-      width: 116%;
-      bottom: -4%;
-      height: 92%;
-      z-index: 0;
-      pointer-events: none;
-      color: #3ee08a;
-      --soc: 0;
-      transform: perspective(260px) rotateX(36deg) scaleY(0.94);
-      transform-origin: 50% 92%;
-    }
-    .hv-power.ev .hv-power-floor,
-    .hv-power.ice .hv-power-floor,
-    .hv-power.hybrid .hv-power-floor { color: var(--hv-power-ev); }
-    .hv-power.idle .hv-power-floor,
-    .hv-power.regen .hv-power-floor,
-    .hv-power.charge .hv-power-floor { color: #3ee08a; }
-    .hv-power-floor-ring {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      object-position: center bottom;
-      opacity: 0;
-      pointer-events: none;
-      display: none;
-    }
-    .hv-power-floor svg {
-      position: absolute;
-      inset: 0;
-      display: block;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-    }
-    .hv-power-floor-shadow {
-      fill: rgba(0, 0, 0, 0.14);
-      stroke: none;
-    }
-    .hv-power-floor-groove {
-      fill: rgba(8, 12, 18, 0.12);
-      stroke: rgba(255, 255, 255, 0.05);
-      stroke-width: 2;
-    }
-    .hv-power-floor-track,
-    .hv-power-floor-fill {
-      fill: none;
-      stroke-linecap: round;
-    }
-    .hv-power-floor-track {
-      stroke: rgba(255, 255, 255, 0.16);
-      stroke-width: 4.2;
-    }
-    .hv-power-floor-fill {
-      stroke: currentColor;
-      stroke-width: 4.2;
-      /* pathLength=100 → dash = SoC directly; grows left→right. */
-      stroke-dasharray: var(--soc) 100;
-      stroke-dashoffset: 0;
-      filter: drop-shadow(0 0 1px currentColor) drop-shadow(0 0 3px currentColor);
-    }
-    .hv-power.charge .hv-power-floor-fill {
-      animation: hv-power-charge-pulse 1.8s ease-in-out infinite;
-    }
-    @keyframes hv-power-charge-pulse {
-      0%, 100% { filter: drop-shadow(0 0 2px currentColor) drop-shadow(0 0 5px currentColor); opacity: 1; }
-      50% { filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 9px currentColor); opacity: .88; }
-    }
-    .hv-power-charge-cable {
-      position: absolute;
-      right: -6%;
-      top: 46%;
-      width: 30%;
-      height: 32%;
-      z-index: 3;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity .25s ease;
-    }
-    .hv-power.charge .hv-power-charge-cable { opacity: 1; }
-    .hv-power-charge-cable svg {
-      display: block;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-    }
-    .hv-power-charge-cable .cable-glow {
-      fill: none;
-      stroke: rgba(235, 242, 255, 0.45);
-      stroke-width: 3.2;
-      stroke-linecap: round;
-      filter: blur(1.6px);
-    }
-    .hv-power-charge-cable .cable-core {
-      fill: none;
-      stroke: #f4f7fb;
-      stroke-width: 1.05;
-      stroke-linecap: round;
-      filter: drop-shadow(0 0 1.8px rgba(235, 245, 255, 1)) drop-shadow(0 0 5px rgba(200, 220, 255, .5));
-    }
-    .hv-power-charge-cable .cable-flow {
-      fill: none;
-      stroke: #3ee08a;
-      stroke-width: 2.35;
-      stroke-linecap: round;
-      stroke-dasharray: 1.8 5.2;
-      filter: drop-shadow(0 0 2px #3ee08a) drop-shadow(0 0 7px rgba(62, 224, 138, .85));
-      animation: hv-power-cable-flow 0.95s linear infinite;
-    }
-    .hv-power-charge-cable .cable-plug {
-      fill: none;
-      stroke: #f4f7fb;
-      stroke-width: 1.15;
-      filter: drop-shadow(0 0 2px rgba(235, 245, 255, 1)) drop-shadow(0 0 6px rgba(180, 210, 255, .55));
-      animation: hv-power-cable-plug 1.4s ease-in-out infinite;
-    }
-    @keyframes hv-power-cable-flow {
-      from { stroke-dashoffset: 0; }
-      to { stroke-dashoffset: -14; }
-    }
-    @keyframes hv-power-cable-plug {
-      0%, 100% { stroke: #f4f7fb; filter: drop-shadow(0 0 2px rgba(235, 245, 255, 1)) drop-shadow(0 0 6px rgba(180, 210, 255, .55)); }
-      50% { stroke: #b8f5d2; filter: drop-shadow(0 0 3px #3ee08a) drop-shadow(0 0 8px rgba(62, 224, 138, .75)); }
-    }
-    .hv-power-floor-label {
-      position: absolute;
-      left: 53%;
-      bottom: 0;
-      transform: translateX(-50%);
-      z-index: 5;
-      display: flex;
-      align-items: baseline;
-      justify-content: center;
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      font-weight: 700;
-      line-height: 1;
-      letter-spacing: .02em;
-      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
-      pointer-events: none;
-    }
-    .hv-power-mode-label { position:absolute; left:50%; bottom:4%; transform:translateX(-50%); z-index:6; display:flex; flex-direction:column; align-items:center; gap:3px; max-width:82%; text-align:center; pointer-events:none; text-shadow:0 1px 8px rgba(0,0,0,.8); }
-    .hv-power-mode-label strong { font-size:11px; font-weight:560; white-space:nowrap; }
-    .hv-power-mode-label small { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:6px/1 'Space Mono',monospace; letter-spacing:.06em; opacity:.62; }
-    .hv-power-1x1 .hv-power-mode-label,.hv-power-1x2 .hv-power-mode-label,.hv-power-2x1 .hv-power-mode-label,.hv-power-3x1 .hv-power-mode-label { left:50%; bottom:0; }
-    .hv-power.unavailable .hv-power-mode-label strong,.hv-power.stale .hv-power-mode-label strong { color:#c1ccd4; }
-    .hv-power-1x1 .hv-power-floor-label,
-    .hv-power-1x2 .hv-power-floor-label,
-    .hv-power-2x1 .hv-power-floor-label,
-    .hv-power-3x1 .hv-power-floor-label {
-      left: auto;
-      right: 1%;
-      bottom: 2%;
-      transform: none;
-    }
-    .hv-power-ring-num { font-size: 15px; letter-spacing: -0.03em; }
-    .hv-power-1x1 .hv-power-ring-num { font-size: 22px; }
-    .hv-power-1x2 .hv-power-ring-num { font-size: 20px; }
-    .hv-power-2x1 .hv-power-ring-num,
-    .hv-power-3x1 .hv-power-ring-num { font-size: 18px; }
-    .hv-power-2x2 .hv-power-ring-num { font-size: 20px; }
-    .hv-power-ring-unit {
-      font-size: 9px;
-      letter-spacing: .06em;
-      opacity: .55;
-      margin-left: 3px;
-      font-weight: 600;
-    }
-    .hv-power-1x1 .hv-power-ring-unit { font-size: 11px; margin-left: 2px; }
-    .hv-power-1x2 .hv-power-ring-unit { font-size: 11px; margin-left: 2px; }
-    .hv-power-2x1 .hv-power-ring-unit,
-    .hv-power-3x1 .hv-power-ring-unit { font-size: 10px; }
-    .hv-power-2x2 .hv-power-ring-unit { font-size: 11px; }
-    .hv-power-conduits {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 3;
-      overflow: visible;
-      display: none;
-    }
-    .hv-power-conduits .rail-under {
-      fill: none;
-      stroke: rgba(255, 255, 255, 0.22);
-      stroke-width: 11px;
-      stroke-linecap: round;
-      vector-effect: non-scaling-stroke;
-    }
-    .hv-power-conduits .rail {
-      fill: none;
-      stroke: rgba(255, 255, 255, 0.5);
-      stroke-width: 4.5px;
-      stroke-linecap: round;
-      vector-effect: non-scaling-stroke;
-    }
-    .hv-power-flow-layer {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
-    }
-    .hv-power-pipe {
-      position: absolute;
-      height: 14px;
-      border-radius: 0;
-      z-index: auto;
-      pointer-events: none;
-      box-sizing: border-box;
-      /* OEM frosted ribbon: bright glass body + crisp edge rails */
-      background:
-        linear-gradient(180deg,
-          rgba(220, 230, 240, 0.48) 0%,
-          rgba(175, 190, 205, 0.26) 20%,
-          rgba(140, 155, 170, 0.14) 50%,
-          rgba(170, 185, 200, 0.22) 80%,
-          rgba(215, 225, 235, 0.40) 100%);
-      border-top: 1px solid rgba(255, 255, 255, 0.72);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.52);
-      box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
-      opacity: 0.9;
-    }
-    /* Extend under motor/battery opaque cores so square ends are covered. */
-    /* Align pipe with chevron lane (lane centered in pipe). */
-    .hv-power-pipe.front { left: 17%; top: 64.7%; width: 20%; }
-    .hv-power-pipe.rear { left: 66%; top: 64.7%; width: 18%; }
-    .hv-power-lane {
-      position: absolute;
-      /* Match pipe height/top so chevrons sit exactly mid-pipe */
-      height: 14px;
-      opacity: 0;
-      pointer-events: none;
-      z-index: auto;
-      overflow: hidden;
-      --flow: var(--hv-power-ev);
-    }
-    .hv-power-lane::after {
-      content: '';
-      position: absolute;
-      top: 2px; /* optical mid — chevron stroke sits slightly high in mask */
-      left: 0;
-      height: 8px;
-      width: 220%;
-      background-color: var(--flow);
-      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 1 L8 4 L2 7' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M2 1 L8 4 L2 7' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      -webkit-mask-repeat: repeat-x;
-      mask-repeat: repeat-x;
-      -webkit-mask-size: 12px 8px;
-      mask-size: 12px 8px;
-      filter: drop-shadow(0 0 2px var(--flow)) drop-shadow(0 0 5px var(--flow));
-    }
-    .hv-power-lane.front {
-      left: 17%;
-      top: 64.7%;
-      width: 20%;
-    }
-    .hv-power-lane.rear {
-      left: 66%;
-      top: 64.7%;
-      width: 18%;
-    }
-    .hv-power-lane.drive {
-      opacity: .95;
-      --flow: var(--hv-power-ev);
-      background:
-        linear-gradient(180deg,
-          rgba(79, 214, 232, 0.04) 0%,
-          rgba(79, 214, 232, 0.22) 28%,
-          rgba(79, 214, 232, 0.38) 50%,
-          rgba(79, 214, 232, 0.22) 72%,
-          rgba(79, 214, 232, 0.04) 100%);
-    }
-    .hv-power-lane.regen {
-      opacity: .95;
-      --flow: var(--hv-power-regen);
-      background:
-        linear-gradient(180deg,
-          rgba(62, 224, 138, 0.04) 0%,
-          rgba(62, 224, 138, 0.22) 28%,
-          rgba(62, 224, 138, 0.38) 50%,
-          rgba(62, 224, 138, 0.22) 72%,
-          rgba(62, 224, 138, 0.04) 100%);
-    }
-    .hv-power-lane.front.drive,
-    .hv-power-lane.rear.regen {
-      transform: scaleX(-1);
-    }
-    .hv-power-lane.drive::after,
-    .hv-power-lane.regen::after {
-      animation: hv-power-flow 0.55s linear infinite;
-    }
-    @keyframes hv-power-flow {
-      from { transform: translateX(0); }
-      to { transform: translateX(12px); }
-    }
-    .hv-power-ranges {
-      min-width: 0;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 14px;
-    }
-    .hv-power-1x2 .hv-power-ranges {
-      flex-direction: row;
-      align-items: stretch;
-      gap: 12px;
-    }
-    .hv-power-stat {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .hv-power-1x2 .hv-power-stat {
-      flex: 1 1 0;
-      padding-top: 8px;
-      border-top: 1px solid rgba(255,255,255,.12);
-    }
-    .hv-power-2x1 .hv-power-stat,
-    .hv-power-3x1 .hv-power-stat,
-    .hv-power-2x2 .hv-power-stat {
-      padding-top: 0;
-      border-top: 0;
-    }
-    .hv-power-stat-kicker {
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: .14em;
-      opacity: .5;
-    }
-    .hv-power-stat-value {
-      font-family: 'Space Mono', monospace;
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: .01em;
-      line-height: .95;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .hv-power-1x2 .hv-power-stat-value { font-size: 26px; }
-    .hv-power-2x2 .hv-power-stat-value,
-    .hv-power-3x1 .hv-power-stat-value { font-size: 32px; }
-    .hv-power-stat-value span {
-      font-size: 11px;
-      font-weight: 400;
-      letter-spacing: .08em;
-      opacity: .45;
-      margin-left: 5px;
-    }
+    @media (prefers-reduced-motion:reduce) { .hv-power-flow-track,.hv-power-cell-pulse { animation:none !important; stroke-dashoffset:0; } .hv-power-cell-fill,.hv-power-route,.hv-power-highlight,.hv-power-charging { transition:none !important; } }
     .hv-graphs {
       position: absolute;
       top: 0; right: 0; bottom: 0; left: 0;
@@ -5504,43 +5098,6 @@ window.HavalSplash = (function () {
     .hv-range-card-2x2 { padding:18px; }.hv-range-card-2x2 .hv-range-body { grid-template-columns:minmax(170px,.76fr) minmax(270px,1.24fr); gap:26px; }.hv-range-card-2x2 .hv-range-total strong { margin:8px 0 5px; font-size:clamp(52px,7vw,76px); }.hv-range-card-2x2 .hv-range-detail { gap:14px; }.hv-range-card-2x2 .hv-range-soc strong { font-size:24px; }.hv-range-card-2x2 .hv-range-split { height:14px; }.hv-range-card-2x2 .hv-range-legend { gap:12px; }.hv-range-card-2x2 .hv-range-legend > div { padding:12px; border-radius:13px; }.hv-range-card-2x2 .hv-range-legend strong { margin-top:7px; font-size:26px; }
     .hv-range-focus { min-height:calc(100% - 48px); padding:20px; border-radius:16px; background:linear-gradient(140deg,rgba(255,255,255,.065),rgba(255,255,255,.018)); }.hv-range-focus-hero { display:flex; align-items:end; justify-content:space-between; gap:20px; padding-bottom:18px; border-bottom:1px solid var(--hv-widget-border); }.hv-range-focus-kicker,.hv-range-focus-soc span,.hv-range-focus-cell span,.hv-range-focus-source { font:9px/1.2 'Space Mono',monospace; letter-spacing:.1em; opacity:.62; }.hv-range-focus-total strong { display:inline-block; margin-top:7px; font-size:clamp(54px,10vw,84px); font-weight:360; line-height:.8; letter-spacing:-.08em; font-variant-numeric:tabular-nums; }.hv-range-focus-total small { margin-left:7px; font:12px/1 'Space Mono',monospace; letter-spacing:.1em; color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-focus-soc { min-width:98px; padding:12px; border:1px solid var(--hv-widget-border); border-radius:13px; text-align:right; }.hv-range-focus-soc strong { display:block; margin-top:6px; font-size:25px; font-weight:530; font-variant-numeric:tabular-nums; }.hv-range-focus-split { margin:22px 0 10px; }.hv-range-focus-split .hv-range-split { height:18px; }.hv-range-focus-scale { display:flex; justify-content:space-between; font:8px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; }.hv-range-focus-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:22px; }.hv-range-focus-cell { padding:14px; border:1px solid var(--hv-widget-border); border-radius:14px; background:rgba(255,255,255,.035); }.hv-range-focus-cell strong { display:block; margin-top:8px; font-size:28px; line-height:.9; font-weight:470; font-variant-numeric:tabular-nums; }.hv-range-focus-cell.ev strong { color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-focus-cell small { margin-left:4px; font:9px/1 'Space Mono',monospace; opacity:.56; }.hv-range-focus-units { display:flex; gap:4px; margin:18px 0 -2px; }.hv-range-focus-units button { min-width:44px; min-height:30px; padding:0 9px; border:1px solid var(--hv-widget-border); border-radius:9px; color:inherit; background:rgba(255,255,255,.035); font:8px/1 'Space Mono',monospace; letter-spacing:.09em; cursor:pointer; }.hv-range-focus-units button.on { border-color:var(--hv-readable-accent,var(--hv-accent)); color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(99,217,231,.10); }.hv-range-focus-source { margin-top:18px; padding-top:14px; border-top:1px solid var(--hv-widget-border); }
 
-    .hv-power-focus { min-height:calc(100% - 42px); padding:18px; box-sizing:border-box; border-radius:16px; background:var(--hv-frost-inner); --hv-power-ev:var(--hv-accent,#4fd6e8); --hv-power-regen:#3ee08a; --hv-power-engine:#f0bd65; }
-    .hv-power-focus-head { display:flex; align-items:end; justify-content:space-between; gap:18px; padding-bottom:16px; border-bottom:1px solid var(--hv-widget-border); }
-    .hv-power-focus-head span,.hv-power-focus-stat span,.hv-power-focus-source,.hv-power-focus-legend span { font:8px/1.2 'Space Mono',monospace; letter-spacing:.1em; opacity:.62; }
-    .hv-power-focus-head strong { display:block; margin-top:7px; font-size:clamp(27px,5vw,46px); line-height:.9; font-weight:430; letter-spacing:-.06em; }
-    .hv-power-focus-head small { display:block; margin-top:9px; font:8px/1.2 'Space Mono',monospace; letter-spacing:.08em; opacity:.62; }
-    .hv-power-focus-soc { min-width:84px; padding:11px 13px; border:1px solid var(--hv-widget-border); border-radius:13px; text-align:right; }
-    .hv-power-focus-soc strong { display:block; margin-top:7px; font-size:25px; font-weight:530; font-variant-numeric:tabular-nums; }
-    .hv-power-focus-map { position:relative; min-height:184px; margin:16px 0; border:1px solid var(--hv-widget-border); border-radius:14px; background:radial-gradient(ellipse at center,rgba(255,255,255,.07),rgba(255,255,255,.018) 58%,transparent 70%); overflow:hidden; }
-    .hv-power-focus-node { position:absolute; z-index:2; display:flex; align-items:center; justify-content:center; min-width:86px; min-height:42px; padding:0 9px; box-sizing:border-box; border:1px solid rgba(255,255,255,.26); border-radius:10px; background:rgba(8,14,20,.52); color:#eef5fa; font:8px/1.15 'Space Mono',monospace; letter-spacing:.08em; text-align:center; }
-    .hv-power-focus-node.battery { left:6%; top:50%; transform:translateY(-50%); border-color:var(--hv-power-ev); color:var(--hv-power-ev); }
-    .hv-power-focus-node.engine { left:39%; top:12%; border-color:var(--hv-power-engine); color:var(--hv-power-engine); }
-    .hv-power-focus-node.engine:not(.on),.hv-power-focus-line.engine-drive:not(.on) { opacity:.18; }
-    .hv-power-focus-node.motor { right:7%; top:50%; transform:translateY(-50%); border-color:var(--hv-power-ev); color:var(--hv-power-ev); }
-    .hv-power-focus-wheel { position:absolute; z-index:2; bottom:14%; width:26px; height:26px; border:2px solid currentColor; border-radius:50%; color:rgba(238,245,250,.65); }
-    .hv-power-focus-wheel.fl { left:41%; }.hv-power-focus-wheel.fr { left:48%; }.hv-power-focus-wheel.rl { right:15%; }.hv-power-focus-wheel.rr { right:8%; }
-    .hv-power-focus-line { position:absolute; z-index:1; height:2px; transform-origin:left center; background:var(--hv-power-ev); box-shadow:0 0 8px currentColor; color:var(--hv-power-ev); }
-    .hv-power-focus-line.battery-drive { left:22%; top:50%; width:22%; }
-    .hv-power-focus-line.engine-drive { left:47%; top:27%; width:17%; transform:rotate(31deg); background:var(--hv-power-engine); color:var(--hv-power-engine); }
-    .hv-power-focus-line.motor-wheel { left:64%; top:50%; width:21%; }
-    .hv-power-focus-line.regen { background:var(--hv-power-regen); color:var(--hv-power-regen); }
-    .hv-power-focus-map.drive .hv-power-focus-line::after,.hv-power-focus-map.regen .hv-power-focus-line::after { content:'›'; position:absolute; right:-2px; top:-9px; font:18px/1 sans-serif; animation:hv-power-focus-flow .7s linear infinite; }
-    .hv-power-focus-map.regen .hv-power-focus-line { transform:scaleX(-1); transform-origin:center; }
-    .hv-power-focus-map.regen .battery-drive,.hv-power-focus-map.regen .motor-wheel { transform:scaleX(-1); }
-    .hv-power-focus-map.regen .engine-drive { opacity:.22; }
-    .hv-power-focus-map.unavailable .hv-power-focus-line,.hv-power-focus-map.stale .hv-power-focus-line { opacity:.2; box-shadow:none; }
-    @keyframes hv-power-focus-flow { from { opacity:.15; transform:translateX(-5px); } 50% { opacity:1; } to { opacity:.15; transform:translateX(4px); } }
-    .hv-power-focus-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-    .hv-power-focus-stat { min-width:0; padding:11px; border:1px solid var(--hv-widget-border); border-radius:11px; background:rgba(255,255,255,.035); }
-    .hv-power-focus-stat strong { display:block; margin-top:8px; font-size:22px; line-height:.9; font-weight:500; font-variant-numeric:tabular-nums; white-space:nowrap; }
-    .hv-power-focus-stat small { margin-left:3px; font:8px/1 'Space Mono',monospace; opacity:.56; }
-    .hv-power-focus-legend { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:16px; }
-    .hv-power-focus-legend div { min-width:0; display:flex; align-items:center; gap:6px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.04em; }
-    .hv-power-focus-legend i { width:8px; height:8px; flex:none; border-radius:50%; background:var(--hv-power-ev); box-shadow:0 0 8px currentColor; }
-    .hv-power-focus-legend .regen i { background:var(--hv-power-regen); }.hv-power-focus-legend .engine i { background:var(--hv-power-engine); }.hv-power-focus-legend .neutral i { background:#c0cbd4; }
-    .hv-power-focus-source { margin-top:16px; padding-top:13px; border-top:1px solid var(--hv-widget-border); }
-    .hv-power-focus-note { margin-top:9px; font:8px/1.45 'Space Mono',monospace; opacity:.58; }
-    @media (max-width:560px) { .hv-power-focus-stats { grid-template-columns:1fr 1fr 1fr; }.hv-power-focus-legend { grid-template-columns:1fr 1fr; }.hv-power-focus-node { min-width:68px; font-size:7px; } }
 
     .hv-card-focus-backdrop { position:absolute; inset:0; z-index:84; opacity:0; pointer-events:none; background:rgba(2,6,10,.38); transition:opacity .2s ease; }
     .hv-card-focus-backdrop.on { opacity:1; pointer-events:auto; }
@@ -6255,64 +5812,22 @@ window.HavalSplash = (function () {
             </sc-if>
           </sc-if>
           <sc-if value="{{ wg.isPower }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-power {{ wg.powerSizeClass }} {{ wg.powerTone }}" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}" role="button" aria-label="{{ wg.powerAriaLabel }}">
-              <div class="hv-power-source {{ wg.powerSourceClass }}" role="status">{{ wg.powerSource }}</div>
-              <div class="hv-power-stage">
-                <div class="hv-power-car">
-                  <div class="hv-power-car-frame">
-                  <div class="hv-power-floor" style="--soc: {{ wg.socPct }};">
-                    <img class="hv-power-floor-ring" src="assets/power/floor_ring.png?v=4" alt="">
-                    <svg viewBox="0 0 240 56" preserveAspectRatio="none" aria-hidden="true">
-                      <!-- 220° floor arc: 180° front→rear +20° each end (tucks behind car). -->
-                      <path class="hv-power-floor-track" pathLength="100" d="M 5.4 18.1 A 122 23 0 1 0 234.6 18.1"></path>
-                      <path class="hv-power-floor-fill" pathLength="100" d="M 5.4 18.1 A 122 23 0 1 0 234.6 18.1"></path>
-                    </svg>
-                  </div>
-                  <img class="hv-power-car-img" src="assets/power/car.webp" alt="">
-                  <div class="hv-power-flow-layer" aria-hidden="true">
-                    <div class="hv-power-pipe front"></div>
-                    <div class="hv-power-pipe rear"></div>
-                    <div class="hv-power-lane front {{ wg.frontFlow }}"></div>
-                    <div class="hv-power-lane rear {{ wg.rearFlow }}"></div>
-                  </div>
-                  <img class="hv-power-ice {{ wg.iceClass }}" src="{{ wg.iceSrc }}" alt="">
-                  <img class="hv-power-motor front {{ wg.frontClass }}" src="{{ wg.frontSrc }}" alt="">
-                  <img class="hv-power-motor rear {{ wg.rearClass }}" src="{{ wg.rearSrc }}" alt="">
-                  <div class="hv-power-batt {{ wg.battClass }}" style="--soc: {{ wg.socPct }}%;">
-                    <img class="hv-power-batt-base" src="assets/power/battery.webp?v=6" alt="">
-                    <div class="hv-power-batt-fill" style="clip-path: {{ wg.battFillClip }};">
-                      <svg viewBox="0 0 140 60" preserveAspectRatio="none" aria-hidden="true">
-                        <!-- Soft-corner parallelogram inset in the silver tray cavity -->
-                        <path class="{{ wg.battParaClass }}" d="M 28.5 12.2 L 105.5 11.3 Q 107.5 11.1 108 13 L 111 30.5 Q 111.5 32.3 109.5 32.5 L 25 32.5 Q 23 32.4 23.3 30.5 L 26.5 14 Q 26.6 12.4 28.5 12.2 Z"></path>
-                      </svg>
-                    </div>
-                  </div>
-                  <div class="hv-power-charge-cable" aria-hidden="true">
-                    <svg viewBox="0 0 100 48" preserveAspectRatio="none">
-                      <path class="cable-glow" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
-                      <path class="cable-core" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
-                      <path class="cable-flow" d="M 100 16 C 82 16, 68 42, 50 42 S 28 30, 22.5 20"></path>
-                      <circle class="cable-plug" cx="18.5" cy="18.5" r="4.2"></circle>
-                    </svg>
-                  </div>
-                  <div class="hv-power-floor-label">
-                    <span class="hv-power-ring-num">{{ wg.socNum }}</span>
-                    <span class="hv-power-ring-unit">%</span>
-                  </div>
-                  <div class="hv-power-mode-label"><strong>{{ wg.powerState }}</strong><small>{{ wg.powerFlowSummary }}</small></div>
-                  </div>
+            <div class="hv-power" data-power-size="{{ wg.powerSize }}" onClick="{{ wg.onPowerTap }}" role="button" aria-label="{{ wg.powerAriaLabel }}">
+              <div class="hv-power-head"><strong class="hv-power-title">{{ wg.powerState }}</strong><span class="hv-power-source {{ wg.powerSourceClass }}" role="status">{{ wg.powerSource }}</span></div>
+              <div class="hv-power-stage" role="img" aria-label="{{ wg.powerAriaLabel }}">
+                <div class="hv-power-canvas">
+                  <div class="hv-power-art"><img class="hv-power-chassis" src="{{ wg.powerChassis }}" style="{{ wg.powerArtStyle }}" alt=""></div>
+                  <svg class="hv-power-overlay" viewBox="0 0 350 770" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><title>Powertrain graphic</title></svg>
+                  <span class="hv-power-variant-label">{{ wg.powerVariantLabel }}</span>
                 </div>
               </div>
-              <sc-if value="{{ wg.showPowerStats }}" hint-placeholder-val="{{ false }}">
-                <div class="hv-power-ranges">
-                  <sc-for list="{{ wg.powerStats }}" as="st" hint-placeholder-count="2">
-                    <div class="hv-power-stat">
-                      <div class="hv-power-stat-kicker">{{ st.kicker }}</div>
-                      <div class="hv-power-stat-value">{{ st.value }}<span>{{ st.unit }}</span></div>
-                    </div>
-                  </sc-for>
-                </div>
-              </sc-if>
+              <div class="hv-power-metrics">
+                <div class="hv-power-metric"><span>Battery power</span><strong class="hv-power-kw">{{ wg.powerKw }}</strong><small>kW</small></div>
+                <div class="hv-power-metric"><span>SOC</span><strong class="hv-power-soc">{{ wg.powerSocNum }}</strong><small>%</small></div>
+                <div class="hv-power-metric hv-power-secondary"><span>Voltage</span><strong class="hv-power-voltage">{{ wg.powerVoltage }}</strong><small>V</small></div>
+                <div class="hv-power-metric hv-power-secondary"><span>Current</span><strong class="hv-power-current">{{ wg.powerCurrent }}</strong><small>A</small></div>
+                <div class="hv-power-axles"><div><span>Front axle</span><strong class="hv-power-axle-front">{{ wg.powerFrontLabel }}</strong></div><div><span>Rear axle</span><strong class="hv-power-axle-rear">{{ wg.powerRearLabel }}</strong></div></div>
+              </div>
             </div>
           </sc-if>
           <sc-if value="{{ wg.isHint }}" hint-placeholder-val="{{ false }}">
@@ -6718,17 +6233,29 @@ window.HavalSplash = (function () {
       <div class="hv-range-focus"><div class="hv-range-focus-hero"><div class="hv-range-focus-total"><span class="hv-range-focus-kicker">{{ focusedRangeTotalLabel }}</span><strong>{{ focusedRangeTotal }}</strong><small>{{ focusedRangeUnit }}</small></div><div class="hv-range-focus-soc"><span>BATTERY SOC</span><strong>{{ focusedRangeSoc }}</strong></div></div><div class="hv-range-focus-split"><div class="hv-range-split" role="img" aria-label="EV {{ focusedRangeEv }} {{ focusedRangeUnit }}, fuel {{ focusedRangeFuel }} {{ focusedRangeUnit }}"><i class="ev" style="width:{{ focusedRangeEvPct }}%;"></i><i class="fuel" style="width:{{ focusedRangeFuelPct }}%;"></i></div></div><div class="hv-range-focus-scale"><span>EV</span><span>FUEL</span></div><div class="hv-range-focus-grid"><div class="hv-range-focus-cell ev"><span>EV ESTIMATE</span><strong>{{ focusedRangeEv }}<small>{{ focusedRangeUnit }}</small></strong></div><div class="hv-range-focus-cell"><span>FUEL ESTIMATE</span><strong>{{ focusedRangeFuel }}<small>{{ focusedRangeUnit }}</small></strong></div></div><div class="hv-range-focus-units" role="group" aria-label="Distance unit"><button type="button" class="{{ focusedRangeUnitKmClass }}" onClick="{{ focusedRangeSetKm }}" aria-pressed="{{ focusedRangeUnitKmPressed }}">KM</button><button type="button" class="{{ focusedRangeUnitMiClass }}" onClick="{{ focusedRangeSetMi }}" aria-pressed="{{ focusedRangeUnitMiPressed }}">MI</button></div><div class="hv-range-focus-source" role="status">{{ focusedRangeSource }}</div></div>
     </sc-if>
     <sc-if value="{{ focusedCardIsPower }}" hint-placeholder-val="{{ false }}">
-      <div class="hv-power-focus">
-        <div class="hv-power-focus-head"><div><span>LIVE PROPULSION / ENERGY FLOW</span><strong>{{ focusedPowerState }}</strong><small>{{ focusedPowerFlowSummary }}</small></div><div class="hv-power-focus-soc"><span>SOC</span><strong>{{ focusedPowerSocNum }}%</strong></div></div>
-        <div class="hv-power-focus-map {{ focusedPowerFocusTone }}" role="img" aria-label="{{ focusedPowerAriaLabel }}">
-          <div class="hv-power-focus-node battery">BATTERY</div><div class="hv-power-focus-node engine {{ focusedPowerEngineClass }}">ENGINE</div><div class="hv-power-focus-node motor">E-MOTOR</div>
-          <div class="hv-power-focus-line battery-drive"></div><div class="hv-power-focus-line engine-drive {{ focusedPowerEngineClass }}"></div><div class="hv-power-focus-line motor-wheel"></div>
-          <i class="hv-power-focus-wheel fl"></i><i class="hv-power-focus-wheel fr"></i><i class="hv-power-focus-wheel rl"></i><i class="hv-power-focus-wheel rr"></i>
-        </div>
-        <div class="hv-power-focus-stats"><sc-for list="{{ focusedPowerStats }}" as="pst" hint-placeholder-count="3"><div class="hv-power-focus-stat"><span>{{ pst.kicker }}</span><strong>{{ pst.value }}<small>{{ pst.unit }}</small></strong></div></sc-for></div>
-        <div class="hv-power-focus-legend" aria-label="Power flow legend"><div><i></i><span>EV FLOW</span></div><div class="regen"><i></i><span>REGEN</span></div><div class="engine"><i></i><span>ENGINE</span></div><div class="neutral"><i></i><span>NEUTRAL / UNAVAILABLE</span></div></div>
-        <div class="hv-power-focus-source" role="status">{{ focusedPowerSource }}</div><div class="hv-power-focus-note">{{ focusedPowerNote }}</div>
-      </div>
+      <div class="hv-power" data-power-size="popup">
+              <div class="hv-power-head"><strong class="hv-power-title">{{ focusedPowerState }}</strong><span class="hv-power-source {{ focusedPowerSourceClass }}" role="status">{{ focusedPowerSource }}</span></div>
+              <div class="hv-power-stage" role="img" aria-label="{{ focusedPowerAriaLabel }}">
+                <div class="hv-power-canvas">
+                  <div class="hv-power-art"><img class="hv-power-chassis" src="{{ focusedPowerChassis }}" style="{{ focusedPowerArtStyle }}" alt=""></div>
+                  <svg class="hv-power-overlay" viewBox="0 0 350 770" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><title>Powertrain graphic</title></svg>
+                  <span class="hv-power-variant-label">{{ focusedPowerVariantLabel }}</span>
+                </div>
+              </div>
+              <div class="hv-power-metrics">
+                <div class="hv-power-metric"><span>Battery power</span><strong class="hv-power-kw">{{ focusedPowerKw }}</strong><small>kW</small></div>
+                <div class="hv-power-metric"><span>SOC</span><strong class="hv-power-soc">{{ focusedPowerSocNum }}</strong><small>%</small></div>
+                <div class="hv-power-axles"><div><span>Engine</span><strong class="hv-power-engine-label">{{ focusedPowerEngineLabel }}</strong></div><div><span>Front axle</span><strong class="hv-power-axle-front">{{ focusedPowerFrontLabel }}</strong></div><div><span>Rear axle</span><strong class="hv-power-axle-rear">{{ focusedPowerRearLabel }}</strong></div></div>
+                <div class="hv-power-history">
+                  <div class="hv-power-history-head"><span>Battery load · last 60 s</span><span>Peak <span class="hv-power-history-peak">{{ focusedPowerHistoryPeak }}</span> kW</span></div>
+                  <sc-if value="{{ focusedPowerHistoryHasData }}" hint-placeholder-val="{{ false }}"><div class="hv-power-history-scale"><span><span class="hv-power-history-ceiling">{{ focusedPowerHistoryCeiling }}</span> kW</span></div><svg viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="{{ focusedPowerHistoryLabel }}"><path class="hv-power-history-baseline" d="M 0 88 H 300"></path><path class="hv-power-history-path" d="{{ focusedPowerHistoryPath }}"></path></svg><div class="hv-power-history-scale"><span>0 · −60 s</span><span>Now</span></div></sc-if>
+                  <sc-if value="{{ !focusedPowerHistoryHasData }}" hint-placeholder-val="{{ true }}"><div class="hv-power-history-empty">{{ focusedPowerHistoryLabel }}</div></sc-if>
+                  <div class="hv-power-history-note">Magnitude · not wheel power</div>
+                </div>
+                <details class="hv-power-electrical"><summary>Electrical readings</summary><div class="hv-power-electrical-values"><span>Voltage <strong class="hv-power-voltage">{{ focusedPowerVoltage }}</strong> V</span><span>Current <strong class="hv-power-current">{{ focusedPowerCurrent }}</strong> A</span></div></details>
+                <p class="hv-power-flow-note">Reported flow · axle activity may be estimated</p>
+              </div>
+            </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsStatus }}" hint-placeholder-val="{{ false }}">
       <div class="hv-status-focus">
@@ -7731,6 +7258,24 @@ const CAR_POWER_ASSETS = {
   rearOnRegen: 'assets/power/motor_on.webp',
 };
 const CAR_POWER_IDLE = { tone: 'idle', label: 'Parado', ice: false, batt: false, wheel: false, front: 0, rear: 0 };
+// Approved illustration atlas: each viewport is 350 x 770 source pixels.
+// Only the indicator panel is replaced by live SVG. Coordinates are measured
+// against that crop, not the retired procedural GLB projection.
+const CAR_POWER_GRAPHICS = {
+  phev19: { label:'PHEV19', crop:[20,158,350,770], awd:false,
+    panel:[121,375,115,130], display:[126,409,105,45],
+    front:[[178,340],[178,252],[178,173]], fl:[[178,173],[58,144]], fr:[[178,173],[290,144]],
+    engine:[135,61,80,70], frontMotor:[139,135,78,60] },
+  phev34: { label:'PHEV34 / GT', crop:[398,158,350,770], awd:true,
+    panel:[118,371,115,134], display:[123,409,105,49],
+    front:[[177,248],[177,221],[177,173]], fl:[[177,173],[57,144]], fr:[[177,173],[289,144]],
+    rear:[[177,567],[177,594],[177,640]], rl:[[177,640],[57,654]], rr:[[177,640],[289,654]],
+    engine:[137,61,80,70], frontMotor:[138,135,78,60], rearMotor:[140,606,77,60] },
+  hev2: { label:'HEV2', crop:[774,158,350,770], awd:false,
+    panel:[127,538,91,90], display:[132,567,81,22],
+    front:[[172,534],[111,514],[111,246],[177,216],[177,173]], fl:[[177,173],[55,144]], fr:[[177,173],[288,144]],
+    engine:[137,61,80,70], frontMotor:[137,135,78,60] },
+};
 const CAR_POWER_STATE_LABEL = {
   idle: 'Parado',
   ev: 'Elétrico',
@@ -9848,8 +9393,10 @@ class Component extends DCLogic {
   _powerUnpackFlow(raw) {
     const parts = String(raw == null ? '' : raw).split('|');
     if (parts.length < 5 || parts[0] !== 'v1') return null;
-    const front = parseInt(parts[3], 10);
-    const rear = parseInt(parts[4], 10);
+    if (['idle', 'ev', 'hybrid', 'ice', 'regen', 'charge'].indexOf(parts[1]) < 0
+      || !/^[01]$/.test(parts[2]) || !/^-?\d+$/.test(parts[3]) || !/^-?\d+$/.test(parts[4])) return null;
+    const front = Math.sign(Number(parts[3]));
+    const rear = Math.sign(Number(parts[4]));
     if (!isFinite(front) || !isFinite(rear)) return null;
     return { state: parts[1], ice: parts[2] === '1', front: front, rear: rear };
   }
@@ -9882,6 +9429,8 @@ class Component extends DCLogic {
   }
 
   _queuePowerRefresh() {
+    this._recordPowerSample(Date.now());
+    this._schedulePowerFreshness();
     if (this._unmounted || this._powerRefreshPending) return;
     this._powerRefreshPending = true;
     clearTimeout(this._powerRefreshTimer);
@@ -9895,11 +9444,6 @@ class Component extends DCLogic {
       if (this._unmounted) return;
       this._commitPowerRefresh();
     }, 250);
-    clearTimeout(this._powerFreshTimer);
-    this._powerFreshTimer = setTimeout(() => {
-      this._powerFreshTimer = 0;
-      if (!this._unmounted) this._commitPowerRefresh();
-    }, 120050);
   }
 
   /**
@@ -9941,6 +9485,75 @@ class Component extends DCLogic {
     }
   }
 
+  _schedulePowerFreshness() {
+    clearTimeout(this._powerFreshTimer);
+    const now = Date.now(), at = this._carSignalAt || {};
+    const next = [CAR_SIGNALS.powerFlow, CAR_SIGNALS.batterySoc,
+      CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent]
+      .map((key) => Number(at[key]) + 120001).filter((time) => time > now);
+    if (!next.length || this._unmounted) return;
+    this._powerFreshTimer = setTimeout(() => {
+      this._powerFreshTimer = 0;
+      if (!this._unmounted) {
+        this._commitPowerRefresh();
+        this._schedulePowerFreshness();
+      }
+    }, Math.max(1, Math.min.apply(Math, next) - now));
+  }
+
+  _recordPowerSample(now) {
+    const at = this._carSignalAt || {}, live = this._powerLive || {};
+    const vt = Number(at[CAR_SIGNALS.batteryVoltage]) || 0;
+    const it = Number(at[CAR_SIGNALS.batteryCurrent]) || 0;
+    const voltage = this._carNumber(live.voltage), current = this._carNumber(live.current);
+    if (!vt || !it || now - vt > 2000 || now - it > 2000 || Math.abs(vt - it) > 1500
+      || !isFinite(voltage) || voltage < 0 || !isFinite(current)) return;
+    const samples = this._powerHistory || (this._powerHistory = []);
+    const last = samples[samples.length - 1];
+    const stamp = Math.max(vt, it);
+    if (last && stamp - last.at < 250) return;
+    samples.push({ at: stamp, kw: Math.abs(voltage * current / 1000) });
+    this._powerHistory = samples.filter((sample) => sample.at >= now - 60000).slice(-241);
+  }
+
+  _powerHistoryView(now, demo) {
+    // Vehicle samples are local to this session; never backfill OEM history.
+    const samples = demo ? Array.from({ length: 61 }, (_, i) => ({
+      at: now - (60 - i) * 1000, kw: this._powerDemoKw(now - (60 - i) * 1000)
+    })) : (this._powerHistory || []).filter((sample) => sample.at >= now - 60000);
+    const peak = samples.reduce((max, sample) => Math.max(max, sample.kw), 0);
+    const ceiling = Math.max(10, Math.ceil(peak / 10) * 10);
+    let previous = null;
+    const path = samples.map((sample) => {
+      const x = Math.max(0, Math.min(300, (sample.at - now + 60000) / 200));
+      const y = 88 - sample.kw / ceiling * 78;
+      const move = !previous || sample.at - previous.at > 2000;
+      previous = sample;
+      return (move ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ');
+    return { powerHistoryPath: path, powerHistoryHasData: samples.length > 1,
+      powerHistoryPeak: samples.length ? this._powerFmtNum(peak, 1) : '—',
+      powerHistoryCeiling: String(ceiling),
+      powerHistoryLabel: demo ? 'Simulated example' : (samples.length > 1
+        ? 'This session · gaps mean no sample' : 'Waiting for battery readings') };
+  }
+
+  _ensurePowerHistoryTicker() {
+    if (this._powerHistoryTimer || this._unmounted) return;
+    this._powerHistoryTimer = setTimeout(() => {
+      this._powerHistoryTimer = 0;
+      if (this._unmounted || this.state.focusedCardType !== 'power') return;
+      // Slide the session window even when the bus stops. This timer exists
+      // only while the popup is open and never requests a 3D frame.
+      if (!document.hidden) {
+        this._updatePowerCards(performance.now());
+        this._uiOnlySetState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }));
+        this._syncDockIndicators();
+      }
+      this._ensurePowerHistoryTicker();
+    }, 1000);
+  }
+
   _powerStatus(now) {
     const at = this._carSignalAt || {};
     const keys = [CAR_SIGNALS.powerFlow, CAR_SIGNALS.batterySoc,
@@ -9950,7 +9563,8 @@ class Component extends DCLogic {
     const flowFresh = fresh(CAR_SIGNALS.powerFlow)
       && !!this._powerFromPacked(this._powerLive && this._powerLive.flow);
     const voltageFresh = fresh(CAR_SIGNALS.batteryVoltage)
-      && isFinite(this._carNumber(this._powerLive && this._powerLive.voltage));
+      && isFinite(this._carNumber(this._powerLive && this._powerLive.voltage))
+      && this._carNumber(this._powerLive && this._powerLive.voltage) >= 0;
     const currentFresh = fresh(CAR_SIGNALS.batteryCurrent)
       && isFinite(this._carNumber(this._powerLive && this._powerLive.current));
     const demo = !!this._demoPreview && !known && !(this._busCount > 0);
@@ -9961,7 +9575,7 @@ class Component extends DCLogic {
     if (!keys.some(fresh)) return { key: 'stale', source: 'STALE · POWER SIGNAL',
       flowFresh, voltageFresh, currentFresh };
     if (flowFresh && voltageFresh && currentFresh) {
-      return { key: 'live', source: 'LIVE · VEHICLE POWER FLOW',
+      return { key: 'live', source: 'LIVE · REPORTED FLOW',
         flowFresh, voltageFresh, currentFresh };
     }
     return { key: 'partial', source: 'PARTIAL · VEHICLE POWER SIGNALS',
@@ -9970,6 +9584,11 @@ class Component extends DCLogic {
 
   _powerSource(now) {
     return this._powerStatus(now || Date.now()).source;
+  }
+
+  _powerDemoKw(now) {
+    const t = now / 1000;
+    return 9 + 18 * Math.pow(Math.sin(t * .09), 2) + 5 * Math.pow(Math.sin(t * .31), 2);
   }
 
   /** Same packed flow the 2D POWER card and the x-ray powertrain FX share. */
@@ -9987,11 +9606,7 @@ class Component extends DCLogic {
     return demo ? 64 : 0;
   }
 
-  /**
-   * Signed pack power in kW — the same number the POWER card prints, including
-   * its parked clamp (pack V×I noise otherwise reads as a few hundred watts
-   * on a stationary car).
-   */
+  /** Signed electrical pack readout. Direction comes only from the flow packet. */
   _powerKwNow(now) {
     const status = this._powerStatus(Date.now());
     const demo = status.key === 'demo';
@@ -9999,7 +9614,7 @@ class Component extends DCLogic {
     const current = this._carNumber(this._powerLive && this._powerLive.current);
     let kw = status.voltageFresh && status.currentFresh
       ? voltage * current / 1000
-      : (demo ? this._graphDemoValue('evPowerKw', now) : NaN);
+      : (demo ? this._powerDemoKw(Date.now()) : NaN);
     // Flow direction is never inferred from V×I; this signed value is only a
     // measured/derived pack readout and the packed flow remains authoritative
     // for propulsion, regen, engine and charging labels.
@@ -10020,25 +9635,34 @@ class Component extends DCLogic {
     const status = this._powerStatus(Date.now());
     const demo = status.key === 'demo';
     const flow = demo ? this._powerFromPacked(this._powerDemoPacked(stamp))
-      : this._powerFromPacked(live.flow);
+      : (status.flowFresh ? this._powerFromPacked(live.flow) : null);
     const visibleFlow = flow || CAR_POWER_IDLE;
+    const graphic = this._powerGraphicsVariant();
+    const frontDir = Math.sign(Number(visibleFlow.front) || 0);
+    // A packet may be inferred by the companion. Vehicle topology wins: an
+    // HEV2/PHEV19 can never light a rear traction path.
+    const rearDir = graphic.awd ? Math.sign(Number(visibleFlow.rear) || 0) : 0;
     const kwRaw = this._powerKwNow(stamp);
     const voltage = status.voltageFresh ? this._carNumber(live.voltage)
       : (demo ? 360 : NaN);
     const current = status.currentFresh ? this._carNumber(live.current)
       : (demo && isFinite(kwRaw) ? kwRaw * 1000 / 360 : NaN);
-    const regenKw = isFinite(kwRaw) && kwRaw < -0.4;
     let kwClass = '';
-    if (regenKw || visibleFlow.tone === 'regen' || visibleFlow.tone === 'charge') kwClass = 'regen';
+    if (visibleFlow.tone === 'regen' || visibleFlow.tone === 'charge') kwClass = 'regen';
     else if (flow && ((isFinite(kwRaw) && kwRaw > 0.4) || visibleFlow.tone === 'ev'
       || visibleFlow.tone === 'ice' || visibleFlow.tone === 'hybrid' || visibleFlow.tone === 'idle')) kwClass = 'ev';
     const socRaw = this._carNumber(live.soc);
-    const socPct = this._powerSocPct(stamp);
-    const socNum = isFinite(socRaw) || demo ? String(socPct) : '—';
+    const socAt = Number((this._carSignalAt || {})[CAR_SIGNALS.batterySoc]) || 0;
+    const socFresh = socAt && Date.now() - socAt <= 120000 && isFinite(socRaw)
+      && socRaw >= 0 && socRaw <= 100;
+    const socPct = demo ? 64 : (socFresh ? socRaw : 0);
+    const socNum = socFresh || demo ? String(Math.round(socPct)) : '—';
     const battTone = (visibleFlow.tone === 'regen' || visibleFlow.tone === 'charge')
       ? (visibleFlow.tone === 'charge' ? 'charge' : 'regen')
       : (visibleFlow.batt ? 'ev' : '');
-    const state = flow ? flow.label : (status.key === 'demo' ? 'Demo flow' : 'Power flow unavailable');
+    const labels = { ev: 'Electric drive', hybrid: 'Hybrid drive', ice: 'Engine drive',
+      regen: 'Recovering energy', charge: 'Charging', idle: visibleFlow.ice ? 'Engine idling' : 'Standby' };
+    const state = flow ? labels[flow.tone] : (status.key === 'stale' ? 'Signal expired' : 'Flow unavailable');
     const flowSummary = flow && flow.tone === 'regen' ? 'WHEELS → MOTOR → BATTERY'
       : (flow && flow.tone === 'charge' ? 'CHARGE → BATTERY'
         : (flow && flow.tone === 'hybrid' ? 'BATTERY + ENGINE → WHEELS'
@@ -10046,30 +9670,38 @@ class Component extends DCLogic {
             (flow && flow.tone === 'ev' ? 'BATTERY → MOTOR → WHEELS' : 'NO FLOW'))));
     const fmtSigned = (n) => isFinite(n) ? ((n > 0 ? '+' : '') + this._powerFmtNum(n, 1)) : '—';
     const stats = [
-      { kicker: 'PACK POWER', value: fmtSigned(kwRaw), unit: 'kW' },
+      { kicker: 'PACK POWER', value: isFinite(kwRaw) ? this._powerFmtNum(Math.abs(kwRaw), 1) : '—', unit: 'kW' },
       { kicker: 'VOLTAGE', value: this._powerFmtNum(voltage, 0), unit: 'V' },
       { kicker: 'CURRENT', value: fmtSigned(current), unit: 'A' },
     ];
     return {
-      tone: flow ? flow.tone : 'unavailable',
+      tone: flow ? flow.tone : (status.key === 'stale' ? 'stale' : 'unavailable'),
       state: state,
       stateKey: status.key,
       flowSummary: flowSummary,
-      kw: fmtSigned(kwRaw),
+      kw: isFinite(kwRaw) ? this._powerFmtNum(Math.abs(kwRaw), 1) : '—',
       kwClass: kwClass,
       socPct: socPct,
+      socKnown: !!(socFresh || demo),
       socNum: socNum,
       voltage: this._powerFmtNum(voltage, 0),
       current: fmtSigned(current),
       iceClass: visibleFlow.ice ? 'on' : '',
       iceSrc: this._powerMotorSrc('ice', visibleFlow.ice),
-      frontClass: this._powerMotorClass(visibleFlow.front),
-      frontSrc: this._powerMotorSrc('front', visibleFlow.front),
-      rearClass: this._powerMotorClass(visibleFlow.rear),
-      rearSrc: this._powerMotorSrc('rear', visibleFlow.rear),
+      frontDir: frontDir,
+      rearDir: rearDir,
+      frontClass: this._powerMotorClass(frontDir),
+      frontSrc: this._powerMotorSrc('front', frontDir),
+      rearClass: this._powerMotorClass(rearDir),
+      rearSrc: this._powerMotorSrc('rear', rearDir),
       battClass: (visibleFlow.batt ? 'on ' : '') + battTone,
-      frontFlow: this._powerFlowClass(visibleFlow.front),
-      rearFlow: this._powerFlowClass(visibleFlow.rear),
+      frontFlow: this._powerFlowClass(frontDir),
+      rearFlow: this._powerFlowClass(rearDir),
+      frontLabel: !flow ? 'Unavailable' : (frontDir > 0 ? 'Driving' : (frontDir < 0 ? 'Recovering' : 'Inactive')),
+      rearLabel: !flow ? 'Unavailable' : (!graphic.awd ? 'Not driven' : (rearDir > 0 ? 'Driving' : (rearDir < 0 ? 'Recovering' : 'Inactive'))),
+      engineLabel: !flow ? 'Unavailable' : (flow.ice ? 'Running' : 'Off'),
+      driveToken: flow ? [frontDir, rearDir, flow.ice ? 1 : 0].join(',') : '',
+      graphic: graphic,
       stats: stats,
       source: status.source,
       sourceClass: status.key,
@@ -10078,16 +9710,142 @@ class Component extends DCLogic {
     };
   }
 
+  _powerGraphicsVariant() {
+    const trim = String((this.state && this.state.modelTrim) || '').toLowerCase();
+    const key = trim === 'phev34' || trim === 'gt' ? 'phev34' : trim === 'hev' || trim === 'hev2' ? 'hev2' : 'phev19';
+    const g = Object.assign({key,asset:'assets/power/graphics/approved-chassis-atlas.png'}, CAR_POWER_GRAPHICS[key]);
+    if (!['phev34','gt','hev','hev2','phev19'].includes(trim)) g.label='FWD schematic';
+    g.artStyle = 'width:'+(1145/350*100)+'%;height:'+(1374/770*100)+'%;left:'+(-g.crop[0]/350*100)+'%;top:'+(-g.crop[1]/770*100)+'%';
+    return g;
+  }
+
+  _powerSvgPath(points, direction) {
+    const ordered = direction < 0 ? points.slice().reverse() : points;
+    return ordered.map((p, i) => (i ? 'L ' : 'M ') + p[0] + ' ' + p[1]).join(' ');
+  }
+
+  _powerBatteryVisual(model) {
+    const levels = Array.from({ length: 10 }, (_, i) => model.socKnown
+      ? Math.max(0, Math.min(1, model.socPct / 10 - i)) : 0);
+    const last = levels.reduce((last, level, i) => level > 0 ? i : last, -1);
+    const incoming = model.frontDir < 0 || model.rearDir < 0;
+    const outgoing = model.frontDir > 0 || model.rearDir > 0;
+    const validFlow = !!model.driveToken;
+    const charging = validFlow && ((model.tone === 'charge' && model.graphic.key !== 'hev2') || incoming && !outgoing);
+    const discharging = validFlow && outgoing && !incoming && ['ev', 'hybrid'].includes(model.tone);
+    const mode = !model.socKnown ? 'unknown' : charging ? 'charging' : discharging ? 'discharging' : 'standby';
+    return { levels, last, mode, pulse: model.socKnown && last >= 0
+      && (mode === 'discharging' || mode === 'charging' && model.socPct < 100) };
+  }
+
+  _powerGraphicMarkup(model, size, prefix) {
+    const g = model.graphic;
+    const b = g.display, bx = b[0], by = b[1], bw = b[2], bh = b[3], count = 10;
+    const battery = this._powerBatteryVisual(model);
+    const gap = 2.5, cellW = (bw-gap*9)/10;
+    const rect = (x, y, w, h, cls, extra) => '<rect x="' + x + '" y="' + y + '" width="' + Math.max(0, w) + '" height="' + Math.max(0, h) + '" rx="4" class="' + cls + '"' + (extra || '') + '></rect>';
+    let out = '<defs><filter id="' + prefix + '-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="8"></feGaussianBlur></filter>';
+    out += '<linearGradient id="'+prefix+'-steel" x2="1" y2="1"><stop stop-color="#737b80"/><stop offset=".45" stop-color="#586167"/><stop offset="1" stop-color="#737b80"/></linearGradient>';
+    out += '<marker id="' + prefix + '-arrow-drive" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1 1 L 11 6 L 1 11 Z" fill="#22c9ff"></path></marker>';
+    out += '<marker id="' + prefix + '-arrow-regen" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1 1 L 11 6 L 1 11 Z" fill="#53ed91"></path></marker></defs>';
+    out += rect(g.panel[0],g.panel[1],g.panel[2],g.panel[3],'hv-power-indicator-panel',' fill="url(#'+prefix+'-steel)" stroke="#9aa1a5" stroke-width="1"');
+    out += '<g data-layer="battery-cells" data-battery-mode="' + battery.mode + '">';
+    for (let i = 0; i < count; i++) {
+      const x = bx+i*(cellW+gap), level = battery.levels[i];
+      const pulse = battery.pulse && level > 0 && (battery.mode === 'discharging' || i === battery.last);
+      // Every face stays full size: its brightness alone represents the fraction.
+      // Discharge phases run from the last occupied segment back toward the first.
+      const delay = battery.mode === 'discharging' ? (battery.last-i)*.14 : 0;
+      out += '<g data-module="' + i + '">' + rect(x, by, cellW, bh, 'hv-power-cell-empty');
+      out += rect(x+1, by+1.5, cellW-2, bh-3, 'hv-power-cell-fill ' + battery.mode + (pulse ? ' hv-power-cell-pulse' : ''),
+        ' data-level="' + level.toFixed(3) + '" style="--cell-level:' + level + ';--cell-delay:' + delay + 's"');
+      out += '</g>';
+    }
+    out += '</g>';
+    const highlight = (box, tone, active, name) => {
+      if (!box) return '';
+      return rect(box[0], box[1], box[2], box[3], 'hv-power-highlight ' + tone + (active ? ' active' : ''), ' data-highlight="' + name + '"');
+    };
+    out += '<g data-layer="component-highlights">';
+    out += highlight(g.engine, 'engine', !!model.iceClass, 'engine');
+    out += highlight(g.frontMotor, model.frontDir < 0 ? 'regen' : 'drive', !!model.frontDir, 'front');
+    if (g.awd) out += highlight(g.rearMotor, model.rearDir < 0 ? 'regen' : 'drive', !!model.rearDir, 'rear');
+    out += '</g>';
+    const route = (name, points, direction) => {
+      if (!direction || !points) return '';
+      const tone = direction < 0 ? 'regen' : 'drive', d = this._powerSvgPath(points, direction), marker = 'url(#' + prefix + '-arrow-' + tone + ')';
+      return '<g class="hv-power-route active ' + tone + '" data-route="' + name + '"><path d="' + d + '" class="hv-power-flow-glow" filter="url(#' + prefix + '-glow)"></path><path d="' + d + '" class="hv-power-flow-ribbon"></path><path d="' + d + '" class="hv-power-flow-track" marker-end="' + marker + '"></path></g>';
+    };
+    out += '<g data-layer="flows">' + route('front', g.front, model.frontDir) + route('front-left', g.fl, model.frontDir) + route('front-right', g.fr, model.frontDir);
+    if (g.awd) out += route('rear', g.rear, model.rearDir) + route('rear-left', g.rl, model.rearDir) + route('rear-right', g.rr, model.rearDir);
+    out += '</g>';
+    const cx = bx+bw/2, small = g.key === 'hev2';
+    out += '<g data-layer="soc-label"><text x="' + cx + '" y="' + (by-16) + '" class="hv-power-soc-label" style="font-size:'+(small?19:23)+'px">' + model.socNum + (model.socKnown ? '%' : '') + '</text>';
+    out += '<text x="'+cx+'" y="'+(by+bh+12)+'" class="hv-power-battery-caption">HIGH VOLTAGE</text><text x="'+cx+'" y="'+(by+bh+24)+'" class="hv-power-battery-caption">BATTERY</text></g>';
+    return out;
+  }
+
+  _renderPowerGraphic(el, model, size, index) {
+    const canvas = el.querySelector('.hv-power-canvas');
+    const svg = el.querySelector('.hv-power-overlay');
+    const image = el.querySelector('.hv-power-chassis');
+    if (!canvas || !svg || !image) return;
+    const key = [model.graphic.key, model.socKnown ? model.socPct : 'x', model.frontDir,
+      model.rearDir, model.iceClass ? 1 : 0, model.tone, model.driveToken, size].join('|');
+    if (canvas.getAttribute('data-graphic-key') !== key) {
+      canvas.setAttribute('data-graphic-key', key);
+      canvas.setAttribute('data-power-variant', model.graphic.key);
+      image.src = model.graphic.asset;
+      image.style.cssText = model.graphic.artStyle;
+      image.alt = '';
+      if (!canvas._powerSvgId) canvas._powerSvgId = 'power-' + (this._powerSvgSerial = (this._powerSvgSerial || 0) + 1);
+      svg.setAttribute('viewBox', '0 0 350 770');
+      svg.innerHTML = this._powerGraphicMarkup(model, size, canvas._powerSvgId);
+      const label = canvas.querySelector('.hv-power-variant-label');
+      if (label) label.textContent = model.graphic.label;
+    }
+    canvas.classList.toggle('soc-stale', !model.socKnown);
+    const active = !!(model.frontDir || model.rearDir || this._powerBatteryVisual(model).pulse);
+    canvas.setAttribute('data-flow-active', active ? '1' : '0');
+    if (!canvas._powerObserved && typeof IntersectionObserver === 'function') {
+      if (!this._powerIntersectionObserver) {
+        this._powerIntersectionObserver = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            entry.target.classList.toggle('is-in-view', entry.isIntersecting);
+            this._syncPowerGraphicMotion(entry.target);
+          });
+        }, { threshold: 0.05 });
+      }
+      canvas._powerObserved = true;
+      this._powerIntersectionObserver.observe(canvas);
+    }
+    this._syncPowerGraphicMotion(canvas);
+  }
+
+  _syncPowerGraphicMotion(canvas) {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const visible = document.visibilityState !== 'hidden' && rect.width > 0 && rect.height > 0
+      && rect.bottom > 0 && rect.right > 0
+      && rect.top < (window.innerHeight || document.documentElement.clientHeight)
+      && rect.left < (window.innerWidth || document.documentElement.clientWidth);
+    canvas.classList.toggle('is-running', canvas.getAttribute('data-flow-active') === '1' && visible);
+  }
+
   _powerWidgetView(item) {
     const w = Number(item.w) || 2;
     const h = Number(item.h) || 1;
-    const model = this._powerModel(this._graphNow || performance.now());
+    const model = this._powerModel(performance.now());
     const size = w + 'x' + h;
-    return {
+    return Object.assign({
       isPower: true,
       isStub: false,
       powerSize: size,
       powerSizeClass: 'hv-power-' + size,
+      powerVariantKey: model.graphic.key,
+      powerVariantLabel: model.graphic.label,
+      powerChassis: model.graphic.asset,
+      powerArtStyle: model.graphic.artStyle,
       powerTone: model.tone,
       socPct: model.socPct,
       socNum: model.socNum,
@@ -10098,8 +9856,6 @@ class Component extends DCLogic {
       rearClass: model.rearClass,
       rearSrc: model.rearSrc,
       battClass: model.battClass,
-      battFillClip: this._powerBattClipPath(model.socPct),
-      battParaClass: 'hv-power-batt-para' + (model.socPct <= 10 ? ' low' : ''),
       frontFlow: model.frontFlow,
       rearFlow: model.rearFlow,
       showPowerStats: w >= 2 || h >= 2,
@@ -10116,6 +9872,15 @@ class Component extends DCLogic {
       powerKw: model.kw,
       powerVoltage: model.voltage,
       powerCurrent: model.current,
+      powerFrontLabel: model.frontLabel,
+      powerRearLabel: model.rearLabel,
+      powerEngineLabel: model.engineLabel,
+      powerFrontClass: model.frontClass,
+      powerRearClass: model.rearClass,
+      powerBatteryClass: model.battClass,
+      powerFrontFlow: model.frontFlow,
+      powerRearFlow: model.rearFlow,
+      powerDriveToken: model.driveToken,
       powerAriaLabel: model.ariaLabel,
       powerNote: 'PACK POWER = battery voltage × battery current ÷ 1000. Flow direction, engine contribution and regeneration are read only from haval.power.flow.',
       onPowerTap: (ev) => {
@@ -10123,7 +9888,7 @@ class Component extends DCLogic {
         if (this._widgetSuppressClick || this.state.widgetMenuId) return;
         this._openFocusedCard('power');
       },
-    };
+    }, this._powerHistoryView(Date.now(), model.stateKey === 'demo'));
   }
 
   _launchEnergyAssistant() {
@@ -10141,24 +9906,6 @@ class Component extends DCLogic {
     el.className = base + (extra ? (' ' + extra) : '');
   }
 
-  _powerBattClipPath(socPct) {
-    const LT = 20.4, LB = 17.9, RT = 75.4, RB = 79.3;
-    const t = socPct / 100;
-    const rTop = LT + (RT - LT) * t;
-    const slant = (LB - LT) * (1 - t) + (RB - RT) * t;
-    const rBot = rTop + slant;
-    return 'polygon(' + LT + '% 0%, ' + rTop + '% 0%, ' + rBot + '% 100%, ' + LB + '% 100%)';
-  }
-
-  _applyPowerBattSoc(batt, socPct) {
-    if (!batt) return;
-    const fill = batt.querySelector('.hv-power-batt-fill');
-    if (fill) fill.style.clipPath = this._powerBattClipPath(socPct);
-    batt.style.setProperty('--soc', socPct + '%');
-    const para = batt.querySelector('.hv-power-batt-para');
-    if (para) para.classList.toggle('low', socPct <= 10);
-  }
-
   _updatePowerCards(now) {
     if (!this._powerCardCacheAt || now - this._powerCardCacheAt > 500) {
       this._powerCardCache = document.querySelectorAll('.hv-power');
@@ -10170,60 +9917,26 @@ class Component extends DCLogic {
     for (let i = 0; i < cards.length; i++) {
       const el = cards[i];
       const size = el.getAttribute('data-power-size') || '2x1';
-      el.className = 'hv-power hv-power-' + size + ' ' + model.tone;
+      ['ev', 'hybrid', 'ice', 'regen', 'charge', 'idle', 'stale', 'unavailable'].forEach((tone) => el.classList.remove(tone));
+      el.classList.add(model.tone);
       el.setAttribute('aria-label', model.ariaLabel);
       const source = el.querySelector('.hv-power-source');
       if (source) {
         source.className = 'hv-power-source ' + model.sourceClass;
         source.textContent = model.source;
       }
-      const ice = el.querySelector('.hv-power-ice');
-      if (ice) {
-        ice.className = 'hv-power-ice' + (model.iceClass ? (' ' + model.iceClass) : '');
-        if (ice.getAttribute('src') !== model.iceSrc) ice.setAttribute('src', model.iceSrc);
-      }
-      const front = el.querySelector('.hv-power-motor.front');
-      if (front) {
-        front.className = 'hv-power-motor front' + (model.frontClass ? (' ' + model.frontClass) : '');
-        if (front.getAttribute('src') !== model.frontSrc) front.setAttribute('src', model.frontSrc);
-      }
-      const rear = el.querySelector('.hv-power-motor.rear');
-      if (rear) {
-        rear.className = 'hv-power-motor rear' + (model.rearClass ? (' ' + model.rearClass) : '');
-        if (rear.getAttribute('src') !== model.rearSrc) rear.setAttribute('src', model.rearSrc);
-      }
-      const batt = el.querySelector('.hv-power-batt');
-      if (batt) {
-        batt.className = 'hv-power-batt' + (model.battClass ? (' ' + model.battClass) : '');
-        this._applyPowerBattSoc(batt, model.socPct);
-      }
-      const floor = el.querySelector('.hv-power-floor');
-      if (floor) {
-        floor.style.setProperty('--soc', String(model.socPct));
-        const fill = floor.querySelector('.hv-power-floor-fill');
-        if (fill) {
-          fill.style.strokeDasharray = model.socPct + ' 100';
-          fill.style.strokeDashoffset = '0';
-        }
-      }
-      const socNum = el.querySelector('.hv-power-ring-num');
-      if (socNum) socNum.textContent = model.socNum;
-      const modeLabel = el.querySelector('.hv-power-mode-label strong');
-      if (modeLabel) modeLabel.textContent = model.state;
-      const flowLabel = el.querySelector('.hv-power-mode-label small');
-      if (flowLabel) flowLabel.textContent = model.flowSummary;
-      const frontLane = el.querySelector('.hv-power-lane.front');
-      if (frontLane) frontLane.className = 'hv-power-lane front' + (model.frontFlow ? (' ' + model.frontFlow) : '');
-      const rearLane = el.querySelector('.hv-power-lane.rear');
-      if (rearLane) rearLane.className = 'hv-power-lane rear' + (model.rearFlow ? (' ' + model.rearFlow) : '');
-      const stats = el.querySelectorAll('.hv-power-stat-value');
-      for (let s = 0; s < stats.length && s < model.stats.length; s++) {
-        const st = model.stats[s];
-        const unit = document.createElement('span');
-        unit.textContent = st.unit;
-        stats[s].textContent = st.value;
-        stats[s].appendChild(unit);
-      }
+      const text = (selector, value) => {
+        el.querySelectorAll(selector).forEach((node) => { if (node.textContent !== value) node.textContent = value; });
+      };
+      text('.hv-power-title', model.state);
+      text('.hv-power-kw', model.kw);
+      text('.hv-power-soc', model.socNum);
+      text('.hv-power-voltage', model.voltage);
+      text('.hv-power-current', model.current);
+      text('.hv-power-axle-front', model.frontLabel);
+      text('.hv-power-axle-rear', model.rearLabel);
+      text('.hv-power-engine-label', model.engineLabel);
+      this._renderPowerGraphic(el, model, size, i);
     }
   }
 
@@ -25653,6 +25366,8 @@ class Component extends DCLogic {
     };
     this._desktopKeyHandler = (ev) => this._onDesktopKey(ev);
     document.addEventListener('keydown', this._desktopKeyHandler, false);
+    this._powerVisibilityHandler = () => this._updatePowerCards(performance.now());
+    document.addEventListener('visibilitychange', this._powerVisibilityHandler, false);
     if (typeof window.__flushAndroidShell === 'function') {
       try { window.__flushAndroidShell(); } catch (e) { console.warn('[AndroidShell]', e); }
     }
@@ -35030,10 +34745,12 @@ class Component extends DCLogic {
 
   _focusedCardRenderFields(s) {
     const type = s.focusedCardType;
+    if (type === 'power') this._ensurePowerHistoryTicker();
     const base = {
       // Driving sizes to its content now that it fits; the others keep the
       // fixed frame their layouts were built against.
       focusedCardPopupClass: (type ? 'on' : '') + (type === 'driving' || type === 'media' ? ' fit' : '')
+        + (type === 'power' ? ' power-popup fit' : '')
         + (type === 'media' ? ' narrow' : '')
         + (type === 'consumption' && this._energyPopupWideOn() ? ' wide' : ''),
       focusedCardBackdropClass: type ? 'on' : '',
@@ -39457,12 +39174,16 @@ class Component extends DCLogic {
         progress: percent(range.rangeSoc, 0),
       },
       power: {
-        primary: power.powerState,
+        primary: power.powerKw + ' kW',
         secondary: power.powerSource,
-        metricA: power.powerKw + ' kW',
-        metricB: power.powerFlowSummary,
+        metricA: power.powerState,
+        metricB: 'SOC ' + power.powerSocNum + '%',
         progress: power.socPct,
+        socKnown: power.socNum !== '—',
+        powerSoc: power.socPct,
+        powerVariant: power.powerVariantKey,
         state: power.powerTone,
+        glyphText: power.powerDriveToken,
       },
       status: {
         primary: status.statusSummary,
@@ -41645,6 +41366,10 @@ class Component extends DCLogic {
     clearTimeout(this._desktopDotHoldTimer);
     clearTimeout(this._camSlotHoldTimer);
     clearInterval(this._energyTimer);
+    clearTimeout(this._consumptionRefreshTimer);
+    clearTimeout(this._powerRefreshTimer);
+    clearTimeout(this._powerFreshTimer);
+    clearTimeout(this._powerHistoryTimer);
     clearTimeout(this._tireFreshTimer);
     clearInterval(this._demoDoorTicker);
     this._demoDoorTicker = 0;
@@ -41657,6 +41382,9 @@ class Component extends DCLogic {
     this._teardownHotspots();
     if (this._onResize) window.removeEventListener('resize', this._onResize);
     if (this._desktopKeyHandler) document.removeEventListener('keydown', this._desktopKeyHandler, false);
+    if (this._powerVisibilityHandler) document.removeEventListener('visibilitychange', this._powerVisibilityHandler, false);
+    if (this._powerIntersectionObserver) this._powerIntersectionObserver.disconnect();
+    this._powerIntersectionObserver = null;
     if (window.__desktopDebug) { try { delete window.__desktopDebug; } catch (e) { window.__desktopDebug = null; } }
     if (this.renderer && this.renderer.domElement && this._desktopGestureHandlers) {
       const gestureEl = this.renderer.domElement;

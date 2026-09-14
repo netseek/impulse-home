@@ -33,7 +33,15 @@ assert.ok(html.includes("[3, 2]"), '3x2 Power widget size is required');
 assert.equal((html.match(/value="\{\{ wg\.isPower \}\}"/g) || []).length, 1,
   'Power widget markup must exist on the widget board');
 assert.ok(html.includes('focusedCardIsPower'));
-assert.ok(html.includes('class="hv-power-focus"'));
+assert.ok(html.includes('data-power-size="popup"'));
+assert.equal((html.match(/class="hv-power-overlay"/g) || []).length, 2, 'both boards and popup share the vehicle overlay');
+assert.equal((html.match(/class="hv-power-chassis"/g) || []).length, 2, 'all Power surfaces use the top-down chassis layer');
+assert.ok(!html.includes('src="assets/power/h6-ghost-dark.png"'), 'retired side-view ghost must not remain in Power markup');
+for (const token of ['CAR_POWER_GRAPHICS', '_powerGraphicsVariant', '_powerGraphicMarkup',
+  '_renderPowerGraphic', '_syncPowerGraphicMotion', 'IntersectionObserver',
+  'hv-power-flow-ribbon', 'hv-power-cell-fill', 'prefers-reduced-motion']) {
+  assert.ok(html.includes(token), `missing layered Power integration: ${token}`);
+}
 assert.ok(html.includes("case 'openPower':\n        this._openFocusedCard('power');"));
 
 for (const key of [
@@ -45,7 +53,7 @@ for (const key of [
 
 const powerStatus = method(html, '_powerStatus');
 for (const label of [
-  "'LIVE · VEHICLE POWER FLOW'",
+  "'LIVE · REPORTED FLOW'",
   "'PARTIAL · VEHICLE POWER SIGNALS'",
   "'STALE · POWER SIGNAL'",
   "'UNAVAILABLE · NO POWER SIGNAL'",
@@ -64,6 +72,10 @@ assert.ok(!refresh.includes('requestAnimationFrame'),
 
 assert.ok(java.includes('case "power": drawPower'));
 assert.ok(java.includes('sanitizePowerState'));
+assert.ok(java.includes('sanitizePowerVariant'));
+assert.ok(java.includes('drawPowerBatteryCells'));
+assert.ok(java.includes('drawPowerTopRoute'));
+assert.ok(java.includes('www/assets/power/graphics/'));
 assert.ok(java.includes('Opens power flow details.'));
 
 console.log('power card contract: OK');
