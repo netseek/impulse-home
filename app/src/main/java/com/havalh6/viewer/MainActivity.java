@@ -8052,6 +8052,7 @@ public final class MainActivity extends Activity {
                 Math.round(24 * density), Math.round(6 * density));
         quickCardsRow = row;
         populateQuickCardsRow(row, density);
+        bindRailEditLongPress();
 
         scroll.addView(row, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -10701,6 +10702,7 @@ public final class MainActivity extends Activity {
         // The views an open menu is anchored to are about to be replaced.
         dismissQuickMenu();
         populateQuickCardsRow(quickCardsRow, getResources().getDisplayMetrics().density);
+        bindRailEditLongPress();
         refreshQuickCardsTheme();
         // A reorder or remove comes back from the page as a new card list; the
         // rebuilt tiles have to rejoin edit mode.
@@ -10865,6 +10867,28 @@ public final class MainActivity extends Activity {
         return index;
     }
 
+    /**
+     * Long press on any rail card opens card edit. Set after every build, so it
+     * replaces a card's own longAction; edit mode clears it again.
+     */
+    private void bindRailEditLongPress() {
+        for (View card : railCardViews()) {
+            card.setLongClickable(true);
+            card.setOnLongClickListener(v -> {
+                if (railEditMode) return false;
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                callViewerDock("openRailEdit");
+                return true;
+            });
+        }
+    }
+
+    /**
+     * Edit-mode gesture. A quick swipe is left to the scroll view, which
+     * intercepts it past touch slop. Only a hold arms the drag; once armed the
+     * rail may no longer intercept, and holding the card near either edge
+     * scrolls the rail so it can travel past the visible cards.
+     */
     private final class RailEditTouch implements View.OnTouchListener {
         private final String id;
         private final View card;
@@ -10873,7 +10897,32 @@ public final class MainActivity extends Activity {
         private final float density;
         private final int slop;
         private float downX;
+        private float lastRawX;
+        private int downScrollX;
         private boolean dragging;
+        private boolean armed;
+        private final Runnable arm = this::armDrag;
+        private final Runnable autoScroll = new Runnable() {
+            @Override
+            public void run() {
+                if (!dragging) return;
+                android.widget.HorizontalScrollView scroll = railScroll();
+                if (scroll == null) return;
+                int[] loc = new int[2];
+                scroll.getLocationOnScreen(loc);
+                float edge = 90f * density;
+                float left = lastRawX - loc[0];
+                float right = loc[0] + scroll.getWidth() - lastRawX;
+                int step = 0;
+                if (left < edge) step = -Math.round(Math.min(1f, (edge - left) / edge) * 22f * density);
+                else if (right < edge) step = Math.round(Math.min(1f, (edge - right) / edge) * 22f * density);
+                if (step != 0) {
+                    scroll.scrollBy(step, 0);
+                    follow();
+                }
+                card.postOnAnimation(this);
+            }
+        };
 
         RailEditTouch(String id, View card, RailBadge badge, RailBadge more, float density) {
             this.id = id;
@@ -10884,30 +10933,58 @@ public final class MainActivity extends Activity {
             this.slop = android.view.ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
         }
 
+        private android.widget.HorizontalScrollView railScroll() {
+            return cardsScrollView instanceof android.widget.HorizontalScrollView
+                    ? (android.widget.HorizontalScrollView) cardsScrollView : null;
+        }
+
+        private int scrollX() {
+            android.widget.HorizontalScrollView s = railScroll();
+            return s == null ? 0 : s.getScrollX();
+        }
+
+        /** Finger offset plus however far the rail has scrolled under it. */
+        private void follow() {
+            card.setTranslationX(lastRawX - downX + (scrollX() - downScrollX));
+        }
+
+        private void armDrag() {
+            armed = true;
+            dragging = true;
+            if (card.getParent() != null) card.getParent().requestDisallowInterceptTouchEvent(true);
+            card.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            android.animation.Animator jiggle = railJiggles.get(card);
+            if (jiggle != null) jiggle.pause();
+            card.setRotation(0f);
+            card.setAlpha(0.92f);
+            card.setScaleX(1.04f);
+            card.setScaleY(1.04f);
+            card.setTranslationZ(8f * density);
+            card.postOnAnimation(autoScroll);
+        }
+
         @Override
         public boolean onTouch(View v, MotionEvent e) {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    downX = e.getRawX();
+                    downX = lastRawX = e.getRawX();
+                    downScrollX = scrollX();
                     dragging = false;
-                    // A press that starts on a card drags it; the rail scrolls
-                    // from the gaps between cards.
-                    if (v.getParent() != null) v.getParent().requestDisallowInterceptTouchEvent(true);
+                    armed = false;
+                    card.postDelayed(arm, android.view.ViewConfiguration.getLongPressTimeout());
                     return true;
                 case MotionEvent.ACTION_MOVE: {
-                    float dx = e.getRawX() - downX;
-                    if (!dragging && Math.abs(dx) > slop) {
-                        dragging = true;
-                        android.animation.Animator jiggle = railJiggles.get(card);
-                        if (jiggle != null) jiggle.pause();
-                        card.setRotation(0f);
-                        card.setAlpha(0.92f);
-                        card.setTranslationZ(8f * density);
+                    lastRawX = e.getRawX();
+                    if (!armed) {
+                        // Moved before the hold completed: a swipe, not a drag.
+                        if (Math.abs(lastRawX - downX) > slop) card.removeCallbacks(arm);
+                        return true;
                     }
-                    if (dragging) card.setTranslationX(dx);
+                    follow();
                     return true;
                 }
                 case MotionEvent.ACTION_UP: {
+                    card.removeCallbacks(arm);
                     if (dragging) {
                         int to = railDropIndex(card);
                         int from = railCardViews().indexOf(card);
@@ -10931,6 +11008,8 @@ public final class MainActivity extends Activity {
                     return true;
                 }
                 case MotionEvent.ACTION_CANCEL:
+                    // Also what the rail sends when it takes a quick swipe.
+                    card.removeCallbacks(arm);
                     if (dragging) settle();
                     return true;
                 default:

@@ -5604,7 +5604,7 @@ window.HavalSplash = (function () {
     .hv-status-focus-roof-buttons { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
     .hv-status-tire { position:absolute; z-index:8; display:grid; min-width:52px; gap:2px; padding:5px 6px; border:1px solid rgba(99,217,231,.48); border-radius:8px; background:var(--hv-frost-fill-strong); text-align:center; font-style:normal; }
     .hv-status-tire strong { font:600 13px/.95 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; }
-    .hv-status-tire small { font:500 6px/1 'Space Mono',monospace; letter-spacing:.04em; opacity:.62; }
+    .hv-status-tire small { font:300 7px/1 'Space Grotesk',sans-serif; letter-spacing:.02em; color:#8f949b; }
     .hv-status-tire.warning { border-color:#ff6671; color:#ff6671; }.hv-status-tire.unavailable { opacity:.42; }
     .hv-status-tire.front-left { left:4%; top:19%; }.hv-status-tire.front-right { right:4%; top:19%; }.hv-status-tire.rear-left { left:4%; bottom:16%; }.hv-status-tire.rear-right { right:4%; bottom:16%; }
     .hv-status-card-tire { position:absolute; z-index:8; display:grid; min-width:38px; gap:1px; padding:3px 4px; border-radius:6px; background:var(--hv-frost-fill-strong); text-align:center; font-style:normal; }
@@ -21504,6 +21504,7 @@ class Component extends DCLogic {
   }
 
   _openRoofLevelPopup() {
+    this._closeFocusedCard();
     Object.values(this._hsEls || {}).forEach((el) => { if (el) el.classList.remove('open'); });
     this._hsOpenId = null;
     if (this._hsLayer) this._hsLayer.classList.remove('menu-open');
@@ -34493,7 +34494,9 @@ class Component extends DCLogic {
       this._setCardAction(type, { kind: 'popup' });
     }
     this._focusedCardEntry(type);
-    this.setState({ focusedCardType: type, desktopStudioOpen: false, panelOpen: false });
+    // One card popup at a time: the roof popup (Status card) is not React state.
+    if (this._hsRoofPopOpen) this._setRoofLevelPopup(false);
+    this.setState({ focusedCardType: type, desktopStudioOpen: false, panelOpen: false, energyUnitsOpen: false });
   }
 
   _closeFocusedCard() { if (this.state.focusedCardType) this.setState({ focusedCardType: null, energyUnitsOpen: false }); }
@@ -38274,6 +38277,10 @@ class Component extends DCLogic {
       // The native Layout card (Workspace card → LAYOUT).
       case 'openLayoutDesktops':
         this._openDesktopStudio('desktops');
+        break;
+      // Long press on any native rail card: straight into card edit.
+      case 'openRailEdit':
+        this._openDesktopStudio('cards');
         break;
       case 'openLayoutCards':
         this._openDesktopStudio(this.state.desktopStudioTab === 'widgets' ? 'widgets' : 'cards');
