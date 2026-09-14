@@ -39,7 +39,7 @@ const fill = (markup, data) => markup.replace(/onClick="[^"]*"/g,'').replace(/\{
   key = key.replace(/^wg\./,'').replace(/^focusedPower/,'power');
   const value = key in data ? data[key] : '';
   return inverse ? String(!value) : String(value);
-}).replace(/(<svg class="hv-power-overlay"[^>]*>)[\s\S]*?<\/svg>/,
+}).replace('class="hv-power-canvas"','class="hv-power-canvas" data-graphic-key="fixture"').replace(/(<svg class="hv-power-overlay"[^>]*>)[\s\S]*?<\/svg>/,
   (_,open)=>open+data.powerGraphicMarkup+'</svg>');
 const sizes = [[1,1],[1,2],[2,1],[3,1],[2,2],[3,2]];
 const gallery = (theme, focus=false) => `<!doctype html><html><head><meta charset="utf-8"><base href="/"><style>${styles}
@@ -58,7 +58,7 @@ const server = http.createServer((req,res)=>{
       if(trim==='hev2'&&label==='Charging')continue;
       app.state.modelTrim=trim;app._powerLive.flow=flow;app._powerLive.soc=soc;
       const model=app._powerModel(Date.now());
-      cards+=`<article><h3>${trim.toUpperCase()} · ${label}</h3><div class="hv-power-canvas" style="height:350px"><img class="hv-power-chassis" src="${model.graphic.asset}"><svg class="hv-power-overlay" viewBox="0 0 600 1000">${app._powerGraphicMarkup(model,'popup','matrix-'+trim+'-'+label)}</svg></div></article>`;
+      cards+=`<article><h3>${trim.toUpperCase()} · ${label}</h3><div class="hv-power-canvas" data-graphic-key="fixture" style="height:350px"><div class="hv-power-art"><img class="hv-power-chassis" src="${model.graphic.asset}" style="${model.graphic.artStyle}"></div><svg class="hv-power-overlay" viewBox="0 0 350 770">${app._powerGraphicMarkup(model,'popup','matrix-'+trim+'-'+label)}</svg></div></article>`;
     }
     app.state.modelTrim='phev34';app._powerLive.flow='v1|hybrid|1|1|0';app._powerLive.soc='64';
     res.setHeader('Content-Type','text/html; charset=utf-8');res.end(`<html><head><meta charset="utf-8"><base href="/"><style>${styles}html,body{height:auto;overflow:auto;background:#18232b;color:#d9e5ec;font:12px Arial}main{display:grid;grid-template-columns:repeat(7,210px);gap:12px;padding:16px}article{background:#202e38;border-radius:12px;padding:12px}h3{font:12px Arial}</style></head><body><main>${cards}</main></body></html>`);return;
@@ -105,16 +105,44 @@ try{
     return canvas&&canvas.getBoundingClientRect().width>0;
   });
   await page.evaluate(()=>window.__app._updatePowerCards(performance.now()));
-  await page.waitForFunction(()=>document.querySelectorAll('.hv-power[data-power-size="popup"] [data-module]').length===6);
+  await page.waitForFunction(()=>document.querySelectorAll('.hv-power[data-power-size="popup"] [data-module]').length===10);
   await page.waitForTimeout(500);
   const liveGraphic = await page.evaluate(()=>{
     const canvas=document.querySelector('.hv-power[data-power-size="popup"] .hv-power-canvas');
     return canvas ? {variant:canvas.dataset.powerVariant,running:canvas.classList.contains('is-running'),
       cells:canvas.querySelectorAll('[data-module]').length,routes:canvas.querySelectorAll('.hv-power-route.active').length} : null;
   });
-  if(!liveGraphic||liveGraphic.variant!=='phev34'||!liveGraphic.running||liveGraphic.cells!==6||liveGraphic.routes!==6){
+  if(!liveGraphic||liveGraphic.variant!=='phev34'||!liveGraphic.running||liveGraphic.cells!==10||liveGraphic.routes!==6){
     throw Error('production Power graphic did not reach the expected live AWD state: '+JSON.stringify(liveGraphic));
   }
   await page.screenshot({path:path.join(root,'docs/power-redesign-app-popup.png')});
+  // Sample actual CSS animation at known times, rather than just checking its class.
+  const pulseCheck=await page.evaluate(()=>{
+    const app=window.__app;
+    app._powerLive.flow='v1|charge|0|0|0';app._powerLive.soc='12';
+    app._updatePowerCards(performance.now());
+    const canvas=document.querySelector('.hv-power[data-power-size="popup"] .hv-power-canvas');
+    const cells=[...canvas.querySelectorAll('.hv-power-cell-fill')];
+    const active=cells.filter(c=>c.classList.contains('hv-power-cell-pulse'));
+    const anim=active[0]?.getAnimations()[0];
+    if(!anim)return {error:'charging pulse missing'};
+    anim.pause();
+    const values=[0,900,1800].map(t=>{anim.currentTime=t;return Number(getComputedStyle(active[0]).opacity);});
+    const staticLevels=cells.map(c=>Number(c.style.getPropertyValue('--cell-level')));
+    const filter=getComputedStyle(active[0]).filter,shadow=getComputedStyle(active[0]).boxShadow;
+    const card=canvas.closest('.hv-power');card.style.display='none';app._syncPowerGraphicMotion(canvas);
+    const paused=!canvas.classList.contains('is-running');card.style.display='';app._syncPowerGraphicMotion(canvas);
+    return {active:active.length,values,staticLevels,filter,shadow,paused};
+  });
+  if(pulseCheck.error||pulseCheck.active!==1||Math.abs(pulseCheck.values[0])>.001||Math.abs(pulseCheck.values[1]-.2)>.001||Math.abs(pulseCheck.values[2])>.001||pulseCheck.filter!=='none'||pulseCheck.shadow!=='none'||!pulseCheck.paused){
+    throw Error('Battery pulse regression: '+JSON.stringify(pulseCheck));
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const reduced=await page.evaluate(()=>{
+    const cell=document.querySelector('.hv-power[data-power-size="popup"] [data-module="1"] .hv-power-cell-fill');
+    return {opacity:Number(getComputedStyle(cell).opacity),animation:getComputedStyle(cell).animationName};
+  });
+  if(Math.abs(reduced.opacity-.2)>.001||reduced.animation!=='none')throw Error('Reduced motion must preserve proportional SOC: '+JSON.stringify(reduced));
+  console.log('Pulse: 0 → 20% → 0 for the 12% boundary cell; no glow; hidden and reduced-motion states OK');
   console.log('production markup size/theme captures + app popup captured');
 }finally{await browser?.close();server.close();}

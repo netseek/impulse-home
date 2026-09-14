@@ -74,3 +74,46 @@ const before = JSON.stringify(app._powerHistory);
 assert.equal(app._powerHistoryView(now, true).powerHistoryLabel, 'Simulated example');
 assert.equal(JSON.stringify(app._powerHistory), before, 'demo must never contaminate recorded history');
 console.log('Power behavior: fresh/stale signals, independent axles, polarity, malformed packets and history gaps OK');
+
+// Ten fixed-size faces encode SOC with intensity, independently of activity.
+for (const trim of ['phev19','phev34','hev2']) {
+  app.state.modelTrim=trim;
+  publish(keys.powerFlow,'flow','v1|idle|0|0|0');
+  for(const soc of [0,1,12,64,64.25,100]){
+    publish(keys.batterySoc,'soc',soc);
+    const m=app._powerModel(1), visual=app._powerBatteryVisual(m);
+    assert.equal(visual.levels.length,10);
+    assert.ok(Math.abs(visual.levels.reduce((sum,n)=>sum+n,0)-soc/10)<1e-9);
+    assert.equal(visual.mode,'standby');assert.equal(visual.pulse,false);
+    const svg=app._powerGraphicMarkup(m,'popup','test-'+trim);
+    assert.equal((svg.match(/data-module=/g)||[]).length,10);
+    assert.ok(svg.includes('HIGH VOLTAGE')&&svg.includes('BATTERY'));
+    const widths=[...svg.matchAll(/width="([\d.]+)"[^>]*class="hv-power-cell-fill/g)].map(m=>m[1]);
+    assert.equal(widths.length,10);assert.equal(new Set(widths).size,1,'SOC never resizes a face');
+  }
+  publish(keys.batterySoc,'soc',12);
+  let v=app._powerBatteryVisual(app._powerModel(1));
+  assert.equal(v.levels[0],1);assert.ok(Math.abs(v.levels[1]-.2)<1e-9);
+  assert.equal(v.levels.slice(2).reduce((sum,n)=>sum+n,0),0);
+  publish(keys.powerFlow,'flow','v1|charge|0|0|0');
+  v=app._powerBatteryVisual(app._powerModel(1));
+  assert.equal(v.mode,trim==='hev2'?'standby':'charging');
+  assert.equal(v.pulse,trim!=='hev2');
+  assert.equal((app._powerGraphicMarkup(app._powerModel(1),'popup','test').match(/hv-power-cell-pulse/g)||[]).length,trim==='hev2'?0:1);
+  publish(keys.powerFlow,'flow','v1|ev|0|1|0');
+  v=app._powerBatteryVisual(app._powerModel(1));
+  assert.equal(v.mode,'discharging');assert.equal(v.last,1);assert.equal(v.pulse,true);
+  publish(keys.powerFlow,'flow','v1|regen|0|-1|0');
+  assert.equal(app._powerBatteryVisual(app._powerModel(1)).mode,'charging');
+  publish(keys.batterySoc,'soc',100);
+  assert.equal(app._powerBatteryVisual(app._powerModel(1)).pulse,false,'full charging battery stays steady');
+  publish(keys.powerFlow,'flow','v1|ev|0|1|0',120010);
+  assert.equal(app._powerBatteryVisual(app._powerModel(1)).pulse,false,'stale flow cannot keep pulsing');
+  publish(keys.batterySoc,'soc',64,120010);
+  v=app._powerBatteryVisual(app._powerModel(1));
+  assert.equal(v.mode,'unknown');assert.equal(v.levels.reduce((sum,n)=>sum+n,0),0);
+}
+app.state.modelTrim='phev34';publish(keys.batterySoc,'soc',64);
+publish(keys.powerFlow,'flow','v1|hybrid|1|1|-1');
+assert.equal(app._powerBatteryVisual(app._powerModel(1)).mode,'standby','mixed axles do not establish net pack direction');
+console.log('Battery display: exact ten segments, fractional intensity, mode colors, edge pulse and stale/full/mixed handling OK');

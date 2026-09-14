@@ -1826,15 +1826,24 @@ window.HavalSplash = (function () {
     .hv-power-source.live { color:var(--hv-power-ev); }
     .hv-power-source.demo,.hv-power-source.partial { color:var(--hv-power-engine); }
     .hv-power-stage { min-width:0; min-height:0; display:flex; align-items:center; justify-content:center; }
-    .hv-power-canvas { position:relative; height:100%; width:auto; max-width:100%; aspect-ratio:3 / 5; isolation:isolate; }
-    @supports not (aspect-ratio:3 / 5) { .hv-power-canvas { width:min(100%,240px); } .hv-power-canvas::before { content:''; display:block; padding-top:166.667%; } }
+    .hv-power-canvas { position:relative; height:100%; width:auto; max-width:100%; aspect-ratio:350 / 770; isolation:isolate; }
+    @supports not (aspect-ratio:350 / 770) { .hv-power-canvas { width:min(100%,180px); } .hv-power-canvas::before { content:''; display:block; padding-top:220%; } }
+    .hv-power-art { position:absolute; inset:0; overflow:hidden; border-radius:8px; }
+    .hv-power-canvas:not([data-graphic-key]) .hv-power-art { visibility:hidden; }
+    .hv-power-art .hv-power-chassis { max-width:none; object-fit:fill; }
     .hv-power-chassis,.hv-power-overlay { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none; }
-    .hv-power-chassis { z-index:0; filter:brightness(.72) saturate(.72) drop-shadow(0 12px 12px rgba(0,0,0,.3)); }
+    .hv-power-chassis { z-index:0; }
     .hv-power-overlay { z-index:1; overflow:visible; }
     .hv-power-canvas.is-unavailable .hv-power-chassis { display:none; }
     .hv-power-battery-outline { fill:#52616c; fill-opacity:.28; stroke:#87959f; stroke-width:3; }
-    .hv-power-cell-empty { fill:#283640; fill-opacity:.65; stroke:#75838c; stroke-width:1.5; }
-    .hv-power-cell-fill { fill:#6ebda6; fill-opacity:.58; }
+    .hv-power-cell-empty { fill:#141d22; stroke:#929a9f; stroke-width:1.3; }
+    .hv-power-cell-fill { fill:#65ec55; opacity:var(--cell-level,0); }
+    .hv-power-cell-fill.discharging { fill:#22c9ff; }
+    .hv-power-cell-pulse { animation:hv-power-cell-breathe 1.8s linear infinite; animation-delay:var(--cell-delay,0s); animation-play-state:paused; }
+    .hv-power-canvas.is-running .hv-power-cell-pulse { animation-play-state:running; }
+    @keyframes hv-power-cell-breathe { 0%,100% { opacity:0; } 50% { opacity:var(--cell-level,1); } }
+    .hv-power-battery-caption { fill:#f2f5f7; font:500 9px/1 Arial,sans-serif; text-anchor:middle; dominant-baseline:middle; }
+    .hv-power-component-label { fill:#f2f5f7; font:600 12px/1 Arial,sans-serif; text-anchor:middle; dominant-baseline:middle; }
     .hv-power-pack-edge { fill:none; stroke:#8b9ba6; stroke-width:4; opacity:.65; }
     .hv-power-pack-edge.receiving { stroke:#53ed91; opacity:.95; }
     .hv-power-pack-edge.supplying { stroke:#22c9ff; opacity:.95; }
@@ -1921,10 +1930,10 @@ window.HavalSplash = (function () {
     .hv-power-history-note,.hv-power-history-empty { font-size:11px; line-height:1.45; color:var(--hv-widget-muted,#a8b7c2); }
     .hv-power-history-empty { padding:14px 0; }
     #hv-root.hv-widgets-light .hv-power { --ef-neutral:#647886; --ef-fill:rgba(239,247,249,.88); --hv-power-ev:#087d90; --hv-power-regen:#168044; --hv-power-engine:#9a611c; }
-    #hv-root.hv-widgets-light .hv-power-chassis { filter:brightness(.78) saturate(.66) drop-shadow(0 10px 10px rgba(38,61,77,.18)); }
+    #hv-root.hv-widgets-light .hv-power-chassis { filter:none; }
     #hv-root.hv-widgets-light .hv-power-soc-plate { fill:rgba(239,247,249,.92); }
     #hv-root.hv-widgets-light .hv-power-variant-label { background:rgba(239,247,249,.88); color:#314957; }
-    #hv-root.hv-widgets-light .hv-power-soc-label { fill:#203743; }
+    #hv-root.hv-widgets-light .hv-power-soc-label { fill:#edf5fa; }
     @media (max-width:640px) {
       .hv-power[data-power-size="popup"] { grid-template-columns:1fr; gap:12px; }
       .hv-power[data-power-size="popup"] .hv-power-head { align-items:flex-start; flex-direction:column; }
@@ -1932,7 +1941,7 @@ window.HavalSplash = (function () {
       .hv-power[data-power-size="popup"] .hv-power-canvas { max-width:460px; }
       .hv-power[data-power-size="popup"] .hv-power-metrics { grid-column:1; grid-row:3; gap:12px; padding:12px; }
     }
-    @media (prefers-reduced-motion:reduce) { .hv-power-flow-track { animation:none !important; stroke-dashoffset:0; } .hv-power-cell-fill,.hv-power-route,.hv-power-highlight,.hv-power-charging { transition:none !important; } }
+    @media (prefers-reduced-motion:reduce) { .hv-power-flow-track,.hv-power-cell-pulse { animation:none !important; stroke-dashoffset:0; } .hv-power-cell-fill,.hv-power-route,.hv-power-highlight,.hv-power-charging { transition:none !important; } }
     .hv-graphs {
       position: absolute;
       top: 0; right: 0; bottom: 0; left: 0;
@@ -4679,8 +4688,8 @@ window.HavalSplash = (function () {
               <div class="hv-power-head"><strong class="hv-power-title">{{ wg.powerState }}</strong><span class="hv-power-source {{ wg.powerSourceClass }}" role="status">{{ wg.powerSource }}</span></div>
               <div class="hv-power-stage" role="img" aria-label="{{ wg.powerAriaLabel }}">
                 <div class="hv-power-canvas">
-                  <img class="hv-power-chassis" src="{{ wg.powerChassis }}" alt="">
-                  <svg class="hv-power-overlay" viewBox="0 0 600 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><title>Powertrain graphic</title></svg>
+                  <div class="hv-power-art"><img class="hv-power-chassis" src="{{ wg.powerChassis }}" style="{{ wg.powerArtStyle }}" alt=""></div>
+                  <svg class="hv-power-overlay" viewBox="0 0 350 770" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><title>Powertrain graphic</title></svg>
                   <span class="hv-power-variant-label">{{ wg.powerVariantLabel }}</span>
                 </div>
               </div>
@@ -4843,8 +4852,8 @@ window.HavalSplash = (function () {
               <div class="hv-power-head"><strong class="hv-power-title">{{ wg.powerState }}</strong><span class="hv-power-source {{ wg.powerSourceClass }}" role="status">{{ wg.powerSource }}</span></div>
               <div class="hv-power-stage" role="img" aria-label="{{ wg.powerAriaLabel }}">
                 <div class="hv-power-canvas">
-                  <img class="hv-power-chassis" src="{{ wg.powerChassis }}" alt="">
-                  <svg class="hv-power-overlay" viewBox="0 0 600 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><title>Powertrain graphic</title></svg>
+                  <div class="hv-power-art"><img class="hv-power-chassis" src="{{ wg.powerChassis }}" style="{{ wg.powerArtStyle }}" alt=""></div>
+                  <svg class="hv-power-overlay" viewBox="0 0 350 770" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><title>Powertrain graphic</title></svg>
                   <span class="hv-power-variant-label">{{ wg.powerVariantLabel }}</span>
                 </div>
               </div>
@@ -5157,8 +5166,8 @@ window.HavalSplash = (function () {
               <div class="hv-power-head"><strong class="hv-power-title">{{ focusedPowerState }}</strong><span class="hv-power-source {{ focusedPowerSourceClass }}" role="status">{{ focusedPowerSource }}</span></div>
               <div class="hv-power-stage" role="img" aria-label="{{ focusedPowerAriaLabel }}">
                 <div class="hv-power-canvas">
-                  <img class="hv-power-chassis" src="{{ focusedPowerChassis }}" alt="">
-                  <svg class="hv-power-overlay" viewBox="0 0 600 1000" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><title>Powertrain graphic</title></svg>
+                  <div class="hv-power-art"><img class="hv-power-chassis" src="{{ focusedPowerChassis }}" style="{{ focusedPowerArtStyle }}" alt=""></div>
+                  <svg class="hv-power-overlay" viewBox="0 0 350 770" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><title>Powertrain graphic</title></svg>
                   <span class="hv-power-variant-label">{{ focusedPowerVariantLabel }}</span>
                 </div>
               </div>
@@ -5903,25 +5912,23 @@ const CAR_POWER_ASSETS = {
   rearOnRegen: 'assets/power/motor_on.webp',
 };
 const CAR_POWER_IDLE = { tone: 'idle', label: 'Parado', ice: false, batt: false, wheel: false, front: 0, rear: 0 };
-// Production projection exported by scripts/build-power-graphics.mjs. Keep the
-// coordinates in lockstep with assets/power/graphics/manifest.json. Dynamic
-// battery/flow layers are generated in the WebView; only the neutral steel
-// chassis is rasterized.
+// Approved illustration atlas: each viewport is 350 x 770 source pixels.
+// Only the indicator panel is replaced by live SVG. Coordinates are measured
+// against that crop, not the retired procedural GLB projection.
 const CAR_POWER_GRAPHICS = {
-  phev19: { label: 'PHEV19', asset: 'assets/power/graphics/phev19-chassis.png', awd: false,
-    battery: [160.8,382.4,278.4,264,5], front: [[300,382.4],[300,272.9],[232.8,272.9],[232.8,163.4]],
-    fl: [[232.8,163.4],[107.28,171.44]], fr: [[232.8,163.4],[492.72,171.44]],
-    engine: [239.04,51.68,188.9,180], frontMotor: [177.6,107.6,110.4,111.6] },
-  phev34: { label: 'PHEV34 / GT', asset: 'assets/power/graphics/phev34-chassis.png', awd: true,
-    battery: [148.8,312.8,302.4,364.8,6], front: [[300,312.8],[300,238.1],[232.8,238.1],[232.8,163.4]],
-    fl: [[232.8,163.4],[107.28,171.44]], fr: [[232.8,163.4],[492.72,171.44]],
-    rear: [[300,677.6],[300,759.2],[309.96,759.2],[309.96,840.8]],
-    rl: [[309.96,840.8],[106.56,828.56]], rr: [[309.96,840.8],[493.44,828.56]],
-    engine: [239.04,51.68,188.9,180], frontMotor: [177.6,107.6,110.4,111.6], rearMotor: [234,797.6,151.92,86.4] },
-  hev2: { label: 'HEV2', asset: 'assets/power/graphics/hev2-chassis.png', awd: false,
-    battery: [206.4,658.4,187.2,96,3], front: [[300,658.4],[300,410.9],[232.8,410.9],[232.8,163.4]],
-    fl: [[232.8,163.4],[107.28,171.44]], fr: [[232.8,163.4],[492.72,171.44]],
-    engine: [239.04,51.68,188.9,180], frontMotor: [177.6,107.6,110.4,111.6] },
+  phev19: { label:'PHEV19', crop:[20,158,350,770], awd:false,
+    panel:[121,375,115,130], display:[126,409,105,45],
+    front:[[178,340],[178,252],[178,173]], fl:[[178,173],[58,144]], fr:[[178,173],[290,144]],
+    engine:[135,61,80,70], frontMotor:[139,135,78,60] },
+  phev34: { label:'PHEV34 / GT', crop:[398,158,350,770], awd:true,
+    panel:[118,371,115,134], display:[123,409,105,49],
+    front:[[177,248],[177,221],[177,173]], fl:[[177,173],[57,144]], fr:[[177,173],[289,144]],
+    rear:[[177,567],[177,594],[177,640]], rl:[[177,640],[57,654]], rr:[[177,640],[289,654]],
+    engine:[137,61,80,70], frontMotor:[138,135,78,60], rearMotor:[140,606,77,60] },
+  hev2: { label:'HEV2', crop:[774,158,350,770], awd:false,
+    panel:[127,538,91,90], display:[132,567,81,22],
+    front:[[172,534],[111,514],[111,246],[177,216],[177,173]], fl:[[177,173],[55,144]], fr:[[177,173],[288,144]],
+    engine:[137,61,80,70], frontMotor:[137,135,78,60] },
 };
 const CAR_POWER_STATE_LABEL = {
   idle: 'Parado',
@@ -7727,8 +7734,8 @@ class Component extends DCLogic {
     const socAt = Number((this._carSignalAt || {})[CAR_SIGNALS.batterySoc]) || 0;
     const socFresh = socAt && Date.now() - socAt <= 120000 && isFinite(socRaw)
       && socRaw >= 0 && socRaw <= 100;
-    const socPct = demo ? 64 : (socFresh ? Math.round(socRaw) : 0);
-    const socNum = socFresh || demo ? String(socPct) : '—';
+    const socPct = demo ? 64 : (socFresh ? socRaw : 0);
+    const socNum = socFresh || demo ? String(Math.round(socPct)) : '—';
     const battTone = (visibleFlow.tone === 'regen' || visibleFlow.tone === 'charge')
       ? (visibleFlow.tone === 'charge' ? 'charge' : 'regen')
       : (visibleFlow.batt ? 'ev' : '');
@@ -7784,11 +7791,11 @@ class Component extends DCLogic {
 
   _powerGraphicsVariant() {
     const trim = String((this.state && this.state.modelTrim) || '').toLowerCase();
-    if (trim === 'phev34' || trim === 'gt') return Object.assign({ key: 'phev34' }, CAR_POWER_GRAPHICS.phev34);
-    if (trim === 'hev' || trim === 'hev2') return Object.assign({ key: 'hev2' }, CAR_POWER_GRAPHICS.hev2);
-    if (trim === 'phev19') return Object.assign({ key: 'phev19' }, CAR_POWER_GRAPHICS.phev19);
-    // An invalid/missing trim must not imply a rear motor.
-    return Object.assign({}, CAR_POWER_GRAPHICS.phev19, { key: 'phev19', label: 'FWD schematic' });
+    const key = trim === 'phev34' || trim === 'gt' ? 'phev34' : trim === 'hev' || trim === 'hev2' ? 'hev2' : 'phev19';
+    const g = Object.assign({key,asset:'assets/power/graphics/approved-chassis-atlas.png'}, CAR_POWER_GRAPHICS[key]);
+    if (!['phev34','gt','hev','hev2','phev19'].includes(trim)) g.label='FWD schematic';
+    g.artStyle = 'width:'+(1145/350*100)+'%;height:'+(1374/770*100)+'%;left:'+(-g.crop[0]/350*100)+'%;top:'+(-g.crop[1]/770*100)+'%';
+    return g;
   }
 
   _powerSvgPath(points, direction) {
@@ -7796,33 +7803,44 @@ class Component extends DCLogic {
     return ordered.map((p, i) => (i ? 'L ' : 'M ') + p[0] + ' ' + p[1]).join(' ');
   }
 
+  _powerBatteryVisual(model) {
+    const levels = Array.from({ length: 10 }, (_, i) => model.socKnown
+      ? Math.max(0, Math.min(1, model.socPct / 10 - i)) : 0);
+    const last = levels.reduce((last, level, i) => level > 0 ? i : last, -1);
+    const incoming = model.frontDir < 0 || model.rearDir < 0;
+    const outgoing = model.frontDir > 0 || model.rearDir > 0;
+    const validFlow = !!model.driveToken;
+    const charging = validFlow && ((model.tone === 'charge' && model.graphic.key !== 'hev2') || incoming && !outgoing);
+    const discharging = validFlow && outgoing && !incoming && ['ev', 'hybrid'].includes(model.tone);
+    const mode = !model.socKnown ? 'unknown' : charging ? 'charging' : discharging ? 'discharging' : 'standby';
+    return { levels, last, mode, pulse: model.socKnown && last >= 0
+      && (mode === 'discharging' || mode === 'charging' && model.socPct < 100) };
+  }
+
   _powerGraphicMarkup(model, size, prefix) {
     const g = model.graphic;
-    const b = g.battery, bx = b[0]+b[2]*.14, by = b[1]+b[3]*.12, bw = b[2]*.72, bh = b[3]*.76, count = b[4];
-    const compact = size !== 'popup';
-    const transverse = g.key === 'hev2';
-    const pad = 12, gap = 10, labelH = 0;
-    const cellH = transverse ? bh-pad*2 : (bh-pad*2-(count-1)*gap)/count;
-    const levelTotal = model.socKnown ? model.socPct / 100 * count : 0;
+    const b = g.display, bx = b[0], by = b[1], bw = b[2], bh = b[3], count = 10;
+    const battery = this._powerBatteryVisual(model);
+    const gap = 2.5, cellW = (bw-gap*9)/10;
     const rect = (x, y, w, h, cls, extra) => '<rect x="' + x + '" y="' + y + '" width="' + Math.max(0, w) + '" height="' + Math.max(0, h) + '" rx="4" class="' + cls + '"' + (extra || '') + '></rect>';
     let out = '<defs><filter id="' + prefix + '-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="8"></feGaussianBlur></filter>';
+    out += '<linearGradient id="'+prefix+'-steel" x2="1" y2="1"><stop stop-color="#737b80"/><stop offset=".45" stop-color="#586167"/><stop offset="1" stop-color="#737b80"/></linearGradient>';
     out += '<marker id="' + prefix + '-arrow-drive" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1 1 L 11 6 L 1 11 Z" fill="#22c9ff"></path></marker>';
     out += '<marker id="' + prefix + '-arrow-regen" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1 1 L 11 6 L 1 11 Z" fill="#53ed91"></path></marker></defs>';
-    out += '<g data-layer="battery-outline">' + rect(bx, by, bw, bh, 'hv-power-battery-outline') + '</g><g data-layer="battery-cells">';
+    out += rect(g.panel[0],g.panel[1],g.panel[2],g.panel[3],'hv-power-indicator-panel',' fill="url(#'+prefix+'-steel)" stroke="#9aa1a5" stroke-width="1"');
+    out += '<g data-layer="battery-cells" data-battery-mode="' + battery.mode + '">';
     for (let i = 0; i < count; i++) {
-      const w = transverse ? (bw-pad*2-gap*(count-1))/count : bw-pad*2;
-      const x = bx+pad+(transverse ? i*(w+gap) : 0), y = by+pad+(transverse ? 0 : i*(cellH+gap));
-      const level = Math.max(0, Math.min(1, levelTotal - i));
-      out += '<g data-module="' + i + '">' + rect(x, y, w, cellH, 'hv-power-cell-empty');
-      out += rect(x, y, w * level, cellH, 'hv-power-cell-fill', ' data-level="' + level.toFixed(3) + '"');
-      if (!transverse) out += '<path d="M ' + (x+w/2) + ' ' + y + ' v ' + cellH + '" class="hv-power-cell-divider"></path>';
+      const x = bx+i*(cellW+gap), level = battery.levels[i];
+      const pulse = battery.pulse && level > 0 && (battery.mode === 'discharging' || i === battery.last);
+      // Every face stays full size: its brightness alone represents the fraction.
+      // Discharge phases run from the last occupied segment back toward the first.
+      const delay = battery.mode === 'discharging' ? (battery.last-i)*.14 : 0;
+      out += '<g data-module="' + i + '">' + rect(x, by, cellW, bh, 'hv-power-cell-empty');
+      out += rect(x+1, by+1.5, cellW-2, bh-3, 'hv-power-cell-fill ' + battery.mode + (pulse ? ' hv-power-cell-pulse' : ''),
+        ' data-level="' + level.toFixed(3) + '" style="--cell-level:' + level + ';--cell-delay:' + delay + 's"');
       out += '</g>';
     }
     out += '</g>';
-    const receiving = model.tone === 'charge' && g.key !== 'hev2' || (model.frontDir < 0 || model.rearDir < 0) && !(model.frontDir > 0 || model.rearDir > 0);
-    const supplying = (model.frontDir > 0 || model.rearDir > 0) && !(model.frontDir < 0 || model.rearDir < 0) && model.tone !== 'charge';
-    out += rect(bx,by,bw,bh,'hv-power-pack-edge'+(receiving?' receiving':supplying?' supplying':''));
-    out += '<path class="hv-power-pack-terminal" d="M 300 '+b[1]+' V '+by+(g.awd?' M 300 '+(by+bh)+' V '+(b[1]+b[3]):'')+'"></path>';
     const highlight = (box, tone, active, name) => {
       if (!box) return '';
       return rect(box[0], box[1], box[2], box[3], 'hv-power-highlight ' + tone + (active ? ' active' : ''), ' data-highlight="' + name + '"');
@@ -7831,7 +7849,7 @@ class Component extends DCLogic {
     out += highlight(g.engine, 'engine', !!model.iceClass, 'engine');
     out += highlight(g.frontMotor, model.frontDir < 0 ? 'regen' : 'drive', !!model.frontDir, 'front');
     if (g.awd) out += highlight(g.rearMotor, model.rearDir < 0 ? 'regen' : 'drive', !!model.rearDir, 'rear');
-    out += '</g>' + rect(bx, by, bw, bh, 'hv-power-charging' + (model.tone === 'charge' && g.key !== 'hev2' ? ' active' : ''), ' data-layer="charging-highlight"');
+    out += '</g>';
     const route = (name, points, direction) => {
       if (!direction || !points) return '';
       const tone = direction < 0 ? 'regen' : 'drive', d = this._powerSvgPath(points, direction), marker = 'url(#' + prefix + '-arrow-' + tone + ')';
@@ -7840,10 +7858,9 @@ class Component extends DCLogic {
     out += '<g data-layer="flows">' + route('front', g.front, model.frontDir) + route('front-left', g.fl, model.frontDir) + route('front-right', g.fr, model.frontDir);
     if (g.awd) out += route('rear', g.rear, model.rearDir) + route('rear-left', g.rl, model.rearDir) + route('rear-right', g.rr, model.rearDir);
     out += '</g>';
-    if (!compact) {
-      const ly = by + bh + 24;
-      out += '<g data-layer="soc-label">' + rect(bx + bw / 2 - 43, ly - 18, 86, 32, 'hv-power-soc-plate') + '<text x="' + (bx + bw / 2) + '" y="' + ly + '" class="hv-power-soc-label">' + model.socNum + (model.socKnown ? '%' : '') + '</text></g>';
-    }
+    const cx = bx+bw/2, small = g.key === 'hev2';
+    out += '<g data-layer="soc-label"><text x="' + cx + '" y="' + (by-16) + '" class="hv-power-soc-label" style="font-size:'+(small?19:23)+'px">' + model.socNum + (model.socKnown ? '%' : '') + '</text>';
+    out += '<text x="'+cx+'" y="'+(by+bh+12)+'" class="hv-power-battery-caption">HIGH VOLTAGE</text><text x="'+cx+'" y="'+(by+bh+24)+'" class="hv-power-battery-caption">BATTERY</text></g>';
     return out;
   }
 
@@ -7853,18 +7870,21 @@ class Component extends DCLogic {
     const image = el.querySelector('.hv-power-chassis');
     if (!canvas || !svg || !image) return;
     const key = [model.graphic.key, model.socKnown ? model.socPct : 'x', model.frontDir,
-      model.rearDir, model.iceClass ? 1 : 0, model.tone, size].join('|');
+      model.rearDir, model.iceClass ? 1 : 0, model.tone, model.driveToken, size].join('|');
     if (canvas.getAttribute('data-graphic-key') !== key) {
       canvas.setAttribute('data-graphic-key', key);
       canvas.setAttribute('data-power-variant', model.graphic.key);
       image.src = model.graphic.asset;
+      image.style.cssText = model.graphic.artStyle;
       image.alt = '';
-      svg.innerHTML = this._powerGraphicMarkup(model, size, 'power-' + index);
+      if (!canvas._powerSvgId) canvas._powerSvgId = 'power-' + (this._powerSvgSerial = (this._powerSvgSerial || 0) + 1);
+      svg.setAttribute('viewBox', '0 0 350 770');
+      svg.innerHTML = this._powerGraphicMarkup(model, size, canvas._powerSvgId);
       const label = canvas.querySelector('.hv-power-variant-label');
       if (label) label.textContent = model.graphic.label;
     }
     canvas.classList.toggle('soc-stale', !model.socKnown);
-    const active = !!(model.frontDir || model.rearDir);
+    const active = !!(model.frontDir || model.rearDir || this._powerBatteryVisual(model).pulse);
     canvas.setAttribute('data-flow-active', active ? '1' : '0');
     if (!canvas._powerObserved && typeof IntersectionObserver === 'function') {
       if (!this._powerIntersectionObserver) {
@@ -7904,6 +7924,7 @@ class Component extends DCLogic {
       powerVariantKey: model.graphic.key,
       powerVariantLabel: model.graphic.label,
       powerChassis: model.graphic.asset,
+      powerArtStyle: model.graphic.artStyle,
       powerTone: model.tone,
       socPct: model.socPct,
       socNum: model.socNum,
@@ -30799,6 +30820,7 @@ class Component extends DCLogic {
         metricB: 'SOC ' + power.powerSocNum + '%',
         progress: power.socPct,
         socKnown: power.socNum !== '—',
+        powerSoc: power.socPct,
         powerVariant: power.powerVariantKey,
         state: power.powerTone,
         glyphText: power.powerDriveToken,
