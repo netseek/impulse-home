@@ -52,6 +52,17 @@ html,body{height:auto;overflow:auto;background:${theme==='light'?'#e7ecf0':'#101
 </style></head><body><main id="hv-root" class="${theme==='light'?'hv-widgets-light':'hv-widgets-dark'}"><div class="review-grid">${focus?`<div class="review-card review-popup"><p class="review-label">ENERGY FLOW · EXPANDED VIEW</p>${fill(popup,fixture('3x2'))}</div>`:sizes.map(([w,h])=>`<article class="review-item"><p class="review-label">${w} × ${h}</p><div class="review-card" style="width:${w*240+(w-1)*8}px;height:${h*180+(h-1)*8}px">${fill(widget,fixture(w+'x'+h))}</div></article>`).join('')}</div></main><script>document.querySelectorAll('sc-if').forEach(e=>{if(e.getAttribute('value')==='false')e.remove();else e.replaceWith(...e.childNodes)});</script></body></html>`;
 const server = http.createServer((req,res)=>{
   const url = new URL(req.url,'http://localhost');
+  if(url.pathname==='/battery-review'){
+    let cards='';
+    for(const trim of ['phev19','phev34','hev2'])for(const [label,flow,soc] of [['Standby','v1|idle|0|0|0','64'],['Supplying','v1|ev|0|1|0','64'],['Recovering','v1|regen|0|-1|0','64'],['Full','v1|idle|0|0|0','100'],['Empty','v1|idle|0|0|0','0'],['Unavailable',null,null],['Charging','v1|charge|0|0|0','64']]){
+      if(trim==='hev2'&&label==='Charging')continue;
+      app.state.modelTrim=trim;app._powerLive.flow=flow;app._powerLive.soc=soc;
+      const model=app._powerModel(Date.now());
+      cards+=`<article><h3>${trim.toUpperCase()} · ${label}</h3><div class="hv-power-canvas" style="height:350px"><img class="hv-power-chassis" src="${model.graphic.asset}"><svg class="hv-power-overlay" viewBox="0 0 600 1000">${app._powerGraphicMarkup(model,'popup','matrix-'+trim+'-'+label)}</svg></div></article>`;
+    }
+    app.state.modelTrim='phev34';app._powerLive.flow='v1|hybrid|1|1|0';app._powerLive.soc='64';
+    res.setHeader('Content-Type','text/html; charset=utf-8');res.end(`<html><head><meta charset="utf-8"><base href="/"><style>${styles}html,body{height:auto;overflow:auto;background:#18232b;color:#d9e5ec;font:12px Arial}main{display:grid;grid-template-columns:repeat(7,210px);gap:12px;padding:16px}article{background:#202e38;border-radius:12px;padding:12px}h3{font:12px Arial}</style></head><body><main>${cards}</main></body></html>`);return;
+  }
   if(url.pathname==='/review'){res.setHeader('Content-Type','text/html');res.end(gallery(url.searchParams.get('theme')||'dark',url.searchParams.has('popup')));return;}
   const file=path.resolve(root,'.'+decodeURIComponent(url.pathname));
   if(!file.startsWith(root+path.sep)){res.writeHead(403).end();return;}
@@ -63,6 +74,10 @@ try{
   browser=await chromium.launch({channel:'chrome',headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const page=await browser.newPage({viewport:{width:1540,height:1100}});
   const base=`http://127.0.0.1:${server.address().port}`;
+  await page.goto(base+'/battery-review');
+  await page.locator('.hv-power-chassis').last().waitFor();
+  await page.waitForFunction(()=>Array.from(document.images).every(i=>i.complete));
+  await page.screenshot({path:path.join(root,'docs/power-battery-states.png'),fullPage:true});
   for(const theme of ['dark','light']){
     for(const popup of [false,true]){
       await page.goto(`${base}/review?theme=${theme}${popup?'&popup':''}`);

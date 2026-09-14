@@ -1381,6 +1381,15 @@ public final class MainActivity extends Activity {
             }
             drawPowerBatteryCells(c, bx, by, bw, bh, modules, descriptor.socKnown,
                     descriptor.progress, muted);
+            boolean receiving = ("charge".equals(state) && !"hev2".equals(variant))
+                    || ((front < 0 || rear < 0) && front <= 0 && rear <= 0);
+            boolean supplying = (front > 0 || rear > 0) && front >= 0 && rear >= 0
+                    && !"charge".equals(state);
+            stroke(receiving ? 0xFF53ED91 : supplying ? 0xFF22C9FF : 0xAA8B9BA6, 4f);
+            c.drawRoundRect(bx+bw*.14f,by+bh*.12f,bx+bw*.86f,by+bh*.88f,4f,4f,paint);
+            stroke(0xFF87959F,4f);
+            c.drawLine(300f,by,300f,by+bh*.12f,paint);
+            if(awd)c.drawLine(300f,by+bh*.88f,300f,by+bh,paint);
 
             if (ice == 1) {
                 fill(withAlpha(0xFFFFB65C, 0x38));
@@ -1401,19 +1410,23 @@ public final class MainActivity extends Activity {
 
         private void drawPowerBatteryCells(android.graphics.Canvas c, float x, float y,
                 float w, float h, int count, boolean socKnown, int socPercent, int muted) {
-            fill(0xFF858E96);
+            boolean transverse = count == 3;
+            x+=w*.14f;y+=h*.12f;w*=.72f;h*=.76f;
+            fill(0x4852616C);
             c.drawRoundRect(x,y,x+w,y+h,12f,12f,paint);
-            stroke(0xFFB4BDC5,3f);
+            stroke(0xFF87959F,3f);
             c.drawRoundRect(x,y,x+w,y+h,12f,12f,paint);
-            float pad=10f,gap=5f,cellH=(h-pad*2f-gap*(count-1))/count;
+            float pad=12f,gap=10f,cellH=transverse?h-pad*2f:(h-pad*2f-gap*(count-1))/count;
             float total=socKnown ? Math.max(0,Math.min(100,socPercent))/100f*count : 0f;
             for(int i=0;i<count;i++){
-                float cy=y+pad+i*(cellH+gap),cw=w-pad*2f;
-                fill(0xFF35404A);c.drawRoundRect(x+pad,cy,x+pad+cw,cy+cellH,4f,4f,paint);
+                float cw=transverse?(w-pad*2f-gap*(count-1))/count:w-pad*2f;
+                float cx=x+pad+(transverse?i*(cw+gap):0),cy=y+pad+(transverse?0:i*(cellH+gap));
+                fill(0xA6283640);c.drawRoundRect(cx,cy,cx+cw,cy+cellH,4f,4f,paint);
+                stroke(0xFF75838C,1.5f);c.drawRoundRect(cx,cy,cx+cw,cy+cellH,4f,4f,paint);
                 float level=Math.max(0f,Math.min(1f,total-i));
-                if(level>0f){fill(withAlpha(0xFF39CE91,0xBD));c.drawRoundRect(x+pad,cy,x+pad+cw*level,cy+cellH,4f,4f,paint);}
+                if(level>0f){fill(0x946EBDA6);c.drawRoundRect(cx,cy,cx+cw*level,cy+cellH,4f,4f,paint);}
                 stroke(withAlpha(0xFF1B2931,0xB0),2f);
-                for(int j=1;j<4;j++)c.drawLine(x+pad+cw*j/4f,cy,x+pad+cw*j/4f,cy+cellH,paint);
+                if(!transverse)c.drawLine(cx+cw/2f,cy,cx+cw/2f,cy+cellH,paint);
             }
         }
 

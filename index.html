@@ -1832,9 +1832,13 @@ window.HavalSplash = (function () {
     .hv-power-chassis { z-index:0; filter:brightness(.72) saturate(.72) drop-shadow(0 12px 12px rgba(0,0,0,.3)); }
     .hv-power-overlay { z-index:1; overflow:visible; }
     .hv-power-canvas.is-unavailable .hv-power-chassis { display:none; }
-    .hv-power-battery-outline { fill:#858e96; stroke:#b4bdc5; stroke-width:3; }
-    .hv-power-cell-empty { fill:#35404a; }
-    .hv-power-cell-fill { fill:#39ce91; fill-opacity:.74; transform-box:fill-box; transform-origin:left center; transition:transform .2s ease-out; }
+    .hv-power-battery-outline { fill:#52616c; fill-opacity:.28; stroke:#87959f; stroke-width:3; }
+    .hv-power-cell-empty { fill:#283640; fill-opacity:.65; stroke:#75838c; stroke-width:1.5; }
+    .hv-power-cell-fill { fill:#6ebda6; fill-opacity:.58; }
+    .hv-power-pack-edge { fill:none; stroke:#8b9ba6; stroke-width:4; opacity:.65; }
+    .hv-power-pack-edge.receiving { stroke:#53ed91; opacity:.95; }
+    .hv-power-pack-edge.supplying { stroke:#22c9ff; opacity:.95; }
+    .hv-power-pack-terminal { fill:none; stroke:#87959f; stroke-width:4; }
     .hv-power-canvas.soc-stale .hv-power-cell-fill { transition:none; }
     .hv-power-cell-divider { stroke:#1b2931; stroke-width:2; }
     .hv-power-highlight { opacity:0; transition:opacity .15s linear; }
@@ -7794,10 +7798,11 @@ class Component extends DCLogic {
 
   _powerGraphicMarkup(model, size, prefix) {
     const g = model.graphic;
-    const b = g.battery, bx = b[0], by = b[1], bw = b[2], bh = b[3], count = b[4];
+    const b = g.battery, bx = b[0]+b[2]*.14, by = b[1]+b[3]*.12, bw = b[2]*.72, bh = b[3]*.76, count = b[4];
     const compact = size !== 'popup';
-    const pad = 10, gap = 5, labelH = compact ? 0 : (bh < 140 ? 28 : 42);
-    const cellH = Math.max(10, (bh - pad * 2 - labelH - (count - 1) * gap) / count);
+    const transverse = g.key === 'hev2';
+    const pad = 12, gap = 10, labelH = 0;
+    const cellH = transverse ? bh-pad*2 : (bh-pad*2-(count-1)*gap)/count;
     const levelTotal = model.socKnown ? model.socPct / 100 * count : 0;
     const rect = (x, y, w, h, cls, extra) => '<rect x="' + x + '" y="' + y + '" width="' + Math.max(0, w) + '" height="' + Math.max(0, h) + '" rx="4" class="' + cls + '"' + (extra || '') + '></rect>';
     let out = '<defs><filter id="' + prefix + '-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="8"></feGaussianBlur></filter>';
@@ -7805,14 +7810,19 @@ class Component extends DCLogic {
     out += '<marker id="' + prefix + '-arrow-regen" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" orient="auto"><path d="M 1 1 L 11 6 L 1 11 Z" fill="#53ed91"></path></marker></defs>';
     out += '<g data-layer="battery-outline">' + rect(bx, by, bw, bh, 'hv-power-battery-outline') + '</g><g data-layer="battery-cells">';
     for (let i = 0; i < count; i++) {
-      const x = bx + pad, y = by + pad + i * (cellH + gap), w = bw - pad * 2;
+      const w = transverse ? (bw-pad*2-gap*(count-1))/count : bw-pad*2;
+      const x = bx+pad+(transverse ? i*(w+gap) : 0), y = by+pad+(transverse ? 0 : i*(cellH+gap));
       const level = Math.max(0, Math.min(1, levelTotal - i));
       out += '<g data-module="' + i + '">' + rect(x, y, w, cellH, 'hv-power-cell-empty');
       out += rect(x, y, w * level, cellH, 'hv-power-cell-fill', ' data-level="' + level.toFixed(3) + '"');
-      for (let j = 1; j < 4; j++) out += '<path d="M ' + (x + w * j / 4) + ' ' + y + ' v ' + cellH + '" class="hv-power-cell-divider"></path>';
+      if (!transverse) out += '<path d="M ' + (x+w/2) + ' ' + y + ' v ' + cellH + '" class="hv-power-cell-divider"></path>';
       out += '</g>';
     }
     out += '</g>';
+    const receiving = model.tone === 'charge' && g.key !== 'hev2' || (model.frontDir < 0 || model.rearDir < 0) && !(model.frontDir > 0 || model.rearDir > 0);
+    const supplying = (model.frontDir > 0 || model.rearDir > 0) && !(model.frontDir < 0 || model.rearDir < 0) && model.tone !== 'charge';
+    out += rect(bx,by,bw,bh,'hv-power-pack-edge'+(receiving?' receiving':supplying?' supplying':''));
+    out += '<path class="hv-power-pack-terminal" d="M 300 '+b[1]+' V '+by+(g.awd?' M 300 '+(by+bh)+' V '+(b[1]+b[3]):'')+'"></path>';
     const highlight = (box, tone, active, name) => {
       if (!box) return '';
       return rect(box[0], box[1], box[2], box[3], 'hv-power-highlight ' + tone + (active ? ' active' : ''), ' data-highlight="' + name + '"');
@@ -7831,7 +7841,7 @@ class Component extends DCLogic {
     if (g.awd) out += route('rear', g.rear, model.rearDir) + route('rear-left', g.rl, model.rearDir) + route('rear-right', g.rr, model.rearDir);
     out += '</g>';
     if (!compact) {
-      const ly = by + bh - labelH / 2 - 3;
+      const ly = by + bh + 24;
       out += '<g data-layer="soc-label">' + rect(bx + bw / 2 - 43, ly - 18, 86, 32, 'hv-power-soc-plate') + '<text x="' + (bx + bw / 2) + '" y="' + ly + '" class="hv-power-soc-label">' + model.socNum + (model.socKnown ? '%' : '') + '</text></g>';
     }
     return out;
