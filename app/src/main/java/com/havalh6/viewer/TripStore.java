@@ -446,6 +446,37 @@ final class TripStore extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Refuels and charges since {@code fromMs}: how many, and the level points they
+     * added (fuel %, SOC %). The page turns points into litres or kWh with the
+     * version's tank or battery, so a stored figure never carries a guessed size.
+     */
+    String stopTotalsJson(long fromMs) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("refuels", 0);
+            o.put("refuelPct", 0);
+            o.put("charges", 0);
+            o.put("chargePct", 0);
+            try (Cursor c = getReadableDatabase().rawQuery(
+                    "SELECT kind, COUNT(*), SUM(level_after - level_before) FROM trip_stops WHERE t >= ? GROUP BY kind",
+                    new String[]{String.valueOf(fromMs)})) {
+                while (c.moveToNext()) {
+                    if (TripStop.REFUEL.equals(c.getString(0))) {
+                        o.put("refuels", c.getLong(1));
+                        o.put("refuelPct", c.getDouble(2));
+                    } else if (TripStop.CHARGE.equals(c.getString(0))) {
+                        o.put("charges", c.getLong(1));
+                        o.put("chargePct", c.getDouble(2));
+                    }
+                }
+            }
+            return o.toString();
+        } catch (JSONException e) {
+            return "{}";
+        }
+    }
+
     private static double round(double v, int decimals) {
         double k = Math.pow(10, decimals);
         return Math.round(v * k) / k;
@@ -576,6 +607,10 @@ final class TripStore extends SQLiteOpenHelper {
             o.put("kwhPer100Km", num(s.kwhPer100Km()));
             o.put("evShare", num(s.evShare()));
             o.put("avgKmh", num(s.avgMovingKmh()));
+            o.put("fuelPctStart", num(s.fuelPctStart));
+            o.put("fuelPctEnd", num(s.fuelPctEnd));
+            o.put("socStart", num(s.socStart));
+            o.put("socEnd", num(s.socEnd));
             return o.toString();
         } catch (JSONException e) {
             return "";

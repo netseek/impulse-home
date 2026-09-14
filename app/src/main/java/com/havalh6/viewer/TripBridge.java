@@ -80,4 +80,14 @@ final class TripBridge {
     public void finishTrip() {
         recorder.finishTrip();
     }
+
+    /** Refuels and charges since {@code fromMs} (as a string: see getTrip): counts and level points added. */
+    @JavascriptInterface
+    public String getStopTotals(String fromMs) {
+        try {
+            return recorder.stopTotalsJson(Long.parseLong(fromMs.trim()));
+        } catch (RuntimeException e) {
+            return "{}";
+        }
+    }
 }

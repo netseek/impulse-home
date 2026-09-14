@@ -41,7 +41,7 @@ const CHECKS = {
   // A per-signal / per-second path must never reach React (197 ms per commit on the car).
   'graph writes do not commit': ({ html }) => noCommit(method(html, '_setGraphValue')),
   'live paint path does not commit': ({ html }) =>
-    ['_energyTick', '_paintEnergyCards', '_energyModel', '_energyReadLive'].every((n) => noCommit(method(html, n))),
+    ['_energyTick', '_paintEnergyCards', '_energyModel', '_energyReadLive', '_paintEnergyChart', '_energySample'].every((n) => noCommit(method(html, n))),
   'no consumptionRev state': ({ html }) => !/consumptionRev\s*:|\.consumptionRev\b/.test(html),
   // Replacing a parent's text would detach React's interpolation span.
   'paint writes inside the interpolation span': ({ html }) =>
@@ -95,7 +95,7 @@ const CHECKS = {
   // pinches and opens the full map on a tap.
   'zoom buttons only on the maximised map': ({ html }) => {
     const body = method(html, '_energyMapCreate') || '';
-    return /if \(maxMode\) \{\s*button\('\+'/.test(body) && /if \(tap && !maxMode\) this\._setEnergyMapMax\(true\);/.test(body);
+    return /if \(maxMode\) \{\s*button\(H6_ENERGY_ICONS\.add,/.test(body) && /if \(tap && !maxMode\) this\._setEnergyMapMax\(true\);/.test(body);
   },
   // FINALIZAR VIAGEM ends a trip for good: the button only opens a confirmation.
   'finishing a trip asks for confirmation': ({ html }) => {

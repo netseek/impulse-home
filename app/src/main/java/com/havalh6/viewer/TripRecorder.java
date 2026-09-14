@@ -206,6 +206,11 @@ final class TripRecorder implements TripEngine.Listener {
         return s == null ? "{}" : s.totalsJson();
     }
 
+    String stopTotalsJson(long fromMs) {
+        TripStore s = store;
+        return s == null ? "{}" : s.stopTotalsJson(fromMs);
+    }
+
     String tripMapDataUrl(long startMs) {
         TripMapWorker m = maps;
         return m == null ? "" : m.dataUrl(startMs);

@@ -109,17 +109,26 @@ const SCENARIOS = {
     assert.equal(segments([], 'fuel', L100).legend[1].label, '< 5 L/100');
     assert.equal(segments([], 'ev', L100).legend[1].label, '> 10 km/kWh');
   },
-  'range per tank uses the 55 L tank Impulse uses; low levels give no estimate': ({ range }) => {
-    const e = range({ km: 1000, fuelL: 50 }, { fuelRange: '400', fuelLevel: '50', evRange: '3', soc: '5' });
+  "range per tank uses the version's tank; low levels give no estimate": ({ range }) => {
+    const e = range({ km: 1000, fuelL: 50 }, { fuelRange: '400', fuelLevel: '50', evRange: '3', soc: '5' }, { tankL: 55 });
     assert.equal(e.perTankYours, 1100);
+    assert.equal(range({ km: 1000, fuelL: 50 }, {}, { tankL: 60 }).perTankYours, 1200, 'the HEV tank is 60 L');
     assert.equal(e.perTankCar, 800);
     assert.ok(Number.isNaN(e.perChargeCar), 'SOC 5% is too coarse to scale up');
-    assert.ok(Number.isNaN(range({ km: 100, fuelL: 0.5 }, {}).perTankYours), 'half a litre is not an economy');
+    assert.ok(Number.isNaN(range({ km: 100, fuelL: 0.5 }, {}, { tankL: 55 }).perTankYours), 'half a litre is not an economy');
   },
-  'range per charge from the car and from measured capacity': ({ range }) => {
-    const e = range({ km: 500, fuelL: 30, evKm: 200, kwhOut: 30, kwhIn: 10, capacityKwh: 1.5 }, { evRange: '2', soc: '40' });
+  'range per charge: measured capacity first, else nominal; share of the declared range': ({ range }) => {
+    const spec = { tankL: 55, batteryKwh: 34, evRangeKm: 170 };
+    const e = range({ km: 500, fuelL: 30, evKm: 200, kwhOut: 30, kwhIn: 10, capacityKwh: 1.5 }, { evRange: '2', soc: '40' }, spec);
     assert.equal(e.perChargeCar, 5);
-    assert.equal(e.perChargeYours, 15);   // 1.5 kWh / (20 kWh / 200 km)
+    assert.equal(e.perChargeYours, 15);   // measured 1.5 kWh / (20 kWh / 200 km)
+    assert.equal(e.capacityMeasured, true);
+    const n = range({ km: 500, fuelL: 30, evKm: 200, kwhOut: 30, kwhIn: 13 }, {}, spec);
+    assert.equal(n.capacityKwh, 34);
+    assert.equal(Math.round(n.perChargeYours), 400);   // nominal 34 kWh / (17 kWh / 200 km)
+    assert.equal(Math.round(n.declaredShare * 100), 235);
+    const p19 = range({ km: 500, fuelL: 30, evKm: 200, kwhOut: 30, kwhIn: 13 }, {}, { tankL: 55, batteryKwh: 19, evRangeKm: 115 });
+    assert.equal(Math.round(p19.declaredShare * 100), 194, "PHEV19 is measured against its own 115 km");
   },
 };
 
@@ -144,7 +153,9 @@ const MUTANTS = {
   'speed band edge moved': ["return kmh < 30 ? 'b0' : (kmh < 60 ? 'b1'", "return kmh < 30 ? 'b0' : (kmh < 75 ? 'b1'"],
   'segments never merge': ['if (cur && cur.cls === cls) {', 'if (false) {'],
   'regeneration not shown': ["if (kw < 0) return 'b0';", "if (kw < 0) return 'b1';"],
-  'different tank size': ['const TANK_L = 55;', 'const TANK_L = 50;'],
+  'one tank size for every version': ['const tankL = spec && spec.tankL > 0 ? spec.tankL : 55;', 'const tankL = 55;'],
+  'measured capacity ignored': ['const capacity = measured > 0 ? measured :', 'const capacity = false ? measured :'],
+  'declared share against the wrong range': ['declaredShare: declared > 0 ? perChargeYours / declared : NaN,', 'declaredShare: declared > 0 ? perChargeYours / 170 : NaN,'],
   'low battery level scaled up': ['const perChargeCar = soc >= 10 && evRange >= 0', 'const perChargeCar = soc >= 0 && evRange >= 0'],
 };
 
