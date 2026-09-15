@@ -359,6 +359,7 @@ public final class MainActivity extends Activity {
                 try {
                     Intent request = new Intent(ACTION_UPDATE_CAR_DATA);
                     request.setPackage(IMPULSE_PACKAGE);
+                    request.putExtra(ImpulseApi.EXTRA_CALLER, apiCallerToken());
                     request.putExtra("key", key);
                     request.putExtra("value", safeValue);
                     sendBroadcast(request);
