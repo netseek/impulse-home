@@ -2866,6 +2866,8 @@ public final class MainActivity extends Activity {
     private final java.util.Set<String> packageIconMiss =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
     private MotionTrailLayout projectionItem;
+    /** OEM settings; its MAIN activity opens on the phone "Conectar" page. */
+    private static final String PHONE_CONNECT_PACKAGE = "com.beantechs.settings";
     /** Waiting for Impulse to resolve a projection display task id. */
     private ProjectionPresence.Kind pendingProjectionKind;
     private final java.util.Set<String> pendingProjectionPackages = new java.util.HashSet<>();
@@ -12192,7 +12194,14 @@ public final class MainActivity extends Activity {
     private void bindProjectionSlot(ProjectionPresence.Kind kind) {
         if (projectionItem == null) return;
         if (kind == null || kind == ProjectionPresence.Kind.NONE) {
-            projectionItem.setVisibility(View.GONE);
+            // Same as the OEM rail: nothing projected -> offer the connect screen.
+            if (getPackageManager().getLaunchIntentForPackage(PHONE_CONNECT_PACKAGE) == null) {
+                projectionItem.setVisibility(View.GONE);
+                return;
+            }
+            bindDockItem(projectionItem,
+                    new android.graphics.drawable.InsetDrawable(getDrawable(R.drawable.ic_phone_link), 0.06f), "Configurar Navegação",
+                    v -> launchAppFullscreen(PHONE_CONNECT_PACKAGE));
             return;
         }
         Drawable icon = projectionPresence != null ? projectionPresence.iconFor(kind) : null;
