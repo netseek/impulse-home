@@ -6961,6 +6961,13 @@ window.HavalSplash = (function () {
         <button type="button" onClick="{{ setSize21 }}" style="background: {{ size21Bg }}; color: {{ size21Col }};">21"</button>
         <button type="button" onClick="{{ setSize22 }}" style="background: {{ size22Bg }}; color: {{ size22Col }};">22"</button>
       </div>
+
+      <div class="hv-config-section-label">MODEL</div>
+      <div class="hv-size-row">
+        <sc-for list="{{ modelSwitchItems }}" as="mi" hint-placeholder-count="4">
+          <button type="button" onClick="{{ mi.onClick }}" style="background: {{ mi.bg }}; color: {{ mi.col }};">{{ mi.label }}</button>
+        </sc-for>
+      </div>
     </sc-if>
 
     </div>
@@ -7691,6 +7698,18 @@ const CAR_SHADOW_OPACITY = 0.80;
 // Flip via CONFIG → ENV "KEEP DAY LIGHTING", window.__nightLighting({keepDay:false}),
 // or this default — SAVE persists the choice.
 const NIGHT_KEEP_DAY_LIGHTING_DEFAULT = true;
+
+// Built-in metalness/roughness for the named catalog paints (Branco keeps the
+// generic luma default, i.e. no entry here). Keyed by uppercase hex — see
+// _paintFinishKey — and read by _bodyPaintParams before per-tint panel tuning.
+const CATALOG_PAINT_DEFAULTS = {
+  '#121214': { metalness: 1,    roughness: 0    }, // Preto Hematita
+  '#C2C2C2': { metalness: 0.68, roughness: 0.36 }, // Cinza Diamante
+  '#8AABD4': { metalness: 0.63, roughness: 0.38 }, // Cinza Amazonita
+  '#1B365D': { metalness: 1,    roughness: 0.8  }, // Azul Topázio
+  '#4A3C31': { metalness: 1,    roughness: 0.5  }, // Marrom Citrino
+  '#8B0000': { metalness: 0.8,  roughness: 0.8  }, // Vermelho Granada
+};
 
 // The two roof openings do NOT share a scale.
 //   sunshade → vehicle.getShadeScreensLevel(): 0-100 (havalshisuku sets 100 to
@@ -12992,8 +13011,8 @@ class Component extends DCLogic {
     const palette = [
       { key: '#F4F5F7', hex: '#F4F5F7', title: 'Branco Ágata' },
       { key: '#121214', hex: '#121214', title: 'Preto Hematita' },
-      { key: '#757B85', hex: '#757B85', title: 'Cinza Diamante' },
-      { key: '#8A9BB8', hex: '#8A9BB8', title: 'Cinza Amazonita' },
+      { key: '#C2C2C2', hex: '#C2C2C2', title: 'Cinza Diamante' },
+      { key: '#8AABD4', hex: '#8AABD4', title: 'Cinza Amazonita' },
       { key: '#1B365D', hex: '#1B365D', title: 'Azul Topázio' },
       { key: '#4A3C31', hex: '#4A3C31', title: 'Marrom Citrino' },
       { key: '#8B0000', hex: '#8B0000', title: 'Vermelho Granada' },
@@ -13337,6 +13356,17 @@ class Component extends DCLogic {
       modelBtnCol: hvOff.col,
       modelBtnBg: hvOff.bg,
       toggleModelVariant: () => this._cycleTrim(),
+      modelSwitchItems: ['gt', 'phev34', 'phev19', 'hev'].map((key) => {
+        const t = this._trims().find((tr) => tr.key === key);
+        const active = this._currentTrim().key === key;
+        return {
+          key,
+          label: t.label,
+          bg: active ? 'rgba(79,214,232,.18)' : 'transparent',
+          col: active ? '#4fd6e8' : 'rgba(255,255,255,.45)',
+          onClick: () => this._selectTrim(key),
+        };
+      }),
       currentCarPaintHex: activeKey,
       swatches,
       ...(() => {
@@ -18466,7 +18496,14 @@ class Component extends DCLogic {
       if (luma < 0.15) { metalness = 0.85; roughness = 0.3; envMapIntensity = 0.4; }
       else if (luma < 0.30) { metalness = 0.75; roughness = 0.34; envMapIntensity = 0.45; }
     }
-    // Per-tint tuning from the paint panel wins over the luma defaults above.
+    // Catalog-swatch defaults, tuned by eye per named paint — win over the
+    // generic luma buckets above, still overridden by per-tint panel tuning below.
+    const catalogDefault = CATALOG_PAINT_DEFAULTS[this._paintFinishKey(hex)];
+    if (catalogDefault) {
+      metalness = catalogDefault.metalness;
+      roughness = catalogDefault.roughness;
+    }
+    // Per-tint tuning from the paint panel wins over the defaults above.
     const fin = this._paintFinishMap()[this._paintFinishKey(hex)];
     if (fin) {
       if (Number.isFinite(fin.metalness)) metalness = fin.metalness;
@@ -27215,7 +27252,14 @@ class Component extends DCLogic {
   _cycleTrim() {
     const list = this._trims();
     const i = list.findIndex((t) => t.key === this._currentTrim().key);
-    const next = list[(i + 1) % list.length];
+    this._selectTrim(list[(i + 1) % list.length].key);
+  }
+
+  /** Jump directly to a given trim key, swapping the body only when it differs. */
+  _selectTrim(key) {
+    const list = this._trims();
+    const next = list.find((t) => t.key === key);
+    if (!next || next.key === this._currentTrim().key) return;
     const bodyChanged = next.body !== this._currentTrim().body;
     this.setState({ modelTrim: next.key });
     const currentKey = this.state.selectedCatalogKey;
@@ -38421,7 +38465,7 @@ class Component extends DCLogic {
       ? String(s.carColor) : '#F4F5F7';
     const paintNames = {
       '#F4F5F7': 'Branco Ágata', '#121214': 'Preto Hematita',
-      '#757B85': 'Cinza Diamante', '#8A9BB8': 'Cinza Amazonita',
+      '#C2C2C2': 'Cinza Diamante', '#8AABD4': 'Cinza Amazonita',
       '#1B365D': 'Azul Topázio', '#4A3C31': 'Marrom Citrino',
       '#8B0000': 'Vermelho Granada',
     };
