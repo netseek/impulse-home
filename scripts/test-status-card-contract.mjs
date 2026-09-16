@@ -183,7 +183,7 @@ assert.match(nativeStatus, /float imageH = h \* [\d.]+f/,
   'status vehicle height must scale with the card');
 assert.match(nativeStatus, /Math\.min\(imageW, w \* \.\d+f\)/,
   'status vehicle width must stay capped by the card');
-assert.match(nativeStatus, /paint\.setTextSize\(Math\.max\([\d.]+f, Math\.min\(w, h\) \* \.\d+f\)\)/,
+assert.match(nativeStatus, /(?:float valueSize = Math\.max|paint\.setTextSize\(Math\.max)\([\d.]+f, Math\.min\(w, h\) \* \.\d+f\)/,
   'status tyre pressures must scale with the card');
 assert.ok(!nativeStatus.includes('drawCircle'),
   'status corner readouts must contain no dots');

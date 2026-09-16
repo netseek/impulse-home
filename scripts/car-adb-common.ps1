@@ -337,7 +337,7 @@ function Start-HavalEmulator([string]$Adb) {
     throw "Haval AVD '$HavalAvdName' not found. Create it in Android Studio (AVD Manager), then retry."
   }
   Write-Host "Starting $HavalAvdName emulator ..."
-  Start-Process -FilePath (Get-EmulatorExe) -ArgumentList @('-avd', $HavalAvdName, '-no-snapshot-load')
+  Start-Process -FilePath (Get-EmulatorExe) -ArgumentList @('-avd', $HavalAvdName, '-no-skin', '-no-snapshot-load')
   $deadline = (Get-Date).AddSeconds(120)
   do {
     Start-Sleep -Seconds 3

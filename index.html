@@ -1489,6 +1489,12 @@ window.HavalSplash = (function () {
       --hv-widget-fg: #1c2430;
       --hv-widget-muted: rgba(28,36,48,.58);
       --hv-widget-menu-bg: rgba(255,255,255,.88);
+      --hv-config-chip-border: rgba(20, 28, 40, 0.16);
+      --hv-config-chip-bg: rgba(20, 28, 40, 0.05);
+      --hv-config-chip-fg: rgba(28, 36, 48, 0.68);
+      --hv-config-chip-on-border: var(--hv-accent, #0a6f7c);
+      --hv-config-chip-on-bg: rgba(20, 28, 40, 0.10);
+      --hv-config-chip-on-fg: var(--hv-accent, #0a6f7c);
       --hv-config-track: rgba(10, 111, 124, 0.22);
       --hv-config-track-fill: rgba(10, 111, 124, 0.45);
       --hv-config-thumb: #0a6f7c;
@@ -1710,7 +1716,8 @@ window.HavalSplash = (function () {
       font-size: 10px;
       letter-spacing: .14em;
       font-weight: 600;
-      color: var(--hv-widget-muted);
+      color: var(--hv-widget-fg);
+      opacity: .72;
     }
     .hv-wallpaper-pop-close {
       background: none;
@@ -1723,6 +1730,11 @@ window.HavalSplash = (function () {
       min-width: 36px;
       min-height: 36px;
       border-radius: 8px;
+      transition: color .15s ease, background-color .15s ease;
+    }
+    .hv-wallpaper-pop-close:hover {
+      color: var(--hv-accent);
+      background: rgba(255,255,255,.08);
     }
     .hv-wallpaper-pop-sub {
       font-family: 'Space Grotesk', system-ui, sans-serif;
@@ -1756,27 +1768,35 @@ window.HavalSplash = (function () {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: var(--hv-config-thumb);
+      background: var(--hv-accent);
+      box-shadow: 0 0 6px var(--hv-accent);
       flex-shrink: 0;
     }
     .hv-wallpaper-pop-today {
-      padding: 8px 12px;
+      padding: 8px 14px;
       min-height: 36px;
       border-radius: 8px;
       border: 1px solid var(--hv-widget-border);
-      background: var(--hv-config-chip-bg);
+      background: var(--hv-control-fill, rgba(255,255,255,.06));
       color: var(--hv-widget-fg);
       cursor: pointer;
       font-family: 'Space Mono', monospace;
       font-size: 10px;
       letter-spacing: .06em;
       font-weight: 600;
+      transition: border-color .15s ease, color .15s ease;
+    }
+    .hv-wallpaper-pop-today:hover,
+    .hv-wallpaper-pop-today:active {
+      border-color: var(--hv-accent);
+      color: var(--hv-accent);
     }
     .hv-wallpaper-pop-strip-label {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
       letter-spacing: .12em;
-      color: var(--hv-widget-muted);
+      color: var(--hv-widget-fg);
+      opacity: .68;
       margin-bottom: 8px;
       flex-shrink: 0;
     }
@@ -1795,27 +1815,48 @@ window.HavalSplash = (function () {
     .hv-wallpaper-pop-strip::-webkit-scrollbar-thumb {
       background: var(--hv-widget-border);
       border-radius: 999px;
+      transition: background-color .15s ease;
+    }
+    .hv-wallpaper-pop-strip::-webkit-scrollbar-thumb:hover {
+      background: var(--hv-accent);
     }
     .hv-wallpaper-src-row {
       display: flex;
       gap: 6px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
       flex-shrink: 0;
     }
     .hv-wallpaper-src-tab {
       flex: 1;
-      min-height: 32px;
+      min-height: 34px;
       padding: 7px 4px;
-      border-radius: 7px;
+      border-radius: 8px;
       border: 1px solid var(--hv-widget-border);
-      background: var(--hv-config-chip-bg);
+      background: var(--hv-control-fill, rgba(255,255,255,.06));
       color: var(--hv-widget-fg);
       cursor: pointer;
       font-family: 'Space Mono', monospace;
-      font-size: 9px;
+      font-size: 10px;
       letter-spacing: .08em;
       font-weight: 600;
       touch-action: manipulation;
+      transition: border-color .15s ease, color .15s ease, background-color .15s ease, opacity .15s ease;
+      opacity: .72;
+    }
+    .hv-wallpaper-src-tab:hover {
+      opacity: 1;
+      border-color: var(--hv-widget-fg);
+    }
+    .hv-wallpaper-src-tab.on {
+      opacity: 1;
+      border-color: var(--hv-accent);
+      color: var(--hv-accent);
+      box-shadow: inset 0 0 0 1px var(--hv-accent);
+      background: rgba(255,255,255,.12);
+      font-weight: 700;
+    }
+    #hv-root.hv-widgets-light .hv-wallpaper-src-tab.on {
+      background: rgba(0,0,0,.06);
     }
     .hv-wallpaper-web-search {
       display: flex;
@@ -1835,21 +1876,31 @@ window.HavalSplash = (function () {
       font-family: 'Space Grotesk', system-ui, sans-serif;
       font-size: 12px;
     }
+    .hv-wallpaper-web-input:focus {
+      border-color: var(--hv-accent);
+      outline: none;
+    }
     .hv-wallpaper-web-go {
       flex: none;
       min-width: 52px;
       min-height: 36px;
       padding: 0 10px;
       border-radius: 8px;
-      border: 1px solid var(--hv-widget-border);
-      background: var(--hv-config-chip-on-bg);
-      color: var(--hv-config-chip-on-fg);
+      border: 1px solid var(--hv-accent);
+      background: var(--hv-control-fill, rgba(255,255,255,.08));
+      color: var(--hv-accent);
+      box-shadow: inset 0 0 0 1px var(--hv-accent);
       cursor: pointer;
       font-family: 'Space Mono', monospace;
       font-size: 10px;
       letter-spacing: .08em;
-      font-weight: 600;
+      font-weight: 700;
       touch-action: manipulation;
+      transition: filter .15s ease, transform .12s ease;
+    }
+    .hv-wallpaper-web-go:active {
+      transform: scale(.96);
+      filter: brightness(1.15);
     }
     .hv-wallpaper-random-toggle {
       display: inline-flex;
@@ -1895,7 +1946,8 @@ window.HavalSplash = (function () {
       transition: border-color .15s ease, transform .12s ease;
     }
     .hv-wallpaper-thumb.on {
-      border-color: var(--hv-config-thumb);
+      border-color: var(--hv-accent);
+      box-shadow: 0 0 0 1px var(--hv-accent), 0 4px 14px rgba(0,0,0,.32);
       transform: scale(1.02);
     }
     .hv-wallpaper-thumb-star {
@@ -1937,7 +1989,8 @@ window.HavalSplash = (function () {
       font-family: 'Space Grotesk', system-ui, sans-serif;
       font-size: 12px;
       line-height: 1.45;
-      color: var(--hv-widget-muted);
+      color: var(--hv-widget-fg);
+      opacity: .75;
       margin: 4px 0 12px;
       flex-shrink: 0;
       min-height: 2.9em;
@@ -1948,19 +2001,26 @@ window.HavalSplash = (function () {
       margin-top: auto;
       padding: 12px 10px;
       border-radius: 10px;
-      border: 1px solid var(--hv-widget-border);
-      background: var(--hv-config-chip-on-bg);
-      color: var(--hv-config-chip-on-fg);
+      border: 1px solid var(--hv-accent);
+      background: var(--hv-control-fill, rgba(255,255,255,.08));
+      color: var(--hv-accent);
+      box-shadow: inset 0 0 0 1px var(--hv-accent);
       cursor: pointer;
       font-family: 'Space Mono', monospace;
       font-size: 11px;
       letter-spacing: .12em;
-      font-weight: 600;
+      font-weight: 700;
       touch-action: manipulation;
+      transition: filter .15s ease, transform .12s ease;
     }
     #hv-root.hv-widgets-light .hv-wallpaper-pop-done {
-      background: var(--hv-config-chip-on-bg);
-      color: var(--hv-config-chip-on-fg);
+      background: rgba(0,0,0,.04);
+      color: var(--hv-accent);
+      border-color: var(--hv-accent);
+    }
+    .hv-wallpaper-pop-done:active {
+      transform: scale(.985);
+      filter: brightness(1.15);
     }
     .hv-layout-config-btn {
       width: 100%;
@@ -4427,6 +4487,10 @@ window.HavalSplash = (function () {
       top: max(46px, calc(var(--hv-safe-top, 22px) + 14px));
       bottom: max(14px, calc(var(--hv-launcher-bottom, 60px) + 10px));
       width: min(900px, calc(100vw - 64px)); max-height: none;
+      background: var(--hv-frost-card-bg, rgba(16,24,34,.94));
+      -webkit-backdrop-filter: blur(24px) saturate(1.2);
+      backdrop-filter: blur(24px) saturate(1.2);
+      box-shadow: 0 16px 40px rgba(0,0,0,.45);
       color: var(--hv-widget-fg, #edf5fa); border: 1px solid var(--hv-frost-edge); border-radius: 22px;
       overflow: hidden; opacity: 0; pointer-events: none; transform: translate(0, 18px) scale(.985); transform-origin: left top; display: flex; flex-direction: column;
       transition: opacity .2s ease, transform .24s cubic-bezier(.2,.75,.2,1);
@@ -4437,7 +4501,8 @@ window.HavalSplash = (function () {
     .hv-studio-close { flex: none; width: 44px; height: 44px; border: 0; border-radius: 14px; background: rgba(255,255,255,.07); color: inherit; font-size: 22px; cursor: pointer; }
     .hv-studio-body { min-height: 0; flex: 1; max-height: none; overflow: auto; padding: 20px 22px 24px; }
     .hv-studio-note { font-size: 12px; opacity: .58; }
-    .hv-studio-actions,.hv-studio-chip-row,.hv-studio-accents { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 20px; }
+    .hv-studio-actions,.hv-studio-chip-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 20px; }
+    .hv-studio-accents { display: grid; grid-template-columns: repeat(6, 44px); gap: 8px; margin: 10px 0 20px; }
     .hv-studio-actions button,.hv-studio-chip-row button,.hv-studio-wide {
       min-height: 44px; padding: 0 17px; border: 1px solid var(--hv-frost-edge); border-radius: 13px;
       background: rgba(255,255,255,.055); color: inherit; font-weight: 600; cursor: pointer;
@@ -4445,8 +4510,138 @@ window.HavalSplash = (function () {
     .hv-studio-actions button.on,.hv-studio-chip-row button.on { border-color: var(--hv-accent); color: var(--hv-accent); background: rgba(255,255,255,.10); }
     .hv-studio-actions button.danger { color: #ff8d82; }
     .hv-studio-actions button:disabled { opacity: .3; cursor: default; }
-    .hv-studio-accents button { width: 44px; height: 44px; border: 4px solid transparent; border-radius: 50%; box-shadow: 0 0 0 1px var(--hv-frost-edge); cursor: pointer; }
+    .hv-studio-accents button {
+      position: relative;
+      width: 44px; height: 44px;
+      min-width: 44px; min-height: 44px;
+      aspect-ratio: 1;
+      flex-shrink: 0;
+      border: 0;
+      outline: 0;
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px var(--hv-frost-edge);
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      -webkit-mask-image: -webkit-radial-gradient(white, black);
+      mask-image: radial-gradient(white, black);
+      transition: transform .12s ease, box-shadow .15s ease;
+    }
+    .hv-studio-accents button:active { transform: scale(.94); }
     .hv-studio-accents button.on { box-shadow: 0 0 0 2px var(--hv-frost-fill-strong), 0 0 0 4px var(--hv-accent); }
+    .hv-studio-accents button.custom-empty {
+      border: 1.5px dashed var(--hv-frost-edge);
+      background: rgba(255,255,255,.04);
+      box-shadow: none;
+    }
+    .hv-studio-accents button.custom-empty:hover { border-color: var(--hv-accent); }
+    .hv-studio-accents button.custom-empty.on {
+      border: 0;
+      box-shadow: 0 0 0 2px var(--hv-frost-fill-strong), 0 0 0 4px var(--hv-accent);
+    }
+    .hv-studio-accent-plus {
+      width: 18px; height: 18px;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      fill: none;
+      opacity: .55;
+      pointer-events: none;
+    }
+    .hv-studio-custom-editor {
+      margin: -6px 0 16px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--hv-frost-edge);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .hv-studio-custom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .hv-studio-custom-tone {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .hv-studio-custom-tone-header {
+      font: 8px/1 'Space Mono', monospace;
+      letter-spacing: .12em;
+      opacity: .6;
+    }
+    .hv-studio-custom-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hv-studio-custom-swatch {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--hv-frost-edge);
+      overflow: hidden;
+      cursor: pointer;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    }
+    .hv-studio-custom-swatch input[type="color"] {
+      position: absolute;
+      inset: -10px;
+      width: 60px;
+      height: 60px;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .hv-studio-custom-hex {
+      width: 100%;
+      height: 32px;
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid var(--hv-frost-edge);
+      border-radius: 8px;
+      color: inherit;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      padding: 0 8px;
+      outline: none;
+    }
+    .hv-studio-custom-hex:focus {
+      border-color: var(--hv-accent);
+      background: rgba(255, 255, 255, .1);
+    }
+    .hv-studio-custom-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .hv-studio-custom-btn {
+      flex: 1;
+      min-height: 30px;
+      padding: 0 8px;
+      border: 1px solid var(--hv-frost-edge);
+      border-radius: 8px;
+      background: rgba(255,255,255,.07);
+      color: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .hv-studio-custom-btn:hover {
+      background: rgba(255,255,255,.14);
+    }
+    .hv-studio-custom-btn.danger {
+      color: #ff866e;
+      border-color: rgba(255,134,110,.3);
+    }
     .hv-studio-wide { width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; margin-top: 6px; }
     .hv-studio-wide span { font-size: 10px; opacity: .5; font-weight: 400; }
     /* Layout manager. One frame; each tab sizes it to what it holds. */
@@ -5985,7 +6180,7 @@ window.HavalSplash = (function () {
     </div>
     <div class="hv-wallpaper-src-row">
       <sc-for list="{{ wallpaperSourceTabs }}" as="wst" hint-placeholder-count="4">
-        <button type="button" class="hv-wallpaper-src-tab {{ wst.onClass }}" onClick="{{ wst.onClick }}" style="border-color: {{ wst.border }}; background: {{ wst.bg }}; color: {{ wst.col }};">{{ wst.label }}</button>
+        <button type="button" class="hv-wallpaper-src-tab {{ wst.onClass }}" onClick="{{ wst.onClick }}">{{ wst.label }}</button>
       </sc-for>
     </div>
     <div class="hv-wallpaper-pop-sub">{{ wallpaperSourceSub }}</div>
@@ -6479,10 +6674,41 @@ window.HavalSplash = (function () {
             </div>
             <div class="hv-studio-label">ACCENT</div>
             <div class="hv-studio-accents">
-              <sc-for list="{{ desktopAccentItems }}" as="da" hint-placeholder-count="8">
-                <button type="button" class="{{ da.cls }}" style="{{ da.style }}" onClick="{{ da.onClick }}" title="{{ da.title }}" aria-label="{{ da.title }} accent"></button>
+              <sc-for list="{{ desktopAccentItems }}" as="da" hint-placeholder-count="12">
+                <button type="button" class="{{ da.cls }}" style="{{ da.style }}" onClick="{{ da.onClick }}" title="{{ da.title }}" aria-label="{{ da.title }} accent">
+                  <sc-if value="{{ da.isCustomEmpty }}" hint-placeholder-val="{{ false }}">
+                    <svg viewBox="0 0 24 24" class="hv-studio-accent-plus" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+                  </sc-if>
+                </button>
               </sc-for>
             </div>
+            <sc-if value="{{ studioCustomActive }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-studio-custom-editor">
+                <div class="hv-studio-custom-grid">
+                  <div class="hv-studio-custom-tone">
+                    <div class="hv-studio-custom-tone-header"><span>DARK THEME</span></div>
+                    <div class="hv-studio-custom-row">
+                      <label class="hv-studio-custom-swatch" style="background: {{ studioCustomDark }};">
+                        <input type="color" value="{{ studioCustomDark }}" onChange="{{ studioCustomDarkChange }}" onInput="{{ studioCustomDarkInput }}" title="Pick dark theme tone" />
+                      </label>
+                      <input type="text" class="hv-studio-custom-hex" value="{{ studioCustomDark }}" onChange="{{ studioCustomDarkHexChange }}" maxlength="7" placeholder="#2aa7b7" />
+                    </div>
+                  </div>
+                  <div class="hv-studio-custom-tone">
+                    <div class="hv-studio-custom-tone-header"><span>LIGHT THEME</span></div>
+                    <div class="hv-studio-custom-row">
+                      <label class="hv-studio-custom-swatch" style="background: {{ studioCustomLight }};">
+                        <input type="color" value="{{ studioCustomLight }}" onChange="{{ studioCustomLightChange }}" onInput="{{ studioCustomLightInput }}" title="Pick light theme tone" />
+                      </label>
+                      <input type="text" class="hv-studio-custom-hex" value="{{ studioCustomLight }}" onChange="{{ studioCustomLightHexChange }}" maxlength="7" placeholder="#029eb6" />
+                    </div>
+                  </div>
+                </div>
+                <div class="hv-studio-custom-actions">
+                  <button type="button" class="hv-studio-custom-btn danger" onClick="{{ studioCustomClearSlot }}" title="Reset this custom slot">Reset</button>
+                </div>
+              </div>
+            </sc-if>
           </div>
           <div>
             <div class="hv-studio-label">BACKGROUND</div>
@@ -7344,15 +7570,17 @@ const H6_ENERGY_ICONS = {
 // AGORA zone readouts, painted in place at 1 Hz (_energyTick / _paintEnergyCards).
 const H6_ENERGY_NOW_KEYS = ['nowFuelChip', 'nowFuelChipClass', 'nowKwValue', 'nowKwChip', 'nowKwChipClass', 'nowEvSub', 'tenMinAvg', 'tripSince', 'tripEconomy', 'tripFuelL', 'tripKwh', 'tripKwhIn', 'levelsSpec', 'socText', 'socSub', 'socDelta', 'socBaseW', 'socDeltaL', 'socDeltaW', 'socDeltaClass', 'socMarkL', 'socMarkClass', 'fuelText', 'fuelSub', 'fuelDelta', 'fuelBaseW', 'fuelDeltaL', 'fuelDeltaW', 'fuelDeltaClass', 'fuelMarkL', 'fuelMarkClass'];
 const H6_DESKTOP_ACCENTS = [
-  { key: 'cyan', color: '#2aa7b7' },
-  { key: 'mint', color: '#66dfb1' },
-  { key: 'amber', color: '#f0bd65' },
-  { key: 'coral', color: '#ff866e' },
-  { key: 'violet', color: '#a99aff' },
-  { key: 'ice', color: '#9ac8ff' },
-  { key: 'darkgray', color: '#4a5058' },
-  { key: 'black', color: '#0b0d10' },
+  { key: 'cyan', name: 'Cyan', dark: '#2aa7b7', light: '#029eb6' },
+  { key: 'mint', name: 'Mint', dark: '#66dfb1', light: '#02cf9c' },
+  { key: 'amber', name: 'Amber', dark: '#f0bd65', light: '#e29208' },
+  { key: 'coral', name: 'Coral', dark: '#f75a3b', light: '#f52d05' },
+  { key: 'violet', name: 'Violet', dark: '#a99aff', light: '#6351d4' },
+  { key: 'ice', name: 'Ice Blue', dark: '#9ac8ff', light: '#3c92fb' },
+  { key: 'slate', name: 'Slate Gray', dark: '#86909c', light: '#737d87' },
+  { key: 'mono', name: 'Mono', dark: '#dedee3', light: '#494a4b' }
 ];
+const H6_CUSTOM_ACCENTS_KEY = 'h6_custom_accents_v1';
+const H6_CUSTOM_ACCENT_SLOTS = 4;
 const H6_GRAPH_PERIODS = [
   { key: 'trip', label: 'Trip' }, { key: '1km', label: '1 km' },
   { key: '5min', label: '5 min' }, { key: '30min', label: '30 min' },
@@ -8176,12 +8404,15 @@ class Component extends DCLogic {
     clockFormat: '24h',
     accentKey: 'cyan',
     accentColor: '#2aa7b7',
+    accentDark: '#2aa7b7',
+    accentLight: '#029eb6',
   };
 
   constructor(props) {
     super(props);
     this.containerRef = React.createRef();
     this.outerRef = React.createRef();
+    this._customAccents = this._loadCustomAccents();
     try { this._rangeUnit = localStorage.getItem('h6_range_unit') === 'mi' ? 'mi' : 'km'; } catch (e) { this._rangeUnit = 'km'; }
     // ENERGY units. Fuel defaults to km/L (owner, 2026-09-13); both are one preference
     // for every surface, so the rail, widget and popup never quote different units.
@@ -12472,12 +12703,19 @@ class Component extends DCLogic {
   setWidgetThemeMode(mode) {
     const next = (mode === 'light' || mode === 'dark' || mode === 'auto') ? mode : 'dark';
     if (this.state.widgetThemeMode === next) return;
-    this.setState({ widgetThemeMode: next }, () => {
+    const accent = this._desktopAccent(this.state.accentKey, this.state.accentColor, this.state.accentDark, this.state.accentLight);
+    const effTheme = (next === 'light' || next === 'dark') ? next : (this._autoSceneIsBright(this.state) ? 'dark' : 'light');
+    const effectiveColor = effTheme === 'light' ? accent.light : accent.dark;
+    this.setState({
+      widgetThemeMode: next,
+      accentColor: effectiveColor,
+    }, () => {
       if (next === 'auto') this._refreshAutoWidgetThemeSample(true);
       else {
         this._lastEffectiveWidgetTheme = this._effectiveWidgetTheme();
         this._syncDockIndicators();
       }
+      this._persistActiveDesktop();
       this.saveSettings();
     });
   }
@@ -12580,7 +12818,9 @@ class Component extends DCLogic {
     const eff = this._effectiveWidgetTheme();
     if (eff === this._lastEffectiveWidgetTheme && !forceRender) return;
     this._lastEffectiveWidgetTheme = eff;
-    if (forceRender) this.setState({});
+    const accent = this._desktopAccent(this.state.accentKey, this.state.accentColor, this.state.accentDark, this.state.accentLight);
+    const effectiveColor = eff === 'light' ? accent.light : accent.dark;
+    this.setState({ accentColor: effectiveColor });
     this._syncDockIndicators();
   }
 
@@ -14455,13 +14695,9 @@ class Component extends DCLogic {
     const randomKey = this._sourceRandomKey(source);
     const sourceTabs = ['bing', 'curated', 'web', 'favorites'].map((src) => {
       const isBrowsing = source === src;
-      const btn = this._hvBtn(isBrowsing);
       return {
         label: WALLPAPER_SOURCE_LABELS[src],
         onClass: isBrowsing ? 'on' : '',
-        border: btn.border,
-        bg: btn.bg,
-        col: btn.col,
         onClick: () => this._setWallpaperSource(src),
       };
     });
@@ -33645,11 +33881,108 @@ class Component extends DCLogic {
     return 'desk-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 46656).toString(36);
   }
 
-  _desktopAccent(key, color) {
+  _generateAccentPair(baseHex) {
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(baseHex || ''));
+    if (!m) return { dark: '#2aa7b7', light: '#029eb6' };
+    const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+    const rNorm = r / 255, gNorm = g / 255, bNorm = b / 255;
+    const max = Math.max(rNorm, gNorm, bNorm), min = Math.min(rNorm, gNorm, bNorm);
+    let h = 0, s = 0, l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case rNorm: h = (gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0); break;
+        case gNorm: h = (bNorm - rNorm) / d + 2; break;
+        case bNorm: h = (rNorm - gNorm) / d + 4; break;
+      }
+      h /= 6;
+    }
+
+    const hslToHex = (hVal, sVal, lVal) => {
+      const hue2rgb = (p, q, t) => {
+        let tVal = t;
+        if (tVal < 0) tVal += 1;
+        if (tVal > 1) tVal -= 1;
+        if (tVal < 1 / 6) return p + (q - p) * 6 * tVal;
+        if (tVal < 1 / 2) return q;
+        if (tVal < 2 / 3) return p + (q - p) * (2 / 3 - tVal) * 6;
+        return p;
+      };
+      let rOut, gOut, bOut;
+      if (sVal === 0) {
+        rOut = gOut = bOut = lVal;
+      } else {
+        const q = lVal < 0.5 ? lVal * (1 + sVal) : lVal + sVal - lVal * sVal;
+        const p = 2 * lVal - q;
+        rOut = hue2rgb(p, q, hVal + 1 / 3);
+        gOut = hue2rgb(p, q, hVal);
+        bOut = hue2rgb(p, q, hVal - 1 / 3);
+      }
+      const toHex = (x) => {
+        const hex = Math.round(Math.min(255, Math.max(0, x * 255))).toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      };
+      return '#' + toHex(rOut) + toHex(gOut) + toHex(bOut);
+    };
+
+    if (s < 0.12) {
+      return {
+        dark: hslToHex(h, 0.05, 0.88),
+        light: hslToHex(h, 0.05, 0.18),
+      };
+    }
+
+    const darkL = Math.max(0.58, Math.min(0.74, l >= 0.5 ? l : l + 0.25));
+    const darkS = Math.max(0.65, Math.min(1.0, s));
+    const lightL = Math.max(0.26, Math.min(0.38, l <= 0.45 ? l : l - 0.28));
+    const lightS = Math.max(0.70, Math.min(1.0, s * 1.1));
+
+    return {
+      dark: hslToHex(h, darkS, darkL),
+      light: hslToHex(h, lightS, lightL),
+    };
+  }
+
+  _loadCustomAccents() {
+    try {
+      const raw = localStorage.getItem(H6_CUSTOM_ACCENTS_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length === H6_CUSTOM_ACCENT_SLOTS) {
+          return arr;
+        }
+      }
+    } catch (e) {}
+    return [null, null, null, null];
+  }
+
+  _saveCustomAccents(slots) {
+    this._customAccents = slots;
+    try {
+      localStorage.setItem(H6_CUSTOM_ACCENTS_KEY, JSON.stringify(slots));
+    } catch (e) {}
+  }
+
+  _desktopAccent(key, color, colorDark, colorLight) {
     for (let i = 0; i < H6_DESKTOP_ACCENTS.length; i++) {
       if (H6_DESKTOP_ACCENTS[i].key === key) return H6_DESKTOP_ACCENTS[i];
     }
-    if (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)) return { key: 'custom', color: color };
+    const customMatch = /^custom-(\d+)$/.exec(String(key || ''));
+    if (customMatch) {
+      const idx = parseInt(customMatch[1], 10);
+      const slots = this._customAccents || this._loadCustomAccents();
+      if (slots[idx] && slots[idx].dark && slots[idx].light) {
+        return { key: 'custom-' + idx, name: 'Custom ' + (idx + 1), dark: slots[idx].dark, light: slots[idx].light };
+      }
+    }
+    if (typeof colorDark === 'string' && typeof colorLight === 'string' && /^#[0-9a-f]{6}$/i.test(colorDark) && /^#[0-9a-f]{6}$/i.test(colorLight)) {
+      return { key: key || 'custom', name: 'Custom', dark: colorDark, light: colorLight };
+    }
+    if (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)) {
+      const pair = this._generateAccentPair(color);
+      return { key: key || 'custom', name: 'Custom', dark: pair.dark, light: pair.light };
+    }
     return H6_DESKTOP_ACCENTS[0];
   }
 
@@ -33686,7 +34019,7 @@ class Component extends DCLogic {
 
   _desktopSnapshot(name, id, layout) {
     const s = this.state || {};
-    const accent = this._desktopAccent(s.accentKey, s.accentColor);
+    const accent = this._desktopAccent(s.accentKey, s.accentColor, s.accentDark, s.accentLight);
     return {
       id: id || this._desktopId(),
       name: String(name || 'Desktop').trim().slice(0, 24) || 'Desktop',
@@ -33706,7 +34039,9 @@ class Component extends DCLogic {
       wallpaperCustomUrl: (s.wallpaperCustomUrl || (this._savedSettings && this._savedSettings.wallpaperCustomUrl) || ''),
       widgetThemeMode: ['dark', 'light', 'auto'].indexOf(s.widgetThemeMode) >= 0 ? s.widgetThemeMode : 'dark',
       accentKey: accent.key,
-      accentColor: accent.color,
+      accentColor: (s.widgetThemeMode === 'light' ? accent.light : accent.dark),
+      accentDark: accent.dark,
+      accentLight: accent.light,
       dockMode: s.dockMode === 'cards' ? 'cards' : 'launcher',
       clockFace: ['panorama', 'meridian', 'split', 'date-spine'].indexOf(s.clockFace) >= 0 ? s.clockFace : 'panorama',
       clockFormat: s.clockFormat === '12h' ? '12h' : '24h',
@@ -33725,7 +34060,7 @@ class Component extends DCLogic {
   _normalizeDesktop(raw, fallbackName) {
     const d = raw && typeof raw === 'object' ? raw : {};
     const base = this._desktopSnapshot(fallbackName || 'Desktop', d.id);
-    const accent = this._desktopAccent(d.accentKey, d.accentColor);
+    const accent = this._desktopAccent(d.accentKey, d.accentColor, d.accentDark, d.accentLight);
     base.name = String(d.name || fallbackName || 'Desktop').trim().slice(0, 24) || 'Desktop';
     if (['car', 'wallpaper', 'mixed'].indexOf(d.centerFill) >= 0) base.centerFill = d.centerFill;
     if (['bing', 'curated', 'web', 'favorites'].indexOf(d.wallpaperSource) >= 0) base.wallpaperSource = d.wallpaperSource;
@@ -33740,7 +34075,9 @@ class Component extends DCLogic {
     base.wallpaperCustomUrl = typeof d.wallpaperCustomUrl === 'string' ? d.wallpaperCustomUrl.slice(0, 2048) : '';
     if (['dark', 'light', 'auto'].indexOf(d.widgetThemeMode) >= 0) base.widgetThemeMode = d.widgetThemeMode;
     base.accentKey = accent.key;
-    base.accentColor = accent.color;
+    base.accentColor = (base.widgetThemeMode === 'light' ? accent.light : accent.dark);
+    base.accentDark = accent.dark;
+    base.accentLight = accent.light;
     base.dockMode = d.dockMode === 'cards' ? 'cards' : 'launcher';
     base.clockFace = ['panorama', 'meridian', 'split', 'date-spine'].indexOf(d.clockFace) >= 0 ? d.clockFace : 'panorama';
     base.clockFormat = d.clockFormat === '12h' ? '12h' : '24h';
@@ -33793,10 +34130,10 @@ class Component extends DCLogic {
       const migrated = legacy ? this._parseWidgetLayout(legacy) : this._defaultWidgetLayout();
       desktops.push(this._desktopSnapshot('Drive', null, migrated));
       const focus = this._desktopSnapshot('Focus', null, this._defaultWidgetLayout());
-      focus.accentKey = 'mint'; focus.accentColor = '#66dfb1';
+      focus.accentKey = 'mint'; focus.accentColor = '#66dfb1'; focus.accentDark = '#66dfb1'; focus.accentLight = '#0d8a5b';
       desktops.push(focus);
       const lounge = this._desktopSnapshot('Lounge', null, this._defaultWidgetLayout());
-      lounge.centerFill = 'wallpaper'; lounge.widgetThemeMode = 'auto'; lounge.accentKey = 'violet'; lounge.accentColor = '#a99aff';
+      lounge.centerFill = 'wallpaper'; lounge.widgetThemeMode = 'auto'; lounge.accentKey = 'violet'; lounge.accentColor = '#a99aff'; lounge.accentDark = '#a99aff'; lounge.accentLight = '#6351d4';
       desktops.push(lounge);
     }
     this._desktops = desktops;
@@ -33830,6 +34167,8 @@ class Component extends DCLogic {
       widgetThemeMode: current.widgetThemeMode,
       accentKey: current.accentKey,
       accentColor: current.accentColor,
+      accentDark: current.accentDark || current.accentColor,
+      accentLight: current.accentLight || current.accentColor,
       dockMode: current.dockMode,
       clockFace: current.clockFace,
       clockFormat: current.clockFormat,
@@ -34555,10 +34894,107 @@ class Component extends DCLogic {
 
   _setDesktopAccent(key) {
     const accent = this._desktopAccent(key);
-    this.setState({ accentKey: accent.key, accentColor: accent.color }, () => {
+    const theme = this._effectiveWidgetTheme();
+    const effectiveColor = theme === 'light' ? accent.light : accent.dark;
+    this.setState({
+      accentKey: accent.key,
+      accentColor: effectiveColor,
+      accentDark: accent.dark,
+      accentLight: accent.light,
+    }, () => {
       this._persistActiveDesktop();
       this._syncDockIndicators();
     });
+  }
+
+  _setCustomAccentHalf(index, isDarkHalf, hex) {
+    if (index < 0 || index >= H6_CUSTOM_ACCENT_SLOTS) return;
+    if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return;
+    const slots = (this._customAccents || this._loadCustomAccents()).slice();
+    const existing = slots[index] || {};
+    let dark = existing.dark;
+    let light = existing.light;
+
+    if (isDarkHalf) {
+      dark = hex;
+      if (!light) {
+        light = this._generateAccentPair(hex).light;
+      }
+    } else {
+      light = hex;
+      if (!dark) {
+        dark = this._generateAccentPair(hex).dark;
+      }
+    }
+
+    slots[index] = { key: 'custom-' + index, dark: dark, light: light };
+    this._saveCustomAccents(slots);
+    const key = 'custom-' + index;
+    const theme = this._effectiveWidgetTheme();
+    const effectiveColor = theme === 'light' ? light : dark;
+    this.setState({
+      accentKey: key,
+      accentColor: effectiveColor,
+      accentDark: dark,
+      accentLight: light,
+    }, () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
+  _setCustomAccentPair(index, dark, light) {
+    if (index < 0 || index >= H6_CUSTOM_ACCENT_SLOTS) return;
+    const slots = (this._customAccents || this._loadCustomAccents()).slice();
+    slots[index] = { key: 'custom-' + index, dark: dark, light: light };
+    this._saveCustomAccents(slots);
+    const key = 'custom-' + index;
+    const theme = this._effectiveWidgetTheme();
+    const effectiveColor = theme === 'light' ? light : dark;
+    this.setState({
+      accentKey: key,
+      accentColor: effectiveColor,
+      accentDark: dark,
+      accentLight: light,
+    }, () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
+  _onCustomToneInput(isDarkHalf, hex) {
+    const s = this.state || {};
+    if (!s.accentKey || !s.accentKey.startsWith('custom-')) return;
+    const idx = parseInt(s.accentKey.replace('custom-', ''), 10);
+    if (isNaN(idx) || idx < 0 || idx >= H6_CUSTOM_ACCENT_SLOTS) return;
+    let cleanHex = String(hex || '').trim();
+    if (cleanHex && !cleanHex.startsWith('#')) cleanHex = '#' + cleanHex;
+    if (!/^#[0-9a-f]{6}$/i.test(cleanHex)) return;
+    this._setCustomAccentHalf(idx, isDarkHalf, cleanHex);
+  }
+
+  _onCustomAutoPair() {
+    const s = this.state || {};
+    if (!s.accentKey || !s.accentKey.startsWith('custom-')) return;
+    const idx = parseInt(s.accentKey.replace('custom-', ''), 10);
+    if (isNaN(idx) || idx < 0 || idx >= H6_CUSTOM_ACCENT_SLOTS) return;
+    const slots = (this._customAccents || this._loadCustomAccents()).slice();
+    const cur = slots[idx] || {};
+    const theme = this._effectiveWidgetTheme();
+    const base = (theme === 'light' ? cur.light : cur.dark) || cur.dark || cur.light || '#2aa7b7';
+    const pair = this._generateAccentPair(base);
+    this._setCustomAccentPair(idx, pair.dark, pair.light);
+  }
+
+  _onCustomClearSlot() {
+    const s = this.state || {};
+    if (!s.accentKey || !s.accentKey.startsWith('custom-')) return;
+    const idx = parseInt(s.accentKey.replace('custom-', ''), 10);
+    if (isNaN(idx) || idx < 0 || idx >= H6_CUSTOM_ACCENT_SLOTS) return;
+    const slots = (this._customAccents || this._loadCustomAccents()).slice();
+    slots[idx] = { key: 'custom-' + idx, dark: '', light: '' };
+    this._saveCustomAccents(slots);
+    this._setDesktopAccent('cyan');
   }
 
   /**
@@ -34571,7 +35007,7 @@ class Component extends DCLogic {
     this._captureActiveDesktop();
     const at = this._desktopIndex || 0;
     const src = this._desktops[at];
-    const keys = ['widgetThemeMode', 'accentKey', 'accentColor', 'centerFill', 'wallpaperSource', 'wallpaperAuto', 'wallpaperIdx',
+    const keys = ['widgetThemeMode', 'accentKey', 'accentColor', 'accentDark', 'accentLight', 'centerFill', 'wallpaperSource', 'wallpaperAuto', 'wallpaperIdx',
       'wallpaperCuratedIdx', 'wallpaperFavoritesIdx', 'wallpaperWebUrl', 'wallpaperWebTitle', 'wallpaperWebCredit', 'wallpaperWebSourcePage', 'wallpaperCustomUrl'];
     this._desktops.forEach((d, i) => {
       if (i !== at) keys.forEach((key) => { d[key] = src[key]; });
@@ -34924,7 +35360,10 @@ class Component extends DCLogic {
       carStyle: 'left:' + pct((gap.l + gap.r) / 2 - carW / 2, vw) + ';top:' + pct(gap.t + bandH * 0.55 - carH / 2, vh)
         + ';width:' + pct(carW, vw) + ';',
       widgets: useShot ? [] : widgets,
-      accentStyle: 'background:' + (d.accentColor || '#2aa7b7') + ';',
+      accentStyle: (() => {
+        const acc = this._desktopAccent(d.accentKey, d.accentColor, d.accentDark, d.accentLight);
+        return 'background: linear-gradient(135deg, ' + acc.dark + ' 50%, ' + acc.light + ' 50%);';
+      })(),
       id: d.id,
       onClick: (ev) => this._onDesksItemClick(i, ev),
       onDuplicate: (ev) => { this._cardControlEvent(ev); this._duplicateDesktopAt(i); },
@@ -34961,7 +35400,6 @@ class Component extends DCLogic {
     const self = this;
     const bottomCards = this._normalizeBottomCards(this._desktopBottomCards);
     const fill = this._normalizeCenterFill(s.centerFill);
-    const accentNames = { darkgray: 'Dark gray' };
     return {
       accentColor: this._effectiveAccentColor(),
       desktopSwitcherDisplay: (!s.error && (!s.loading || this._viewerReady)
@@ -34976,9 +35414,97 @@ class Component extends DCLogic {
       desktopSwipeEnd: (ev) => this._onDesktopGestureEnd(ev),
       desktopSwipeCancel: () => this._onDesktopGestureCancel(),
       // Frost pill is always on; no idle colour override.
-      desktopSwitcherStyle: '',
-      desktopName: current.name,
-      desktopCountLabel: (index + 1) + ' / ' + Math.max(1, list.length),
+      desktopDotClass: 'on' + (s.desktopIndicatorExpanded ? ' expanded' : ''),
+      desktopName: current.name || 'Desktop',
+      desktopIndexLabel: (index + 1) + '/' + list.length,
+      desktopIndicatorClick: () => this._openDesktopStudio('desktops'),
+      desktopIndicatorStyle: '',
+      desksStripClass: (studioOpen && tab === 'desktops' ? 'on' : '') + (s.desksEditing ? ' editing' : ''),
+      desksBackdropClass: (studioOpen && tab === 'desktops' ? 'on' : ''),
+      desksTitle: s.desksEditing ? 'EDIT DESKTOPS' : 'DESKTOPS',
+      desksItems: list.map((d, i) => this._desktopThumbView(d, i, index)),
+      desksEmpty: !list.length,
+      desksAddVisible: list.length < H6_MAX_DESKTOPS,
+      desksNote: s.desksEditing
+        ? 'Arraste para reordenar · toque em qualquer lugar para concluir'
+        : 'Deslize para trocar de área de trabalho · toque em uma para abrir · segure para editar · toque fora para fechar',
+      desksAddStart: (ev) => { this._cardControlEvent(ev); if (!this._desksClickSuppressed()) this._addDesktopAt(true); },
+      desksAddEnd: (ev) => { this._cardControlEvent(ev); if (!this._desksClickSuppressed()) this._addDesktopAt(false); },
+      desksBackdropClick: () => this._onDesksBackdropClick(),
+      desksPointerDown: (ev) => this._onDesksPointerDown(ev),
+      ...this._studioCardFields(s, bottomCards, studioOpen && tab === 'cards'),
+      studioWidgetItems: studioOpen && tab === 'widgets'
+        ? this._widgetThumbItems((key) => (this._widgetTypeBlocked('appCar', key) ? 'added'
+          : (this._typeHasAnySlot(key) ? '' : 'no room')), (key) => this._startWidgetPlacement(key))
+        : [],
+      studioThemeDarkClass: s.widgetThemeMode === 'dark' ? 'on' : '',
+      studioThemeLightClass: s.widgetThemeMode === 'light' ? 'on' : '',
+      studioThemeAutoClass: s.widgetThemeMode === 'auto' ? 'on' : '',
+      studioThemeDark: () => this.setWidgetThemeMode('dark'),
+      studioThemeLight: () => this.setWidgetThemeMode('light'),
+      studioThemeAuto: () => this.setWidgetThemeMode('auto'),
+      desktopAccentItems: (() => {
+        const slots = this._customAccents || this._loadCustomAccents();
+        const items = [];
+        H6_DESKTOP_ACCENTS.forEach((a) => {
+          items.push({
+            key: a.key,
+            cls: a.key === s.accentKey ? 'on' : '',
+            style: 'background: linear-gradient(135deg, ' + a.dark + ' 50%, ' + a.light + ' 50%);',
+            title: a.name + ' (' + a.dark + ' / ' + a.light + ')',
+            isCustom: false,
+            isCustomEmpty: false,
+            colorVal: a.dark,
+            onClick: () => this._setDesktopAccent(a.key),
+          });
+        });
+        for (let i = 0; i < H6_CUSTOM_ACCENT_SLOTS; i++) {
+          const key = 'custom-' + i;
+          const slot = slots[i];
+          const isConfigured = !!(slot && slot.dark && slot.light);
+          const isSelected = s.accentKey === key;
+          const darkVal = isConfigured ? slot.dark : '#2aa7b7';
+          const lightVal = isConfigured ? slot.light : '#029eb6';
+          items.push({
+            key,
+            cls: (isSelected ? 'on ' : '') + (isConfigured ? 'custom-filled' : 'custom-empty'),
+            style: isConfigured
+              ? 'background: linear-gradient(135deg, ' + slot.dark + ' 50%, ' + slot.light + ' 50%);'
+              : '',
+            title: isConfigured ? ('Custom ' + (i + 1) + ' (Dark: ' + slot.dark + ' / Light: ' + slot.light + ')') : ('Custom ' + (i + 1) + ' · Tap to configure'),
+            isCustom: true,
+            isCustomEmpty: !isConfigured,
+            onClick: () => {
+              if (isConfigured) {
+                this._setDesktopAccent(key);
+              } else {
+                const pair = this._generateAccentPair(s.accentColor || '#2aa7b7');
+                this._setCustomAccentPair(i, pair.dark, pair.light);
+              }
+            },
+          });
+        }
+        return items;
+      })(),
+      studioCustomActive: !!(s.accentKey && s.accentKey.startsWith('custom-')),
+      studioCustomDark: (() => {
+        const slots = this._customAccents || this._loadCustomAccents();
+        const idx = parseInt((s.accentKey || '').replace('custom-', ''), 10);
+        return (slots[idx] && slots[idx].dark) || s.accentDark || '#2aa7b7';
+      })(),
+      studioCustomLight: (() => {
+        const slots = this._customAccents || this._loadCustomAccents();
+        const idx = parseInt((s.accentKey || '').replace('custom-', ''), 10);
+        return (slots[idx] && slots[idx].light) || s.accentLight || '#029eb6';
+      })(),
+      studioCustomDarkChange: (e) => this._onCustomToneInput(true, e.target.value),
+      studioCustomDarkInput: (e) => this._onCustomToneInput(true, e.target.value),
+      studioCustomDarkHexChange: (e) => this._onCustomToneInput(true, e.target.value),
+      studioCustomLightChange: (e) => this._onCustomToneInput(false, e.target.value),
+      studioCustomLightInput: (e) => this._onCustomToneInput(false, e.target.value),
+      studioCustomLightHexChange: (e) => this._onCustomToneInput(false, e.target.value),
+      studioCustomAutoPair: () => this._onCustomAutoPair(),
+      studioCustomClearSlot: () => this._onCustomClearSlot(),
       desktopDots: list.map((d, i) => ({
         cls: i === index ? 'on' : '',
         title: d.name,
@@ -35018,36 +35544,6 @@ class Component extends DCLogic {
       studioIsClock: tab === 'clock',
       studioLayoutExplain: tab === 'widgets' ? H6_STUDIO_EXPLAIN_WIDGETS : H6_STUDIO_EXPLAIN_CARDS,
       ...this._clockConfigurationFields(s),
-      desksClass: (studioOpen && tab === 'desktops' ? 'on' : '') + (s.desksEditing ? ' editing' : ''),
-      desksItems: studioOpen && tab === 'desktops'
-        ? list.map((d, i) => this._desktopThumbView(d, i, index)) : [],
-      desksCanAdd: list.length < H6_MAX_DESKTOPS,
-      desksDuplicateDisabled: list.length >= H6_MAX_DESKTOPS,
-      desksDeleteDisabled: list.length <= 1,
-      desksHint: s.desksEditing
-        ? 'Arraste para reordenar · toque em qualquer lugar para concluir'
-        : 'Deslize para trocar de área de trabalho · toque em uma para abrir · segure para editar · toque fora para fechar',
-      desksAddStart: (ev) => { this._cardControlEvent(ev); if (!this._desksClickSuppressed()) this._addDesktopAt(true); },
-      desksAddEnd: (ev) => { this._cardControlEvent(ev); if (!this._desksClickSuppressed()) this._addDesktopAt(false); },
-      desksBackdropClick: () => this._onDesksBackdropClick(),
-      desksPointerDown: (ev) => this._onDesksPointerDown(ev),
-      ...this._studioCardFields(s, bottomCards, studioOpen && tab === 'cards'),
-      studioWidgetItems: studioOpen && tab === 'widgets'
-        ? this._widgetThumbItems((key) => (this._widgetTypeBlocked('appCar', key) ? 'added'
-          : (this._typeHasAnySlot(key) ? '' : 'no room')), (key) => this._startWidgetPlacement(key))
-        : [],
-      studioThemeDarkClass: s.widgetThemeMode === 'dark' ? 'on' : '',
-      studioThemeLightClass: s.widgetThemeMode === 'light' ? 'on' : '',
-      studioThemeAutoClass: s.widgetThemeMode === 'auto' ? 'on' : '',
-      studioThemeDark: () => this.setWidgetThemeMode('dark'),
-      studioThemeLight: () => this.setWidgetThemeMode('light'),
-      studioThemeAuto: () => this.setWidgetThemeMode('auto'),
-      desktopAccentItems: H6_DESKTOP_ACCENTS.map((a) => ({
-        cls: a.key === s.accentKey ? 'on' : '',
-        style: 'background:' + a.color + ';',
-        title: accentNames[a.key] || (a.key.charAt(0).toUpperCase() + a.key.slice(1)),
-        onClick: () => this._setDesktopAccent(a.key),
-      })),
       studioFillCarClass: fill === 'car' ? 'on' : '',
       studioFillWallClass: fill === 'wallpaper' ? 'on' : '',
       studioFillMixedClass: fill === 'mixed' ? 'on' : '',
@@ -39526,9 +40022,14 @@ class Component extends DCLogic {
    * leaving Sport restores their colour without a write.
    */
   _effectiveAccentColor() {
-    const chosen = this.state.accentColor || '#2aa7b7';
-    return this._readableAccent(this.state[CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.drive].stateKey]
-      === CAR_DRIVE_MODE_SPORT ? CAR_SPORT_ACCENT : chosen);
+    if (this.state[CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.drive].stateKey] === CAR_DRIVE_MODE_SPORT) {
+      return CAR_SPORT_ACCENT;
+    }
+    const s = this.state || {};
+    const accent = this._desktopAccent(s.accentKey, s.accentColor, s.accentDark, s.accentLight);
+    const theme = this._effectiveWidgetTheme();
+    const chosen = (theme === 'light' ? accent.light : accent.dark) || accent.dark || '#2aa7b7';
+    return this._readableAccent(chosen);
   }
 
   /**
