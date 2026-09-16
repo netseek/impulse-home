@@ -12200,7 +12200,7 @@ public final class MainActivity extends Activity {
                 return;
             }
             bindDockItem(projectionItem,
-                    new android.graphics.drawable.InsetDrawable(getDrawable(R.drawable.ic_phone_link), 0.06f), "Configurar Navegação",
+                    getDrawable(R.drawable.ic_phone_link), "Configurar Navegação",
                     v -> launchAppFullscreen(PHONE_CONNECT_PACKAGE));
             return;
         }
