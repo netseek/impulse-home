@@ -1906,6 +1906,7 @@ public final class MainActivity extends Activity {
             paint.setColorFilter(null);
             drawStatusRoof(c, vehicleRect);
             drawStatusSeatBelts(c, vehicleRect);
+            drawStatusTireMarks(c, vehicleRect);
 
             // Status and Tires share TPMS health. Large values stay completely
             // outside the vehicle so the door, roof and restraint art remains clear.
@@ -2014,6 +2015,65 @@ public final class MainActivity extends Activity {
                 stroke(0xFFFFFFFF, Math.max(1f, radius * .30f));
                 c.drawLine(x - radius * .35f, y - radius * .45f,
                         x + radius * .35f, y + radius * .45f, paint);
+            }
+        }
+
+        /** Red rectangles on flagged wheel arches (TPMS pressure/temp warning). */
+        private void drawStatusTireMarks(android.graphics.Canvas c,
+                android.graphics.RectF vehicleRect) {
+            if (descriptor.wheelStates == null) return;
+            float markW = vehicleRect.width() * .13f;
+            float markH = vehicleRect.height() * .065f;
+            float[] xs = {
+                    vehicleRect.left + vehicleRect.width() * .07f,
+                    vehicleRect.right - vehicleRect.width() * .07f - markW,
+                    vehicleRect.left + vehicleRect.width() * .07f,
+                    vehicleRect.right - vehicleRect.width() * .07f - markW
+            };
+            float[] ys = {
+                    vehicleRect.top + vehicleRect.height() * .16f,
+                    vehicleRect.top + vehicleRect.height() * .16f,
+                    vehicleRect.bottom - vehicleRect.height() * .13f - markH,
+                    vehicleRect.bottom - vehicleRect.height() * .13f - markH
+            };
+            float radius = Math.max(1.5f, markW * .12f);
+            for (int i = 0; i < 4 && i < descriptor.wheelStates.length; i++) {
+                if (!"warning".equals(descriptor.wheelStates[i])) continue;
+                fill(0x5CFF6671);
+                c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
+                        radius, radius, paint);
+                stroke(0xFFFF6671, Math.max(1.5f, markW * .12f));
+                c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
+                        radius, radius, paint);
+            }
+        }
+
+        private void drawTireWheelMarks(android.graphics.Canvas c,
+                android.graphics.RectF carRect) {
+            if (descriptor.wheelStates == null) return;
+            float markW = carRect.width() * .18f;
+            float markH = carRect.height() * .09f;
+            float[] xs = {
+                    carRect.left + carRect.width() * .02f,
+                    carRect.right - carRect.width() * .02f - markW,
+                    carRect.left + carRect.width() * .02f,
+                    carRect.right - carRect.width() * .02f - markW
+            };
+            float[] ys = {
+                    carRect.top + carRect.height() * .13f,
+                    carRect.top + carRect.height() * .13f,
+                    carRect.bottom - carRect.height() * .11f - markH,
+                    carRect.bottom - carRect.height() * .11f - markH
+            };
+            float radius = Math.max(1.5f, markW * .12f);
+            for (int i = 0; i < 4 && i < descriptor.wheelStates.length; i++) {
+                if (!"warning".equals(descriptor.wheelStates[i])) continue;
+                fill(0x5CFF6671);
+                c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
+                        radius, radius, paint);
+                stroke(0xFFFF6671, Math.max(1.5f, markW * .12f));
+                c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
+                        radius, radius, paint);
             }
         }
 
@@ -2492,6 +2552,7 @@ public final class MainActivity extends Activity {
             paint.setAlpha(dockUiLight ? 238 : 255);
             c.drawBitmap(topView, null, destination, paint);
             paint.setAlpha(255);
+            drawTireWheelMarks(c, destination);
             drawTireReadouts(c, w, h, accent, muted);
         }
 
@@ -2523,6 +2584,9 @@ public final class MainActivity extends Activity {
             c.drawLine(w * .39f, h * .43f, w * .61f, h * .43f, paint);
             c.drawLine(w * .38f, h * .76f, w * .62f, h * .76f, paint);
 
+            android.graphics.RectF fallbackCar = new android.graphics.RectF(
+                    w * .31f, h * .08f, w * .69f, h * .95f);
+            drawTireWheelMarks(c, fallbackCar);
             drawTireReadouts(c, w, h, accent, muted);
         }
 
@@ -2559,7 +2623,7 @@ public final class MainActivity extends Activity {
         }
 
         private int tireSignalColor(String wheelState, int muted) {
-            if ("warning".equals(wheelState)) return 0xFFFFB342;
+            if ("warning".equals(wheelState)) return 0xFFFF6671;
             if ("unavailable".equals(wheelState) || "unavailable".equals(descriptor.state)) {
                 return withAlpha(muted, 0xA8);
             }

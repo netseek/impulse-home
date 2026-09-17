@@ -4328,9 +4328,16 @@ window.HavalSplash = (function () {
     .hv-hs-vehicle-tire strong { font:560 clamp(21px,1.8vw,29px)/.92 'Space Grotesk',sans-serif; }
     .hv-hs-vehicle-tire em { font:650 8px/1 'Space Mono',monospace; letter-spacing:.07em; opacity:.66; font-style:normal; }
     .hv-hs-vehicle-tire small { flex:1 0 100%; font:600 15px/1 'Space Grotesk',sans-serif; letter-spacing:.02em; opacity:.86; }
-    .hv-hs-vehicle-tire.warning strong { color:#ff6671; }
+    .hv-hs-vehicle-tire.warning strong,.hv-hs-vehicle-tire.pressure-warning strong { color:#ff6671; }
+    .hv-hs-vehicle-tire.temp-warning small { color:#ff6671; opacity:1; }
     .hv-hs-vehicle-tire.unavailable { opacity:.42; }
     .hv-hs-vehicle-tire.fl { left:-48%; top:17%; justify-content:flex-end; text-align:right; }.hv-hs-vehicle-tire.fr { right:-48%; top:17%; justify-content:flex-start; text-align:left; }.hv-hs-vehicle-tire.rl { left:-48%; bottom:13%; justify-content:flex-end; text-align:right; }.hv-hs-vehicle-tire.rr { right:-48%; bottom:13%; justify-content:flex-start; text-align:left; }
+    .hv-hs-vehicle-tire-mark,.hv-status-tire-mark { position:absolute; z-index:7; display:none; width:13%; height:6.5%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.36); pointer-events:none; }
+    .hv-hs-vehicle-tire-mark.warning,.hv-status-tire-mark.warning { display:block; }
+    .hv-hs-vehicle-tire-mark.fl,.hv-status-tire-mark.front-left,.hv-status-tire-mark.fl { left:7%; top:16%; }
+    .hv-hs-vehicle-tire-mark.fr,.hv-status-tire-mark.front-right,.hv-status-tire-mark.fr { right:7%; top:16%; }
+    .hv-hs-vehicle-tire-mark.rl,.hv-status-tire-mark.rear-left,.hv-status-tire-mark.rl { left:7%; bottom:13%; }
+    .hv-hs-vehicle-tire-mark.rr,.hv-status-tire-mark.rear-right,.hv-status-tire-mark.rr { right:7%; bottom:13%; }
     @media (max-width: 640px) {
       .hv-hs-roof-pop { width: calc(100vw - 28px); padding-inline: 12px; }
       .hv-hs-roof-stack { grid-template-columns:minmax(150px,.9fr) minmax(160px,1fr) minmax(180px,1.1fr); gap:7px; }
@@ -5254,7 +5261,12 @@ window.HavalSplash = (function () {
 
     .hv-tires { cursor:pointer; }
     .hv-tires-visual { position:relative; height:calc(100% - 30px); min-height:90px; overflow:hidden; }
-    .hv-tire-car { position:absolute; left:50%; top:50%; width:min(104px,31%); height:92%; object-fit:contain; transform:translate(-50%,-50%); filter:drop-shadow(0 8px 10px rgba(0,0,0,.28)); }
+    .hv-tires-car-stage { position:absolute; left:50%; top:50%; width:min(104px,31%); height:92%; transform:translate(-50%,-50%); }
+    .hv-tire-car { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 8px 10px rgba(0,0,0,.28)); }
+    .hv-tire-wheel-mark { position:absolute; z-index:2; display:none; width:18%; height:9%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.34); pointer-events:none; }
+    .hv-tire-wheel-mark.warning { display:block; }
+    .hv-tire-wheel-mark.front-left { left:2%; top:13%; } .hv-tire-wheel-mark.front-right { right:2%; top:13%; }
+    .hv-tire-wheel-mark.rear-left { left:2%; bottom:11%; } .hv-tire-wheel-mark.rear-right { right:2%; bottom:11%; }
     .hv-tire-point { position:absolute; width:29%; display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 5px; font-variant-numeric:tabular-nums; }
     .hv-tire-point.front-left { left:2%; top:12%; justify-content:flex-end; text-align:right; }
     .hv-tire-point.front-right { right:2%; top:12%; justify-content:flex-start; text-align:left; }
@@ -5262,7 +5274,8 @@ window.HavalSplash = (function () {
     .hv-tire-point.rear-right { right:2%; bottom:12%; justify-content:flex-start; text-align:left; }
     .hv-tire-point strong { font-size:clamp(17px,3.2vw,29px); font-weight:560; line-height:.92; }
     .hv-tire-point small,.hv-tire-point em { font:7px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; font-style:normal; }
-    .hv-tire-point.warning strong { color:#ff8d82; }
+    .hv-tire-point.warning strong,.hv-tire-point.pressure-warning strong { color:#ff6671; }
+    .hv-tire-point.temp-warning em { color:#ff6671; opacity:.9; }
     .hv-tire-point.normal strong { color:var(--hv-widget-fg); }
     .hv-tires-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.05em; opacity:.52; }
     .hv-tires-unavailable .hv-tire-point strong { opacity:.45; }
@@ -5524,7 +5537,12 @@ window.HavalSplash = (function () {
     .hv-tires-focus-summary { font:600 11px/1.2 'Space Grotesk',sans-serif; letter-spacing:.04em; }
     .hv-tires-focus-stage { position:relative; min-height:285px; height:calc(100% - 70px); margin-top:14px; border:1px solid var(--hv-frost-edge); border-radius:18px; overflow:hidden; background:radial-gradient(circle at 50% 48%,rgba(99,217,231,.12),transparent 42%); }
     .hv-tires-focus-stage::before { content:''; position:absolute; left:50%; top:8%; bottom:8%; width:1px; background:currentColor; opacity:.06; }
-    .hv-tires-focus-car { position:absolute; left:50%; top:50%; width:min(210px,33%); height:86%; object-fit:contain; transform:translate(-50%,-50%); filter:drop-shadow(0 20px 22px rgba(0,0,0,.34)); }
+    .hv-tires-focus-car-stage { position:absolute; left:50%; top:50%; width:min(210px,33%); height:86%; transform:translate(-50%,-50%); }
+    .hv-tires-focus-car { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 20px 22px rgba(0,0,0,.34)); }
+    .hv-tires-focus-mark { position:absolute; z-index:2; display:none; width:16%; height:8%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.34); pointer-events:none; }
+    .hv-tires-focus-mark.warning { display:block; }
+    .hv-tires-focus-mark.front-left { left:3%; top:12%; } .hv-tires-focus-mark.front-right { right:3%; top:12%; }
+    .hv-tires-focus-mark.rear-left { left:3%; bottom:10%; } .hv-tires-focus-mark.rear-right { right:3%; bottom:10%; }
     .hv-tires-focus-wheel { position:absolute; width:min(190px,28%); min-height:96px; padding:12px 14px; box-sizing:border-box; border:1px solid var(--hv-frost-edge); border-radius:14px; background:var(--hv-frost-fill); box-shadow:inset 0 1px 0 var(--hv-frost-inner); }
     .hv-tires-focus-wheel.front-left { left:3%; top:7%; } .hv-tires-focus-wheel.front-right { right:3%; top:7%; }
     .hv-tires-focus-wheel.rear-left { left:3%; bottom:7%; } .hv-tires-focus-wheel.rear-right { right:3%; bottom:7%; }
@@ -5539,7 +5557,9 @@ window.HavalSplash = (function () {
     .hv-tires-temperature strong { font-size:20px; line-height:1; font-weight:560; font-variant-numeric:tabular-nums; }
     .hv-tires-temperature small { font:8px/1 'Space Mono',monospace; opacity:.62; }
     .hv-tires-focus-wheel > em { position:absolute; right:10px; bottom:10px; padding:3px 6px; border-radius:999px; background:rgba(255,255,255,.065); font-style:normal; opacity:.72; }
-    .hv-tires-focus-wheel.warning { color:#ff8d82; border-color:rgba(255,141,130,.62); }
+    .hv-tires-focus-wheel.warning { color:#ff6671; border-color:rgba(255,102,113,.62); }
+    .hv-tires-focus-wheel.pressure-warning > strong { color:#ff6671; }
+    .hv-tires-focus-wheel.temp-warning .hv-tires-temperature strong { color:#ff6671; }
     .hv-tires-focus-wheel.normal > strong,
     .hv-tires-focus-wheel.normal .hv-tires-temperature strong { color:var(--hv-widget-fg); }
     .hv-tires-focus-wheel.unavailable { opacity:.5; }
@@ -5592,7 +5612,9 @@ window.HavalSplash = (function () {
     .hv-status-tire { position:absolute; z-index:8; display:grid; min-width:52px; gap:2px; padding:5px 6px; border:1px solid rgba(99,217,231,.48); border-radius:8px; background:var(--hv-frost-fill-strong); text-align:center; font-style:normal; }
     .hv-status-tire strong { font:600 13px/.95 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; }
     .hv-status-tire small { font:300 7px/1 'Space Grotesk',sans-serif; letter-spacing:.02em; color:#8f949b; }
-    .hv-status-tire.warning { border-color:#ff6671; color:#ff6671; }.hv-status-tire.unavailable { opacity:.42; }
+    .hv-status-tire.warning,.hv-status-tire.pressure-warning { border-color:#ff6671; color:#ff6671; }
+    .hv-status-tire.temp-warning small { color:#ff6671; }
+    .hv-status-tire.unavailable { opacity:.42; }
     .hv-status-tire.front-left { left:4%; top:19%; }.hv-status-tire.front-right { right:4%; top:19%; }.hv-status-tire.rear-left { left:4%; bottom:16%; }.hv-status-tire.rear-right { right:4%; bottom:16%; }
     .hv-status-card-tire { position:absolute; z-index:8; display:grid; min-width:42px; gap:2px; padding:3px 4px; border-radius:6px; background:var(--hv-frost-fill-strong); text-align:center; font-style:normal; }
     .hv-status-card-tire > span { display:flex; align-items:baseline; justify-content:center; gap:3px; }
@@ -5602,7 +5624,9 @@ window.HavalSplash = (function () {
     .hv-status-2x2 .hv-status-card-tire strong,.hv-status-3x2 .hv-status-card-tire strong { font-size:18px; }
     .hv-status-2x2 .hv-status-card-tire em,.hv-status-3x2 .hv-status-card-tire em { font-size:6px; }
     .hv-status-2x2 .hv-status-card-tire small,.hv-status-3x2 .hv-status-card-tire small { font-size:12px; }
-    .hv-status-card-tire.warning { color:#ff6671; }.hv-status-card-tire.unavailable { opacity:.36; }
+    .hv-status-card-tire.warning,.hv-status-card-tire.pressure-warning { color:#ff6671; }
+    .hv-status-card-tire.temp-warning small { color:#ff6671; opacity:1; }
+    .hv-status-card-tire.unavailable { opacity:.36; }
     .hv-status-card-tire.front-left { left:-62%; top:18%; }.hv-status-card-tire.front-right { right:-62%; top:18%; }.hv-status-card-tire.rear-left { left:-62%; bottom:15%; }.hv-status-card-tire.rear-right { right:-62%; bottom:15%; }
     /* The 6x2 widget is the popup without dialog chrome: same information
        architecture, vehicle composition and large-touch roof controls. */
@@ -5644,7 +5668,8 @@ window.HavalSplash = (function () {
       .hv-tires-focus-meta { align-items:flex-start; flex-direction:column; gap:7px; }
       .hv-tires-focus-actions { justify-content:flex-start; }
       .hv-tires-focus-stage { min-height:360px; height:auto; }
-      .hv-tires-focus-car { width:30%; height:70%; }
+      .hv-tires-focus-car-stage { width:30%; height:70%; }
+      .hv-tires-focus-car { width:100%; height:100%; }
       .hv-tires-focus-wheel { width:31%; padding:9px; }
       .hv-tires-focus-wheel > strong { font-size:30px; }
       .hv-status-focus { padding:12px; }.hv-status-focus-meta { flex-direction:column; gap:8px; }.hv-status-focus-console { grid-template-columns:145px minmax(180px,1fr) 170px; min-height:390px; height:auto; }.hv-status-focus-stage { min-height:390px; height:auto; }.hv-status-focus-envelope { width:32%; height:72%; }.hv-status-focus-opening { width:29%; padding:8px; }.hv-status-focus-opening.trunk { width:34%; }.hv-status-focus-systems { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -5966,7 +5991,7 @@ window.HavalSplash = (function () {
             </div>
           </sc-if>
           <sc-if value="{{ wg.isTires }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-tires {{ wg.tiresSizeClass }}" onClick="{{ wg.onTiresOpen }}"><div class="hv-glance-head"><span>TIRES</span><small>{{ wg.tiresSource }}</small></div><div class="hv-tires-visual"><img class="hv-tire-car" src="./assets/ui/tires-top-view-v1.png" alt=""><sc-for list="{{ wg.tiresWheels }}" as="tw" hint-placeholder-count="4"><div class="hv-tire-point {{ tw.cls }}"><small>{{ tw.short }}</small><strong>{{ tw.pressure }}</strong><em>{{ tw.pressureUnit }}</em></div></sc-for></div><div class="hv-tires-foot"><span>{{ wg.tiresFoot }}</span><span>{{ wg.tiresUnit }}</span></div></div>
+            <div class="hv-tires {{ wg.tiresSizeClass }}" onClick="{{ wg.onTiresOpen }}"><div class="hv-glance-head"><span>TIRES</span><small>{{ wg.tiresSource }}</small></div><div class="hv-tires-visual"><div class="hv-tires-car-stage"><img class="hv-tire-car" src="./assets/ui/tires-top-view-v1.png" alt=""><sc-for list="{{ wg.tiresWheels }}" as="tw" hint-placeholder-count="4"><i class="hv-tire-wheel-mark {{ tw.markCls }}" aria-hidden="true"></i></sc-for></div><sc-for list="{{ wg.tiresWheels }}" as="tw" hint-placeholder-count="4"><div class="hv-tire-point {{ tw.cls }}"><small>{{ tw.short }}</small><strong>{{ tw.pressure }}</strong><em>{{ tw.pressureUnit }}</em></div></sc-for></div><div class="hv-tires-foot"><span>{{ wg.tiresFoot }}</span><span>{{ wg.tiresUnit }}</span></div></div>
           </sc-if>
           <sc-if value="{{ wg.isStatus }}" hint-placeholder-val="{{ false }}">
             <sc-if value="{{ wg.statusIsFull }}" hint-placeholder-val="{{ false }}">
@@ -5974,13 +5999,13 @@ window.HavalSplash = (function () {
                 <header class="hv-status-full-head"><span>STATUS DO VEÍCULO</span><span class="hv-status-full-mode {{ wg.statusState }}">{{ wg.statusSource }}</span></header>
                 <div class="hv-status-full-console">
                   <section class="hv-vehicle-window-panel" aria-label="Status e controles dos vidros"><div class="hv-vehicle-window-head"><strong>VIDROS</strong></div><div class="hv-vehicle-window-grid"><sc-for list="{{ wg.statusWindowControls }}" as="sw" hint-placeholder-count="4"><button type="button" class="hv-vehicle-window-button {{ sw.cls }}" onClick="{{ sw.onClick }}" aria-label="{{ sw.ariaLabel }}" disabled="{{ sw.disabled }}" aria-disabled="{{ sw.disabled }}" aria-pressed="{{ sw.pressed }}"><strong aria-hidden="true">{{ sw.short }}</strong><span>{{ sw.stateLabel }}</span></button></sc-for></div><div class="hv-vehicle-window-all"><button type="button" onClick="{{ wg.statusWindowCloseAll }}">FECHAR TODAS</button><button type="button" onClick="{{ wg.statusWindowOpenAll }}">ABRIR TODAS</button></div></section>
-                  <button type="button" class="hv-status-full-stage" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-hs-vehicle-meta"><strong class="hv-hs-vehicle-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><small class="hv-hs-vehicle-subtitle">{{ wg.statusSubtitle }}</small></div><div class="hv-hs-vehicle-art" style="{{ wg.statusVehicleStyle }}" aria-hidden="true"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-hs-vehicle-tire {{ st.cls }}"><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em><small>{{ st.temperature }} {{ st.temperatureUnit }}</small></i></sc-for></div><div class="hv-hs-vehicle-stats"><span><small>ABERTURAS</small><strong>{{ wg.statusDoorStat }}</strong></span><span><small>VIDROS</small><strong>{{ wg.statusGlassStat }}</strong></span><span class="{{ wg.statusBeltStatClass }}"><small>CINTOS</small><strong>{{ wg.statusBeltStat }}</strong></span><span class="{{ wg.statusTireStatClass }}"><small>PNEUS</small><strong>{{ wg.statusTireStat }}</strong></span></div></button>
+                  <button type="button" class="hv-status-full-stage" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-hs-vehicle-meta"><strong class="hv-hs-vehicle-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><small class="hv-hs-vehicle-subtitle">{{ wg.statusSubtitle }}</small></div><div class="hv-hs-vehicle-art" style="{{ wg.statusVehicleStyle }}" aria-hidden="true"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-tire-mark {{ st.markCls }}" aria-hidden="true"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-hs-vehicle-tire {{ st.cls }}"><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em><small>{{ st.temperature }} {{ st.temperatureUnit }}</small></i></sc-for></div><div class="hv-hs-vehicle-stats"><span><small>ABERTURAS</small><strong>{{ wg.statusDoorStat }}</strong></span><span><small>VIDROS</small><strong>{{ wg.statusGlassStat }}</strong></span><span class="{{ wg.statusBeltStatClass }}"><small>CINTOS</small><strong>{{ wg.statusBeltStat }}</strong></span><span class="{{ wg.statusTireStatClass }}"><small>PNEUS</small><strong>{{ wg.statusTireStat }}</strong></span></div></button>
                   <aside class="hv-status-full-roof" aria-label="Controles do teto solar e da cortina"><section class="hv-status-focus-roof-card"><div class="hv-hs-roof-row"><div class="hv-hs-roof-slide" style="{{ wg.statusSunroofLevelStyle }}"><span class="hv-hs-roof-slide-name">TETO SOLAR</span><span class="hv-hs-roof-slide-pct">{{ wg.statusSunroofPct }}%</span><div class="hv-hs-roof-track"><i class="hv-hs-roof-track-well"></i><i class="hv-hs-roof-track-fill"></i><i class="hv-hs-roof-knob"></i><i class="hv-hs-roof-vent-mark"></i><input class="hv-hs-roof-quick-range" type="range" min="0" max="100" step="1" value="{{ wg.statusSunroofPct }}" onInput="{{ wg.statusSunroofInput }}" onChange="{{ wg.statusSunroofInput }}" aria-label="Abertura do teto solar"></div></div></div><div class="hv-status-full-presets"><button type="button" onClick="{{ wg.statusSunroofPrimary }}">{{ wg.statusSunroofPrimaryLabel }}</button><button type="button" onClick="{{ wg.statusSunroofSecondary }}">{{ wg.statusSunroofSecondaryLabel }}</button></div></section><section class="hv-status-focus-roof-card"><div class="hv-hs-roof-row"><div class="hv-hs-roof-slide" style="{{ wg.statusCurtainLevelStyle }}"><span class="hv-hs-roof-slide-name">CORTINA</span><span class="hv-hs-roof-slide-pct">{{ wg.statusCurtainPct }}%</span><div class="hv-hs-roof-track"><i class="hv-hs-roof-track-well"></i><i class="hv-hs-roof-track-fill"></i><i class="hv-hs-roof-knob"></i><input class="hv-hs-roof-quick-range" type="range" min="0" max="100" step="1" value="{{ wg.statusCurtainPct }}" onInput="{{ wg.statusCurtainInput }}" onChange="{{ wg.statusCurtainInput }}" aria-label="Abertura da cortina"></div></div></div><div class="hv-status-full-presets"><button type="button" onClick="{{ wg.statusCurtainPrimary }}">{{ wg.statusCurtainPrimaryLabel }}</button><button type="button" onClick="{{ wg.statusCurtainSecondary }}">{{ wg.statusCurtainSecondaryLabel }}</button></div></section></aside>
                 </div>
                 <footer class="hv-status-full-footer"><button type="button" onClick="{{ wg.statusWindowsToggleAll }}">{{ wg.statusWindowsToggleAllLabel }}</button><button type="button" onClick="{{ wg.statusRoofToggleAll }}">{{ wg.statusRoofToggleAllLabel }}</button><button type="button" onClick="{{ wg.statusTrunkToggle }}">{{ wg.statusTrunkToggleLabel }}</button></footer>
               </section>
             </sc-if>
-            <sc-if value="{{ wg.statusIsCompact }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>STATUS DO VEÍCULO</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-card-tire {{ st.cls }}"><span><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em></span><small>{{ st.temperature }}{{ st.temperatureUnit }}</small></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="4"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button></sc-if>
+            <sc-if value="{{ wg.statusIsCompact }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>STATUS DO VEÍCULO</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-tire-mark {{ st.markCls }}" aria-hidden="true"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-card-tire {{ st.cls }}"><span><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em></span><small>{{ st.temperature }}{{ st.temperatureUnit }}</small></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="4"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button></sc-if>
           </sc-if>
           <sc-if value="{{ wg.isRange }}" hint-placeholder-val="{{ false }}">
             <button type="button" class="hv-range-card {{ wg.rangeSizeClass }}" onClick="{{ wg.onRangeOpen }}" aria-label="{{ wg.rangeAriaLabel }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-total"><span>{{ wg.rangeTotalLabel }}</span><strong>{{ wg.rangeTotal }}</strong><small>{{ wg.rangeUnit }}</small></div><div class="hv-range-detail"><div class="hv-range-soc"><span>BATTERY SOC</span><strong>{{ wg.rangeSoc }}</strong></div><div class="hv-range-split" aria-hidden="true"><i class="ev" style="width:{{ wg.rangeEvPct }}%;"></i><i class="fuel" style="width:{{ wg.rangeFuelPct }}%;"></i></div><div class="hv-range-legend"><div class="ev"><span>EV</span><strong>{{ wg.rangeEv }}<small>{{ wg.rangeUnit }}</small></strong></div><div><span>FUEL</span><strong>{{ wg.rangeFuel }}<small>{{ wg.rangeUnit }}</small></strong></div></div></div></div></button>
@@ -6611,7 +6636,12 @@ window.HavalSplash = (function () {
           </div>
         </div>
         <div class="hv-tires-focus-stage">
-          <img class="hv-tires-focus-car" src="./assets/ui/tires-top-view-v1.png" alt="Top view of vehicle">
+          <div class="hv-tires-focus-car-stage">
+            <img class="hv-tires-focus-car" src="./assets/ui/tires-top-view-v1.png" alt="Top view of vehicle">
+            <sc-for list="{{ focusedTiresWheels }}" as="tw" hint-placeholder-count="4">
+              <i class="hv-tires-focus-mark {{ tw.markCls }}" aria-hidden="true"></i>
+            </sc-for>
+          </div>
           <sc-for list="{{ focusedTiresWheels }}" as="tw" hint-placeholder-count="4">
             <article class="hv-tires-focus-wheel {{ tw.cls }}">
               <span>{{ tw.label }} · {{ tw.short }}</span>
@@ -6655,7 +6685,7 @@ window.HavalSplash = (function () {
       <div class="hv-status-focus-canonical">
         <div class="hv-status-full-console">
           <section class="hv-vehicle-window-panel" aria-label="Status e controles dos vidros"><div class="hv-vehicle-window-head"><strong>VIDROS</strong></div><div class="hv-vehicle-window-grid"><sc-for list="{{ focusedStatusWindowControls }}" as="sw" hint-placeholder-count="4"><button type="button" class="hv-vehicle-window-button {{ sw.cls }}" onClick="{{ sw.onClick }}" aria-label="{{ sw.ariaLabel }}" disabled="{{ sw.disabled }}" aria-disabled="{{ sw.disabled }}" aria-pressed="{{ sw.pressed }}"><strong aria-hidden="true">{{ sw.short }}</strong><span>{{ sw.stateLabel }}</span></button></sc-for></div><div class="hv-vehicle-window-all"><button type="button" onClick="{{ focusedStatusWindowCloseAll }}">FECHAR TODAS</button><button type="button" onClick="{{ focusedStatusWindowOpenAll }}">ABRIR TODAS</button></div></section>
-          <button type="button" class="hv-status-full-stage" onClick="{{ focusedStatusOpenRoofControls }}" aria-label="{{ focusedStatusAriaLabel }}"><div class="hv-hs-vehicle-meta"><strong class="hv-hs-vehicle-summary {{ focusedStatusSummaryClass }}">{{ focusedStatusSummary }}</strong><small class="hv-hs-vehicle-subtitle">{{ focusedStatusSubtitle }}</small></div><div class="hv-hs-vehicle-art" style="{{ focusedStatusVehicleStyle }}" aria-hidden="true"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ focusedStatusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ focusedStatusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ focusedStatusTires }}" as="st" hint-placeholder-count="4"><i class="hv-hs-vehicle-tire {{ st.cls }}"><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em><small>{{ st.temperature }} {{ st.temperatureUnit }}</small></i></sc-for></div><div class="hv-hs-vehicle-stats"><span><small>ABERTURAS</small><strong>{{ focusedStatusDoorStat }}</strong></span><span><small>VIDROS</small><strong>{{ focusedStatusGlassStat }}</strong></span><span class="{{ focusedStatusBeltStatClass }}"><small>CINTOS</small><strong>{{ focusedStatusBeltStat }}</strong></span><span class="{{ focusedStatusTireStatClass }}"><small>PNEUS</small><strong>{{ focusedStatusTireStat }}</strong></span></div></button>
+          <button type="button" class="hv-status-full-stage" onClick="{{ focusedStatusOpenRoofControls }}" aria-label="{{ focusedStatusAriaLabel }}"><div class="hv-hs-vehicle-meta"><strong class="hv-hs-vehicle-summary {{ focusedStatusSummaryClass }}">{{ focusedStatusSummary }}</strong><small class="hv-hs-vehicle-subtitle">{{ focusedStatusSubtitle }}</small></div><div class="hv-hs-vehicle-art" style="{{ focusedStatusVehicleStyle }}" aria-hidden="true"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ focusedStatusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ focusedStatusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ focusedStatusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-tire-mark {{ st.markCls }}" aria-hidden="true"></i></sc-for><sc-for list="{{ focusedStatusTires }}" as="st" hint-placeholder-count="4"><i class="hv-hs-vehicle-tire {{ st.cls }}"><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em><small>{{ st.temperature }} {{ st.temperatureUnit }}</small></i></sc-for></div><div class="hv-hs-vehicle-stats"><span><small>ABERTURAS</small><strong>{{ focusedStatusDoorStat }}</strong></span><span><small>VIDROS</small><strong>{{ focusedStatusGlassStat }}</strong></span><span class="{{ focusedStatusBeltStatClass }}"><small>CINTOS</small><strong>{{ focusedStatusBeltStat }}</strong></span><span class="{{ focusedStatusTireStatClass }}"><small>PNEUS</small><strong>{{ focusedStatusTireStat }}</strong></span></div></button>
           <aside class="hv-status-full-roof" aria-label="Controles do teto solar e da cortina"><section class="hv-status-focus-roof-card"><div class="hv-hs-roof-row"><div class="hv-hs-roof-slide" style="{{ focusedStatusSunroofLevelStyle }}"><span class="hv-hs-roof-slide-name">TETO SOLAR</span><span class="hv-hs-roof-slide-pct">{{ focusedStatusSunroofPct }}%</span><div class="hv-hs-roof-track"><i class="hv-hs-roof-track-well"></i><i class="hv-hs-roof-track-fill"></i><i class="hv-hs-roof-knob"></i><i class="hv-hs-roof-vent-mark"></i><input class="hv-hs-roof-quick-range" type="range" min="0" max="100" step="1" value="{{ focusedStatusSunroofPct }}" onInput="{{ focusedStatusSunroofInput }}" onChange="{{ focusedStatusSunroofInput }}" aria-label="Abertura do teto solar"></div></div></div><div class="hv-status-full-presets"><button type="button" onClick="{{ focusedStatusSunroofPrimary }}">{{ focusedStatusSunroofPrimaryLabel }}</button><button type="button" onClick="{{ focusedStatusSunroofSecondary }}">{{ focusedStatusSunroofSecondaryLabel }}</button></div></section><section class="hv-status-focus-roof-card"><div class="hv-hs-roof-row"><div class="hv-hs-roof-slide" style="{{ focusedStatusCurtainLevelStyle }}"><span class="hv-hs-roof-slide-name">CORTINA</span><span class="hv-hs-roof-slide-pct">{{ focusedStatusCurtainPct }}%</span><div class="hv-hs-roof-track"><i class="hv-hs-roof-track-well"></i><i class="hv-hs-roof-track-fill"></i><i class="hv-hs-roof-knob"></i><input class="hv-hs-roof-quick-range" type="range" min="0" max="100" step="1" value="{{ focusedStatusCurtainPct }}" onInput="{{ focusedStatusCurtainInput }}" onChange="{{ focusedStatusCurtainInput }}" aria-label="Abertura da cortina"></div></div></div><div class="hv-status-full-presets"><button type="button" onClick="{{ focusedStatusCurtainPrimary }}">{{ focusedStatusCurtainPrimaryLabel }}</button><button type="button" onClick="{{ focusedStatusCurtainSecondary }}">{{ focusedStatusCurtainSecondaryLabel }}</button></div></section></aside>
         </div>
         <footer class="hv-status-full-footer"><button type="button" onClick="{{ focusedStatusWindowsToggleAll }}">{{ focusedStatusWindowsToggleAllLabel }}</button><button type="button" onClick="{{ focusedStatusRoofToggleAll }}">{{ focusedStatusRoofToggleAllLabel }}</button><button type="button" onClick="{{ focusedStatusTrunkToggle }}">{{ focusedStatusTrunkToggleLabel }}</button></footer>
@@ -7494,8 +7524,11 @@ const CAR_SIGNALS = {
   tireStatus: 'car.basic.tpms_status',
   tireUnits: 'car.basic.tpms_units',
   tireWarnings: [
+    // Per-corner brace vectors `{fl,fr,rl,rr}` (1 = flagged). Measured
+    // 2026-09-17 with RL low: tirepress_warning={0,0,1,0} at 2.17 bar.
     'car.basic.tirepress_warning',
     'car.basic.tiretemp_warning',
+    // Aggregate TPMS lamps (scalar). Used only when no corner is identified.
     'car.basic.tpms_warning',
     'car.ipk_light.tpms_warning',
   ],
@@ -7756,7 +7789,9 @@ const H6_DESKTOPS_KEY = 'h6_desktops_v1';
 const H6_DESKTOPS_VERSION = 5;
 const H6_MAX_DESKTOPS = 6;
 // Real thumbnails for the Desktops strip, one JPEG data URL per desktop id.
-const H6_DESKTOP_SHOTS_KEY = 'h6_desktop_shots_v1';
+const H6_DESKTOP_SHOTS_KEY = 'h6_desktop_shots_v2';
+/** Finger travel (px) that commits a desktop switch on release or mid-drag. */
+const H6_DESK_SLIDE_COMMIT_PX = 100;
 // The one widget canvas: panel-wide and fixed. See _gridColsForMode.
 const H6_FULL_GRID = { cols: 6, rows: 2 };
 // ENERGIA by version: nominal battery (GWM publishes no usable figure), tank and
@@ -9446,6 +9481,31 @@ class Component extends DCLogic {
       }
     }
     return { pressuresBar, temperaturesC };
+  }
+
+  /**
+   * Per-corner TPMS flags from the car: `car.basic.tirepress_warning` and
+   * `car.basic.tiretemp_warning` are brace vectors `{fl,fr,rl,rr}` with 1 =
+   * flagged. Measured 2026-09-17 with RL low: pressures ≈ 2.45/2.46/2.17/2.46
+   * bar and tirepress_warning `{0,0,1,0}`. Scalar keys
+   * (`car.basic.tpms_warning`, `car.ipk_light.tpms_warning`) stay aggregate.
+   * Anything unparsable is treated as no corner flags rather than inventing
+   * four warnings.
+   */
+  _parseTireCornerFlags(value) {
+    const flags = [false, false, false, false];
+    const raw = String(value == null ? '' : value).trim();
+    if (!raw) return flags;
+    const parts = raw.replace(/^\s*[\[{]\s*|\s*[\]}]\s*$/g, '').split(',');
+    if (parts.length < 4) {
+      // A lone 0/1 is an aggregate lamp, not a corner map.
+      return flags;
+    }
+    for (let i = 0; i < 4; i++) {
+      const part = String(parts[i] == null ? '' : parts[i]).trim().toLowerCase();
+      flags[i] = part === '1' || part === 'true';
+    }
+    return flags;
   }
 
   _refreshTireTelemetry() {
@@ -20921,6 +20981,7 @@ class Component extends DCLogic {
             '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="rr-open" src="./assets/ui/vehicle-status/window-rr-open-v2.png" alt="">' +
             '<img class="hv-hs-vehicle-layer window" data-hs-vehicle-window="rr-partial" src="./assets/ui/vehicle-status/window-rr-partial-v2.png" alt="">' +
             '<i class="hv-hs-vehicle-belt fl" data-hs-vehicle-belt="fl"></i><i class="hv-hs-vehicle-belt fr" data-hs-vehicle-belt="fr"></i><i class="hv-hs-vehicle-belt rl" data-hs-vehicle-belt="rl"></i><i class="hv-hs-vehicle-belt rc" data-hs-vehicle-belt="rc"></i><i class="hv-hs-vehicle-belt rr" data-hs-vehicle-belt="rr"></i>' +
+            '<i class="hv-hs-vehicle-tire-mark fl" data-hs-vehicle-tire-mark="front-left"></i><i class="hv-hs-vehicle-tire-mark fr" data-hs-vehicle-tire-mark="front-right"></i><i class="hv-hs-vehicle-tire-mark rl" data-hs-vehicle-tire-mark="rear-left"></i><i class="hv-hs-vehicle-tire-mark rr" data-hs-vehicle-tire-mark="rear-right"></i>' +
             '<i class="hv-hs-vehicle-tire fl" data-hs-vehicle-tire="front-left"><strong>—</strong><em></em><small>—</small></i><i class="hv-hs-vehicle-tire fr" data-hs-vehicle-tire="front-right"><strong>—</strong><em></em><small>—</small></i><i class="hv-hs-vehicle-tire rl" data-hs-vehicle-tire="rear-left"><strong>—</strong><em></em><small>—</small></i><i class="hv-hs-vehicle-tire rr" data-hs-vehicle-tire="rear-right"><strong>—</strong><em></em><small>—</small></i>' +
           '</div>' +
           '<div class="hv-hs-vehicle-stats"><span><small>ABERTURAS</small><strong data-hs-vehicle-doors>—</strong></span><span><small>VIDROS</small><strong data-hs-vehicle-glass>—</strong></span><span data-hs-vehicle-belts-wrap><small>CINTOS</small><strong data-hs-vehicle-belts>—</strong></span><span data-hs-vehicle-tires-wrap><small>PNEUS</small><strong data-hs-vehicle-tires>—</strong></span></div>' +
@@ -20973,6 +21034,10 @@ class Component extends DCLogic {
     roofPop.querySelectorAll('[data-hs-window-state]').forEach((el) => { this._hsWindowStateEls[el.getAttribute('data-hs-window-state')] = el; });
     this._hsVehicleTireEls = {};
     roofPop.querySelectorAll('[data-hs-vehicle-tire]').forEach((el) => { this._hsVehicleTireEls[el.getAttribute('data-hs-vehicle-tire')] = el; });
+    this._hsVehicleTireMarkEls = {};
+    roofPop.querySelectorAll('[data-hs-vehicle-tire-mark]').forEach((el) => {
+      this._hsVehicleTireMarkEls[el.getAttribute('data-hs-vehicle-tire-mark')] = el;
+    });
     this._hsVehicleCavityEls = {};
     roofPop.querySelectorAll('[data-hs-vehicle-cavity]').forEach((el) => { this._hsVehicleCavityEls[el.getAttribute('data-hs-vehicle-cavity')] = el; });
     this._hsVehicleClosedDoorEls = {};
@@ -21770,7 +21835,18 @@ class Component extends DCLogic {
       if (pressureUnit) pressureUnit.textContent = target && target.pressureUnit ? target.pressureUnit : '';
       if (temperature) temperature.textContent = target && target.hasTemperature
         ? target.temperature + ' ' + target.temperatureUnit : 'TEMP. —';
-      el.className = 'hv-hs-vehicle-tire ' + ({'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'}[key] || '') + ' ' + (target ? target.state : 'unavailable');
+      const short = ({'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'}[key] || '');
+      el.className = target && target.cls
+        ? 'hv-hs-vehicle-tire ' + target.cls
+        : ('hv-hs-vehicle-tire ' + short + ' ' + (target ? target.state : 'unavailable'));
+    });
+    Object.keys(this._hsVehicleTireMarkEls || {}).forEach((key) => {
+      const target = tireWheels.find((wheel) => wheel.key === key);
+      const el = this._hsVehicleTireMarkEls[key];
+      const short = ({'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'}[key] || '');
+      el.className = target && target.markCls
+        ? 'hv-hs-vehicle-tire-mark ' + target.markCls
+        : ('hv-hs-vehicle-tire-mark ' + short + ' ' + (target && target.state === 'warning' ? 'warning' : 'ok'));
     });
     if (this._hsVehicleTires) {
       this._hsVehicleTires.textContent = envelope.tires && envelope.tires.warning ? '!' : (tireWheels.some((wheel) => wheel.pressure !== '—') ? 'OK' : '—');
@@ -25675,7 +25751,10 @@ class Component extends DCLogic {
         ((board && board.items) || []).map((i) => i.type + i.x + i.y + i.w + i.h).join(',')].join('|');
       if (shotSig !== this._desktopShotTrigger) {
         this._desktopShotTrigger = shotSig;
-        if (this._viewerReady) this._scheduleDesktopShot(3000);
+        // Wait for intro + chrome; early schedules only poll while blocked.
+        if (this._viewerReady && this._introPlayed && !this._introActive) {
+          this._scheduleDesktopShot(3500);
+        }
       }
     }
     // Start the load intro only after the loading overlay has actually cleared.
@@ -33847,6 +33926,9 @@ class Component extends DCLogic {
     } else {
       this._scheduleCamIconWarmup();
     }
+    // First honest desktop photograph: after the intro has actually settled
+    // and the widget boards are on screen (hv-boot clears ~2s after splash).
+    this._scheduleDesktopShot(3500);
   }
 
   _tickIntro(dt) {
@@ -34660,9 +34742,9 @@ class Component extends DCLogic {
     const d = this._desktops && this._desktops[index];
     if (!d) return null;
     const shot = this._desktopShots && this._desktopShots[d.id];
+    // Only a matching settled frame — stale intro/splash captures must not
+    // stand in for the real desktop.
     if (shot && shot.url && shot.sig === this._desktopShotSig(d)) return shot;
-    // Stale / missing sig still usable for motion — better than a blank panel.
-    if (shot && shot.url) return shot;
     return null;
   }
 
@@ -34959,7 +35041,13 @@ class Component extends DCLogic {
   /** Anything covering the desktop would end up in its thumbnail. */
   _desktopShotBlocked() {
     const s = this.state;
-    return !!(s.loading || s.error || !this._viewerReady || this._introActive
+    const splash = (typeof window !== 'undefined') ? window.HavalSplash : null;
+    const body = (typeof document !== 'undefined') ? document.body : null;
+    const bootChrome = !!(body && (body.classList.contains('hv-splash-up')
+      || body.classList.contains('hv-boot')));
+    return !!(s.loading || s.error || !this._viewerReady || !this._introPlayed
+      || this._introActive || this._camAnim || s.splashActive
+      || (splash && splash.active) || bootChrome
       || s.desktopStudioOpen || s.focusedCardType || s.widgetMenuId || s.widgetPickerStep
       || s.widgetPlaceType || s.widgetPlaceMode || s.wallpaperPopupOpen || s.panelOpen || s.graphEditId
       || (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx))
@@ -35004,6 +35092,14 @@ class Component extends DCLogic {
       if (typeof req.after === 'function') req.after(false);
       return;
     }
+    // Native answers late; drop the frame if the desktop is covered again
+    // (splash / intro / studio) so we never cache an intro-movie still.
+    if (this._desktopShotBlocked()
+      || !this._desktops || !this._desktops[this._desktopIndex || 0]
+      || this._desktops[this._desktopIndex || 0].id !== req.id) {
+      if (typeof req.after === 'function') req.after(false);
+      return;
+    }
     this._desktopShots[req.id] = { url, sig: req.sig, at: Date.now() };
     this._saveDesktopShots();
     if (typeof req.after === 'function') req.after(true);
@@ -35019,12 +35115,12 @@ class Component extends DCLogic {
     this._desktopShotTimer = setTimeout(() => {
       if (this._desktopShotBlocked()) {
         this._desktopShotTries = (this._desktopShotTries || 0) + 1;
-        if (this._desktopShotTries < 20) this._scheduleDesktopShot(3000);
+        if (this._desktopShotTries < 30) this._scheduleDesktopShot(2500);
         return;
       }
       this._desktopShotTries = 0;
       this._requestDesktopShot();
-    }, delay);
+    }, delay == null ? 3500 : delay);
   }
 
   _setStudioTab(tab) {
@@ -35820,7 +35916,7 @@ class Component extends DCLogic {
     if (!g.trackSlide || !g.moved) return;
     // Need a clear horizontal intent before arming the slide layers.
     if (!this._deskSlide) {
-      if (Math.abs(dx) < 22 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      if (Math.abs(dx) < 18 || Math.abs(dx) < Math.abs(dy) * 1.1) return;
       if (!this._desktopReady || !this._desktops || this._desktops.length < 2) return;
       const dir = dx < 0 ? -1 : 1;
       const count = this._desktops.length;
@@ -35838,7 +35934,17 @@ class Component extends DCLogic {
         this._fillDeskSlidePane(this._deskSlideDom && this._deskSlideDom.incoming, toIndex);
       }
     }
-    if (this._deskSlide && !this._deskSlide.busy) this._deskSlideApplyOffset(dx);
+    if (this._deskSlide && !this._deskSlide.busy) {
+      this._deskSlideApplyOffset(dx);
+      // Commit as soon as travel hits the threshold — no need to wait for lift.
+      const travel = Math.abs(this._deskSlide.dx || dx);
+      if (travel >= H6_DESK_SLIDE_COMMIT_PX && Math.abs(dx) >= Math.abs(dy)) {
+        this._suppressDesktopClickUntil = Date.now() + 450;
+        if (g.fromBoard) this._suppressNextWidgetClick();
+        g.slideCommitted = true;
+        this._deskSlideCommit(this._deskSlide.toIndex, this._deskSlide.dir, this._deskSlide.dx || dx);
+      }
+    }
   }
 
   _onDesktopGestureEnd(ev) {
@@ -35846,22 +35952,22 @@ class Component extends DCLogic {
     this._desktopGesture = null;
     if (g && this.controls && g.controlsEnabled != null) this.controls.enabled = g.controlsEnabled;
     if (!g) return;
+    if (g.slideCommitted) return;
     const p = this._eventClientPoint(ev);
     if (!p) return;
     const dx = p.x - g.x;
     const dy = p.y - g.y;
-    const w = this._deskSlideWidth();
     const vx = g.vx || 0;
+    const travel = Math.max(Math.abs(dx), Math.abs((this._deskSlide && this._deskSlide.dx) || 0));
 
     // Interactive slide was armed — commit or snap back.
     if (this._deskSlide && !this._deskSlide.busy && g.trackSlide) {
       const dir = this._deskSlide.dir;
-      const progress = Math.abs(this._deskSlide.dx || dx) / w;
-      const flicked = (dir < 0 && vx < -0.45) || (dir > 0 && vx > 0.45);
-      const farEnough = progress >= 0.22 || Math.abs(dx) >= 72;
+      const flicked = (dir < 0 && vx < -0.35) || (dir > 0 && vx > 0.35);
+      const farEnough = travel >= H6_DESK_SLIDE_COMMIT_PX && Math.abs(dx) >= Math.abs(dy) * 0.85;
       this._suppressDesktopClickUntil = Date.now() + 450;
       if (g.fromBoard) this._suppressNextWidgetClick();
-      if ((farEnough || flicked) && Math.abs(dy) <= 90) {
+      if (farEnough || flicked) {
         this._deskSlideCommit(this._deskSlide.toIndex, dir, this._deskSlide.dx || dx);
       } else {
         this._deskSlideCancel(this._deskSlide.dx || dx);
@@ -35870,7 +35976,8 @@ class Component extends DCLogic {
     }
 
     const isSwipe = !!(g.moved && Date.now() - g.at < 900
-      && Math.abs(dx) >= 72 && Math.abs(dy) <= 64 && Math.abs(dx) > Math.abs(dy) * 1.35);
+      && travel >= H6_DESK_SLIDE_COMMIT_PX
+      && Math.abs(dx) >= Math.abs(dy) * 1.1);
     if (isSwipe) {
       this._suppressDesktopClickUntil = Date.now() + 450;
       if (g.fromBoard) this._suppressNextWidgetClick();
@@ -35887,6 +35994,7 @@ class Component extends DCLogic {
     const g = this._desktopGesture;
     this._desktopGesture = null;
     if (g && this.controls && g.controlsEnabled != null) this.controls.enabled = g.controlsEnabled;
+    if (g && g.slideCommitted) return;
     if (this._deskSlide && !this._deskSlide.busy) this._deskSlideCancel(this._deskSlide.dx || 0);
   }
 
@@ -38910,31 +39018,60 @@ class Component extends DCLogic {
       : (Array.isArray(this._tirePressuresBar) ? this._tirePressuresBar : [null, null, null, null]);
     const temperatures = demo ? [29, 30, 31, 31]
       : (Array.isArray(this._tireTemperaturesC) ? this._tireTemperaturesC : [null, null, null, null]);
-    const warningSignal = observed && CAR_SIGNALS.tireWarnings.some((key) => (
-      Object.prototype.hasOwnProperty.call(this._tireWarningsRaw || {}, key)
-        && this._carBool(this._tireWarningsRaw[key])
-    ));
+    const warningsRaw = this._tireWarningsRaw || {};
+    // Prefer the car's own corner maps. Absolute bands are only a last-resort
+    // safety net for a missing warning key — the OEM flagged RL at 2.17 bar,
+    // which is above the old 1.9 hard floor and was therefore invisible.
+    const pressFlags = observed
+      ? this._parseTireCornerFlags(warningsRaw['car.basic.tirepress_warning'])
+      : [false, false, false, false];
+    const tempFlags = observed
+      ? this._parseTireCornerFlags(warningsRaw['car.basic.tiretemp_warning'])
+      : [false, false, false, false];
+    const aggregateWarning = observed && ['car.basic.tpms_warning', 'car.ipk_light.tpms_warning']
+      .some((key) => Object.prototype.hasOwnProperty.call(warningsRaw, key)
+        && this._carBool(warningsRaw[key]));
     const tpmsKeys = [CAR_SIGNALS.tireStatus].concat(CAR_SIGNALS.tireWarnings);
     const fresh = observed && this._carSignalFreshness(tpmsKeys) === 'live';
+    // Extreme absolute fallbacks only — OEM flags win when present.
+    const PRESSURE_LOW_BAR = 1.9;
+    const PRESSURE_HIGH_BAR = 3.2;
+    // Soft UI fallback when tiretemp_warning is absent: ~80 C is a common OEM
+    // TPMS hot threshold; running highway temps of 40-65 C are normal.
+    const TEMP_HOT_C = 80;
     const wheels = positions.map((position, index) => {
       const pressure = typeof pressures[index] === 'number' && isFinite(pressures[index])
         ? Number(pressures[index]) : null;
       const temperature = typeof temperatures[index] === 'number' && isFinite(temperatures[index])
         ? Number(temperatures[index]) : null;
-      // A temperature-only sample is useful supporting data, but it must not
-      // make a missing pressure look healthy. The broadcast warning is global
-      // (no corner is identified), so only the pressure threshold can assign a
-      // warning to a specific wheel.
       const hasPressure = pressure !== null;
-      const warning = hasPressure && (pressure < 1.9 || pressure > 3.2);
-      const state = !hasPressure ? 'unavailable' : (warning ? 'warning' : 'normal');
+      const pressureWarning = pressFlags[index]
+        || (hasPressure && (pressure < PRESSURE_LOW_BAR || pressure > PRESSURE_HIGH_BAR));
+      const temperatureWarning = tempFlags[index]
+        || (temperature !== null && temperature >= TEMP_HOT_C);
+      const warning = pressureWarning || temperatureWarning;
+      const state = !hasPressure && temperature === null
+        ? 'unavailable'
+        : (warning ? 'warning' : (hasPressure ? 'normal' : 'unavailable'));
+      const shortKey = ({ 'front-left': 'fl', 'front-right': 'fr', 'rear-left': 'rl', 'rear-right': 'rr' })[position.key] || '';
+      const cls = [position.key, shortKey, state,
+        pressureWarning ? 'pressure-warning' : '',
+        temperatureWarning ? 'temp-warning' : ''].filter(Boolean).join(' ');
       return {
         key: position.key,
         short: position.short,
         label: position.label,
-        cls: position.key + ' ' + state,
+        cls: cls,
+        markCls: [position.key, shortKey, warning ? 'warning' : 'ok',
+          pressureWarning ? 'pressure-warning' : '',
+          temperatureWarning ? 'temp-warning' : ''].filter(Boolean).join(' '),
         state: state,
-        stateLabel: state === 'warning' ? 'CHECK' : (state === 'normal' ? 'NORMAL' : 'UNAVAILABLE'),
+        pressureWarning: !!pressureWarning,
+        temperatureWarning: !!temperatureWarning,
+        stateLabel: warning
+          ? (pressureWarning && temperatureWarning ? 'PRESSURE · TEMP'
+            : (pressureWarning ? 'LOW PRESSURE' : 'HOT'))
+          : (state === 'normal' ? 'NORMAL' : 'UNAVAILABLE'),
         pressure: pressure === null ? '—' : formatTirePressure(pressure, pressureFormat),
         pressureUnit: pressure === null ? '' : pressureUnit,
         hasTemperature: temperature !== null,
@@ -38943,14 +39080,25 @@ class Component extends DCLogic {
       };
     });
     const pressureCount = wheels.filter((wheel) => wheel.pressure !== '—').length;
-    const anyPressureWarning = wheels.some((wheel) => wheel.state === 'warning');
-    const overallWarning = warningSignal || anyPressureWarning;
+    const anyCornerWarning = wheels.some((wheel) => wheel.state === 'warning');
+    const overallWarning = anyCornerWarning || aggregateWarning;
+    const flagged = wheels.filter((wheel) => wheel.state === 'warning');
     const source = observed
       ? (fresh ? 'VEHICLE · LIVE' : 'VEHICLE · STALE')
       : (demo ? 'DEMO · SIMULATED · NOT VEHICLE' : 'UNAVAILABLE · NO TPMS SIGNAL');
     const state = overallWarning ? 'warning'
       : (demo ? 'demo' : (observed && pressureCount ? (fresh ? 'live' : 'stale') : 'unavailable'));
     const unavailable = pressureCount === 0;
+    let tiresSummary = 'PRESSURE DATA UNAVAILABLE';
+    if (flagged.length === 1) {
+      tiresSummary = flagged[0].label + (flagged[0].pressureWarning ? ' · CHECK PRESSURE' : ' · HIGH TEMP');
+    } else if (flagged.length > 1) {
+      tiresSummary = flagged.length + ' TYRES NEED ATTENTION';
+    } else if (aggregateWarning) {
+      tiresSummary = 'TPMS WARNING · POSITION NOT REPORTED';
+    } else if (pressureCount) {
+      tiresSummary = 'ALL AVAILABLE TYRES NORMAL';
+    }
     return {
       tiresSizeClass: 'hv-tires-' + (item.w || 2) + 'x' + (item.h || 1)
         + (unavailable ? ' hv-tires-unavailable' : '') + (overallWarning ? ' hv-tires-warning' : ''),
@@ -38960,9 +39108,7 @@ class Component extends DCLogic {
         ? (fresh ? 'TPMS UPDATED WITHIN 2 MIN' : 'TPMS DATA OLDER THAN 2 MIN')
         : (demo ? 'SIMULATED PRESSURE & TEMPERATURE' : 'PRESSURE DATA NOT CONNECTED'),
       tiresUnit: pressureCount ? pressureUnit : '',
-      tiresSummary: anyPressureWarning ? 'CHECK TYRE PRESSURE'
-        : (warningSignal ? 'TPMS WARNING · POSITION NOT REPORTED'
-          : (pressureCount ? 'ALL AVAILABLE TYRES NORMAL' : 'PRESSURE DATA UNAVAILABLE')),
+      tiresSummary: tiresSummary,
       tiresOverallState: state,
       tiresWarning: overallWarning,
       tiresHasAnyPressure: pressureCount > 0,
@@ -39126,7 +39272,15 @@ class Component extends DCLogic {
       summary: tireView.tiresSummary,
       unit: tireView.tiresPressureUnit,
     };
-    const tireAttention = tires.warning ? [{ cls:'attention', label:'Tyre pressure needs attention' }] : [];
+    const tireAttention = (tires.wheels || []).filter((wheel) => wheel.state === 'warning').map((wheel) => ({
+      cls: 'attention',
+      label: wheel.label + (wheel.pressureWarning
+        ? (wheel.temperatureWarning ? ' pressure & temperature' : ' pressure low')
+        : ' temperature high'),
+    }));
+    if (!tireAttention.length && tires.warning) {
+      tireAttention.push({ cls: 'attention', label: 'Tyre pressure needs attention' });
+    }
     const attentionItems = doors.open.map((opening) => ({ cls: 'attention', label: opening.label + ' open' }))
       .concat(roofAttention, glassAttention, beltAttention, tireAttention);
     if (!attentionItems.length) attentionItems.push({ cls: '', label: demo ? 'Demo vehicle secured' : 'Only verified vehicle signals are shown' });
@@ -39138,6 +39292,7 @@ class Component extends DCLogic {
     // the GLASS/BELTS rows continue to expose their independent demo warnings.
     // Live/unavailable surfaces retain the normal cross-system priority below.
     if (!demo && !doors.open.length && beltAttention.length) summary = 'Seat belt attention';
+    else if (!demo && !doors.open.length && tireAttention.length) summary = tireAttention.length === 1 ? tireAttention[0].label : tireAttention.length + ' tyres need attention';
     else if (!demo && !doors.open.length && glassAttention.length) summary = glassAttention.length === 1 ? glassAttention[0].label : glassAttention.length + ' windows open';
     else if (!demo && !doors.open.length && roofAttention.length) summary = roofAttention[0].label;
     const realisticArt = demo && doors.open.some((opening) => opening.key === 'fl')
@@ -39646,9 +39801,20 @@ class Component extends DCLogic {
     }[String(value || '').toLowerCase()] || String(value || '—').toUpperCase());
     const ptDoorName = { fl:'Porta dianteira esquerda', fr:'Porta dianteira direita',
       rl:'Porta traseira esquerda', rr:'Porta traseira direita', trunk:'Porta-malas' };
+    const ptTireName = {
+      'front-left': 'Pneu dianteiro esquerdo',
+      'front-right': 'Pneu dianteiro direito',
+      'rear-left': 'Pneu traseiro esquerdo',
+      'rear-right': 'Pneu traseiro direito',
+    };
+    const flaggedTires = (envelope.tires.wheels || []).filter((wheel) => wheel.state === 'warning');
     const ptSummary = (() => {
       if (status.open.length === 1) return ptDoorName[status.open[0].key] + (status.open[0].key === 'trunk' ? ' aberto' : ' aberta');
       if (status.open.length > 1) return status.open.length + ' aberturas';
+      if (flaggedTires.length === 1) {
+        return ptTireName[flaggedTires[0].key] + (flaggedTires[0].pressureWarning ? ' com pressão baixa' : ' quente');
+      }
+      if (flaggedTires.length > 1) return flaggedTires.length + ' pneus precisam de atenção';
       if (status.openings.every((opening) => opening.state === 'closed')) return 'Tudo fechado';
       if (status.openings.some((opening) => opening.state !== 'unknown')) return 'Status parcial';
       return 'Status indisponível';
@@ -39724,7 +39890,10 @@ class Component extends DCLogic {
       statusSource: ptMode,
       statusState: status.state,
       statusSummary: ptSummary,
-      statusSummaryClass: status.open.length || envelope.seatBelts.some((belt) => belt.state === 'unfastened') ? 'attention' : '',
+      statusSummaryClass: status.open.length
+        || envelope.seatBelts.some((belt) => belt.state === 'unfastened')
+        || flaggedTires.length
+        ? 'attention' : '',
       statusSubtitle: ptSubtitle,
       statusOpenings: status.openings,
       statusRealisticArt: envelope.realisticArt,
@@ -39737,7 +39906,12 @@ class Component extends DCLogic {
       statusWindowOpenAll: (ev) => this._setAllStatusWindows('open', ev),
       statusSeatBelts: envelope.seatBelts,
       statusTires: envelope.tires.wheels.map((wheel) => Object.assign({}, wheel, {
-        cls:wheel.key + ' ' + ({'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'}[wheel.key] || '') + ' ' + wheel.state,
+        cls: wheel.cls || (wheel.key + ' '
+          + ({'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'}[wheel.key] || '')
+          + ' ' + wheel.state),
+        markCls: wheel.markCls || (wheel.key + ' '
+          + ({'front-left':'fl','front-right':'fr','rear-left':'rl','rear-right':'rr'}[wheel.key] || '')
+          + ' ' + (wheel.state === 'warning' ? 'warning' : 'ok')),
       })),
       statusSunroofPct: envelope.sunroof.pct,
       statusCurtainPct: envelope.curtain.pct,

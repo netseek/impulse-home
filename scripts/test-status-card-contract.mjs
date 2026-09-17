@@ -126,6 +126,11 @@ assert.ok(!popupMarkup.includes('roof-top-view-v1.png'), 'popup must not contain
 assert.ok(!popupMarkup.includes('hv-hs-unified'), 'popup must not retain the old two-panel/two-car layout');
 all(popupMarkup, ['hv-vehicle-window-panel', 'data-hs-window-key="fl"', 'data-hs-window-key="fr"', 'data-hs-window-key="rl"', 'data-hs-window-key="rr"', 'data-hs-window-all="close"', 'data-hs-window-all="open"'], 'left-side window console');
 assert.equal((popupMarkup.match(/data-hs-vehicle-tire=/g) || []).length, 4, 'popup must render all four tire positions around the one car');
+assert.equal((popupMarkup.match(/data-hs-vehicle-tire-mark=/g) || []).length, 4,
+  'popup must render a wheel-arch mark for each tire corner');
+assert.match(html, /\.hv-status-tire-mark\.warning,\s*\.hv-hs-vehicle-tire-mark\.warning|\.hv-hs-vehicle-tire-mark\.warning,\s*\.hv-status-tire-mark\.warning/,
+  'status tire marks must appear only in the warning state');
+assert.match(statusView, /markCls:/, 'status tire payload must expose mark classes for wheel rectangles');
 assert.equal((popupMarkup.match(/data-hs-vehicle-tire="[^"]+"><strong>—<\/strong><em><\/em><small>—<\/small>/g) || []).length, 4,
   'popup tire positions must show pressure over temperature without redundant corner initials');
 assert.equal((popupMarkup.match(/class="hv-hs-roof-quick-range"/g) || []).length, 2,

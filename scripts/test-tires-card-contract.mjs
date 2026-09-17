@@ -92,6 +92,9 @@ includesAll(html, [
   '.hv-tire-point.normal strong { color:var(--hv-widget-fg); }',
   '.hv-tires-focus-wheel.normal > strong,',
   '.hv-tires-focus-wheel.normal .hv-tires-temperature strong { color:var(--hv-widget-fg); }',
+  '.hv-tire-point.warning strong,.hv-tire-point.pressure-warning strong { color:#ff6671; }',
+  '.hv-tire-wheel-mark.warning { display:block; }',
+  '.hv-tires-focus-mark.warning { display:block; }',
 ], 'Tires primary text colors');
 
 // Unit changes are presentation-only: bar / °C remain the canonical signal values.
@@ -160,6 +163,17 @@ assert.match(parserBody, /parts\.length\s*<\s*8/, 'tpms_status carries eight int
 const parseTpmsStatus = Function('value', parserBody);
 const round2 = (list) => list.map((n) => (n === null ? null : Math.round(n * 100) / 100));
 
+const cornerFlagsBody = methodBody(html, '  _parseTireCornerFlags(', '_parseTireCornerFlags()');
+const parseTireCornerFlags = Function('value', cornerFlagsBody);
+assert.deepEqual(parseTireCornerFlags('{0,0,1,0}'), [false, false, true, false],
+  'tirepress_warning maps FL,FR,RL,RR corner flags');
+assert.deepEqual(parseTireCornerFlags('{0,0,0,0}'), [false, false, false, false],
+  'clear tire warning vector is all false');
+assert.deepEqual(parseTireCornerFlags('1'), [false, false, false, false],
+  'scalar aggregate lamps are not treated as corner maps');
+assert.deepEqual(parseTireCornerFlags(''), [false, false, false, false],
+  'empty warning payload stays quiet');
+
 // The exact frame captured off the car (bar, Celsius).
 assert.deepEqual(
   round2(parseTpmsStatus('{2.48922,24.0,2.48922,24.0,2.28335,23.0,2.48922,24.0}').pressuresBar),
@@ -200,10 +214,13 @@ includesAll(tiresView, [
   'tiresCyclePressureUnit:',
   'tiresToggleTemperatureUnit:',
   'hasTemperature:',
-  'const hasPressure = pressure !== null;',
-  'const warning = hasPressure &&',
-  'const overallWarning = warningSignal || anyPressureWarning;',
+  'const pressureWarning = pressFlags[index]',
+  'const temperatureWarning = tempFlags[index]',
+  'const overallWarning = anyCornerWarning || aggregateWarning;',
   'TPMS WARNING · POSITION NOT REPORTED',
+  '_parseTireCornerFlags',
+  "warningsRaw['car.basic.tirepress_warning']",
+  "warningsRaw['car.basic.tiretemp_warning']",
   // Freshness is bus liveness, not per-key age: a seated tyre publishes once
   // and never again, so a per-key window aged the card out on a healthy bus.
   "this._carSignalFreshness(tpmsKeys) === 'live'",
@@ -274,11 +291,16 @@ assert.ok(!nativeReadouts.includes('"FL", "FR", "RL", "RR"'),
   'native compact Tires card must not label pressures with wheel abbreviations');
 assert.ok(!nativeReadouts.includes('drawCircle'), 'native corner readouts must contain no dots');
 const nativeTiresRaster = blockFrom(native, '        private void drawTiresRaster(', 'drawTiresRaster()');
-assert.ok(!nativeTiresRaster.includes('drawRoundRect'),
-  'native compact Tires card must not add a rounded background behind the vehicle');
+includesAll(nativeTiresRaster, ['drawTireWheelMarks(', 'drawTireReadouts('],
+  'native compact Tires card draws warning marks on the vehicle');
+const nativeTireMarks = blockFrom(native, '        private void drawTireWheelMarks(', 'drawTireWheelMarks()');
+includesAll(nativeTireMarks, ['"warning"', 'drawRoundRect', '0xFFFF6671'],
+  'native tire marks are red rectangles on flagged wheels');
 const nativeTireColor = blockFrom(native, '        private int tireSignalColor(', 'tireSignalColor()');
 assert.match(nativeTireColor, /if\s*\("demo"\.equals\(descriptor\.state\)\)\s*return\s+dockLabelColor\(\);/,
   'normal demo readings must use the native primary text color');
+assert.match(nativeTireColor, /if\s*\("warning"\.equals\(wheelState\)\)\s*return\s+0xFFFF6671;/,
+  'warning pressure readouts must use the shared red tone');
 
 // This visual pilot must not rename stores that hold the user's existing
 // desktops, layouts, shell boot choice, launcher overrides, or native shell.
