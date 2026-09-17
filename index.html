@@ -625,10 +625,9 @@ window.HavalSplash = (function () {
     }
   </style>
   <style>
-    /* Black, not the old #0b1016: this is what shows around/behind #hv-root, and
-       the boot splash clip is pure black (see #hv-splash in <head>). */
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
-    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    *:focus, *:active, *:focus-visible { outline: none; -webkit-tap-highlight-color: transparent; }
     @keyframes vp-spin { to { transform: rotate(360deg); } }
     @keyframes vp-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
     .hv-toolbar {
@@ -3510,6 +3509,16 @@ window.HavalSplash = (function () {
       box-shadow: var(--hv-widget-shadow, 0 2px 10px rgba(0,0,0,.32));
       transition: background .15s ease, border-color .15s ease, color .15s ease;
       font-size: 0;
+      outline: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+      -webkit-touch-callout: none;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    .hv-hs-dot:focus, .hv-hs-dot:active, .hv-hs-dot:focus-visible {
+      outline: none !important;
+      -webkit-tap-highlight-color: transparent !important;
     }
     .hv-hs-dot::before {
       content: '';
@@ -3556,6 +3565,8 @@ window.HavalSplash = (function () {
       transform: translate3d(-9999px, -9999px, 0);
       will-change: transform, opacity;
       transition: opacity .18s ease;
+      -webkit-tap-highlight-color: transparent !important;
+      outline: none !important;
     }
     .hv-cam-fab.on { opacity: 1; visibility: visible; }
     .hv-cam-fab-btn {
@@ -3574,6 +3585,18 @@ window.HavalSplash = (function () {
       pointer-events: auto;
       box-shadow: var(--hv-widget-shadow, 0 2px 10px rgba(0,0,0,.32));
       transition: background .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+      outline: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+      -webkit-touch-callout: none;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    .hv-cam-fab-btn:focus,
+    .hv-cam-fab-btn:active,
+    .hv-cam-fab-btn:focus-visible {
+      outline: none !important;
+      -webkit-tap-highlight-color: transparent !important;
     }
     /* Invisible oversized hit zone — enlarges the tap target without touching
        the visible 34px circle (generated content still hit-tests to the button). */
@@ -7512,6 +7535,8 @@ const CAR_SIGNALS = {
   // Impulse publishes it to the cluster themes alongside fuel_mode_remain_odometer
   // and its dashboard card prints the pair as "31.9 L - 210 km".
   fuelLevel: 'car.basic.remain_fuel_percentage',
+  energyDriveState: 'car.ev_info.energy_drive_state',
+  chargingState: 'car.ev_info.charging_state',
   // TPMS. `car.tpms.pressures` / `car.tpms.temperatures` were never real — no
   // such key exists in Impulse's CarConstants and nothing on the bus ever
   // published them, which is why the TIRES card read PRESSURE UNAVAILABLE on a
@@ -9441,6 +9466,7 @@ class Component extends DCLogic {
             CAR_SIGNALS.tireStatus, CAR_SIGNALS.tireUnits,
             CAR_SIGNALS.windows, CAR_SIGNALS.seatBelts, CAR_SIGNALS.mirrorsFold, CAR_SIGNALS.doorLock,
             CAR_SIGNALS.cycleFuel, CAR_SIGNALS.powerFlow,
+            CAR_SIGNALS.energyDriveState, CAR_SIGNALS.chargingState,
             CAR_SIGNALS.aaSession, CAR_SIGNALS.navDirections, CAR_SIGNALS.place,
             CAR_SIGNALS.autoHold, CAR_SIGNALS.gear,
             CAR_SIGNALS.epb, CAR_SIGNALS.handbrake]
@@ -9670,6 +9696,10 @@ class Component extends DCLogic {
       return;
     }
     if (key === CAR_SIGNALS.powerFlow) { this._powerLive.flow = String(value); this._queuePowerRefresh(); return; }
+    if (key === CAR_SIGNALS.energyDriveState || key === CAR_SIGNALS.chargingState) {
+      if (!this._powerLive.flow) this._queuePowerRefresh();
+      return;
+    }
     if (key === CAR_SIGNALS.fuelTrip) {
       const n = this._parseFuelAvg(value);
       if (this._graphAcceptKpi(n, 0, 40)) {
@@ -10032,11 +10062,14 @@ class Component extends DCLogic {
     const vt = Number(at[CAR_SIGNALS.batteryVoltage]) || 0;
     const it = Number(at[CAR_SIGNALS.batteryCurrent]) || 0;
     const voltage = this._carNumber(live.voltage), current = this._carNumber(live.current);
-    if (!vt || !it || now - vt > 2000 || now - it > 2000 || Math.abs(vt - it) > 1500
-      || !isFinite(voltage) || voltage < 0 || !isFinite(current)) return;
+    const busLive = typeof this._carBusLive === 'function' && this._carBusLive();
+    const vFresh = vt && (busLive || now - vt <= 2000);
+    const iFresh = it && now - it <= 2000;
+    if (!vFresh || !iFresh || (!busLive && Math.abs(vt - it) > 1500)
+      || !isFinite(voltage) || voltage < 50 || !isFinite(current)) return;
     const samples = this._powerHistory || (this._powerHistory = []);
     const last = samples[samples.length - 1];
-    const stamp = Math.max(vt, it);
+    const stamp = busLive ? it : Math.max(vt, it);
     if (last && stamp - last.at < 250) return;
     samples.push({ at: stamp, kw: Math.abs(voltage * current / 1000) });
     this._powerHistory = samples.filter((sample) => sample.at >= now - 60000).slice(-241);
@@ -10080,17 +10113,66 @@ class Component extends DCLogic {
     }, 1000);
   }
 
+  _powerEffectiveFlow() {
+    const live = this._powerLive || {};
+    if (live.flow && this._powerFromPacked(live.flow)) return live.flow;
+    return this._powerFallbackPacked();
+  }
+
+  _powerFallbackPacked() {
+    const getVal = (k) => {
+      try {
+        if (window.carTelemetry && typeof window.carTelemetry.get === 'function') {
+          return window.carTelemetry.get(k, '');
+        }
+      } catch (e) {}
+      return '';
+    };
+    const driveRaw = getVal(CAR_SIGNALS.energyDriveState);
+    if (!driveRaw && driveRaw !== '0') return '';
+    const drive = parseInt(String(driveRaw).trim(), 10);
+    const charging = getVal(CAR_SIGNALS.chargingState).trim() === '1';
+    if (charging) return 'v1|charge|0|0|0';
+    const rpm = this._carNumber(getVal('car.basic.engine_speed'));
+    const iceOn = isFinite(rpm) && rpm >= 400;
+    const speed = this._carNumber(getVal(CAR_SIGNALS.speed));
+    const v = this._carNumber(this._powerLive && this._powerLive.voltage);
+    const i = this._carNumber(this._powerLive && this._powerLive.current);
+    const kw = isFinite(v) && isFinite(i) ? v * i / 1000 : 0;
+    const TABLE = {
+      0: 'idle|0|0', 10: 'idle|0|0', 11: 'idle|0|0', 21: 'idle|0|0',
+      14: 'ev|1|0', 22: 'ev|1|0', 42: 'ev|1|0', 41: 'ev|0|1', 40: 'ev|1|1',
+      6: 'regen|-1|0', 13: 'regen|-1|0', 38: 'regen|-1|0', 39: 'regen|0|-1',
+      15: 'hybrid|1|0', 16: 'hybrid|1|0', 17: 'hybrid|1|0', 20: 'hybrid|1|0',
+      31: 'hybrid|1|1', 34: 'hybrid|0|1', 35: 'hybrid|1|1', 36: 'hybrid|1|0', 37: 'hybrid|1|1',
+      3: 'ice|0|0',
+      1: 'charge|1|0', 12: 'charge|0|0', 18: 'charge|0|0', 23: 'charge|0|0',
+      45: 'charge|0|0', 46: 'charge|0|0', 30: 'charge|1|1', 32: 'charge|1|0', 33: 'charge|0|1'
+    };
+    let mapped = TABLE[drive] || 'idle|0|0';
+    let parts = mapped.split('|');
+    let state = parts[0], front = parts[1], rear = parts[2];
+    if (state === 'idle' && isFinite(speed) && speed >= 0.5) {
+      if (kw < -0.15) { state = 'regen'; front = '-1'; rear = '-1'; }
+      else if (kw > 0.15 && iceOn) { state = 'hybrid'; front = '1'; rear = '1'; }
+      else if (kw > 0.15) { state = 'ev'; front = '1'; rear = '1'; }
+    }
+    return 'v1|' + state + '|' + (iceOn ? '1' : '0') + '|' + front + '|' + rear;
+  }
+
   _powerStatus(now) {
     const at = this._carSignalAt || {};
-    const keys = [CAR_SIGNALS.powerFlow, CAR_SIGNALS.batterySoc,
+    const keys = [CAR_SIGNALS.powerFlow, CAR_SIGNALS.energyDriveState, CAR_SIGNALS.batterySoc,
       CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent];
-    const fresh = (key) => !!at[key] && now - at[key] <= 120000;
+    const busLive = typeof this._carBusLive === 'function' && this._carBusLive();
+    const fresh = (key) => !!at[key] && (busLive || now - at[key] <= 120000);
     const known = keys.some((key) => !!at[key]);
-    const flowFresh = fresh(CAR_SIGNALS.powerFlow)
-      && !!this._powerFromPacked(this._powerLive && this._powerLive.flow);
-    const voltageFresh = fresh(CAR_SIGNALS.batteryVoltage)
+    const flowPacket = this._powerEffectiveFlow();
+    const flowFresh = (fresh(CAR_SIGNALS.powerFlow) || (busLive && !!at[CAR_SIGNALS.energyDriveState]) || (!!at[CAR_SIGNALS.energyDriveState] && now - at[CAR_SIGNALS.energyDriveState] <= 120000))
+      && !!this._powerFromPacked(flowPacket);
+    const voltageFresh = (busLive ? !!at[CAR_SIGNALS.batteryVoltage] : fresh(CAR_SIGNALS.batteryVoltage))
       && isFinite(this._carNumber(this._powerLive && this._powerLive.voltage))
-      && this._carNumber(this._powerLive && this._powerLive.voltage) >= 0;
+      && this._carNumber(this._powerLive && this._powerLive.voltage) >= 50;
     const currentFresh = fresh(CAR_SIGNALS.batteryCurrent)
       && isFinite(this._carNumber(this._powerLive && this._powerLive.current));
     const demo = !!this._demoPreview && !known && !(this._busCount > 0);
@@ -10121,7 +10203,8 @@ class Component extends DCLogic {
   _powerFlowRaw(now) {
     const live = this._powerLive || {};
     const demo = this._demoPreview && !this._graphAnyLive && !(this._busCount > 0);
-    return this._powerFromPacked(demo ? this._powerDemoPacked(now) : live.flow) || CAR_POWER_IDLE;
+    const flow = demo ? this._powerDemoPacked(now) : this._powerEffectiveFlow();
+    return this._powerFromPacked(flow) || CAR_POWER_IDLE;
   }
 
   _powerSocPct(now) {
@@ -10161,7 +10244,7 @@ class Component extends DCLogic {
     const status = this._powerStatus(Date.now());
     const demo = status.key === 'demo';
     const flow = demo ? this._powerFromPacked(this._powerDemoPacked(stamp))
-      : (status.flowFresh ? this._powerFromPacked(live.flow) : null);
+      : (status.flowFresh ? this._powerFromPacked(this._powerEffectiveFlow()) : null);
     const visibleFlow = flow || CAR_POWER_IDLE;
     const graphic = this._powerGraphicsVariant();
     const frontDir = Math.sign(Number(visibleFlow.front) || 0);
@@ -10179,7 +10262,8 @@ class Component extends DCLogic {
       || visibleFlow.tone === 'ice' || visibleFlow.tone === 'hybrid' || visibleFlow.tone === 'idle')) kwClass = 'ev';
     const socRaw = this._carNumber(live.soc);
     const socAt = Number((this._carSignalAt || {})[CAR_SIGNALS.batterySoc]) || 0;
-    const socFresh = socAt && Date.now() - socAt <= 120000 && isFinite(socRaw)
+    const busLive = typeof this._carBusLive === 'function' && this._carBusLive();
+    const socFresh = socAt && (busLive || Date.now() - socAt <= 120000) && isFinite(socRaw)
       && socRaw >= 0 && socRaw <= 100;
     const socPct = demo ? 64 : (socFresh ? socRaw : 0);
     const socNum = socFresh || demo ? String(Math.round(socPct)) : '—';
@@ -10626,7 +10710,8 @@ class Component extends DCLogic {
 
   _graphSource(key) {
     const at = this._graphLiveAt && this._graphLiveAt[key];
-    if (at && Date.now() - at <= 120000) return 'LIVE';
+    const busLive = typeof this._carBusLive === 'function' && this._carBusLive();
+    if (at && (busLive || Date.now() - at <= 120000)) return 'LIVE';
     if (at) return 'STALE';
     return this._graphAnyLive ? 'UNAVAILABLE' : 'DEMO · SIMULATED';
   }
@@ -28088,38 +28173,41 @@ class Component extends DCLogic {
 
     const warm = () => {
       const t0 = (performance && performance.now) ? performance.now() : 0;
-      this._ensurePowertrain().then((rig) => {
-        if (!rig) return;
-        try {
-          // Programs first, then textures. Both are otherwise paid on the first
-          // frame the rig is visible, which is exactly the frame we care about.
-          if (this.renderer && this.scene && this.camera) {
-            this.renderer.compile(this.scene, this.camera);
-          }
-          if (this.renderer && this.renderer.initTexture) {
-            const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap'];
-            rig.traverse((o) => {
-              if (!o.isMesh) return;
-              const list = Array.isArray(o.material) ? o.material : [o.material];
-              list.forEach((m) => {
-                if (!m) return;
-                maps.forEach((k) => { if (m[k]) this.renderer.initTexture(m[k]); });
+      const ptPromise = this._ensurePowertrain();
+      const ghostPromise = (typeof this._ensureGhostBody === 'function') ? this._ensureGhostBody() : Promise.resolve(null);
+      Promise.all([ptPromise, ghostPromise]).then(([rig, ghost]) => {
+        if (rig) {
+          try {
+            // Programs first, then textures. Both are otherwise paid on the first
+            // frame the rig is visible, which is exactly the frame we care about.
+            if (this.renderer && this.scene && this.camera) {
+              this.renderer.compile(this.scene, this.camera);
+            }
+            if (this.renderer && this.renderer.initTexture) {
+              const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap'];
+              rig.traverse((o) => {
+                if (!o.isMesh) return;
+                const list = Array.isArray(o.material) ? o.material : [o.material];
+                list.forEach((m) => {
+                  if (!m) return;
+                  maps.forEach((k) => { if (m[k]) this.renderer.initTexture(m[k]); });
+                });
               });
-            });
+            }
+          } catch (e) {
+            console.warn('[Powertrain] warm-up skipped', e);
           }
-        } catch (e) {
-          console.warn('[Powertrain] warm-up skipped', e);
         }
         const ms = ((performance && performance.now) ? performance.now() : 0) - t0;
-        console.log('[Powertrain] preloaded + warmed in ' + Math.round(ms) + ' ms');
+        console.log('[Powertrain+Ghost] preloaded + warmed in ' + Math.round(ms) + ' ms');
       });
     };
 
     // Let the car settle first, then take an idle slot if the browser offers one.
     setTimeout(() => {
-      if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 5000 });
-      else setTimeout(warm, 500);
-    }, 6000);
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 4000 });
+      else setTimeout(warm, 300);
+    }, 2500);
   }
 
   _ensurePowertrain() {
@@ -31180,26 +31268,31 @@ class Component extends DCLogic {
       }
       if (cold) this._endCarSwap();
     };
-    this._ensurePowertrain().then((rig) => {
-      if (!rig) { endBadge(); return; }
-      this._applyPowertrainVariant();
-      this._fitPowertrain();
-      rig.visible = true;
-      this._setBodyGhost(true);
-      this._setShadowSoft(true);
-      // Seed FX from the live / demo POWER card state immediately.
-      this._powertrainFxSig = '';
-      this._tickPowertrainFx(0, performance.now());
-      this._syncXrayWheelGlows(performance.now());
-      const wantBloom = !!this._powertrainFxTune().bloomOn;
-      this._setXrayBloomMeshes(wantBloom);
-      this._setXrayBloomStrength(wantBloom);
-      if (this.requestRender) this.requestRender(12);
-      endBadge();
-    }, (err) => {
-      // Without this the badge would hang until the 25 s safety timer.
-      console.warn('[Powertrain] load failed', err && err.message);
-      endBadge();
+    // Yield to the browser frame paint so the spinner paints immediately on click
+    // without stalling the main thread before the first frame.
+    requestAnimationFrame(() => {
+      if (!this.state.powertrainOn) { endBadge(); return; }
+      this._ensurePowertrain().then((rig) => {
+        if (!rig || !this.state.powertrainOn) { endBadge(); return; }
+        this._applyPowertrainVariant();
+        this._fitPowertrain();
+        rig.visible = true;
+        this._setBodyGhost(true);
+        this._setShadowSoft(true);
+        // Seed FX from the live / demo POWER card state immediately.
+        this._powertrainFxSig = '';
+        this._tickPowertrainFx(0, performance.now());
+        this._syncXrayWheelGlows(performance.now());
+        const wantBloom = !!this._powertrainFxTune().bloomOn;
+        this._setXrayBloomMeshes(wantBloom);
+        this._setXrayBloomStrength(wantBloom);
+        if (this.requestRender) this.requestRender(12);
+        endBadge();
+      }, (err) => {
+        // Without this the badge would hang until the 25 s safety timer.
+        console.warn('[Powertrain] load failed', err && err.message);
+        endBadge();
+      });
     });
   }
 
@@ -39474,7 +39567,8 @@ class Component extends DCLogic {
     const raw = String(this.state[group.stateKey] || '');
     const index = group.options.findIndex((opt) => opt.value === raw);
     const hasSignal = !!(this._carSignalAt && this._carSignalAt[group.key]);
-    const fresh = hasSignal && Date.now() - this._carSignalAt[group.key] <= CAR_MODE_FRESH_MS;
+    const busLive = typeof this._carBusLive === 'function' && this._carBusLive();
+    const fresh = hasSignal && (busLive || Date.now() - this._carSignalAt[group.key] <= CAR_MODE_FRESH_MS);
     const pending = !!(this._modePending && this._modePending[group.stateKey]);
     const preview = !this._androidApp || !!this._demoPreview;
     const fallback = group.options.findIndex((opt) => opt.value === demoValue);
@@ -40116,7 +40210,7 @@ class Component extends DCLogic {
   _rangeDistanceUnit() { return this._rangeUnit === 'mi' ? 'mi' : 'km'; }
   _setRangeDistanceUnit(unit, ev) { this._cardControlEvent(ev); if (unit !== 'km' && unit !== 'mi') return; this._rangeUnit = unit; try { localStorage.setItem('h6_range_unit', unit); } catch (e) {} this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 })); }
   _rangeTelemetry(now) {
-    const at = this._carSignalAt || {}, live = this._powerLive || {}, keys = [CAR_SIGNALS.batterySoc, CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange], stamp = (key) => Number(at[key]) || 0, known = keys.filter((key) => stamp(key)), demo = !!this._demoPreview && !known.length, fresh = (key) => stamp(key) && now - stamp(key) <= 120000, number = (key, raw) => (demo || stamp(key)) ? this._carNumber(raw) : NaN;
+    const at = this._carSignalAt || {}, live = this._powerLive || {}, keys = [CAR_SIGNALS.batterySoc, CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange], stamp = (key) => Number(at[key]) || 0, known = keys.filter((key) => stamp(key)), demo = !!this._demoPreview && !known.length, busLive = typeof this._carBusLive === 'function' && this._carBusLive(), fresh = (key) => stamp(key) && (busLive || now - stamp(key) <= 120000), number = (key, raw) => (demo || stamp(key)) ? this._carNumber(raw) : NaN;
     const socValue = demo ? 64 : number(CAR_SIGNALS.batterySoc, live.soc), evValue = demo ? 42 : number(CAR_SIGNALS.evRange, live.evRange), fuelValue = demo ? 510 : number(CAR_SIGNALS.fuelRange, live.fuelRange), valid = [{ key: CAR_SIGNALS.batterySoc, value: socValue }, { key: CAR_SIGNALS.evRange, value: evValue }, { key: CAR_SIGNALS.fuelRange, value: fuelValue }], available = valid.filter((entry) => isFinite(entry.value)), freshAvailable = available.filter((entry) => fresh(entry.key)), evKnown = isFinite(evValue), fuelKnown = isFinite(fuelValue), totalValue = (evKnown ? Math.max(0, evValue) : 0) + (fuelKnown ? Math.max(0, fuelValue) : 0), hasKnownRange = evKnown || fuelKnown, completeRange = evKnown && fuelKnown, unitKey = this._rangeDistanceUnit(), unit = unitKey.toUpperCase(), formatDistance = (km) => isFinite(km) ? String(Math.round(Math.max(0, km) * (unitKey === 'mi' ? .621371 : 1))) : '—', total = completeRange ? formatDistance(totalValue) : '—', evPct = hasKnownRange && totalValue > 0 && evKnown ? Math.round(Math.max(0, evValue) * 100 / totalValue) : 0, fuelPct = hasKnownRange && totalValue > 0 && fuelKnown ? Math.max(0, 100 - evPct) : 0;
     let source = 'UNAVAILABLE · NO RANGE SIGNAL'; if (demo) source = 'DEMO · SIMULATED · NOT VEHICLE'; else if (!available.length && known.length) source = 'UNAVAILABLE · RANGE DATA INVALID'; else if (available.length < valid.length) source = freshAvailable.length ? 'PARTIAL · VEHICLE RANGE' : 'PARTIAL · STALE RANGE'; else if (freshAvailable.length === available.length) source = 'VEHICLE · LIVE RANGE'; else if (!freshAvailable.length) source = 'STALE · VEHICLE RANGE'; else source = 'PARTIAL · VEHICLE RANGE';
     return { source, totalLabel: completeRange ? 'TOTAL RANGE' : (hasKnownRange ? 'TOTAL RANGE · PARTIAL' : 'TOTAL RANGE'), total, unit, soc: isFinite(socValue) ? String(Math.round(Math.max(0, Math.min(100, socValue)))) + '%' : '—', ev: evKnown ? formatDistance(evValue) : '—', fuel: fuelKnown ? formatDistance(fuelValue) : '—', evPct, fuelPct };
