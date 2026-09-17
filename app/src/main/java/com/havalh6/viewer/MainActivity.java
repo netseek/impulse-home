@@ -190,7 +190,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v47-aa-tbt-gmaps";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v58-range-toggle-width";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -1146,6 +1146,17 @@ public final class MainActivity extends Activity {
         final String[] seatBeltStates;
         final int sunroofLevel;
         final int curtainLevel;
+        int fuelLevel = 0;
+        String rangeTotal = "";
+        String rangeUnit = "KM";
+        String rangeEv = "";
+        String rangeFuel = "";
+        String rangeSoc = "";
+        int rangeEvPct = -1;
+        int rangeFuelPct = -1;
+        String battery12vVoltage = "";
+        boolean battery12vCharging = false;
+        String battery12vState = "";
         final boolean demo;
         /**
          * Command for a tap on the graphic alone, empty when the icon is not a
@@ -1753,7 +1764,7 @@ public final class MainActivity extends Activity {
             int muted = dockUiLight ? 0x55323C48 : 0x66FFFFFF;
             int strong = dockUiLight ? 0xCC25303B : 0xE6FFFFFF;
             switch (descriptor.id) {
-                case "range": drawRing(canvas, w, h, accent, muted, true); break;
+                case "range": drawRange(canvas, w, h, accent, muted, strong); break;
                 case "status": drawVehicleStatus(canvas, w, h, accent, muted, strong); break;
                 case "climate": drawClimate(canvas, w, h, accent, muted); break;
                 case "consumption": drawEnergy(canvas, w, h, accent, muted, strong); break;
@@ -1804,6 +1815,346 @@ public final class MainActivity extends Activity {
                 fill(accent);
                 c.drawPath(p, paint);
             }
+        }
+
+        private void drawRange(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            boolean isLinear = "linear".equalsIgnoreCase(descriptor.state);
+            int fuelLevel = descriptor.fuelLevel > 0 ? descriptor.fuelLevel
+                    : (descriptor.sunroofLevel > 0 ? descriptor.sunroofLevel
+                    : (descriptor.demo ? 88 : Math.round(descriptor.progress * 0.9f)));
+            float density = getResources().getDisplayMetrics().density;
+
+            String totalStr = !descriptor.rangeTotal.isEmpty() ? descriptor.rangeTotal : "";
+            String unitStr = !descriptor.rangeUnit.isEmpty() ? descriptor.rangeUnit : "KM";
+            if (totalStr.isEmpty()) {
+                String[] p = descriptor.primary.trim().split("\\s+", 2);
+                totalStr = p[0];
+                if (p.length > 1 && !p[1].isEmpty()) unitStr = p[1];
+            }
+            if (totalStr.isEmpty()) totalStr = descriptor.value;
+            if (totalStr.isEmpty()) totalStr = "—";
+
+            String evKm = !descriptor.rangeEv.isEmpty() ? descriptor.rangeEv : "";
+            if (evKm.isEmpty() && descriptor.metricA.startsWith("EV ")) {
+                String[] p = descriptor.metricA.substring(3).trim().split("\\s+", 2);
+                evKm = p[0];
+            }
+            if (evKm.isEmpty()) evKm = "—";
+
+            String fuelKm = !descriptor.rangeFuel.isEmpty() ? descriptor.rangeFuel : "";
+            if (fuelKm.isEmpty() && (descriptor.metricB.startsWith("FUEL ") || descriptor.metricB.startsWith("GAS "))) {
+                String[] p = descriptor.metricB.substring(5).trim().split("\\s+", 2);
+                fuelKm = p[0];
+            }
+            if (fuelKm.isEmpty()) fuelKm = "—";
+
+            String statusText = descriptor.secondary;
+            if (statusText.isEmpty()) statusText = descriptor.demo ? "DEMO · SIMULATED" : "VEHICLE · LIVE";
+
+            int evSoc = Math.max(0, Math.min(100, descriptor.progress));
+
+            int evPct = descriptor.rangeEvPct >= 0 ? descriptor.rangeEvPct : -1;
+            int fuelPct = descriptor.rangeFuelPct >= 0 ? descriptor.rangeFuelPct : -1;
+            if (evPct < 0) {
+                try {
+                    int e = Integer.parseInt(evKm.replaceAll("[^0-9]", ""));
+                    int f = Integer.parseInt(fuelKm.replaceAll("[^0-9]", ""));
+                    int t = e + f;
+                    evPct = t > 0 ? Math.round(e * 100f / t) : 50;
+                    fuelPct = 100 - evPct;
+                } catch (Exception ignored) {
+                    evPct = 25;
+                    fuelPct = 75;
+                }
+            }
+
+            if (isLinear) {
+                drawRangeLinear(c, w, h, accent, muted, strong, density,
+                        totalStr, unitStr, statusText, evKm, fuelKm, evSoc, fuelLevel, evPct, fuelPct);
+            } else {
+                drawRangeGauge(c, w, h, accent, muted, strong, density,
+                        totalStr, unitStr, statusText, evKm, fuelKm, evSoc, fuelLevel);
+            }
+        }
+
+        private void drawRangeLinear(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong, float density,
+                String totalStr, String unitStr, String statusText,
+                String evKm, String fuelKm, int evSoc, int fuelLevel, int evPct, int fuelPct) {
+            paint.reset();
+            paint.setAntiAlias(true);
+
+            // 1. Top row: Big hero total on left, KM in gray, no status label
+            float yHero = h * 0.36f;
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(strong);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+            paint.setTextSize(Math.min(32f * density, h * 0.38f));
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            c.drawText(totalStr, 0f, yHero, paint);
+
+            float totalW = paint.measureText(totalStr);
+            paint.setColor(muted);
+            paint.setTextSize(11f * density);
+            c.drawText(unitStr, totalW + 4f * density, yHero, paint);
+
+            // 1b. Top row right: 12V auxiliary battery indicator (glyph + voltage)
+            String v12Str = descriptor != null ? descriptor.battery12vVoltage : "";
+            if (!v12Str.isEmpty()) {
+                boolean isCharging = descriptor.battery12vCharging;
+                int v12Color = isCharging ? accent : (dockUiLight ? 0xFF2B3A42 : 0xFFCFDCE6);
+                if ("low".equals(descriptor.battery12vState)) v12Color = 0xFFF2994A;
+                else if ("critical".equals(descriptor.battery12vState)) v12Color = 0xFFEB5757;
+
+                paint.setTextAlign(android.graphics.Paint.Align.RIGHT);
+                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+                paint.setTextSize(11f * density);
+                paint.setColor(v12Color);
+                c.drawText(v12Str, w, yHero, paint);
+                float v12TextW = paint.measureText(v12Str);
+
+                float battW = 15f * density;
+                float battH = 9f * density;
+                float battRight = w - v12TextW - 5f * density;
+                float battLeft = battRight - battW;
+                float battTop = yHero - battH * 0.85f;
+                float battBottom = battTop + battH;
+
+                // Terminal posts on top (+ and -)
+                paint.setStyle(android.graphics.Paint.Style.FILL);
+                paint.setColor(v12Color);
+                float termH = 1.6f * density;
+                float termW = 2.8f * density;
+                c.drawRect(battLeft + 2.2f * density, battTop - termH, battLeft + 2.2f * density + termW, battTop, paint);
+                c.drawRect(battRight - 2.2f * density - termW, battTop - termH, battRight - 2.2f * density, battTop, paint);
+
+                // Body outline
+                paint.setStyle(android.graphics.Paint.Style.STROKE);
+                paint.setStrokeWidth(1.2f * density);
+                oval.set(battLeft, battTop, battRight, battBottom);
+                c.drawRoundRect(oval, 1.8f * density, 1.8f * density, paint);
+
+                // Fill interior
+                paint.setStyle(android.graphics.Paint.Style.FILL);
+                float fillW12 = isCharging ? (battW - 3.6f * density) : (battW - 3.6f * density) * 0.75f;
+                oval.set(battLeft + 1.8f * density, battTop + 1.8f * density, battLeft + 1.8f * density + fillW12, battBottom - 1.8f * density);
+                c.drawRoundRect(oval, 1f * density, 1f * density, paint);
+
+                // "12V" micro label to left of battery glyph
+                paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+                paint.setTextSize(9f * density);
+                paint.setColor(muted);
+                c.drawText("12V", battLeft - 3.5f * density, yHero, paint);
+            }
+
+            // 2. Middle row: Dual split track showing used % in gray on the right
+            float barH = Math.max(7f, Math.round(8f * density));
+            float yTrack = h * 0.54f;
+            float trackTop = yTrack - barH * 0.5f;
+            float trackBottom = trackTop + barH;
+            float r = barH * 0.5f;
+
+            // Background track (Gray, representing total capacity with used capacity visible on right)
+            paint.setColor(dockUiLight ? 0x24000000 : 0x24FFFFFF);
+            oval.set(0f, trackTop, w, trackBottom);
+            c.drawRoundRect(oval, r, r, paint);
+
+            // Calculate remaining shares vs total capacity
+            float evValNum = 0f;
+            float fuelValNum = 0f;
+            try { evValNum = Float.parseFloat(evKm.replaceAll("[^0-9.]", "")); } catch (Exception ignored) {}
+            try { fuelValNum = Float.parseFloat(fuelKm.replaceAll("[^0-9.]", "")); } catch (Exception ignored) {}
+            float evCapMax = evSoc > 0 ? (evValNum / (evSoc / 100f)) : 100f;
+            float fuelCapMax = fuelLevel > 0 ? (fuelValNum / (fuelLevel / 100f)) : 800f;
+            float totalCapMax = evCapMax + fuelCapMax;
+
+            float evShare = totalCapMax > 0f ? Math.max(0.03f, Math.min(0.92f, evValNum / totalCapMax)) : 0.07f;
+            float fuelShare = totalCapMax > 0f ? Math.max(0.03f, Math.min(0.92f, fuelValNum / totalCapMax)) : 0.79f;
+            float fillShare = Math.min(1.0f, evShare + fuelShare);
+
+            float evW = Math.round(w * evShare);
+            float fillW = Math.max(evW + 4f * density, Math.round(w * fillShare));
+            fillW = Math.min(w, fillW);
+
+            // Left (EV) pill with rounded left end
+            android.graphics.Path evPath = new android.graphics.Path();
+            float[] evRadii = {r, r, 0f, 0f, 0f, 0f, r, r};
+            evPath.addRoundRect(new android.graphics.RectF(0f, trackTop, Math.max(r, evW - 1f * density), trackBottom),
+                    evRadii, android.graphics.Path.Direction.CW);
+            paint.setColor(accent);
+            c.drawPath(evPath, paint);
+
+            // Middle (Fuel) pill: fills up to fillW; remainder from fillW to w is gray (used %)
+            android.graphics.Path fuelPath = new android.graphics.Path();
+            float rightR = fillW >= w - 2f * density ? r : Math.min(r, 2.5f * density);
+            float[] fuelRadii = {0f, 0f, rightR, rightR, rightR, rightR, 0f, 0f};
+            fuelPath.addRoundRect(new android.graphics.RectF(evW + 1f * density, trackTop, fillW, trackBottom),
+                    fuelRadii, android.graphics.Path.Direction.CW);
+            paint.setColor(0xFFF2994A);
+            c.drawPath(fuelPath, paint);
+
+            // 3. Bottom row: Chips for EV (left) and GAS (right) with enlarged fonts and gap before %
+            float yChips = h * 0.88f;
+            float gap = 6f * density;
+
+            // EV Chip on left: EV  <evKm> KM  <evSoc>%
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+            paint.setColor(accent);
+            paint.setTextSize(12f * density);
+            c.drawText("EV", 0f, yChips, paint);
+            float evLblW = paint.measureText("EV ");
+
+            paint.setTextSize(14.5f * density);
+            c.drawText(evKm, evLblW, yChips, paint);
+            float evValW = paint.measureText(evKm + " ");
+
+            paint.setTextSize(10.5f * density);
+            c.drawText(unitStr, evLblW + evValW, yChips, paint);
+            float evUnitW = paint.measureText(unitStr);
+
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+            paint.setColor(muted);
+            paint.setTextSize(12f * density);
+            c.drawText(evSoc + "%", evLblW + evValW + evUnitW + gap, yChips, paint);
+
+            // GAS Chip on right: GAS  <fuelKm> KM  <fuelLevel>%
+            String gasLvlStr = fuelLevel + "%";
+            String gasUnitStr = unitStr;
+            String gasValStr = fuelKm + " ";
+            String gasLblStr = "GAS ";
+
+            paint.setTextSize(12f * density);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+            float gasLvlW = paint.measureText(gasLvlStr);
+
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+            paint.setTextSize(10.5f * density);
+            float gasUnitW = paint.measureText(gasUnitStr);
+
+            paint.setTextSize(14.5f * density);
+            float gasValW = paint.measureText(gasValStr);
+
+            paint.setTextSize(12f * density);
+            float gasLblW = paint.measureText(gasLblStr);
+
+            float gasStart = w - (gasLblW + gasValW + gasUnitW + gap + gasLvlW);
+
+            paint.setColor(0xFFF2994A);
+            c.drawText(gasLblStr, gasStart, yChips, paint);
+            paint.setTextSize(14.5f * density);
+            c.drawText(gasValStr, gasStart + gasLblW, yChips, paint);
+            paint.setTextSize(10.5f * density);
+            c.drawText(gasUnitStr, gasStart + gasLblW + gasValW, yChips, paint);
+
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+            paint.setColor(muted);
+            paint.setTextSize(12f * density);
+            c.drawText(gasLvlStr, gasStart + gasLblW + gasValW + gasUnitW + gap, yChips, paint);
+        }
+
+        private void drawRangeGauge(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong, float density,
+                String totalStr, String unitStr, String statusText,
+                String evKm, String fuelKm, int evSoc, int fuelLevel) {
+            paint.reset();
+            paint.setAntiAlias(true);
+
+            float cy = h * 0.5f;
+            float rOuter = Math.min(28f * density, h * 0.38f);
+            float rInner = Math.min(18f * density, h * 0.25f);
+            float cx = rOuter + 4f * density;
+            float strokeOuter = Math.max(3.0f, Math.round(3.3f * density));
+            float strokeInner = Math.max(3.0f, Math.round(3.3f * density));
+
+            // Outer ring (Fuel) - background
+            paint.setStyle(android.graphics.Paint.Style.STROKE);
+            paint.setStrokeWidth(strokeOuter);
+            paint.setColor(dockUiLight ? 0x1A000000 : 0x22FFFFFF);
+            oval.set(cx - rOuter, cy - rOuter, cx + rOuter, cy + rOuter);
+            c.drawArc(oval, 0f, 360f, false, paint);
+
+            // Outer ring (Fuel) - progress from -90 deg (12 o'clock)
+            paint.setColor(0xFFF2994A);
+            paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            float fuelSweep = 360f * Math.max(0f, Math.min(100f, (float) fuelLevel)) / 100f;
+            if (fuelSweep > 1f) {
+                c.drawArc(oval, -90f, fuelSweep, false, paint);
+            }
+
+            // Inner ring (EV) - background
+            paint.setStrokeCap(android.graphics.Paint.Cap.BUTT);
+            paint.setStrokeWidth(strokeInner);
+            paint.setColor(dockUiLight ? 0x1A000000 : 0x22FFFFFF);
+            oval.set(cx - rInner, cy - rInner, cx + rInner, cy + rInner);
+            c.drawArc(oval, 0f, 360f, false, paint);
+
+            // Inner ring (EV) - progress from -90 deg (12 o'clock)
+            paint.setColor(accent);
+            paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            float evSweep = 360f * Math.max(0f, Math.min(100f, (float) evSoc)) / 100f;
+            if (evSweep > 1f) {
+                c.drawArc(oval, -90f, evSweep, false, paint);
+            }
+
+            // Right readout column: starts at colLeft
+            float colLeft = cx + rOuter + 14f * density;
+
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+
+            // Row 1: Primary big number + unit
+            float yRow1 = h * 0.38f;
+            paint.setColor(strong);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+            paint.setTextSize(Math.min(28f * density, h * 0.35f));
+            c.drawText(totalStr, colLeft, yRow1, paint);
+
+            float totalW = paint.measureText(totalStr);
+            paint.setColor(accent);
+            paint.setTextSize(11f * density);
+            c.drawText(unitStr, colLeft + totalW + 4f * density, yRow1, paint);
+
+            // Row 2: Status / Source Detail
+            float yRow2 = h * 0.63f;
+            paint.setColor(muted);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+            paint.setTextSize(9.5f * density);
+            paint.setLetterSpacing(0.06f);
+            String st = statusText;
+            float maxStatusW = w - colLeft;
+            if (paint.measureText(st) > maxStatusW) {
+                while (st.length() > 3 && paint.measureText(st + "…") > maxStatusW) {
+                    st = st.substring(0, st.length() - 1);
+                }
+                st += "…";
+            }
+            c.drawText(st, colLeft, yRow2, paint);
+            paint.setLetterSpacing(0f);
+
+            // Row 3: Sub line: EV <evKm> · GAS <fuelKm>
+            float yRow3 = h * 0.88f;
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+            paint.setColor(accent);
+            paint.setTextSize(11f * density);
+            c.drawText("EV ", colLeft, yRow3, paint);
+            float evLblW = paint.measureText("EV ");
+
+            c.drawText(evKm + "  ", colLeft + evLblW, yRow3, paint);
+            float evValW = paint.measureText(evKm + "  ");
+
+            paint.setColor(muted);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+            c.drawText("·  ", colLeft + evLblW + evValW, yRow3, paint);
+            float sepW = paint.measureText("·  ");
+
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+            paint.setColor(0xFFF2994A);
+            c.drawText("GAS ", colLeft + evLblW + evValW + sepW, yRow3, paint);
+            float gasLblW = paint.measureText("GAS ");
+
+            c.drawText(fuelKm, colLeft + evLblW + evValW + sepW + gasLblW, yRow3, paint);
         }
 
         private void drawGauge(android.graphics.Canvas c, float w, float h,
@@ -8396,7 +8747,7 @@ public final class MainActivity extends Activity {
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
         boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id)
-                || "navigation".equals(descriptor.id);
+                || "navigation".equals(descriptor.id) || "range".equals(descriptor.id);
         if (fullGraphicCard) {
             graphic.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
@@ -10413,14 +10764,16 @@ public final class MainActivity extends Activity {
                     new String[] {"short", "long"}, "short");
             if ("power".equals(id)) glyphText = sanitizePowerDirections(raw.optString("glyphText", ""));
             java.util.List<QuickMenuRow> menu = parseQuickMenu(raw.optJSONArray("menu"));
-            String state = "tires".equals(id)
+            String state = "range".equals(id)
+                    ? ("linear".equalsIgnoreCase(raw.optString("state", "")) ? "linear" : "gauge")
+                    : ("tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
                             raw.optString("tireState", "unavailable")))
                     : ("status".equals(id) ? sanitizeStatusState(raw.optString("state", "unavailable"))
                             : ("power".equals(id) ? sanitizePowerState(raw.optString("state", "unavailable"))
                             : ("navigation".equals(id) ? sanitizeNavigationState(raw.optString("state", "unavailable"))
                             : (DRIVING_CARD_IDS.contains(id)
-                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : ""))));
+                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : "")))));
             String[] wheelStates = ("tires".equals(id) || "status".equals(id))
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))
@@ -10455,6 +10808,19 @@ public final class MainActivity extends Activity {
             descriptor.navIdleCity = cleanBottomCardText(raw.optString("navIdleCity", ""), 32);
             descriptor.navIdleAction = cleanBottomCardText(raw.optString("navIdleAction", ""), 48);
             if ("consumption".equals(id)) descriptor.energyBars = parseEnergyBars(raw.optString("energyBars", ""));
+            if ("range".equals(id)) {
+                descriptor.fuelLevel = Math.max(0, Math.min(100, raw.optInt("fuelLevel", 0)));
+                descriptor.rangeTotal = cleanBottomCardText(raw.optString("rangeTotal", ""), 16);
+                descriptor.rangeUnit = cleanBottomCardText(raw.optString("rangeUnit", "KM"), 8);
+                descriptor.rangeEv = cleanBottomCardText(raw.optString("rangeEv", ""), 16);
+                descriptor.rangeFuel = cleanBottomCardText(raw.optString("rangeFuel", ""), 16);
+                descriptor.rangeSoc = cleanBottomCardText(raw.optString("rangeSoc", ""), 8);
+                descriptor.rangeEvPct = raw.optInt("rangeEvPct", -1);
+                descriptor.rangeFuelPct = raw.optInt("rangeFuelPct", -1);
+                descriptor.battery12vVoltage = cleanBottomCardText(raw.optString("battery12vVoltage", ""), 8);
+                descriptor.battery12vCharging = raw.optBoolean("battery12vCharging", false);
+                descriptor.battery12vState = cleanBottomCardText(raw.optString("battery12vState", ""), 16);
+            }
             descriptor.editMenu = parseEditMenu(raw.optJSONArray("editMenu"));
             next.add(descriptor);
         }
