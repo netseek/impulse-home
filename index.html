@@ -4334,15 +4334,14 @@ window.HavalSplash = (function () {
     .hv-hs-vehicle-tire.temp-warning small { color:#ff6671; opacity:1; }
     .hv-hs-vehicle-tire.unavailable { opacity:.42; }
     .hv-hs-vehicle-tire.fl { left:-48%; top:17%; justify-content:flex-end; text-align:right; }.hv-hs-vehicle-tire.fr { right:-48%; top:17%; justify-content:flex-start; text-align:left; }.hv-hs-vehicle-tire.rl { left:-48%; bottom:13%; justify-content:flex-end; text-align:right; }.hv-hs-vehicle-tire.rr { right:-48%; bottom:13%; justify-content:flex-start; text-align:left; }
-    /* Wheel marks sit on the body wheel arches. vehicle-status/base.png body is
-       ~26–73% x; axle bands ~27% / ~64% y. left:7% landed in the black margin
-       beside the pressure readout (live popup, 2026-09-17). */
-    .hv-hs-vehicle-tire-mark,.hv-status-tire-mark { position:absolute; z-index:7; display:none; width:9.5%; height:4.8%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.45); pointer-events:none; }
+    /* Portrait wheel marks with solid red fill. Height +20% and axle nudge
+       measured against tire-mark-preview.html (front up / rear down by 0.75×H). */
+    .hv-hs-vehicle-tire-mark,.hv-status-tire-mark { position:absolute; z-index:7; display:none; width:5.5%; height:11.4%; box-sizing:border-box; border:2px solid #ff3b4a; border-radius:2px; background:#ff6671; pointer-events:none; }
     .hv-hs-vehicle-tire-mark.warning,.hv-status-tire-mark.warning { display:block; }
-    .hv-hs-vehicle-tire-mark.fl,.hv-status-tire-mark.front-left,.hv-status-tire-mark.fl { left:27.5%; top:27.5%; }
-    .hv-hs-vehicle-tire-mark.fr,.hv-status-tire-mark.front-right,.hv-status-tire-mark.fr { right:27.5%; top:27.5%; }
-    .hv-hs-vehicle-tire-mark.rl,.hv-status-tire-mark.rear-left,.hv-status-tire-mark.rl { left:27.5%; bottom:32%; }
-    .hv-hs-vehicle-tire-mark.rr,.hv-status-tire-mark.rear-right,.hv-status-tire-mark.rr { right:27.5%; bottom:32%; }
+    .hv-hs-vehicle-tire-mark.fl,.hv-status-tire-mark.front-left,.hv-status-tire-mark.fl { left:28%; top:17.9%; }
+    .hv-hs-vehicle-tire-mark.fr,.hv-status-tire-mark.front-right,.hv-status-tire-mark.fr { right:28%; top:17.9%; }
+    .hv-hs-vehicle-tire-mark.rl,.hv-status-tire-mark.rear-left,.hv-status-tire-mark.rl { left:28%; bottom:21.9%; }
+    .hv-hs-vehicle-tire-mark.rr,.hv-status-tire-mark.rear-right,.hv-status-tire-mark.rr { right:28%; bottom:21.9%; }
     @media (max-width: 640px) {
       .hv-hs-roof-pop { width: calc(100vw - 28px); padding-inline: 12px; }
       .hv-hs-roof-stack { grid-template-columns:minmax(150px,.9fr) minmax(160px,1fr) minmax(180px,1.1fr); gap:7px; }
@@ -4373,7 +4372,6 @@ window.HavalSplash = (function () {
     .hv-wallpaper-pop,
     .hv-graph-editor,
     .hv-apps-tile,
-    .hv-desktop-switcher,
     .hv-desktop-studio {
       background-color: var(--hv-frost-fill);
       background-image: var(--hv-frost-noise);
@@ -4405,75 +4403,50 @@ window.HavalSplash = (function () {
     .hv-graph-editor button.on,
     .hv-widget-picker button.on { border-color: var(--hv-accent); color: var(--hv-accent); }
 
-    .hv-desktop-switcher {
+    /* Page dots between the widget board and the bottom card rail. No hit
+       proxy: these sit in the WebView, not under the MMI status bar. */
+    .hv-desktop-dots-bar {
       position: absolute;
-      z-index: 74;
-      /* Always-frost pill, visually in the MMI header. Android's StatusBar
-         window owns y=0..60 and would swallow taps; a native overlay matching
-         this rect (AppLauncherBridge.reportDesktopSwitcherHit) sits above it
-         and forwards presses into the WebView. Horizontal sizes: original × 0.7 × 1.1. */
-      top: max(0px, calc((var(--hv-safe-top, 28px) - 42px) / 2 - 8px));
-      left: calc(33.333% + 105px);
+      z-index: 34;
+      left: 50%;
+      bottom: 65px;
       transform: translateX(-50%);
-      height: 37px;
-      padding: 0;
+      display: flex;
       align-items: center;
-      gap: 1px;
-      border: 1px solid var(--hv-frost-edge);
-      border-radius: 15px;
+      justify-content: center;
+      height: 22px;
+      padding: 0 10px;
       color: var(--hv-widget-fg, #edf5fa);
-      overflow: visible;
-      user-select: none;
-      /* manipulation: allow taps; avoid pan-y eating the status-bar proxy press. */
-      touch-action: manipulation;
       pointer-events: auto;
+      user-select: none;
+      touch-action: manipulation;
     }
-    .hv-desktop-switcher button {
+    .hv-desktop-dots-bar button {
       color: inherit; border: 0; background: transparent; cursor: pointer; pointer-events: auto;
       -webkit-appearance: none; appearance: none;
       -webkit-tap-highlight-color: transparent;
       outline: none;
     }
-    .hv-desktop-arrow {
-      position: relative;
-      width: 102px; height: 37px; border-radius: 0;
-      flex: 0 0 auto;
-      display: flex; align-items: center; justify-content: center;
-      font: 300 22px/1 system-ui;
-      padding-top: 1px;
-      background: rgba(255,255,255,.04);
-      overflow: visible;
+    .hv-desktop-dots { display: flex; align-items: center; justify-content: center; height: 22px; gap: 0; }
+    .hv-desktop-dot { position: relative; width: 16px; height: 22px; padding: 0; }
+    .hv-desktop-dot::after {
+      content: ''; position: absolute; width: 5px; height: 5px; border-radius: 5px;
+      background: currentColor; opacity: .28; left: 50%; top: 50%;
+      transform: translate(-50%,-50%);
+      transition: width .16s ease, opacity .16s ease, background .16s ease;
     }
-    /* 20% slop around each chevron so the status-bar tap is easier to hit. */
-    .hv-desktop-arrow::before {
-      content: '';
-      position: absolute;
-      inset: -20%;
-    }
-    .hv-desktop-switcher > .hv-desktop-arrow:first-child {
-      border-radius: 13px 0 0 13px;
-    }
-    .hv-desktop-switcher > .hv-desktop-arrow:last-child {
-      border-radius: 0 13px 13px 0;
-    }
-    /* Fill must follow the segmented radii — WebView's default tap highlight is a
-       blue oval that ignores border-radius. No scale: that also mismatches. */
-    .hv-desktop-arrow:active {
-      background: rgba(79,214,232,.34);
-    }
-    .hv-desktop-current {
-      min-width: 92px; height: 37px; padding: 0 7px;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-    }
-    .hv-desktop-name {
-      max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      font-weight: 650; font-size: 15px; line-height: 1; letter-spacing: .015em;
-    }
-    .hv-desktop-count { font: 10px/1 'Space Mono', monospace; opacity: .52; display: block; }
-    .hv-desktop-dots { display: flex; align-items: center; justify-content: center; height: 37px; gap: 0; }
-    .hv-desktop-dot { position: relative; width: 14px; height: 37px; padding: 0; }
-    .hv-desktop-dot::after { content: ''; position: absolute; width: 5px; height: 5px; border-radius: 5px; background: currentColor; opacity: .28; left: 50%; top: 50%; transform: translate(-50%,-50%); transition: width .2s ease, opacity .2s ease, background .2s ease; }
     .hv-desktop-dot.on::after { width: 14px; opacity: 1; background: var(--hv-accent); }
+    /* Live swipe preview: --p is 0..1 toward the commit threshold. */
+    .hv-desktop-dot.slide-from::after {
+      width: calc(14px - 9px * var(--p, 0));
+      opacity: calc(1 - 0.72 * var(--p, 0));
+      background: var(--hv-accent);
+    }
+    .hv-desktop-dot.slide-to::after {
+      width: calc(5px + 9px * var(--p, 0));
+      opacity: calc(0.28 + 0.72 * var(--p, 0));
+      background: var(--hv-accent);
+    }
     /* Keep a small system-gesture margin on both outer edges. These invisible
        gutters are intentionally inset: the Android back/home gesture must
        remain available even when a widget fills an entire board. */
@@ -4860,7 +4833,6 @@ window.HavalSplash = (function () {
     #hv-root.hv-desk-sliding > .hv-canvas-host,
     #hv-root.hv-desk-sliding > .hv-wallpaper,
     #hv-root.hv-desk-sliding > .hv-widget-board,
-    #hv-root.hv-desk-sliding > .hv-desktop-switcher,
     #hv-root.hv-desk-sliding > .hv-desktop-swipe-edge,
     #hv-root.hv-desk-sliding > .hv-car-stage-action,
     #hv-root.hv-desk-sliding > .hv-apps-pane,
@@ -4876,6 +4848,16 @@ window.HavalSplash = (function () {
     .hv-desks { position: absolute; inset: 0; z-index: 84; display: flex; flex-direction: column; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .22s ease;
       background: linear-gradient(to bottom, rgba(4,8,12,0) 0%, rgba(4,8,12,.56) 24%, rgba(4,8,12,.64) 50%, rgba(4,8,12,.56) 76%, rgba(4,8,12,0) 100%); }
     .hv-desks.on { opacity: 1; pointer-events: auto; }
+    /* Framed Cards/Widgets/Appearance sit above; keep the strip visible behind. */
+    .hv-desks.behind { z-index: 82; pointer-events: none; }
+    .hv-desks-chrome { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 auto 18px; padding: 0 24px; }
+    .hv-desks-chrome button {
+      min-width: 108px; height: 40px; padding: 0 16px; border: 1px solid rgba(255,255,255,.22);
+      border-radius: 12px; background: rgba(12,16,22,.55); color: #eef3f7;
+      font: 600 13px/1 'Space Grotesk', system-ui, sans-serif; letter-spacing: .04em;
+      cursor: pointer; text-shadow: 0 1px 2px rgba(0,0,0,.45);
+    }
+    .hv-desks-chrome button.on { border-color: var(--hv-accent); color: var(--hv-accent); box-shadow: 0 0 0 1px var(--hv-accent); }
     .hv-desks-strip { position: relative; width: 90%; margin: 0 auto; display: flex; align-items: flex-start; gap: 28px; overflow: hidden; padding: 28px calc(45% - 230px) 14px; box-sizing: border-box; touch-action: none; user-select: none; -webkit-user-select: none; }
     .hv-desks-item,.hv-desks-add { position: relative; flex: none; width: 460px; padding: 0; border: 0; background: transparent; color: #eef3f7; text-align: left; cursor: pointer; }
     .hv-desks-item .hv-studio-desk-screen { box-shadow: 0 18px 40px rgba(0,0,0,.35); }
@@ -5268,11 +5250,11 @@ window.HavalSplash = (function () {
     .hv-tires-visual { position:relative; height:calc(100% - 30px); min-height:90px; overflow:hidden; }
     .hv-tires-car-stage { position:absolute; left:50%; top:50%; width:min(104px,31%); height:92%; transform:translate(-50%,-50%); }
     .hv-tire-car { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 8px 10px rgba(0,0,0,.28)); }
-    .hv-tire-wheel-mark { position:absolute; z-index:2; display:none; width:14%; height:7%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.45); pointer-events:none; }
+    .hv-tire-wheel-mark { position:absolute; z-index:2; display:none; width:8%; height:16.8%; box-sizing:border-box; border:2px solid #ff3b4a; border-radius:2px; background:#ff6671; pointer-events:none; }
     .hv-tire-wheel-mark.warning { display:block; }
-    /* tires-top-view body ~18–82% — marks on the wheel arches, not the margin. */
-    .hv-tire-wheel-mark.front-left { left:16%; top:24%; } .hv-tire-wheel-mark.front-right { right:16%; top:24%; }
-    .hv-tire-wheel-mark.rear-left { left:15%; bottom:28%; } .hv-tire-wheel-mark.rear-right { right:15%; bottom:28%; }
+    /* tires-top-view: same +20% height and 0.75×H axle nudge as status marks. */
+    .hv-tire-wheel-mark.front-left { left:19%; top:11.5%; } .hv-tire-wheel-mark.front-right { right:19%; top:11.5%; }
+    .hv-tire-wheel-mark.rear-left { left:18%; bottom:15.5%; } .hv-tire-wheel-mark.rear-right { right:18%; bottom:15.5%; }
     .hv-tire-point { position:absolute; width:29%; display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 5px; font-variant-numeric:tabular-nums; }
     .hv-tire-point.front-left { left:2%; top:12%; justify-content:flex-end; text-align:right; }
     .hv-tire-point.front-right { right:2%; top:12%; justify-content:flex-start; text-align:left; }
@@ -5547,10 +5529,10 @@ window.HavalSplash = (function () {
     .hv-tires-focus-stage::before { content:''; position:absolute; left:50%; top:8%; bottom:8%; width:1px; background:currentColor; opacity:.06; }
     .hv-tires-focus-car-stage { position:absolute; left:50%; top:50%; width:min(210px,33%); height:86%; transform:translate(-50%,-50%); }
     .hv-tires-focus-car { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 20px 22px rgba(0,0,0,.34)); }
-    .hv-tires-focus-mark { position:absolute; z-index:2; display:none; width:14%; height:7%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.45); pointer-events:none; }
+    .hv-tires-focus-mark { position:absolute; z-index:2; display:none; width:8%; height:16.8%; box-sizing:border-box; border:2px solid #ff3b4a; border-radius:2px; background:#ff6671; pointer-events:none; }
     .hv-tires-focus-mark.warning { display:block; }
-    .hv-tires-focus-mark.front-left { left:16%; top:24%; } .hv-tires-focus-mark.front-right { right:16%; top:24%; }
-    .hv-tires-focus-mark.rear-left { left:15%; bottom:28%; } .hv-tires-focus-mark.rear-right { right:15%; bottom:28%; }
+    .hv-tires-focus-mark.front-left { left:19%; top:11.5%; } .hv-tires-focus-mark.front-right { right:19%; top:11.5%; }
+    .hv-tires-focus-mark.rear-left { left:18%; bottom:15.5%; } .hv-tires-focus-mark.rear-right { right:18%; bottom:15.5%; }
     .hv-tires-focus-wheel { position:absolute; width:min(190px,28%); min-height:96px; padding:12px 14px; box-sizing:border-box; border:1px solid var(--hv-frost-edge); border-radius:14px; background:var(--hv-frost-fill); box-shadow:inset 0 1px 0 var(--hv-frost-inner); }
     .hv-tires-focus-wheel.front-left { left:3%; top:7%; } .hv-tires-focus-wheel.front-right { right:3%; top:7%; }
     .hv-tires-focus-wheel.rear-left { left:3%; bottom:7%; } .hv-tires-focus-wheel.rear-right { right:3%; bottom:7%; }
@@ -5810,7 +5792,7 @@ window.HavalSplash = (function () {
 
   </style>
 </helmet>
-  <div id="hv-root" class="{{ rootClass }}" ref="{{ outerRef }}" onClick="{{ revealDesktopIndicator }}" style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; background: {{ shellBg }}; font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }}; --hv-safe-left: {{ safeLeft }}; --hv-safe-right: {{ safeRight }}; --hv-safe-bottom: {{ safeBottom }}; --hv-launcher-bottom: {{ launcherBottom }}; --hv-chrome-main-left: {{ chromeMainLeft }}; --hv-accent: {{ accentColor }}; {{ popupWorkspaceStyle }}">
+  <div id="hv-root" class="{{ rootClass }}" ref="{{ outerRef }}" style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; background: {{ shellBg }}; font-family: 'Space Grotesk', system-ui, sans-serif; transition: background 0.9s ease; --hv-safe-top: {{ safeTop }}; --hv-safe-left: {{ safeLeft }}; --hv-safe-right: {{ safeRight }}; --hv-safe-bottom: {{ safeBottom }}; --hv-launcher-bottom: {{ launcherBottom }}; --hv-chrome-main-left: {{ chromeMainLeft }}; --hv-accent: {{ accentColor }}; {{ popupWorkspaceStyle }}">
 
   <div ref="{{ containerRef }}" class="hv-canvas-host" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%;"></div>
   <div class="hv-wallpaper {{ wallpaperClass }}" style="background-image: url('{{ wallpaperUrl }}');"></div>
@@ -5825,18 +5807,12 @@ window.HavalSplash = (function () {
     </div>
   </div>
 
-  <div class="hv-desktop-switcher {{ desktopSwitcherClass }}" style="display: {{ desktopSwitcherDisplay }}; {{ desktopSwitcherStyle }}" role="navigation" aria-label="Virtual desktops" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}" onMouseDown="{{ desktopSwipeStart }}" onMouseMove="{{ desktopSwipeMove }}" onMouseUp="{{ desktopSwipeEnd }}" onMouseLeave="{{ desktopSwipeCancel }}">
-    <button type="button" class="hv-desktop-arrow" onClick="{{ previousDesktop }}" aria-label="Previous desktop" title="Previous desktop · Ctrl+Left">‹</button>
-    <button type="button" class="hv-desktop-current" onClick="{{ openDesktopStudio }}" aria-label="Open Desktop Studio">
-      <span class="hv-desktop-name">{{ desktopName }}</span>
-      <span class="hv-desktop-count">{{ desktopCountLabel }}</span>
-    </button>
+  <div class="hv-desktop-dots-bar {{ desktopDotsBarClass }}" style="display: {{ desktopDotsBarDisplay }};" role="navigation" aria-label="Virtual desktops">
     <div class="hv-desktop-dots" aria-label="Choose desktop">
       <sc-for list="{{ desktopDots }}" as="dd" hint-placeholder-count="3">
-        <button type="button" class="hv-desktop-dot {{ dd.cls }}" onClick="{{ dd.onClick }}" onTouchStart="{{ dd.onHoldStart }}" onTouchEnd="{{ dd.onHoldEnd }}" onTouchCancel="{{ dd.onHoldEnd }}" onMouseDown="{{ dd.onHoldStart }}" onMouseUp="{{ dd.onHoldEnd }}" onMouseLeave="{{ dd.onHoldEnd }}" onContextMenu="{{ dd.onContextMenu }}" title="{{ dd.title }}"></button>
+        <button type="button" class="hv-desktop-dot {{ dd.cls }}" onClick="{{ dd.onClick }}" title="{{ dd.title }}" aria-label="{{ dd.title }}"></button>
       </sc-for>
     </div>
-    <button type="button" class="hv-desktop-arrow" onClick="{{ nextDesktop }}" aria-label="Next desktop" title="Next desktop · Ctrl+Right">›</button>
   </div>
 
   <!-- Config and camera form one bottom-aligned row beside the occupied widgets: config left, camera right. -->
@@ -6764,6 +6740,11 @@ window.HavalSplash = (function () {
   </section>
 
   <div class="hv-desks {{ desksClass }}" onClick="{{ desksBackdropClick }}" role="dialog" aria-label="Desktops">
+    <div class="hv-desks-chrome" onClick="{{ desksChromeClick }}">
+      <button type="button" class="{{ desksTabCardsClass }}" onClick="{{ desksOpenCards }}">Cards</button>
+      <button type="button" class="{{ desksTabWidgetsClass }}" onClick="{{ desksOpenWidgets }}">Widgets</button>
+      <button type="button" class="{{ desksTabAppearanceClass }}" onClick="{{ desksOpenAppearance }}">Appearance</button>
+    </div>
     <div class="hv-desks-strip" onPointerDown="{{ desksPointerDown }}">
       <sc-if value="{{ desksCanAdd }}" hint-placeholder-val="{{ true }}">
         <button type="button" class="hv-desks-add" onClick="{{ desksAddStart }}" aria-label="New desktop at the start"><span class="hv-desks-add-screen">+</span><span class="hv-desks-name">New desktop</span></button>
@@ -6973,6 +6954,14 @@ window.HavalSplash = (function () {
               <button type="button" class="{{ studioFillMixedClass }}" onClick="{{ studioFillMixed }}">Ambos</button>
             </div>
             <div class="hv-studio-note">{{ studioFillNote }}</div>
+            <sc-if value="{{ studioShowXray }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-studio-label">MODO 3D</div>
+              <div class="hv-studio-chip-row">
+                <button type="button" class="{{ studioXrayOffClass }}" onClick="{{ studioXrayOff }}">Normal</button>
+                <button type="button" class="{{ studioXrayOnClass }}" onClick="{{ studioXrayOn }}">Raio-X</button>
+              </div>
+              <div class="hv-studio-note">Salvo nesta área de trabalho.</div>
+            </sc-if>
             <div class="hv-studio-label">PAPEL DE PAREDE</div>
             <button type="button" class="hv-studio-wall {{ studioWallClass }}" onClick="{{ studioOpenWallpaper }}" aria-label="{{ studioWallLabel }}" title="{{ studioWallLabel }}">
               <span class="hv-studio-wall-img" style="{{ studioWallStyle }}"></span>
@@ -13726,7 +13715,7 @@ class Component extends DCLogic {
         const powertrainOn = !st.powertrainOn;
         this._applyPowertrainVisibility(powertrainOn);
         return { powertrainOn };
-      }),
+      }, () => { this._persistActiveDesktop(); this._syncDockIndicators(); }),
       configBtnBorder: hv(s.configExpanded).border,
       configBtnCol:    hv(s.configExpanded).col,
       configBtnBg:     hv(s.configExpanded).bg,
@@ -21265,7 +21254,7 @@ class Component extends DCLogic {
       const powertrainOn = !st.powertrainOn;
       this._applyPowertrainVisibility(powertrainOn);
       return { powertrainOn };
-    });
+    }, () => { this._persistActiveDesktop(); this._syncDockIndicators(); });
     this._armHotspotHideTimer();
     if (this.requestRender) this.requestRender(4);
   }
@@ -34522,6 +34511,7 @@ class Component extends DCLogic {
       bottomClock: this._cloneDesktopValue(this._normalizeBottomClock(this._bottomClockConfig), this._normalizeBottomClock()),
       widgetLayout: this._cloneDesktopValue(layout || this._widgetLayout || this._defaultWidgetLayout(), this._defaultWidgetLayout()),
       cameras: this._cloneDesktopCameras(this._desktopCameras),
+      powertrainOn: !!s.powertrainOn,
     };
   }
 
@@ -34567,6 +34557,7 @@ class Component extends DCLogic {
       { cameras: d.cameras, camera: d.camera },
       d.shellMode
     );
+    base.powertrainOn = !!d.powertrainOn;
     return base;
   }
 
@@ -34644,6 +34635,7 @@ class Component extends DCLogic {
       dockMode: current.dockMode,
       clockFace: current.clockFace,
       clockFormat: current.clockFormat,
+      powertrainOn: !!current.powertrainOn,
     });
     this._desktopReady = true;
     this._saveDesktopStore();
@@ -34722,6 +34714,7 @@ class Component extends DCLogic {
       dockMode: d.dockMode,
       clockFace: d.clockFace,
       clockFormat: d.clockFormat,
+      powertrainOn: !!d.powertrainOn,
       leftSlotUse: (left && left.use) || 'app',
       rightSlotUse: (right && right.use) || 'app',
       widgetMenuId: null,
@@ -34740,6 +34733,7 @@ class Component extends DCLogic {
       // desktop kept the previous desktop's opaque background over the wallpaper.
       this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg,
         this.state.vignette, this.state.grainEnabled);
+      this._applyPowertrainVisibility(!!d.powertrainOn);
       this._refreshAutoWidgetThemeSample(true);
       this._syncCenterFillIndicator();
       this._syncSlotUseToNative();
@@ -34834,7 +34828,7 @@ class Component extends DCLogic {
       const cls = el.classList;
       if (!cls) continue;
       if (cls.contains('hv-canvas-host') || cls.contains('hv-wallpaper')
-        || cls.contains('hv-widget-board') || cls.contains('hv-desktop-switcher')
+        || cls.contains('hv-widget-board')
         || cls.contains('hv-desktop-swipe-edge') || cls.contains('hv-car-stage-action')
         || cls.contains('hv-apps-pane') || cls.contains('hv-center-slot-zone')
         || cls.contains('hv-shell-hud')) {
@@ -34896,6 +34890,46 @@ class Component extends DCLogic {
     const incomingBase = clamped < 0 ? w : -w;
     dom.incoming.style.transition = 'none';
     dom.incoming.style.transform = 'translate3d(' + (incomingBase + clamped) + 'px,0,0)';
+    this._deskSlidePaintDots(clamped);
+  }
+
+  /** Morph page dots toward the destination as the swipe nears commit. */
+  _deskSlidePaintDots(dx) {
+    const bar = document.querySelector('.hv-desktop-dots-bar .hv-desktop-dots');
+    if (!bar) return;
+    const dots = bar.querySelectorAll('.hv-desktop-dot');
+    const cur = this._desktopIndex || 0;
+    const slide = this._deskSlide;
+    const to = slide ? slide.toIndex : cur;
+    const progress = Math.max(0, Math.min(1, Math.abs(dx || 0) / H6_DESK_SLIDE_COMMIT_PX));
+    for (let i = 0; i < dots.length; i++) {
+      const el = dots[i];
+      el.classList.remove('on', 'slide-from', 'slide-to');
+      el.style.removeProperty('--p');
+      if (!slide || progress <= 0 || to === cur) {
+        if (i === cur) el.classList.add('on');
+        continue;
+      }
+      if (i === cur) {
+        el.classList.add('slide-from');
+        el.style.setProperty('--p', String(progress));
+      } else if (i === to) {
+        el.classList.add('slide-to');
+        el.style.setProperty('--p', String(progress));
+      }
+    }
+  }
+
+  _deskSlideClearDots() {
+    const bar = document.querySelector('.hv-desktop-dots-bar .hv-desktop-dots');
+    if (!bar) return;
+    const dots = bar.querySelectorAll('.hv-desktop-dot');
+    const cur = this._desktopIndex || 0;
+    for (let i = 0; i < dots.length; i++) {
+      dots[i].classList.remove('slide-from', 'slide-to');
+      dots[i].style.removeProperty('--p');
+      dots[i].classList.toggle('on', i === cur);
+    }
   }
 
   /** Prepare the incoming pane for a given direction (−1 = next, +1 = previous). */
@@ -34940,6 +34974,7 @@ class Component extends DCLogic {
       dom.cover.style.transition = '';
     }
     this._deskSlide = null;
+    this._deskSlideClearDots();
   }
 
   /**
@@ -35509,6 +35544,16 @@ class Component extends DCLogic {
     });
   }
 
+  /** Framed Cards/Widgets/Appearance close back to the desks strip; desks closes all. */
+  _closeDesktopStudioFramedOrAll() {
+    const tab = this.state.desktopStudioTab;
+    if (this.state.desktopStudioOpen && tab && tab !== 'desktops' && tab !== 'clock') {
+      this._setStudioTab('desktops');
+      return;
+    }
+    this._closeDesktopStudio();
+  }
+
   _closeDesktopStudio() {
     this._desksEndGesture();
     if (this._deskSlide) this._deskSlideTeardown();
@@ -35818,6 +35863,17 @@ class Component extends DCLogic {
     this._setDesktopAccent('cyan');
   }
 
+  _setDesktopPowertrain(on) {
+    const next = !!on;
+    if (!!this.state.powertrainOn === next) return;
+    this._applyPowertrainVisibility(next);
+    this.setState({ powertrainOn: next }, () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+      if (this.requestRender) this.requestRender(4);
+    });
+  }
+
   /**
    * Layout manager → Appearance → "Apply to all desktops". Copies the active
    * desktop's theme, accent and background onto the others. Widgets, cards
@@ -35828,7 +35884,7 @@ class Component extends DCLogic {
     this._captureActiveDesktop();
     const at = this._desktopIndex || 0;
     const src = this._desktops[at];
-    const keys = ['widgetThemeMode', 'accentKey', 'accentColor', 'accentDark', 'accentLight', 'dynamicColorSport', 'dynamicColorEco', 'centerFill', 'wallpaperSource', 'wallpaperAuto', 'wallpaperIdx',
+    const keys = ['widgetThemeMode', 'accentKey', 'accentColor', 'accentDark', 'accentLight', 'dynamicColorSport', 'dynamicColorEco', 'centerFill', 'powertrainOn', 'wallpaperSource', 'wallpaperAuto', 'wallpaperIdx',
       'wallpaperCuratedIdx', 'wallpaperFavoritesIdx', 'wallpaperWebUrl', 'wallpaperWebTitle', 'wallpaperWebCredit', 'wallpaperWebSourcePage', 'wallpaperCustomUrl'];
     this._desktops.forEach((d, i) => {
       if (i !== at) keys.forEach((key) => { d[key] = src[key]; });
@@ -35921,58 +35977,40 @@ class Component extends DCLogic {
   }
 
   _reportDesktopSwitcherHit() {
+    // Top switcher removed — keep the native hit proxy cleared.
     const B = window.AppLauncherBridge;
     if (!B || typeof B.reportDesktopSwitcherHit !== 'function') return;
-    const el = document.querySelector('.hv-desktop-switcher');
-    const r = el ? el.getBoundingClientRect() : null;
-    const vis = !!(r && r.width > 1 && r.height > 1
-      && el && window.getComputedStyle(el).display !== 'none');
-    const padX = vis ? r.width * 0.2 : 0;
-    const padY = vis ? r.height * 0.2 : 0;
-    const left = vis ? r.left - padX : 0;
-    const top = vis ? r.top - padY : 0;
-    const width = vis ? r.width + padX * 2 : 0;
-    const height = vis ? r.height + padY * 2 : 0;
-    const key = vis
-      ? ([Math.round(left), Math.round(top), Math.round(width), Math.round(height)].join(','))
-      : 'off';
-    if (key === this._desktopHitSig) return;
-    this._desktopHitSig = key;
-    try {
-      if (vis) B.reportDesktopSwitcherHit(left, top, width, height, true);
-      else B.reportDesktopSwitcherHit(0, 0, 0, 0, false);
-    } catch (e) {}
+    if (this._desktopHitSig === 'off') return;
+    this._desktopHitSig = 'off';
+    try { B.reportDesktopSwitcherHit(0, 0, 0, 0, false); } catch (e) {}
   }
 
   _onDesktopGestureStart(ev) {
     const p = this._eventClientPoint(ev);
     const mode = this._shellMode || this.state.shellMode || 'appCar';
     const cls = ev && ev.currentTarget && ev.currentTarget.classList;
-    const fromSwitcher = !!(cls && cls.contains('hv-desktop-switcher'));
-    // Background, top switcher, outer edges, and the widget board. Map pans /
-    // chrome controls inside a widget keep ownership; the car orbit disc is
+    // Background, outer edges, and the widget board. Map pans / chrome
+    // controls inside a widget keep ownership; the car orbit disc is
     // excluded so a drag on the model still rotates it.
     if (!p || !this._pointInDesktopSwipeZone(p.x, p.y, ev) || mode === 'appsOnly'
       || this.state.desktopStudioOpen || this._widgetAddingOn() || this.state.graphEditId
       || this.state.widgetMenuId || this.state.widgetPickerStep
       || this.state.widgetPlaceMode === 'move'
       || (this._deskSlide && this._deskSlide.busy)
-      || (!fromSwitcher && this._isDesktopSwipeBlockedTarget(ev))) return;
+      || this._isDesktopSwipeBlockedTarget(ev)) return;
     this._desktopGesture = {
       x: p.x, y: p.y, at: Date.now(), moved: false,
       lastX: p.x, lastT: Date.now(), vx: 0,
-      fromSwitcher: fromSwitcher,
       fromBoard: !!(cls && cls.contains('hv-widget-board')),
       fromTouch: !!(ev && (ev.type === 'touchstart'
         || (ev.touches && ev.touches.length)
         || (ev.pointerType === 'touch'))),
-      // Finger-follow on the board / edges / canvas — switcher stays tap-first.
-      trackSlide: !fromSwitcher,
+      trackSlide: true,
       controlsEnabled: this.controls ? this.controls.enabled !== false : null,
     };
     // Outside the car disc, this press is a desktop swipe — don't let orbit
     // steal the first 18 px of travel.
-    if (this.controls && !this._desktopGesture.fromSwitcher && !this._desktopGesture.fromBoard) {
+    if (this.controls && !this._desktopGesture.fromBoard) {
       this.controls.enabled = false;
     }
   }
@@ -35990,9 +36028,7 @@ class Component extends DCLogic {
       g.lastX = p.x;
       g.lastT = now;
     }
-    // Switcher taps are jittery under the status-bar proxy; wait for a clearer
-    // move before treating this as a drag (still synthesise the click on end).
-    const movePx = g.fromSwitcher ? 18 : 10;
+    const movePx = 10;
     if (!g.moved && (Math.abs(dx) > movePx || Math.abs(dy) > movePx)) {
       g.moved = true;
       if (g.fromBoard) {
@@ -36071,10 +36107,6 @@ class Component extends DCLogic {
       this._requestDesktopSwitch((this._desktopIndex || 0) + (dx < 0 ? 1 : -1));
       return;
     }
-    // Any touchmove on the switcher cancels the browser click — even a 2 px
-    // jitter under the move threshold. Always activate from the press point on
-    // touch; mouse keeps its native click (synthesising would double-fire).
-    if (g.fromSwitcher && g.fromTouch) this._activateDesktopSwitcherAt(g.x, g.y);
   }
 
   _onDesktopGestureCancel() {
@@ -36343,28 +36375,30 @@ class Component extends DCLogic {
     const fill = this._normalizeCenterFill(s.centerFill);
     return {
       accentColor: this._effectiveAccentColor(),
-      desktopSwitcherDisplay: (!s.error && (!s.loading || this._viewerReady)
+      desktopDotsBarDisplay: (!s.error && (!s.loading || this._viewerReady)
         && !s.desktopStudioOpen && !s.focusedCardType
         && !s.widgetPickerStep && !s.widgetPlaceType && !s.widgetPlaceMode) ? 'flex' : 'none',
-      desktopSwitcherClass: (s.nightMode ? 'scene-night' : 'scene-day'),
-      revealDesktopIndicator: () => this._revealDesktopIndicator(),
+      desktopDotsBarClass: (s.nightMode ? 'scene-night' : 'scene-day'),
       desktopSwipeEdgesDisplay: (!s.error && !s.desktopStudioOpen && !s.widgetPickerStep
         && !s.widgetPlaceType && (s.shellMode || 'appCar') !== 'appsOnly') ? 'block' : 'none',
       desktopSwipeStart: (ev) => this._onDesktopGestureStart(ev),
       desktopSwipeMove: (ev) => this._onDesktopGestureMove(ev),
       desktopSwipeEnd: (ev) => this._onDesktopGestureEnd(ev),
       desktopSwipeCancel: () => this._onDesktopGestureCancel(),
-      // Frost pill is always on; no idle colour override.
-      desktopDotClass: 'on' + (s.desktopIndicatorExpanded ? ' expanded' : ''),
       desktopName: current.name || 'Desktop',
-      desktopSwitcherStyle: '',
       desktopCountLabel: (index + 1) + ' / ' + Math.max(1, list.length),
       desktopIndexLabel: (index + 1) + '/' + list.length,
-      desktopIndicatorClick: () => this._openDesktopStudio('desktops'),
-      desktopIndicatorStyle: '',
-      // Template binds desksClass / desksCanAdd / desksHint (not the Strip* aliases).
-      desksClass: (studioOpen && tab === 'desktops' ? 'on' : '')
+      // Desks strip stays visible behind framed Cards/Widgets/Appearance.
+      desksClass: (studioOpen ? 'on' : '')
+        + (studioOpen && tab !== 'desktops' ? ' behind' : '')
         + (s.desksEditing ? ' editing' : ''),
+      desksChromeClick: (ev) => this._cardControlEvent(ev),
+      desksTabCardsClass: tab === 'cards' ? 'on' : '',
+      desksTabWidgetsClass: tab === 'widgets' ? 'on' : '',
+      desksTabAppearanceClass: tab === 'appearance' ? 'on' : '',
+      desksOpenCards: (ev) => { this._cardControlEvent(ev); this._setStudioTab('cards'); },
+      desksOpenWidgets: (ev) => { this._cardControlEvent(ev); this._setStudioTab('widgets'); },
+      desksOpenAppearance: (ev) => { this._cardControlEvent(ev); this._setStudioTab('appearance'); },
       desksItems: list.map((d, i) => this._desktopThumbView(d, i, index)),
       desksEmpty: !list.length,
       desksCanAdd: list.length < H6_MAX_DESKTOPS,
@@ -36461,24 +36495,11 @@ class Component extends DCLogic {
           if (self._desktopClickSuppressed()) return;
           self._requestDesktopSwitch(i);
         },
-        onHoldStart: (function(n) { return function(ev) { self._onDesktopDotHoldStart(n, ev); }; })(i),
-        onHoldEnd: (ev) => this._onDesktopDotHoldEnd(ev),
-        onContextMenu: (function(n) { return function(ev) {
-          if (ev && ev.preventDefault) ev.preventDefault();
-          if (n !== self._desktopIndex) self._switchDesktop(n);
-          setTimeout(() => self._openDesktopStudio('desktops'), 0);
-        }; })(i),
       })),
-      previousDesktop: () => this._previousDesktop(),
-      nextDesktop: () => this._nextDesktop(),
-      openDesktopStudio: () => {
-        if (this._desktopClickSuppressed()) return;
-        this._openDesktopStudio('desktops');
-      },
       // Desktops is its own full-screen strip; the frame hosts everything else.
       desktopStudioClass: (studioOpen && tab !== 'desktops' ? 'on ' : '') + 'tab-' + tab,
       desktopStudioBackdropClass: studioOpen && tab !== 'desktops' ? 'on' : '',
-      closeDesktopStudio: () => this._closeDesktopStudio(),
+      closeDesktopStudio: () => this._closeDesktopStudioFramedOrAll(),
       studioTitle: tab === 'appearance' ? 'Aparência' : 'Cards & widgets',
       studioTitleDisplay: tab === 'clock' ? 'none' : 'block',
       studioSegTabsDisplay: (tab === 'cards' || tab === 'widgets') ? 'flex' : 'none',
@@ -36504,6 +36525,11 @@ class Component extends DCLogic {
         : (fill === 'wallpaper'
           ? 'O papel de parede preenche a tela; o carro 3D fica oculto.'
           : 'O cenário 3D do carro preenche a tela; nenhum papel de parede é carregado.'),
+      studioShowXray: fill === 'car' || fill === 'mixed',
+      studioXrayOffClass: !s.powertrainOn ? 'on' : '',
+      studioXrayOnClass: s.powertrainOn ? 'on' : '',
+      studioXrayOff: () => this._setDesktopPowertrain(false),
+      studioXrayOn: () => this._setDesktopPowertrain(true),
       // 3D mode has no wallpaper: the thumb shows greyed out and empty, and a
       // tap still opens the editor (which switches the background to it).
       studioWallClass: fill === 'car' ? 'off' : '',
@@ -40581,9 +40607,10 @@ class Component extends DCLogic {
       case 'railEditDone':
         if (this.state.desktopStudioOpen && this.state.desktopStudioTab === 'cards') this._closeDesktopStudio();
         break;
-      // The native Layout card (Workspace card → LAYOUT).
+      // The native Layout card (Workspace card → LAYOUT). Toggle closes all.
       case 'openLayoutDesktops':
-        this._openDesktopStudio('desktops');
+        if (this.state.desktopStudioOpen) this._closeDesktopStudio();
+        else this._openDesktopStudio('desktops');
         break;
       // Long press on any native rail card: straight into card edit.
       case 'openRailEdit':
@@ -41454,25 +41481,16 @@ class Component extends DCLogic {
   }
 
   _pointInDesktopSwitcher(clientX, clientY) {
-    const el = typeof document !== 'undefined'
-      ? document.querySelector('.hv-desktop-switcher') : null;
-    if (!el) return false;
-    const style = el.style && el.style.display;
-    if (style === 'none') return false;
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height) return false;
-    return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+    return false;
   }
 
   _pointInDesktopSwipeZone(clientX, clientY, ev) {
     const cls = ev && ev.currentTarget && ev.currentTarget.classList;
     // Handlers sit on these elements — trust the target, skip geometry.
-    if (cls && (cls.contains('hv-desktop-switcher')
-      || cls.contains('hv-widget-board')
+    if (cls && (cls.contains('hv-widget-board')
       || cls.contains('hv-desktop-swipe-edge'))) {
       return true;
     }
-    if (this._pointInDesktopSwitcher(clientX, clientY)) return true;
     const width = (typeof window !== 'undefined' && window.innerWidth) || 1920;
     const height = (typeof window !== 'undefined' && window.innerHeight) || 720;
     const workspace = this._popupWorkspace();
@@ -41672,10 +41690,9 @@ class Component extends DCLogic {
     const showLeft = android && onMain && !appsOnly;
     const leftSlotRect = this._rectCss(this._shellLeftBounds, { l: 48, t: 40, r: 740, b: 500 });
     const rightSlotRect = this._rectCss(this._shellRightBounds, { l: 1180, t: 40, r: 1872, b: 500 });
-    // Visual widget canvases sit 10px below their freeform-app counterparts.
-    // Width and height remain unchanged, so saved grid placements do not move.
-    const leftRect = this._rectCss(this._shellLeftBounds, { l: 48, t: 40, r: 740, b: 500 }, 0, 10);
-    const rightRect = this._rectCss(this._shellRightBounds, { l: 1180, t: 40, r: 1872, b: 500 }, 0, 10);
+    // Widget canvases share the freeform slot band (expanded toward the header).
+    const leftRect = this._rectCss(this._shellLeftBounds, { l: 48, t: 40, r: 740, b: 500 });
+    const rightRect = this._rectCss(this._shellRightBounds, { l: 1180, t: 40, r: 1872, b: 500 });
     const appsFields = this._appsOnlyRenderFields(s, android && onMain && appsOnly, leftSlotRect, rightSlotRect);
     const cols = this._gridColsForMode(mode);
     const pickerOpen = !appsOnly && !!s.widgetPickerStep && s.widgetPickerStep !== 'slot';
@@ -41963,7 +41980,7 @@ class Component extends DCLogic {
     const cellW = (b.r - b.l - gap * (H6_FULL_GRID.cols - 1)) / H6_FULL_GRID.cols;
     return {
       left: Math.max(12, Math.round(b.l)),
-      top: Math.round(b.t + 10),
+      top: Math.round(b.t),
       width: Math.round(cellW * 3 + gap * 2),
       height: Math.max(240, Math.round(b.b - b.t)),
       // The maximised ENERGIA popup spans the board's six columns.

@@ -1949,12 +1949,14 @@ public final class MainActivity extends Activity {
                 float x = leftSide ? tireXs[i] - valueW - unitW : tireXs[i];
                 float baseline = tireYs[i] + valueSize * .34f;
                 paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-                fill(tireSignalColor(wheelState, muted));
+                int pressureColor = tireSignalColor(wheelState, muted);
+                fill(pressureColor);
                 c.drawText(value, x, baseline, paint);
                 if (!unitText.isEmpty()) {
                     paint.setTypeface(unitFace);
                     paint.setTextSize(smallSize);
-                    fill(withAlpha(muted, 0xC8));
+                    // Match the web popup: PSI/bar rides the same warning tint as the value.
+                    fill("warning".equals(wheelState) ? pressureColor : withAlpha(muted, 0xC8));
                     c.drawText(unitText, x + valueW, baseline, paint);
                 }
                 String temp = i < temps.length ? temps[i].trim() : "";
@@ -2018,32 +2020,31 @@ public final class MainActivity extends Activity {
             }
         }
 
-        /** Red rectangles on flagged wheel arches (TPMS pressure/temp warning).
-         *  vehicle-status/base.png body ~26–73% x; axle bands ~27% / ~64% y. */
+        /** Portrait red rectangles on flagged wheel arches (solid fill). */
         private void drawStatusTireMarks(android.graphics.Canvas c,
                 android.graphics.RectF vehicleRect) {
             if (descriptor.wheelStates == null) return;
-            float markW = vehicleRect.width() * .095f;
-            float markH = vehicleRect.height() * .048f;
+            float markW = vehicleRect.width() * .055f;
+            float markH = vehicleRect.height() * .114f;
             float[] xs = {
-                    vehicleRect.left + vehicleRect.width() * .275f,
-                    vehicleRect.right - vehicleRect.width() * .275f - markW,
-                    vehicleRect.left + vehicleRect.width() * .275f,
-                    vehicleRect.right - vehicleRect.width() * .275f - markW
+                    vehicleRect.left + vehicleRect.width() * .28f,
+                    vehicleRect.right - vehicleRect.width() * .28f - markW,
+                    vehicleRect.left + vehicleRect.width() * .28f,
+                    vehicleRect.right - vehicleRect.width() * .28f - markW
             };
             float[] ys = {
-                    vehicleRect.top + vehicleRect.height() * .275f,
-                    vehicleRect.top + vehicleRect.height() * .275f,
-                    vehicleRect.bottom - vehicleRect.height() * .32f - markH,
-                    vehicleRect.bottom - vehicleRect.height() * .32f - markH
+                    vehicleRect.top + vehicleRect.height() * .179f,
+                    vehicleRect.top + vehicleRect.height() * .179f,
+                    vehicleRect.bottom - vehicleRect.height() * .219f - markH,
+                    vehicleRect.bottom - vehicleRect.height() * .219f - markH
             };
-            float radius = Math.max(1.5f, markW * .12f);
+            float radius = Math.max(1.5f, markW * .18f);
             for (int i = 0; i < 4 && i < descriptor.wheelStates.length; i++) {
                 if (!"warning".equals(descriptor.wheelStates[i])) continue;
-                fill(0x73FF6671);
+                fill(0xFFFF6671);
                 c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
                         radius, radius, paint);
-                stroke(0xFFFF6671, Math.max(1.5f, markW * .12f));
+                stroke(0xFFFF3B4A, Math.max(1.5f, markW * .18f));
                 c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
                         radius, radius, paint);
             }
@@ -2052,27 +2053,27 @@ public final class MainActivity extends Activity {
         private void drawTireWheelMarks(android.graphics.Canvas c,
                 android.graphics.RectF carRect) {
             if (descriptor.wheelStates == null) return;
-            float markW = carRect.width() * .14f;
-            float markH = carRect.height() * .07f;
+            float markW = carRect.width() * .08f;
+            float markH = carRect.height() * .168f;
             float[] xs = {
-                    carRect.left + carRect.width() * .16f,
-                    carRect.right - carRect.width() * .16f - markW,
-                    carRect.left + carRect.width() * .15f,
-                    carRect.right - carRect.width() * .15f - markW
+                    carRect.left + carRect.width() * .19f,
+                    carRect.right - carRect.width() * .19f - markW,
+                    carRect.left + carRect.width() * .18f,
+                    carRect.right - carRect.width() * .18f - markW
             };
             float[] ys = {
-                    carRect.top + carRect.height() * .24f,
-                    carRect.top + carRect.height() * .24f,
-                    carRect.bottom - carRect.height() * .28f - markH,
-                    carRect.bottom - carRect.height() * .28f - markH
+                    carRect.top + carRect.height() * .115f,
+                    carRect.top + carRect.height() * .115f,
+                    carRect.bottom - carRect.height() * .155f - markH,
+                    carRect.bottom - carRect.height() * .155f - markH
             };
-            float radius = Math.max(1.5f, markW * .12f);
+            float radius = Math.max(1.5f, markW * .18f);
             for (int i = 0; i < 4 && i < descriptor.wheelStates.length; i++) {
                 if (!"warning".equals(descriptor.wheelStates[i])) continue;
-                fill(0x73FF6671);
+                fill(0xFFFF6671);
                 c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
                         radius, radius, paint);
-                stroke(0xFFFF6671, Math.max(1.5f, markW * .12f));
+                stroke(0xFFFF3B4A, Math.max(1.5f, markW * .18f));
                 c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
                         radius, radius, paint);
             }
@@ -3078,7 +3079,7 @@ public final class MainActivity extends Activity {
      * {@code adb shell settings put global enable_freeform_support 1}
      * {@code adb shell settings put global force_resizable_activities 1}
      */
-    private static final Rect LEFT_POPUP_BOUNDS = new Rect(48, 100, 740, 530);
+    private static final Rect LEFT_POPUP_BOUNDS = new Rect(48, 28, 740, 530);
     /** Right media slot (idle now-playing + music apps share these bounds). */
     private static final Rect RIGHT_APP_BOUNDS = new Rect(1180, 100, 1872, 530);
     private static final Rect RIGHT_IDLE_BOUNDS = RIGHT_APP_BOUNDS;
@@ -3280,12 +3281,12 @@ public final class MainActivity extends Activity {
 
     /**
      * Top band kept clear of freeform slots. Layout / 3D chrome moved into the
-     * launcher drawer, so this is only breathing room under the MMI header /
-     * brand — widgets grow into the old 96dp button band.
+     * launcher drawer; keep a slim breath under the MMI header so widgets and
+     * popups can grow ~70dp closer to the top bar.
      */
     private int chromeReservePx() {
         float density = getResources().getDisplayMetrics().density;
-        return Math.round(28f * density);
+        return Math.round(4f * density);
     }
 
     /**

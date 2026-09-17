@@ -95,10 +95,14 @@ includesAll(html, [
   '.hv-tire-point.warning strong,.hv-tire-point.pressure-warning strong',
   '.hv-tire-wheel-mark.warning { display:block; }',
   '.hv-tires-focus-mark.warning { display:block; }',
-  '.hv-hs-vehicle-tire-mark.rl,.hv-status-tire-mark.rear-left,.hv-status-tire-mark.rl { left:27.5%; bottom:32%; }',
+  '.hv-hs-vehicle-tire-mark.rl,.hv-status-tire-mark.rear-left,.hv-status-tire-mark.rl { left:28%; bottom:21.9%; }',
+  'width:5.5%; height:11.4%;',
+  'background:#ff6671;',
 ], 'Tires primary text colors');
 assert.match(html, /\.hv-hs-vehicle-tire\.pressure-warning em|\.hv-hs-vehicle-tire\.warning em/,
   'pressure warning must tint the unit (PSI/bar) with the value');
+assert.match(html, /\.hv-hs-vehicle-tire-mark[^}]*height:11\.4%/,
+  'status tire marks must be portrait (taller than wide)');
 assert.ok(!/hv-hs-vehicle-tire-mark\.rl[^\{]*\{[^}]*left:\s*7%/.test(html),
   'status tire marks must not sit in the black margin beside the readout');
 
@@ -306,6 +310,11 @@ assert.match(nativeTireColor, /if\s*\("demo"\.equals\(descriptor\.state\)\)\s*re
   'normal demo readings must use the native primary text color');
 assert.match(nativeTireColor, /if\s*\("warning"\.equals\(wheelState\)\)\s*return\s+0xFFFF6671;/,
   'warning pressure readouts must use the shared red tone');
+// Status card draws the unit beside each value; it used to stay muted while
+// the popup tinted PSI/bar red with the number. Gate on the warning branch so
+// a deliberate mute-for-normal change does not trip this.
+assert.match(native, /fill\("warning"\.equals\(wheelState\)\s*\?\s*pressureColor\s*:\s*withAlpha\(muted,\s*0xC8\)\)/,
+  'native status pressure unit must share the warning tint with the value');
 
 // This visual pilot must not rename stores that hold the user's existing
 // desktops, layouts, shell boot choice, launcher overrides, or native shell.
