@@ -1,0 +1,49 @@
+<!doctype html><meta charset="utf-8"><title>Power graphics bake (development only)</title>
+<script src="/vendor/three/build/three.min.js"></script>
+<script src="/vendor/three/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+(async()=>{try{
+  const meta=await (await fetch('/assets/power/haval-powertrain.json')).json();
+  const model=(await new THREE.GLTFLoader().loadAsync('/assets/power/haval-powertrain.glb')).scene;
+  const scene=new THREE.Scene();scene.add(model);model.updateMatrixWorld(true);
+  const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});
+  renderer.setSize(1200,2000);renderer.setClearColor(0,0);renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.95;
+  document.body.appendChild(renderer.domElement);
+  const camera=new THREE.OrthographicCamera(-1.25,1.25,25/12,-25/12,0.1,30);
+  camera.position.set(0,10,0);camera.up.set(0,0,-1);camera.lookAt(0,0,0);camera.updateMatrixWorld();
+  scene.add(new THREE.HemisphereLight(0xffffff,0x4a5260,0.8));
+  for(const [x,z,i] of [[-3,-2,0.85],[3,2,0.45]]){const l=new THREE.DirectionalLight(0xffffff,i);l.position.set(x,7,z);scene.add(l);}
+  model.traverse(o=>{if(!o.isMesh)return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    const converted=mats.map(m=>{const dark=/tyre|tire|rubber/i.test(m.name),trim=/frameDark|Trim/i.test(m.name);
+      const material=m.clone();material.map=null;material.roughnessMap=null;material.metalnessMap=null;
+      material.color.set(dark?0x20252b:trim?0x626c76:0x858e96).convertSRGBToLinear();
+      material.metalness=dark?0:0.22;material.roughness=0.78;material.emissive.set(0);return material;});
+    o.material=Array.isArray(o.material)?converted:converted[0];
+  });
+  const round=n=>Math.round(n*100)/100;
+  const project=p=>{const v=new THREE.Vector3(...p).project(camera);return [round((v.x+1)*300),round((1-v.y)*500)];};
+  const bounds=name=>{const o=model.getObjectByName(name);if(!o)throw Error('Missing node '+name);
+    const b=new THREE.Box3().setFromObject(o),a=project([b.min.x,0,b.min.z]),c=project([b.max.x,0,b.max.z]);
+    return {x:a[0],y:a[1],width:round(c[0]-a[0]),height:round(c[1]-a[1])};};
+  window.bake=key=>{
+    const pack=meta.batteries[key];
+    for(const p of Object.values(meta.batteries))model.getObjectByName(p.group).visible=false;
+    model.getObjectByName('Powerplant_Rear').visible=pack.awd;
+    // Battery artwork is exported as editable SVG, never baked into the chassis.
+    renderer.render(scene,camera);
+    const [x,,z]=pack.position,w=pack.dims.w,d=pack.dims.d;
+    const tl=project([x-w/2,0,z-d/2]),br=project([x+w/2,0,z+d/2]);
+    const battery={x:tl[0],y:tl[1],width:round(br[0]-tl[0]),height:round(br[1]-tl[1]),moduleCount:pack.modules.length};
+    const anchors={frontMotor:project(meta.pivots.Motor_P2),engine:project(meta.pivots.ICE),
+      wheelFL:project(meta.pivots.Wheel_FL),wheelFR:project(meta.pivots.Wheel_FR),
+      wheelRL:project(meta.pivots.Wheel_RL),wheelRR:project(meta.pivots.Wheel_RR),
+      batteryFront:[300,battery.y],batteryRear:[300,round(battery.y+battery.height)]};
+    if(pack.awd)anchors.rearMotor=project(meta.pivots.Motor_P4);
+    return {png:renderer.domElement.toDataURL('image/png'),key:key==='hev'?'hev2':key,sourcePack:key,awd:pack.awd,battery,anchors,
+      highlights:{engine:bounds('ICE'),frontMotor:bounds('Motor_P2'),...(pack.awd?{rearMotor:bounds('Motor_P4')}:{})}};
+  };
+  window.ready=true;
+}catch(e){window.failure=String(e);}})();
+</script>

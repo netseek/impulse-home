@@ -36,6 +36,8 @@ final class TripState {
     long driveMs;
     long idleMs;
     double evKm;
+    /** Distance driven with the engine known to be on; with evKm, the share's denominator. */
+    double iceKm;
     long evMs;
     double kwhOut;
     double kwhIn;
@@ -70,6 +72,8 @@ final class TripState {
     long guideEndT;
     boolean arrived;
     double lastRemainingM = Double.NaN;
+    /** Last Android Auto guidance update; guidance silent too long no longer holds the trip. */
+    long lastNavT;
 
     /** Battery state of charge at both ends: with the net pack energy, it measures usable capacity. */
     double socStart = Double.NaN;
@@ -98,6 +102,7 @@ final class TripState {
         put(b, "driveMs", driveMs);
         put(b, "idleMs", idleMs);
         put(b, "evKm", evKm);
+        put(b, "iceKm", iceKm);
         put(b, "evMs", evMs);
         put(b, "kwhOut", kwhOut);
         put(b, "kwhIn", kwhIn);
@@ -124,6 +129,7 @@ final class TripState {
         put(b, "guideEndT", guideEndT);
         put(b, "arrived", arrived ? 1 : 0);
         put(b, "lastRemainingM", lastRemainingM);
+        put(b, "lastNavT", lastNavT);
         put(b, "socStart", socStart);
         put(b, "socEnd", socEnd);
         for (Map.Entry<String, String> e : rawFirst.entrySet()) put(b, "rf." + e.getKey(), e.getValue());
@@ -159,6 +165,7 @@ final class TripState {
                     case "driveMs": s.driveMs = Long.parseLong(v); break;
                     case "idleMs": s.idleMs = Long.parseLong(v); break;
                     case "evKm": s.evKm = Double.parseDouble(v); break;
+                    case "iceKm": s.iceKm = Double.parseDouble(v); break;
                     case "evMs": s.evMs = Long.parseLong(v); break;
                     case "kwhOut": s.kwhOut = Double.parseDouble(v); break;
                     case "kwhIn": s.kwhIn = Double.parseDouble(v); break;
@@ -185,6 +192,7 @@ final class TripState {
                     case "guideEndT": s.guideEndT = Long.parseLong(v); break;
                     case "arrived": s.arrived = "1".equals(v); break;
                     case "lastRemainingM": s.lastRemainingM = Double.parseDouble(v); break;
+                    case "lastNavT": s.lastNavT = Long.parseLong(v); break;
                     case "socStart": s.socStart = Double.parseDouble(v); break;
                     case "socEnd": s.socEnd = Double.parseDouble(v); break;
                     default: break;

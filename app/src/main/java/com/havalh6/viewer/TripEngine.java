@@ -82,6 +82,8 @@ final class TripEngine {
     static final double ODOMETER_MAX_KMH = 250;
     /** Android Auto remaining distance at or under this is "arrived". */
     static final double ARRIVAL_M = 150;
+    /** Guidance that has sent nothing for this long is a lost session and no longer holds a trip open. */
+    static final long GUIDANCE_HOLD_MAX_MS = 60 * 60_000L;
     /** Impulse DASHBOARD_FUEL_TANK_CAPACITY_LITERS: one tank size across both apps (CLAUDE.md). */
     static final double TANK_LITRES = 55.0;
     /** A fuel level this much higher after a stop is a refuel, not gauge noise. */
@@ -151,7 +153,7 @@ final class TripEngine {
         }
         switch (key) {
             case KEY_READY: {
-                Boolean on = TripSignals.parseBool(raw);
+                Boolean on = TripSignals.parseReady(raw);
                 if (on != null) setReady(on, t);
                 break;
             }
@@ -267,6 +269,7 @@ final class TripEngine {
                 st.guideStartKm = liveKm();
                 st.guideStartT = t;
             }
+            st.lastNavT = t;
             if (st.guideEndT != 0 || Double.isNaN(remainingM)) return;
             st.lastRemainingM = remainingM;
             if (remainingM <= ARRIVAL_M || (destinationTurn && remainingM <= 2 * ARRIVAL_M)) endGuidance(t, true);
@@ -373,7 +376,7 @@ final class TripEngine {
         settleStops(t);
         if (!st.open) return;
         if (!Boolean.TRUE.equals(ready)) {
-            if (st.readyOffAt > 0 && t - st.readyOffAt >= MERGE_GAP_MS) close(st.readyOffAt);
+            if (st.readyOffAt > 0 && t - st.readyOffAt >= MERGE_GAP_MS && !guidingNow(t)) close(st.readyOffAt);
             return;
         }
         boolean moving = !Double.isNaN(kmh) && kmh >= MOVING_KMH;
@@ -386,6 +389,53 @@ final class TripEngine {
                     fresh ? lat : Double.NaN, fresh ? lon : Double.NaN, fresh ? alt : Double.NaN,
                     kmh, kw, fuelMode, fuelRate, ice == null ? -1 : (ice ? 1 : 0), liveKm()));
         }
+    }
+
+    /**
+     * The head unit slept with this trip open: the recorder's monotonic clock
+     * says its ticks stopped for longer than a stop may last, and READY=0 never
+     * reached it. Nobody drives with the head unit asleep, so the trip ends
+     * where its data stopped, and READY must be heard again before the next
+     * one opens. Owner report 2026-09-14: parked at home, the trip never
+     * concluded. Not inferred from a wall-clock gap: a forward NTP/GNSS
+     * correction while driving must keep the trip (clockJumpsAreNotIntegrated).
+     */
+    void closeInterrupted(long t) {
+        if (!st.open) return;
+        ready = null;
+        if (guidingNow(t)) {
+            // Still guiding: the trip stays open, with the car treated as off since
+            // its data stopped, so the usual rule ends it once guidance does.
+            if (st.readyOffAt == 0) st.readyOffAt = st.lastT;
+            return;
+        }
+        close(st.readyOffAt > 0 ? st.readyOffAt : st.lastT);
+    }
+
+    /**
+     * Android Auto is guiding and the car has not reached the destination (owner,
+     * 2026-09-14): a stop, however long, does not end the trip until guidance
+     * ends -- arrived or cancelled -- and then the READY-off rules apply as usual.
+     * Within 2 x ARRIVAL_M counts as reached. Guidance silent for
+     * GUIDANCE_HOLD_MAX_MS is a lost session and holds nothing.
+     */
+    private boolean guidingNow(long t) {
+        return st.open && st.guided && st.guideEndT == 0
+                && !(st.lastRemainingM <= 2 * ARRIVAL_M)
+                && t - st.lastNavT < GUIDANCE_HOLD_MAX_MS;
+    }
+
+    /**
+     * The driver's FINALIZAR VIAGEM. Closes the open trip now (at READY-off if
+     * the car is already off; a READY cycle too short to be a trip is discarded
+     * as usual). If the car is still READY the next trip starts at this moment,
+     * so driving on is recorded from here.
+     */
+    void finishNow(long t) {
+        advance(t);
+        if (!st.open) return;
+        close(st.readyOffAt > 0 ? st.readyOffAt : t);
+        if (Boolean.TRUE.equals(ready)) open(t);
     }
 
     /** The open trip as of {@code t}, or null. */
@@ -408,7 +458,7 @@ final class TripEngine {
         st = saved;
         ready = null;
         if (st.readyOffAt == 0) st.readyOffAt = st.lastT;
-        if (now - st.readyOffAt >= MERGE_GAP_MS) close(st.readyOffAt);
+        if (now - st.readyOffAt >= MERGE_GAP_MS && !guidingNow(now)) close(st.readyOffAt);
     }
 
     private void setReady(boolean on, long t) {
@@ -418,7 +468,7 @@ final class TripEngine {
             if (!st.open) {
                 open(t);
             } else if (st.readyOffAt > 0) {
-                if (t - st.readyOffAt < MERGE_GAP_MS) {
+                if (t - st.readyOffAt < MERGE_GAP_MS || guidingNow(t)) {
                     st.readyOffAt = 0;
                 } else {
                     close(st.readyOffAt);
@@ -506,6 +556,8 @@ final class TripEngine {
             if (moving && Boolean.FALSE.equals(ice)) {
                 st.evKm += km;
                 st.evMs += dt;
+            } else if (moving && Boolean.TRUE.equals(ice)) {
+                st.iceKm += km;
             }
             if (fuelMode == TripSignals.FUEL_RUNNING && fuelRate > 0) st.fuelL += fuelRate / 100.0 * km;
         }

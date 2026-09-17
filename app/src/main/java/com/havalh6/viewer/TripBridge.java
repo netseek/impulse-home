@@ -44,6 +44,21 @@ final class TripBridge {
     }
 
     /**
+     * The trip being recorded, for the live map: its points after {@code afterT}
+     * (0 for all of them, thinned to {@code maxPoints}), including those not saved
+     * yet, and its stops. Times as strings, as in getTrip.
+     */
+    @JavascriptInterface
+    public String getTripPointsSince(String startMs, String afterT, int maxPoints) {
+        try {
+            int cap = maxPoints <= 0 ? MAX_POINTS : Math.min(MAX_POINTS, maxPoints);
+            return recorder.livePointsJson(Long.parseLong(startMs.trim()), Long.parseLong(afterT.trim()), cap);
+        } catch (RuntimeException e) {
+            return "null";
+        }
+    }
+
+    /**
      * The trip's map snapshot as a {@code data:image/jpeg} URL, or "" while it
      * has not been drawn (offline) or cannot be (no GPS fix). Bind it to an
      * {@code <img src>}, never a style: the template engine splits a style on
@@ -73,5 +88,21 @@ final class TripBridge {
     @JavascriptInterface
     public String getTotals() {
         return recorder.totalsJson();
+    }
+
+    /** FINALIZAR VIAGEM: ends the open trip; a new one starts at once if the car is still READY. */
+    @JavascriptInterface
+    public void finishTrip() {
+        recorder.finishTrip();
+    }
+
+    /** Refuels and charges since {@code fromMs} (as a string: see getTrip): counts and level points added. */
+    @JavascriptInterface
+    public String getStopTotals(String fromMs) {
+        try {
+            return recorder.stopTotalsJson(Long.parseLong(fromMs.trim()));
+        } catch (RuntimeException e) {
+            return "{}";
+        }
     }
 }

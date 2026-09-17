@@ -35,6 +35,16 @@ public class TripSignalsTest {
     }
 
     @Test
+    public void readyIsOffOnlyForZeroAndMinusOneLikeImpulse() {
+        assertTrue(TripSignals.parseReady("1"));
+        assertTrue(TripSignals.parseReady("2"));
+        assertFalse(TripSignals.parseReady("0"));
+        assertFalse(TripSignals.parseReady("-1"));
+        assertFalse(TripSignals.parseReady("{0,1}"));
+        assertNull(TripSignals.parseReady(" "));
+    }
+
+    @Test
     public void numberReadsTheSecondSlotOfAPair() {
         assertEquals(12345.6, TripSignals.parseNumber("12345.6"), 1e-9);
         assertEquals(17.3, TripSignals.parseNumber("{0,17.3}"), 1e-9);

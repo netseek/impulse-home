@@ -359,6 +359,7 @@ public final class MainActivity extends Activity {
                 try {
                     Intent request = new Intent(ACTION_UPDATE_CAR_DATA);
                     request.setPackage(IMPULSE_PACKAGE);
+                    request.putExtra(ImpulseApi.EXTRA_CALLER, apiCallerToken());
                     request.putExtra("key", key);
                     request.putExtra("value", safeValue);
                     sendBroadcast(request);
@@ -1114,6 +1115,10 @@ public final class MainActivity extends Activity {
         final String metricA;
         final String metricB;
         final int progress;
+        /** Power-only topology key and independent SOC validity. */
+        final String powerVariant;
+        final boolean socKnown;
+        final double powerSoc;
         /** Dynamic Tires semantics; deliberately excluded from structural comparison. */
         final String state;
         final String[] wheelStates;
@@ -1131,6 +1136,8 @@ public final class MainActivity extends Activity {
          * "unavailable" on all four corners while TPMS was live.
          */
         String tirePressures = "";
+        String tireTemperatures = "";
+        String tirePressureUnit = "";
         /** ENERGY card: the last seven days' distance, 0-100 each, oldest first. */
         int[] energyBars = new int[0];
         /** Status opening order: FL, FR, RL, RR, tailgate. */
@@ -1174,7 +1181,7 @@ public final class MainActivity extends Activity {
 
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
-                String state, String[] wheelStates, String[] openingStates,
+                String state, String powerVariant, boolean socKnown, double powerSoc, String[] wheelStates, String[] openingStates,
                 String[] seatBeltStates, int sunroofLevel, int curtainLevel, boolean demo,
                 String iconAction, String longAction, String glyph, String glyphText,
                 String clockFace, String clockHourFormat, String dialMarks, String splitPlates,
@@ -1189,6 +1196,9 @@ public final class MainActivity extends Activity {
             this.metricB = metricB;
             this.progress = Math.max(0, Math.min(100, progress));
             this.state = state;
+            this.powerVariant = powerVariant == null ? "phev19" : powerVariant;
+            this.socKnown = socKnown;
+            this.powerSoc = powerSoc;
             this.wheelStates = wheelStates;
             this.openingStates = openingStates;
             this.seatBeltStates = seatBeltStates;
@@ -1713,6 +1723,10 @@ public final class MainActivity extends Activity {
         private final android.graphics.RectF oval = new android.graphics.RectF();
         private Bitmap tiresTopViewBitmap;
         private boolean tiresTopViewDecodeAttempted;
+        private float statusLift;
+        private long statusLiftLastMs;
+        private final java.util.Map<String, Bitmap> powerGhostBitmaps =
+                new java.util.HashMap<>();
         private final java.util.Map<String, Bitmap> statusVehicleBitmaps =
                 new java.util.HashMap<>();
 
@@ -1827,6 +1841,26 @@ public final class MainActivity extends Activity {
             imageW = Math.min(imageW, w * .42f);
             float left = (w - imageW) * .5f;
             float top = -h * .019f;
+            String[] openings = descriptor.openingStates == null ? new String[0]
+                    : descriptor.openingStates;
+            // The raster overflows the card at the bottom, which is where the
+            // open tailgate sits. Lift the car so the open trunk is on screen.
+            // Eased over ~320 ms each way instead of snapping.
+            float liftTarget = openings.length > 4 && "open".equals(openings[4]) ? 1f : 0f;
+            long nowMs = android.os.SystemClock.uptimeMillis();
+            float stepMs = statusLiftLastMs == 0L ? 0f : Math.min(64f, nowMs - statusLiftLastMs);
+            statusLiftLastMs = nowMs;
+            float delta = liftTarget - statusLift;
+            if (Math.abs(delta) > .001f) {
+                float move = stepMs / 320f;
+                statusLift += Math.signum(delta) * Math.min(Math.abs(delta), move);
+                postInvalidateOnAnimation();
+            } else {
+                statusLift = liftTarget;
+                statusLiftLastMs = 0L;
+            }
+            float eased = statusLift * statusLift * (3f - 2f * statusLift);
+            top -= (imageH - h * 1.02f) * eased;
             android.graphics.RectF vehicleRect = new android.graphics.RectF(
                     left, top, left + imageW, top + imageH);
             if (base != null) {
@@ -1839,8 +1873,6 @@ public final class MainActivity extends Activity {
                 drawStatusVehicleFallback(c, w, h, muted, strong);
                 c.restore();
             }
-            String[] openings = descriptor.openingStates == null ? new String[0]
-                    : descriptor.openingStates;
             // Darken only the matching door footprint before drawing an open panel.
             // The repository's doorless base retains bright pillar/rocker pixels which
             // otherwise resemble a second, closed door at compact card size.
@@ -1886,20 +1918,53 @@ public final class MainActivity extends Activity {
             // overflow off the bottom: at imageH 1.34x the lower baseline
             // computed to 83.4 in an 81px view. X still tracks the vehicle,
             // which is the whole point of flanking it.
-            float[] tireYs = {h * .29f, h * .29f, h * .78f, h * .78f};
+            float[] tireYs = {h * .24f, h * .24f, h * .70f, h * .70f};
             String[] pressureReadings = tireReadings(descriptor);
+            String[] temps = descriptor.tireTemperatures.split("\\s*/\\s*", -1);
+            String unit = descriptor.tirePressureUnit;
+            android.graphics.Typeface valueFace = android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.BOLD);
+            android.graphics.Typeface unitFace = android.graphics.Typeface.create("sans-serif",
+                    android.graphics.Typeface.NORMAL);
+            android.graphics.Typeface tempFace = android.graphics.Typeface.create("sans-serif-light",
+                    android.graphics.Typeface.NORMAL);
+            float valueSize = Math.max(16f, Math.min(w, h) * .245f);
+            float smallSize = Math.max(9f, valueSize * .5f);
             for (int i = 0; i < 4; i++) {
                 String wheelState = descriptor.wheelStates != null
                         && i < descriptor.wheelStates.length
                         ? descriptor.wheelStates[i] : "unavailable";
+                boolean leftSide = i == 0 || i == 2;
+                String value = pressureReadings[i];
+                boolean hasValue = !"unavailable".equals(value) && !"—".equals(value);
+                String unitText = hasValue && !unit.isEmpty() ? " " + unit : "";
+                paint.setTypeface(unitFace);
+                paint.setTextSize(smallSize);
+                float unitW = paint.measureText(unitText);
+                paint.setTypeface(valueFace);
+                paint.setTextSize(valueSize);
+                float valueW = paint.measureText(value);
+                // Left-side readouts end at the car; right-side ones start there.
+                float x = leftSide ? tireXs[i] - valueW - unitW : tireXs[i];
+                float baseline = tireYs[i] + valueSize * .34f;
+                paint.setTextAlign(android.graphics.Paint.Align.LEFT);
                 fill(tireSignalColor(wheelState, muted));
-                paint.setTextAlign(i == 0 || i == 2
-                        ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
-                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                        android.graphics.Typeface.BOLD));
-                paint.setTextSize(Math.max(16f, Math.min(w, h) * .245f));
-                c.drawText(pressureReadings[i], tireXs[i],
-                        tireYs[i] + paint.getTextSize() * .34f, paint);
+                c.drawText(value, x, baseline, paint);
+                if (!unitText.isEmpty()) {
+                    paint.setTypeface(unitFace);
+                    paint.setTextSize(smallSize);
+                    fill(withAlpha(muted, 0xC8));
+                    c.drawText(unitText, x + valueW, baseline, paint);
+                }
+                String temp = i < temps.length ? temps[i].trim() : "";
+                if (!temp.isEmpty()) {
+                    paint.setTypeface(tempFace);
+                    paint.setTextSize(smallSize * 1.1f);
+                    paint.setTextAlign(leftSide
+                            ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
+                    fill(0xFF8F949B);
+                    c.drawText(temp, tireXs[i], baseline + smallSize * 1.35f, paint);
+                }
             }
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
@@ -1937,7 +2002,7 @@ public final class MainActivity extends Activity {
                 android.graphics.RectF vehicleRect) {
             String[] states = descriptor.seatBeltStates == null
                     ? new String[0] : descriptor.seatBeltStates;
-            float[] xs = {.455f, .545f, .445f, .5f, .555f};
+            float[] xs = {.425f, .575f, .405f, .5f, .595f};
             float[] ys = {.49f, .49f, .60f, .60f, .60f};
             for (int i = 0; i < 5 && i < states.length; i++) {
                 if (!"unfastened".equals(states[i])) continue;
@@ -2079,7 +2144,7 @@ public final class MainActivity extends Activity {
                     paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                     paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                             android.graphics.Typeface.NORMAL));
-                    paint.setTextSize(Math.max(11f, h * .16f));
+                    paint.setTextSize(Math.max(13f, h * .20f));
                     fill(strong);
                     c.drawText(maneuver, col * .5f, h * .88f, paint);
                 }
@@ -2109,9 +2174,9 @@ public final class MainActivity extends Activity {
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.NORMAL));
                 if (!street.isEmpty()) {
-                    paint.setTextSize(Math.max(13f, h * .21f));
+                    paint.setTextSize(Math.max(16f, h * .26f));
                     fill(strong);
-                    c.drawText(ellipsizeNav(street, textMax), textX, h * .30f, paint);
+                    c.drawText(ellipsizeNav(street, textMax), textX, h * .32f, paint);
                 }
                 if (showTurn) {
                     drawNavMetricRow(c, textX, h * .46f, textMax, h,
@@ -2123,14 +2188,14 @@ public final class MainActivity extends Activity {
                     String idleCity = descriptor.navIdleCity == null ? "" : descriptor.navIdleCity;
                     String idleAction = descriptor.navIdleAction == null ? "" : descriptor.navIdleAction;
                     if (!idleCity.isEmpty()) {
-                        paint.setTextSize(Math.max(9f, h * .12f));
+                        paint.setTextSize(Math.max(12f, h * .17f));
                         fill(muted);
-                        c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .46f, paint);
+                        c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .54f, paint);
                     }
                     if (!idleAction.isEmpty()) {
-                        paint.setTextSize(Math.max(7f, h * .09f));
+                        paint.setTextSize(Math.max(10f, h * .13f));
                         fill(muted);
-                        c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .64f, paint);
+                        c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .76f, paint);
                     }
                 }
             }
@@ -2154,8 +2219,8 @@ public final class MainActivity extends Activity {
             if (items.isEmpty() || maxW <= 0f) return;
             android.graphics.Typeface medium = android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL);
-            float valueSize = Math.max(13f, h * .24f);
-            float labelSize = Math.max(7f, h * .11f);
+            float valueSize = Math.max(15f, h * .28f);
+            float labelSize = Math.max(9f, h * .13f);
             float gap = Math.max(10f, h * .08f);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(medium);
@@ -2269,84 +2334,137 @@ public final class MainActivity extends Activity {
             drawTiresFallback(c, w, h, accent, muted, strong);
         }
 
-        /**
-         * Compact propulsion map for the native rail.  It intentionally uses
-         * the same vocabulary as the web Power family, but stays vector-only:
-         * no extracted OEM art and no animation loop in the native dock.
-         */
+        /** Approved chassis atlas and independently animated ten-segment SOC overlay. */
         private void drawPower(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
-            String state = descriptor.state == null ? "unavailable" : descriptor.state;
-            boolean known = !"unavailable".equals(state) && !"stale".equals(state);
-            boolean regen = "regen".equals(state);
-            boolean activeFlow = "ev".equals(state) || "hybrid".equals(state)
-                    || "ice".equals(state) || regen || "charge".equals(state);
-            int flow = regen || "charge".equals(state) ? 0xFF3EE08A
-                    : (activeFlow ? accent : muted);
-            float cy = h * .50f;
-            float batteryL = w * .08f, batteryR = w * .31f;
-            float motorL = w * .61f, motorR = w * .84f;
-            float nodeT = h * .32f, nodeB = h * .68f;
-
-            fill(withAlpha(flow, known ? 0x22 : 0x12));
-            c.drawRoundRect(batteryL, nodeT, batteryR, nodeB, w * .045f, w * .045f, paint);
-            stroke(flow, Math.max(1.5f, w * .026f));
-            c.drawRoundRect(batteryL, nodeT, batteryR, nodeB, w * .045f, w * .045f, paint);
-            fill(withAlpha(flow, known ? 0xA8 : 0x38));
-            float fillR = batteryL + (batteryR - batteryL) * descriptor.progress / 100f;
-            c.drawRoundRect(batteryL + w * .025f, nodeT + h * .07f,
-                    Math.max(batteryL + w * .025f, fillR - w * .025f), nodeB - h * .07f,
-                    w * .025f, w * .025f, paint);
-            fill(flow);
-            c.drawRect(batteryR, cy - h * .07f, batteryR + w * .025f, cy + h * .07f, paint);
-
-            float motorCx = (motorL + motorR) * .5f;
-            stroke(flow, Math.max(1.5f, w * .026f));
-            c.drawCircle(motorCx, cy, w * .105f, paint);
-            c.drawCircle(motorCx, cy, w * .04f, paint);
-
-            int engine = "hybrid".equals(state) || "ice".equals(state) || "idle".equals(state)
-                    ? 0xFFF0BD65 : muted;
-            fill(withAlpha(engine, known ? 0x2A : 0x12));
-            c.drawRoundRect(w * .42f, h * .10f, w * .58f, h * .27f,
-                    w * .025f, w * .025f, paint);
-            stroke(engine, Math.max(1.3f, w * .022f));
-            c.drawRoundRect(w * .42f, h * .10f, w * .58f, h * .27f,
-                    w * .025f, w * .025f, paint);
-
-            if (activeFlow) {
-                stroke(withAlpha(flow, known ? 0xD8 : 0x38), Math.max(1.4f, w * .024f));
-                if (regen) {
-                    c.drawLine(motorL, cy, batteryR + w * .02f, cy, paint);
-                } else {
-                    c.drawLine(batteryR + w * .02f, cy, motorL, cy, paint);
-                }
+            String variant = sanitizePowerVariant(descriptor.powerVariant);
+            Bitmap car = getPowerChassisBitmap(variant);
+            String state = sanitizePowerState(descriptor.state);
+            String token = sanitizePowerDirections(descriptor.glyphText);
+            boolean known = !"stale".equals(state) && !"unavailable".equals(state) && !token.isEmpty();
+            int front=0,rear=0,ice=0;
+            if(known){String[] parts=token.split(",");front=Integer.parseInt(parts[0]);rear=Integer.parseInt(parts[1]);ice=Integer.parseInt(parts[2]);}
+            boolean awd="phev34".equals(variant),hev="hev2".equals(variant);
+            if(!awd)rear=0;
+            int cropX=awd?398:hev?774:20;
+            float fit=Math.min(w/770f,h/350f)*.96f;
+            int saved=c.save();
+            c.translate(w*.5f,h*.5f);c.scale(fit,fit);c.rotate(90f);c.translate(-175f,-385f);
+            if(car!=null){
+                oval.set(0,0,350,770);fill(0xFFFFFFFF);paint.setFilterBitmap(true);
+                c.drawBitmap(car,new android.graphics.Rect(cropX,158,cropX+350,928),oval,paint);
+                paint.setFilterBitmap(false);
             }
-            if ("hybrid".equals(state) || "ice".equals(state)) {
-                stroke(0xFFF0BD65, Math.max(1.3f, w * .022f));
-                c.drawLine(w * .50f, h * .27f, motorCx, cy - w * .10f, paint);
+            boolean incoming=front<0||rear<0,outgoing=front>0||rear>0;
+            boolean charging=known&&(("charge".equals(state)&&!hev)||incoming&&!outgoing);
+            boolean discharging=known&&outgoing&&!incoming&&("ev".equals(state)||"hybrid".equals(state));
+            float px=awd?118:hev?127:121,py=awd?371:hev?538:375;
+            float pw=hev?91:115,ph=awd?134:hev?90:130;
+            float bx=awd?123:hev?132:126,by=hev?567:409,bw=hev?81:105,bh=awd?49:hev?22:45;
+            fill(0xFF626B71);c.drawRoundRect(px,py,px+pw,py+ph,4,4,paint);
+            stroke(0xFF9AA1A5,1);c.drawRoundRect(px,py,px+pw,py+ph,4,4,paint);
+            boolean pulse=drawPowerBatteryCells(c,bx,by,bw,bh,descriptor.socKnown,descriptor.powerSoc,charging,discharging);
+            float[][] frontPath=awd?new float[][]{{177,248},{177,221},{177,173}}
+                    :hev?new float[][]{{172,534},{111,514},{111,246},{177,216},{177,173}}
+                    :new float[][]{{178,340},{178,252},{178,173}};
+            drawPowerTopRoute(c,frontPath,front,accent);
+            drawPowerTopRoute(c,new float[][]{{177,173},{57,144}},front,accent);
+            drawPowerTopRoute(c,new float[][]{{177,173},{289,144}},front,accent);
+            if(awd){
+                drawPowerTopRoute(c,new float[][]{{177,567},{177,594},{177,640}},rear,accent);
+                drawPowerTopRoute(c,new float[][]{{177,640},{57,654}},rear,accent);
+                drawPowerTopRoute(c,new float[][]{{177,640},{289,654}},rear,accent);
             }
-            if (known) {
-                android.graphics.Path arrow = new android.graphics.Path();
-                float ax = regen ? batteryR + w * .06f : motorL - w * .03f;
-                arrow.moveTo(ax, cy - h * .07f);
-                arrow.lineTo(ax + (regen ? -w * .06f : w * .06f), cy);
-                arrow.lineTo(ax, cy + h * .07f);
-                stroke(flow, Math.max(1.4f, w * .024f));
-                c.drawPath(arrow, paint);
-            }
-
-            stroke(withAlpha(strong, known ? 0xA0 : 0x48), Math.max(1.2f, w * .02f));
-            c.drawCircle(w * .67f, h * .84f, w * .045f, paint);
-            c.drawCircle(w * .78f, h * .84f, w * .045f, paint);
-            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                    android.graphics.Typeface.NORMAL));
-            paint.setTextSize(Math.max(7f, Math.min(w, h) * .085f));
-            fill(withAlpha(known ? strong : muted, 0xD8));
-            c.drawText(state.toUpperCase(java.util.Locale.US), w * .5f, h * .98f, paint);
+            if(ice==1){fill(0x28FFB65C);c.drawRoundRect(137,61,217,131,4,4,paint);}
+            fill(0xFFF2F5F7);paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(hev?19:23);
+            c.drawText(descriptor.socKnown?Math.round(descriptor.powerSoc)+"%":"—",bx+bw/2,by-9,paint);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);paint.setTextSize(9);
+            c.drawText("HIGH VOLTAGE",bx+bw/2,by+bh+15,paint);
+            c.drawText("BATTERY",bx+bw/2,by+bh+27,paint);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+            c.restoreToCount(saved);
+            // Only this small view repaints; no WebView telemetry or 3D render loop.
+            // View invalidation resumes naturally after becoming visible again.
+            if(pulse&&powerMotionEnabled()&&getGlobalVisibleRect(powerVisibleRect))postInvalidateDelayed(33);
+        }
+
+        private final android.graphics.Rect powerVisibleRect=new android.graphics.Rect();
+
+        private boolean powerMotionEnabled(){
+            if(!isShown()||getWindowVisibility()!=View.VISIBLE||!hasWindowFocus())return false;
+            try{return android.provider.Settings.Global.getFloat(getContentResolver(),
+                    android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,1f)>0f;}
+            catch(RuntimeException ignored){return true;}
+        }
+
+        @Override
+        public void onWindowFocusChanged(boolean hasFocus){
+            super.onWindowFocusChanged(hasFocus);
+            if(hasFocus&&descriptor!=null&&"power".equals(descriptor.id))invalidate();
+        }
+
+        private boolean drawPowerBatteryCells(android.graphics.Canvas c,float x,float y,float w,float h,
+                boolean socKnown,double soc,boolean charging,boolean discharging){
+            double total=socKnown?Math.max(0,Math.min(100,soc))/10:0;
+            int last=(int)Math.ceil(total)-1;
+            boolean pulse=last>=0&&(discharging||charging&&soc<100);
+            boolean animate=pulse&&powerMotionEnabled();
+            double seconds=android.os.SystemClock.uptimeMillis()/1000.0;
+            float gap=2.5f,cw=(w-gap*9)/10;
+            for(int i=0;i<10;i++){
+                float cx=x+i*(cw+gap),level=(float)Math.max(0,Math.min(1,total-i));
+                fill(0xFF141D22);c.drawRoundRect(cx,y,cx+cw,y+h,4,4,paint);
+                stroke(0xFF929A9F,1.3f);c.drawRoundRect(cx,y,cx+cw,y+h,4,4,paint);
+                if(animate&&level>0&&(discharging||i==last)){
+                    double delay=discharging?(last-i)*.14:0;
+                    double phase=((seconds-delay)%1.8+1.8)%1.8/1.8;
+                    level*=(float)(1-Math.abs(2*phase-1));
+                }
+                fill(withAlpha(discharging?0xFF22C9FF:0xFF65EC55,Math.round(level*255)));
+                c.drawRoundRect(cx+1,y+1.5f,cx+cw-1,y+h-1.5f,4,4,paint);
+            }
+            return pulse;
+        }
+
+        private void drawPowerTopRoute(android.graphics.Canvas c, float[][] points,
+                int direction, int accent) {
+            if(direction==0||points==null||points.length<2)return;
+            int color=direction>0?0xFF22C9FF:0xFF53ED91;
+            android.graphics.Path p=new android.graphics.Path();
+            int start=direction>0?0:points.length-1,step=direction>0?1:-1;
+            p.moveTo(points[start][0],points[start][1]);
+            for(int i=start+step;i>=0&&i<points.length;i+=step)p.lineTo(points[i][0],points[i][1]);
+            stroke(withAlpha(color,0x28),48f);c.drawPath(p,paint);
+            stroke(withAlpha(color,0x78),34f);c.drawPath(p,paint);
+            stroke(color,7f);c.drawPath(p,paint);
+            for(int i=start;i+step>=0&&i+step<points.length;i+=step){
+                float[] a=points[i],b=points[i+step];
+                drawPowerChevron(c,(a[0]+b[0])/2f,(a[1]+b[1])/2f,b[0]-a[0],b[1]-a[1],color);
+            }
+        }
+
+        private void drawPowerChevron(android.graphics.Canvas c,float x,float y,float dx,float dy,int color){
+            float len=(float)Math.hypot(dx,dy);if(len<1f)return;
+            float ux=dx/len,uy=dy/len,backX=x-ux*13f,backY=y-uy*13f;
+            stroke(color,7f);
+            c.drawLine(backX-uy*10f,backY+ux*10f,x,y,paint);
+            c.drawLine(backX+uy*10f,backY-ux*10f,x,y,paint);
+        }
+
+        /** Cache successful and failed top-down chassis loads once per variant. */
+        private Bitmap getPowerChassisBitmap(String variant) {
+            String key = "approved-atlas";
+            if (powerGhostBitmaps.containsKey(key)) return powerGhostBitmaps.get(key);
+            Bitmap bitmap = null;
+            try (InputStream stream = getAssets().open(
+                    "www/assets/power/graphics/approved-chassis-atlas.png")) {
+                bitmap = BitmapFactory.decodeStream(stream);
+            } catch (IOException | RuntimeException error) {
+                Log.w(TAG, "Optional Power top-down chassis asset unavailable", error);
+            }
+            powerGhostBitmaps.put(key, bitmap);
+            return bitmap;
         }
 
         /** Lazy and failure-tolerant: a missing optional raster never blanks the card. */
@@ -2748,6 +2866,8 @@ public final class MainActivity extends Activity {
     private final java.util.Set<String> packageIconMiss =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
     private MotionTrailLayout projectionItem;
+    /** OEM settings; its MAIN activity opens on the phone "Conectar" page. */
+    private static final String PHONE_CONNECT_PACKAGE = "com.beantechs.settings";
     /** Waiting for Impulse to resolve a projection display task id. */
     private ProjectionPresence.Kind pendingProjectionKind;
     private final java.util.Set<String> pendingProjectionPackages = new java.util.HashSet<>();
@@ -8047,6 +8167,7 @@ public final class MainActivity extends Activity {
                 Math.round(24 * density), Math.round(6 * density));
         quickCardsRow = row;
         populateQuickCardsRow(row, density);
+        bindRailEditLongPress();
 
         scroll.addView(row, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -8287,7 +8408,7 @@ public final class MainActivity extends Activity {
             return card;
         }
         android.widget.LinearLayout.LayoutParams graphicLp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(76 * density),
+                Math.round(("power".equals(descriptor.id) ? 156 : 76) * density),
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         graphicLp.rightMargin = Math.round(10 * density);
         graphic.setLayoutParams(graphicLp);
@@ -8326,7 +8447,7 @@ public final class MainActivity extends Activity {
         // The source badge is long and must never ellipsise into something that
         // reads like a different claim ("DEMO · SIMULATED · NOT VEHICLE..." is
         // not the same statement).
-        detail.setMaxLines(3);
+        detail.setMaxLines("power".equals(descriptor.id) ? 4 : 3);
         detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
@@ -8344,6 +8465,9 @@ public final class MainActivity extends Activity {
     }
 
     private String quickVisualDetail(BottomCardDescriptor descriptor) {
+        if ("power".equals(descriptor.id)) {
+            return descriptor.metricA + "\n" + descriptor.metricB + "\n" + descriptor.secondary;
+        }
         if ("tires".equals(descriptor.id)) {
             String rear = labelTirePair("RL", "RR", descriptor.metricA);
             if (descriptor.secondary.isEmpty()) return rear;
@@ -8385,6 +8509,7 @@ public final class MainActivity extends Activity {
     }
 
     private int quickVisualCardWidthDp(String id) {
+        if ("power".equals(id)) return 318;
         if ("navigation".equals(id)) return 286;
         if ("roof".equals(id)) return 286;
         if ("status".equals(id) || "tires".equals(id)) return 270;
@@ -8457,6 +8582,7 @@ public final class MainActivity extends Activity {
         headingLp.leftMargin = Math.round(14 * density);
         headingLp.topMargin = Math.round(10 * density);
         heading.setLayoutParams(headingLp);
+        heading.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
         card.addView(heading);
         workspaceHeading = heading;
 
@@ -8508,7 +8634,9 @@ public final class MainActivity extends Activity {
         grid.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         int pad = Math.round(6 * density);
-        grid.setPadding(pad, Math.round(28 * density), pad, pad);
+        // No title band: the LAYOUT heading is hidden on this face, so the four
+        // cells take the whole card.
+        grid.setPadding(pad, pad, pad, pad);
         final String[][] cells = {
                 {"desktops", "Desktops", "openLayoutDesktops"},
                 {"layout", "Cards & widgets", "openLayoutCards"},
@@ -8526,7 +8654,7 @@ public final class MainActivity extends Activity {
                 cell.setText(def[1]);
                 cell.setTag("workspaceLayoutCell:" + def[0]);
                 cell.setGravity(android.view.Gravity.CENTER);
-                cell.setTextSize(11.5f);
+                cell.setTextSize(13f);
                 cell.setMaxLines(1);
                 cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 cell.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
@@ -8561,21 +8689,62 @@ public final class MainActivity extends Activity {
         float density = getResources().getDisplayMetrics().density;
         for (android.widget.TextView cell : workspaceLayoutCells) {
             String key = String.valueOf(cell.getTag()).substring("workspaceLayoutCell:".length());
-            boolean on = !"return".equals(key) && key.equals(studioScreen);
+            boolean isReturn = "return".equals(key);
+            boolean on = !isReturn && key.equals(studioScreen);
+            // The three screens stay neutral (accent only marks the open one);
+            // Return wears the accent and carries a back arrow.
             cell.setTextColor(on ? dockAccentColor : dockLabelColor());
             android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
             bg.setCornerRadius(9 * density);
-            bg.setColor(on ? withAlpha(dockAccentColor, 0x2E) : (dockUiLight ? 0x0F000000 : 0x12FFFFFF));
+            bg.setColor(isReturn ? withAlpha(dockAccentColor, 0x33)
+                    : on ? withAlpha(dockAccentColor, 0x2E) : (dockUiLight ? 0x0F000000 : 0x12FFFFFF));
             if (on) bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0xA0));
+            android.graphics.drawable.Drawable content = bg;
+            if (isReturn) {
+                // Drawn as a centred background layer, not a compound drawable:
+                // an empty TextView still reserves a text line under a top
+                // compound, which pushed the arrow above the middle.
+                cell.setText("");
+                android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(
+                        new android.graphics.drawable.Drawable[] {
+                                bg, workspaceBackGlyph(density, dockAccentColor) });
+                layers.setLayerGravity(1, android.view.Gravity.CENTER);
+                content = layers;
+            }
             cell.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(withAlpha(dockLabelColor(), 0x33)), bg, null));
+                    android.content.res.ColorStateList.valueOf(withAlpha(dockLabelColor(), 0x33)), content, null));
         }
+    }
+
+    /** A left arrow (shaft + chevron) for the Layout face's Return cell. */
+    private android.graphics.drawable.Drawable workspaceBackGlyph(float density, int color) {
+        int box = Math.max(8, Math.round(22 * density));
+        Bitmap bmp = Bitmap.createBitmap(box, box, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+        p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+        p.setStrokeWidth(2.2f * box / 24f);
+        p.setColor(color);
+        float u = box / 24f;
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(19 * u, 12 * u);
+        path.lineTo(5 * u, 12 * u);
+        path.moveTo(11 * u, 6 * u);
+        path.lineTo(5 * u, 12 * u);
+        path.lineTo(11 * u, 18 * u);
+        c.drawPath(path, p);
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
     }
 
     private void setWorkspaceLayoutMode(boolean on) {
         if (workspaceLayoutMode == on) return;
         workspaceLayoutMode = on;
-        if (workspaceHeading != null) workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
+        if (workspaceHeading != null) {
+            workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
+            workspaceHeading.setVisibility(on ? View.GONE : View.VISIBLE);
+        }
         crossfadeFaces(on ? workspaceActionsFace : workspaceLayoutFace,
                 on ? workspaceLayoutFace : workspaceActionsFace);
     }
@@ -8802,8 +8971,11 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
         copy.setOrientation(android.widget.LinearLayout.VERTICAL);
         copy.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        copy.setPadding(Math.round(13 * density), Math.round(8 * density),
-                Math.round(11 * density), Math.round(8 * density));
+        // 4dp, not 8: measured on the car the column needs ~116dp (30dp source
+        // chip row, title, artist, 48dp play) and 8dp padding left 108, so the
+        // play circle drew 38dp tall -- clipped top and bottom.
+        copy.setPadding(Math.round(13 * density), Math.round(4 * density),
+                Math.round(11 * density), Math.round(4 * density));
         copy.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
@@ -8854,7 +9026,7 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout.LayoutParams controlsLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        controlsLp.topMargin = Math.round(3 * density);
+        controlsLp.topMargin = 0;
         controls.setLayoutParams(controlsLp);
         controls.addView(makeQuickMediaButton(density, false, "prev", "Previous track",
                 v -> mediaNowPlaying.prev()));
@@ -10241,6 +10413,7 @@ public final class MainActivity extends Activity {
                     new String[] {"month-name", "numeric"}, "month-name");
             String dateWording = sanitizeClockOption(raw.optString("dateWording", "short"),
                     new String[] {"short", "long"}, "short");
+            if ("power".equals(id)) glyphText = sanitizePowerDirections(raw.optString("glyphText", ""));
             java.util.List<QuickMenuRow> menu = parseQuickMenu(raw.optJSONArray("menu"));
             String state = "tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
@@ -10257,6 +10430,11 @@ public final class MainActivity extends Activity {
             String[] openingStates = "status".equals(id)
                     ? sanitizeOpeningStates(raw.optString("openingStates", ""))
                     : new String[] {"unknown", "unknown", "unknown", "unknown", "unknown"};
+            String powerVariant = "power".equals(id)
+                    ? sanitizePowerVariant(raw.optString("powerVariant", "")) : "phev19";
+            boolean socKnown = "power".equals(id) && raw.optBoolean("socKnown", false);
+            double powerSoc = raw.optDouble("powerSoc", progress);
+            if(Double.isNaN(powerSoc)||Double.isInfinite(powerSoc)||powerSoc<0||powerSoc>100){socKnown=false;powerSoc=0;}
             String[] seatBeltStates = "status".equals(id)
                     ? sanitizeSeatBeltStates(raw.optString("seatBeltStates", ""))
                     : new String[] {"unknown", "unknown", "unknown", "unknown", "unknown"};
@@ -10265,11 +10443,13 @@ public final class MainActivity extends Activity {
             int curtainLevel = "status".equals(id)
                     ? Math.max(0, Math.min(100, raw.optInt("curtainLevel", 0))) : 0;
             BottomCardDescriptor descriptor = new BottomCardDescriptor(id, title.toUpperCase(java.util.Locale.US), value,
-                    action, primary, secondary, metricA, metricB, progress, state, wheelStates,
+                    action, primary, secondary, metricA, metricB, progress, state, powerVariant, socKnown, powerSoc, wheelStates,
                     openingStates, seatBeltStates, sunroofLevel, curtainLevel, demo,
                     iconAction, longAction, glyph, glyphText, clockFace, clockHourFormat,
                     dialMarks, splitPlates, dateSpineFormat, dateWording, menu);
             descriptor.tirePressures = cleanBottomCardText(raw.optString("tirePressures", ""), 48);
+            descriptor.tireTemperatures = cleanBottomCardText(raw.optString("tireTemperatures", ""), 48);
+            descriptor.tirePressureUnit = cleanBottomCardText(raw.optString("tirePressureUnit", ""), 6);
             descriptor.appPackage = cleanBottomCardText(raw.optString("appPackage", ""), 80);
             descriptor.navRemaining = cleanBottomCardText(raw.optString("navRemaining", ""), 16);
             descriptor.navDuration = cleanBottomCardText(raw.optString("navDuration", ""), 16);
@@ -10465,6 +10645,19 @@ public final class MainActivity extends Activity {
             default:
                 return "unavailable";
         }
+    }
+
+    private String sanitizePowerDirections(String value) {
+        // Reject the whole token, including trailing content; never truncate it into valid data.
+        return value != null && value.matches("(?:-1|0|1),(?:-1|0|1),[01]") ? value : "";
+    }
+
+    private String sanitizePowerVariant(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.US);
+        if ("phev34".equals(normalized) || "phev19".equals(normalized)
+                || "hev2".equals(normalized)) return normalized;
+        // Invalid data must never invent a rear motor.
+        return "phev19";
     }
 
     private String sanitizePowerState(String value) {
@@ -10696,6 +10889,7 @@ public final class MainActivity extends Activity {
         // The views an open menu is anchored to are about to be replaced.
         dismissQuickMenu();
         populateQuickCardsRow(quickCardsRow, getResources().getDisplayMetrics().density);
+        bindRailEditLongPress();
         refreshQuickCardsTheme();
         // A reorder or remove comes back from the page as a new card list; the
         // rebuilt tiles have to rejoin edit mode.
@@ -10860,6 +11054,28 @@ public final class MainActivity extends Activity {
         return index;
     }
 
+    /**
+     * Long press on any rail card opens card edit. Set after every build, so it
+     * replaces a card's own longAction; edit mode clears it again.
+     */
+    private void bindRailEditLongPress() {
+        for (View card : railCardViews()) {
+            card.setLongClickable(true);
+            card.setOnLongClickListener(v -> {
+                if (railEditMode) return false;
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                callViewerDock("openRailEdit");
+                return true;
+            });
+        }
+    }
+
+    /**
+     * Edit-mode gesture. A quick swipe is left to the scroll view, which
+     * intercepts it past touch slop. Only a hold arms the drag; once armed the
+     * rail may no longer intercept, and holding the card near either edge
+     * scrolls the rail so it can travel past the visible cards.
+     */
     private final class RailEditTouch implements View.OnTouchListener {
         private final String id;
         private final View card;
@@ -10868,7 +11084,32 @@ public final class MainActivity extends Activity {
         private final float density;
         private final int slop;
         private float downX;
+        private float lastRawX;
+        private int downScrollX;
         private boolean dragging;
+        private boolean armed;
+        private final Runnable arm = this::armDrag;
+        private final Runnable autoScroll = new Runnable() {
+            @Override
+            public void run() {
+                if (!dragging) return;
+                android.widget.HorizontalScrollView scroll = railScroll();
+                if (scroll == null) return;
+                int[] loc = new int[2];
+                scroll.getLocationOnScreen(loc);
+                float edge = 90f * density;
+                float left = lastRawX - loc[0];
+                float right = loc[0] + scroll.getWidth() - lastRawX;
+                int step = 0;
+                if (left < edge) step = -Math.round(Math.min(1f, (edge - left) / edge) * 22f * density);
+                else if (right < edge) step = Math.round(Math.min(1f, (edge - right) / edge) * 22f * density);
+                if (step != 0) {
+                    scroll.scrollBy(step, 0);
+                    follow();
+                }
+                card.postOnAnimation(this);
+            }
+        };
 
         RailEditTouch(String id, View card, RailBadge badge, RailBadge more, float density) {
             this.id = id;
@@ -10879,34 +11120,102 @@ public final class MainActivity extends Activity {
             this.slop = android.view.ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
         }
 
+        private android.widget.HorizontalScrollView railScroll() {
+            return cardsScrollView instanceof android.widget.HorizontalScrollView
+                    ? (android.widget.HorizontalScrollView) cardsScrollView : null;
+        }
+
+        private int scrollX() {
+            android.widget.HorizontalScrollView s = railScroll();
+            return s == null ? 0 : s.getScrollX();
+        }
+
+        /** Finger offset plus however far the rail has scrolled under it. */
+        private void follow() {
+            card.setTranslationX(lastRawX - downX + (scrollX() - downScrollX));
+            shiftNeighbours(railDropIndex(card));
+        }
+
+        private int shownTo = -1;
+        /** Where the dragged card lands if dropped now: its offset to the open slot. */
+        private float slotOffset;
+
+        /**
+         * Live swap feedback: the cards between the dragged card's origin and
+         * its drop index slide over by one slot. railDropIndex reads getLeft(),
+         * which translation does not move, so this cannot feed back on itself.
+         */
+        private void shiftNeighbours(int to) {
+            if (to == shownTo) return;
+            shownTo = to;
+            List<View> cards = railCardViews();
+            int from = cards.indexOf(card);
+            float slot = card.getWidth() + marginRight(card);
+            slotOffset = 0f;
+            for (int i = 0; i < cards.size(); i++) {
+                View c = cards.get(i);
+                if (c == card) continue;
+                float shift = 0f;
+                if (from < to && i > from && i <= to) {
+                    shift = -slot;
+                    slotOffset += c.getWidth() + marginRight(c);
+                } else if (to < from && i >= to && i < from) {
+                    shift = slot;
+                    slotOffset -= c.getWidth() + marginRight(c);
+                }
+                c.animate().translationX(shift).setDuration(160)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            }
+        }
+
+        private int marginRight(View v) {
+            android.view.ViewGroup.LayoutParams lp = v.getLayoutParams();
+            return lp instanceof android.view.ViewGroup.MarginLayoutParams
+                    ? ((android.view.ViewGroup.MarginLayoutParams) lp).rightMargin : 0;
+        }
+
+        private void armDrag() {
+            armed = true;
+            dragging = true;
+            if (card.getParent() != null) card.getParent().requestDisallowInterceptTouchEvent(true);
+            card.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            android.animation.Animator jiggle = railJiggles.get(card);
+            if (jiggle != null) jiggle.pause();
+            card.setRotation(0f);
+            card.setAlpha(0.92f);
+            card.setScaleX(1.04f);
+            card.setScaleY(1.04f);
+            card.setTranslationZ(8f * density);
+            card.postOnAnimation(autoScroll);
+        }
+
         @Override
         public boolean onTouch(View v, MotionEvent e) {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    downX = e.getRawX();
+                    downX = lastRawX = e.getRawX();
+                    downScrollX = scrollX();
                     dragging = false;
-                    // A press that starts on a card drags it; the rail scrolls
-                    // from the gaps between cards.
-                    if (v.getParent() != null) v.getParent().requestDisallowInterceptTouchEvent(true);
+                    armed = false;
+                    card.postDelayed(arm, android.view.ViewConfiguration.getLongPressTimeout());
                     return true;
                 case MotionEvent.ACTION_MOVE: {
-                    float dx = e.getRawX() - downX;
-                    if (!dragging && Math.abs(dx) > slop) {
-                        dragging = true;
-                        android.animation.Animator jiggle = railJiggles.get(card);
-                        if (jiggle != null) jiggle.pause();
-                        card.setRotation(0f);
-                        card.setAlpha(0.92f);
-                        card.setTranslationZ(8f * density);
+                    lastRawX = e.getRawX();
+                    if (!armed) {
+                        // Moved before the hold completed: a swipe, not a drag.
+                        if (Math.abs(lastRawX - downX) > slop) card.removeCallbacks(arm);
+                        return true;
                     }
-                    if (dragging) card.setTranslationX(dx);
+                    follow();
                     return true;
                 }
                 case MotionEvent.ACTION_UP: {
+                    card.removeCallbacks(arm);
                     if (dragging) {
                         int to = railDropIndex(card);
                         int from = railCardViews().indexOf(card);
-                        settle();
+                        shiftNeighbours(to);
+                        settle(to >= 0 && to != from);
                         if (to >= 0 && to != from) callViewerDock("railMoveCard:" + id + ":" + to);
                     } else {
                         int x = Math.round(e.getX());
@@ -10926,6 +11235,8 @@ public final class MainActivity extends Activity {
                     return true;
                 }
                 case MotionEvent.ACTION_CANCEL:
+                    // Also what the rail sends when it takes a quick swipe.
+                    card.removeCallbacks(arm);
                     if (dragging) settle();
                     return true;
                 default:
@@ -10934,8 +11245,23 @@ public final class MainActivity extends Activity {
         }
 
         private void settle() {
+            settle(false);
+        }
+
+        /** moved: glide into the open slot and leave neighbours shifted until the rebuild. */
+        private void settle(boolean moved) {
             dragging = false;
-            card.animate().translationX(0f).translationZ(0f).alpha(1f).setDuration(120).start();
+            armed = false;
+            card.removeCallbacks(autoScroll);
+            if (!moved) {
+                for (View c : railCardViews()) {
+                    if (c != card) c.animate().translationX(0f).setDuration(160).start();
+                }
+            }
+            float target = moved ? slotOffset : 0f;
+            shownTo = -1;
+            card.animate().translationX(target).translationZ(0f).alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(120).start();
             android.animation.Animator jiggle = railJiggles.get(card);
             if (jiggle != null) jiggle.resume();
         }
@@ -11868,7 +12194,14 @@ public final class MainActivity extends Activity {
     private void bindProjectionSlot(ProjectionPresence.Kind kind) {
         if (projectionItem == null) return;
         if (kind == null || kind == ProjectionPresence.Kind.NONE) {
-            projectionItem.setVisibility(View.GONE);
+            // Same as the OEM rail: nothing projected -> offer the connect screen.
+            if (getPackageManager().getLaunchIntentForPackage(PHONE_CONNECT_PACKAGE) == null) {
+                projectionItem.setVisibility(View.GONE);
+                return;
+            }
+            bindDockItem(projectionItem,
+                    getDrawable(R.drawable.ic_phone_link), "Configurar Navegação",
+                    v -> launchAppFullscreen(PHONE_CONNECT_PACKAGE));
             return;
         }
         Drawable icon = projectionPresence != null ? projectionPresence.iconFor(kind) : null;

@@ -41,7 +41,7 @@ const CHECKS = {
   // A per-signal / per-second path must never reach React (197 ms per commit on the car).
   'graph writes do not commit': ({ html }) => noCommit(method(html, '_setGraphValue')),
   'live paint path does not commit': ({ html }) =>
-    ['_energyTick', '_paintEnergyCards', '_energyModel', '_energyReadLive'].every((n) => noCommit(method(html, n))),
+    ['_energyTick', '_paintEnergyCards', '_energyModel', '_energyReadLive', '_paintEnergyChart', '_energySample'].every((n) => noCommit(method(html, n))),
   'no consumptionRev state': ({ html }) => !/consumptionRev\s*:|\.consumptionRev\b/.test(html),
   // Replacing a parent's text would detach React's interpolation span.
   'paint writes inside the interpolation span': ({ html }) =>
@@ -85,11 +85,25 @@ const CHECKS = {
   'wide widget shows both panes': ({ html }) => {
     const trips = method(html, '_energyTripsView') || '';
     const pop = method(html, '_energyPopupView') || '';
-    return /const wide = !popup && w >= 4 && h >= 2;/.test(method(html, '_consumptionWidgetView') || '')
+    return (method(html, '_consumptionWidgetView') || '').includes('const wide = popup ? this._energyPopupWideOn() : (w >= 4 && h >= 2);')
       && trips.includes("consumptionTripShowMap: !!t && (wide || tripView === 'map')")
       && trips.includes("consumptionTripShowData: !!t && (wide || tripView === 'data')")
       && pop.includes("consumptionHistShowData: wide || histView === 'data'")
       && html.includes("this._consumptionWidgetView(entry.item, 'popup')");
+  },
+  // Owner, 2026-09-14: zoom buttons only on the maximised map; the pane pans,
+  // pinches and opens the full map on a tap.
+  'zoom buttons only on the maximised map': ({ html }) => {
+    const body = method(html, '_energyMapCreate') || '';
+    return /if \(maxMode\) \{\s*button\(H6_ENERGY_ICONS\.add,/.test(body) && /if \(tap && !maxMode\) this\._setEnergyMapMax\(true\);/.test(body);
+  },
+  // FINALIZAR VIAGEM ends a trip for good: the button only opens a confirmation.
+  'finishing a trip asks for confirmation': ({ html }) => {
+    const ask = method(html, '_finishEnergyTrip') || '';
+    const confirm = method(html, '_confirmFinishEnergyTrip') || '';
+    return /energyFinishConfirm: true/.test(ask) && !/finishTrip\(\)/.test(ask)
+      && /b\.finishTrip\(\)/.test(confirm)
+      && html.includes('FinishConfirm }}">FINALIZAR</button>');
   },
 };
 
@@ -124,6 +138,9 @@ const MUTANTS = {
     "credit.textContent = '© OpenStreetMap contributors';", "credit.textContent = '';") }),
   'wide widget shows both panes': (s) => ({ ...s, html: s.html.replace(
     "consumptionTripShowData: !!t && (wide || tripView === 'data')", "consumptionTripShowData: !!t && tripView === 'data'") }),
+  'zoom buttons only on the maximised map': (s) => ({ ...s, html: s.html.replace('    if (maxMode) {\n      button(', '    if (true) {\n      button(') }),
+  'finishing a trip asks for confirmation': (s) => ({ ...s, html: s.html.replace(
+    '    this._uiOnlySetState({ energyFinishConfirm: true });', '    this._confirmFinishEnergyTrip(ev);') }),
 };
 
 const changed = (a, b) => Object.keys(a).some((k) => a[k] !== b[k]);
