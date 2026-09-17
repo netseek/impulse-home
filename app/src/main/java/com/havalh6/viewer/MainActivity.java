@@ -1772,7 +1772,8 @@ public final class MainActivity extends Activity {
                 case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
                 case "power": drawPower(canvas, w, h, accent, muted, strong); break;
                 case "clock": drawClock(canvas, w, h, accent, muted, strong); break;
-                case "desktops": drawDesktops(canvas, w, h, accent, muted); break;
+                case "desktops":
+                case "wallpaper": drawWallpaper(canvas, w, h, accent, muted, strong); break;
                 case "driveMode": drawDriveMode(canvas, w, h, accent, muted, strong); break;
                 case "powerMode": drawPowerMode(canvas, w, h, accent, muted, strong); break;
                 case "regen": drawRegen(canvas, w, h, accent, muted, strong); break;
@@ -3253,17 +3254,37 @@ public final class MainActivity extends Activity {
                     Math.max(3f, w * .04f), paint);
         }
 
-        private void drawDesktops(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            float gap = w * .07f, cw = w * .30f, ch = h * .27f;
-            float left = (w - cw * 2f - gap) * .5f, top = (h - ch * 2f - gap) * .5f;
-            for (int row = 0; row < 2; row++) {
-                for (int col = 0; col < 2; col++) {
-                    fill(row == 0 && col == 0 ? withAlpha(accent, 0xCC) : muted);
-                    float x = left + col * (cw + gap), y = top + row * (ch + gap);
-                    c.drawRoundRect(x, y, x + cw, y + ch, w * .04f, w * .04f, paint);
-                }
-            }
+        private void drawWallpaper(android.graphics.Canvas c, float w, float h,
+                int accent, int muted, int strong) {
+            float padX = w * .18f, top = h * .16f, bottom = h * .72f;
+            float left = padX, right = w - padX;
+            float r = w * .06f;
+
+            // Frame outline
+            stroke(muted, Math.max(1.8f, w * .028f));
+            c.drawRoundRect(left, top, right, bottom, r, r, paint);
+
+            // Sun / circle - highlight with accent if wallpaper or mixed is active
+            boolean hasWallpaper = descriptor != null && !"car".equals(descriptor.state);
+            fill(hasWallpaper ? withAlpha(accent, 0xDD) : withAlpha(muted, 0x66));
+            float sunR = (bottom - top) * .17f;
+            c.drawCircle(left + (right - left) * .30f, top + (bottom - top) * .35f, sunR, paint);
+
+            // Mountain peaks
+            android.graphics.Path hills = new android.graphics.Path();
+            float baseW = right - left;
+            float baseH = bottom - top;
+            hills.moveTo(left + baseW * .10f, bottom - Math.max(1.8f, w * .028f));
+            hills.lineTo(left + baseW * .42f, top + baseH * .42f);
+            hills.lineTo(left + baseW * .65f, top + baseH * .68f);
+            hills.lineTo(left + baseW * .80f, top + baseH * .52f);
+            hills.lineTo(right - baseW * .08f, bottom - Math.max(1.8f, w * .028f));
+            stroke(hasWallpaper ? strong : muted, Math.max(2f, w * .032f));
+            c.drawPath(hills, paint);
+
+            // 3-step indicator dots at bottom: 3D -> Wallpaper -> Both
+            int prog = descriptor != null ? descriptor.progress : 0;
+            drawStepDots(c, w, h, 3, prog, accent, muted);
         }
     }
     /** Content shown to the right of the mode drawer: apps | layout | config. */
@@ -11252,6 +11273,9 @@ public final class MainActivity extends Activity {
     }
 
     private String bottomCardAccessibilityDescription(BottomCardDescriptor descriptor) {
+        if ("wallpaper".equals(descriptor.id) || "desktops".equals(descriptor.id)) {
+            return "Wallpaper and display fill. " + descriptor.primary + ". " + descriptor.secondary;
+        }
         if ("power".equals(descriptor.id)) {
             StringBuilder description = new StringBuilder("Power flow. ");
             description.append(descriptor.primary.isEmpty() ? "Power flow unavailable" : descriptor.primary);

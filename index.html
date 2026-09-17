@@ -2028,6 +2028,224 @@ window.HavalSplash = (function () {
       transform: scale(.985);
       filter: brightness(1.15);
     }
+
+    /* ── First-Run Setup Modal ─────────────────────────────────────── */
+    .hv-first-run-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 95;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(3, 7, 14, 0.76);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s ease;
+      font-family: 'Space Mono', monospace;
+    }
+    .hv-first-run-backdrop.on {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .hv-first-run-modal {
+      width: min(840px, 94vw);
+      max-height: min(620px, 92vh);
+      padding: 22px 26px 20px;
+      border-radius: 16px;
+      background: rgba(13, 19, 28, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.65), 0 0 35px rgba(79, 214, 232, 0.12);
+      backdrop-filter: blur(28px) saturate(1.2);
+      -webkit-backdrop-filter: blur(28px) saturate(1.2);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-sizing: border-box;
+    }
+    .hv-first-run-head {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .hv-first-run-badge {
+      display: inline-block;
+      align-self: flex-start;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(79, 214, 232, 0.15);
+      border: 1px solid rgba(79, 214, 232, 0.35);
+      color: var(--hv-accent, #4fd6e8);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .15em;
+    }
+    .hv-first-run-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      color: #edf5fa;
+      margin-top: 2px;
+    }
+    .hv-first-run-sub {
+      font-size: 10px;
+      letter-spacing: .04em;
+      opacity: .65;
+      line-height: 1.4;
+    }
+    .hv-first-run-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .hv-first-run-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .hv-first-run-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .hv-first-run-color-name {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      color: var(--hv-accent, #4fd6e8);
+    }
+    .hv-first-run-models {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .hv-first-run-model-card {
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 10px 12px;
+      text-align: left;
+      cursor: pointer;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: all .16s ease;
+      font-family: inherit;
+    }
+    .hv-first-run-model-card:hover {
+      border-color: rgba(79, 214, 232, 0.4);
+      background: rgba(255, 255, 255, 0.07);
+    }
+    .hv-first-run-model-card.on {
+      border-color: var(--hv-accent, #4fd6e8);
+      background: rgba(79, 214, 232, 0.12);
+      box-shadow: 0 0 14px rgba(79, 214, 232, 0.22);
+    }
+    .hv-first-run-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .hv-first-run-card-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: #fff;
+    }
+    .hv-first-run-card-check {
+      display: none;
+      font-size: 11px;
+      color: var(--hv-accent, #4fd6e8);
+      font-weight: 900;
+    }
+    .hv-first-run-model-card.on .hv-first-run-card-check {
+      display: inline;
+    }
+    .hv-first-run-card-tag {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      color: var(--hv-accent, #4fd6e8);
+      opacity: .88;
+    }
+    .hv-first-run-card-spec {
+      font-size: 8px;
+      letter-spacing: .02em;
+      opacity: .55;
+      line-height: 1.3;
+      margin-top: 2px;
+    }
+    .hv-first-run-colors {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 0;
+    }
+    .hv-first-run-color-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      position: relative;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      padding: 0;
+      outline: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 8px rgba(0,0,0,.35);
+    }
+    .hv-first-run-color-btn:hover {
+      transform: scale(1.08);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    .hv-first-run-color-btn.on {
+      border-color: var(--hv-accent, #4fd6e8);
+      transform: scale(1.15);
+      box-shadow: 0 0 16px rgba(79, 214, 232, 0.5);
+    }
+    .hv-first-run-color-check {
+      display: none;
+      font-size: 13px;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,.8), 0 0 4px #000;
+    }
+    .hv-first-run-color-btn.on .hv-first-run-color-check {
+      display: block;
+    }
+    .hv-first-run-footer {
+      margin-top: 4px;
+    }
+    .hv-first-run-confirm-btn {
+      width: 100%;
+      padding: 12px 20px;
+      border-radius: 10px;
+      border: none;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      background: linear-gradient(135deg, #4fd6e8 0%, #29a8ba 100%);
+      color: #06121c;
+      cursor: pointer;
+      box-shadow: 0 4px 18px rgba(79, 214, 232, 0.35);
+      transition: filter .15s ease, transform .12s ease;
+    }
+    .hv-first-run-confirm-btn:hover {
+      filter: brightness(1.1);
+    }
+    .hv-first-run-confirm-btn:active {
+      transform: scale(.985);
+      filter: brightness(1.18);
+    }
+
     .hv-layout-config-btn {
       width: 100%;
       margin: 8px 0 4px;
@@ -6087,7 +6305,7 @@ window.HavalSplash = (function () {
   <!-- widget boards occupy the same rects as freeform app slots -->
   <div class="hv-desktop-swipe-edge left" style="display: {{ desktopSwipeEdgesDisplay }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}"></div>
   <div class="hv-desktop-swipe-edge right" style="display: {{ desktopSwipeEdgesDisplay }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}"></div>
-  <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}" onMouseDown="{{ desktopSwipeStart }}" onMouseMove="{{ desktopSwipeMove }}" onMouseUp="{{ desktopSwipeEnd }}" onMouseLeave="{{ desktopSwipeCancel }}">
+  <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}" onMouseDown="{{ desktopSwipeStart }}" onMouseMove="{{ desktopSwipeMove }}" onMouseUp="{{ desktopSwipeEnd }}">
     <div class="hv-widget-grid {{ leftGridPickClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: {{ leftGridRows }};" onTouchStart="{{ onLeftBoardHoldStart }}" onTouchEnd="{{ onLeftBoardHoldEnd }}" onTouchCancel="{{ onLeftBoardHoldCancel }}" onMouseDown="{{ onLeftBoardHoldStart }}" onMouseUp="{{ onLeftBoardHoldEnd }}" onMouseLeave="{{ onLeftBoardHoldCancel }}">
       <sc-for list="{{ leftSlotCells }}" as="sc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ sc.cls }}" style="{{ sc.gridStyle }}" onClick="{{ sc.onClick }}"></button>
@@ -6666,6 +6884,49 @@ window.HavalSplash = (function () {
       </sc-for>
     </div>
     </sc-if>
+  <!-- First-Run Setup Modal -->
+  <div class="hv-first-run-backdrop {{ firstRunBackdropClass }}" style="display: {{ firstRunDisplay }};">
+    <div class="hv-first-run-modal">
+      <div class="hv-first-run-head">
+        <div class="hv-first-run-badge">INITIAL SETUP</div>
+        <div class="hv-first-run-title">CHOOSE YOUR HAVAL H6</div>
+        <div class="hv-first-run-sub">Select your vehicle model and exterior body color to personalize your experience.</div>
+      </div>
+
+      <div class="hv-first-run-section">
+        <div class="hv-first-run-label">1. SELECT MODEL</div>
+        <div class="hv-first-run-models">
+          <sc-for list="{{ firstRunModels }}" as="frm">
+            <button type="button" class="hv-first-run-model-card {{ frm.activeClass }}" onClick="{{ frm.onClick }}">
+              <div class="hv-first-run-card-header">
+                <span class="hv-first-run-card-title">{{ frm.name }}</span>
+                <span class="hv-first-run-card-check">✓</span>
+              </div>
+              <div class="hv-first-run-card-tag">{{ frm.label }}</div>
+              <div class="hv-first-run-card-spec">{{ frm.spec }}</div>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div class="hv-first-run-section">
+        <div class="hv-first-run-label-row">
+          <span class="hv-first-run-label">2. SELECT BODY COLOR</span>
+          <span class="hv-first-run-color-name">{{ firstRunSelectedColorName }}</span>
+        </div>
+        <div class="hv-first-run-colors">
+          <sc-for list="{{ firstRunColors }}" as="frc">
+            <button type="button" class="hv-first-run-color-btn {{ frc.activeClass }}" onClick="{{ frc.onClick }}" title="{{ frc.title }}" style="background: {{ frc.hex }};">
+              <span class="hv-first-run-color-check">✓</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div class="hv-first-run-footer">
+        <button type="button" class="hv-first-run-confirm-btn" onClick="{{ confirmFirstRunSetup }}">CONFIRM & START</button>
+      </div>
+    </div>
   </div>
 
   <div class="hv-wallpaper-backdrop {{ wallpaperBackdropClass }}" onClick="{{ closeWallpaperPopup }}"></div>
@@ -8226,6 +8487,7 @@ const H6_RAIL_CARD_ICONS = {
   power: 'M13 2L4 14h7l-1 8 9-12h-7z',
   status: 'M4 16v-4l2-5h12l2 5v4zM4 16v2M20 16v2M7.5 13h.01M16.5 13h.01',
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
+  wallpaper: 'M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 21',
   desktops: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   driveMode: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6zM12 3v6.2M4.3 15.4l5.3-2.8M19.7 15.4l-5.3-2.8',
   powerMode: 'M4 16a8 8 0 1 1 16 0M12 16l4-5',
@@ -8252,7 +8514,7 @@ const H6_BOTTOM_CARD_CATALOG = [
   { id: 'power', title: 'Power flow', action: 'openPower' },
   { id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' },
   { id: 'clock', title: 'Clock', action: 'openClockSettings' },
-  { id: 'desktops', title: 'Desktops', action: 'openDesktopStudio' },
+  { id: 'wallpaper', title: 'Wallpaper', action: 'configureWallpaper', iconAction: 'toggleCenterFill' },
   // Three rail tiles, one destination. `action` fires on the card body and
   // opens the shared DRIVING popup; `iconAction` fires on the graphic alone
   // and is the per-mode quick change.
@@ -8971,6 +9233,7 @@ class Component extends DCLogic {
     wallpaperWebSourcePage: '',
     wallpaperLoading: false,
     wallpaperPopupOpen: false,
+    firstRunSetupOpen: false,
     focusedCardType: null,
     energyTab: 'now',
     energyTripStart: '',
@@ -9648,6 +9911,7 @@ class Component extends DCLogic {
     if (saved.modelVariant === 'hev' || saved.modelVariant === 'gt') {
       s.modelVariant = saved.modelVariant;
     }
+    if (saved.setupCompleted) this._setupCompleted = true;
     if (typeof saved.carColor === 'string' || saved.carColor === null) s.carColor = saved.carColor;
     if (saved.paintFinish && typeof saved.paintFinish === 'object') s.paintFinish = { ...saved.paintFinish };
     if (typeof saved.lightIntensity === 'number') s.lightIntensity = saved.lightIntensity;
@@ -13842,6 +14106,7 @@ class Component extends DCLogic {
     // One SAVE for the dock: settings + current layout home on this desktop.
     this.saveCurrentDesktopCamera({ quiet: true });
     const payload = {
+      setupCompleted: !!this._setupCompleted,
       timeMode: s.timeMode,
       nightMode: s.nightMode,
       widgetThemeMode: (s.widgetThemeMode === 'light' || s.widgetThemeMode === 'auto') ? s.widgetThemeMode : 'dark',
@@ -14010,12 +14275,59 @@ class Component extends DCLogic {
       { key: '#8B0000', hex: '#8B0000', title: 'Vermelho Granada' },
     ];
     const activeKey = s.carColor === null ? '#F4F5F7' : s.carColor;
+    const activeColorObj = palette.find((p) => p.key === activeKey) || palette[0];
     const swatches = palette.map((p) => ({
       hex: p.hex,
       title: p.title,
       ring: p.key === activeKey ? '#4fd6e8' : 'rgba(255,255,255,.22)',
       onClick: () => this.setColor(p.key),
     }));
+    const firstRunModelsList = [
+      {
+        key: 'gt',
+        name: 'H6 GT',
+        label: 'GT',
+        spec: 'Coupe SUV · AWD',
+      },
+      {
+        key: 'phev34',
+        name: 'H6 PHEV',
+        label: 'PHEV / PHEV34',
+        spec: 'Plug-in Hybrid · AWD',
+      },
+      {
+        key: 'phev19',
+        name: 'H6 PHEV19',
+        label: 'PHEV19',
+        spec: 'Plug-in Hybrid · FWD',
+      },
+      {
+        key: 'hev',
+        name: 'H6 HEV',
+        label: 'HEV / HEV2',
+        spec: 'Hybrid · FWD',
+      },
+    ].map((m) => {
+      const isSelected = (s.modelTrim || 'phev34') === m.key;
+      return {
+        key: m.key,
+        name: m.name,
+        label: m.label,
+        spec: m.spec,
+        activeClass: isSelected ? 'on' : '',
+        onClick: () => this._selectTrim(m.key),
+      };
+    });
+    const firstRunColorsList = palette.map((p) => {
+      const isSelected = p.key === activeKey;
+      return {
+        key: p.key,
+        hex: p.hex,
+        title: p.title,
+        activeClass: isSelected ? 'on' : '',
+        onClick: () => this.setColor(p.key),
+      };
+    });
     const hv = (on) => this._hvBtn(!!on);
     const hvOff = hv(false);
     this._syncDockIndicators();
@@ -14023,6 +14335,12 @@ class Component extends DCLogic {
     const themeMode = s.widgetThemeMode || 'dark';
     const themeBtn = hv(themeMode !== 'auto');
     return {
+      firstRunDisplay: s.firstRunSetupOpen ? 'flex' : 'none',
+      firstRunBackdropClass: s.firstRunSetupOpen ? 'on' : '',
+      firstRunModels: firstRunModelsList,
+      firstRunColors: firstRunColorsList,
+      firstRunSelectedColorName: activeColorObj.title,
+      confirmFirstRunSetup: () => this._confirmFirstRunSetup(),
       containerRef: this.containerRef,
       outerRef: this.outerRef,
       nightMode: s.nightMode,
@@ -15282,6 +15600,10 @@ class Component extends DCLogic {
     }
     const patch = { centerFill: next };
     if (next === 'car') patch.wallpaperPopupOpen = false;
+    if (next === 'wallpaper') {
+      if (this._hotspotsVisible || this._hsRoofPopOpen) this._hideHotspots();
+      patch.hotspotsChrome = false;
+    }
     this.setState(patch, () => {
       if (this._centerFillUsesWallpaper()) this._ensureWallpapers(false);
       else this._syncWallpaperLayer();
@@ -15293,6 +15615,7 @@ class Component extends DCLogic {
         this.state.grainEnabled
       );
       this._syncCenterFillIndicator();
+      this._syncDockIndicators();
       // Always re-evaluate car visibility — wallpaper-only must hide the model
       // AND clear any vehicle hotspot dots left from a previous car fill.
       this._syncCarSceneForShell();
@@ -15310,7 +15633,14 @@ class Component extends DCLogic {
   }
 
   openWallpaperPopup() {
-    if (!this._centerFillUsesWallpaper()) return;
+    if (!this._centerFillUsesWallpaper()) {
+      this._setCenterFill('wallpaper', () => {
+        this._wallpaperReturnTab = null;
+        this.setState({ wallpaperPopupOpen: true });
+        this._ensureWallpapers(false);
+      });
+      return;
+    }
     // Opened from anywhere but Appearance: nothing to go back to.
     this._wallpaperReturnTab = null;
     this.setState({ wallpaperPopupOpen: true });
@@ -15323,6 +15653,52 @@ class Component extends DCLogic {
     this._wallpaperReturnTab = null;
     this.setState({ wallpaperPopupOpen: false }, () => {
       if (back) this._openDesktopStudio(back);
+    });
+  }
+
+  _isFirstRunForced() {
+    try {
+      const q = new URLSearchParams((location.search || '').replace(/^[#?]/, ''));
+      const h = new URLSearchParams((location.hash || '').replace(/^[#?]/, ''));
+      return q.get('firstRun') === '1' || h.get('firstRun') === '1' || q.get('setup') === '1' || h.get('setup') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  _hasCompletedSetup() {
+    if (this._isFirstRunForced()) return false;
+    try {
+      if (localStorage.getItem('h6_setup_completed') === '1' || localStorage.getItem('h6_first_run_completed') === '1') return true;
+      if (this._setupCompleted) return true;
+      if (this._savedSettings && this._savedSettings.setupCompleted) return true;
+    } catch (e) {}
+    return false;
+  }
+
+  _checkFirstRunSetup() {
+    if (this._firstRunChecked) return;
+    if (this.state && this.state.loading && !this._viewerReady) return;
+    this._firstRunChecked = true;
+    if (!this._hasCompletedSetup()) {
+      setTimeout(() => {
+        if (!this._unmounted) this.setState({ firstRunSetupOpen: true });
+      }, 350);
+    }
+  }
+
+  openFirstRunSetup() {
+    this.setState({ firstRunSetupOpen: true });
+  }
+
+  _confirmFirstRunSetup() {
+    this._setupCompleted = true;
+    try {
+      localStorage.setItem('h6_setup_completed', '1');
+      localStorage.setItem('h6_first_run_completed', '1');
+    } catch (e) {}
+    this.setState({ firstRunSetupOpen: false }, () => {
+      this.saveSettings();
     });
   }
 
@@ -26225,14 +26601,17 @@ class Component extends DCLogic {
       // capture ever ran. Only what a thumbnail shows: which desktop, its
       // layout, its look.
       const board = this._widgetLayout && this._widgetLayout.appCar && this._widgetLayout.appCar.left;
+      const curDesk = this._desktops && this._desktops[this._desktopIndex || 0];
       const shotSig = [this._desktopIndex || 0, s.desktopRev || 0, s.centerFill, s.wallpaperAuto ? 1 : 0,
-        s.wallpaperIdx || 0, s.widgetThemeMode, s.accentColor, s.nightMode ? 1 : 0, this._viewerReady ? 1 : 0,
+        s.wallpaperIdx || 0, s.wallpaperSource || 'bing', s.widgetThemeMode, s.accentColor, s.nightMode ? 1 : 0, this._viewerReady ? 1 : 0,
+        (this._desktopBottomCards || []).join(','),
+        this._desktopWallpaperSig ? this._desktopWallpaperSig(curDesk) : '',
         ((board && board.items) || []).map((i) => i.type + i.x + i.y + i.w + i.h).join(',')].join('|');
       if (shotSig !== this._desktopShotTrigger) {
         this._desktopShotTrigger = shotSig;
         // Wait for intro + chrome; early schedules only poll while blocked.
         if (this._viewerReady && this._introPlayed && !this._introActive) {
-          this._scheduleDesktopShot(3500);
+          this._scheduleDesktopShot(2000);
         }
       }
     }
@@ -26684,8 +27063,22 @@ class Component extends DCLogic {
         start: (ev) => this._onDesktopGestureStart(ev),
         move: (ev) => this._onDesktopGestureMove(ev),
         end: (ev) => this._onDesktopGestureEnd(ev),
-        cancel: () => this._onDesktopGestureCancel(),
+        cancel: (ev) => this._onDesktopGestureCancel(ev),
       };
+      renderer.domElement.addEventListener('pointerdown', (ev) => {
+        if (this._desktopGesture || (this._deskSlide && this._deskSlide.busy)) {
+          if (this.controls) this.controls.enabled = false;
+          return;
+        }
+        const p = this._eventClientPoint(ev);
+        if (p && this._pointInDesktopSwipeZone(p.x, p.y, ev)) {
+          if (this.controls) this.controls.enabled = false;
+        } else if (!this._desktopGesture && !this.state.desktopStudioOpen && !this.state.firstRunSetupOpen) {
+          if (this.controls && this._shouldShowCar()) this.controls.enabled = true;
+        } else if (this.controls && this.state.firstRunSetupOpen) {
+          this.controls.enabled = false;
+        }
+      }, { capture: true });
       renderer.domElement.addEventListener('touchstart', this._desktopGestureHandlers.start, { passive: true });
       renderer.domElement.addEventListener('touchmove', this._desktopGestureHandlers.move, { passive: true });
       renderer.domElement.addEventListener('touchend', this._desktopGestureHandlers.end, { passive: true });
@@ -26864,8 +27257,12 @@ class Component extends DCLogic {
         // the refine pass's own trailing frames - see _setResTier.
         this._extRenderSeq = (this._extRenderSeq || 0) + 1;
       };
-      controls.addEventListener('change', () => this.requestRender(2));
+      controls.addEventListener('change', () => {
+        if (!this.controls || !this.controls.enabled || this._desktopGesture) return;
+        this.requestRender(2);
+      });
       controls.addEventListener('start', () => {
+        if (!this.controls || !this.controls.enabled || this._desktopGesture) return;
         this._cancelCenterHold();
         this._camCycleElapsed = 0;
         if (this._camEventKind && this._camEventKind !== 'user') {
@@ -28035,7 +28432,7 @@ class Component extends DCLogic {
         }
         this._syncCamOrbit();
         // controls.update() must run every frame for damping; true = camera moved
-        if (controls.update()) {
+        if (controls.enabled && !this._desktopGesture && controls.update()) {
           cameraBusy = true;
           needRender = true;
           this._postFxDirty = true;
@@ -28046,7 +28443,7 @@ class Component extends DCLogic {
         // Skipped while a tween or the intro owns the camera — those drive
         // target themselves, and a pose they are heading for may legitimately
         // sit off the car centre until they land.
-        if (!this._camAnim && !this._introActive && this._rebaseOrbitPan()) {
+        if (!this._desktopGesture && !this._camAnim && !this._introActive && this._rebaseOrbitPan()) {
           needRender = true;
           this._postFxDirty = true;
         }
@@ -33857,6 +34254,14 @@ class Component extends DCLogic {
     this._widgetRevealTimer = setTimeout(() => {
       document.body.classList.remove('hv-boot');
     }, immediate ? 0 : afterFade + 2000);
+
+    if (!this._introActive) {
+      this._checkFirstRunSetup();
+    } else {
+      setTimeout(() => {
+        this._checkFirstRunSetup();
+      }, 3500);
+    }
   }
 
   _shouldShowCar() {
@@ -34145,6 +34550,7 @@ class Component extends DCLogic {
       }
       if (this.controls) this.controls.enabled = false;
       this._setCarSceneVisible(false);
+      if (this.state && this.state.hotspotsChrome) this.setState({ hotspotsChrome: false });
       return;
     }
     // Car layout is active and loading is done.
@@ -34424,6 +34830,7 @@ class Component extends DCLogic {
     // First honest desktop photograph: after the intro has actually settled
     // and the widget boards are on screen (hv-boot clears ~2s after splash).
     this._scheduleDesktopShot(3500);
+    this._checkFirstRunSetup();
   }
 
   _tickIntro(dt) {
@@ -34906,7 +35313,8 @@ class Component extends DCLogic {
     const seen = {};
     // v15 merged the old Tires rail card into Vehicle status. Migrate saved
     // desktops losslessly and deduplicate when both cards used to be enabled.
-    const source = Array.isArray(raw) ? raw.map((id) => id === 'tires' ? 'status' : id) : [];
+    // Desktops card is refactored into the wallpaper card.
+    const source = Array.isArray(raw) ? raw.map((id) => id === 'tires' ? 'status' : (id === 'desktops' ? 'wallpaper' : id)) : [];
     const next = source.filter((id) => {
       const key = String(id || '');
       if (seen[key] || allowed.indexOf(key) < 0) return false;
@@ -35248,9 +35656,11 @@ class Component extends DCLogic {
     const d = this._desktops && this._desktops[index];
     if (!d) return null;
     const shot = this._desktopShots && this._desktopShots[d.id];
-    // Only a matching settled frame — stale intro/splash captures must not
-    // stand in for the real desktop.
+    // Exact signature match: current desktop layout/wallpaper/accent
     if (shot && shot.url && shot.sig === this._desktopShotSig(d)) return shot;
+    // Stale / slightly modified signature: still usable for swipe animation
+    // — much better than showing a blank/fallback box during motion.
+    if (shot && typeof shot.url === 'string' && shot.url.indexOf('data:image/') === 0) return shot;
     return null;
   }
 
@@ -35309,8 +35719,14 @@ class Component extends DCLogic {
       pane.style.backgroundImage = 'url("' + shot.url + '")';
       pane.classList.add('has-shot');
     } else {
-      pane.style.backgroundImage = '';
-      pane.classList.remove('has-shot');
+      const wall = this._desktopWallpaperEntry ? this._desktopWallpaperEntry(d) : null;
+      if (wall && wall.url) {
+        pane.style.backgroundImage = 'url("' + String(wall.url).replace(/'/g, '%27') + '")';
+        pane.classList.add('has-shot');
+      } else {
+        pane.style.backgroundImage = '';
+        pane.classList.remove('has-shot');
+      }
     }
   }
 
@@ -35431,6 +35847,9 @@ class Component extends DCLogic {
     }
     this._deskSlide = null;
     this._deskSlideClearDots();
+    if (this.controls && !this._desktopGesture && !this.state.desktopStudioOpen && !this.state.firstRunSetupOpen && this._shouldShowCar()) {
+      this.controls.enabled = true;
+    }
   }
 
   /**
@@ -35564,8 +35983,16 @@ class Component extends DCLogic {
     this._desktopShotReqs = {};
     this._desktopShotSeq = 0;
     try {
-      const raw = JSON.parse(localStorage.getItem(H6_DESKTOP_SHOTS_KEY) || '{}');
-      this._desktopShots = raw && typeof raw === 'object' ? raw : {};
+      const v2 = JSON.parse(localStorage.getItem(H6_DESKTOP_SHOTS_KEY) || 'null');
+      if (v2 && typeof v2 === 'object' && Object.keys(v2).length) {
+        this._desktopShots = v2;
+      } else {
+        const v1 = JSON.parse(localStorage.getItem('h6_desktop_shots_v1') || '{}');
+        this._desktopShots = v1 && typeof v1 === 'object' ? v1 : {};
+        if (Object.keys(this._desktopShots).length) {
+          this._saveDesktopShots();
+        }
+      }
     } catch (e) {
       this._desktopShots = {};
     }
@@ -35573,6 +36000,24 @@ class Component extends DCLogic {
 
   _saveDesktopShots() {
     try { localStorage.setItem(H6_DESKTOP_SHOTS_KEY, JSON.stringify(this._desktopShots || {})); } catch (e) {}
+  }
+
+  _desktopWallpaperEntry(d) {
+    if (!d) return null;
+    const fill = this._normalizeCenterFill ? this._normalizeCenterFill(d.centerFill) : d.centerFill;
+    if (fill === 'car') return null;
+    const dSource = ['bing', 'curated', 'web', 'favorites'].indexOf(d.wallpaperSource) >= 0 ? d.wallpaperSource : 'bing';
+    if (dSource === 'web') {
+      return d.wallpaperWebUrl ? { url: d.wallpaperWebUrl } : null;
+    }
+    const entries = this._sourceEntries ? this._sourceEntries(dSource) : null;
+    if (!entries || !entries.length) return null;
+    const auto = d.wallpaperAuto !== false;
+    const idx = (auto && dSource === 'bing')
+      ? 0
+      : (dSource === 'curated' ? (d.wallpaperCuratedIdx || 0)
+        : (dSource === 'favorites' ? (d.wallpaperFavoritesIdx || 0) : (d.wallpaperIdx || 0)));
+    return entries[idx % entries.length] || null;
   }
 
   _desktopWallpaperSig(d) {
@@ -35694,12 +36139,12 @@ class Component extends DCLogic {
     this._desktopShotTimer = setTimeout(() => {
       if (this._desktopShotBlocked()) {
         this._desktopShotTries = (this._desktopShotTries || 0) + 1;
-        if (this._desktopShotTries < 30) this._scheduleDesktopShot(2500);
+        if (this._desktopShotTries < 30) this._scheduleDesktopShot(2000);
         return;
       }
       this._desktopShotTries = 0;
       this._requestDesktopShot();
-    }, delay == null ? 3500 : delay);
+    }, delay == null ? 2000 : delay);
   }
 
   _setStudioTab(tab) {
@@ -36466,11 +36911,9 @@ class Component extends DCLogic {
       trackSlide: true,
       controlsEnabled: this.controls ? this.controls.enabled !== false : null,
     };
-    // Outside the car disc, this press is a desktop swipe — don't let orbit
-    // steal the first 18 px of travel.
-    if (this.controls && !this._desktopGesture.fromBoard) {
-      this.controls.enabled = false;
-    }
+    // Outside the car disc, this press is a desktop swipe — disable orbit
+    // for the entire gesture duration regardless of which zone it started in.
+    if (this.controls) this.controls.enabled = false;
   }
 
   _onDesktopGestureMove(ev) {
@@ -36495,6 +36938,9 @@ class Component extends DCLogic {
       }
     }
     if (!g.trackSlide || !g.moved) return;
+    // Keep controls locked for the whole gesture, even if something re-enabled
+    // them between start and this move event.
+    if (this.controls && this.controls.enabled) this.controls.enabled = false;
     // Need a clear horizontal intent before arming the slide layers.
     if (!this._deskSlide) {
       if (Math.abs(dx) < 18 || Math.abs(dx) < Math.abs(dy) * 1.1) return;
@@ -36531,7 +36977,13 @@ class Component extends DCLogic {
   _onDesktopGestureEnd(ev) {
     const g = this._desktopGesture;
     this._desktopGesture = null;
-    if (g && this.controls && g.controlsEnabled != null) this.controls.enabled = g.controlsEnabled;
+    // Only restore controls immediately when no slide animation is flying.
+    // If a slide was committed or is busy, _deskSlideTeardown restores controls
+    // once the animation finishes, avoiding a camera jump mid-slide.
+    const slideFlying = g && (g.slideCommitted || (this._deskSlide && this._deskSlide.busy));
+    if (g && this.controls && g.controlsEnabled != null && !slideFlying) {
+      this.controls.enabled = g.controlsEnabled;
+    }
     if (!g) return;
     if (g.slideCommitted) return;
     const p = this._eventClientPoint(ev);
@@ -36570,7 +37022,11 @@ class Component extends DCLogic {
   _onDesktopGestureCancel() {
     const g = this._desktopGesture;
     this._desktopGesture = null;
-    if (g && this.controls && g.controlsEnabled != null) this.controls.enabled = g.controlsEnabled;
+    // Defer controls restore to _deskSlideTeardown when a slide is in flight.
+    const slideFlying = g && (g.slideCommitted || (this._deskSlide && this._deskSlide.busy));
+    if (g && this.controls && g.controlsEnabled != null && !slideFlying) {
+      this.controls.enabled = g.controlsEnabled;
+    }
     if (g && g.slideCommitted) return;
     if (this._deskSlide && !this._deskSlide.busy) this._deskSlideCancel(this._deskSlide.dx || 0);
   }
@@ -41380,6 +41836,7 @@ class Component extends DCLogic {
     const desktopCount = Math.max(1, this._desktops ? this._desktops.length : 1);
     const activeDesktopName = this._desktops && this._desktops[activeDesktopIndex]
       ? this._desktops[activeDesktopIndex].name : 'Drive';
+    const fill = this._normalizeCenterFill(s.centerFill);
     const percent = (value, fallback) => {
       const parsed = parseFloat(String(value == null ? '' : value).replace(',', '.'));
       return isFinite(parsed) ? Math.max(0, Math.min(100, Math.round(parsed))) : fallback;
@@ -41456,6 +41913,7 @@ class Component extends DCLogic {
       tires: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / ')
         + (tires.tiresHasAnyPressure ? ' ' + tires.tiresUnit : ''),
       clock: clock.clockTime + ' · ' + clock.clockDate,
+      wallpaper: fill === 'car' ? '3D' : (fill === 'wallpaper' ? 'Wallpaper' : 'Both'),
       desktops: activeDesktopName,
       driveMode: driveModeVisual.primary,
       powerMode: powerModeVisual.primary,
@@ -41580,12 +42038,21 @@ class Component extends DCLogic {
         dateSpineFormat: bottomClock.dateSpineFormat,
         dateWording: bottomClock.dateWording,
       },
-      desktops: {
-        primary: activeDesktopName,
-        secondary: (activeDesktopIndex + 1) + ' OF ' + desktopCount,
-        metricA: 'WORKSPACE',
+      wallpaper: {
+        primary: fill === 'car' ? '3D' : (fill === 'wallpaper' ? 'Wallpaper' : 'Both'),
+        secondary: fill === 'car' ? '3D MODEL' : (fill === 'wallpaper' ? (s.wallpaperSource ? s.wallpaperSource.toUpperCase() : 'WALLPAPER') : '3D + WALLPAPER'),
+        metricA: 'DISPLAY',
         metricB: '',
-        progress: Math.round((activeDesktopIndex + 1) * 100 / desktopCount),
+        progress: fill === 'car' ? 33 : (fill === 'wallpaper' ? 66 : 100),
+        state: fill,
+      },
+      desktops: {
+        primary: fill === 'car' ? '3D' : (fill === 'wallpaper' ? 'Wallpaper' : 'Both'),
+        secondary: fill === 'car' ? '3D MODEL' : (fill === 'wallpaper' ? (s.wallpaperSource ? s.wallpaperSource.toUpperCase() : 'WALLPAPER') : '3D + WALLPAPER'),
+        metricA: 'DISPLAY',
+        metricB: '',
+        progress: fill === 'car' ? 33 : (fill === 'wallpaper' ? 66 : 100),
+        state: fill,
       },
       media: {
         primary: media.mediaTitle,
@@ -41608,6 +42075,8 @@ class Component extends DCLogic {
       range: range.rangeSource,
       power: power.powerSource,
       status: status.statusSource,
+      wallpaper: false,
+      desktops: false,
       tires: tires.tiresOverallState === 'demo',
       driveMode: driveModeVisual.secondary,
       powerMode: powerModeVisual.secondary,
@@ -42452,7 +42921,8 @@ class Component extends DCLogic {
     const stageControlBottom = boardTop + boardHeight;
     const holdAddWidget = !appsOnly && !slotPick && !pickerOpen && !addOn;
     const widgetFlowOpen = !appsOnly && (slotPick || pickerOpen || addOn);
-    const stageControlsVisible = android && onMain && !appsOnly && !widgetFlowOpen
+    const isWallpaper = this._normalizeCenterFill(s.centerFill) === 'wallpaper';
+    const stageControlsVisible = android && onMain && !appsOnly && !isWallpaper && !widgetFlowOpen
       && !s.desktopStudioOpen && !s.focusedCardType && !s.panelOpen && s.hotspotsChrome ? 'flex' : 'none';
     const pickClass = slotPick ? 'slot-picking' : (
       (!appsOnly && s.widgetPlaceType && !s.widgetPickerStep && s.widgetPlaceW && s.widgetPlaceH) ? 'placing' : ''
@@ -42510,8 +42980,8 @@ class Component extends DCLogic {
       centerSlotTop: centerRect.top,
       centerSlotWidth: centerRect.width,
       centerSlotHeight: centerRect.height,
-      stageAestheticDisplay: stageControlsVisible,
-      stageCameraDisplay: stageControlsVisible,
+      stageAestheticDisplay: isWallpaper ? 'none' : stageControlsVisible,
+      stageCameraDisplay: isWallpaper ? 'none' : stageControlsVisible,
       // One row: config takes the slot nearest the widgets, camera sits to its
       // right. The camera moves rather than the config, because stageControlLeft
       // is already the leftmost x that does not cover a card.
@@ -43335,6 +43805,9 @@ class Component extends DCLogic {
     } catch (e) {}
     if (this.state && this.state.powertrainOn) {
       this._applyPowertrainVisibility(true);
+    }
+    if (!this._hasCompletedSetup()) {
+      setTimeout(() => this._checkFirstRunSetup(), 400);
     }
   }
 
