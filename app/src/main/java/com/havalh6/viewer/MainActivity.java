@@ -190,7 +190,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v58-range-toggle-width";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v59-range-oem-fallback";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -10855,7 +10855,7 @@ public final class MainActivity extends Activity {
             if ("power".equals(id)) glyphText = sanitizePowerDirections(raw.optString("glyphText", ""));
             java.util.List<QuickMenuRow> menu = parseQuickMenu(raw.optJSONArray("menu"));
             String state = "range".equals(id)
-                    ? ("linear".equalsIgnoreCase(raw.optString("state", "")) ? "linear" : "gauge")
+                    ? ("gauge".equalsIgnoreCase(raw.optString("state", "")) ? "gauge" : "linear")
                     : ("tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
                             raw.optString("tireState", "unavailable")))
