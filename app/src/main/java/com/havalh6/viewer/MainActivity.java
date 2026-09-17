@@ -1343,13 +1343,12 @@ public final class MainActivity extends Activity {
             if(known){String[] parts=token.split(",");front=Integer.parseInt(parts[0]);rear=Integer.parseInt(parts[1]);ice=Integer.parseInt(parts[2]);}
             boolean awd="phev34".equals(variant),hev="hev2".equals(variant);
             if(!awd)rear=0;
-            int cropX=awd?398:hev?774:20;
             float fit=Math.min(w/770f,h/350f)*.96f;
             int saved=c.save();
             c.translate(w*.5f,h*.5f);c.scale(fit,fit);c.rotate(90f);c.translate(-175f,-385f);
             if(car!=null){
                 oval.set(0,0,350,770);fill(0xFFFFFFFF);paint.setFilterBitmap(true);
-                c.drawBitmap(car,new android.graphics.Rect(cropX,158,cropX+350,928),oval,paint);
+                c.drawBitmap(car,null,oval,paint);
                 paint.setFilterBitmap(false);
             }
             boolean incoming=front<0||rear<0,outgoing=front>0||rear>0;
@@ -1451,11 +1450,11 @@ public final class MainActivity extends Activity {
 
         /** Cache successful and failed top-down chassis loads once per variant. */
         private Bitmap getPowerChassisBitmap(String variant) {
-            String key = "approved-atlas";
+            String key = "approved-" + variant;
             if (powerGhostBitmaps.containsKey(key)) return powerGhostBitmaps.get(key);
             Bitmap bitmap = null;
             try (InputStream stream = getAssets().open(
-                    "www/assets/power/graphics/approved-chassis-atlas.png")) {
+                    "www/assets/power/graphics/approved-" + variant + "-chassis.png")) {
                 bitmap = BitmapFactory.decodeStream(stream);
             } catch (IOException | RuntimeException error) {
                 Log.w(TAG, "Optional Power top-down chassis asset unavailable", error);
