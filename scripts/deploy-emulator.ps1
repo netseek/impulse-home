@@ -31,7 +31,7 @@ Grant-CarHitAccessibility $Adb $serial
 
 if (-not $NoLaunch) {
   Write-Host 'Launching viewer ...'
-  & $Adb -s $serial shell am start -n $CarActivity
+  & $Adb -s $serial shell am start -S -n $CarActivity
 }
 
 Write-Host "Done. serial=$serial avd=$($HavalAvdName)"

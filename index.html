@@ -1797,8 +1797,6 @@ window.HavalSplash = (function () {
     .hv-wallpaper-pop-strip-head {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
       margin-bottom: 8px;
       flex-shrink: 0;
     }
@@ -1808,33 +1806,6 @@ window.HavalSplash = (function () {
       letter-spacing: .12em;
       color: var(--hv-widget-fg);
       opacity: .68;
-    }
-    .hv-wallpaper-pop-strip-steppers {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .hv-wallpaper-pop-step {
-      width: 28px;
-      height: 24px;
-      border-radius: 6px;
-      border: 1px solid var(--hv-widget-border);
-      background: var(--hv-control-fill, rgba(255,255,255,.06));
-      color: var(--hv-widget-fg);
-      font-size: 10px;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      touch-action: manipulation;
-      transition: border-color .15s ease, background-color .15s ease, color .15s ease;
-    }
-    .hv-wallpaper-pop-step:hover,
-    .hv-wallpaper-pop-step:active {
-      border-color: var(--hv-accent);
-      color: var(--hv-accent);
-      background: rgba(255,255,255,.12);
     }
     .hv-wallpaper-pop-strip {
       display: grid;
@@ -1846,12 +1817,13 @@ window.HavalSplash = (function () {
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
       overscroll-behavior: contain;
-      padding: 2px 4px 12px;
+      scroll-behavior: smooth;
+      padding: 2px 4px 14px;
       margin: 0 -2px 8px;
       scrollbar-width: none;
       -ms-overflow-style: none;
-      -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 26px), transparent 100%);
-      mask-image: linear-gradient(to bottom, black calc(100% - 26px), transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent 100%);
+      mask-image: linear-gradient(to bottom, black calc(100% - 28px), transparent 100%);
       flex-shrink: 0;
     }
     .hv-wallpaper-pop-strip::-webkit-scrollbar { display: none; }
@@ -6295,10 +6267,6 @@ window.HavalSplash = (function () {
     </div>
     <div class="hv-wallpaper-pop-strip-head">
       <span class="hv-wallpaper-pop-strip-label">{{ wallpaperStripLabel }}</span>
-      <div class="hv-wallpaper-pop-strip-steppers">
-        <button type="button" class="hv-wallpaper-pop-step" onClick="{{ wallpaperScrollUp }}" title="Scroll up" aria-label="Scroll up">▲</button>
-        <button type="button" class="hv-wallpaper-pop-step" onClick="{{ wallpaperScrollDown }}" title="Scroll down" aria-label="Scroll down">▼</button>
-      </div>
     </div>
     <div class="hv-wallpaper-pop-strip">
       <sc-for list="{{ wallpaperStripItems }}" as="wt" hint-placeholder-count="6">
@@ -14818,14 +14786,6 @@ class Component extends DCLogic {
       toggleWallpaperRandomOnStart: () => this._toggleWallpaperRandomOnStart(source),
       wallpaperStripLabel: stripLabel,
       wallpaperStripItems: stripItems,
-      wallpaperScrollUp: () => {
-        const el = document.querySelector('.hv-wallpaper-pop-strip');
-        if (el) el.scrollBy({ top: -140, behavior: 'smooth' });
-      },
-      wallpaperScrollDown: () => {
-        const el = document.querySelector('.hv-wallpaper-pop-strip');
-        if (el) el.scrollBy({ top: 140, behavior: 'smooth' });
-      },
       wallpaperUseToday: () => this._useTodayWallpaper(),
       centerFillCarBorder: carBtn.border,
       centerFillCarBg: carBtn.bg,
