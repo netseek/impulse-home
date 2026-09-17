@@ -5469,15 +5469,149 @@ window.HavalSplash = (function () {
     .hv-status-2x1 .hv-status-body,.hv-status-3x1 .hv-status-body { grid-template-columns:minmax(116px,.7fr) minmax(160px,1.3fr); }
     .hv-status-2x2 .hv-status-body,.hv-status-3x2 .hv-status-body { grid-template-columns:minmax(150px,.85fr) minmax(190px,1.15fr); }
 
-    .hv-range-card { width:100%; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
-    .hv-range-body { height:calc(100% - 26px); display:grid; grid-template-columns:minmax(94px,.76fr) minmax(130px,1.24fr); align-items:center; gap:14px; }
-    .hv-range-total { min-width:0; }.hv-range-total span,.hv-range-soc span,.hv-range-legend span { display:block; font:7px/1 'Space Mono',monospace; letter-spacing:.09em; opacity:.56; }.hv-range-total strong { display:block; margin:5px 0 3px; font-size:clamp(32px,6vw,52px); font-weight:390; line-height:.82; letter-spacing:-.07em; font-variant-numeric:tabular-nums; white-space:nowrap; }.hv-range-total small { font:8px/1 'Space Mono',monospace; letter-spacing:.08em; color:var(--hv-readable-accent,var(--hv-accent)); }
-    .hv-range-detail { min-width:0; display:grid; gap:9px; }.hv-range-soc { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }.hv-range-soc strong { font-size:15px; font-weight:560; font-variant-numeric:tabular-nums; }.hv-range-split { height:10px; display:flex; overflow:hidden; border:1px solid var(--hv-widget-border); border-radius:999px; background:rgba(255,255,255,.07); box-shadow:inset 0 1px 2px rgba(0,0,0,.18); }.hv-range-split i { display:block; min-width:0; transition:width .28s ease; }.hv-range-split .ev { background:var(--hv-accent); box-shadow:0 0 12px rgba(99,217,231,.34); }.hv-range-split .fuel { background:rgba(237,245,250,.48); }
-    .hv-range-legend { display:grid; grid-template-columns:1fr 1fr; gap:8px; }.hv-range-legend > div { min-width:0; padding:7px 8px; border-radius:10px; background:rgba(255,255,255,.04); }.hv-range-legend strong { display:block; margin-top:4px; font-size:16px; line-height:1; font-weight:560; font-variant-numeric:tabular-nums; white-space:nowrap; }.hv-range-legend .ev strong { color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-legend small { margin-left:2px; font:7px/1 'Space Mono',monospace; opacity:.56; }
+    .hv-range-card { width:100%; height:100%; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; box-sizing:border-box; font-family:'Space Mono',monospace; }
+    .hv-range-body { height:calc(100% - 22px); display:flex; flex-direction:column; justify-content:space-between; }
+    .hv-range-total { min-width:0; }
+    .hv-range-total > span:first-child, .hv-range-total-lbl { display:block; font:11px/1.2 'Space Mono',monospace; letter-spacing:.09em; opacity:.7; text-transform:uppercase; }
+    .hv-range-num-wrap { display:flex; align-items:baseline; gap:6px; }
+    .hv-range-total strong { display:block; margin:2px 0; font-size:38px; font-weight:700; line-height:.88; letter-spacing:-.05em; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .hv-range-total small { font:12px/1 'Space Mono',monospace; letter-spacing:.08em; color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); font-weight:700; }
+    .hv-range-total strong * { font-size:inherit !important; line-height:inherit !important; font-weight:inherit !important; color:inherit !important; text-shadow:inherit !important; }
+    .hv-range-total small * { font-size:inherit !important; line-height:inherit !important; font-weight:inherit !important; color:inherit !important; }
+    .hv-range-split { height:10px; display:flex; overflow:hidden; border:1px solid var(--hv-widget-border); border-radius:999px; background:rgba(255,255,255,.06); box-shadow:inset 0 1px 2px rgba(0,0,0,.18); margin:6px 0; }
+    .hv-range-split i { display:block; min-width:0; transition:width .35s ease; height:100%; }
+    .hv-range-split .ev { background:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); box-shadow:0 0 10px rgba(0,180,216,.38); }
+    .hv-range-split .fuel { background:#f2994a; box-shadow:0 0 10px rgba(242,153,74,.38); }
+    .hv-range-legend { display:grid; grid-template-columns:1fr 1fr; gap:8px; min-width:0; }
+    .hv-range-legend > div { min-width:0; overflow:hidden; padding:7px 9px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid var(--hv-widget-border); display:flex; flex-direction:column; gap:3px; }
+    .hv-range-legend .leg-head { display:flex; align-items:center; justify-content:space-between; font:700 10px/1 'Space Mono',monospace; letter-spacing:.08em; }
+    .hv-range-legend .ev .leg-head { color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); }
+    .hv-range-legend .fuel .leg-head { color:#f2994a; }
+    .hv-range-legend strong { font-size:16px; line-height:1.1; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; display:flex; align-items:baseline; gap:2px; }
+    .hv-range-legend strong small { font:10px/1 'Space Mono',monospace; font-weight:700; opacity:.7; }
+    .hv-range-legend .leg-sub { font:10px/1 'Space Mono',monospace; opacity:.65; letter-spacing:.04em; }
+
     .hv-range-card-1x1 { padding:10px; }
-    .hv-range-card-1x1 .hv-range-body { grid-template-columns:1fr; gap:7px; }.hv-range-card-1x1 .hv-range-total { display:grid; grid-template-columns:auto 1fr; align-items:baseline; column-gap:6px; }.hv-range-card-1x1 .hv-range-total span { grid-column:1 / -1; }.hv-range-card-1x1 .hv-range-total strong { margin:3px 0 0; font-size:31px; }.hv-range-card-1x1 .hv-range-total small { font-size:7px; }.hv-range-card-1x1 .hv-range-detail { gap:6px; }.hv-range-card-1x1 .hv-range-legend > div { padding:5px 6px; }.hv-range-card-1x1 .hv-range-legend strong { font-size:12px; }
-    .hv-range-card-2x2 { padding:18px; }.hv-range-card-2x2 .hv-range-body { grid-template-columns:minmax(170px,.76fr) minmax(270px,1.24fr); gap:26px; }.hv-range-card-2x2 .hv-range-total strong { margin:8px 0 5px; font-size:clamp(52px,7vw,76px); }.hv-range-card-2x2 .hv-range-detail { gap:14px; }.hv-range-card-2x2 .hv-range-soc strong { font-size:24px; }.hv-range-card-2x2 .hv-range-split { height:14px; }.hv-range-card-2x2 .hv-range-legend { gap:12px; }.hv-range-card-2x2 .hv-range-legend > div { padding:12px; border-radius:13px; }.hv-range-card-2x2 .hv-range-legend strong { margin-top:7px; font-size:26px; }
-    .hv-range-focus { min-height:calc(100% - 48px); padding:20px; border-radius:16px; background:linear-gradient(140deg,rgba(255,255,255,.065),rgba(255,255,255,.018)); }.hv-range-focus-hero { display:flex; align-items:end; justify-content:space-between; gap:20px; padding-bottom:18px; border-bottom:1px solid var(--hv-widget-border); }.hv-range-focus-kicker,.hv-range-focus-soc span,.hv-range-focus-cell span,.hv-range-focus-source { font:9px/1.2 'Space Mono',monospace; letter-spacing:.1em; opacity:.62; }.hv-range-focus-total strong { display:inline-block; margin-top:7px; font-size:clamp(54px,10vw,84px); font-weight:360; line-height:.8; letter-spacing:-.08em; font-variant-numeric:tabular-nums; }.hv-range-focus-total small { margin-left:7px; font:12px/1 'Space Mono',monospace; letter-spacing:.1em; color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-focus-soc { min-width:98px; padding:12px; border:1px solid var(--hv-widget-border); border-radius:13px; text-align:right; }.hv-range-focus-soc strong { display:block; margin-top:6px; font-size:25px; font-weight:530; font-variant-numeric:tabular-nums; }.hv-range-focus-split { margin:22px 0 10px; }.hv-range-focus-split .hv-range-split { height:18px; }.hv-range-focus-scale { display:flex; justify-content:space-between; font:8px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; }.hv-range-focus-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:22px; }.hv-range-focus-cell { padding:14px; border:1px solid var(--hv-widget-border); border-radius:14px; background:rgba(255,255,255,.035); }.hv-range-focus-cell strong { display:block; margin-top:8px; font-size:28px; line-height:.9; font-weight:470; font-variant-numeric:tabular-nums; }.hv-range-focus-cell.ev strong { color:var(--hv-readable-accent,var(--hv-accent)); }.hv-range-focus-cell small { margin-left:4px; font:9px/1 'Space Mono',monospace; opacity:.56; }.hv-range-focus-units { display:flex; gap:4px; margin:18px 0 -2px; }.hv-range-focus-units button { min-width:44px; min-height:30px; padding:0 9px; border:1px solid var(--hv-widget-border); border-radius:9px; color:inherit; background:rgba(255,255,255,.035); font:8px/1 'Space Mono',monospace; letter-spacing:.09em; cursor:pointer; }.hv-range-focus-units button.on { border-color:var(--hv-readable-accent,var(--hv-accent)); color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(99,217,231,.10); }.hv-range-focus-source { margin-top:18px; padding-top:14px; border-top:1px solid var(--hv-widget-border); }
+    .hv-range-card-2x1 { padding:14px; }
+    .hv-range-card-2x1 .hv-range-body { display:grid; grid-template-columns:120px 1fr; align-items:center; gap:14px; min-width:0; }
+    .hv-range-card-2x1 .hv-range-total { border-right:1px solid var(--hv-widget-border); padding-right:12px; min-width:0; }
+    .hv-range-card-2x1 .hv-range-total strong { font-size:44px; letter-spacing:-.05em; }
+    .hv-range-card-2x1 .hv-range-detail { display:flex; flex-direction:column; gap:8px; min-width:0; }
+
+    /* 2x2 Max Widget: Full-card gauge backgrounds */
+    .hv-range-card-2x2 { padding:18px; }
+    .hv-range-2x2-body { height:calc(100% - 24px); display:flex; flex-direction:column; justify-content:space-between; min-height:0; }
+    .hv-range-2x2-top { display:flex; align-items:flex-end; justify-content:space-between; padding-bottom:12px; border-bottom:1px solid var(--hv-widget-border); }
+    .hv-range-2x2-top .hv-range-total > span:first-child, .hv-range-2x2-top .hv-range-total-lbl { display:block; font:800 15px/1.2 'Space Mono',monospace; letter-spacing:.1em; color:var(--hv-widget-fg,#ffffff); opacity:.95; text-transform:uppercase; margin-bottom:6px; }
+    .hv-range-2x2-top .hv-range-total strong { font-size:66px; font-weight:800; line-height:.82; letter-spacing:-.06em; color:#ffffff; text-shadow:0 2px 14px rgba(0,0,0,.45); }
+    .hv-range-2x2-top .hv-range-total strong * { font-size:inherit !important; line-height:inherit !important; font-weight:inherit !important; color:inherit !important; text-shadow:inherit !important; }
+    .hv-range-2x2-top .hv-range-total small { font-size:18px; font-weight:800; color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); margin-left:5px; }
+    .hv-range-2x2-top .hv-range-total small * { font-size:inherit !important; line-height:inherit !important; font-weight:inherit !important; color:inherit !important; }
+    .hv-range-top-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+    .hv-range-12v-pill { display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:999px; border:1px solid var(--hv-widget-border, rgba(255,255,255,.16)); background:rgba(255,255,255,.06); font:700 11.5px/1 'Space Mono',monospace; color:var(--hv-widget-fg,#edf5fa); letter-spacing:.04em; }
+    .hv-range-12v-pill.charging { color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); border-color:rgba(0,180,216,.45); background:rgba(0,180,216,.1); }
+    .hv-range-12v-pill.low { color:#f2994a; border-color:rgba(242,153,74,.45); }
+    .hv-range-12v-pill.critical { color:#eb5757; border-color:rgba(235,87,87,.45); }
+    .hv-12v-icon { width:20px; height:12px; display:block; flex-shrink:0; }
+    .hv-12v-lbl { font-size:10px; opacity:.75; }
+    .hv-12v-val { font-size:11.5px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .hv-12v-sep { font-size:10px; opacity:.45; margin:0 -1px; }
+    .hv-12v-volt { font-size:11.5px; font-weight:700; opacity:.92; font-variant-numeric:tabular-nums; }
+    .hv-range-2x2-trackers { display:flex; flex-direction:column; gap:12px; margin:12px 0; }
+    
+    .hv-range-tracker { position:relative; overflow:hidden; border-radius:15px; border:1px solid var(--hv-widget-border); background:rgba(255,255,255,.035); }
+    .hv-range-gauge-bg { position:absolute; left:0; top:0; bottom:0; z-index:1; transition:width .35s cubic-bezier(.4,0,.2,1); border-right:3px solid rgba(255,255,255,.9); box-shadow:4px 0 18px rgba(0,0,0,.4); pointer-events:none; }
+    .hv-range-tracker.ev .hv-range-gauge-bg { background:linear-gradient(90deg, #016b77 0%, #00b4d8 100%); }
+    .hv-range-tracker.fuel .hv-range-gauge-bg { background:linear-gradient(90deg, #b85210 0%, #f2994a 100%); }
+    
+    .gauge-layer-base { position:relative; z-index:2; padding:13px 18px; display:flex; flex-direction:column; gap:8px; color:var(--hv-widget-fg,#edf5fa); }
+    #hv-root.light .gauge-layer-base { color:#111820; }
+    #hv-root.light .gauge-layer-base strong { color:#000000; }
+
+    .gauge-layer-fill { position:absolute; inset:0; z-index:3; padding:13px 18px; display:flex; flex-direction:column; gap:8px; color:#ffffff !important; pointer-events:none; text-shadow:0 1px 4px rgba(0,0,0,.45); }
+    .gauge-layer-fill span, .gauge-layer-fill strong, .gauge-layer-fill small { color:#ffffff !important; text-shadow:0 1px 4px rgba(0,0,0,.5); }
+
+    .hv-range-gauge-grid { display:grid; grid-template-columns:minmax(140px, 1.25fr) minmax(150px, 1.35fr) minmax(90px, 1fr); align-items:center; width:100%; box-sizing:border-box; }
+    .gauge-col { display:flex; flex-direction:column; min-width:0; }
+    .gauge-col.col-left { align-items:flex-start; gap:4px; }
+    .gauge-col.col-center { align-items:center; text-align:center; gap:2px; }
+    .gauge-col.col-right { align-items:flex-end; text-align:right; }
+
+    .gauge-name { font:800 16px/1.1 'Space Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }
+    .hv-range-tracker.ev .gauge-name { color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); }
+    .hv-range-tracker.fuel .gauge-name { color:#f2994a; }
+
+    .gauge-pct { font-size:32px; font-weight:800; line-height:1; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+    .hv-range-tracker.ev .gauge-pct { color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); }
+    .hv-range-tracker.fuel .gauge-pct { color:#f2994a; }
+
+    .gauge-sub { font:700 13px/1.2 'Space Mono',monospace; letter-spacing:.03em; opacity:.85; white-space:nowrap; }
+    .gauge-sub strong { opacity:1; font-weight:700; color:inherit; }
+
+    .gauge-col.col-right .val-grp { display:flex; align-items:baseline; gap:3px; font-variant-numeric:tabular-nums; }
+    .gauge-col.col-right .gauge-val { font-size:36px; font-weight:800; line-height:1; letter-spacing:-.04em; }
+    .gauge-col.col-right .gauge-unit { font:700 14px/1 'Space Mono',monospace; opacity:.85; }
+
+    .hv-range-2x2-foot { display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid var(--hv-widget-border); font:700 13.5px/1 'Space Mono',monospace; opacity:.92; letter-spacing:.05em; }
+    .hv-range-2x2-foot b.ev { color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); }
+    .hv-range-2x2-foot b.fuel { color:#f2994a; }
+    .hv-range-2x2-foot strong { color:var(--hv-widget-fg,#edf5fa); opacity:1; font-weight:700; }
+
+    /* Focus Modal Workspace - 2x2 Layout */
+    .hv-card-focus.range-popup { width:min(640px,calc(100vw - 48px)); }
+    .hv-range-focus { padding:0; border-radius:18px; font-family:'Space Mono',monospace; }
+    .hv-range-focus .hv-range-2x2-body { border-radius:18px; background:linear-gradient(140deg,rgba(255,255,255,.065),rgba(255,255,255,.018)); padding:18px; }
+    .hv-card-focus-head .hv-range-toggle-group { width:auto !important; max-width:none !important; height:38px !important; display:inline-flex; align-items:center; gap:10px; padding:0 14px; margin-left:auto; margin-right:8px; background:rgba(255,255,255,.05); border:1px solid var(--hv-widget-border, rgba(255,255,255,.16)); border-radius:999px; cursor:pointer; color:var(--hv-widget-fg,#edf5fa); transition:all .2s ease; -webkit-tap-highlight-color:transparent; flex-shrink:0; box-sizing:border-box; }
+    .hv-card-focus-head .hv-range-toggle-group:hover, .hv-card-focus-head .hv-range-toggle-group:active { background:rgba(255,255,255,.11); border-color:rgba(255,255,255,.28); }
+    .hv-card-focus-head .hv-range-toggle-group.on { background:rgba(0,180,216,.12); border-color:rgba(0,180,216,.45); box-shadow:0 0 12px rgba(0,180,216,.2); }
+    .hv-range-toggle-label { font:700 12px/1 'Space Mono',monospace; letter-spacing:.03em; opacity:.92; white-space:nowrap; }
+    .hv-range-toggle-control { display:inline-flex; align-items:center; gap:8px; }
+    .hv-range-toggle-track { width:36px; height:20px; border-radius:999px; background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.26); position:relative; transition:all .22s cubic-bezier(.4,0,.2,1); box-sizing:border-box; flex-shrink:0; }
+    .hv-range-toggle-group.on .hv-range-toggle-track { background:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); border-color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); box-shadow:0 0 10px rgba(0,180,216,.4); }
+    .hv-range-toggle-thumb { width:14px; height:14px; border-radius:50%; background:#ffffff; box-shadow:0 1px 4px rgba(0,0,0,.35); position:absolute; top:2px; left:2px; transition:transform .22s cubic-bezier(.4,0,.2,1); }
+    .hv-range-toggle-group.on .hv-range-toggle-thumb { transform:translateX(16px); }
+    .hv-range-toggle-state { font:800 11.5px/1 'Space Mono',monospace; letter-spacing:.06em; min-width:26px; text-align:left; opacity:.65; }
+    .hv-range-toggle-group.on .hv-range-toggle-state { color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); opacity:1; text-shadow:0 0 8px rgba(0,180,216,.4); }
+    #hv-root.light .hv-card-focus-head .hv-range-toggle-group { background:rgba(0,0,0,.04); border-color:rgba(0,0,0,.15); color:#111820; }
+    #hv-root.light .hv-range-toggle-track { background:rgba(0,0,0,.15); border-color:rgba(0,0,0,.22); }
+    #hv-root.light .hv-range-toggle-thumb { background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+    .hv-range-tab-btn.selected.alt .tab-desc { color:#0c3144; opacity:.9; }
+    
+    .hv-range-data-pane { display:flex; flex-direction:column; gap:12px; }
+    .hv-range-cmp-card { background:rgba(255,255,255,.035); border:1px solid var(--hv-widget-border); border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+    .hv-range-cmp-head { display:flex; align-items:center; justify-content:space-between; }
+    .hv-range-cmp-title { font:700 11px/1 'Space Mono',monospace; letter-spacing:.1em; }
+    .hv-range-cmp-title.ev { color:var(--hv-readable-accent,#00b4d8); }
+    .hv-range-cmp-title.fuel { color:#f2994a; }
+    .hv-range-cmp-grid { display:grid; grid-template-columns:1fr 1fr 110px; align-items:baseline; gap:10px; }
+    .hv-range-cmp-cell { display:flex; flex-direction:column; gap:2px; }
+    .hv-range-cmp-cell .lbl { font:10px/1 'Space Mono',monospace; opacity:.6; letter-spacing:.06em; }
+    .hv-range-cmp-cell .val { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; }
+    .hv-range-cmp-cell .val.ev { color:var(--hv-readable-accent,#00b4d8); }
+    .hv-range-cmp-cell .val.fuel { color:#f2994a; }
+    .hv-range-delta-chip { font:700 11px/1 'Space Mono',monospace; padding:4px 8px; border-radius:6px; text-align:center; }
+    .hv-range-delta-chip.pos { background:rgba(34,197,94,.16); color:#22c55e; }
+    .hv-range-delta-chip.neg { background:rgba(244,63,94,.16); color:#f43f5e; }
+    
+    .hv-range-cmp-meter { height:6px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; position:relative; display:flex; }
+    .hv-range-cmp-meter .fill-oem { height:100%; opacity:.45; transition:width .35s ease; }
+    .hv-range-cmp-meter .fill-hist { height:100%; position:absolute; left:0; top:0; transition:width .35s ease; }
+    .hv-range-cmp-card.ev .fill-oem { background:#00b4d8; }
+    .hv-range-cmp-card.ev .fill-hist { background:#38bdf8; }
+    .hv-range-cmp-card.fuel .fill-oem { background:#f2994a; }
+    .hv-range-cmp-card.fuel .fill-hist { background:#fb923c; }
+
+    .hv-range-hero-total { background:rgba(255,255,255,.05); border:1px solid var(--hv-widget-border); border-radius:14px; padding:14px 18px; display:flex; flex-direction:column; gap:10px; }
+    .hv-range-hero-head { display:flex; align-items:center; justify-content:space-between; }
+    .hv-range-hero-head .lbl { font:700 11px/1 'Space Mono',monospace; letter-spacing:.12em; opacity:.7; text-transform:uppercase; }
+    .hv-range-hero-grid { display:grid; grid-template-columns:1fr 1fr 130px; align-items:baseline; gap:14px; }
+    .hv-range-hero-cell .lbl { font:10px/1 'Space Mono',monospace; opacity:.6; letter-spacing:.06em; margin-bottom:2px; }
+    .hv-range-hero-cell .num-wrap { display:flex; align-items:baseline; gap:4px; }
+    .hv-range-hero-cell .num { font-size:32px; font-weight:700; line-height:1; letter-spacing:-.05em; font-variant-numeric:tabular-nums; }
+    .hv-range-hero-cell .num.hist { color:#a78bfa; }
+    .hv-range-hero-cell .unit { font:700 11px/1 'Space Mono',monospace; color:var(--hv-readable-accent,#00b4d8); }
+    @keyframes altPulse { 0% { opacity:1; } 50% { opacity:.3; } 100% { opacity:1; } }
+    .hv-range-alt-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#38bdf8; margin-right:5px; animation:altPulse 1.2s infinite; }
 
 
     .hv-card-focus-backdrop { position:absolute; inset:0; z-index:84; opacity:0; pointer-events:none; background:rgba(2,6,10,.72); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); transition:opacity .2s ease; }
@@ -6018,7 +6152,128 @@ window.HavalSplash = (function () {
             <sc-if value="{{ wg.statusIsCompact }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-status {{ wg.statusSizeClass }}" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><div class="hv-glance-head"><span>STATUS DO VEÍCULO</span><small>{{ wg.statusSource }}</small></div><div class="hv-status-body"><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-tire-mark {{ st.markCls }}" aria-hidden="true"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-card-tire {{ st.cls }}"><span><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em></span><small>{{ st.temperature }}{{ st.temperatureUnit }}</small></i></sc-for></div></div><div class="hv-status-copy"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><span class="hv-status-subtitle">{{ wg.statusSubtitle }}</span><div class="hv-status-grid"><sc-for list="{{ wg.statusMetrics }}" as="sm" hint-placeholder-count="4"><div class="hv-status-cell"><span>{{ sm.label }}</span><strong class="{{ sm.cls }}">{{ sm.value }}</strong></div></sc-for></div></div></div></button></sc-if>
           </sc-if>
           <sc-if value="{{ wg.isRange }}" hint-placeholder-val="{{ false }}">
-            <button type="button" class="hv-range-card {{ wg.rangeSizeClass }}" onClick="{{ wg.onRangeOpen }}" aria-label="{{ wg.rangeAriaLabel }}"><div class="hv-glance-head"><span>RANGE</span><small>{{ wg.rangeSource }}</small></div><div class="hv-range-body"><div class="hv-range-total"><span>{{ wg.rangeTotalLabel }}</span><strong>{{ wg.rangeTotal }}</strong><small>{{ wg.rangeUnit }}</small></div><div class="hv-range-detail"><div class="hv-range-soc"><span>BATTERY SOC</span><strong>{{ wg.rangeSoc }}</strong></div><div class="hv-range-split" aria-hidden="true"><i class="ev" style="width:{{ wg.rangeEvPct }}%;"></i><i class="fuel" style="width:{{ wg.rangeFuelPct }}%;"></i></div><div class="hv-range-legend"><div class="ev"><span>EV</span><strong>{{ wg.rangeEv }}<small>{{ wg.rangeUnit }}</small></strong></div><div><span>FUEL</span><strong>{{ wg.rangeFuel }}<small>{{ wg.rangeUnit }}</small></strong></div></div></div></div></button>
+            <button type="button" class="hv-range-card {{ wg.rangeSizeClass }}" onClick="{{ wg.onRangeOpen }}" aria-label="{{ wg.rangeAriaLabel }}">
+              <div class="hv-glance-head"><span>{{ wg.rangeHeaderTitle }}</span><small>{{ wg.rangeSource }}</small></div>
+              <sc-if value="{{ wg.rangeIs2x2 }}" hint-placeholder-val="{{ false }}">
+                <div class="hv-range-2x2-body">
+                  <div class="hv-range-2x2-top">
+                    <div class="hv-range-total">
+                      <span class="hv-range-total-lbl">{{ wg.rangeTotalLabel }}</span>
+                      <div class="hv-range-num-wrap"><strong>{{ wg.rangeTotal }}</strong><small>{{ wg.rangeUnit }}</small></div>
+                    </div>
+                    <div class="hv-range-top-right">
+                      <div class="hv-range-12v-pill {{ wg.range12vClass }}">
+                        <svg viewBox="0 0 22 13" class="hv-12v-icon" aria-hidden="true">
+                          <rect x="1" y="2" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+                          <rect x="3.5" y="0.5" width="3.5" height="1.5" rx="0.5" fill="currentColor"></rect>
+                          <rect x="13" y="0.5" width="3.5" height="1.5" rx="0.5" fill="currentColor"></rect>
+                          <rect x="3" y="4" width="{{ wg.range12vFillW }}" height="6" rx="1" fill="currentColor" opacity="0.8"></rect>
+                        </svg>
+                        <span class="hv-12v-lbl">12V</span>
+                        <strong class="hv-12v-val">{{ wg.range12vPct }}%</strong>
+                        <span class="hv-12v-sep">·</span>
+                        <span class="hv-12v-volt">{{ wg.range12vVoltage }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="hv-range-2x2-trackers">
+                    <div class="hv-range-tracker ev">
+                      <div class="hv-range-gauge-bg" style="width:{{ wg.rangeSocVal }}%;"></div>
+                      <div class="gauge-layer-base">
+                        <div class="hv-range-gauge-grid">
+                          <div class="gauge-col col-left">
+                            <span class="gauge-name">BATERIA</span>
+                            <span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeEvConsume }}</strong></span>
+                          </div>
+                          <div class="gauge-col col-center">
+                            <strong class="gauge-pct">{{ wg.rangeSoc }}</strong>
+                            <span class="gauge-sub">{{ wg.rangeEvEnergy }}</span>
+                          </div>
+                          <div class="gauge-col col-right">
+                            <div class="val-grp"><strong class="gauge-val">{{ wg.rangeEv }}</strong><small class="gauge-unit">{{ wg.rangeUnit }}</small></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="gauge-layer-fill" style="clip-path:inset(0 {{ wg.rangeSocClipRight }} 0 0);-webkit-clip-path:inset(0 {{ wg.rangeSocClipRight }} 0 0);">
+                        <div class="hv-range-gauge-grid">
+                          <div class="gauge-col col-left">
+                            <span class="gauge-name">BATERIA</span>
+                            <span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeEvConsume }}</strong></span>
+                          </div>
+                          <div class="gauge-col col-center">
+                            <strong class="gauge-pct">{{ wg.rangeSoc }}</strong>
+                            <span class="gauge-sub">{{ wg.rangeEvEnergy }}</span>
+                          </div>
+                          <div class="gauge-col col-right">
+                            <div class="val-grp"><strong class="gauge-val">{{ wg.rangeEv }}</strong><small class="gauge-unit">{{ wg.rangeUnit }}</small></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="hv-range-tracker fuel">
+                      <div class="hv-range-gauge-bg" style="width:{{ wg.rangeFuelLvlVal }}%;"></div>
+                      <div class="gauge-layer-base">
+                        <div class="hv-range-gauge-grid">
+                          <div class="gauge-col col-left">
+                            <span class="gauge-name">COMBUSTÍVEL</span>
+                            <span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeFuelAvg }}</strong></span>
+                          </div>
+                          <div class="gauge-col col-center">
+                            <strong class="gauge-pct">{{ wg.rangeFuelLvl }}</strong>
+                            <span class="gauge-sub">{{ wg.rangeFuelVolume }}</span>
+                          </div>
+                          <div class="gauge-col col-right">
+                            <div class="val-grp"><strong class="gauge-val">{{ wg.rangeFuel }}</strong><small class="gauge-unit">{{ wg.rangeUnit }}</small></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="gauge-layer-fill" style="clip-path:inset(0 {{ wg.rangeFuelClipRight }} 0 0);-webkit-clip-path:inset(0 {{ wg.rangeFuelClipRight }} 0 0);">
+                        <div class="hv-range-gauge-grid">
+                          <div class="gauge-col col-left">
+                            <span class="gauge-name">COMBUSTÍVEL</span>
+                            <span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeFuelAvg }}</strong></span>
+                          </div>
+                          <div class="gauge-col col-center">
+                            <strong class="gauge-pct">{{ wg.rangeFuelLvl }}</strong>
+                            <span class="gauge-sub">{{ wg.rangeFuelVolume }}</span>
+                          </div>
+                          <div class="gauge-col col-right">
+                            <div class="val-grp"><strong class="gauge-val">{{ wg.rangeFuel }}</strong><small class="gauge-unit">{{ wg.rangeUnit }}</small></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="hv-range-2x2-foot">
+                    <span>DISTRIBUIÇÃO: <b class="ev">{{ wg.rangeEvPct }}%</b> BATERIA · <b class="fuel">{{ wg.rangeFuelPct }}%</b> COMBUSTÍVEL</span>
+                    <span>VIAGEM ESTIMADA: <strong>{{ wg.rangeTravelTime }}</strong></span>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ wg.rangeIsNot2x2 }}" hint-placeholder-val="{{ true }}">
+                <div class="hv-range-body">
+                  <div class="hv-range-total">
+                    <span>{{ wg.rangeTotalLabel }}</span>
+                    <div class="hv-range-num-wrap"><strong>{{ wg.rangeTotal }}</strong><small>{{ wg.rangeUnit }}</small></div>
+                  </div>
+                  <div class="hv-range-detail">
+                    <div class="hv-range-split" aria-hidden="true"><i class="ev" style="width:{{ wg.rangeEvPct }}%;"></i><i class="fuel" style="width:{{ wg.rangeFuelPct }}%;"></i></div>
+                    <div class="hv-range-legend">
+                      <div class="ev">
+                        <div class="leg-head"><span>ELECTRIC</span><span>{{ wg.rangeSoc }}</span></div>
+                        <strong>{{ wg.rangeEv }}<small>{{ wg.rangeUnit }}</small></strong>
+                        <span class="leg-sub">BATTERY SOC</span>
+                      </div>
+                      <div class="fuel">
+                        <div class="leg-head"><span>COMBUSTION</span><span>{{ wg.rangeFuelLvl }}</span></div>
+                        <strong>{{ wg.rangeFuel }}<small>{{ wg.rangeUnit }}</small></strong>
+                        <span class="leg-sub">FUEL TANK</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+            </button>
           </sc-if>
           <sc-if value="{{ wg.isDriving }}" hint-placeholder-val="{{ false }}">
             <div class="hv-driving {{ wg.drivingSizeClass }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
@@ -6462,7 +6717,7 @@ window.HavalSplash = (function () {
        CSS variables so it cannot cover the launcher/dock on Android. -->
   <div class="hv-card-focus-backdrop {{ focusedCardBackdropClass }}" onClick="{{ closeFocusedCard }}"></div>
   <section class="hv-card-focus {{ focusedCardPopupClass }}" role="dialog" aria-label="{{ focusedCardTitle }}">
-    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-card-focus-action {{ focusedConsumptionUnitsClass }}" onClick="{{ focusedConsumptionUnitsToggle }}" aria-expanded="{{ focusedConsumptionUnitsOpen }}">UNIDADES</button><button type="button" class="hv-card-focus-action hv-card-focus-max" onClick="{{ focusedConsumptionWideToggle }}" aria-label="{{ focusedConsumptionWideLabel }}"><sc-if value="{{ focusedConsumptionWideOn }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22,3.41l-5.29,5.29L20,12h-8V4l3.29,3.29L20.59,2L22,3.41z M3.41,22l5.29-5.29L12,20v-8H4l3.29,3.29L2,20.59L3.41,22z"></path></svg></sc-if><sc-if value="{{ focusedConsumptionWideOff }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21,11 L21,3 L13,3 L16.29,6.29 L6.29,16.29 L3,13 L3,21 L11,21 L7.71,17.71 L17.71,7.71 Z"></path></svg></sc-if></button></sc-if><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
+    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-card-focus-action {{ focusedConsumptionUnitsClass }}" onClick="{{ focusedConsumptionUnitsToggle }}" aria-expanded="{{ focusedConsumptionUnitsOpen }}">UNIDADES</button><button type="button" class="hv-card-focus-action hv-card-focus-max" onClick="{{ focusedConsumptionWideToggle }}" aria-label="{{ focusedConsumptionWideLabel }}"><sc-if value="{{ focusedConsumptionWideOn }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22,3.41l-5.29,5.29L20,12h-8V4l3.29,3.29L20.59,2L22,3.41z M3.41,22l5.29-5.29L12,20v-8H4l3.29,3.29L2,20.59L3.41,22z"></path></svg></sc-if><sc-if value="{{ focusedConsumptionWideOff }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21,11 L21,3 L13,3 L16.29,6.29 L6.29,16.29 L3,13 L3,21 L11,21 L7.71,17.71 L17.71,7.71 Z"></path></svg></sc-if></button></sc-if><sc-if value="{{ focusedCardIsRange }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-range-toggle-group {{ focusedRangeSourceModeClass }}" onClick="{{ focusedRangeToggleSourceMode }}" role="switch" aria-checked="{{ focusedRangeSourceIsOn }}" title="Alternar estimativas por histórico"><span class="hv-range-toggle-label">Usar estimativas por histórico</span><span class="hv-range-toggle-control"><span class="hv-range-toggle-track"><span class="hv-range-toggle-thumb"></span></span><span class="hv-range-toggle-state">{{ focusedRangeSourceStateText }}</span></span></button></sc-if><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
     <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}">
       <div class="hv-climate hv-climate-2x2">
         <div class="hv-climate-head"><span>CLIMATE</span><small>{{ focusedClimateCurrent }}</small></div><div role="status" style="font:7px/1.25 'Space Mono',monospace;letter-spacing:.06em;color:#f0bd65;margin:-1px 0 3px;">{{ focusedClimateHelper }}</div>
@@ -6664,7 +6919,102 @@ window.HavalSplash = (function () {
       </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsRange }}" hint-placeholder-val="{{ false }}">
-      <div class="hv-range-focus"><div class="hv-range-focus-hero"><div class="hv-range-focus-total"><span class="hv-range-focus-kicker">{{ focusedRangeTotalLabel }}</span><strong>{{ focusedRangeTotal }}</strong><small>{{ focusedRangeUnit }}</small></div><div class="hv-range-focus-soc"><span>BATTERY SOC</span><strong>{{ focusedRangeSoc }}</strong></div></div><div class="hv-range-focus-split"><div class="hv-range-split" role="img" aria-label="EV {{ focusedRangeEv }} {{ focusedRangeUnit }}, fuel {{ focusedRangeFuel }} {{ focusedRangeUnit }}"><i class="ev" style="width:{{ focusedRangeEvPct }}%;"></i><i class="fuel" style="width:{{ focusedRangeFuelPct }}%;"></i></div></div><div class="hv-range-focus-scale"><span>EV</span><span>FUEL</span></div><div class="hv-range-focus-grid"><div class="hv-range-focus-cell ev"><span>EV ESTIMATE</span><strong>{{ focusedRangeEv }}<small>{{ focusedRangeUnit }}</small></strong></div><div class="hv-range-focus-cell"><span>FUEL ESTIMATE</span><strong>{{ focusedRangeFuel }}<small>{{ focusedRangeUnit }}</small></strong></div></div><div class="hv-range-focus-units" role="group" aria-label="Distance unit"><button type="button" class="{{ focusedRangeUnitKmClass }}" onClick="{{ focusedRangeSetKm }}" aria-pressed="{{ focusedRangeUnitKmPressed }}">KM</button><button type="button" class="{{ focusedRangeUnitMiClass }}" onClick="{{ focusedRangeSetMi }}" aria-pressed="{{ focusedRangeUnitMiPressed }}">MI</button></div><div class="hv-range-focus-source" role="status">{{ focusedRangeSource }}</div></div>
+      <div class="hv-range-focus">
+        <div class="hv-range-2x2-body">
+          <div class="hv-range-2x2-top">
+            <div class="hv-range-total">
+              <span class="hv-range-total-lbl">{{ focusedRangeTotalLabel }}</span>
+              <div class="hv-range-num-wrap"><strong>{{ focusedRangeTotal }}</strong><small>{{ focusedRangeUnit }}</small></div>
+            </div>
+            <div class="hv-range-top-right">
+              <div class="hv-range-12v-pill {{ focusedRange12vClass }}">
+                <svg viewBox="0 0 22 13" class="hv-12v-icon" aria-hidden="true">
+                  <rect x="1" y="2" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+                  <rect x="3.5" y="0.5" width="3.5" height="1.5" rx="0.5" fill="currentColor"></rect>
+                  <rect x="13" y="0.5" width="3.5" height="1.5" rx="0.5" fill="currentColor"></rect>
+                  <rect x="3" y="4" width="{{ focusedRange12vFillW }}" height="6" rx="1" fill="currentColor" opacity="0.8"></rect>
+                </svg>
+                <span class="hv-12v-lbl">12V</span>
+                <strong class="hv-12v-val">{{ focusedRange12vPct }}%</strong>
+                <span class="hv-12v-sep">·</span>
+                <span class="hv-12v-volt">{{ focusedRange12vVoltage }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="hv-range-2x2-trackers">
+            <div class="hv-range-tracker ev">
+              <div class="hv-range-gauge-bg" style="width:{{ focusedRangeSocVal }}%;"></div>
+              <div class="gauge-layer-base">
+                <div class="hv-range-gauge-grid">
+                  <div class="gauge-col col-left">
+                    <span class="gauge-name">BATERIA</span>
+                    <span class="gauge-sub">MÉDIA: <strong>{{ focusedRangeEvConsume }}</strong></span>
+                  </div>
+                  <div class="gauge-col col-center">
+                    <strong class="gauge-pct">{{ focusedRangeSoc }}</strong>
+                    <span class="gauge-sub">{{ focusedRangeEvEnergy }}</span>
+                  </div>
+                  <div class="gauge-col col-right">
+                    <div class="val-grp"><strong class="gauge-val">{{ focusedRangeEv }}</strong><small class="gauge-unit">{{ focusedRangeUnit }}</small></div>
+                  </div>
+                </div>
+              </div>
+              <div class="gauge-layer-fill" style="clip-path:inset(0 {{ focusedRangeSocClipRight }} 0 0);-webkit-clip-path:inset(0 {{ focusedRangeSocClipRight }} 0 0);">
+                <div class="hv-range-gauge-grid">
+                  <div class="gauge-col col-left">
+                    <span class="gauge-name">BATERIA</span>
+                    <span class="gauge-sub">MÉDIA: <strong>{{ focusedRangeEvConsume }}</strong></span>
+                  </div>
+                  <div class="gauge-col col-center">
+                    <strong class="gauge-pct">{{ focusedRangeSoc }}</strong>
+                    <span class="gauge-sub">{{ focusedRangeEvEnergy }}</span>
+                  </div>
+                  <div class="gauge-col col-right">
+                    <div class="val-grp"><strong class="gauge-val">{{ focusedRangeEv }}</strong><small class="gauge-unit">{{ focusedRangeUnit }}</small></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="hv-range-tracker fuel">
+              <div class="hv-range-gauge-bg" style="width:{{ focusedRangeFuelLvlVal }}%;"></div>
+              <div class="gauge-layer-base">
+                <div class="hv-range-gauge-grid">
+                  <div class="gauge-col col-left">
+                    <span class="gauge-name">COMBUSTÍVEL</span>
+                    <span class="gauge-sub">MÉDIA: <strong>{{ focusedRangeFuelAvg }}</strong></span>
+                  </div>
+                  <div class="gauge-col col-center">
+                    <strong class="gauge-pct">{{ focusedRangeFuelLvl }}</strong>
+                    <span class="gauge-sub">{{ focusedRangeFuelVolume }}</span>
+                  </div>
+                  <div class="gauge-col col-right">
+                    <div class="val-grp"><strong class="gauge-val">{{ focusedRangeFuel }}</strong><small class="gauge-unit">{{ focusedRangeUnit }}</small></div>
+                  </div>
+                </div>
+              </div>
+              <div class="gauge-layer-fill" style="clip-path:inset(0 {{ focusedRangeFuelClipRight }} 0 0);-webkit-clip-path:inset(0 {{ focusedRangeFuelClipRight }} 0 0);">
+                <div class="hv-range-gauge-grid">
+                  <div class="gauge-col col-left">
+                    <span class="gauge-name">COMBUSTÍVEL</span>
+                    <span class="gauge-sub">MÉDIA: <strong>{{ focusedRangeFuelAvg }}</strong></span>
+                  </div>
+                  <div class="gauge-col col-center">
+                    <strong class="gauge-pct">{{ focusedRangeFuelLvl }}</strong>
+                    <span class="gauge-sub">{{ focusedRangeFuelVolume }}</span>
+                  </div>
+                  <div class="gauge-col col-right">
+                    <div class="val-grp"><strong class="gauge-val">{{ focusedRangeFuel }}</strong><small class="gauge-unit">{{ focusedRangeUnit }}</small></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="hv-range-2x2-foot">
+            <span>DISTRIBUIÇÃO: <b class="ev">{{ focusedRangeEvPct }}%</b> BATERIA · <b class="fuel">{{ focusedRangeFuelPct }}%</b> COMBUSTÍVEL</span>
+            <span>VIAGEM ESTIMADA: <strong>{{ focusedRangeTravelTime }}</strong></span>
+          </div>
+        </div>
+      </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsPower }}" hint-placeholder-val="{{ false }}">
       <div class="hv-power" data-power-size="popup">
@@ -7518,6 +7868,7 @@ const CAR_SIGNALS = {
   },
   // GRAPHS widget — Impulse evPowerKw = V * I / 1000.
   batteryVoltage: 'car.ev_info.power_battery_voltage',
+  battery12vVoltage: 'car.basic.battery_voltage',
   batteryCurrent: 'car.ev_info.cur_charge_current',
   fuelInst: 'car.basic.instant_fuel_consumption',
   evConsume: 'car.ev_info.Instant_energy_consumption',
@@ -8687,7 +9038,11 @@ class Component extends DCLogic {
     this.outerRef = React.createRef();
     this._customAccents = this._loadCustomAccents();
     try { this._rangeUnit = localStorage.getItem('h6_range_unit') === 'mi' ? 'mi' : 'km'; } catch (e) { this._rangeUnit = 'km'; }
-    // ENERGY units. Fuel defaults to km/L (owner, 2026-09-13); both are one preference
+    try { this._rangeCardStyle = localStorage.getItem('h6_range_card_style') === 'linear' ? 'linear' : 'gauge'; } catch (e) { this._rangeCardStyle = 'gauge'; }
+    try {
+      const savedRangeMode = localStorage.getItem('h6_range_source_mode');
+      this._rangeSourceMode = (savedRangeMode === 'hist' || savedRangeMode === 'alt') ? savedRangeMode : 'oem';
+    } catch (e) { this._rangeSourceMode = 'oem'; }
     // for every surface, so the rail, widget and popup never quote different units.
     try { this._energyFuelUnit = localStorage.getItem('h6_energy_fuel_unit') === 'l100' ? 'l100' : 'kml'; } catch (e) { this._energyFuelUnit = 'kml'; }
     try { this._energyEvUnit = localStorage.getItem('h6_energy_ev_unit') === 'kmkwh' ? 'kmkwh' : 'kwh100'; } catch (e) { this._energyEvUnit = 'kwh100'; }
@@ -9606,6 +9961,14 @@ class Component extends DCLogic {
     if (key === CAR_SIGNALS.speed) this._busSpeedCount = (this._busSpeedCount || 0) + 1;
     // Auto day/night follows headlights — ignore MMI theme (`isNight`).
     if (key === CAR_SIGNALS.night) return;
+    if (key === CAR_SIGNALS.battery12vVoltage) {
+      const num = parseFloat(String(value).trim());
+      if (isFinite(num) && num > 5 && num < 20) {
+        this._car12vVoltage = num;
+        this._car12vAt = Date.now();
+      }
+      return;
+    }
     if (key === CAR_SIGNALS.doors)  { this._applyCarDoors(value); return; }
     if (key === CAR_SIGNALS.windows) { this._applyCarWindows(value); return; }
     if (key === CAR_SIGNALS.seatBelts) { this._applyCarSeatBelts(value); return; }
@@ -36292,9 +36655,10 @@ class Component extends DCLogic {
       focusedCardPopupClass: (type ? 'on' : '') + (type === 'driving' || type === 'media' ? ' fit' : '')
         + (type === 'power' ? ' power-popup fit' : '')
         + (type === 'media' ? ' narrow' : '')
-        + (type === 'consumption' && this._energyPopupWideOn() ? ' wide' : ''),
+        + (type === 'consumption' && this._energyPopupWideOn() ? ' wide' : '')
+        + (type === 'range' ? ' range-popup fit' : ''),
       focusedCardBackdropClass: type ? 'on' : '',
-      focusedCardTitle: type === 'range' ? 'RANGE'
+      focusedCardTitle: type === 'range' ? 'AUTONOMIA'
         : (type === 'consumption' ? 'ENERGIA'
           : (type === 'tires' ? 'TYRE PRESSURE'
             : (type === 'status' ? 'STATUS DO VEÍCULO'
@@ -36306,8 +36670,8 @@ class Component extends DCLogic {
       focusedCardIsRange: type === 'range', focusedCardIsDriving: type === 'driving',
       focusedCardIsMedia: type === 'media', focusedCardIsPower: type === 'power',
       focusedCardBadge: '', focusedCardBadgeClass: '',
-      // ENERGIA carries a UNIDADES button beside the close button.
-      focusedCardHeadClass: type === 'consumption' ? 'with-action' : '',
+      // ENERGIA and RANGE carry action buttons beside the close button.
+      focusedCardHeadClass: (type === 'consumption' || type === 'range') ? 'with-action' : '',
       closeFocusedCard: () => this._closeFocusedCard(),
     };
     if (!type) return base;
@@ -36315,7 +36679,7 @@ class Component extends DCLogic {
     const view = type === 'climate' ? this._climateWidgetView(entry.item, entry.side)
         : (type === 'tires' ? this._tiresWidgetView(entry.item)
           : (type === 'status' ? this._statusWidgetView(entry.item)
-            : (type === 'range' ? this._rangeWidgetView(entry.item)
+            : (type === 'range' ? this._rangeWidgetView({ type: 'range', w: 2, h: 2 })
               : (type === 'driving' ? this._drivingWidgetView(entry.item)
                 : (type === 'media' ? this._mediaWidgetView(entry.item)
                   : (type === 'power' ? this._powerWidgetView(entry.item)
@@ -36350,6 +36714,49 @@ class Component extends DCLogic {
     if (type === 'consumption' && view.consumptionDemo) {
       base.focusedCardBadge = 'DEMO';
       base.focusedCardBadgeClass = 'on demo';
+    }
+    if (type === 'range') {
+      base.focusedCardBadge = view.rangeSource;
+      base.focusedCardBadgeClass = 'on' + (view.rangeSource.indexOf('DEMO') >= 0 ? ' demo' : '');
+      const range = this._rangeTelemetry(Date.now());
+      const currentSource = this._rangeSourceMode || 'oem';
+      const isHist = currentSource === 'hist';
+      base.focusedRangeSourceModeLabel = isHist ? 'Usar estimativas por histórico [ ON ]' : 'Usar estimativas por histórico [ OFF ]';
+      base.focusedRangeSourceModeClass = isHist ? 'on' : '';
+      base.focusedRangeSourceIsOn = isHist;
+      base.focusedRangeSourceStateText = isHist ? 'ON' : 'OFF';
+      base.focusedRangeToggleSourceMode = (ev) => {
+        this._cardControlEvent(ev);
+        const next = (this._rangeSourceMode || 'oem') === 'oem' ? 'hist' : 'oem';
+        this._setRangeSourceMode(next, ev);
+      };
+
+      base.focusedRangeStyleGaugeClass = range.cardStyle === 'gauge' ? 'selected' : '';
+      base.focusedRangeStyleLinearClass = range.cardStyle === 'linear' ? 'selected' : '';
+      base.focusedRangeSetStyleGauge = (ev) => this._setRangeCardStyle('gauge', ev);
+      base.focusedRangeSetStyleLinear = (ev) => this._setRangeCardStyle('linear', ev);
+
+      base.focusedRangeSourceOemClass = range.sourceMode === 'oem' ? 'selected' : '';
+      base.focusedRangeSourceHistClass = range.sourceMode === 'hist' ? 'selected hist' : '';
+      base.focusedRangeSourceAltClass = range.sourceMode === 'alt' ? 'selected alt' : '';
+      base.focusedRangeSetSourceOem = (ev) => this._setRangeSourceMode('oem', ev);
+      base.focusedRangeSetSourceHist = (ev) => this._setRangeSourceMode('hist', ev);
+      base.focusedRangeSetSourceAlt = (ev) => this._setRangeSourceMode('alt', ev);
+
+      base.focusedRangeOemTotal = range.oemTotal;
+      base.focusedRangeOemEv = range.oemEv;
+      base.focusedRangeOemFuel = range.oemFuel;
+      base.focusedRangeHistTotal = range.histTotal;
+      base.focusedRangeHistEv = range.histEv;
+      base.focusedRangeHistFuel = range.histFuel;
+      base.focusedRangeEvDelta = range.evDelta;
+      base.focusedRangeEvDeltaClass = range.evDeltaClass;
+      base.focusedRangeFuelDelta = range.fuelDelta;
+      base.focusedRangeFuelDeltaClass = range.fuelDeltaClass;
+      base.focusedRangeTotalDelta = range.totalDelta;
+      base.focusedRangeTotalDeltaClass = range.totalDeltaClass;
+      base.focusedRangeIsAlt = range.isAlt;
+      base.focusedRangeActiveMode = range.activeMode.toUpperCase();
     }
     return base;
   }
@@ -40206,16 +40613,157 @@ class Component extends DCLogic {
 
   _rangeWidgetView(item) {
     const range = this._rangeTelemetry(Date.now());
-    return { rangeSizeClass: 'hv-range-card-' + (item.w || 1) + 'x' + (item.h || 1), rangeSource: range.source, rangeTotalLabel: range.totalLabel, rangeTotal: range.total, rangeUnit: range.unit, rangeSoc: range.soc, rangeEv: range.ev, rangeFuel: range.fuel, rangeEvPct: range.evPct, rangeFuelPct: range.fuelPct, rangeUnitKmClass: range.unit === 'KM' ? 'on' : '', rangeUnitMiClass: range.unit === 'MI' ? 'on' : '', rangeUnitKmPressed: range.unit === 'KM', rangeUnitMiPressed: range.unit === 'MI', rangeAriaLabel: 'Range: ' + range.total + ' ' + range.unit + '. Battery ' + range.soc + '. EV ' + range.ev + ' ' + range.unit + '. Fuel ' + range.fuel + ' ' + range.unit + '. ' + range.source, onRangeOpen: (ev) => this._openRangeCard(ev), rangeSetKm: (ev) => this._setRangeDistanceUnit('km', ev), rangeSetMi: (ev) => this._setRangeDistanceUnit('mi', ev) };
+    const is2x2 = (item.w || 1) >= 2 && (item.h || 1) >= 2;
+    return {
+      rangeSizeClass: 'hv-range-card-' + (item.w || 1) + 'x' + (item.h || 1),
+      rangeIs2x2: is2x2,
+      rangeIsNot2x2: !is2x2,
+      rangeHeaderTitle: is2x2 ? 'DINÂMICA DE AUTONOMIA' : 'AUTONOMIA',
+      rangeSource: range.source,
+      rangeTotalLabel: range.totalLabel,
+      rangeTotal: range.total,
+      rangeUnit: range.unit,
+      rangeSoc: range.soc,
+      rangeSocVal: range.socNum,
+      rangeEv: range.ev,
+      rangeFuel: range.fuel,
+      rangeEvPct: range.evPct,
+      rangeFuelPct: range.fuelPct,
+      rangeFuelLvl: range.fuelLvl,
+      rangeFuelLvlVal: range.fuelLvlNum,
+      rangeSocClipRight: range.socClipRight,
+      rangeFuelClipRight: range.fuelClipRight,
+      rangeBatteryPack: range.batteryPack,
+      rangeFuelTank: range.fuelTank,
+      rangeEvEnergy: range.evEnergy,
+      rangeFuelVolume: range.fuelVolume,
+      rangeEvConsume: range.evConsume,
+      rangeFuelAvg: range.fuelAvg,
+      rangeTravelTime: range.travelTime,
+      rangePowertrainMode: range.powertrainMode,
+      range12vVoltage: range.v12Str,
+      range12vCharging: range.v12Charging,
+      range12vState: range.v12State,
+      range12vPct: range.v12Pct,
+      range12vFillW: range.v12FillW,
+      range12vClass: range.v12State + (range.v12Charging ? ' charging' : ''),
+      rangeUnitKmClass: range.unit === 'KM' ? 'on' : '',
+      rangeUnitMiClass: range.unit === 'MI' ? 'on' : '',
+      rangeUnitKmPressed: range.unit === 'KM',
+      rangeUnitMiPressed: range.unit === 'MI',
+      rangeAriaLabel: 'Range: ' + range.total + ' ' + range.unit + '. Battery ' + range.soc + '. EV ' + range.ev + ' ' + range.unit + '. Fuel ' + range.fuel + ' ' + range.unit + '. ' + range.source,
+      onRangeOpen: (ev) => this._openRangeCard(ev),
+      rangeSetKm: (ev) => this._setRangeDistanceUnit('km', ev),
+      rangeSetMi: (ev) => this._setRangeDistanceUnit('mi', ev),
+    };
   }
 
   _rangeDistanceUnit() { return this._rangeUnit === 'mi' ? 'mi' : 'km'; }
   _setRangeDistanceUnit(unit, ev) { this._cardControlEvent(ev); if (unit !== 'km' && unit !== 'mi') return; this._rangeUnit = unit; try { localStorage.setItem('h6_range_unit', unit); } catch (e) {} this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 })); }
+  _setRangeCardStyle(style, ev) { this._cardControlEvent(ev); if (style !== 'gauge' && style !== 'linear') return; this._rangeCardStyle = style; try { localStorage.setItem('h6_range_card_style', style); } catch (e) {} this._syncDockIndicators(); this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 })); }
+  _setRangeSourceMode(mode, ev) { this._cardControlEvent(ev); if (mode !== 'oem' && mode !== 'hist' && mode !== 'alt') return; this._rangeSourceMode = mode; try { localStorage.setItem('h6_range_source_mode', mode); } catch (e) {} this._syncDockIndicators(); this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 })); }
   _rangeTelemetry(now) {
     const at = this._carSignalAt || {}, live = this._powerLive || {}, keys = [CAR_SIGNALS.batterySoc, CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange], stamp = (key) => Number(at[key]) || 0, known = keys.filter((key) => stamp(key)), demo = !!this._demoPreview && !known.length, busLive = typeof this._carBusLive === 'function' && this._carBusLive(), fresh = (key) => stamp(key) && (busLive || now - stamp(key) <= 120000), number = (key, raw) => (demo || stamp(key)) ? this._carNumber(raw) : NaN;
-    const socValue = demo ? 64 : number(CAR_SIGNALS.batterySoc, live.soc), evValue = demo ? 42 : number(CAR_SIGNALS.evRange, live.evRange), fuelValue = demo ? 510 : number(CAR_SIGNALS.fuelRange, live.fuelRange), valid = [{ key: CAR_SIGNALS.batterySoc, value: socValue }, { key: CAR_SIGNALS.evRange, value: evValue }, { key: CAR_SIGNALS.fuelRange, value: fuelValue }], available = valid.filter((entry) => isFinite(entry.value)), freshAvailable = available.filter((entry) => fresh(entry.key)), evKnown = isFinite(evValue), fuelKnown = isFinite(fuelValue), totalValue = (evKnown ? Math.max(0, evValue) : 0) + (fuelKnown ? Math.max(0, fuelValue) : 0), hasKnownRange = evKnown || fuelKnown, completeRange = evKnown && fuelKnown, unitKey = this._rangeDistanceUnit(), unit = unitKey.toUpperCase(), formatDistance = (km) => isFinite(km) ? String(Math.round(Math.max(0, km) * (unitKey === 'mi' ? .621371 : 1))) : '—', total = completeRange ? formatDistance(totalValue) : '—', evPct = hasKnownRange && totalValue > 0 && evKnown ? Math.round(Math.max(0, evValue) * 100 / totalValue) : 0, fuelPct = hasKnownRange && totalValue > 0 && fuelKnown ? Math.max(0, 100 - evPct) : 0;
+    const socValue = demo ? 64 : number(CAR_SIGNALS.batterySoc, live.soc), evValue = demo ? 42 : number(CAR_SIGNALS.evRange, live.evRange), fuelValue = demo ? 510 : number(CAR_SIGNALS.fuelRange, live.fuelRange), valid = [{ key: CAR_SIGNALS.batterySoc, value: socValue }, { key: CAR_SIGNALS.evRange, value: evValue }, { key: CAR_SIGNALS.fuelRange, value: fuelValue }], available = valid.filter((entry) => isFinite(entry.value)), freshAvailable = available.filter((entry) => fresh(entry.key)), evKnown = isFinite(evValue), fuelKnown = isFinite(fuelValue), totalValue = (evKnown ? Math.max(0, evValue) : 0) + (fuelKnown ? Math.max(0, fuelValue) : 0), hasKnownRange = evKnown || fuelKnown, completeRange = evKnown && fuelKnown, unitKey = this._rangeDistanceUnit(), unit = unitKey.toUpperCase(), formatDistance = (km) => isFinite(km) ? String(Math.round(Math.max(0, km) * (unitKey === 'mi' ? .621371 : 1))) : '—';
+    const socNum = isFinite(socValue) ? Math.max(0, Math.min(100, Math.round(socValue))) : 0;
+    const rawFuelLvl = number(CAR_SIGNALS.fuelLevel, live.fuelLevel);
+    const fuelLvlNum = isFinite(rawFuelLvl) ? Math.max(0, Math.min(100, Math.round(rawFuelLvl))) : (demo ? 88 : (fuelKnown ? Math.min(100, Math.round(fuelValue / 7.5)) : 0));
+    const fuelLvl = (demo || isFinite(rawFuelLvl) || fuelKnown) ? (fuelLvlNum + '%') : '—';
+    const variantKey = (typeof this._currentVariantKey === 'function' ? this._currentVariantKey() : '') || 'phev19';
+    const batteryCapacityKwh = variantKey === 'phev34' ? 34.0 : (variantKey === 'hev2' ? 1.8 : 19.27);
+    const fuelTankCapacityL = variantKey === 'hev2' ? 61.0 : 55.0;
+    const batteryPack = batteryCapacityKwh.toFixed(variantKey === 'phev19' ? 2 : 1) + ' kWh';
+    const fuelTank = fuelTankCapacityL.toFixed(1) + ' L';
+    const currentKwh = (batteryCapacityKwh * (socNum / 100)).toFixed(1);
+    const evEnergy = currentKwh + ' kWh / ' + batteryPack;
+    const currentFuelL = (fuelTankCapacityL * (fuelLvlNum / 100)).toFixed(1);
+    const fuelVolume = currentFuelL + ' L / ' + fuelTank;
+
+    // Derive real consumption averages from energy history if available
+    let histEvKmPerKwh = 100 / 16.8;
+    let histFuelKmPerL = 100 / 5.4;
+    try {
+      const hist = typeof this._energyHistory === 'function' ? this._energyHistory(now) : null;
+      if (hist && hist.totals && hist.totals.km > 10) {
+        if (hist.totals.evKm > 5 && hist.totals.kwhOut > 0.5) {
+          const netKwh = Math.max(0.1, hist.totals.kwhOut - (hist.totals.kwhIn || 0));
+          histEvKmPerKwh = Math.max(2, Math.min(10, hist.totals.evKm / netKwh));
+        }
+        const combustionKm = hist.totals.km - (hist.totals.evKm || 0);
+        if (combustionKm > 5 && hist.totals.fuelL > 0.5) {
+          histFuelKmPerL = Math.max(5, Math.min(25, combustionKm / hist.totals.fuelL));
+        }
+      }
+    } catch (e) {}
+
+    const usableKwh = batteryCapacityKwh * 0.9 * (socNum / 100);
+    const usableFuelL = fuelTankCapacityL * (fuelLvlNum / 100);
+    const histEvKm = Math.round(usableKwh * histEvKmPerKwh);
+    const histFuelKm = Math.round(usableFuelL * histFuelKmPerL);
+    const histTotalKm = histEvKm + histFuelKm;
+
+    const evConsume = (100 / histEvKmPerKwh).toFixed(1) + ' kWh/100km';
+    const fuelAvg = (100 / histFuelKmPerL).toFixed(1) + ' L/100km';
+
+    // Source selection: oem | hist | alt (alternating every 5 seconds)
+    const sourceMode = this._rangeSourceMode || 'oem';
+    const isAltTick = (Math.floor(Date.now() / 5000) % 2 === 1);
+    const activeMode = sourceMode === 'alt' ? (isAltTick ? 'hist' : 'oem') : sourceMode;
+
+    const displayEvKm = activeMode === 'hist' ? histEvKm : (evKnown ? evValue : histEvKm);
+    const displayFuelKm = activeMode === 'hist' ? histFuelKm : (fuelKnown ? fuelValue : histFuelKm);
+    const displayTotalKm = displayEvKm + displayFuelKm;
+
+    const total = formatDistance(displayTotalKm);
+    const ev = formatDistance(displayEvKm);
+    const fuel = formatDistance(displayFuelKm);
+    const oemTotal = formatDistance(totalValue);
+    const oemEv = evKnown ? formatDistance(evValue) : '—';
+    const oemFuel = fuelKnown ? formatDistance(fuelValue) : '—';
+    const histTotal = formatDistance(histTotalKm);
+    const histEv = formatDistance(histEvKm);
+    const histFuel = formatDistance(histFuelKm);
+
+    const evDeltaNum = (isFinite(evValue) && evValue > 0) ? Math.round((histEvKm - evValue) * 100 / evValue) : 0;
+    const fuelDeltaNum = (isFinite(fuelValue) && fuelValue > 0) ? Math.round((histFuelKm - fuelValue) * 100 / fuelValue) : 0;
+    const totalDeltaNum = (totalValue > 0) ? Math.round((histTotalKm - totalValue) * 100 / totalValue) : 0;
+
+    const evDelta = (evDeltaNum >= 0 ? '+' : '') + evDeltaNum + '%';
+    const fuelDelta = (fuelDeltaNum >= 0 ? '+' : '') + fuelDeltaNum + '%';
+    const totalDelta = (totalDeltaNum >= 0 ? '+' : '') + totalDeltaNum + '%';
+    const evDeltaClass = evDeltaNum >= 0 ? 'pos' : 'neg';
+    const fuelDeltaClass = fuelDeltaNum >= 0 ? 'pos' : 'neg';
+    const totalDeltaClass = totalDeltaNum >= 0 ? 'pos' : 'neg';
+
+    const evPct = hasKnownRange && displayTotalKm > 0 ? Math.round(displayEvKm * 100 / displayTotalKm) : 0;
+    const fuelPct = hasKnownRange && displayTotalKm > 0 ? Math.max(0, 100 - evPct) : 0;
+    const socClipRight = (100 - socNum) + '%';
+    const fuelClipRight = (100 - fuelLvlNum) + '%';
+
+    const travelHours = displayTotalKm > 0 ? (displayTotalKm / 68).toFixed(1) : null;
+    const travelTime = travelHours ? ('~' + travelHours + 'h') : '—';
+    const powertrainMode = variantKey === 'hev2' ? 'HEV DUAL' : 'HYBRID AUTO';
+
+    // 12V auxiliary battery
+    const v12Known = isFinite(this._car12vVoltage) && (this._car12vAt && (busLive || now - this._car12vAt <= 120000));
+    const v12Val = v12Known ? this._car12vVoltage : (demo ? 14.4 : (this._carReady ? 14.2 : 12.6));
+    const v12Str = v12Val.toFixed(1) + 'V';
+    const v12Charging = v12Val >= 13.4;
+    const v12State = v12Charging ? 'charging' : (v12Val >= 12.3 ? 'healthy' : (v12Val >= 11.8 ? 'low' : 'critical'));
+    const v12Pct = Math.round(Math.max(0, Math.min(100, (v12Val - 11.5) / (12.8 - 11.5) * 100)));
+    const v12FillW = Math.max(2, Math.min(13, Math.round(13 * (v12Charging ? 1 : Math.max(0.2, v12Pct / 100)))));
     let source = 'UNAVAILABLE · NO RANGE SIGNAL'; if (demo) source = 'DEMO · SIMULATED · NOT VEHICLE'; else if (!available.length && known.length) source = 'UNAVAILABLE · RANGE DATA INVALID'; else if (available.length < valid.length) source = freshAvailable.length ? 'PARTIAL · VEHICLE RANGE' : 'PARTIAL · STALE RANGE'; else if (freshAvailable.length === available.length) source = 'VEHICLE · LIVE RANGE'; else if (!freshAvailable.length) source = 'STALE · VEHICLE RANGE'; else source = 'PARTIAL · VEHICLE RANGE';
-    return { source, totalLabel: completeRange ? 'TOTAL RANGE' : (hasKnownRange ? 'TOTAL RANGE · PARTIAL' : 'TOTAL RANGE'), total, unit, soc: isFinite(socValue) ? String(Math.round(Math.max(0, Math.min(100, socValue)))) + '%' : '—', ev: evKnown ? formatDistance(evValue) : '—', fuel: fuelKnown ? formatDistance(fuelValue) : '—', evPct, fuelPct };
+    const cardStyle = this._rangeCardStyle || 'gauge';
+    return {
+      source, totalLabel: completeRange ? 'AUTONOMIA TOTAL' : (hasKnownRange ? 'AUTONOMIA TOTAL · PARCIAL' : 'AUTONOMIA TOTAL'),
+      total, unit, soc: isFinite(socValue) ? String(Math.round(Math.max(0, Math.min(100, socValue)))) + '%' : '—',
+      socNum, socClipRight, ev, fuel, evPct, fuelPct, fuelLvl, fuelLvlNum, fuelClipRight,
+      oemTotal, oemEv, oemFuel, histTotal, histEv, histFuel,
+      evDelta, fuelDelta, totalDelta, evDeltaClass, fuelDeltaClass, totalDeltaClass,
+      cardStyle, sourceMode, activeMode, isAlt: sourceMode === 'alt',
+      batteryPack, fuelTank, evEnergy, fuelVolume, evConsume, fuelAvg, travelTime, powertrainMode,
+      v12Str, v12Val, v12Charging, v12State, v12Pct, v12FillW
+    };
   }
   _openRangeCard(ev) { this._cardControlEvent(ev); if (this._widgetSuppressClick || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return; this._openFocusedCard('range'); }
 
@@ -40940,6 +41488,18 @@ class Component extends DCLogic {
         metricA: 'EV ' + range.rangeEv + ' ' + range.rangeUnit,
         metricB: 'FUEL ' + range.rangeFuel + ' ' + range.rangeUnit,
         progress: percent(range.rangeSoc, 0),
+        state: this._rangeCardStyle || 'gauge',
+        fuelLevel: range.rangeFuelLvlVal || 0,
+        rangeTotal: String(range.rangeTotal || ''),
+        rangeUnit: String(range.rangeUnit || 'KM'),
+        rangeEv: String(range.rangeEv || ''),
+        rangeFuel: String(range.rangeFuel || ''),
+        rangeSoc: String(range.rangeSoc || ''),
+        rangeEvPct: Number(range.evPct || 0),
+        rangeFuelPct: Number(range.fuelPct || 0),
+        battery12vVoltage: String(range.range12vVoltage || ''),
+        battery12vCharging: Boolean(range.range12vCharging),
+        battery12vState: String(range.range12vState || 'healthy'),
       },
       power: {
         primary: power.powerKw + ' kW',
@@ -41258,7 +41818,7 @@ class Component extends DCLogic {
     const theme = this._effectiveWidgetTheme();
     if (s.dynamicColorSport !== false && driveMode === CAR_DRIVE_MODE_SPORT) {
       const coral = (Array.isArray(H6_DESKTOP_ACCENTS) && H6_DESKTOP_ACCENTS.find((a) => a.key === 'coral')) || { dark: '#f75a3b', light: '#f52d05' };
-      const chosen = (theme === 'light' ? coral.light : coral.dark) || coral.dark;
+      const chosen = (theme === 'light' ? coral.light : coral.dark) || coral.dark || CAR_SPORT_ACCENT;
       return this._readableAccent(chosen);
     }
     if (s.dynamicColorEco !== false && driveMode === CAR_DRIVE_MODE_ECO) {

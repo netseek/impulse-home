@@ -384,8 +384,19 @@ function Find-Emulator([string]$Adb, [string]$PreferredSerial) {
 
 function Install-EmulatorApk([string]$Adb, [string]$Serial, [string]$Apk) {
   Write-Host "Installing on $Serial ..."
+  $callerEap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
   $out = & $Adb -s $Serial install -r $Apk 2>&1 | Out-String
+  $ErrorActionPreference = $callerEap
   Write-Host $out.Trim()
+  if ($out -match 'INSTALL_FAILED_UPDATE_INCOMPATIBLE') {
+    Write-Host "Signature mismatch on emulator - uninstalling then reinstalling ..."
+    $ErrorActionPreference = 'Continue'
+    $null = & $Adb -s $Serial uninstall $CarPackage 2>&1
+    $out = & $Adb -s $Serial install -r $Apk 2>&1 | Out-String
+    $ErrorActionPreference = $callerEap
+    Write-Host $out.Trim()
+  }
   if ($LASTEXITCODE -ne 0 -or $out -match 'Failure \[') {
     throw "adb install failed: $($out.Trim())"
   }
