@@ -186,7 +186,7 @@ function serveRepo(port) {
       try {
         const pages = await Promise.all([0, 8].map(async (idx) => {
           const upstream = await fetch(
-            `https://www.bing.com/HPImageArchive.aspx?format=js&idx=${idx}&n=8&mkt=en-US`,
+            `https://www.bing.com/HPImageArchive.aspx?format=js&idx=${idx}&n=8&mkt=pt-BR`,
           );
           if (!upstream.ok) throw new Error('bing ' + upstream.status);
           return upstream.json();
