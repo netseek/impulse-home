@@ -14448,7 +14448,11 @@ class Component extends DCLogic {
 
   _saveWallpaperCache(fetchedKey, entries) {
     try {
-      localStorage.setItem(BING_WALLPAPER_CACHE_KEY, JSON.stringify({ fetched: fetchedKey, entries }));
+      localStorage.setItem(BING_WALLPAPER_CACHE_KEY, JSON.stringify({
+        fetched: fetchedKey,
+        timestamp: Date.now(),
+        entries,
+      }));
     } catch (e) {}
   }
 
@@ -14535,10 +14539,19 @@ class Component extends DCLogic {
     const today = this._todayWallpaperKey();
     const cached = this._loadWallpaperCache();
     const auto = !!this.state.wallpaperAuto;
+    const latestDate = (cached && cached.entries && cached.entries[0] && cached.entries[0].date) || '';
+    const now = Date.now();
+    const staleHours = (cached && cached.timestamp) ? (now - cached.timestamp) / 3600000 : 999;
+    // Need fetch if:
+    // - forced
+    // - no valid cache
+    // - auto rotation on AND:
+    //   * not fetched on this date yet (cached.fetched !== today)
+    //   * OR fetched today, but Bing hasn't rotated yet (latestDate !== today) and >=30m elapsed
     const needFetch = force
       || !cached
       || !cached.entries || !cached.entries.length
-      || (auto && cached.fetched !== today);
+      || (auto && (cached.fetched !== today || (latestDate !== today && staleHours >= 0.5)));
     if (!needFetch) {
       this._wallpaperEntries = cached.entries;
       const randomIdx = this._takeBingRandomStartIdx(cached.entries);
@@ -14557,6 +14570,8 @@ class Component extends DCLogic {
         const entries = await this._fetchBingWallpapers();
         this._wallpaperEntries = entries;
         this._saveWallpaperCache(today, entries);
+        this._wallpaperRetryCount = 0;
+        clearTimeout(this._wallpaperRetryTimer);
         const randomIdx = this._takeBingRandomStartIdx(entries);
         const idx = randomIdx != null ? randomIdx : (auto ? 0 : Math.min(this.state.wallpaperIdx || 0, entries.length - 1));
         const patch = { wallpaperIdx: idx, wallpaperLoading: false };
@@ -14570,11 +14585,28 @@ class Component extends DCLogic {
           this._wallpaperEntries = cached.entries;
         }
         this.setState({ wallpaperLoading: false }, () => this._syncWallpaperLayer());
+        if (auto) this._scheduleWallpaperRetry();
       } finally {
         this._wallpaperFetchPromise = null;
       }
     })();
     return this._wallpaperFetchPromise;
+  }
+
+  _scheduleWallpaperRetry() {
+    clearTimeout(this._wallpaperRetryTimer);
+    this._wallpaperRetryCount = (this._wallpaperRetryCount || 0) + 1;
+    if (this._wallpaperRetryCount > 5) return;
+    const delay = Math.min(120000, 8000 * Math.pow(1.8, this._wallpaperRetryCount - 1));
+    this._wallpaperRetryTimer = setTimeout(() => {
+      if (this._unmounted) return;
+      const today = this._todayWallpaperKey();
+      const cached = this._loadWallpaperCache();
+      const latestDate = (cached && cached.entries && cached.entries[0] && cached.entries[0].date) || '';
+      if (!cached || !cached.entries || (latestDate !== today)) {
+        this._ensureWallpapers(false);
+      }
+    }, delay);
   }
 
   // ── Curated / Favorites / Web sources ─────────────────────────────────────
@@ -26056,12 +26088,20 @@ class Component extends DCLogic {
     if (typeof window.__flushAndroidShell === 'function') {
       try { window.__flushAndroidShell(); } catch (e) { console.warn('[AndroidShell]', e); }
     }
-    if (this._centerFillUsesWallpaper()) {
-      this._ensureWallpapers(false);
-    } else {
-      const cached = this._loadWallpaperCache();
-      if (cached && cached.entries) this._wallpaperEntries = cached.entries;
-    }
+    const cached = this._loadWallpaperCache();
+    if (cached && cached.entries) this._wallpaperEntries = cached.entries;
+    // Always trigger background fetch so today's daily wallpaper is ready,
+    // even if the active desktop on boot is 3D 'car' and the user switches later.
+    this._ensureWallpapers(false);
+    this._wallpaperOnlineHandler = () => {
+      const today = this._todayWallpaperKey();
+      const c = this._loadWallpaperCache();
+      const latestDate = (c && c.entries && c.entries[0] && c.entries[0].date) || '';
+      if (!c || !c.entries || !c.entries.length || (latestDate !== today)) {
+        this._ensureWallpapers(false);
+      }
+    };
+    window.addEventListener('online', this._wallpaperOnlineHandler, false);
     this._syncCenterFillIndicator();
     this._lastEffectiveWidgetTheme = this._effectiveWidgetTheme();
     this._refreshAutoWidgetThemeSample(false);
@@ -34627,6 +34667,9 @@ class Component extends DCLogic {
     if (!skipCapture) this._captureActiveDesktop();
     this._desktopIndex = nextIndex;
     const d = this._normalizeDesktop(this._desktops[nextIndex], 'Desktop ' + (nextIndex + 1));
+    if (d.wallpaperSource === 'bing' && d.wallpaperAuto !== false) {
+      d.wallpaperIdx = 0;
+    }
     this._desktops[nextIndex] = d;
     this._widgetLayout = this._cloneDesktopValue(d.widgetLayout, this._defaultWidgetLayout());
     this._desktopBottomCards = this._normalizeBottomCards(d.bottomCards);
@@ -34679,6 +34722,9 @@ class Component extends DCLogic {
       this._applyFitCamera();
       this._syncCarSceneForShell();
       this._syncWallpaperLayer();
+      if (this._centerFillUsesWallpaper(d)) {
+        this._ensureWallpapers(false);
+      }
       // centerFill can differ between desktops, and only _applyBackground makes
       // the canvas transparent for 'mixed'. Without it, switching into a Both
       // desktop kept the previous desktop's opaque background over the wallpaper.
@@ -35027,13 +35073,37 @@ class Component extends DCLogic {
     try { localStorage.setItem(H6_DESKTOP_SHOTS_KEY, JSON.stringify(this._desktopShots || {})); } catch (e) {}
   }
 
+  _desktopWallpaperSig(d) {
+    if (!d || d.centerFill === 'car') return '';
+    const src = d.wallpaperSource || 'bing';
+    if (src === 'bing') {
+      const auto = d.wallpaperAuto !== false;
+      const idx = auto ? 0 : (d.wallpaperIdx || 0);
+      const entry = this._wallpaperEntries && this._wallpaperEntries[idx];
+      return entry ? (entry.date + ':' + entry.url) : ('bing:' + idx);
+    }
+    if (src === 'curated') {
+      const idx = d.wallpaperCuratedIdx || 0;
+      const entry = this._curatedWallpaperEntries && this._curatedWallpaperEntries[idx];
+      return entry ? entry.url : ('curated:' + idx);
+    }
+    if (src === 'favorites') {
+      const idx = d.wallpaperFavoritesIdx || 0;
+      const entry = this._favoriteWallpapers && this._favoriteWallpapers[idx];
+      return entry ? entry.url : ('fav:' + idx);
+    }
+    return d.wallpaperWebUrl || '';
+  }
+
   /** What a thumbnail depends on. Live telemetry is not part of it. */
   _desktopShotSig(d) {
     if (!d) return '';
     const left = d.widgetLayout && d.widgetLayout.appCar && d.widgetLayout.appCar.left;
     return JSON.stringify([
       ((left && left.items) || []).map((i) => [i.type, i.x, i.y, i.w, i.h]),
-      d.centerFill, d.wallpaperAuto !== false, d.wallpaperIdx || 0, d.widgetThemeMode, d.accentColor,
+      d.centerFill, d.wallpaperAuto !== false, d.wallpaperIdx || 0,
+      this._desktopWallpaperSig(d),
+      d.widgetThemeMode, d.accentColor,
       (d.bottomCards || []).join(','),
     ]);
   }
@@ -42959,6 +43029,8 @@ class Component extends DCLogic {
     if (this._onResize) window.removeEventListener('resize', this._onResize);
     if (this._desktopKeyHandler) document.removeEventListener('keydown', this._desktopKeyHandler, false);
     if (this._powerVisibilityHandler) document.removeEventListener('visibilitychange', this._powerVisibilityHandler, false);
+    if (this._wallpaperOnlineHandler) window.removeEventListener('online', this._wallpaperOnlineHandler, false);
+    clearTimeout(this._wallpaperRetryTimer);
     if (this._powerIntersectionObserver) this._powerIntersectionObserver.disconnect();
     this._powerIntersectionObserver = null;
     if (window.__desktopDebug) { try { delete window.__desktopDebug; } catch (e) { window.__desktopDebug = null; } }
