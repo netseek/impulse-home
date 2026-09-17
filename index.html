@@ -1697,6 +1697,7 @@ window.HavalSplash = (function () {
       display: flex;
       flex-direction: column;
       gap: 0;
+      font-family: 'Space Mono', monospace;
     }
     .hv-wallpaper-pop.on {
       opacity: 1;
@@ -1737,10 +1738,12 @@ window.HavalSplash = (function () {
       background: rgba(255,255,255,.08);
     }
     .hv-wallpaper-pop-sub {
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      font-size: 13px;
-      line-height: 1.45;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      letter-spacing: .02em;
       color: var(--hv-widget-fg);
+      opacity: .78;
       margin-bottom: 12px;
     }
     .hv-wallpaper-pop-meta {
@@ -1791,35 +1794,67 @@ window.HavalSplash = (function () {
       border-color: var(--hv-accent);
       color: var(--hv-accent);
     }
+    .hv-wallpaper-pop-strip-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
     .hv-wallpaper-pop-strip-label {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
       letter-spacing: .12em;
       color: var(--hv-widget-fg);
       opacity: .68;
-      margin-bottom: 8px;
-      flex-shrink: 0;
+    }
+    .hv-wallpaper-pop-strip-steppers {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hv-wallpaper-pop-step {
+      width: 28px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid var(--hv-widget-border);
+      background: var(--hv-control-fill, rgba(255,255,255,.06));
+      color: var(--hv-widget-fg);
+      font-size: 10px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+    }
+    .hv-wallpaper-pop-step:hover,
+    .hv-wallpaper-pop-step:active {
+      border-color: var(--hv-accent);
+      color: var(--hv-accent);
+      background: rgba(255,255,255,.12);
     }
     .hv-wallpaper-pop-strip {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
       gap: 10px;
-      overflow-x: auto;
-      overflow-y: hidden;
+      max-height: 236px;
+      overflow-y: auto;
+      overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
-      scroll-snap-type: x proximity;
-      padding: 2px 2px 10px;
-      margin: 0 -2px 4px;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      padding: 2px 4px 12px;
+      margin: 0 -2px 8px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 26px), transparent 100%);
+      mask-image: linear-gradient(to bottom, black calc(100% - 26px), transparent 100%);
       flex-shrink: 0;
     }
-    .hv-wallpaper-pop-strip::-webkit-scrollbar { height: 6px; }
-    .hv-wallpaper-pop-strip::-webkit-scrollbar-thumb {
-      background: var(--hv-widget-border);
-      border-radius: 999px;
-      transition: background-color .15s ease;
-    }
-    .hv-wallpaper-pop-strip::-webkit-scrollbar-thumb:hover {
-      background: var(--hv-accent);
-    }
+    .hv-wallpaper-pop-strip::-webkit-scrollbar { display: none; }
     .hv-wallpaper-src-row {
       display: flex;
       gap: 6px;
@@ -1873,8 +1908,9 @@ window.HavalSplash = (function () {
       border: 1px solid var(--hv-widget-border);
       background: var(--hv-widget-bg);
       color: var(--hv-widget-fg);
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: .02em;
     }
     .hv-wallpaper-web-input:focus {
       border-color: var(--hv-accent);
@@ -1924,11 +1960,9 @@ window.HavalSplash = (function () {
       accent-color: var(--hv-accent);
     }
     .hv-wallpaper-thumb-wrap {
-      flex: 0 0 128px;
-      width: 128px;
-      height: 72px;
+      width: 100%;
+      aspect-ratio: 16 / 9;
       position: relative;
-      scroll-snap-align: start;
     }
     .hv-wallpaper-thumb {
       width: 100%;
@@ -1986,11 +2020,12 @@ window.HavalSplash = (function () {
       text-align: left;
     }
     .hv-wallpaper-pop-credit {
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      font-size: 12px;
-      line-height: 1.45;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      line-height: 1.5;
+      letter-spacing: .02em;
       color: var(--hv-widget-fg);
-      opacity: .75;
+      opacity: .72;
       margin: 4px 0 12px;
       flex-shrink: 0;
       min-height: 2.9em;
@@ -6241,12 +6276,6 @@ window.HavalSplash = (function () {
       </sc-for>
     </div>
     <div class="hv-wallpaper-pop-sub">{{ wallpaperSourceSub }}</div>
-    <sc-if value="{{ wallpaperShowWebSearch }}" hint-placeholder-val="{{ false }}">
-    <div class="hv-wallpaper-web-search">
-      <input type="text" class="hv-wallpaper-web-input" placeholder="Search Wallhaven: cars, landscape, abstract…" value="{{ wallpaperWebQuery }}" onInput="{{ setWallpaperWebQuery }}" onKeyDown="{{ wallpaperWebKeyDown }}" />
-      <button type="button" class="hv-wallpaper-web-go" onClick="{{ wallpaperWebSearch }}">GO</button>
-    </div>
-    </sc-if>
     <div class="hv-wallpaper-pop-meta">
       <sc-if value="{{ wallpaperShowRotationBadge }}" hint-placeholder-val="{{ false }}">
       <div class="hv-wallpaper-pop-badge" title="Today's image is applied automatically each morning">
@@ -6264,8 +6293,14 @@ window.HavalSplash = (function () {
       </label>
       </sc-if>
     </div>
-    <div class="hv-wallpaper-pop-strip-label">{{ wallpaperStripLabel }}</div>
-    <div class="hv-wallpaper-pop-strip slim-scrollbar">
+    <div class="hv-wallpaper-pop-strip-head">
+      <span class="hv-wallpaper-pop-strip-label">{{ wallpaperStripLabel }}</span>
+      <div class="hv-wallpaper-pop-strip-steppers">
+        <button type="button" class="hv-wallpaper-pop-step" onClick="{{ wallpaperScrollUp }}" title="Scroll up" aria-label="Scroll up">▲</button>
+        <button type="button" class="hv-wallpaper-pop-step" onClick="{{ wallpaperScrollDown }}" title="Scroll down" aria-label="Scroll down">▼</button>
+      </div>
+    </div>
+    <div class="hv-wallpaper-pop-strip">
       <sc-for list="{{ wallpaperStripItems }}" as="wt" hint-placeholder-count="6">
         <div class="hv-wallpaper-thumb-wrap">
           <button type="button" class="hv-wallpaper-thumb {{ wt.onClass }}" onClick="{{ wt.onClick }}" title="{{ wt.title }}" style="background-image: url('{{ wt.url }}'); opacity: {{ wt.opacity }};">
@@ -8150,11 +8185,11 @@ const INTRO_FRONT_DIST_MUL = 0.793;
 const SHELL_MODES = ['appCar', 'appsOnly'];
 const SHELL_RATIOS = ['1:1', '2:1', '1:2'];
 const SHELL_BOOT_KEY = 'hv_shell_boot_v1';
-const BING_WALLPAPER_API = 'https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US';
+const BING_WALLPAPER_API = 'https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=pt-BR';
 const BING_WALLPAPER_PAGE = 8;
-const BING_WALLPAPER_PAGES = 2; // 16 recent images — scroll for older
-// Microsoft Bing daily wallpaper — same image pool as Windows Spotlight.
-const BING_WALLPAPER_CACHE_KEY = 'h6_wallpaper_cache_v1';
+const BING_WALLPAPER_PAGES = 2; // 16 recent images — scroll for more
+// Microsoft Bing daily wallpaper — Brazilian feed (pt-BR).
+const BING_WALLPAPER_CACHE_KEY = 'h6_wallpaper_cache_v2_br';
 
 // Curated wallpaper pack — the same 20 Wallhaven picks bundled by the Impulse
 // companion app (StudioProjects/haval-app-tool-multimidia, assets/backgrounds/
@@ -8189,12 +8224,11 @@ const CURATED_WALLPAPERS = [
 // Live, key-free search — same provider and endpoint Impulse's Web tab uses.
 const WALLHAVEN_SEARCH_API = 'https://wallhaven.cc/api/v1/search';
 const WALLPAPER_FAVORITES_KEY = 'h6_wallpaper_favorites_v1';
-const WALLPAPER_SOURCE_LABELS = { bing: 'BING', curated: 'CURATED', web: 'WEB', favorites: 'FAVORITES' };
+const WALLPAPER_SOURCE_LABELS = { bing: 'BING', curated: 'CURATED', favorites: 'FAVORITES' };
 const WALLPAPER_SOURCE_SUB = {
   bing: 'Microsoft Bing daily images — same feed as Windows Spotlight.',
   curated: 'A hand-picked set bundled with the app — works offline.',
-  web: 'Live search on Wallhaven — no account needed.',
-  favorites: 'Images you’ve starred from Bing, Curated or Web.',
+  favorites: 'Images you’ve starred from Bing or Curated.',
 };
 
 /**
@@ -14209,7 +14243,7 @@ class Component extends DCLogic {
   _bingWallpaperApiUrl(idx, count) {
     const i = Math.max(0, idx | 0);
     const n = Math.max(1, Math.min(8, count | 0));
-    return `https://www.bing.com/HPImageArchive.aspx?format=js&idx=${i}&n=${n}&mkt=en-US`;
+    return `https://www.bing.com/HPImageArchive.aspx?format=js&idx=${i}&n=${n}&mkt=pt-BR`;
   }
 
   _mergeWallpaperEntries(pages) {
@@ -14406,7 +14440,7 @@ class Component extends DCLogic {
   }
 
   _setWallpaperSource(source) {
-    if (['bing', 'curated', 'web', 'favorites'].indexOf(source) === -1) return;
+    if (['bing', 'curated', 'favorites'].indexOf(source) === -1) return;
     if (this.state.wallpaperSource === source) return;
     this.setState({ wallpaperSource: source }, () => {
       this._syncWallpaperLayer();
@@ -14673,7 +14707,7 @@ class Component extends DCLogic {
     const mixedBtn = this._hvBtn(mixedOn);
     const appsOnly = (s.shellMode || '') === 'appsOnly';
     const showWall = this._centerFillUsesWallpaper(s) && !appsOnly;
-    const source = ['bing', 'curated', 'web', 'favorites'].indexOf(s.wallpaperSource) !== -1 ? s.wallpaperSource : 'bing';
+    const source = ['bing', 'curated', 'favorites'].indexOf(s.wallpaperSource) !== -1 ? s.wallpaperSource : 'bing';
     const entry = showWall ? this._currentWallpaperEntry() : null;
     const url = entry ? entry.url : '';
     const cfgBtn = this._hvBtn(!!s.wallpaperPopupOpen);
@@ -14689,7 +14723,7 @@ class Component extends DCLogic {
     if (source === 'bing') {
       stripLabel = s.wallpaperLoading
         ? 'LOADING RECENT IMAGES…'
-        : (bingEntries.length ? `RECENT (${bingEntries.length}) · SCROLL FOR OLDER` : 'NO IMAGES YET');
+        : (bingEntries.length ? `RECENT (${bingEntries.length}) · SCROLL FOR MORE` : 'NO IMAGES YET');
       stripItems = bingEntries.map((e, i) => ({
         url: e.url,
         date: this._formatWallpaperDate(e.date) || (i === 0 ? 'Today' : ''),
@@ -14748,11 +14782,11 @@ class Component extends DCLogic {
       }));
       creditText = entry
         ? ((entry.title ? entry.title + ' — ' : '') + (entry.credit || ''))
-        : 'Star an image from Bing, Curated or Web to add it here.';
+        : 'Star an image from Bing or Curated to add it here.';
     }
 
     const randomKey = this._sourceRandomKey(source);
-    const sourceTabs = ['bing', 'curated', 'web', 'favorites'].map((src) => {
+    const sourceTabs = ['bing', 'curated', 'favorites'].map((src) => {
       const isBrowsing = source === src;
       return {
         label: WALLPAPER_SOURCE_LABELS[src],
@@ -14771,7 +14805,7 @@ class Component extends DCLogic {
       showWallpaperConfigureBtn: showWall,
       wallpaperSourceTabs: sourceTabs,
       wallpaperSourceSub: WALLPAPER_SOURCE_SUB[source] || '',
-      wallpaperShowWebSearch: source === 'web',
+      wallpaperShowWebSearch: false,
       wallpaperWebQuery: s.wallpaperWebQuery || '',
       setWallpaperWebQuery: (ev) => this.setState({ wallpaperWebQuery: (ev && ev.target && ev.target.value) || '' }),
       wallpaperWebSearch: () => this._wallpaperWebSearch(true),
@@ -14784,6 +14818,14 @@ class Component extends DCLogic {
       toggleWallpaperRandomOnStart: () => this._toggleWallpaperRandomOnStart(source),
       wallpaperStripLabel: stripLabel,
       wallpaperStripItems: stripItems,
+      wallpaperScrollUp: () => {
+        const el = document.querySelector('.hv-wallpaper-pop-strip');
+        if (el) el.scrollBy({ top: -140, behavior: 'smooth' });
+      },
+      wallpaperScrollDown: () => {
+        const el = document.querySelector('.hv-wallpaper-pop-strip');
+        if (el) el.scrollBy({ top: 140, behavior: 'smooth' });
+      },
       wallpaperUseToday: () => this._useTodayWallpaper(),
       centerFillCarBorder: carBtn.border,
       centerFillCarBg: carBtn.bg,
@@ -21180,6 +21222,8 @@ class Component extends DCLogic {
     this._xrayFabEl = null;
     this._xrayFabBtn = null;
     this._xrayFabAnchor = null;
+    clearTimeout(this._xrayFabRingTimer);
+    this._xrayFabRingTimer = null;
     this._xrayFabRing = null;
     this._hsEls = null;
     this._hsRoofPop = null;
@@ -21773,6 +21817,9 @@ class Component extends DCLogic {
       if (el) el.classList.remove('on', 'open', 'act', 'flip');
     });
     if (this._xrayFabEl) this._xrayFabEl.classList.remove('on');
+    if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
+    clearTimeout(this._xrayFabRingTimer);
+    this._xrayFabRingTimer = null;
     if (this.state && this.state.hotspotsChrome) this.setState({ hotspotsChrome: false });
   }
 
@@ -30831,7 +30878,10 @@ class Component extends DCLogic {
   }
 
   _applyPowertrainVisibility(on) {
+    clearTimeout(this._xrayFabRingTimer);
+    this._xrayFabRingTimer = null;
     if (!on) {
+      if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
       this._setBodyGhost(false);
       this._setShadowSoft(false);
       this._clearPowertrainFx();
@@ -30841,33 +30891,31 @@ class Component extends DCLogic {
       if (this.requestRender) this.requestRender(6);
       return;
     }
-    // X-ray fetches its own GLB + manifest the first time it is opened.
-    // _preloadPowertrain usually beats the click, but not always -- and this
-    // path set neither `loading` nor a swap, so a cold click sat on a
-    // multi-MB fetch with nothing on screen at all.
-    //
-    // Badged ONLY when the rig is genuinely not there yet: _ensurePowertrain
-    // resolves synchronously once it is, and bracketing a warm toggle would
-    // flash the badge for MIN_BADGE_MS on every single press. The
-    // _carSwapActive test keeps us from adopting -- and then prematurely
-    // ending -- a swap somebody else started.
-    //
-    // Note this deliberately does NOT set `loading: true`, unlike the wheel
-    // and model paths: bootCenterDisplay already keys off _carSwapLabel on its
-    // own, and `loading` is read by _syncCarSceneForShell as "keep the car
-    // hidden", which is the opposite of what an x-ray toggle wants.
+    // Ring feedback on the round FAB: spin immediately on tap while the x-ray
+    // scene prepares and shows up, holding for at least MIN_RING_SPIN_MS so
+    // fast local/cached loads still provide responsive, visible tactile feedback.
+    if (this._xrayFabRing) this._xrayFabRing.classList.add('on');
+    const spinStart = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const MIN_RING_SPIN_MS = 450;
+
+    // The center-screen badge ('LOADING X-RAY') stays reserved for genuinely
+    // cold loads so warm toggles don't flash the large center card.
     const cold = !this._powertrainRig && !this._carSwapActive;
     if (cold) {
       this._beginCarSwap('xray');
       this.setState({});                 // paint the badge on the next render
-      // Belt-and-suspenders feedback: a CSS animation on the FAB itself,
-      // independent of whether the boot-center badge's commit ever gets
-      // painted (see _applyPowertrainVisibility notes above/CLAUDE.md) —
-      // this ring is toggled by a plain classList call, not a React render.
-      if (this._xrayFabRing) this._xrayFabRing.classList.add('on');
     }
     const endBadge = () => {
-      if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
+      const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - spinStart;
+      const remaining = Math.max(0, MIN_RING_SPIN_MS - elapsed);
+      if (remaining > 0) {
+        this._xrayFabRingTimer = setTimeout(() => {
+          if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
+          this._xrayFabRingTimer = null;
+        }, remaining);
+      } else {
+        if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
+      }
       if (cold) this._endCarSwap();
     };
     this._ensurePowertrain().then((rig) => {
