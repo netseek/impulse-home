@@ -6884,6 +6884,8 @@ window.HavalSplash = (function () {
       </sc-for>
     </div>
     </sc-if>
+  </div>
+
   <!-- First-Run Setup Modal -->
   <div class="hv-first-run-backdrop {{ firstRunBackdropClass }}" style="display: {{ firstRunDisplay }};">
     <div class="hv-first-run-modal">
@@ -8133,6 +8135,7 @@ const CAR_SIGNALS = {
   // GRAPHS widget — Impulse evPowerKw = V * I / 1000.
   batteryVoltage: 'car.ev_info.power_battery_voltage',
   battery12vVoltage: 'car.basic.battery_voltage',
+  battery12vSoc: 'car.basic.battery_power_level',
   batteryCurrent: 'car.ev_info.cur_charge_current',
   fuelInst: 'car.basic.instant_fuel_consumption',
   evConsume: 'car.ev_info.Instant_energy_consumption',
@@ -10077,6 +10080,7 @@ class Component extends DCLogic {
     return [CAR_SIGNALS.doors, CAR_SIGNALS.speed, CAR_SIGNALS.night,
             CAR_SIGNALS.sunroof, CAR_SIGNALS.curtain, CAR_SIGNALS.steering,
             CAR_SIGNALS.batteryVoltage, CAR_SIGNALS.batteryCurrent,
+            CAR_SIGNALS.battery12vVoltage, CAR_SIGNALS.battery12vSoc,
             CAR_SIGNALS.fuelInst, CAR_SIGNALS.evConsume,
             CAR_SIGNALS.fuelTrip, CAR_SIGNALS.fuelAvg, CAR_SIGNALS.evTrip,
             CAR_SIGNALS.batterySoc,
@@ -10233,6 +10237,14 @@ class Component extends DCLogic {
       if (isFinite(num) && num > 5 && num < 20) {
         this._car12vVoltage = num;
         this._car12vAt = Date.now();
+      }
+      return;
+    }
+    if (key === CAR_SIGNALS.battery12vSoc) {
+      const num = parseFloat(String(value).trim());
+      if (isFinite(num) && num >= 0 && num <= 100) {
+        this._car12vSoc = Math.round(num);
+        this._car12vSocAt = Date.now();
       }
       return;
     }
@@ -41229,7 +41241,10 @@ class Component extends DCLogic {
     const v12Str = v12Val.toFixed(1) + 'V';
     const v12Charging = v12Val >= 13.4;
     const v12State = v12Charging ? 'charging' : (v12Val >= 12.3 ? 'healthy' : (v12Val >= 11.8 ? 'low' : 'critical'));
-    const v12Pct = Math.round(Math.max(0, Math.min(100, (v12Val - 11.5) / (12.8 - 11.5) * 100)));
+    const v12SocKnown = isFinite(this._car12vSoc) && (this._car12vSocAt && (busLive || now - this._car12vSocAt <= 120000));
+    const v12Pct = v12SocKnown
+      ? this._car12vSoc
+      : Math.round(Math.max(0, Math.min(100, (v12Val - 11.5) / (12.8 - 11.5) * 100)));
     const v12FillW = Math.max(2, Math.min(13, Math.round(13 * (v12Charging ? 1 : Math.max(0.2, v12Pct / 100)))));
     let source = 'UNAVAILABLE · NO RANGE SIGNAL'; if (demo) source = 'DEMO · SIMULATED · NOT VEHICLE'; else if (!available.length && known.length) source = 'UNAVAILABLE · RANGE DATA INVALID'; else if (available.length < valid.length) source = freshAvailable.length ? 'PARTIAL · VEHICLE RANGE' : 'PARTIAL · STALE RANGE'; else if (freshAvailable.length === available.length) source = 'VEHICLE · LIVE RANGE'; else if (!freshAvailable.length) source = 'STALE · VEHICLE RANGE'; else source = 'PARTIAL · VEHICLE RANGE';
     const cardStyle = this._rangeCardStyle || 'linear';
@@ -41981,6 +41996,7 @@ class Component extends DCLogic {
         battery12vVoltage: String(range.range12vVoltage || ''),
         battery12vCharging: Boolean(range.range12vCharging),
         battery12vState: String(range.range12vState || 'healthy'),
+        battery12vPct: Number(range.range12vPct || 0),
       },
       power: {
         primary: power.powerKw + ' kW',
