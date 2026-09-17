@@ -4412,7 +4412,8 @@ window.HavalSplash = (function () {
       color: var(--hv-widget-fg, #edf5fa);
       overflow: visible;
       user-select: none;
-      touch-action: pan-y;
+      /* manipulation: allow taps; avoid pan-y eating the status-bar proxy press. */
+      touch-action: manipulation;
       pointer-events: auto;
     }
     .hv-desktop-switcher button {
@@ -4536,24 +4537,26 @@ window.HavalSplash = (function () {
       min-width: 44px; min-height: 44px;
       aspect-ratio: 1;
       flex-shrink: 0;
+      box-sizing: border-box;
       border: 0;
       outline: 0;
       -webkit-appearance: none;
       appearance: none;
       border-radius: 50%;
+      overflow: hidden;
       box-shadow: 0 0 0 1px var(--hv-frost-edge);
       cursor: pointer;
       padding: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
-      -webkit-mask-image: -webkit-radial-gradient(white, black);
-      mask-image: radial-gradient(white, black);
-      transition: transform .12s ease, box-shadow .15s ease;
+      transition: transform .12s ease, border-color .15s ease, box-shadow .15s ease;
     }
     .hv-studio-accents button:active { transform: scale(.94); }
-    .hv-studio-accents button.on { box-shadow: 0 0 0 2px var(--hv-frost-fill-strong), 0 0 0 4px var(--hv-accent); }
+    .hv-studio-accents button.on {
+      border: 0;
+      box-shadow: inset 0 0 0 3px #ffffff, 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 0 4px var(--hv-accent);
+    }
     .hv-studio-accents button.custom-empty {
       border: 1.5px dashed var(--hv-frost-edge);
       background: rgba(255,255,255,.04);
@@ -4562,7 +4565,98 @@ window.HavalSplash = (function () {
     .hv-studio-accents button.custom-empty:hover { border-color: var(--hv-accent); }
     .hv-studio-accents button.custom-empty.on {
       border: 0;
-      box-shadow: 0 0 0 2px var(--hv-frost-fill-strong), 0 0 0 4px var(--hv-accent);
+      box-shadow: inset 0 0 0 3px #ffffff, 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 0 4px var(--hv-accent);
+    }
+    .hv-studio-dynamic-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: -6px 0 18px;
+    }
+    .hv-studio-dynamic-col {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--hv-frost-edge);
+      background: var(--hv-control-fill, rgba(255, 255, 255, 0.055));
+      font-size: 11px;
+      font-weight: 500;
+      color: inherit;
+      cursor: pointer;
+      user-select: none;
+      min-height: 42px;
+      box-sizing: border-box;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .hv-studio-dynamic-col:active {
+      background: rgba(255, 255, 255, 0.09);
+    }
+    .hv-studio-dynamic-col > span:first-child {
+      line-height: 1.25;
+      font-weight: 600;
+    }
+    .hv-studio-sport-text {
+      color: #f75a3b;
+      font-weight: 700;
+    }
+    .hv-studio-eco-text {
+      color: #66dfb1;
+      font-weight: 700;
+    }
+    :root[data-widget-theme="light"] .hv-studio-sport-text,
+    .scene-day .hv-studio-sport-text {
+      color: #f52d05;
+    }
+    :root[data-widget-theme="light"] .hv-studio-eco-text,
+    .scene-day .hv-studio-eco-text {
+      color: #02cf9c;
+    }
+    .hv-studio-toggle-wrap {
+      position: relative;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    .hv-studio-toggle-wrap input[type="checkbox"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      margin: 0;
+      pointer-events: none;
+    }
+    .hv-studio-toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid var(--hv-frost-edge);
+      box-sizing: border-box;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .hv-studio-toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+      transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .hv-studio-toggle-wrap input:checked + .hv-studio-toggle-switch {
+      background: var(--hv-accent, #2aa7b7);
+      border-color: var(--hv-accent, #2aa7b7);
+    }
+    .hv-studio-toggle-wrap input:checked + .hv-studio-toggle-switch::after {
+      transform: translateX(16px);
     }
     .hv-studio-accent-plus {
       width: 18px; height: 18px;
@@ -4607,7 +4701,7 @@ window.HavalSplash = (function () {
       position: relative;
       width: 32px;
       height: 32px;
-      border-radius: 8px;
+      border-radius: 50%;
       border: 1px solid var(--hv-frost-edge);
       overflow: hidden;
       cursor: pointer;
@@ -4687,7 +4781,7 @@ window.HavalSplash = (function () {
     .hv-studio-widget-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 4px; }
     .hv-studio-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 32px; }
     .hv-studio-columns > div + div { padding-left: 32px; border-left: 1px solid var(--hv-frost-edge); }
-    .hv-studio-foot { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--hv-frost-edge); }
+    .hv-studio-foot { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--hv-frost-edge); }
     .hv-studio-foot > span { margin-right: auto; font-size: 12px; opacity: .62; }
     .hv-studio-foot button { min-height: 44px; padding: 0 16px; border: 1px solid var(--hv-frost-edge); border-radius: 12px; background: var(--hv-control-fill, rgba(255,255,255,.06)); color: inherit; font-weight: 600; cursor: pointer; }
     .hv-studio-foot button:disabled { opacity: .35; cursor: default; }
@@ -4720,6 +4814,51 @@ window.HavalSplash = (function () {
     .hv-studio-wall.off { opacity: .45; filter: grayscale(1); background: repeating-linear-gradient(135deg, rgba(255,255,255,.07) 0 10px, transparent 10px 20px), #3a3f45; }
     .hv-studio-wall-edit { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; display: grid; place-items: center; border-radius: 50%; background: rgba(10,14,18,.62); color: #fff; }
     .hv-studio-wall-edit svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* Finger-follow desktop switch: full-bleed panes (shots of adjacent
+       desktops). Live stage content is translated with the finger; these
+       layers only cover the revealed gap / the commit flash. z above widgets
+       (20) and below the Desktops strip (84) / studio. */
+    .hv-desk-slide-layer {
+      position: absolute; inset: 0; z-index: 72; pointer-events: none;
+      display: none; overflow: hidden;
+    }
+    .hv-desk-slide-layer.on { display: block; }
+    .hv-desk-slide-pane, .hv-desk-slide-cover {
+      position: absolute; inset: 0;
+      background-color: #0b1016;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      will-change: transform;
+    }
+    .hv-desk-slide-cover { z-index: 2; opacity: 0; transition: opacity .12s ease; }
+    .hv-desk-slide-cover.on { opacity: 1; }
+    .hv-desk-slide-fallback {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 10px;
+      background: linear-gradient(160deg, #1a222c 0%, #0b1016 70%);
+      color: #eef3f7; text-shadow: 0 1px 3px rgba(0,0,0,.55);
+    }
+    .hv-desk-slide-pane.has-shot .hv-desk-slide-fallback,
+    .hv-desk-slide-cover.has-shot .hv-desk-slide-fallback { display: none; }
+    .hv-desk-slide-fallback strong { font-size: 22px; font-weight: 600; }
+    .hv-desk-slide-fallback span { font: 12px/1 'Space Mono', monospace; opacity: .55; letter-spacing: .08em; }
+    #hv-root.hv-desk-sliding { overflow: hidden; }
+    #hv-root.hv-desk-sliding > .hv-canvas-host,
+    #hv-root.hv-desk-sliding > .hv-wallpaper,
+    #hv-root.hv-desk-sliding > .hv-widget-board,
+    #hv-root.hv-desk-sliding > .hv-desktop-switcher,
+    #hv-root.hv-desk-sliding > .hv-desktop-swipe-edge,
+    #hv-root.hv-desk-sliding > .hv-car-stage-action,
+    #hv-root.hv-desk-sliding > .hv-apps-pane,
+    #hv-root.hv-desk-sliding > .hv-center-slot-zone,
+    #hv-root.hv-desk-sliding > .hv-shell-hud {
+      will-change: transform;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hv-desk-slide-cover { transition: none; }
+    }
 
     /* Desktops: a strip over the whole panel, not a framed popup. */
     .hv-desks { position: absolute; inset: 0; z-index: 84; display: flex; flex-direction: column; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .22s ease;
@@ -5776,7 +5915,7 @@ window.HavalSplash = (function () {
   <!-- widget boards occupy the same rects as freeform app slots -->
   <div class="hv-desktop-swipe-edge left" style="display: {{ desktopSwipeEdgesDisplay }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}"></div>
   <div class="hv-desktop-swipe-edge right" style="display: {{ desktopSwipeEdgesDisplay }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}"></div>
-  <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};">
+  <div class="hv-widget-board" style="display: {{ leftBoardDisplay }}; left: {{ leftBoardLeft }}; top: {{ leftBoardTop }}; width: {{ leftBoardWidth }}; height: {{ leftBoardHeight }};" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}" onMouseDown="{{ desktopSwipeStart }}" onMouseMove="{{ desktopSwipeMove }}" onMouseUp="{{ desktopSwipeEnd }}" onMouseLeave="{{ desktopSwipeCancel }}">
     <div class="hv-widget-grid {{ leftGridPickClass }}" style="grid-template-columns: {{ leftGridCols }}; grid-template-rows: {{ leftGridRows }};" onTouchStart="{{ onLeftBoardHoldStart }}" onTouchEnd="{{ onLeftBoardHoldEnd }}" onTouchCancel="{{ onLeftBoardHoldCancel }}" onMouseDown="{{ onLeftBoardHoldStart }}" onMouseUp="{{ onLeftBoardHoldEnd }}" onMouseLeave="{{ onLeftBoardHoldCancel }}">
       <sc-for list="{{ leftSlotCells }}" as="sc" hint-placeholder-count="0">
         <button type="button" class="hv-widget-cell {{ sc.cls }}" style="{{ sc.gridStyle }}" onClick="{{ sc.onClick }}"></button>
@@ -6726,66 +6865,82 @@ window.HavalSplash = (function () {
       <sc-if value="{{ studioIsAppearance }}" hint-placeholder-val="{{ false }}">
         <div class="hv-studio-columns">
           <div>
-            <div class="hv-studio-label">THEME</div>
+            <div class="hv-studio-label">TEMA</div>
             <div class="hv-studio-chip-row">
-              <button type="button" class="{{ studioThemeDarkClass }}" onClick="{{ studioThemeDark }}">Dark</button>
-              <button type="button" class="{{ studioThemeLightClass }}" onClick="{{ studioThemeLight }}">Light</button>
-              <button type="button" class="{{ studioThemeAutoClass }}" onClick="{{ studioThemeAuto }}">Auto</button>
+              <button type="button" class="{{ studioThemeDarkClass }}" onClick="{{ studioThemeDark }}">Escuro</button>
+              <button type="button" class="{{ studioThemeLightClass }}" onClick="{{ studioThemeLight }}">Claro</button>
+              <button type="button" class="{{ studioThemeAutoClass }}" onClick="{{ studioThemeAuto }}">Automático</button>
             </div>
-            <div class="hv-studio-label">ACCENT</div>
+            <div class="hv-studio-label">COR DE DESTAQUE</div>
             <div class="hv-studio-accents">
               <sc-for list="{{ desktopAccentItems }}" as="da" hint-placeholder-count="12">
-                <button type="button" class="{{ da.cls }}" style="{{ da.style }}" onClick="{{ da.onClick }}" title="{{ da.title }}" aria-label="{{ da.title }} accent">
+                <button type="button" class="{{ da.cls }}" style="{{ da.style }}" onClick="{{ da.onClick }}" title="{{ da.title }}" aria-label="{{ da.title }}">
                   <sc-if value="{{ da.isCustomEmpty }}" hint-placeholder-val="{{ false }}">
                     <svg viewBox="0 0 24 24" class="hv-studio-accent-plus" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
                   </sc-if>
                 </button>
               </sc-for>
             </div>
+            <div class="hv-studio-dynamic-row">
+              <label class="hv-studio-dynamic-col">
+                <span>Cor dinâmica em modo <strong class="hv-studio-sport-text">Sport</strong></span>
+                <span class="hv-studio-toggle-wrap">
+                  <input type="checkbox" checked="{{ studioDynamicSportChecked }}" onChange="{{ studioToggleDynamicSport }}" />
+                  <span class="hv-studio-toggle-switch"></span>
+                </span>
+              </label>
+              <label class="hv-studio-dynamic-col">
+                <span>Cor dinâmica em modo <strong class="hv-studio-eco-text">Eco</strong></span>
+                <span class="hv-studio-toggle-wrap">
+                  <input type="checkbox" checked="{{ studioDynamicEcoChecked }}" onChange="{{ studioToggleDynamicEco }}" />
+                  <span class="hv-studio-toggle-switch"></span>
+                </span>
+              </label>
+            </div>
             <sc-if value="{{ studioCustomActive }}" hint-placeholder-val="{{ false }}">
               <div class="hv-studio-custom-editor">
                 <div class="hv-studio-custom-grid">
                   <div class="hv-studio-custom-tone">
-                    <div class="hv-studio-custom-tone-header"><span>DARK THEME</span></div>
+                    <div class="hv-studio-custom-tone-header"><span>TEMA ESCURO</span></div>
                     <div class="hv-studio-custom-row">
                       <label class="hv-studio-custom-swatch" style="background: {{ studioCustomDark }};">
-                        <input type="color" value="{{ studioCustomDark }}" onChange="{{ studioCustomDarkChange }}" onInput="{{ studioCustomDarkInput }}" title="Pick dark theme tone" />
+                        <input type="color" value="{{ studioCustomDark }}" onChange="{{ studioCustomDarkChange }}" onInput="{{ studioCustomDarkInput }}" title="Escolha a cor do tema escuro" />
                       </label>
                       <input type="text" class="hv-studio-custom-hex" value="{{ studioCustomDark }}" onChange="{{ studioCustomDarkHexChange }}" maxlength="7" placeholder="#2aa7b7" />
                     </div>
                   </div>
                   <div class="hv-studio-custom-tone">
-                    <div class="hv-studio-custom-tone-header"><span>LIGHT THEME</span></div>
+                    <div class="hv-studio-custom-tone-header"><span>TEMA CLARO</span></div>
                     <div class="hv-studio-custom-row">
                       <label class="hv-studio-custom-swatch" style="background: {{ studioCustomLight }};">
-                        <input type="color" value="{{ studioCustomLight }}" onChange="{{ studioCustomLightChange }}" onInput="{{ studioCustomLightInput }}" title="Pick light theme tone" />
+                        <input type="color" value="{{ studioCustomLight }}" onChange="{{ studioCustomLightChange }}" onInput="{{ studioCustomLightInput }}" title="Escolha a cor do tema claro" />
                       </label>
                       <input type="text" class="hv-studio-custom-hex" value="{{ studioCustomLight }}" onChange="{{ studioCustomLightHexChange }}" maxlength="7" placeholder="#029eb6" />
                     </div>
                   </div>
                 </div>
                 <div class="hv-studio-custom-actions">
-                  <button type="button" class="hv-studio-custom-btn danger" onClick="{{ studioCustomClearSlot }}" title="Reset this custom slot">Reset</button>
+                  <button type="button" class="hv-studio-custom-btn danger" onClick="{{ studioCustomClearSlot }}" title="Redefinir este espaço personalizado">Redefinir</button>
                 </div>
               </div>
             </sc-if>
           </div>
           <div>
-            <div class="hv-studio-label">BACKGROUND</div>
+            <div class="hv-studio-label">PLANO DE FUNDO</div>
             <div class="hv-studio-chip-row">
               <button type="button" class="{{ studioFillCarClass }}" onClick="{{ studioFillCar }}">3D</button>
-              <button type="button" class="{{ studioFillWallClass }}" onClick="{{ studioFillWallpaper }}">Wallpaper</button>
-              <button type="button" class="{{ studioFillMixedClass }}" onClick="{{ studioFillMixed }}">Both</button>
+              <button type="button" class="{{ studioFillWallClass }}" onClick="{{ studioFillWallpaper }}">Papel de parede</button>
+              <button type="button" class="{{ studioFillMixedClass }}" onClick="{{ studioFillMixed }}">Ambos</button>
             </div>
             <div class="hv-studio-note">{{ studioFillNote }}</div>
-            <div class="hv-studio-label">WALLPAPER</div>
+            <div class="hv-studio-label">PAPEL DE PAREDE</div>
             <button type="button" class="hv-studio-wall {{ studioWallClass }}" onClick="{{ studioOpenWallpaper }}" aria-label="{{ studioWallLabel }}" title="{{ studioWallLabel }}">
               <span class="hv-studio-wall-img" style="{{ studioWallStyle }}"></span>
               <span class="hv-studio-wall-edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"></path></svg></span>
             </button>
           </div>
         </div>
-        <div class="hv-studio-foot"><span>Applies to {{ desktopName }}</span><button type="button" onClick="{{ studioApplyAppearanceAll }}" disabled="{{ studioApplyAllDisabled }}">Apply to all desktops</button></div>
+        <div class="hv-studio-foot"><button type="button" onClick="{{ studioApplyAppearanceAll }}" disabled="{{ studioApplyAllDisabled }}">Aplicar a todas as telas</button></div>
       </sc-if>
     </div>
     <nav class="hv-studio-segtabs" aria-label="Cards or widgets" style="display:{{ studioSegTabsDisplay }};">
@@ -7630,14 +7785,14 @@ const H6_ENERGY_ICONS = {
 // AGORA zone readouts, painted in place at 1 Hz (_energyTick / _paintEnergyCards).
 const H6_ENERGY_NOW_KEYS = ['nowFuelChip', 'nowFuelChipClass', 'nowKwValue', 'nowKwChip', 'nowKwChipClass', 'nowEvSub', 'tenMinAvg', 'tripSince', 'tripEconomy', 'tripFuelL', 'tripKwh', 'tripKwhIn', 'levelsSpec', 'socText', 'socSub', 'socDelta', 'socBaseW', 'socDeltaL', 'socDeltaW', 'socDeltaClass', 'socMarkL', 'socMarkClass', 'fuelText', 'fuelSub', 'fuelDelta', 'fuelBaseW', 'fuelDeltaL', 'fuelDeltaW', 'fuelDeltaClass', 'fuelMarkL', 'fuelMarkClass'];
 const H6_DESKTOP_ACCENTS = [
-  { key: 'cyan', name: 'Cyan', dark: '#2aa7b7', light: '#029eb6' },
-  { key: 'mint', name: 'Mint', dark: '#66dfb1', light: '#02cf9c' },
-  { key: 'amber', name: 'Amber', dark: '#f0bd65', light: '#e29208' },
+  { key: 'cyan', name: 'Ciano', dark: '#2aa7b7', light: '#029eb6' },
+  { key: 'mint', name: 'Menta', dark: '#66dfb1', light: '#02cf9c' },
+  { key: 'amber', name: 'Âmbar', dark: '#f0bd65', light: '#e29208' },
   { key: 'coral', name: 'Coral', dark: '#f75a3b', light: '#f52d05' },
-  { key: 'violet', name: 'Violet', dark: '#a99aff', light: '#6351d4' },
-  { key: 'ice', name: 'Ice Blue', dark: '#9ac8ff', light: '#3c92fb' },
-  { key: 'slate', name: 'Slate Gray', dark: '#86909c', light: '#737d87' },
-  { key: 'mono', name: 'Mono', dark: '#dedee3', light: '#494a4b' }
+  { key: 'violet', name: 'Violeta', dark: '#a99aff', light: '#6351d4' },
+  { key: 'ice', name: 'Azul Gelo', dark: '#9ac8ff', light: '#3c92fb' },
+  { key: 'slate', name: 'Cinza', dark: '#86909c', light: '#737d87' },
+  { key: 'mono', name: 'Monocromático', dark: '#dedee3', light: '#494a4b' }
 ];
 const H6_CUSTOM_ACCENTS_KEY = 'h6_custom_accents_v1';
 const H6_CUSTOM_ACCENT_SLOTS = 4;
@@ -7846,8 +8001,9 @@ const H6_DRIVING_LEGACY_WIDGET_TYPES = { modes: 'driving' };
 
 /** Rail card id -> the CAR_MODE_GROUPS name its quick menu writes. */
 const H6_DRIVING_MENU_GROUPS = { driveMode: 'drive', powerMode: 'power', regen: 'regen' };
-/** Drive-mode value for Sport, and the accent the interface borrows while it is on. */
+/** Drive-mode values for Sport and Eco, and the accent colors the interface borrows while active. */
 const CAR_DRIVE_MODE_SPORT = '1';
+const CAR_DRIVE_MODE_ECO = '2';
 const CAR_SPORT_ACCENT = '#e0392c';
 /** Prefix for a quick-menu write. Everything after it is re-validated on arrival. */
 const H6_DRIVING_SET_PREFIX = 'drivingSet:';
@@ -8465,6 +8621,8 @@ class Component extends DCLogic {
     accentColor: '#2aa7b7',
     accentDark: '#2aa7b7',
     accentLight: '#029eb6',
+    dynamicColorSport: true,
+    dynamicColorEco: true,
   };
 
   constructor(props) {
@@ -10525,6 +10683,32 @@ class Component extends DCLogic {
       || t.closest('.hv-energy-histdata')
       || t.closest('.hv-energy-confirm')
       || t.closest('.hv-energy-mapmax'));
+  }
+
+  /**
+   * Targets that own their own drag/pan — desktop swipe must not steal them.
+   * Widget card bodies are intentionally allowed so a board swipe works.
+   */
+  _isDesktopSwipeBlockedTarget(ev) {
+    const t = ev && ev.target;
+    if (!t || !t.closest) return false;
+    return !!(t.closest('.hv-widget-remove')
+      || t.closest('.hv-widget-exit')
+      || t.closest('.hv-widget-card-menu')
+      || t.closest('.hv-widget-picker')
+      || t.closest('.hv-widget-picker-backdrop')
+      || t.closest('.hv-widget-slot-banner')
+      || t.closest('.hv-graph-editor')
+      || t.closest('.hv-energy-livemap')
+      || t.closest('.hv-energy-list')
+      || t.closest('.hv-energy-datapane')
+      || t.closest('.hv-energy-histdata')
+      || t.closest('.hv-energy-confirm')
+      || t.closest('.hv-energy-mapmax')
+      || t.closest('.hv-media-transport button')
+      || t.closest('.hv-driving-chip')
+      || t.closest('.hv-climate button')
+      || t.closest('.hv-energy button'));
   }
 
   _onWidgetSuppressClick(e) {
@@ -34192,6 +34376,8 @@ class Component extends DCLogic {
       accentColor: (s.widgetThemeMode === 'light' ? accent.light : accent.dark),
       accentDark: accent.dark,
       accentLight: accent.light,
+      dynamicColorSport: s.dynamicColorSport !== false,
+      dynamicColorEco: s.dynamicColorEco !== false,
       dockMode: s.dockMode === 'cards' ? 'cards' : 'launcher',
       clockFace: ['panorama', 'meridian', 'split', 'date-spine'].indexOf(s.clockFace) >= 0 ? s.clockFace : 'panorama',
       clockFormat: s.clockFormat === '12h' ? '12h' : '24h',
@@ -34228,6 +34414,8 @@ class Component extends DCLogic {
     base.accentColor = (base.widgetThemeMode === 'light' ? accent.light : accent.dark);
     base.accentDark = accent.dark;
     base.accentLight = accent.light;
+    base.dynamicColorSport = d.dynamicColorSport !== false;
+    base.dynamicColorEco = d.dynamicColorEco !== false;
     base.dockMode = d.dockMode === 'cards' ? 'cards' : 'launcher';
     base.clockFace = ['panorama', 'meridian', 'split', 'date-spine'].indexOf(d.clockFace) >= 0 ? d.clockFace : 'panorama';
     base.clockFormat = d.clockFormat === '12h' ? '12h' : '24h';
@@ -34319,6 +34507,8 @@ class Component extends DCLogic {
       accentColor: current.accentColor,
       accentDark: current.accentDark || current.accentColor,
       accentLight: current.accentLight || current.accentColor,
+      dynamicColorSport: current.dynamicColorSport !== false,
+      dynamicColorEco: current.dynamicColorEco !== false,
       dockMode: current.dockMode,
       clockFace: current.clockFace,
       clockFormat: current.clockFormat,
@@ -34392,6 +34582,8 @@ class Component extends DCLogic {
       widgetThemeMode: d.widgetThemeMode,
       accentKey: d.accentKey,
       accentColor: d.accentColor,
+      dynamicColorSport: d.dynamicColorSport !== false,
+      dynamicColorEco: d.dynamicColorEco !== false,
       dockMode: d.dockMode,
       clockFace: d.clockFace,
       clockFormat: d.clockFormat,
@@ -34414,6 +34606,9 @@ class Component extends DCLogic {
       this._syncCenterFillIndicator();
       this._syncSlotUseToNative();
       this._syncDockIndicators();
+      if (opts && opts.afterPaint) {
+        try { opts.afterPaint(); } catch (e) {}
+      }
     });
     try {
       const bridge = window.AppLauncherBridge;
@@ -34423,15 +34618,284 @@ class Component extends DCLogic {
 
   _previousDesktop() {
     if (this._desktopClickSuppressed()) return;
-    this._switchDesktop((this._desktopIndex || 0) - 1);
+    this._requestDesktopSwitch((this._desktopIndex || 0) - 1);
   }
   _nextDesktop() {
     if (this._desktopClickSuppressed()) return;
-    this._switchDesktop((this._desktopIndex || 0) + 1);
+    this._requestDesktopSwitch((this._desktopIndex || 0) + 1);
   }
 
   _desktopClickSuppressed() {
     return !!(this._suppressDesktopClickUntil && Date.now() < this._suppressDesktopClickUntil);
+  }
+
+  /**
+   * Switch with a finger-follow (or programmatic) full-screen slide. Adjacent
+   * desktops are represented by cached full-bleed shots so the motion is
+   * instant — the Desktops strip is only for the explicit picker, not this.
+   */
+  _requestDesktopSwitch(index) {
+    if (!this._desktopReady || !this._desktops || !this._desktops.length) return;
+    if (this._deskSlide && this._deskSlide.busy) return;
+    const count = this._desktops.length;
+    const cur = this._desktopIndex || 0;
+    const nextIndex = ((parseInt(index, 10) || 0) % count + count) % count;
+    if (nextIndex === cur) return;
+    if (this.state.desktopStudioOpen && this.state.desktopStudioTab === 'desktops') {
+      this._switchDesktop(nextIndex, false, false, { keepDesks: true });
+      return;
+    }
+    const forward = (nextIndex - cur + count) % count;
+    const backward = (cur - nextIndex + count) % count;
+    // −1 = stage moves left (next), +1 = stage moves right (previous).
+    const slideDir = forward <= backward ? -1 : 1;
+    this._deskSlideAnimateTo(nextIndex, slideDir);
+  }
+
+  _deskSlideWidth() {
+    return (typeof window !== 'undefined' && window.innerWidth) || 1920;
+  }
+
+  _deskSlideShotForIndex(index) {
+    const d = this._desktops && this._desktops[index];
+    if (!d) return null;
+    const shot = this._desktopShots && this._desktopShots[d.id];
+    if (shot && shot.url && shot.sig === this._desktopShotSig(d)) return shot;
+    // Stale / missing sig still usable for motion — better than a blank panel.
+    if (shot && shot.url) return shot;
+    return null;
+  }
+
+  _ensureDeskSlideDom() {
+    if (this._deskSlideDom && this._deskSlideDom.layer && this._deskSlideDom.layer.isConnected) {
+      return this._deskSlideDom;
+    }
+    const root = document.getElementById('hv-root');
+    if (!root) return null;
+    const layer = document.createElement('div');
+    layer.className = 'hv-desk-slide-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    layer.innerHTML = ''
+      + '<div class="hv-desk-slide-pane incoming"><div class="hv-desk-slide-fallback"><strong></strong><span></span></div></div>'
+      + '<div class="hv-desk-slide-cover"><div class="hv-desk-slide-fallback"><strong></strong><span></span></div></div>';
+    root.appendChild(layer);
+    this._deskSlideDom = {
+      layer: layer,
+      incoming: layer.querySelector('.hv-desk-slide-pane.incoming'),
+      cover: layer.querySelector('.hv-desk-slide-cover'),
+    };
+    return this._deskSlideDom;
+  }
+
+  _deskStageNodes() {
+    const root = document.getElementById('hv-root');
+    if (!root) return [];
+    const out = [];
+    for (let i = 0; i < root.children.length; i++) {
+      const el = root.children[i];
+      const cls = el.classList;
+      if (!cls) continue;
+      if (cls.contains('hv-canvas-host') || cls.contains('hv-wallpaper')
+        || cls.contains('hv-widget-board') || cls.contains('hv-desktop-switcher')
+        || cls.contains('hv-desktop-swipe-edge') || cls.contains('hv-car-stage-action')
+        || cls.contains('hv-apps-pane') || cls.contains('hv-center-slot-zone')
+        || cls.contains('hv-shell-hud')) {
+        out.push(el);
+      }
+    }
+    return out;
+  }
+
+  _fillDeskSlidePane(pane, index) {
+    if (!pane) return;
+    const d = this._desktops[index] || {};
+    const shot = this._deskSlideShotForIndex(index);
+    const fb = pane.querySelector('.hv-desk-slide-fallback');
+    if (fb) {
+      const strong = fb.querySelector('strong');
+      const span = fb.querySelector('span');
+      if (strong) strong.textContent = d.name || ('Desktop ' + (index + 1));
+      if (span) span.textContent = (index + 1) + ' / ' + (this._desktops.length || 1);
+    }
+    if (shot && shot.url) {
+      pane.style.backgroundImage = 'url("' + shot.url + '")';
+      pane.classList.add('has-shot');
+    } else {
+      pane.style.backgroundImage = '';
+      pane.classList.remove('has-shot');
+    }
+  }
+
+  _setDeskStageTransform(dx, withTransition) {
+    const t = withTransition
+      ? 'transform .2s cubic-bezier(.2,.7,.2,1)'
+      : 'none';
+    const value = 'translate3d(' + dx + 'px,0,0)';
+    const nodes = this._deskStageNodes();
+    for (let i = 0; i < nodes.length; i++) {
+      nodes[i].style.transition = t;
+      nodes[i].style.transform = value;
+    }
+  }
+
+  _clearDeskStageTransform() {
+    const nodes = this._deskStageNodes();
+    for (let i = 0; i < nodes.length; i++) {
+      nodes[i].style.transition = '';
+      nodes[i].style.transform = '';
+    }
+  }
+
+  _deskSlideApplyOffset(dx) {
+    const slide = this._deskSlide;
+    const dom = this._deskSlideDom;
+    if (!slide || !dom) return;
+    const w = this._deskSlideWidth();
+    const clamped = Math.max(-w, Math.min(w, dx));
+    slide.dx = clamped;
+    this._setDeskStageTransform(clamped, false);
+    // Incoming starts one screen to the side the finger is revealing.
+    const incomingBase = clamped < 0 ? w : -w;
+    dom.incoming.style.transition = 'none';
+    dom.incoming.style.transform = 'translate3d(' + (incomingBase + clamped) + 'px,0,0)';
+  }
+
+  /** Prepare the incoming pane for a given direction (−1 = next, +1 = previous). */
+  _deskSlideArm(dir, toIndex) {
+    const dom = this._ensureDeskSlideDom();
+    const root = document.getElementById('hv-root');
+    if (!dom || !root) return false;
+    const count = this._desktops.length;
+    const idx = ((toIndex % count) + count) % count;
+    this._fillDeskSlidePane(dom.incoming, idx);
+    dom.cover.classList.remove('on', 'has-shot');
+    dom.cover.style.backgroundImage = '';
+    dom.layer.classList.add('on');
+    root.classList.add('hv-desk-sliding');
+    this._deskSlide = {
+      busy: false,
+      dir: dir < 0 ? -1 : 1,
+      toIndex: idx,
+      dx: 0,
+      at: Date.now(),
+    };
+    this._deskSlideApplyOffset(0);
+    return true;
+  }
+
+  _deskSlideTeardown() {
+    const root = document.getElementById('hv-root');
+    const dom = this._deskSlideDom;
+    clearTimeout(this._deskSlideAnimTimer);
+    clearTimeout(this._deskSlideSafety);
+    this._clearDeskStageTransform();
+    if (root) root.classList.remove('hv-desk-sliding');
+    if (dom) {
+      dom.layer.classList.remove('on');
+      dom.incoming.style.transform = '';
+      dom.incoming.style.transition = '';
+      dom.incoming.style.backgroundImage = '';
+      dom.incoming.classList.remove('has-shot');
+      dom.cover.classList.remove('on', 'has-shot');
+      dom.cover.style.backgroundImage = '';
+      dom.cover.style.opacity = '';
+      dom.cover.style.transition = '';
+    }
+    this._deskSlide = null;
+  }
+
+  /**
+   * Finish a drag (or run a programmatic flick): animate to committed offset,
+   * cover with the destination shot, switch underneath, then peel the cover.
+   */
+  _deskSlideCommit(toIndex, dir, fromDx) {
+    const dom = this._ensureDeskSlideDom();
+    if (!dom) {
+      this._switchDesktop(toIndex);
+      return;
+    }
+    const w = this._deskSlideWidth();
+    const targetDx = dir < 0 ? -w : w;
+    if (!this._deskSlide || this._deskSlide.toIndex !== toIndex) {
+      this._deskSlideArm(dir, toIndex);
+    }
+    const slide = this._deskSlide;
+    slide.busy = true;
+    slide.toIndex = toIndex;
+    const startDx = typeof fromDx === 'number' ? fromDx : (slide.dx || 0);
+    this._deskSlideApplyOffset(startDx);
+    // Force layout, then animate to the committed edge.
+    void dom.layer.offsetWidth;
+    const duration = 200;
+    const nodes = this._deskStageNodes();
+    for (let i = 0; i < nodes.length; i++) {
+      nodes[i].style.transition = 'transform ' + duration + 'ms cubic-bezier(.2,.7,.2,1)';
+      nodes[i].style.transform = 'translate3d(' + targetDx + 'px,0,0)';
+    }
+    dom.incoming.style.transition = 'transform ' + duration + 'ms cubic-bezier(.2,.7,.2,1)';
+    dom.incoming.style.transform = 'translate3d(0,0,0)';
+    clearTimeout(this._deskSlideAnimTimer);
+    this._deskSlideAnimTimer = setTimeout(() => {
+      // Cover with the destination frame so the live rebuild is hidden.
+      this._fillDeskSlidePane(dom.cover, toIndex);
+      dom.cover.style.transition = 'none';
+      dom.cover.style.opacity = '1';
+      dom.cover.classList.add('on');
+      this._clearDeskStageTransform();
+      dom.incoming.style.transition = 'none';
+      dom.incoming.style.transform = 'translate3d(' + (dir < 0 ? w : -w) + 'px,0,0)';
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(this._deskSlideSafety);
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (dom.cover) {
+              dom.cover.style.transition = 'opacity .14s ease';
+              dom.cover.style.opacity = '0';
+              dom.cover.classList.remove('on');
+            }
+            setTimeout(() => this._deskSlideTeardown(), 160);
+          }, 40);
+        });
+      };
+      clearTimeout(this._deskSlideSafety);
+      this._deskSlideSafety = setTimeout(finish, 6000);
+      this._switchDesktop(toIndex, false, false, { afterPaint: finish });
+    }, duration + 8);
+  }
+
+  _deskSlideCancel(fromDx) {
+    const dom = this._deskSlideDom;
+    const slide = this._deskSlide;
+    if (!slide) return;
+    slide.busy = true;
+    const w = this._deskSlideWidth();
+    const startDx = typeof fromDx === 'number' ? fromDx : (slide.dx || 0);
+    const dir = slide.dir || -1;
+    this._deskSlideApplyOffset(startDx);
+    void (dom && dom.layer && dom.layer.offsetWidth);
+    const duration = 160;
+    this._setDeskStageTransform(0, true);
+    if (dom) {
+      dom.incoming.style.transition = 'transform ' + duration + 'ms cubic-bezier(.2,.7,.2,1)';
+      dom.incoming.style.transform = 'translate3d(' + (dir < 0 ? w : -w) + 'px,0,0)';
+    }
+    clearTimeout(this._deskSlideAnimTimer);
+    this._deskSlideAnimTimer = setTimeout(() => this._deskSlideTeardown(), duration + 8);
+  }
+
+  /** Programmatic switch (arrows / dots / keyboard): short slide then commit. */
+  _deskSlideAnimateTo(toIndex, dir) {
+    if (!this._deskSlideArm(dir, toIndex)) {
+      this._switchDesktop(toIndex);
+      return;
+    }
+    // Start slightly off so the motion is visible even on a fast MMI frame.
+    const nudge = dir < 0 ? -28 : 28;
+    this._deskSlideApplyOffset(nudge);
+    requestAnimationFrame(() => this._deskSlideCommit(toIndex, dir, nudge));
   }
 
   _openDesktopStudio(tab, shotTaken) {
@@ -34439,6 +34903,7 @@ class Component extends DCLogic {
     const aliases = { desktop: 'desktops', layout: 'widgets', help: 'desktops' };
     const raw = tab || this.state.desktopStudioTab || 'desktops';
     const next = H6_STUDIO_TABS.indexOf(aliases[raw] || raw) >= 0 ? (aliases[raw] || raw) : 'desktops';
+    if (this._deskSlide) this._deskSlideTeardown();
     // Photograph the desktop on screen before the strip covers it, so its own
     // thumbnail is current. Bounded: a capture that never answers opens the
     // strip anyway (see _requestDesktopShot).
@@ -34458,8 +34923,9 @@ class Component extends DCLogic {
    * changes or is switched to, and just before the Desktops strip opens -- and
    * the picture is cached per desktop id. Native does the capture
    * (AppLauncherBridge.captureDesktopSnapshot: PixelCopy of the window, so the
-   * WebGL car, the widgets and the rail all come out as drawn). A cached picture
-   * is used only while the desktop still matches what was photographed
+   * WebGL car, the widgets and the rail all come out as drawn). Captures are
+   * 960×360 so they double as full-bleed swipe panes and strip thumbs. A cached
+   * picture is used only while the desktop still matches what was photographed
    * (_desktopShotSig); otherwise the schematic thumbnail stands in until the
    * next capture. Live values (clock, media, speed) are deliberately not part
    * of that match.
@@ -34496,6 +34962,7 @@ class Component extends DCLogic {
     return !!(s.loading || s.error || !this._viewerReady || this._introActive
       || s.desktopStudioOpen || s.focusedCardType || s.widgetMenuId || s.widgetPickerStep
       || s.widgetPlaceType || s.widgetPlaceMode || s.wallpaperPopupOpen || s.panelOpen || s.graphEditId
+      || (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx))
       || (this._shellMode || s.shellMode) === 'appsOnly'
       || (typeof document !== 'undefined' && document.visibilityState === 'hidden'));
   }
@@ -34518,7 +34985,7 @@ class Component extends DCLogic {
     const token = 's' + (++this._desktopShotSeq);
     this._desktopShotReqs[token] = { id: current.id, sig: this._desktopShotSig(current), after: once };
     try {
-      bridge.captureDesktopSnapshot(token, 480, 180);
+      bridge.captureDesktopSnapshot(token, 960, 360);
     } catch (e) {
       delete this._desktopShotReqs[token];
       once(false);
@@ -34532,10 +34999,14 @@ class Component extends DCLogic {
     const req = this._desktopShotReqs && this._desktopShotReqs[token];
     if (!req) return;
     delete this._desktopShotReqs[token];
-    if (typeof url !== 'string' || url.indexOf('data:image/jpeg;base64,') !== 0 || url.length > 200000) return;
+    if (typeof url !== 'string' || url.indexOf('data:image/jpeg;base64,') !== 0 || url.length > 450000) {
+      // Still unblock _openDesktopStudio — a bad frame must not strand the open.
+      if (typeof req.after === 'function') req.after(false);
+      return;
+    }
     this._desktopShots[req.id] = { url, sig: req.sig, at: Date.now() };
     this._saveDesktopShots();
-    req.after(true);
+    if (typeof req.after === 'function') req.after(true);
     if (this.state.desktopStudioOpen && this.state.desktopStudioTab === 'desktops') {
       this._uiOnlyStateWrite = true;
       this.setState((s) => ({ desktopShotRev: (s.desktopShotRev || 0) + 1 }));
@@ -34857,6 +35328,7 @@ class Component extends DCLogic {
 
   _closeDesktopStudio() {
     this._desksEndGesture();
+    if (this._deskSlide) this._deskSlideTeardown();
     const invoker = this._clockInvoker;
     this._clockInvoker = null;
     this._clockConfigEntry = null;
@@ -35057,6 +35529,22 @@ class Component extends DCLogic {
     });
   }
 
+  _toggleDynamicSport(e) {
+    const next = e && e.target ? !!e.target.checked : !this.state.dynamicColorSport;
+    this.setState({ dynamicColorSport: next }, () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
+  _toggleDynamicEco(e) {
+    const next = e && e.target ? !!e.target.checked : !this.state.dynamicColorEco;
+    this.setState({ dynamicColorEco: next }, () => {
+      this._persistActiveDesktop();
+      this._syncDockIndicators();
+    });
+  }
+
   _setCustomAccentHalf(index, isDarkHalf, hex) {
     if (index < 0 || index >= H6_CUSTOM_ACCENT_SLOTS) return;
     if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return;
@@ -35157,13 +35645,13 @@ class Component extends DCLogic {
     this._captureActiveDesktop();
     const at = this._desktopIndex || 0;
     const src = this._desktops[at];
-    const keys = ['widgetThemeMode', 'accentKey', 'accentColor', 'accentDark', 'accentLight', 'centerFill', 'wallpaperSource', 'wallpaperAuto', 'wallpaperIdx',
+    const keys = ['widgetThemeMode', 'accentKey', 'accentColor', 'accentDark', 'accentLight', 'dynamicColorSport', 'dynamicColorEco', 'centerFill', 'wallpaperSource', 'wallpaperAuto', 'wallpaperIdx',
       'wallpaperCuratedIdx', 'wallpaperFavoritesIdx', 'wallpaperWebUrl', 'wallpaperWebTitle', 'wallpaperWebCredit', 'wallpaperWebSourcePage', 'wallpaperCustomUrl'];
     this._desktops.forEach((d, i) => {
       if (i !== at) keys.forEach((key) => { d[key] = src[key]; });
     });
     this._saveDesktopStore();
-    this._desktopNotice('APPEARANCE APPLIED', 'Theme, accent and background now match on every desktop.');
+    this._desktopNotice('APARÊNCIA APLICADA', 'Tema, cor de destaque e plano de fundo agora combinam em todas as telas.');
     this.setState((s) => ({ desktopRev: (s.desktopRev || 0) + 1 }));
   }
 
@@ -35238,10 +35726,10 @@ class Component extends DCLogic {
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')) return;
     if (ev.key === 'ArrowLeft') {
       ev.preventDefault();
-      this._switchDesktop((this._desktopIndex || 0) - 1);
+      this._requestDesktopSwitch((this._desktopIndex || 0) - 1);
     } else if (ev.key === 'ArrowRight') {
       ev.preventDefault();
-      this._switchDesktop((this._desktopIndex || 0) + 1);
+      this._requestDesktopSwitch((this._desktopIndex || 0) + 1);
     }
   }
 
@@ -35276,54 +35764,159 @@ class Component extends DCLogic {
   _onDesktopGestureStart(ev) {
     const p = this._eventClientPoint(ev);
     const mode = this._shellMode || this.state.shellMode || 'appCar';
-    // Background + top switcher own desktop swipes. Widget cards / apps panes
-    // keep pointer-events and never reach here; the car orbit disc is excluded
-    // so a drag on the model still rotates it.
+    const cls = ev && ev.currentTarget && ev.currentTarget.classList;
+    const fromSwitcher = !!(cls && cls.contains('hv-desktop-switcher'));
+    // Background, top switcher, outer edges, and the widget board. Map pans /
+    // chrome controls inside a widget keep ownership; the car orbit disc is
+    // excluded so a drag on the model still rotates it.
     if (!p || !this._pointInDesktopSwipeZone(p.x, p.y, ev) || mode === 'appsOnly'
       || this.state.desktopStudioOpen || this._widgetAddingOn() || this.state.graphEditId
-      || this.state.widgetMenuId || this.state.widgetPickerStep) return;
+      || this.state.widgetMenuId || this.state.widgetPickerStep
+      || this.state.widgetPlaceMode === 'move'
+      || (this._deskSlide && this._deskSlide.busy)
+      || (!fromSwitcher && this._isDesktopSwipeBlockedTarget(ev))) return;
     this._desktopGesture = {
       x: p.x, y: p.y, at: Date.now(), moved: false,
-      fromSwitcher: !!(ev && ev.currentTarget
-        && ev.currentTarget.classList
-        && ev.currentTarget.classList.contains('hv-desktop-switcher')),
+      lastX: p.x, lastT: Date.now(), vx: 0,
+      fromSwitcher: fromSwitcher,
+      fromBoard: !!(cls && cls.contains('hv-widget-board')),
+      fromTouch: !!(ev && (ev.type === 'touchstart'
+        || (ev.touches && ev.touches.length)
+        || (ev.pointerType === 'touch'))),
+      // Finger-follow on the board / edges / canvas — switcher stays tap-first.
+      trackSlide: !fromSwitcher,
       controlsEnabled: this.controls ? this.controls.enabled !== false : null,
     };
     // Outside the car disc, this press is a desktop swipe — don't let orbit
     // steal the first 18 px of travel.
-    if (this.controls && !this._desktopGesture.fromSwitcher) this.controls.enabled = false;
+    if (this.controls && !this._desktopGesture.fromSwitcher && !this._desktopGesture.fromBoard) {
+      this.controls.enabled = false;
+    }
   }
 
   _onDesktopGestureMove(ev) {
     if (!this._desktopGesture) return;
     const p = this._eventClientPoint(ev);
     if (!p) return;
-    const dx = p.x - this._desktopGesture.x;
-    const dy = p.y - this._desktopGesture.y;
-    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) this._desktopGesture.moved = true;
+    const g = this._desktopGesture;
+    const dx = p.x - g.x;
+    const dy = p.y - g.y;
+    const now = Date.now();
+    if (now > g.lastT) {
+      g.vx = (p.x - g.lastX) / (now - g.lastT);
+      g.lastX = p.x;
+      g.lastT = now;
+    }
+    // Switcher taps are jittery under the status-bar proxy; wait for a clearer
+    // move before treating this as a drag (still synthesise the click on end).
+    const movePx = g.fromSwitcher ? 18 : 10;
+    if (!g.moved && (Math.abs(dx) > movePx || Math.abs(dy) > movePx)) {
+      g.moved = true;
+      if (g.fromBoard) {
+        this._clearWidgetHold();
+        this._cancelCenterHold();
+      }
+    }
+    if (!g.trackSlide || !g.moved) return;
+    // Need a clear horizontal intent before arming the slide layers.
+    if (!this._deskSlide) {
+      if (Math.abs(dx) < 22 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      if (!this._desktopReady || !this._desktops || this._desktops.length < 2) return;
+      const dir = dx < 0 ? -1 : 1;
+      const count = this._desktops.length;
+      const toIndex = ((this._desktopIndex || 0) + (dir < 0 ? 1 : -1) + count) % count;
+      if (!this._deskSlideArm(dir, toIndex)) return;
+      if (g.fromBoard) this._suppressNextWidgetClick();
+    } else if (!this._deskSlide.busy) {
+      // Re-aim if the user reverses past centre.
+      const dir = dx < 0 ? -1 : 1;
+      if (dir !== this._deskSlide.dir && Math.abs(dx) > 8) {
+        const count = this._desktops.length;
+        const toIndex = ((this._desktopIndex || 0) + (dir < 0 ? 1 : -1) + count) % count;
+        this._deskSlide.dir = dir;
+        this._deskSlide.toIndex = toIndex;
+        this._fillDeskSlidePane(this._deskSlideDom && this._deskSlideDom.incoming, toIndex);
+      }
+    }
+    if (this._deskSlide && !this._deskSlide.busy) this._deskSlideApplyOffset(dx);
   }
 
   _onDesktopGestureEnd(ev) {
     const g = this._desktopGesture;
     this._desktopGesture = null;
     if (g && this.controls && g.controlsEnabled != null) this.controls.enabled = g.controlsEnabled;
-    if (!g || !g.moved) return;
+    if (!g) return;
     const p = this._eventClientPoint(ev);
     if (!p) return;
     const dx = p.x - g.x;
     const dy = p.y - g.y;
-    if (Date.now() - g.at < 900 && Math.abs(dx) >= 72 && Math.abs(dy) <= 64 && Math.abs(dx) > Math.abs(dy) * 1.35) {
-      if (dx < 0) this._switchDesktop((this._desktopIndex || 0) + 1);
-      else this._switchDesktop((this._desktopIndex || 0) - 1);
-      // A swipe that started on a switcher button must not also fire its click.
+    const w = this._deskSlideWidth();
+    const vx = g.vx || 0;
+
+    // Interactive slide was armed — commit or snap back.
+    if (this._deskSlide && !this._deskSlide.busy && g.trackSlide) {
+      const dir = this._deskSlide.dir;
+      const progress = Math.abs(this._deskSlide.dx || dx) / w;
+      const flicked = (dir < 0 && vx < -0.45) || (dir > 0 && vx > 0.45);
+      const farEnough = progress >= 0.22 || Math.abs(dx) >= 72;
       this._suppressDesktopClickUntil = Date.now() + 450;
+      if (g.fromBoard) this._suppressNextWidgetClick();
+      if ((farEnough || flicked) && Math.abs(dy) <= 90) {
+        this._deskSlideCommit(this._deskSlide.toIndex, dir, this._deskSlide.dx || dx);
+      } else {
+        this._deskSlideCancel(this._deskSlide.dx || dx);
+      }
+      return;
     }
+
+    const isSwipe = !!(g.moved && Date.now() - g.at < 900
+      && Math.abs(dx) >= 72 && Math.abs(dy) <= 64 && Math.abs(dx) > Math.abs(dy) * 1.35);
+    if (isSwipe) {
+      this._suppressDesktopClickUntil = Date.now() + 450;
+      if (g.fromBoard) this._suppressNextWidgetClick();
+      this._requestDesktopSwitch((this._desktopIndex || 0) + (dx < 0 ? 1 : -1));
+      return;
+    }
+    // Any touchmove on the switcher cancels the browser click — even a 2 px
+    // jitter under the move threshold. Always activate from the press point on
+    // touch; mouse keeps its native click (synthesising would double-fire).
+    if (g.fromSwitcher && g.fromTouch) this._activateDesktopSwitcherAt(g.x, g.y);
   }
 
   _onDesktopGestureCancel() {
     const g = this._desktopGesture;
     this._desktopGesture = null;
     if (g && this.controls && g.controlsEnabled != null) this.controls.enabled = g.controlsEnabled;
+    if (this._deskSlide && !this._deskSlide.busy) this._deskSlideCancel(this._deskSlide.dx || 0);
+  }
+
+  /** Hit-test the switcher after a cancelled click (see _onDesktopGestureEnd). */
+  _activateDesktopSwitcherAt(x, y) {
+    if (this._desktopClickSuppressed()) return;
+    const el = (typeof document !== 'undefined' && document.elementFromPoint)
+      ? document.elementFromPoint(x, y) : null;
+    let btn = el && el.closest ? el.closest('.hv-desktop-switcher button') : null;
+    // Proxy pad can land slightly outside a button — snap to the nearest one.
+    if (!btn) {
+      const switcher = document.querySelector('.hv-desktop-switcher');
+      if (switcher) {
+        const buttons = switcher.querySelectorAll('button');
+        let best = null;
+        let bestDist = 40;
+        for (let i = 0; i < buttons.length; i++) {
+          const r = buttons[i].getBoundingClientRect();
+          const cx = (r.left + r.right) / 2;
+          const cy = (r.top + r.bottom) / 2;
+          const d = Math.hypot(x - cx, y - cy);
+          if (d < bestDist) { bestDist = d; best = buttons[i]; }
+        }
+        btn = best;
+      }
+    }
+    if (!btn) return;
+    try { btn.click(); } catch (e) {}
+    // Eat a late native click that sometimes still arrives after touchmove.
+    this._suppressDesktopClickUntil = Date.now() + 350;
   }
 
   _onDesktopDotHoldStart(index, ev) {
@@ -35569,16 +36162,20 @@ class Component extends DCLogic {
       // Frost pill is always on; no idle colour override.
       desktopDotClass: 'on' + (s.desktopIndicatorExpanded ? ' expanded' : ''),
       desktopName: current.name || 'Desktop',
+      desktopSwitcherStyle: '',
+      desktopCountLabel: (index + 1) + ' / ' + Math.max(1, list.length),
       desktopIndexLabel: (index + 1) + '/' + list.length,
       desktopIndicatorClick: () => this._openDesktopStudio('desktops'),
       desktopIndicatorStyle: '',
-      desksStripClass: (studioOpen && tab === 'desktops' ? 'on' : '') + (s.desksEditing ? ' editing' : ''),
-      desksBackdropClass: (studioOpen && tab === 'desktops' ? 'on' : ''),
-      desksTitle: s.desksEditing ? 'EDIT DESKTOPS' : 'DESKTOPS',
+      // Template binds desksClass / desksCanAdd / desksHint (not the Strip* aliases).
+      desksClass: (studioOpen && tab === 'desktops' ? 'on' : '')
+        + (s.desksEditing ? ' editing' : ''),
       desksItems: list.map((d, i) => this._desktopThumbView(d, i, index)),
       desksEmpty: !list.length,
-      desksAddVisible: list.length < H6_MAX_DESKTOPS,
-      desksNote: s.desksEditing
+      desksCanAdd: list.length < H6_MAX_DESKTOPS,
+      desksDuplicateDisabled: list.length >= H6_MAX_DESKTOPS,
+      desksDeleteDisabled: list.length <= 1,
+      desksHint: s.desksEditing
         ? 'Arraste para reordenar · toque em qualquer lugar para concluir'
         : 'Deslize para trocar de área de trabalho · toque em uma para abrir · segure para editar · toque fora para fechar',
       desksAddStart: (ev) => { this._cardControlEvent(ev); if (!this._desksClickSuppressed()) this._addDesktopAt(true); },
@@ -35624,7 +36221,7 @@ class Component extends DCLogic {
             style: isConfigured
               ? 'background: linear-gradient(135deg, ' + slot.dark + ' 50%, ' + slot.light + ' 50%);'
               : '',
-            title: isConfigured ? ('Custom ' + (i + 1) + ' (Dark: ' + slot.dark + ' / Light: ' + slot.light + ')') : ('Custom ' + (i + 1) + ' · Tap to configure'),
+            title: isConfigured ? ('Personalizado ' + (i + 1) + ' (Escuro: ' + slot.dark + ' / Claro: ' + slot.light + ')') : ('Personalizado ' + (i + 1) + ' · Toque para configurar'),
             isCustom: true,
             isCustomEmpty: !isConfigured,
             onClick: () => {
@@ -35658,12 +36255,16 @@ class Component extends DCLogic {
       studioCustomLightHexChange: (e) => this._onCustomToneInput(false, e.target.value),
       studioCustomAutoPair: () => this._onCustomAutoPair(),
       studioCustomClearSlot: () => this._onCustomClearSlot(),
+      studioDynamicSportChecked: s.dynamicColorSport !== false,
+      studioDynamicEcoChecked: s.dynamicColorEco !== false,
+      studioToggleDynamicSport: (e) => this._toggleDynamicSport(e),
+      studioToggleDynamicEco: (e) => this._toggleDynamicEco(e),
       desktopDots: list.map((d, i) => ({
         cls: i === index ? 'on' : '',
         title: d.name,
         onClick: () => {
           if (self._desktopClickSuppressed()) return;
-          self._switchDesktop(i);
+          self._requestDesktopSwitch(i);
         },
         onHoldStart: (function(n) { return function(ev) { self._onDesktopDotHoldStart(n, ev); }; })(i),
         onHoldEnd: (ev) => this._onDesktopDotHoldEnd(ev),
@@ -35683,7 +36284,7 @@ class Component extends DCLogic {
       desktopStudioClass: (studioOpen && tab !== 'desktops' ? 'on ' : '') + 'tab-' + tab,
       desktopStudioBackdropClass: studioOpen && tab !== 'desktops' ? 'on' : '',
       closeDesktopStudio: () => this._closeDesktopStudio(),
-      studioTitle: tab === 'appearance' ? 'Appearance' : 'Cards & widgets',
+      studioTitle: tab === 'appearance' ? 'Aparência' : 'Cards & widgets',
       studioTitleDisplay: tab === 'clock' ? 'none' : 'block',
       studioSegTabsDisplay: (tab === 'cards' || tab === 'widgets') ? 'flex' : 'none',
       studioTabCardsClass: tab === 'cards' ? 'on' : '',
@@ -35704,10 +36305,10 @@ class Component extends DCLogic {
       studioFillWallpaper: () => this._setCenterFill('wallpaper'),
       studioFillMixed: () => this._setCenterFill('mixed'),
       studioFillNote: fill === 'mixed'
-        ? 'The 3D car renders over the wallpaper.'
+        ? 'O carro 3D é renderizado sobre o papel de parede.'
         : (fill === 'wallpaper'
-          ? 'The wallpaper fills the screen; the 3D car is hidden.'
-          : 'The 3D car scene fills the screen; no wallpaper is fetched.'),
+          ? 'O papel de parede preenche a tela; o carro 3D fica oculto.'
+          : 'O cenário 3D do carro preenche a tela; nenhum papel de parede é carregado.'),
       // 3D mode has no wallpaper: the thumb shows greyed out and empty, and a
       // tap still opens the editor (which switches the background to it).
       studioWallClass: fill === 'car' ? 'off' : '',
@@ -35715,7 +36316,7 @@ class Component extends DCLogic {
         const entry = fill !== 'car' ? this._currentWallpaperEntry() : null;
         return entry && entry.url ? "background-image:url('" + String(entry.url).replace(/'/g, '%27') + "');" : '';
       })(),
-      studioWallLabel: fill === 'car' ? 'No wallpaper in 3D mode · tap to choose one' : 'Edit wallpaper',
+      studioWallLabel: fill === 'car' ? 'Sem papel de parede no modo 3D · toque para escolher um' : 'Editar papel de parede',
       studioOpenWallpaper: () => this._openWallpaperFromStudio(),
       studioApplyAppearanceAll: () => this._applyAppearanceToAllDesktops(),
       studioApplyAllDisabled: list.length <= 1,
@@ -40260,17 +40861,28 @@ class Component extends DCLogic {
   /**
    * The accent to paint with right now.
    *
-   * Sport borrows the interface for as long as it is selected. Nothing is
-   * persisted — `accentColor` in state is still whatever the user chose — so
-   * leaving Sport restores their colour without a write.
+   * Color resolution:
+   *  - Sport mode dynamically uses the Coral accent when dynamicColorSport is enabled.
+   *  - Eco mode dynamically uses the Mint/Green accent when dynamicColorEco is enabled.
+   *  - These dynamic modes are NOT persisted to the desktop's accentColor/accentKey
+   *    — the user's chosen accent is preserved when leaving Sport/Eco or toggling off.
    */
   _effectiveAccentColor() {
-    if (this.state[CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.drive].stateKey] === CAR_DRIVE_MODE_SPORT) {
-      return CAR_SPORT_ACCENT;
-    }
     const s = this.state || {};
-    const accent = this._desktopAccent(s.accentKey, s.accentColor, s.accentDark, s.accentLight);
+    const driveGroup = CAR_MODE_GROUPS && CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX.drive];
+    const driveMode = String((driveGroup && s[driveGroup.stateKey]) || s.carDriveMode || '');
     const theme = this._effectiveWidgetTheme();
+    if (s.dynamicColorSport !== false && driveMode === CAR_DRIVE_MODE_SPORT) {
+      const coral = (Array.isArray(H6_DESKTOP_ACCENTS) && H6_DESKTOP_ACCENTS.find((a) => a.key === 'coral')) || { dark: '#f75a3b', light: '#f52d05' };
+      const chosen = (theme === 'light' ? coral.light : coral.dark) || coral.dark;
+      return this._readableAccent(chosen);
+    }
+    if (s.dynamicColorEco !== false && driveMode === CAR_DRIVE_MODE_ECO) {
+      const eco = (Array.isArray(H6_DESKTOP_ACCENTS) && (H6_DESKTOP_ACCENTS.find((a) => a.key === 'mint') || H6_DESKTOP_ACCENTS[1])) || { dark: '#66dfb1', light: '#02cf9c' };
+      const chosen = (theme === 'light' ? eco.light : eco.dark) || eco.dark;
+      return this._readableAccent(chosen);
+    }
+    const accent = this._desktopAccent(s.accentKey, s.accentColor, s.accentDark, s.accentLight);
     const chosen = (theme === 'light' ? accent.light : accent.dark) || accent.dark || '#2aa7b7';
     return this._readableAccent(chosen);
   }
@@ -40592,12 +41204,14 @@ class Component extends DCLogic {
   }
 
   _pointInDesktopSwipeZone(clientX, clientY, ev) {
-    // Top switcher always swipes — handlers sit on the element itself.
-    if ((ev && ev.currentTarget && ev.currentTarget.classList
-        && ev.currentTarget.classList.contains('hv-desktop-switcher'))
-      || this._pointInDesktopSwitcher(clientX, clientY)) {
+    const cls = ev && ev.currentTarget && ev.currentTarget.classList;
+    // Handlers sit on these elements — trust the target, skip geometry.
+    if (cls && (cls.contains('hv-desktop-switcher')
+      || cls.contains('hv-widget-board')
+      || cls.contains('hv-desktop-swipe-edge'))) {
       return true;
     }
+    if (this._pointInDesktopSwitcher(clientX, clientY)) return true;
     const width = (typeof window !== 'undefined' && window.innerWidth) || 1920;
     const height = (typeof window !== 'undefined' && window.innerHeight) || 720;
     const workspace = this._popupWorkspace();
