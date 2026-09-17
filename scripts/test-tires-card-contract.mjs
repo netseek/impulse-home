@@ -92,10 +92,15 @@ includesAll(html, [
   '.hv-tire-point.normal strong { color:var(--hv-widget-fg); }',
   '.hv-tires-focus-wheel.normal > strong,',
   '.hv-tires-focus-wheel.normal .hv-tires-temperature strong { color:var(--hv-widget-fg); }',
-  '.hv-tire-point.warning strong,.hv-tire-point.pressure-warning strong { color:#ff6671; }',
+  '.hv-tire-point.warning strong,.hv-tire-point.pressure-warning strong',
   '.hv-tire-wheel-mark.warning { display:block; }',
   '.hv-tires-focus-mark.warning { display:block; }',
+  '.hv-hs-vehicle-tire-mark.rl,.hv-status-tire-mark.rear-left,.hv-status-tire-mark.rl { left:27.5%; bottom:32%; }',
 ], 'Tires primary text colors');
+assert.match(html, /\.hv-hs-vehicle-tire\.pressure-warning em|\.hv-hs-vehicle-tire\.warning em/,
+  'pressure warning must tint the unit (PSI/bar) with the value');
+assert.ok(!/hv-hs-vehicle-tire-mark\.rl[^\{]*\{[^}]*left:\s*7%/.test(html),
+  'status tire marks must not sit in the black margin beside the readout');
 
 // Unit changes are presentation-only: bar / °C remain the canonical signal values.
 // Both formatters delegate to truncateTo, so it has to come along for the ride.

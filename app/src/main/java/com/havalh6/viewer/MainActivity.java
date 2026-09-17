@@ -2018,28 +2018,29 @@ public final class MainActivity extends Activity {
             }
         }
 
-        /** Red rectangles on flagged wheel arches (TPMS pressure/temp warning). */
+        /** Red rectangles on flagged wheel arches (TPMS pressure/temp warning).
+         *  vehicle-status/base.png body ~26–73% x; axle bands ~27% / ~64% y. */
         private void drawStatusTireMarks(android.graphics.Canvas c,
                 android.graphics.RectF vehicleRect) {
             if (descriptor.wheelStates == null) return;
-            float markW = vehicleRect.width() * .13f;
-            float markH = vehicleRect.height() * .065f;
+            float markW = vehicleRect.width() * .095f;
+            float markH = vehicleRect.height() * .048f;
             float[] xs = {
-                    vehicleRect.left + vehicleRect.width() * .07f,
-                    vehicleRect.right - vehicleRect.width() * .07f - markW,
-                    vehicleRect.left + vehicleRect.width() * .07f,
-                    vehicleRect.right - vehicleRect.width() * .07f - markW
+                    vehicleRect.left + vehicleRect.width() * .275f,
+                    vehicleRect.right - vehicleRect.width() * .275f - markW,
+                    vehicleRect.left + vehicleRect.width() * .275f,
+                    vehicleRect.right - vehicleRect.width() * .275f - markW
             };
             float[] ys = {
-                    vehicleRect.top + vehicleRect.height() * .16f,
-                    vehicleRect.top + vehicleRect.height() * .16f,
-                    vehicleRect.bottom - vehicleRect.height() * .13f - markH,
-                    vehicleRect.bottom - vehicleRect.height() * .13f - markH
+                    vehicleRect.top + vehicleRect.height() * .275f,
+                    vehicleRect.top + vehicleRect.height() * .275f,
+                    vehicleRect.bottom - vehicleRect.height() * .32f - markH,
+                    vehicleRect.bottom - vehicleRect.height() * .32f - markH
             };
             float radius = Math.max(1.5f, markW * .12f);
             for (int i = 0; i < 4 && i < descriptor.wheelStates.length; i++) {
                 if (!"warning".equals(descriptor.wheelStates[i])) continue;
-                fill(0x5CFF6671);
+                fill(0x73FF6671);
                 c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
                         radius, radius, paint);
                 stroke(0xFFFF6671, Math.max(1.5f, markW * .12f));
@@ -2051,24 +2052,24 @@ public final class MainActivity extends Activity {
         private void drawTireWheelMarks(android.graphics.Canvas c,
                 android.graphics.RectF carRect) {
             if (descriptor.wheelStates == null) return;
-            float markW = carRect.width() * .18f;
-            float markH = carRect.height() * .09f;
+            float markW = carRect.width() * .14f;
+            float markH = carRect.height() * .07f;
             float[] xs = {
-                    carRect.left + carRect.width() * .02f,
-                    carRect.right - carRect.width() * .02f - markW,
-                    carRect.left + carRect.width() * .02f,
-                    carRect.right - carRect.width() * .02f - markW
+                    carRect.left + carRect.width() * .16f,
+                    carRect.right - carRect.width() * .16f - markW,
+                    carRect.left + carRect.width() * .15f,
+                    carRect.right - carRect.width() * .15f - markW
             };
             float[] ys = {
-                    carRect.top + carRect.height() * .13f,
-                    carRect.top + carRect.height() * .13f,
-                    carRect.bottom - carRect.height() * .11f - markH,
-                    carRect.bottom - carRect.height() * .11f - markH
+                    carRect.top + carRect.height() * .24f,
+                    carRect.top + carRect.height() * .24f,
+                    carRect.bottom - carRect.height() * .28f - markH,
+                    carRect.bottom - carRect.height() * .28f - markH
             };
             float radius = Math.max(1.5f, markW * .12f);
             for (int i = 0; i < 4 && i < descriptor.wheelStates.length; i++) {
                 if (!"warning".equals(descriptor.wheelStates[i])) continue;
-                fill(0x5CFF6671);
+                fill(0x73FF6671);
                 c.drawRoundRect(xs[i], ys[i], xs[i] + markW, ys[i] + markH,
                         radius, radius, paint);
                 stroke(0xFFFF6671, Math.max(1.5f, markW * .12f));

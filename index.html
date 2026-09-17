@@ -4328,16 +4328,21 @@ window.HavalSplash = (function () {
     .hv-hs-vehicle-tire strong { font:560 clamp(21px,1.8vw,29px)/.92 'Space Grotesk',sans-serif; }
     .hv-hs-vehicle-tire em { font:650 8px/1 'Space Mono',monospace; letter-spacing:.07em; opacity:.66; font-style:normal; }
     .hv-hs-vehicle-tire small { flex:1 0 100%; font:600 15px/1 'Space Grotesk',sans-serif; letter-spacing:.02em; opacity:.86; }
-    .hv-hs-vehicle-tire.warning strong,.hv-hs-vehicle-tire.pressure-warning strong { color:#ff6671; }
+    .hv-hs-vehicle-tire.warning strong,.hv-hs-vehicle-tire.pressure-warning strong,
+    .hv-hs-vehicle-tire.warning em,.hv-hs-vehicle-tire.pressure-warning em { color:#ff6671; }
+    .hv-hs-vehicle-tire.pressure-warning em,.hv-hs-vehicle-tire.warning em { opacity:1; }
     .hv-hs-vehicle-tire.temp-warning small { color:#ff6671; opacity:1; }
     .hv-hs-vehicle-tire.unavailable { opacity:.42; }
     .hv-hs-vehicle-tire.fl { left:-48%; top:17%; justify-content:flex-end; text-align:right; }.hv-hs-vehicle-tire.fr { right:-48%; top:17%; justify-content:flex-start; text-align:left; }.hv-hs-vehicle-tire.rl { left:-48%; bottom:13%; justify-content:flex-end; text-align:right; }.hv-hs-vehicle-tire.rr { right:-48%; bottom:13%; justify-content:flex-start; text-align:left; }
-    .hv-hs-vehicle-tire-mark,.hv-status-tire-mark { position:absolute; z-index:7; display:none; width:13%; height:6.5%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.36); pointer-events:none; }
+    /* Wheel marks sit on the body wheel arches. vehicle-status/base.png body is
+       ~26–73% x; axle bands ~27% / ~64% y. left:7% landed in the black margin
+       beside the pressure readout (live popup, 2026-09-17). */
+    .hv-hs-vehicle-tire-mark,.hv-status-tire-mark { position:absolute; z-index:7; display:none; width:9.5%; height:4.8%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.45); pointer-events:none; }
     .hv-hs-vehicle-tire-mark.warning,.hv-status-tire-mark.warning { display:block; }
-    .hv-hs-vehicle-tire-mark.fl,.hv-status-tire-mark.front-left,.hv-status-tire-mark.fl { left:7%; top:16%; }
-    .hv-hs-vehicle-tire-mark.fr,.hv-status-tire-mark.front-right,.hv-status-tire-mark.fr { right:7%; top:16%; }
-    .hv-hs-vehicle-tire-mark.rl,.hv-status-tire-mark.rear-left,.hv-status-tire-mark.rl { left:7%; bottom:13%; }
-    .hv-hs-vehicle-tire-mark.rr,.hv-status-tire-mark.rear-right,.hv-status-tire-mark.rr { right:7%; bottom:13%; }
+    .hv-hs-vehicle-tire-mark.fl,.hv-status-tire-mark.front-left,.hv-status-tire-mark.fl { left:27.5%; top:27.5%; }
+    .hv-hs-vehicle-tire-mark.fr,.hv-status-tire-mark.front-right,.hv-status-tire-mark.fr { right:27.5%; top:27.5%; }
+    .hv-hs-vehicle-tire-mark.rl,.hv-status-tire-mark.rear-left,.hv-status-tire-mark.rl { left:27.5%; bottom:32%; }
+    .hv-hs-vehicle-tire-mark.rr,.hv-status-tire-mark.rear-right,.hv-status-tire-mark.rr { right:27.5%; bottom:32%; }
     @media (max-width: 640px) {
       .hv-hs-roof-pop { width: calc(100vw - 28px); padding-inline: 12px; }
       .hv-hs-roof-stack { grid-template-columns:minmax(150px,.9fr) minmax(160px,1fr) minmax(180px,1.1fr); gap:7px; }
@@ -5263,10 +5268,11 @@ window.HavalSplash = (function () {
     .hv-tires-visual { position:relative; height:calc(100% - 30px); min-height:90px; overflow:hidden; }
     .hv-tires-car-stage { position:absolute; left:50%; top:50%; width:min(104px,31%); height:92%; transform:translate(-50%,-50%); }
     .hv-tire-car { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 8px 10px rgba(0,0,0,.28)); }
-    .hv-tire-wheel-mark { position:absolute; z-index:2; display:none; width:18%; height:9%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.34); pointer-events:none; }
+    .hv-tire-wheel-mark { position:absolute; z-index:2; display:none; width:14%; height:7%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.45); pointer-events:none; }
     .hv-tire-wheel-mark.warning { display:block; }
-    .hv-tire-wheel-mark.front-left { left:2%; top:13%; } .hv-tire-wheel-mark.front-right { right:2%; top:13%; }
-    .hv-tire-wheel-mark.rear-left { left:2%; bottom:11%; } .hv-tire-wheel-mark.rear-right { right:2%; bottom:11%; }
+    /* tires-top-view body ~18–82% — marks on the wheel arches, not the margin. */
+    .hv-tire-wheel-mark.front-left { left:16%; top:24%; } .hv-tire-wheel-mark.front-right { right:16%; top:24%; }
+    .hv-tire-wheel-mark.rear-left { left:15%; bottom:28%; } .hv-tire-wheel-mark.rear-right { right:15%; bottom:28%; }
     .hv-tire-point { position:absolute; width:29%; display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 5px; font-variant-numeric:tabular-nums; }
     .hv-tire-point.front-left { left:2%; top:12%; justify-content:flex-end; text-align:right; }
     .hv-tire-point.front-right { right:2%; top:12%; justify-content:flex-start; text-align:left; }
@@ -5274,7 +5280,9 @@ window.HavalSplash = (function () {
     .hv-tire-point.rear-right { right:2%; bottom:12%; justify-content:flex-start; text-align:left; }
     .hv-tire-point strong { font-size:clamp(17px,3.2vw,29px); font-weight:560; line-height:.92; }
     .hv-tire-point small,.hv-tire-point em { font:7px/1 'Space Mono',monospace; letter-spacing:.08em; opacity:.52; font-style:normal; }
-    .hv-tire-point.warning strong,.hv-tire-point.pressure-warning strong { color:#ff6671; }
+    .hv-tire-point.warning strong,.hv-tire-point.pressure-warning strong,
+    .hv-tire-point.warning em,.hv-tire-point.pressure-warning em { color:#ff6671; }
+    .hv-tire-point.pressure-warning em,.hv-tire-point.warning em { opacity:1; }
     .hv-tire-point.temp-warning em { color:#ff6671; opacity:.9; }
     .hv-tire-point.normal strong { color:var(--hv-widget-fg); }
     .hv-tires-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; font:7px/1.2 'Space Mono',monospace; letter-spacing:.05em; opacity:.52; }
@@ -5539,10 +5547,10 @@ window.HavalSplash = (function () {
     .hv-tires-focus-stage::before { content:''; position:absolute; left:50%; top:8%; bottom:8%; width:1px; background:currentColor; opacity:.06; }
     .hv-tires-focus-car-stage { position:absolute; left:50%; top:50%; width:min(210px,33%); height:86%; transform:translate(-50%,-50%); }
     .hv-tires-focus-car { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 20px 22px rgba(0,0,0,.34)); }
-    .hv-tires-focus-mark { position:absolute; z-index:2; display:none; width:16%; height:8%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.34); pointer-events:none; }
+    .hv-tires-focus-mark { position:absolute; z-index:2; display:none; width:14%; height:7%; box-sizing:border-box; border:2px solid #ff6671; border-radius:2px; background:rgba(255,102,113,.45); pointer-events:none; }
     .hv-tires-focus-mark.warning { display:block; }
-    .hv-tires-focus-mark.front-left { left:3%; top:12%; } .hv-tires-focus-mark.front-right { right:3%; top:12%; }
-    .hv-tires-focus-mark.rear-left { left:3%; bottom:10%; } .hv-tires-focus-mark.rear-right { right:3%; bottom:10%; }
+    .hv-tires-focus-mark.front-left { left:16%; top:24%; } .hv-tires-focus-mark.front-right { right:16%; top:24%; }
+    .hv-tires-focus-mark.rear-left { left:15%; bottom:28%; } .hv-tires-focus-mark.rear-right { right:15%; bottom:28%; }
     .hv-tires-focus-wheel { position:absolute; width:min(190px,28%); min-height:96px; padding:12px 14px; box-sizing:border-box; border:1px solid var(--hv-frost-edge); border-radius:14px; background:var(--hv-frost-fill); box-shadow:inset 0 1px 0 var(--hv-frost-inner); }
     .hv-tires-focus-wheel.front-left { left:3%; top:7%; } .hv-tires-focus-wheel.front-right { right:3%; top:7%; }
     .hv-tires-focus-wheel.rear-left { left:3%; bottom:7%; } .hv-tires-focus-wheel.rear-right { right:3%; bottom:7%; }
@@ -5558,7 +5566,8 @@ window.HavalSplash = (function () {
     .hv-tires-temperature small { font:8px/1 'Space Mono',monospace; opacity:.62; }
     .hv-tires-focus-wheel > em { position:absolute; right:10px; bottom:10px; padding:3px 6px; border-radius:999px; background:rgba(255,255,255,.065); font-style:normal; opacity:.72; }
     .hv-tires-focus-wheel.warning { color:#ff6671; border-color:rgba(255,102,113,.62); }
-    .hv-tires-focus-wheel.pressure-warning > strong { color:#ff6671; }
+    .hv-tires-focus-wheel.pressure-warning > strong,
+    .hv-tires-focus-wheel.pressure-warning > i { color:#ff6671; opacity:1; }
     .hv-tires-focus-wheel.temp-warning .hv-tires-temperature strong { color:#ff6671; }
     .hv-tires-focus-wheel.normal > strong,
     .hv-tires-focus-wheel.normal .hv-tires-temperature strong { color:var(--hv-widget-fg); }
@@ -5625,6 +5634,7 @@ window.HavalSplash = (function () {
     .hv-status-2x2 .hv-status-card-tire em,.hv-status-3x2 .hv-status-card-tire em { font-size:6px; }
     .hv-status-2x2 .hv-status-card-tire small,.hv-status-3x2 .hv-status-card-tire small { font-size:12px; }
     .hv-status-card-tire.warning,.hv-status-card-tire.pressure-warning { color:#ff6671; }
+    .hv-status-card-tire.warning em,.hv-status-card-tire.pressure-warning em { color:#ff6671; opacity:1; }
     .hv-status-card-tire.temp-warning small { color:#ff6671; opacity:1; }
     .hv-status-card-tire.unavailable { opacity:.36; }
     .hv-status-card-tire.front-left { left:-62%; top:18%; }.hv-status-card-tire.front-right { right:-62%; top:18%; }.hv-status-card-tire.rear-left { left:-62%; bottom:15%; }.hv-status-card-tire.rear-right { right:-62%; bottom:15%; }
@@ -35113,11 +35123,18 @@ class Component extends DCLogic {
     const s = this.state;
     const splash = (typeof window !== 'undefined') ? window.HavalSplash : null;
     const body = (typeof document !== 'undefined') ? document.body : null;
+    const splashEl = (typeof document !== 'undefined')
+      ? document.getElementById('hv-splash') : null;
+    // Overlay still in the tree (holding last frame or fading) — PixelCopy
+    // would photograph the intro clip, not the desktop.
+    const splashVisible = !!(splashEl && splashEl.parentNode
+      && splashEl.style.display !== 'none');
     const bootChrome = !!(body && (body.classList.contains('hv-splash-up')
       || body.classList.contains('hv-boot')));
     return !!(s.loading || s.error || !this._viewerReady || !this._introPlayed
-      || this._introActive || this._camAnim || s.splashActive
-      || (splash && splash.active) || bootChrome
+      || this._introActive || this._camAnim || s.splashActive || splashVisible
+      || (splash && typeof splash.isDone === 'function' && !splash.isDone())
+      || bootChrome
       || s.desktopStudioOpen || s.focusedCardType || s.widgetMenuId || s.widgetPickerStep
       || s.widgetPlaceType || s.widgetPlaceMode || s.wallpaperPopupOpen || s.panelOpen || s.graphEditId
       || (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx))
