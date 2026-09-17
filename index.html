@@ -4428,12 +4428,15 @@ window.HavalSplash = (function () {
     .hv-widget-picker button.on { border-color: var(--hv-accent); color: var(--hv-accent); }
 
     /* Page dots between the widget board and the bottom card rail. No hit
-       proxy: these sit in the WebView, not under the MMI status bar. */
+       proxy: these sit in the WebView, not under the MMI status bar.
+       bottom tracks compensated --hv-launcher-bottom (80dp chrome gap) so
+       Impulse wm overscan does not lift the dots; design Y is 60px above
+       the panel bottom (5px lower than the first fixed-65 pass). */
     .hv-desktop-dots-bar {
       position: absolute;
       z-index: 34;
       left: 50%;
-      bottom: 65px;
+      bottom: max(0px, calc(var(--hv-launcher-bottom, 80px) - 20px));
       transform: translateX(-50%);
       display: flex;
       align-items: center;
@@ -35537,6 +35540,7 @@ class Component extends DCLogic {
       this._requestDesktopShot(() => this._openDesktopStudio('desktops', true));
       return;
     }
+    if (next === 'desktops') this._desksSession = true;
     this.setState({ desktopStudioOpen: true, desktopStudioTab: next, studioCardFocus: null, desksEditing: false, focusedCardType: null, panelOpen: false }, () => {
       this._syncDockIndicators();
       if (next === 'desktops') this._centerStudioDesktopStrip();
@@ -36000,7 +36004,7 @@ class Component extends DCLogic {
   /** Framed Cards/Widgets/Appearance close back to the desks strip; desks closes all. */
   _closeDesktopStudioFramedOrAll() {
     const tab = this.state.desktopStudioTab;
-    if (this.state.desktopStudioOpen && tab && tab !== 'desktops' && tab !== 'clock') {
+    if (this._desksSession && this.state.desktopStudioOpen && tab && tab !== 'desktops' && tab !== 'clock') {
       this._setStudioTab('desktops');
       return;
     }
@@ -36010,6 +36014,7 @@ class Component extends DCLogic {
   _closeDesktopStudio() {
     this._desksEndGesture();
     if (this._deskSlide) this._deskSlideTeardown();
+    this._desksSession = false;
     const invoker = this._clockInvoker;
     this._clockInvoker = null;
     this._clockConfigEntry = null;
@@ -36891,8 +36896,8 @@ class Component extends DCLogic {
       desktopCountLabel: (index + 1) + ' / ' + Math.max(1, list.length),
       desktopIndexLabel: (index + 1) + '/' + list.length,
       // Desks strip stays visible behind framed Cards/Widgets/Appearance.
-      desksClass: (studioOpen ? 'on' : '')
-        + (studioOpen && tab !== 'desktops' ? ' behind' : '')
+      desksClass: (studioOpen && (tab === 'desktops' || this._desksSession) ? 'on' : '')
+        + (studioOpen && tab !== 'desktops' && this._desksSession ? ' behind' : '')
         + (s.desksEditing ? ' editing' : ''),
       desksChromeClick: (ev) => this._cardControlEvent(ev),
       desksTabCardsClass: tab === 'cards' ? 'on' : '',
@@ -41215,7 +41220,7 @@ class Component extends DCLogic {
           const powertrainOn = !st.powertrainOn;
           this._applyPowertrainVisibility(powertrainOn);
           return { powertrainOn };
-        });
+        }, () => { this._persistActiveDesktop(); this._syncDockIndicators(); });
         break;
       case 'time':
         this.cycleTimeMode();
@@ -43310,6 +43315,9 @@ class Component extends DCLogic {
         window.MediaBridge.onViewerReady();
       }
     } catch (e) {}
+    if (this.state && this.state.powertrainOn) {
+      this._applyPowertrainVisibility(true);
+    }
   }
 
   _captureVariant(key, root) {

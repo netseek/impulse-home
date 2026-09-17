@@ -9025,8 +9025,8 @@ public final class MainActivity extends Activity {
         divider.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
         actions.addView(divider);
 
-        actions.addView(makeWorkspaceAction(density, false, "LAYOUT", "Show layout shortcuts",
-                v -> setWorkspaceLayoutMode(true)));
+        actions.addView(makeWorkspaceAction(density, false, "LAYOUT", "Show desktop selector",
+                v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops")));
         card.addView(actions);
         workspaceActionsFace = actions;
         View layoutFace = makeWorkspaceLayoutFace(density);
@@ -9163,6 +9163,14 @@ public final class MainActivity extends Activity {
         }
         crossfadeFaces(on ? workspaceActionsFace : workspaceLayoutFace,
                 on ? workspaceLayoutFace : workspaceActionsFace);
+        refreshWorkspaceLayoutAccent();
+    }
+
+    /** Accent the LAYOUT tile while any desktop studio screen is open. */
+    private void refreshWorkspaceLayoutAccent() {
+        if (workspaceActionsFace == null) return;
+        View layout = workspaceActionsFace.findViewWithTag("workspaceLayout");
+        if (layout != null) applyWorkspaceActionGlyph(layout);
     }
 
     private void crossfadeFaces(View out, View in) {
@@ -9233,7 +9241,8 @@ public final class MainActivity extends Activity {
         if (cell == null) return;
         float density = getResources().getDisplayMetrics().density;
         int size = Math.round(32 * density);
-        int color = dockLabelColor();
+        boolean layoutOn = "workspaceLayout".equals(cell.getTag()) && desktopStudioOpen;
+        int color = layoutOn ? dockAccentColor : dockLabelColor();
         android.widget.ImageView glyph = cell.findViewWithTag("workspaceGlyph");
         if (glyph != null) {
             glyph.setImageDrawable("workspaceApps".equals(cell.getTag())
@@ -9242,13 +9251,23 @@ public final class MainActivity extends Activity {
         }
         android.widget.TextView caption = cell.findViewWithTag("workspaceLabel");
         if (caption != null) caption.setTextColor(color);
-        android.graphics.drawable.GradientDrawable mask =
-                new android.graphics.drawable.GradientDrawable();
-        mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        mask.setColor(0xFFFFFFFF);
-        cell.setBackground(new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(withAlpha(color, 0x33)),
-                null, mask));
+        if (layoutOn) {
+            android.graphics.drawable.GradientDrawable bg =
+                    new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(9 * density);
+            bg.setColor(withAlpha(dockAccentColor, 0x2E));
+            bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0xA0));
+            cell.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(withAlpha(color, 0x33)), bg, null));
+        } else {
+            android.graphics.drawable.GradientDrawable mask =
+                    new android.graphics.drawable.GradientDrawable();
+            mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            mask.setColor(0xFFFFFFFF);
+            cell.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(withAlpha(color, 0x33)),
+                    null, mask));
+        }
     }
 
     private View makeQuickTextCard(float density, int widthDp, String title, String value,
@@ -10678,8 +10697,14 @@ public final class MainActivity extends Activity {
             }
             if (o.has("desktopCount")) desktopCount = Math.max(1, o.optInt("desktopCount", 1));
             if (o.has("desktopStudioOpen")) {
-                desktopStudioOpen = o.optBoolean("desktopStudioOpen", false);
-                updateLauncherStripVisibility();
+                boolean nextOpen = o.optBoolean("desktopStudioOpen", false);
+                if (nextOpen != desktopStudioOpen) {
+                    desktopStudioOpen = nextOpen;
+                    updateLauncherStripVisibility();
+                    refreshWorkspaceLayoutAccent();
+                } else {
+                    desktopStudioOpen = nextOpen;
+                }
             }
             if (o.has("activeDesktopIndex")) {
                 activeDesktopIndex = Math.max(0, o.optInt("activeDesktopIndex", 0));
@@ -10691,10 +10716,8 @@ public final class MainActivity extends Activity {
                 }
                 if (!screen.equals(studioScreen)) {
                     studioScreen = screen;
-                    // A screen opened from anywhere (the header pill, a rail card)
-                    // flips the card to its Layout face, one tap from the others.
-                    if (!screen.isEmpty()) setWorkspaceLayoutMode(true);
                     styleWorkspaceLayoutCells();
+                    refreshWorkspaceLayoutAccent();
                 }
             }
             boolean accentChanged = false;

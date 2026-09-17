@@ -32,12 +32,12 @@ if (!source.includes('alignQuickCardsToWidgetBoard()')
     || !/DOCK_SURFACE_CARDS\.equals\(dockSurfaceMode\)\s*\?\s*0\s*:\s*Math\.round\(12 \* density\)/.test(source)) {
   throw new Error('Quick cards must align to the widget board and retain the requested 5dp offset.');
 }
-if (!html.includes('}, 0, 10);')
+if (!html.includes('const leftRect = this._rectCss(this._shellLeftBounds, { l: 48, t: 40, r: 740, b: 500 });')
     || !html.includes('const stageControlLeft = boardLeft + (occupiedCols > 0 ? occupiedWidth + 10 : 0);')
     || !/stageAestheticStyle: 'left:' \+ Math\.round\(stageControlLeft\) \+ 'px;top:'\s*\+ Math\.round\(stageControlBottom - 42\)/.test(html)
     || !/stageCameraStyle: 'left:' \+ Math\.round\(stageControlLeft \+ \d+\) \+ 'px;top:'\s*\+ Math\.round\(stageControlBottom - 42\)/.test(html)) {
-  // Config sits at the widget edge; camera shares its row, offset to the right.
-  throw new Error('Widget offset and dynamic config/camera row contract is missing.');
+  // Widget board shares the freeform band; config/camera sit at the occupied edge.
+  throw new Error('Widget board and dynamic config/camera row contract is missing.');
 }
 if (!source.includes('class QuickCardGraphicView extends View')
     || !source.includes('case "navigation": drawNavigation')
