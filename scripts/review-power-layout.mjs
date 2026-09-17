@@ -86,6 +86,19 @@ try{
       await target.screenshot({path:path.join(root,`docs/power-redesign-${popup?'popup':'sizes'}-${theme}.png`)});
     }
   }
+  const transparentChassis=await page.evaluate(()=>{
+    const images=[...document.querySelectorAll('.hv-power-chassis')];
+    return images.map(image=>{
+      const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+      canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;ctx.drawImage(image,0,0);
+      const corner=ctx.getImageData(0,0,1,1).data[3];
+      const centre=ctx.getImageData((canvas.width/2)|0,(canvas.height/2)|0,1,1).data[3];
+      return {corner,centre};
+    });
+  });
+  if(!transparentChassis.length||transparentChassis.some(sample=>sample.corner!==0||sample.centre===0)){
+    throw Error('approved chassis crop lost its transparent ground: '+JSON.stringify(transparentChassis));
+  }
   await page.setViewportSize({width:1920,height:720});
   page.on('pageerror',e=>console.error('APP ERROR:',e.message));
   await page.goto(`${base}/index.html?demo=1`);
@@ -114,6 +127,16 @@ try{
   });
   if(!liveGraphic||liveGraphic.variant!=='phev34'||!liveGraphic.running||liveGraphic.cells!==10||liveGraphic.routes!==6){
     throw Error('production Power graphic did not reach the expected live AWD state: '+JSON.stringify(liveGraphic));
+  }
+  const flowEdges=await page.evaluate(()=>{
+    const svg=document.querySelector('.hv-power[data-power-size="popup"] .hv-power-overlay');
+    const filter=svg?.querySelector('filter'),markers=[...svg?.querySelectorAll('marker')||[]];
+    return {filterUnits:filter?.getAttribute('filterUnits'), markerUnits:markers.map(m=>m.getAttribute('markerUnits')),
+      visible:getComputedStyle(svg).overflow, routes:svg?.querySelectorAll('.hv-power-route.active').length||0};
+  });
+  if(flowEdges.filterUnits!=='userSpaceOnUse'||flowEdges.markerUnits.some(unit=>unit!=='userSpaceOnUse')
+    ||flowEdges.visible!=='visible'||flowEdges.routes!==6){
+    throw Error('wheel-end flow paint regression: '+JSON.stringify(flowEdges));
   }
   await page.screenshot({path:path.join(root,'docs/power-redesign-app-popup.png')});
   // Sample actual CSS animation at known times, rather than just checking its class.
@@ -144,5 +167,5 @@ try{
   });
   if(Math.abs(reduced.opacity-.2)>.001||reduced.animation!=='none')throw Error('Reduced motion must preserve proportional SOC: '+JSON.stringify(reduced));
   console.log('Pulse: 0 → 20% → 0 for the 12% boundary cell; no glow; hidden and reduced-motion states OK');
-  console.log('production markup size/theme captures + app popup captured');
+  console.log('transparent chassis, unclipped wheel-end flow, production markup size/theme captures + app popup captured');
 }finally{await browser?.close();server.close();}

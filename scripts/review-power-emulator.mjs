@@ -31,6 +31,6 @@ const check=evaluate(`(() => {
  return {cells:c?.querySelectorAll('[data-module]').length,pulses:c?.querySelectorAll('.hv-power-cell-pulse').length,
  mode:c?.querySelector('[data-battery-mode]')?.dataset.batteryMode,asset:c?.querySelector('img')?.naturalWidth};
 })()`);
-if(check.cells!==10||check.pulses!==1||check.mode!=='charging'||check.asset!==1145)throw Error(JSON.stringify(check));
+ if(check.cells!==10||check.pulses!==1||check.mode!=='charging'||check.asset!==350)throw Error(JSON.stringify(check));
 console.log(run('shot','docs/power-approved-emulator-popup.png'));
-console.log('Packaged WebView: ten cells, one charging pulse, approved artwork loaded.',check);
+console.log('Packaged WebView: ten cells, one charging pulse, transparent approved chassis crop loaded.',check);

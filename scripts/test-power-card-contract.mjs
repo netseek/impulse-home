@@ -42,6 +42,15 @@ for (const token of ['CAR_POWER_GRAPHICS', '_powerGraphicsVariant', '_powerGraph
   'hv-power-flow-ribbon', 'hv-power-cell-fill', 'prefers-reduced-motion']) {
   assert.ok(html.includes(token), `missing layered Power integration: ${token}`);
 }
+for (const key of ['phev19', 'phev34', 'hev2']) {
+  assert.ok(html.includes(`approved-${key}-chassis.png`), `missing transparent ${key} chassis crop`);
+}
+assert.ok(html.includes('filterUnits="userSpaceOnUse"'),
+  'flow glow must not use a zero-height/width object bounding box');
+assert.ok(html.includes('markerUnits="userSpaceOnUse"'),
+  'wheel-end chevrons must retain a stable, unclipped size');
+assert.ok(html.includes('.hv-power-canvas { position:relative;') && html.includes('overflow:visible;'),
+  'Power canvas must permit the wheel-end glow to paint past the route bounds');
 assert.ok(html.includes("case 'openPower':\n        this._openFocusedCard('power');"));
 
 for (const key of [
