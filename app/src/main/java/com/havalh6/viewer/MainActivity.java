@@ -728,6 +728,21 @@ public final class MainActivity extends Activity {
             return getSharedPreferences(PREFS_SHELL, MODE_PRIVATE).getString("widgets", "");
         }
 
+        /**
+         * Viewer -> shell: fade the bottom card rail with the widgets during a
+         * desktop swipe (the page fades its own layers; this one is native).
+         */
+        @JavascriptInterface
+        public void fadeLauncherStrip(float alpha, int durationMs) {
+            final float a = Math.max(0f, Math.min(1f, alpha));
+            final int ms = Math.max(0, Math.min(2000, durationMs));
+            runOnUiThread(() -> {
+                if (stripContainer == null) return;
+                stripContainer.animate().cancel();
+                stripContainer.animate().alpha(a).setDuration(ms).withLayer().start();
+            });
+        }
+
         /** A thumbnail of the desktop on screen; answered via __app.onDesktopSnapshot. */
         @JavascriptInterface
         public void captureDesktopSnapshot(String token, int width, int height) {
@@ -11390,8 +11405,8 @@ public final class MainActivity extends Activity {
                 || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return;
         View decor = getWindow().getDecorView();
         if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
-        final int w = Math.max(64, Math.min(1920, width));
-        final int h = Math.max(24, Math.min(720, height));
+        final int w = Math.max(64, Math.min(960, width));
+        final int h = Math.max(24, Math.min(360, height));
         final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         try {
             android.view.PixelCopy.request(getWindow(), new Rect(0, 0, decor.getWidth(), decor.getHeight()), bmp,
