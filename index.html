@@ -5857,6 +5857,12 @@ window.HavalSplash = (function () {
     .gauge-col.col-right .gauge-val { font-size:36px; font-weight:800; line-height:1; letter-spacing:-.04em; }
     .gauge-col.col-right .gauge-unit { font:700 14px/1 'Space Mono',monospace; opacity:.85; }
 
+    #hv-root.hv-widgets-light .hv-range-card .hv-range-2x2-top .hv-range-total strong { color:var(--hv-widget-fg); text-shadow:none; }
+    #hv-root.hv-widgets-light .hv-range-focus .hv-range-2x2-top .hv-range-total strong,
+    #hv-root.light .hv-range-focus .hv-range-2x2-top .hv-range-total strong { color:#1c2430; text-shadow:none; }
+    .hv-range-toggle-inline { display:inline-flex; align-items:center; gap:10px; margin-left:auto; padding:0; background:transparent; border:0; color:inherit; font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .hv-range-toggle-inline .hv-range-toggle-label { font-size:11px; }
+    #hv-root.hv-widgets-light .hv-range-toggle-track { background:rgba(0,0,0,.15); border-color:rgba(0,0,0,.22); }
     .hv-range-2x2-foot { display:flex; align-items:center; justify-content:space-between; padding-top:12px; border-top:1px solid var(--hv-widget-border); font:700 13.5px/1 'Space Mono',monospace; opacity:.92; letter-spacing:.05em; }
     .hv-range-2x2-foot b.ev { color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); }
     .hv-range-2x2-foot b.fuel { color:#f2994a; }
@@ -5864,7 +5870,9 @@ window.HavalSplash = (function () {
 
     /* Focus Modal Workspace - 2x2 Layout */
     .hv-card-focus.range-popup { width:min(640px,calc(100vw - 48px)); }
-    .hv-range-focus { padding:0; border-radius:18px; font-family:'Space Mono',monospace; }
+    .hv-range-focus { padding:0; border-radius:18px; font-family:'Space Mono',monospace; height:calc(100% - 48px); min-height:0; }
+    .hv-range-focus .hv-range-2x2-body { height:100%; box-sizing:border-box; }
+    .hv-range-focus .hv-range-2x2-trackers { flex:1; min-height:0; margin:0; justify-content:space-evenly; }
     .hv-range-focus .hv-range-2x2-body { border-radius:18px; background:linear-gradient(140deg,rgba(255,255,255,.065),rgba(255,255,255,.018)); padding:18px; }
     .hv-card-focus-head .hv-range-toggle-group { width:auto !important; max-width:none !important; height:38px !important; display:inline-flex; align-items:center; gap:10px; padding:0 4px !important; margin-left:auto; margin-right:8px; background:transparent !important; border:none !important; border-radius:0 !important; box-shadow:none !important; cursor:pointer; color:var(--hv-widget-fg,#edf5fa); transition:all .2s ease; -webkit-tap-highlight-color:transparent; flex-shrink:0; box-sizing:border-box; }
     .hv-card-focus-head .hv-range-toggle-group:hover, .hv-card-focus-head .hv-range-toggle-group:active { background:transparent !important; border:none !important; }
@@ -6485,11 +6493,11 @@ window.HavalSplash = (function () {
                         <div class="hv-range-gauge-grid">
                           <div class="gauge-col col-left">
                             <span class="gauge-name">BATERIA</span>
-                            <span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeEvConsume }}</strong></span>
+                            <sc-if value="{{ wg.rangeShowAvg }}" hint-placeholder-val="{{ true }}"><span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeEvConsume }}</strong></span></sc-if>
                           </div>
                           <div class="gauge-col col-center">
                             <strong class="gauge-pct">{{ wg.rangeSoc }}</strong>
-                            <span class="gauge-sub">{{ wg.rangeEvEnergy }}</span>
+                            <sc-if value="{{ wg.rangeShowSize }}" hint-placeholder-val="{{ true }}"><span class="gauge-sub">{{ wg.rangeEvEnergy }}</span></sc-if>
                           </div>
                           <div class="gauge-col col-right">
                             <div class="val-grp"><strong class="gauge-val">{{ wg.rangeEv }}</strong><small class="gauge-unit">{{ wg.rangeUnit }}</small></div>
@@ -6500,11 +6508,11 @@ window.HavalSplash = (function () {
                         <div class="hv-range-gauge-grid">
                           <div class="gauge-col col-left">
                             <span class="gauge-name">BATERIA</span>
-                            <span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeEvConsume }}</strong></span>
+                            <sc-if value="{{ wg.rangeShowAvg }}" hint-placeholder-val="{{ true }}"><span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeEvConsume }}</strong></span></sc-if>
                           </div>
                           <div class="gauge-col col-center">
                             <strong class="gauge-pct">{{ wg.rangeSoc }}</strong>
-                            <span class="gauge-sub">{{ wg.rangeEvEnergy }}</span>
+                            <sc-if value="{{ wg.rangeShowSize }}" hint-placeholder-val="{{ true }}"><span class="gauge-sub">{{ wg.rangeEvEnergy }}</span></sc-if>
                           </div>
                           <div class="gauge-col col-right">
                             <div class="val-grp"><strong class="gauge-val">{{ wg.rangeEv }}</strong><small class="gauge-unit">{{ wg.rangeUnit }}</small></div>
@@ -6518,11 +6526,11 @@ window.HavalSplash = (function () {
                         <div class="hv-range-gauge-grid">
                           <div class="gauge-col col-left">
                             <span class="gauge-name">COMBUSTÍVEL</span>
-                            <span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeFuelAvg }}</strong></span>
+                            <sc-if value="{{ wg.rangeShowAvg }}" hint-placeholder-val="{{ true }}"><span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeFuelAvg }}</strong></span></sc-if>
                           </div>
                           <div class="gauge-col col-center">
                             <strong class="gauge-pct">{{ wg.rangeFuelLvl }}</strong>
-                            <span class="gauge-sub">{{ wg.rangeFuelVolume }}</span>
+                            <sc-if value="{{ wg.rangeShowSize }}" hint-placeholder-val="{{ true }}"><span class="gauge-sub">{{ wg.rangeFuelVolume }}</span></sc-if>
                           </div>
                           <div class="gauge-col col-right">
                             <div class="val-grp"><strong class="gauge-val">{{ wg.rangeFuel }}</strong><small class="gauge-unit">{{ wg.rangeUnit }}</small></div>
@@ -6533,11 +6541,11 @@ window.HavalSplash = (function () {
                         <div class="hv-range-gauge-grid">
                           <div class="gauge-col col-left">
                             <span class="gauge-name">COMBUSTÍVEL</span>
-                            <span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeFuelAvg }}</strong></span>
+                            <sc-if value="{{ wg.rangeShowAvg }}" hint-placeholder-val="{{ true }}"><span class="gauge-sub">MÉDIA: <strong>{{ wg.rangeFuelAvg }}</strong></span></sc-if>
                           </div>
                           <div class="gauge-col col-center">
                             <strong class="gauge-pct">{{ wg.rangeFuelLvl }}</strong>
-                            <span class="gauge-sub">{{ wg.rangeFuelVolume }}</span>
+                            <sc-if value="{{ wg.rangeShowSize }}" hint-placeholder-val="{{ true }}"><span class="gauge-sub">{{ wg.rangeFuelVolume }}</span></sc-if>
                           </div>
                           <div class="gauge-col col-right">
                             <div class="val-grp"><strong class="gauge-val">{{ wg.rangeFuel }}</strong><small class="gauge-unit">{{ wg.rangeUnit }}</small></div>
@@ -6548,7 +6556,7 @@ window.HavalSplash = (function () {
                   </div>
                   <div class="hv-range-2x2-foot">
                     <span>DISTRIBUIÇÃO: <b class="ev">{{ wg.rangeEvPct }}%</b> BATERIA · <b class="fuel">{{ wg.rangeFuelPct }}%</b> COMBUSTÍVEL</span>
-                    <span>VIAGEM ESTIMADA: <strong>{{ wg.rangeTravelTime }}</strong></span>
+                    <sc-if value="{{ wg.rangeToggleShow }}" hint-placeholder-val="{{ false }}"><span class="hv-range-toggle-group hv-range-toggle-inline {{ wg.rangeToggleClass }}" role="switch" aria-checked="{{ wg.rangeToggleIsOn }}" onClick="{{ wg.rangeToggleSourceMode }}"><span class="hv-range-toggle-label">Usar estimativa média por histórico</span><span class="hv-range-toggle-control"><span class="hv-range-toggle-track"><span class="hv-range-toggle-thumb"></span></span><span class="hv-range-toggle-state">{{ wg.rangeToggleStateText }}</span></span></span></sc-if>
                   </div>
                 </div>
               </sc-if>
@@ -7065,7 +7073,7 @@ window.HavalSplash = (function () {
        CSS variables so it cannot cover the launcher/dock on Android. -->
   <div class="hv-card-focus-backdrop {{ focusedCardBackdropClass }}" onClick="{{ closeFocusedCard }}"></div>
   <section class="hv-card-focus {{ focusedCardPopupClass }}" role="dialog" aria-label="{{ focusedCardTitle }}">
-    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-card-focus-action {{ focusedConsumptionUnitsClass }}" onClick="{{ focusedConsumptionUnitsToggle }}" aria-expanded="{{ focusedConsumptionUnitsOpen }}">UNIDADES</button><button type="button" class="hv-card-focus-action hv-card-focus-max" onClick="{{ focusedConsumptionWideToggle }}" aria-label="{{ focusedConsumptionWideLabel }}"><sc-if value="{{ focusedConsumptionWideOn }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22,3.41l-5.29,5.29L20,12h-8V4l3.29,3.29L20.59,2L22,3.41z M3.41,22l5.29-5.29L12,20v-8H4l3.29,3.29L2,20.59L3.41,22z"></path></svg></sc-if><sc-if value="{{ focusedConsumptionWideOff }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21,11 L21,3 L13,3 L16.29,6.29 L6.29,16.29 L3,13 L3,21 L11,21 L7.71,17.71 L17.71,7.71 Z"></path></svg></sc-if></button></sc-if><sc-if value="{{ focusedCardIsRange }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-range-toggle-group {{ focusedRangeSourceModeClass }}" onClick="{{ focusedRangeToggleSourceMode }}" role="switch" aria-checked="{{ focusedRangeSourceIsOn }}" title="Alternar estimativas por histórico"><span class="hv-range-toggle-label">Usar estimativas por histórico</span><span class="hv-range-toggle-control"><span class="hv-range-toggle-track"><span class="hv-range-toggle-thumb"></span></span><span class="hv-range-toggle-state">{{ focusedRangeSourceStateText }}</span></span></button></sc-if><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
+    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-card-focus-action {{ focusedConsumptionUnitsClass }}" onClick="{{ focusedConsumptionUnitsToggle }}" aria-expanded="{{ focusedConsumptionUnitsOpen }}">UNIDADES</button><button type="button" class="hv-card-focus-action hv-card-focus-max" onClick="{{ focusedConsumptionWideToggle }}" aria-label="{{ focusedConsumptionWideLabel }}"><sc-if value="{{ focusedConsumptionWideOn }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22,3.41l-5.29,5.29L20,12h-8V4l3.29,3.29L20.59,2L22,3.41z M3.41,22l5.29-5.29L12,20v-8H4l3.29,3.29L2,20.59L3.41,22z"></path></svg></sc-if><sc-if value="{{ focusedConsumptionWideOff }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21,11 L21,3 L13,3 L16.29,6.29 L6.29,16.29 L3,13 L3,21 L11,21 L7.71,17.71 L17.71,7.71 Z"></path></svg></sc-if></button></sc-if><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
     <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}">
       <div class="hv-climate hv-climate-2x2">
         <div class="hv-climate-head"><span>CLIMATE</span><small>{{ focusedClimateCurrent }}</small></div><div role="status" style="font:7px/1.25 'Space Mono',monospace;letter-spacing:.06em;color:#f0bd65;margin:-1px 0 3px;">{{ focusedClimateHelper }}</div>
@@ -7359,7 +7367,7 @@ window.HavalSplash = (function () {
           </div>
           <div class="hv-range-2x2-foot">
             <span>DISTRIBUIÇÃO: <b class="ev">{{ focusedRangeEvPct }}%</b> BATERIA · <b class="fuel">{{ focusedRangeFuelPct }}%</b> COMBUSTÍVEL</span>
-            <span>VIAGEM ESTIMADA: <strong>{{ focusedRangeTravelTime }}</strong></span>
+            <button type="button" class="hv-range-toggle-group hv-range-toggle-inline {{ focusedRangeSourceModeClass }}" onClick="{{ focusedRangeToggleSourceMode }}" role="switch" aria-checked="{{ focusedRangeSourceIsOn }}" title="Alternar estimativas por histórico"><span class="hv-range-toggle-label">Usar estimativa média por histórico</span><span class="hv-range-toggle-control"><span class="hv-range-toggle-track"><span class="hv-range-toggle-thumb"></span></span><span class="hv-range-toggle-state">{{ focusedRangeSourceStateText }}</span></span></button>
           </div>
         </div>
       </div>
@@ -38044,7 +38052,7 @@ class Component extends DCLogic {
       focusedCardIsMedia: type === 'media', focusedCardIsPower: type === 'power',
       focusedCardBadge: '', focusedCardBadgeClass: '',
       // ENERGIA and RANGE carry action buttons beside the close button.
-      focusedCardHeadClass: (type === 'consumption' || type === 'range') ? 'with-action' : '',
+      focusedCardHeadClass: type === 'consumption' ? 'with-action' : '',
       closeFocusedCard: () => this._closeFocusedCard(),
     };
     if (!type) return base;
@@ -41999,11 +42007,24 @@ class Component extends DCLogic {
   _rangeWidgetView(item) {
     const range = this._rangeTelemetry(Date.now());
     const is2x2 = (item.w || 1) >= 2 && (item.h || 1) >= 2;
+    // Only the 3+ wide board has room for the per-bar averages and pack sizes, and for the tap-to-reveal switch.
+    const wide = is2x2 && (item.w || 1) >= 3;
     return {
       rangeSizeClass: 'hv-range-card-' + (item.w || 1) + 'x' + (item.h || 1),
       rangeIs2x2: is2x2,
       rangeIsNot2x2: !is2x2,
-      rangeHeaderTitle: is2x2 ? 'DINÂMICA DE AUTONOMIA' : 'AUTONOMIA',
+      rangeHeaderTitle: '',
+      rangeShowAvg: range.activeMode === 'hist' && wide,
+      rangeShowSize: wide,
+      rangeToggleShow: this._rangeToggleUntil > Date.now(),
+      rangeToggleIsOn: range.sourceMode === 'hist',
+      rangeToggleClass: range.sourceMode === 'hist' ? 'on' : '',
+      rangeToggleStateText: range.sourceMode === 'hist' ? 'ON' : 'OFF',
+      rangeToggleSourceMode: (ev) => {
+        this._cardControlEvent(ev);
+        this._setRangeSourceMode((this._rangeSourceMode || 'oem') === 'hist' ? 'oem' : 'hist', ev);
+        this._showRangeToggle();
+      },
       rangeSource: range.source,
       rangeTotalLabel: range.totalLabel,
       rangeTotal: range.total,
@@ -42024,7 +42045,6 @@ class Component extends DCLogic {
       rangeFuelVolume: range.fuelVolume,
       rangeEvConsume: range.evConsume,
       rangeFuelAvg: range.fuelAvg,
-      rangeTravelTime: range.travelTime,
       rangePowertrainMode: range.powertrainMode,
       range12vVoltage: range.v12Str,
       range12vCharging: range.v12Charging,
@@ -42037,7 +42057,7 @@ class Component extends DCLogic {
       rangeUnitKmPressed: range.unit === 'KM',
       rangeUnitMiPressed: range.unit === 'MI',
       rangeAriaLabel: 'Range: ' + range.total + ' ' + range.unit + '. Battery ' + range.soc + '. EV ' + range.ev + ' ' + range.unit + '. Fuel ' + range.fuel + ' ' + range.unit + '. ' + range.source,
-      onRangeOpen: (ev) => this._openRangeCard(ev),
+      onRangeOpen: (ev) => this._openRangeCard(ev, wide),
       rangeSetKm: (ev) => this._setRangeDistanceUnit('km', ev),
       rangeSetMi: (ev) => this._setRangeDistanceUnit('mi', ev),
     };
@@ -42165,7 +42185,14 @@ class Component extends DCLogic {
       v12Str, v12Val, v12Charging, v12State, v12Pct, v12FillW
     };
   }
-  _openRangeCard(ev) { this._cardControlEvent(ev); if (this._widgetSuppressClick || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return; this._openFocusedCard('range'); }
+  _openRangeCard(ev, toggleOnly) { this._cardControlEvent(ev); if (this._widgetSuppressClick || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return; if (toggleOnly) this._showRangeToggle(); else this._openFocusedCard('range'); }
+  /** On the wide (3+) range widget a tap reveals the history-estimate switch for 5 s instead of opening the popup. */
+  _showRangeToggle() {
+    this._rangeToggleUntil = Date.now() + 5000;
+    clearTimeout(this._rangeToggleTimer);
+    this._rangeToggleTimer = setTimeout(() => this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 })), 5050);
+    this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }));
+  }
 
   _widgetCatalog() {
     return {
@@ -43359,11 +43386,11 @@ class Component extends DCLogic {
       menuOpen: menuOpen,
       showEdit: item.type === 'profile' || item.type === 'graphs' || item.type === 'climate'
         || item.type === 'consumption' || item.type === 'tires' || item.type === 'status'
-        || item.type === 'driving' || item.type === 'media' || item.type === 'power' || item.type === 'clock',
+        || item.type === 'driving' || item.type === 'media' || item.type === 'power' || item.type === 'clock' || item.type === 'range',
       editLabel: item.type === 'profile' ? 'CUSTOMIZE'
         : (item.type === 'clock' ? 'CUSTOMIZE' : ((item.type === 'climate' || item.type === 'consumption' || item.type === 'tires'
           || item.type === 'status' || item.type === 'driving' || item.type === 'media'
-          || item.type === 'power') ? 'OPEN' : 'CONFIGURE')),
+          || item.type === 'power' || item.type === 'range') ? 'OPEN' : 'CONFIGURE')),
       showResize: this._widgetResizeSizes(item).length > 0,
       showMove: this._widgetCanMove(item, side),
       cardClass: (moving ? 'moving' : (menuOpen ? 'editing' : ''))
@@ -43421,7 +43448,7 @@ class Component extends DCLogic {
       view.onEdit = view.onClockConfigure;
     } else if (item.type === 'profile') {
       view.onEdit = view.onProfileOpen;
-    } else if (item.type === 'climate' || item.type === 'consumption' || item.type === 'tires' || item.type === 'status' || item.type === 'power') {
+    } else if (item.type === 'climate' || item.type === 'consumption' || item.type === 'tires' || item.type === 'status' || item.type === 'power' || item.type === 'range') {
       view.onEdit = (ev) => {
         if (ev && ev.stopPropagation) ev.stopPropagation();
         this._focusedCardEntry(item.type);
