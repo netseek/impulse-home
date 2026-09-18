@@ -1212,12 +1212,25 @@ window.HavalSplash = (function () {
       margin-bottom: 8px;
     }
     .hv-cam-label-gap { margin-top: 16px; }
-    .hv-cam-hint {
+    .hv-cam-current-row {
+      display: grid;
+      grid-template-columns: calc((100% - 30px) / 6 * 1.4) 1fr;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .hv-cam-current { cursor: default; }
+    .hv-cam-current .hv-cam-ico-shot { opacity: 1; }
+    .hv-cam-save-desk {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border-radius: 10px;
+      cursor: pointer;
       font-family: 'Space Grotesk', system-ui, sans-serif;
-      font-size: 11px;
-      line-height: 1.4;
-      opacity: .5;
-      margin-top: 8px;
+      font-size: 12px;
+      letter-spacing: .06em;
+      font-weight: 600;
     }
     .hv-cam-fov {
       display: flex;
@@ -7765,7 +7778,7 @@ window.HavalSplash = (function () {
     <div class="hv-config-head">
       <div class="hv-config-title">{{ configHeaderTitle }}</div>
       <div class="hv-config-head-actions">
-        <button type="button" class="hv-config-save {{ saveBtnClass }}" onClick="{{ onSaveSettings }}" title="{{ configSaveTitle }}">SAVE</button>
+        <button type="button" class="hv-config-save {{ saveBtnClass }}" onClick="{{ onSaveSettings }}" title="{{ configSaveTitle }}" style="display: {{ configSaveDisplay }};">SAVE</button>
         <button class="hv-config-close" onClick="{{ closeConfigPanel }}" title="Close panel">×</button>
       </div>
     </div>
@@ -7874,7 +7887,16 @@ window.HavalSplash = (function () {
 
     <!-- ── CAMERA TAB ── -->
     <sc-if value="{{ sectionIsCamera }}" hint-placeholder-val="{{ false }}">
-      <div class="hv-cam-label">SAVED VIEWS</div>
+      <div class="hv-cam-current-row">
+        <div class="hv-cam-tile hv-cam-current" title="Current view">
+          <img id="hv-cam-current-img" class="hv-cam-ico hv-cam-ico-shot" src="{{ camCurrentShot }}" alt="" draggable="false" />
+        </div>
+        <button type="button" class="hv-cam-save-desk" onClick="{{ saveCurrentDesktopCamera }}" title="Make this view the home camera of the current desktop" style="border: 1px solid {{ camSaveDesktopBorder }}; background: {{ camSaveDesktopBg }}; color: {{ camSaveDesktopCol }};">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8 3v5h7V3"/><rect x="8" y="13" width="8" height="6" rx="1"/></svg>
+          <span>{{ camSaveDesktopLabel }}</span>
+        </button>
+      </div>
+      <div class="hv-cam-label hv-cam-label-gap">SAVED VIEWS</div>
       <div class="hv-cam-grid">
         <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="6">
           <button class="hv-cam-tile {{ cp.onClass }} {{ cp.emptyClass }} {{ cp.pickClass }} {{ cp.flashClass }} {{ cp.deleteClass }}" onClick="{{ cp.onClick }}" onTouchStart="{{ cp.onHoldStart }}" onTouchEnd="{{ cp.onHoldEnd }}" onTouchCancel="{{ cp.onHoldEnd }}" onMouseDown="{{ cp.onHoldStart }}" onMouseUp="{{ cp.onHoldEnd }}" onMouseLeave="{{ cp.onHoldEnd }}" onContextMenu="{{ cp.onContextMenu }}" title="{{ cp.title }}">
@@ -7899,12 +7921,6 @@ window.HavalSplash = (function () {
           <button onClick="{{ cancelCamSlotDelete }}" title="Keep this slot">CANCEL</button>
         </div>
       </sc-if>
-      <sc-if value="{{ camSaveDesktopVisible }}" hint-placeholder-val="{{ false }}">
-        <div class="hv-cam-save-row">
-          <button onClick="{{ saveCurrentDesktopCamera }}" title="Make the current view this desktop's home camera" style="border: 1px solid {{ camSaveDesktopBorder }}; background: {{ camSaveDesktopBg }}; color: {{ camSaveDesktopCol }};">{{ camSaveDesktopLabel }}</button>
-        </div>
-      </sc-if>
-      <div class="hv-cam-hint">{{ camDesktopSaveHint }}</div>
 
       <div class="hv-cam-label hv-cam-label-gap">FIELD OF VIEW</div>
       <div class="hv-cam-fov">
@@ -7918,7 +7934,6 @@ window.HavalSplash = (function () {
           <button onClick="{{ co.onClick }}" title="{{ co.title }}" style="border: 1px solid {{ co.border }}; background: {{ co.bg }}; color: {{ co.col }};">{{ co.label }}</button>
         </sc-for>
       </div>
-      <div class="hv-cam-hint">Event: doors → top-left, roof → top facing left; returns after openings settle. Cycle steps saved views while moving. Orbit is a slow spin. Lower FOV flattens perspective.</div>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -9058,6 +9073,9 @@ const CAM_FOV_DEFAULT = 30;
 const CAM_FOV_MIN = 15;
 const CAM_FOV_MAX = 60;
 const CAM_ICON_GAP_MAX_MS = 500;
+// Pseudo slot key for the live-view tile at the top of the CAMERA section.
+const CAM_CURRENT_KEY = '__current';
+const CAM_CURRENT_POLL_MS = 900;
 const CAM_ICON_BG_GAP_MIN_MS = 120;
 const CAM_ICON_BG_GAP_MAX_MS = 800;
 // Distance the splash hand-off front pose sits at, in fit-distances. This is a
@@ -14711,8 +14729,8 @@ class Component extends DCLogic {
       camSlotDeleteBorder: 'rgba(255,92,92,.85)',
       camSlotDeleteBg: 'rgba(255,60,60,.18)',
       camSlotDeleteCol: '#ffb4b4',
-      camSaveDesktopVisible: !s.camSlotDeleteKey,
-      camSaveDesktopLabel: s.camDesktopFlash ? 'SAVED TO DESKTOP' : 'SAVE TO DESKTOP',
+      camCurrentShot: this._camCurrentShot || '',
+      camSaveDesktopLabel: s.camDesktopFlash ? 'SAVED' : 'SAVE TO CURRENT DESKTOP',
       camSaveDesktopBorder: hv(!!s.camDesktopFlash).border,
       camSaveDesktopBg:     hv(!!s.camDesktopFlash).bg,
       camSaveDesktopCol:    hv(!!s.camDesktopFlash).col,
@@ -14721,11 +14739,6 @@ class Component extends DCLogic {
       camFovMin: CAM_FOV_MIN,
       camFovMax: CAM_FOV_MAX,
       onCamFov: (e) => this.setCamFov(e && e.target ? e.target.value : e),
-      camDesktopSaveHint: this._desktopReady
-        ? (s.camSlotDeleteKey
-          ? 'Tap Delete to clear this slot, or Cancel to keep it.'
-          : 'Tap a view to go there; tap + to save the current view. Hold a view to delete it. Save to desktop makes the current view this desktop’s home.')
-        : 'Desktops are still loading.',
       ...this._wallpaperRenderFields(s),
       cameraOptions: (() => {
         const defs = [
@@ -14746,9 +14759,10 @@ class Component extends DCLogic {
         });
       })(),
       onSaveSettings: () => this.saveSettings(),
-      configSaveTitle: s.configSection === 'camera'
-        ? 'Save settings and this layout’s camera home for the current desktop'
-        : 'Save settings',
+      // The camera section has its own save-to-desktop row; a second SAVE
+      // up here only made it unclear which one stores the view.
+      configSaveDisplay: s.configSection === 'camera' ? 'none' : '',
+      configSaveTitle: 'Save settings',
       saveBtnBorder: hv(s.saveFlash).border,
       saveBtnCol:    hv(s.saveFlash).col,
       saveBtnClass: s.saveFlash ? 'on' : '',
@@ -33842,7 +33856,11 @@ class Component extends DCLogic {
   // because projected size is very nearly linear in 1/distance.
   _camIconCamera(key) {
     const THREE = this.THREE;
-    const pose = this._getCameraPresetPose(key);
+    const pose = key === CAM_CURRENT_KEY
+      ? (this.camera && this.controls
+        ? { position: this.camera.position.clone(), target: this.controls.target.clone() }
+        : null)
+      : this._getCameraPresetPose(key);
     const box = this._camIconBox();
     if (!pose || !box) return null;
     const fov = (this.camera && this.camera.isPerspectiveCamera)
@@ -33968,7 +33986,33 @@ class Component extends DCLogic {
 
   // Prefetch tile renders after boot so opening CAMERA is instant. Waits out
   // the intro (which owns the renderer) then runs one tile per idle slot.
+  /**
+   * Keep the live-view tile in step with the camera while the CAMERA section
+   * is open. Painted straight into the <img>: a React commit per camera move
+   * would cost ~200 ms each on the MMI (see the _live seam notes).
+   */
+  _startCamCurrentShotLoop() {
+    if (this._camCurrentTimer) return;
+    this._camCurrentTimer = setInterval(() => {
+      if (this._unmounted) { clearInterval(this._camCurrentTimer); return; }
+      const s = this.state;
+      if (!s.panelOpen || s.configSection !== 'camera') { this._camCurrentKey = null; return; }
+      if (this._introActive || this._camAnim || this._desktopGesture || !this.camera || !this.controls) return;
+      const p = this.camera.position;
+      const t = this.controls.target;
+      const sig = [p.x, p.y, p.z, t.x, t.y, t.z].map((v) => v.toFixed(3)).join(',');
+      if (sig === this._camCurrentKey) return;
+      const url = this._renderCamIcon(CAM_CURRENT_KEY);
+      if (!url) return;
+      this._camCurrentKey = sig;
+      this._camCurrentShot = url;
+      const img = document.getElementById('hv-cam-current-img');
+      if (img) img.src = url;
+    }, CAM_CURRENT_POLL_MS);
+  }
+
   _scheduleCamIconWarmup() {
+    this._startCamCurrentShotLoop();
     if (this._camIconWarmupArmed) return;
     this._camIconWarmupArmed = true;
     const kick = () => {
