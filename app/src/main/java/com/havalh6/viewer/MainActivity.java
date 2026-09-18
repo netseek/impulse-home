@@ -1072,7 +1072,7 @@ public final class MainActivity extends Activity {
     private JSONObject lastMediaPayload;
     private String quickMediaPackage = "";
     private boolean quickMediaPlaying;
-    private String dockSurfaceMode = DOCK_SURFACE_LAUNCHER;
+    private String dockSurfaceMode = DOCK_SURFACE_CARDS;
     private boolean desktopStudioOpen;
     private String activeDesktopName = "Desktop";
     private int activeDesktopIndex;
@@ -4075,7 +4075,7 @@ public final class MainActivity extends Activity {
         pendingRestoreLeft = prefs.getString("leftApp", "");
         pendingRestoreRight = prefs.getString("rightApp", "");
         dockSurfaceMode = normalizeDockSurfaceMode(
-                prefs.getString(PREF_DOCK_SURFACE, DOCK_SURFACE_LAUNCHER));
+                prefs.getString(PREF_DOCK_SURFACE, DOCK_SURFACE_CARDS));
         appsOnlyRestoreDone = false;
         loadAppsFabPos();
         uiMode = readUiModePref();
@@ -6905,9 +6905,8 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * Bring the launcher icons in once the boot splash has handed off: each one
-     * slides in from the left with a motion smear and an ease-out, 200ms apart,
-     * leftmost first. Idempotent — only the first call animates.
+     * Bring the launcher strip in once the boot splash has handed off, as a
+     * single fade. Idempotent — only the first call animates.
      */
     private void revealLauncherStrip() {
         endSplashOverlay();
@@ -6920,44 +6919,18 @@ public final class MainActivity extends Activity {
             return;
         }
         updateLauncherStripVisibility();
-        if (launcherItems.isEmpty()) return;
-
-        float density = getResources().getDisplayMetrics().density;
-        final float travelPx = 120f * density;
-        final float maxTrailPx = 90f * density;
-
-        // Rightmost icon leads and the sequence walks back toward the left edge.
-        // Every icon still travels left-to-right into its slot — it is the ORDER
-        // that is reversed, so the icon with furthest to go sets off first.
-        // Skip GONE duplicates (recents already occupy a slot on the left).
-        final List<MotionTrailLayout> visible = new ArrayList<>();
-        for (MotionTrailLayout item : launcherItems) {
-            if (item != null && item.getVisibility() == View.VISIBLE) visible.add(item);
-        }
-        final int count = visible.size();
-        for (int i = 0; i < count; i++) {
-            final MotionTrailLayout item = visible.get(i);
-            android.animation.ValueAnimator anim = android.animation.ValueAnimator.ofFloat(0f, 1f);
-            anim.setDuration(520);
-            anim.setStartDelay((count - 1 - i) * 200L);
-            anim.setInterpolator(new android.view.animation.DecelerateInterpolator(1.8f));
-            anim.addUpdateListener(a -> {
-                float e = (Float) a.getAnimatedValue();
-                item.setTranslationX(-travelPx * (1f - e));
-                item.setAlpha(Math.min(1f, e * 1.6f));
-                // Speed under a decelerate curve falls off as the icon arrives, so
-                // tying the smear to (1 - e) makes it fade out with the movement.
-                item.setTrailPx(maxTrailPx * (1f - e));
-            });
-            anim.addListener(new android.animation.AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(android.animation.Animator a) {
-                    item.setTranslationX(0f);
-                    item.setAlpha(1f);
-                    item.setTrailPx(0f);
-                }
-            });
-            anim.start();
+        // One gentle fade of the whole strip. The old per-icon slide ran N
+        // staggered animators, each invalidating its motion trail every frame,
+        // on the same main thread the WebView needs for the car's intro orbit.
+        if (stripContainer != null) {
+            stripContainer.animate().cancel();
+            stripContainer.setAlpha(0f);
+            stripContainer.animate()
+                    .alpha(1f)
+                    .setDuration(450)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .withLayer()
+                    .start();
         }
         if (bootProgressTrack != null && bootProgressTrack.getVisibility() == View.VISIBLE) {
             bootProgressTrack.bringToFront();
@@ -7260,7 +7233,7 @@ public final class MainActivity extends Activity {
         loadWindowApps();
         dockAppOverrides = DockAppOverrides.load(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE));
         dockSurfaceMode = normalizeDockSurfaceMode(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
-                .getString(PREF_DOCK_SURFACE, DOCK_SURFACE_LAUNCHER));
+                .getString(PREF_DOCK_SURFACE, DOCK_SURFACE_CARDS));
         float density = getResources().getDisplayMetrics().density;
         // Bigger than the old 52/78: dropping the captions freed vertical room in
         // the dock band. One GWM hub (ic_gwm on black) opens the four OEM shortcuts.

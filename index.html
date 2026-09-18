@@ -2029,76 +2029,61 @@ window.HavalSplash = (function () {
       filter: brightness(1.15);
     }
 
-    /* ── First-Run Setup Modal ─────────────────────────────────────── */
+    /* ── First-Run Setup Modal (Light Theme / Widget Style) ────────── */
     .hv-first-run-backdrop {
       position: fixed;
       inset: 0;
       z-index: 95;
       display: flex;
       align-items: center;
-      justify-content: center;
-      background: rgba(3, 7, 14, 0.76);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      justify-content: flex-start;
+      padding-left: 64px;
+      box-sizing: border-box;
+      /* No backdrop blur: the car beside the modal is the preview. */
+      background: linear-gradient(90deg, rgba(10, 16, 24, 0.38) 0%, rgba(10, 16, 24, 0.08) 50%, rgba(10, 16, 24, 0) 64%);
       opacity: 0;
       pointer-events: none;
       transition: opacity .25s ease;
-      font-family: 'Space Mono', monospace;
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     .hv-first-run-backdrop.on {
       opacity: 1;
       pointer-events: auto;
     }
     .hv-first-run-modal {
-      width: min(840px, 94vw);
-      max-height: min(620px, 92vh);
-      padding: 22px 26px 20px;
-      border-radius: 16px;
-      background: rgba(13, 19, 28, 0.88);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.65), 0 0 35px rgba(79, 214, 232, 0.12);
-      backdrop-filter: blur(28px) saturate(1.2);
-      -webkit-backdrop-filter: blur(28px) saturate(1.2);
-      color: #fff;
+      width: min(760px, 46vw);
+      padding: 24px 28px 22px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18), 0 2px 12px rgba(0, 0, 0, 0.06);
+      backdrop-filter: blur(28px) saturate(1.25);
+      -webkit-backdrop-filter: blur(28px) saturate(1.25);
+      color: #1c2430;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 16px;
       box-sizing: border-box;
     }
     .hv-first-run-head {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .hv-first-run-badge {
-      display: inline-block;
-      align-self: flex-start;
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: rgba(79, 214, 232, 0.15);
-      border: 1px solid rgba(79, 214, 232, 0.35);
-      color: var(--hv-accent, #4fd6e8);
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: .15em;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      padding-bottom: 12px;
     }
     .hv-first-run-title {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 700;
-      letter-spacing: .12em;
-      color: #edf5fa;
-      margin-top: 2px;
-    }
-    .hv-first-run-sub {
-      font-size: 10px;
-      letter-spacing: .04em;
-      opacity: .65;
-      line-height: 1.4;
+      letter-spacing: .08em;
+      color: #111827;
+      text-transform: uppercase;
+      margin: 0;
     }
     .hv-first-run-section {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
     }
     .hv-first-run-label-row {
       display: flex;
@@ -2108,14 +2093,15 @@ window.HavalSplash = (function () {
     .hv-first-run-label {
       font-size: 10px;
       font-weight: 700;
-      letter-spacing: .14em;
-      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: .12em;
+      color: rgba(28, 36, 48, 0.55);
+      text-transform: uppercase;
     }
     .hv-first-run-color-name {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
-      letter-spacing: .08em;
-      color: var(--hv-accent, #4fd6e8);
+      letter-spacing: .04em;
+      color: var(--hv-accent, #0e8594);
     }
     .hv-first-run-models {
       display: grid;
@@ -2123,27 +2109,28 @@ window.HavalSplash = (function () {
       gap: 10px;
     }
     .hv-first-run-model-card {
-      border-radius: 11px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.04);
-      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: rgba(0, 0, 0, 0.03);
+      padding: 12px 14px;
       text-align: left;
       cursor: pointer;
-      color: #fff;
+      color: #111827;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 4px;
       transition: all .16s ease;
       font-family: inherit;
+      outline: none;
     }
     .hv-first-run-model-card:hover {
-      border-color: rgba(79, 214, 232, 0.4);
-      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(14, 133, 148, 0.35);
+      background: rgba(0, 0, 0, 0.05);
     }
     .hv-first-run-model-card.on {
-      border-color: var(--hv-accent, #4fd6e8);
-      background: rgba(79, 214, 232, 0.12);
-      box-shadow: 0 0 14px rgba(79, 214, 232, 0.22);
+      border-color: var(--hv-accent, #0e8594);
+      background: rgba(14, 133, 148, 0.08);
+      box-shadow: 0 2px 12px rgba(14, 133, 148, 0.16);
     }
     .hv-first-run-card-header {
       display: flex;
@@ -2151,23 +2138,23 @@ window.HavalSplash = (function () {
       align-items: center;
     }
     .hv-first-run-card-title {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 700;
-      letter-spacing: .08em;
-      color: #fff;
+      letter-spacing: .04em;
+      color: #111827;
     }
     .hv-first-run-card-check {
       display: none;
-      font-size: 11px;
-      color: var(--hv-accent, #4fd6e8);
+      font-size: 12px;
+      color: var(--hv-accent, #0e8594);
       font-weight: 900;
     }
     .hv-first-run-card-spinner {
       display: none;
       width: 12px;
       height: 12px;
-      border: 2px solid rgba(79, 214, 232, 0.25);
-      border-top-color: var(--hv-accent, #4fd6e8);
+      border: 2px solid rgba(14, 133, 148, 0.25);
+      border-top-color: var(--hv-accent, #0e8594);
       border-radius: 50%;
       animation: hvFirstRunSpin .75s linear infinite;
     }
@@ -2181,8 +2168,8 @@ window.HavalSplash = (function () {
       display: none !important;
     }
     .hv-first-run-model-card.loading {
-      border-color: rgba(79, 214, 232, 0.65);
-      box-shadow: 0 0 16px rgba(79, 214, 232, 0.22);
+      border-color: rgba(14, 133, 148, 0.65);
+      box-shadow: 0 0 14px rgba(14, 133, 148, 0.2);
     }
     .hv-first-run-model-card:disabled {
       opacity: .6;
@@ -2192,19 +2179,12 @@ window.HavalSplash = (function () {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    .hv-first-run-card-tag {
+    .hv-first-run-card-status {
       font-size: 9px;
       font-weight: 600;
-      letter-spacing: .08em;
-      color: var(--hv-accent, #4fd6e8);
-      opacity: .88;
-    }
-    .hv-first-run-card-spec {
-      font-size: 8px;
-      letter-spacing: .02em;
-      opacity: .55;
-      line-height: 1.3;
-      margin-top: 2px;
+      letter-spacing: .04em;
+      color: var(--hv-accent, #0e8594);
+      min-height: 12px;
     }
     .hv-first-run-colors {
       display: flex;
@@ -2214,35 +2194,35 @@ window.HavalSplash = (function () {
       padding: 4px 0;
     }
     .hv-first-run-color-btn {
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
       cursor: pointer;
       position: relative;
       transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
-      border: 2px solid rgba(255, 255, 255, 0.22);
+      border: 2px solid rgba(0, 0, 0, 0.12);
       padding: 0;
       outline: none;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 3px 8px rgba(0,0,0,.35);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     }
     .hv-first-run-color-btn:hover {
       transform: scale(1.08);
-      border-color: rgba(255, 255, 255, 0.5);
+      border-color: rgba(0, 0, 0, 0.25);
     }
     .hv-first-run-color-btn.on {
-      border-color: var(--hv-accent, #4fd6e8);
+      border-color: #fff;
       transform: scale(1.15);
-      box-shadow: 0 0 16px rgba(79, 214, 232, 0.5);
+      box-shadow: 0 0 0 3px var(--hv-accent, #0e8594), 0 4px 12px rgba(0, 0, 0, 0.25);
     }
     .hv-first-run-color-check {
       display: none;
       font-size: 13px;
       font-weight: 900;
       color: #fff;
-      text-shadow: 0 1px 3px rgba(0,0,0,.8), 0 0 4px #000;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
     }
     .hv-first-run-color-btn.on .hv-first-run-color-check {
       display: block;
@@ -2252,41 +2232,41 @@ window.HavalSplash = (function () {
     }
     .hv-first-run-confirm-btn {
       width: 100%;
-      padding: 12px 20px;
-      border-radius: 10px;
+      padding: 13px 20px;
+      border-radius: 12px;
       border: none;
       font-family: inherit;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
-      letter-spacing: .14em;
-      background: linear-gradient(135deg, #4fd6e8 0%, #29a8ba 100%);
-      color: #06121c;
+      letter-spacing: .08em;
+      background: linear-gradient(135deg, #0e8594 0%, #0a6f7c 100%);
+      color: #ffffff;
       cursor: pointer;
-      box-shadow: 0 4px 18px rgba(79, 214, 232, 0.35);
+      box-shadow: 0 4px 16px rgba(14, 133, 148, 0.28);
       transition: filter .15s ease, transform .12s ease;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .hv-first-run-confirm-btn:hover {
-      filter: brightness(1.1);
+      filter: brightness(1.08);
     }
     .hv-first-run-confirm-btn:active {
       transform: scale(.985);
-      filter: brightness(1.18);
+      filter: brightness(1.15);
     }
     .hv-first-run-btn-spinner {
       display: inline-block;
       width: 12px;
       height: 12px;
       margin-right: 8px;
-      border: 2px solid rgba(6, 18, 28, 0.35);
-      border-top-color: #06121c;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #ffffff;
       border-radius: 50%;
       animation: hvFirstRunSpin .75s linear infinite;
     }
     .hv-first-run-confirm-btn.loading {
-      background: linear-gradient(135deg, #3dbdcf 0%, #1f8b9b 100%);
+      background: linear-gradient(135deg, #0a6f7c 0%, #07525c 100%);
       cursor: wait;
       pointer-events: none;
       opacity: .92;
@@ -6936,13 +6916,11 @@ window.HavalSplash = (function () {
   <div class="hv-first-run-backdrop {{ firstRunBackdropClass }}" style="display: {{ firstRunDisplay }};">
     <div class="hv-first-run-modal">
       <div class="hv-first-run-head">
-        <div class="hv-first-run-badge">INITIAL SETUP</div>
-        <div class="hv-first-run-title">CHOOSE YOUR HAVAL H6</div>
-        <div class="hv-first-run-sub">Select your vehicle model and exterior body color to personalize your experience.</div>
+        <div class="hv-first-run-title">HAVAL H6</div>
       </div>
 
       <div class="hv-first-run-section">
-        <div class="hv-first-run-label">1. SELECT MODEL</div>
+        <div class="hv-first-run-label">MODELO</div>
         <div class="hv-first-run-models">
           <sc-for list="{{ firstRunModels }}" as="frm">
             <button type="button" class="hv-first-run-model-card {{ frm.activeClass }}" onClick="{{ frm.onClick }}" disabled="{{ frm.disabled }}">
@@ -6951,8 +6929,7 @@ window.HavalSplash = (function () {
                 <span class="hv-first-run-card-spinner"></span>
                 <span class="hv-first-run-card-check">✓</span>
               </div>
-              <div class="hv-first-run-card-tag">{{ frm.label }}</div>
-              <div class="hv-first-run-card-spec">{{ frm.spec }}</div>
+              <div class="hv-first-run-card-status">{{ frm.statusText }}</div>
             </button>
           </sc-for>
         </div>
@@ -6960,7 +6937,7 @@ window.HavalSplash = (function () {
 
       <div class="hv-first-run-section">
         <div class="hv-first-run-label-row">
-          <span class="hv-first-run-label">2. SELECT BODY COLOR</span>
+          <span class="hv-first-run-label">COR</span>
           <span class="hv-first-run-color-name">{{ firstRunSelectedColorName }}</span>
         </div>
         <div class="hv-first-run-colors">
@@ -8476,6 +8453,10 @@ const CAR_POWER_DEMO_PACKED = [
 const CAR_WIDGET_HOLD_MS = 500;
 const H6_DESKTOPS_KEY = 'h6_desktops_v1';
 const H6_DESKTOPS_VERSION = 5;
+// Fresh-install desktops, captured from the car (2026-09-18). Cameras are
+// left out on purpose: they fall back to the layout builtin home pose.
+// X-ray is forced off -- it roughly doubles draw calls and never idles.
+const H6_SEED_DESKTOPS = [{"name":"Drive","shellMode":"appCar","centerFill":"mixed","wallpaperSource":"curated","wallpaperAuto":true,"wallpaperIdx":0,"wallpaperCuratedIdx":14,"wallpaperFavoritesIdx":0,"wallpaperWebUrl":"","wallpaperWebTitle":"","wallpaperWebCredit":"","wallpaperWebSourcePage":"","wallpaperCustomUrl":"","widgetThemeMode":"auto","accentKey":"cyan","accentColor":"#2aa7b7","accentDark":"#2aa7b7","accentLight":"#029eb6","dynamicColorSport":true,"dynamicColorEco":true,"dockMode":"cards","clockFace":"panorama","clockFormat":"24h","bottomCards":["clock","consumption","navigation","driveMode","powerMode","regen"],"bottomCardLimit":6,"cardActions":{},"cardFocus":{"power":{"id":"focus-power","type":"power","x":0,"y":0,"w":2,"h":2},"range":{"id":"focus-range","type":"range","x":0,"y":0,"w":2,"h":2},"consumption":{"id":"focus-consumption","type":"consumption","x":0,"y":0,"w":2,"h":2}},"widgetClock":{"version":1,"style":"twin","hourFormat":"system"},"bottomClock":{"version":2,"face":"date-spine","hourFormat":"system","dialMarks":"index","splitPlates":"frost","dateSpineFormat":"month-name","dateWording":"short"},"widgetLayout":{"version":2,"appCar":{"left":{"use":"widgets","items":[{"id":"w-range-mu5qryq2","type":"range","x":0,"y":0,"w":3,"h":2}]}}},"powertrainOn":false},{"name":"Focus","shellMode":"appCar","centerFill":"car","wallpaperSource":"bing","wallpaperAuto":true,"wallpaperIdx":0,"wallpaperCuratedIdx":0,"wallpaperFavoritesIdx":0,"wallpaperWebUrl":"","wallpaperWebTitle":"","wallpaperWebCredit":"","wallpaperWebSourcePage":"","wallpaperCustomUrl":"","widgetThemeMode":"dark","accentKey":"ice","accentColor":"#9ac8ff","accentDark":"#9ac8ff","accentLight":"#3c92fb","dynamicColorSport":true,"dynamicColorEco":true,"dockMode":"cards","clockFace":"panorama","clockFormat":"24h","bottomCards":["clock","media","navigation","status","range","climate","consumption","power","driveMode","powerMode","regen","wallpaper"],"bottomCardLimit":12,"cardActions":{},"cardFocus":{"range":{"id":"focus-range","type":"range","x":0,"y":0,"w":2,"h":2}},"widgetClock":{"version":1,"style":"twin","hourFormat":"system"},"bottomClock":{"version":2,"face":"meridian","hourFormat":"system","dialMarks":"index","splitPlates":"frost","dateSpineFormat":"month-name","dateWording":"short"},"widgetLayout":{"version":2,"appCar":{"left":{"use":"app","items":[]}}},"powertrainOn":false},{"name":"Lounge","shellMode":"appCar","centerFill":"wallpaper","wallpaperSource":"bing","wallpaperAuto":true,"wallpaperIdx":0,"wallpaperCuratedIdx":0,"wallpaperFavoritesIdx":0,"wallpaperWebUrl":"","wallpaperWebTitle":"","wallpaperWebCredit":"","wallpaperWebSourcePage":"","wallpaperCustomUrl":"","widgetThemeMode":"auto","accentKey":"amber","accentColor":"#f0bd65","accentDark":"#f0bd65","accentLight":"#e29208","dynamicColorSport":true,"dynamicColorEco":true,"dockMode":"cards","clockFace":"panorama","clockFormat":"24h","bottomCards":["climate","power","consumption","navigation","wallpaper"],"bottomCardLimit":5,"cardActions":{},"cardFocus":{"power":{"id":"focus-power","type":"power","x":0,"y":0,"w":2,"h":2}},"widgetClock":{"version":1,"style":"signal","hourFormat":"system"},"bottomClock":{"version":2,"face":"panorama","hourFormat":"system","dialMarks":"index","splitPlates":"frost","dateSpineFormat":"month-name","dateWording":"short"},"widgetLayout":{"version":2,"appCar":{"left":{"use":"widgets","items":[{"id":"w-clock-mu5qtzdb","type":"clock","x":0,"y":0,"w":2,"h":1},{"id":"w-status-mu5quxoi","type":"status","x":2,"y":0,"w":2,"h":2},{"id":"w-range-mu5qv5op","type":"range","x":4,"y":0,"w":2,"h":1},{"id":"w-media-mu5qx872","type":"media","x":0,"y":1,"w":2,"h":1},{"id":"w-consumption-mu5qxts2","type":"consumption","x":4,"y":1,"w":2,"h":1}]}}},"powertrainOn":false}];
 const H6_MAX_DESKTOPS = 6;
 // Real thumbnails for the Desktops strip, one JPEG data URL per desktop id.
 const H6_DESKTOP_SHOTS_KEY = 'h6_desktop_shots_v2';
@@ -9004,6 +8985,14 @@ const CAM_ICON_DUTY = 2.5;      // idle this many times the last render's cost
 const CAM_ICON_BG_DUTY = 4.5;   // gentler when prefetching off-screen after boot
 const CAM_ICON_GAP_MIN_MS = 60;
 const CUSTOM_CAM_SLOTS = 6; // user slots in the CAMERA rail (empty until saved)
+// Sample poses picked on the emulator (2026-09-18). The first is also the
+// layout builtin home, i.e. the default starting camera. Only seeded when the
+// user has never saved slots, so a cleared sample stays cleared.
+const H6_SAMPLE_CAMS = [
+  { f: -0.5135, r: 0.5335, y: 0.2838, tf: 0, tr: 0, ty: 0, px: 0.0615, py: 0.1168, viewShift: 0.2659 },
+  { f: -0.0204, r: 0.7705, y: 0.1864, tf: 0, tr: 0, ty: 0, px: 0.2781, py: 0.0823, viewShift: 0.2659 },
+  { f: 0.4655, r: 0.5889, y: 0.2556, tf: 0, tr: 0, ty: 0, px: 0.0513, py: 0.15, viewShift: 0.2659 },
+];
 const CAM_ICON_GAP_MAX_MS = 500;
 const CAM_ICON_BG_GAP_MIN_MS = 120;
 const CAM_ICON_BG_GAP_MAX_MS = 800;
@@ -9018,6 +9007,9 @@ const CAM_ICON_BG_GAP_MAX_MS = 800;
 // The layout still owns where the intro ORBITS TO; it no longer owns where it
 // starts from. Measured on the running scene: _fitDist 14.84 m, so 11.77 m.
 const INTRO_FRONT_DIST_MUL = 0.793;
+// View shift for the front hold while the first-run modal is up: moves the
+// car into the right half of the panel, clear of the left-anchored modal.
+const FIRST_RUN_VIEW_SHIFT = 0.24;
 
 // ── Boot shell layout ─────────────────────────────────────────────────────────
 // Native owns the saved layout, but it can only PUSH it (notifyViewerShellLayout
@@ -9340,7 +9332,7 @@ class Component extends DCLogic {
     clockConfigScope: 'bottom',
     studioCardFocus: null,
     desksEditing: false,
-    dockMode: 'launcher',
+    dockMode: 'cards',
     clockFace: 'panorama',
     clockFormat: '24h',
     accentKey: 'cyan',
@@ -9799,6 +9791,11 @@ class Component extends DCLogic {
   _loadCustomCamViews() {
     this._customCamViews = this._emptyCustomCamViews();
     if (this._debugMode) return;
+    let hasSaved = false;
+    try { hasSaved = localStorage.getItem(this._customCamStorageKey()) != null; } catch (e) {}
+    if (!hasSaved && !(this._savedSettings && this._savedSettings.customCamViews)) {
+      H6_SAMPLE_CAMS.forEach((p, i) => { if (i < CUSTOM_CAM_SLOTS) this._customCamViews[i] = Object.assign({}, p); });
+    }
     const apply = (src) => {
       if (!Array.isArray(src)) return;
       for (let i = 0; i < CUSTOM_CAM_SLOTS; i++) {
@@ -9882,9 +9879,8 @@ class Component extends DCLogic {
     // record of the shift at capture time - it's never read back (see
     // _relToPose): the live gap-fit shift always overrides it.
     return {
-      // Re-captured on the Haval emulator (2026-09-01): near-pure side profile
-      // with slight elevation, in place of the earlier 3/4 front angle.
-      appCar: { f: -0.0009, r: 0.7635, y: 0.2695, tf: -0.0177, tr: 0.0275, ty: -0.0253, viewShift: 0.2981 },
+      // Default starting camera: the first sample pose (see H6_SAMPLE_CAMS).
+      appCar: Object.assign({}, H6_SAMPLE_CAMS[0]),
     };
   }
 
@@ -14165,10 +14161,12 @@ class Component extends DCLogic {
     this.setTimeMode(next);
   }
 
-  saveSettings() {
+  saveSettings(opts) {
     const s = this.state;
     // One SAVE for the dock: settings + current layout home on this desktop.
-    this.saveCurrentDesktopCamera({ quiet: true });
+    // keepCamera: the camera is not a pose the user chose (first-run setup
+    // still sits on the intro's front hold), so do not make it the home.
+    if (!(opts && opts.keepCamera)) this.saveCurrentDesktopCamera({ quiet: true });
     const payload = {
       setupCompleted: !!this._setupCompleted,
       timeMode: s.timeMode,
@@ -14359,30 +14357,10 @@ class Component extends DCLogic {
     const isPendingConfirm = !!this._firstRunPendingConfirm;
 
     const firstRunModelsList = [
-      {
-        key: 'gt',
-        name: 'H6 GT',
-        label: 'GT',
-        spec: 'Coupe SUV · AWD',
-      },
-      {
-        key: 'phev34',
-        name: 'H6 PHEV',
-        label: 'PHEV / PHEV34',
-        spec: 'Plug-in Hybrid · AWD',
-      },
-      {
-        key: 'phev19',
-        name: 'H6 PHEV19',
-        label: 'PHEV19',
-        spec: 'Plug-in Hybrid · FWD',
-      },
-      {
-        key: 'hev',
-        name: 'H6 HEV',
-        label: 'HEV / HEV2',
-        spec: 'Hybrid · FWD',
-      },
+      { key: 'gt', name: 'H6 GT' },
+      { key: 'phev34', name: 'H6 PHEV' },
+      { key: 'phev19', name: 'H6 PHEV19' },
+      { key: 'hev', name: 'H6 HEV' },
     ].map((m) => {
       const isSelected = activeTrim === m.key;
       const mTrimObj = this._trims().find((t) => t.key === m.key);
@@ -14392,8 +14370,7 @@ class Component extends DCLogic {
       return {
         key: m.key,
         name: m.name,
-        label: m.label,
-        spec: isBodyLoading ? 'LOADING 3D ASSETS…' : m.spec,
+        statusText: isBodyLoading ? 'Carregando…' : '',
         activeClass: (isSelected ? 'on' : '') + (isBodyLoading ? ' loading' : ''),
         disabled: isPendingConfirm ? 'disabled' : undefined,
         onClick: () => {
@@ -14426,8 +14403,8 @@ class Component extends DCLogic {
       firstRunColors: firstRunColorsList,
       firstRunSelectedColorName: activeColorObj.title,
       confirmFirstRunText: isPendingConfirm
-        ? 'PREPARING 3D VEHICLE…'
-        : (isModelCurrentlyLoading ? 'LOADING 3D VEHICLE…' : 'CONFIRM & START'),
+        ? 'PREPARANDO VEÍCULO…'
+        : (isModelCurrentlyLoading ? 'CARREGANDO VEÍCULO…' : 'CONFIRMAR'),
       confirmFirstRunBtnClass: isPendingConfirm ? 'loading' : '',
       confirmFirstRunDisabled: isPendingConfirm ? 'disabled' : undefined,
       confirmFirstRunSpinnerDisplay: isPendingConfirm ? 'inline-block' : 'none',
@@ -15848,11 +15825,15 @@ class Component extends DCLogic {
       firstRunLoadingConfirm: false,
       carColor: this.state.carColor,
     }, () => {
-      this.saveSettings();
-      if (this.controls) this.controls.enabled = this._shouldShowCar();
-      this._applyFitCamera(!!window.__androidPopupActive);
-      this._syncCamOrbit();
-      this._syncEventCamera();
+      this.saveSettings({ keepCamera: true });
+      // The intro was held on the front pose for the setup modal; play its
+      // orbit to the layout home now. Falls back to a plain fit.
+      if (!this._startIntroOrbit()) {
+        if (this.controls) this.controls.enabled = true;
+        this._applyFitCamera(!!window.__androidPopupActive);
+        this._syncCamOrbit();
+        this._syncEventCamera();
+      }
       document.body.classList.remove('hv-boot');
       try {
         const bridge = window.AppLauncherBridge;
@@ -34973,6 +34954,10 @@ class Component extends DCLogic {
       this._intro = null;
       this._introActive = false;
       if (this.controls) this.controls.enabled = false;
+      // The setup modal sits on the left; keep the car visible beside it so
+      // the model and colour being picked are actually on screen.
+      this._applyShellViewOffset(FIRST_RUN_VIEW_SHIFT);
+      if (this.requestRender) this.requestRender(4);
       this._checkFirstRunSetup(true);
       return;
     }
@@ -34997,6 +34982,39 @@ class Component extends DCLogic {
       panTo: { x: ((home && home.panX) || 0) * vw, y: ((home && home.panY) || 0) * vh },
     };
     if (this.requestRender) this.requestRender(240);
+  }
+
+  /**
+   * Orbit from wherever the camera is now to the layout home, using the
+   * intro's own tick. Used after first-run setup, where the intro held on the
+   * front pose instead of orbiting. Returns false when there is nothing to do.
+   */
+  _startIntroOrbit() {
+    if (!this.camera || !this.controls || !this._shouldShowCar()) return false;
+    const home = this._homeCameraPose();
+    if (!home) return false;
+    const { w: vw, h: vh } = this._viewportSize();
+    const pan = this._userPanPx || { x: 0, y: 0 };
+    this._camAnim = null;
+    this._fitCamTo = null;
+    this._introActive = true;
+    this.controls.enabled = false;
+    this._intro = {
+      phase: 'orbit',
+      t: 0,
+      camFrom: this.camera.position.clone(),
+      camFromTarget: this.controls.target.clone(),
+      camTo: home.position.clone(),
+      camToTarget: home.target.clone(),
+      viewShiftFrom: this._currentViewShift(),
+      viewShiftTo: home.viewShift != null
+        ? home.viewShift
+        : ((this._fitCam && this._fitCam.viewShift) || 0),
+      panFrom: { x: pan.x || 0, y: pan.y || 0 },
+      panTo: { x: (home.panX || 0) * vw, y: (home.panY || 0) * vh },
+    };
+    if (this.requestRender) this.requestRender(240);
+    return true;
   }
 
   _endIntroAnimation() {
@@ -35553,7 +35571,7 @@ class Component extends DCLogic {
       accentLight: accent.light,
       dynamicColorSport: s.dynamicColorSport !== false,
       dynamicColorEco: s.dynamicColorEco !== false,
-      dockMode: s.dockMode === 'cards' ? 'cards' : 'launcher',
+      dockMode: s.dockMode === 'launcher' ? 'launcher' : 'cards',
       clockFace: ['panorama', 'meridian', 'split', 'date-spine'].indexOf(s.clockFace) >= 0 ? s.clockFace : 'panorama',
       clockFormat: s.clockFormat === '12h' ? '12h' : '24h',
       bottomCards: this._normalizeBottomCards(this._desktopBottomCards),
@@ -35592,7 +35610,7 @@ class Component extends DCLogic {
     base.accentLight = accent.light;
     base.dynamicColorSport = d.dynamicColorSport !== false;
     base.dynamicColorEco = d.dynamicColorEco !== false;
-    base.dockMode = d.dockMode === 'cards' ? 'cards' : 'launcher';
+    base.dockMode = d.dockMode === 'launcher' ? 'launcher' : 'cards';
     base.clockFace = ['panorama', 'meridian', 'split', 'date-spine'].indexOf(d.clockFace) >= 0 ? d.clockFace : 'panorama';
     base.clockFormat = d.clockFormat === '12h' ? '12h' : '24h';
     base.bottomCards = this._normalizeBottomCards(d.bottomCards);
@@ -35642,14 +35660,19 @@ class Component extends DCLogic {
         if (window.AppLauncherBridge && typeof window.AppLauncherBridge.loadWidgets === 'function') legacy = window.AppLauncherBridge.loadWidgets();
       } catch (e) {}
       if (!legacy) { try { legacy = localStorage.getItem('h6_widgets'); } catch (e) {} }
-      const migrated = legacy ? this._parseWidgetLayout(legacy) : this._defaultWidgetLayout();
-      desktops.push(this._desktopSnapshot('Drive', null, migrated));
-      const focus = this._desktopSnapshot('Focus', null, this._defaultWidgetLayout());
-      focus.accentKey = 'mint'; focus.accentColor = '#66dfb1'; focus.accentDark = '#66dfb1'; focus.accentLight = '#0d8a5b';
-      desktops.push(focus);
-      const lounge = this._desktopSnapshot('Lounge', null, this._defaultWidgetLayout());
-      lounge.centerFill = 'wallpaper'; lounge.widgetThemeMode = 'auto'; lounge.accentKey = 'violet'; lounge.accentColor = '#a99aff'; lounge.accentDark = '#a99aff'; lounge.accentLight = '#6351d4';
-      desktops.push(lounge);
+      if (!legacy) {
+        H6_SEED_DESKTOPS.forEach((d) => desktops.push(this._normalizeDesktop(this._cloneDesktopValue(d, {}), d.name)));
+        // Start on Focus (no widget board, the car gets the whole centre).
+        active = Math.max(0, desktops.findIndex((d) => d.name === 'Focus'));
+      } else {
+        desktops.push(this._desktopSnapshot('Drive', null, this._parseWidgetLayout(legacy)));
+        const focus = this._desktopSnapshot('Focus', null, this._defaultWidgetLayout());
+        focus.accentKey = 'mint'; focus.accentColor = '#66dfb1'; focus.accentDark = '#66dfb1'; focus.accentLight = '#0d8a5b';
+        desktops.push(focus);
+        const lounge = this._desktopSnapshot('Lounge', null, this._defaultWidgetLayout());
+        lounge.centerFill = 'wallpaper'; lounge.widgetThemeMode = 'auto'; lounge.accentKey = 'violet'; lounge.accentColor = '#a99aff'; lounge.accentDark = '#a99aff'; lounge.accentLight = '#6351d4';
+        desktops.push(lounge);
+      }
     }
     this._desktops = desktops;
     this._desktopIndex = active;
