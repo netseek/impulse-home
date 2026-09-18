@@ -9093,6 +9093,12 @@ const CAM_CURRENT_KEY = '__current';
 const CAM_CURRENT_POLL_MS = 900;
 // Camera tween when switching desktops (each desktop keeps its own view).
 const DESKTOP_CAM_FLY_SEC = 0.85;
+// Measured wallpaper brightness by URL, so the auto widget theme is right on
+// the first frame of a desktop switch.
+const WALL_BRIGHT_KEY = 'h6_wall_bright_v1';
+const WALL_BRIGHT_MAX = 60;
+// If no camera flight arrives to hand x-ray on, enable it after this anyway.
+const XRAY_AFTER_CAM_MAX_MS = 2600;
 // Longest wait for the frame rate to recover after a switch before flying.
 const DESKTOP_CAM_SETTLE_MAX_MS = 600;
 // Swipe-pane copy of each desktop shot: the full panel, kept in memory only.
@@ -13931,6 +13937,12 @@ class Component extends DCLogic {
     const s = state || this.state;
     const fill = this._normalizeCenterFill(s.centerFill);
     if (fill === 'wallpaper') {
+      // A cached measurement of THIS wallpaper wins: without it the first
+      // render after a desktop switch used the previous desktop's value (or
+      // the flat fallback) and the cards flipped light/dark as samples landed.
+      const entry = this._currentWallpaperEntry && this._currentWallpaperEntry();
+      const cached = entry && entry.url ? this._wallBrightFor(entry.url) : null;
+      if (cached != null) return cached >= 0.48;
       if (this._wallpaperBright != null) return this._wallpaperBright >= 0.48;
       return this._hexLuminance(this._resolvedBg(s)) >= 0.45;
     }
@@ -13943,6 +13955,64 @@ class Component extends DCLogic {
     if (mode === 'light') return 'light';
     if (mode === 'dark') return 'dark';
     return this._autoSceneIsBright(s) ? 'dark' : 'light';
+  }
+
+  /** Accent variant desktop `d` will show, resolved before it is on screen. */
+  _desktopEffectiveAccent(d) {
+    const accent = this._desktopAccent(d.accentKey, d.accentColor, d.accentDark, d.accentLight);
+    let eff = d.widgetThemeMode === 'light' ? 'light' : 'dark';
+    if (d.widgetThemeMode === 'auto') {
+      const fill = this._normalizeCenterFill(d.centerFill);
+      let bright;
+      if (fill === 'wallpaper') {
+        const e = this._desktopWallpaperEntry && this._desktopWallpaperEntry(d);
+        const lum = e && e.url ? this._wallBrightFor(e.url) : null;
+        bright = lum != null ? lum >= 0.48 : this._hexLuminance(this._resolvedBg(this.state)) >= 0.45;
+      } else {
+        bright = !this.state.nightMode;
+      }
+      eff = bright ? 'dark' : 'light';
+    }
+    this._lastEffectiveWidgetTheme = eff;
+    return eff === 'light' ? accent.light : accent.dark;
+  }
+
+  /** Cached luminance of a wallpaper URL (0..1), or null if never measured. */
+  _wallBrightFor(url) {
+    if (!this._wallBrightCache) {
+      this._wallBrightCache = {};
+      try { this._wallBrightCache = JSON.parse(localStorage.getItem(WALL_BRIGHT_KEY) || '{}') || {}; } catch (e) {}
+    }
+    const v = url ? this._wallBrightCache[url] : null;
+    return typeof v === 'number' ? v : null;
+  }
+
+  _storeWallBright(url, lum) {
+    if (!url || typeof lum !== 'number') return;
+    this._wallBrightFor(url);
+    this._wallBrightCache[url] = lum;
+    const keys = Object.keys(this._wallBrightCache);
+    if (keys.length > WALL_BRIGHT_MAX) delete this._wallBrightCache[keys[0]];
+    try { localStorage.setItem(WALL_BRIGHT_KEY, JSON.stringify(this._wallBrightCache)); } catch (e) {}
+  }
+
+  /** Measure every desktop's wallpaper ahead of time, one at a time. */
+  _prefetchDesktopWallBright() {
+    if (this._wallBrightPrefetching || !this._desktops) return;
+    const urls = [];
+    this._desktops.forEach((d) => {
+      if (!d || d.widgetThemeMode !== 'auto' || !this._centerFillUsesWallpaper(d)) return;
+      const e = this._desktopWallpaperEntry && this._desktopWallpaperEntry(d);
+      if (e && e.url && this._wallBrightFor(e.url) == null && urls.indexOf(e.url) < 0) urls.push(e.url);
+    });
+    if (!urls.length) return;
+    this._wallBrightPrefetching = true;
+    const next = () => {
+      const url = urls.shift();
+      if (!url) { this._wallBrightPrefetching = false; return; }
+      this._sampleImageBrightness(url, () => setTimeout(next, 250));
+    };
+    next();
   }
 
   _sampleImageBrightness(url, cb) {
@@ -13965,7 +14035,9 @@ class Component extends DCLogic {
           sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
           n++;
         }
-        if (cb) cb(n ? sum / n : null);
+        const lum = n ? sum / n : null;
+        if (lum != null) this._storeWallBright(url, lum);
+        if (cb) cb(lum);
       } catch (e) {
         if (cb) cb(null);
       }
@@ -34042,6 +34114,11 @@ class Component extends DCLogic {
 
   _scheduleCamIconWarmup() {
     this._startCamCurrentShotLoop();
+    setTimeout(() => {
+      if (this._unmounted) return;
+      this._prefetchDesktopWallBright();
+      this._preloadXrayAssets();
+    }, 6000);
     if (this._camIconWarmupArmed) return;
     this._camIconWarmupArmed = true;
     const kick = () => {
@@ -34229,6 +34306,7 @@ class Component extends DCLogic {
       if (this._fitCam && a.toShift != null) this._fitCam.viewShift = a.toShift;
       if (!this._introActive && this.controls) this.controls.enabled = true;
       this._syncCamOrbit();
+      if (this._xrayAfterCam) this._releaseXrayAfterCam();
     }
     return true;
   }
@@ -35989,7 +36067,9 @@ class Component extends DCLogic {
       wallpaperCustomUrl: d.wallpaperCustomUrl,
       widgetThemeMode: d.widgetThemeMode,
       accentKey: d.accentKey,
-      accentColor: d.accentColor,
+      // Already the variant for this desktop's effective theme: taking the
+      // stored one and correcting it in the callback cost a second commit.
+      accentColor: this._desktopEffectiveAccent(d),
       dynamicColorSport: d.dynamicColorSport !== false,
       dynamicColorEco: d.dynamicColorEco !== false,
       dockMode: d.dockMode,
@@ -36024,8 +36104,13 @@ class Component extends DCLogic {
       // desktop kept the previous desktop's opaque background over the wallpaper.
       this._applyBackground(this.state.nightMode, this.state.dayBg, this.state.nightBg,
         this.state.vignette, this.state.grainEnabled);
-      this._applyPowertrainVisibility(!!d.powertrainOn);
-      this._refreshAutoWidgetThemeSample(true);
+      // Turning x-ray ON hides the body and (first time) loads the rig and
+      // ghost -- doing that mid-flight read as the car vanishing. Fly first,
+      // then switch it on; turning it OFF stays immediate.
+      if (d.powertrainOn && this._shouldShowCar()) this._xrayAfterCamFlight();
+      else this._applyPowertrainVisibility(!!d.powertrainOn);
+      this._refreshAutoWidgetThemeSample(false);
+      this._prefetchDesktopWallBright();
       this._syncCenterFillIndicator();
       this._syncSlotUseToNative();
       this._syncDockIndicators();
@@ -36303,6 +36388,34 @@ class Component extends DCLogic {
    * straight away spends most of its travel in a few starved frames. Wait for
    * two consecutive quick frames (bounded), then fly with an ease-in-out.
    */
+  _xrayAfterCamFlight() {
+    clearTimeout(this._xrayAfterCamTimer);
+    this._xrayAfterCam = true;
+    this._xrayAfterCamTimer = setTimeout(() => this._releaseXrayAfterCam(), XRAY_AFTER_CAM_MAX_MS);
+  }
+
+  _releaseXrayAfterCam() {
+    if (!this._xrayAfterCam) return;
+    this._xrayAfterCam = false;
+    clearTimeout(this._xrayAfterCamTimer);
+    this._applyPowertrainVisibility(!!this.state.powertrainOn);
+  }
+
+  /**
+   * Fetch (not show) the x-ray rig and ghost in the background when any
+   * desktop uses x-ray, so switching to it is not also a download.
+   */
+  _preloadXrayAssets() {
+    if (this._xrayPreloaded || !this._desktops || !this._desktops.some((d) => d && d.powertrainOn)) return;
+    this._xrayPreloaded = true;
+    try {
+      const p = this._ensurePowertrain && this._ensurePowertrain();
+      if (p && p.then) p.then(() => {}, () => {});
+      const g = this._ensureGhostBody && this._ensureGhostBody();
+      if (g && g.then) g.then(() => {}, () => {});
+    } catch (e) {}
+  }
+
   _flyWhenFramesSettle(toIndex) {
     const start = performance.now();
     let last = start;
