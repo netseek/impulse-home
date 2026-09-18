@@ -760,6 +760,15 @@ public final class MainActivity extends Activity {
         }
 
         /**
+         * Viewer -> shell: initial setup is active, hold the launcher strip
+         * and cancel the 60s fallback timer until the user confirms setup.
+         */
+        @JavascriptInterface
+        public void holdLauncher() {
+            runOnUiThread(() -> mainHandler.removeCallbacks(launcherRevealFallback));
+        }
+
+        /**
          * Viewer → shell: is anything already playing on the music stream?
          *
          * The boot clip carries a soundtrack, and an unmuted media element in

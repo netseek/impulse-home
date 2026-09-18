@@ -10087,10 +10087,12 @@ class Component extends DCLogic {
     return 'hev';
   }
 
-  // ?model=gt boots GT without silently fetching the HEV body for wheel pivots.
-  // Saved-settings GT sessions still preload HEV until car-side trim input exists.
+  // Boots GT standalone without silently fetching the HEV body for wheel pivots.
   _gtBootStandalone() {
-    return !!(this._urlModelPreset && this._urlModelPreset.body === 'gt');
+    if (this._urlModelPreset && this._urlModelPreset.body === 'gt') return true;
+    const v = (this.state && this.state.modelVariant) || (this._savedSettings && this._savedSettings.modelVariant) || this._resolvedBootVariant();
+    const t = (this.state && this.state.modelTrim) || (this._savedSettings && this._savedSettings.modelTrim);
+    return v === 'gt' || t === 'gt';
   }
 
   // GT uses its own embedded tires/brakes when HEV is not loaded.
@@ -15770,6 +15772,10 @@ class Component extends DCLogic {
     if (this.state && this.state.loading && !this._viewerReady) return;
     this._firstRunChecked = true;
     if (!this._hasCompletedSetup()) {
+      try {
+        const bridge = window.AppLauncherBridge;
+        if (bridge && typeof bridge.holdLauncher === 'function') bridge.holdLauncher();
+      } catch (e) {}
       if (immediate) {
         if (!this._unmounted) this.setState({ firstRunSetupOpen: true });
       } else {
@@ -15834,9 +15840,13 @@ class Component extends DCLogic {
       localStorage.setItem('h6_setup_completed', '1');
       localStorage.setItem('h6_first_run_completed', '1');
     } catch (e) {}
+    if (!this.state.carColor) {
+      this.state.carColor = '#F4F5F7';
+    }
     this.setState({
       firstRunSetupOpen: false,
       firstRunLoadingConfirm: false,
+      carColor: this.state.carColor,
     }, () => {
       this.saveSettings();
       if (this.controls) this.controls.enabled = this._shouldShowCar();
