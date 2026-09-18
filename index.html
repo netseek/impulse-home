@@ -863,11 +863,11 @@ window.HavalSplash = (function () {
       flex-shrink: 0;
     }
     .hv-config-title {
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: .14em;
-      color: var(--hv-widget-muted);
-      font-weight: 600;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: normal;
+      color: inherit;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -917,6 +917,7 @@ window.HavalSplash = (function () {
       margin-bottom: 10px;
       flex-shrink: 0;
     }
+    .hv-config-tabs { grid-template-columns: repeat(5, 1fr); }
     .hv-config-tabs button,
     .hv-config-subtabs button {
       min-height: 38px;
@@ -927,7 +928,7 @@ window.HavalSplash = (function () {
       color: inherit;
       opacity: .55;
       font-family: 'Space Mono', monospace;
-      font-size: 8px;
+      font-size: 9px;
       letter-spacing: .05em;
       font-weight: 600;
       line-height: 1.15;
@@ -6286,10 +6287,7 @@ window.HavalSplash = (function () {
     </div>
   </div>
 
-  <!-- Config and camera form one bottom-aligned row beside the occupied widgets: config left, camera right. -->
-  <button type="button" class="hv-car-stage-action" style="display: {{ stageAestheticDisplay }}; {{ stageAestheticStyle }}" onClick="{{ openStageAesthetics }}" title="Vehicle appearance" aria-label="Vehicle appearance">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.84 5.34 10.09 2.18a10 10 0 0 1 3.82 0l.25 3.16c.35.12.69.26 1.02.42l2.41-2.05a10 10 0 0 1 2.7 2.7l-2.05 2.41c.16.33.3.67.42 1.02l3.16.25a10 10 0 0 1 0 3.82l-3.16.25c-.12.35-.26.69-.42 1.02l2.05 2.41a10 10 0 0 1-2.7 2.7l-2.41-2.05c-.33.16-.67.3-1.02.42l-.25 3.16a10 10 0 0 1-3.82 0l-.25-3.16a7 7 0 0 1-1.02-.42l-2.41 2.05a10 10 0 0 1-2.7-2.7l2.05-2.41a7 7 0 0 1-.42-1.02l-3.16-.25a10 10 0 0 1 0-3.82l3.16-.25c.12-.35.26-.69.42-1.02L3.71 6.41a10 10 0 0 1 2.7-2.7l2.41 2.05c.33-.16.67-.3 1.02-.42Z"></path><circle cx="12" cy="12" r="3.1"></circle></svg>
-  </button>
+  <!-- Camera quick-access sits alone now; the gear moved into the desktop switcher as "3D car settings". Gated by the Camera shortcut toggle. -->
   <button type="button" class="hv-car-stage-action" style="display: {{ stageCameraDisplay }}; {{ stageCameraStyle }}" onClick="{{ openStageCamera }}" title="Camera views" aria-label="Camera views">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
   </button>
@@ -7473,6 +7471,7 @@ window.HavalSplash = (function () {
       <button type="button" class="{{ desksTabCardsClass }}" onClick="{{ desksOpenCards }}">Cards</button>
       <button type="button" class="{{ desksTabWidgetsClass }}" onClick="{{ desksOpenWidgets }}">Widgets</button>
       <button type="button" class="{{ desksTabAppearanceClass }}" onClick="{{ desksOpenAppearance }}">Appearance</button>
+      <button type="button" class="{{ desksTabCarSettingsClass }}" onClick="{{ desksOpenCarSettings }}">3D car settings</button>
     </div>
     <div class="hv-desks-strip" onPointerDown="{{ desksPointerDown }}">
       <sc-if value="{{ desksCanAdd }}" hint-placeholder-val="{{ true }}">
@@ -7794,6 +7793,7 @@ window.HavalSplash = (function () {
     <!-- Main tabs: Paint / Wheel / Tuning / Advanced -->
     <sc-if value="{{ showConfigMainTabs }}" hint-placeholder-val="{{ true }}">
       <div class="hv-config-tabs">
+        <button type="button" class="{{ tabCameraClass }}" onClick="{{ setConfigTabCamera }}">Camera</button>
         <button type="button" class="{{ tabPaintClass }}" onClick="{{ setConfigTabPaint }}">Paint</button>
         <button type="button" class="{{ tabWheelClass }}" onClick="{{ setConfigTabWheel }}">Wheel</button>
         <button type="button" class="{{ tabTuneClass }}" onClick="{{ setConfigTabTune }}">Tuning</button>
@@ -7942,6 +7942,13 @@ window.HavalSplash = (function () {
           <button onClick="{{ co.onClick }}" title="{{ co.title }}" style="border: 1px solid {{ co.border }}; background: {{ co.bg }}; color: {{ co.col }};">{{ co.label }}</button>
         </sc-for>
       </div>
+
+      <div class="hv-config-section-label">CAMERA SHORTCUT</div>
+      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 4px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; opacity: .85; min-height: 36px;">
+        <input type="checkbox" checked="{{ cameraShortcutEnabled }}" onChange="{{ onCameraShortcutToggle }}" style="accent-color: #4fd6e8; width: 18px; height: 18px; cursor: pointer;" />
+        Camera shortcut
+      </label>
+      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .04em; opacity: .5; line-height: 1.45; margin-bottom: 4px;">Exibe um icone de rapido acesso às configurações de camera</div>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -9086,6 +9093,8 @@ const CAM_CURRENT_KEY = '__current';
 const CAM_CURRENT_POLL_MS = 900;
 // Camera tween when switching desktops (each desktop keeps its own view).
 const DESKTOP_CAM_FLY_SEC = 0.85;
+// Longest wait for the frame rate to recover after a switch before flying.
+const DESKTOP_CAM_SETTLE_MAX_MS = 600;
 // Swipe-pane copy of each desktop shot: the full panel, kept in memory only.
 const DESK_SHOT_HI_W = 1920;
 const DESK_SHOT_HI_H = 720;
@@ -9285,6 +9294,7 @@ class Component extends DCLogic {
     tuningSubTab: 'paint', // 'paint' | 'wheels'
     overrideSubTab: 'motion', // 'motion' | 'doors' | 'lights'
     cameraPreset: null, // custom slot key ('view0'..) or event preset name
+    cameraShortcutEnabled: false, // shows/hides the camera quick-access icon on the car stage
     camEventEnabled: false,
     camCycleEnabled: false,
     camOrbitEnabled: false,
@@ -10091,6 +10101,7 @@ class Component extends DCLogic {
     if (typeof saved.wheelDepthOffset === 'number') s.wheelDepthOffset = saved.wheelDepthOffset;
     if (typeof saved.wheelTintOverride === 'boolean') s.wheelTintOverride = saved.wheelTintOverride;
     if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
+    if (typeof saved.cameraShortcutEnabled === 'boolean') s.cameraShortcutEnabled = saved.cameraShortcutEnabled;
     if (typeof saved.camEventEnabled === 'boolean') s.camEventEnabled = saved.camEventEnabled;
     if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
     if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
@@ -14303,6 +14314,7 @@ class Component extends DCLogic {
       wheelStyle: s.wheelStyle,
       showFps: !!s.showFps,
       resScaleMode: s.resScaleMode || 'off',
+      cameraShortcutEnabled: !!s.cameraShortcutEnabled,
       camEventEnabled: !!s.camEventEnabled,
       camCycleEnabled: !!s.camCycleEnabled,
       camOrbitEnabled: !!s.camOrbitEnabled,
@@ -14668,13 +14680,17 @@ class Component extends DCLogic {
         if (s.configSection === 'env' || s.configSection === 'override') return 'ADVANCED';
         return 'CUSTOMIZE';
       })(),
-      showConfigMainTabs: !!(s.panelOpen && (s.configSection === 'paint' || s.configSection === 'wheels'
+      showConfigMainTabs: !!(s.panelOpen && (s.configSection === 'camera' || s.configSection === 'paint' || s.configSection === 'wheels'
         || s.configSection === 'env' || s.configSection === 'override')),
       showAdvancedSubtabs: !!(s.panelOpen && (s.configSection === 'env' || s.configSection === 'override')),
+      tabCameraClass: (s.configSection === 'camera' ? 'on' : ''),
       tabPaintClass: (s.configSection === 'paint' ? 'on' : ''),
       tabWheelClass: (s.configSection === 'wheels' && s.wheelSubTab !== 'settings' ? 'on' : ''),
       tabTuneClass: (s.configSection === 'wheels' && s.wheelSubTab === 'settings' ? 'on' : ''),
       tabAdvancedClass: (s.configSection === 'env' || s.configSection === 'override' ? 'on' : ''),
+      setConfigTabCamera: () => this.toggleCameraRail(true),
+      cameraShortcutEnabled: !!s.cameraShortcutEnabled,
+      onCameraShortcutToggle: (ev) => this.setState({ cameraShortcutEnabled: !!ev.target.checked }),
       setConfigTabPaint: () => this._openConfigTab('paint'),
       setConfigTabWheel: () => this._openConfigTab('wheel'),
       setConfigTabTune: () => this._openConfigTab('tune'),
@@ -34157,7 +34173,7 @@ class Component extends DCLogic {
     };
   }
 
-  _animateCameraTo(pose, durationSec) {
+  _animateCameraTo(pose, durationSec, ease) {
     if (!pose || !this.camera || !this.controls) return;
     const { w, h } = this._viewportSize();
     const pan = this._userPanPx || { x: 0, y: 0 };
@@ -34175,6 +34191,7 @@ class Component extends DCLogic {
       toPan: { x: ((pose.panX || 0) * w), y: ((pose.panY || 0) * h) },
       t: 0,
       dur: Math.max(0.2, durationSec || 1.1),
+      ease: ease || 'out',
     };
     this._fitCamTo = null;
     if (this.controls) {
@@ -34188,7 +34205,9 @@ class Component extends DCLogic {
     if (!this._camAnim || !this.camera || !this.controls) return false;
     const a = this._camAnim;
     a.t = Math.min(1, a.t + dt / a.dur);
-    const e = 1 - Math.pow(1 - a.t, 3);
+    const e = a.ease === 'inOut'
+      ? (a.t < 0.5 ? 4 * a.t * a.t * a.t : 1 - Math.pow(-2 * a.t + 2, 3) / 2)
+      : 1 - Math.pow(1 - a.t, 3);
     this.camera.position.lerpVectors(a.fromPos, a.toPos, e);
     this.controls.target.lerpVectors(a.fromTarget, a.toTarget, e);
     const dist = this.camera.position.distanceTo(this.controls.target);
@@ -36278,6 +36297,30 @@ class Component extends DCLogic {
     if (!slide.busy) this._deskSlideCamAt(Math.abs(clamped) / w);
   }
 
+  /**
+   * The new desktop keeps the main thread busy for a while after the switch
+   * (measured on the car: ~7 fps for the first second), so a flight started
+   * straight away spends most of its travel in a few starved frames. Wait for
+   * two consecutive quick frames (bounded), then fly with an ease-in-out.
+   */
+  _flyWhenFramesSettle(toIndex) {
+    const start = performance.now();
+    let last = start;
+    let quick = 0;
+    const go = () => {
+      if (this._desktopIndex !== toIndex) return;
+      const pose = this._desktopViewPose(toIndex);
+      if (pose && this._shouldShowCar()) this._animateCameraTo(pose, DESKTOP_CAM_FLY_SEC, 'inOut');
+    };
+    const tick = (now) => {
+      quick = (now - last) < 40 ? quick + 1 : 0;
+      last = now;
+      if (quick >= 2 || now - start > DESKTOP_CAM_SETTLE_MAX_MS) { go(); return; }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
   /** Where the camera should end up on desktop `index`. */
   _desktopViewPose(index) {
     const d = this._desktops && this._desktops[index];
@@ -36474,8 +36517,7 @@ class Component extends DCLogic {
         // starves rAF, so a flight started before it froze mid-air and then
         // jumped (measured: no frame from 206 ms to 849 ms on the emulator).
         // Aimed after the switch, so it frames against the new boards.
-        const camTo = this._desktopViewPose(toIndex);
-        if (camTo && this._shouldShowCar()) this._animateCameraTo(camTo, DESKTOP_CAM_FLY_SEC);
+        this._flyWhenFramesSettle(toIndex);
         requestAnimationFrame(() => {
           setTimeout(() => {
             if (dom.cover) {
@@ -37969,9 +38011,15 @@ class Component extends DCLogic {
       desksTabCardsClass: tab === 'cards' ? 'on' : '',
       desksTabWidgetsClass: tab === 'widgets' ? 'on' : '',
       desksTabAppearanceClass: tab === 'appearance' ? 'on' : '',
+      desksTabCarSettingsClass: '',
       desksOpenCards: (ev) => { this._cardControlEvent(ev); this._setStudioTab('cards'); },
       desksOpenWidgets: (ev) => { this._cardControlEvent(ev); this._setStudioTab('widgets'); },
       desksOpenAppearance: (ev) => { this._cardControlEvent(ev); this._setStudioTab('appearance'); },
+      desksOpenCarSettings: (ev) => {
+        this._cardControlEvent(ev);
+        this.setState({ desktopStudioOpen: false });
+        this.toggleCameraRail(true);
+      },
       desksItems: list.map((d, i) => this._desktopThumbView(d, i, index)),
       desksEmpty: !list.length,
       desksCanAdd: list.length < H6_MAX_DESKTOPS,
@@ -43588,18 +43636,11 @@ class Component extends DCLogic {
       centerSlotTop: centerRect.top,
       centerSlotWidth: centerRect.width,
       centerSlotHeight: centerRect.height,
-      stageAestheticDisplay: isWallpaper ? 'none' : stageControlsVisible,
-      stageCameraDisplay: isWallpaper ? 'none' : stageControlsVisible,
-      // One row: config takes the slot nearest the widgets, camera sits to its
-      // right. The camera moves rather than the config, because stageControlLeft
-      // is already the leftmost x that does not cover a card.
-      stageAestheticStyle: 'left:' + Math.round(stageControlLeft) + 'px;top:'
+      // The gear moved into the desktop switcher ("3D car settings"); only the
+      // camera quick-access remains here, gated by the Camera shortcut toggle.
+      stageCameraDisplay: (isWallpaper || !s.cameraShortcutEnabled) ? 'none' : stageControlsVisible,
+      stageCameraStyle: 'left:' + Math.round(stageControlLeft) + 'px;top:'
         + Math.round(stageControlBottom - 42) + 'px;',
-      stageCameraStyle: 'left:' + Math.round(stageControlLeft + 50) + 'px;top:'
-        + Math.round(stageControlBottom - 42) + 'px;',
-      openStageAesthetics: () => this._toggleConfigSection('paint', {
-        activeGroup: 'tuning', tuningSubTab: 'paint',
-      }),
       openStageCamera: () => this.toggleCameraRail(),
       onLeftBoardHoldStart: (ev) => this._onBoardHoldStart('left', ev),
       onLeftBoardHoldEnd: (ev) => this._onBoardHoldEnd('left', ev),
