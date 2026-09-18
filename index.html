@@ -2162,8 +2162,35 @@ window.HavalSplash = (function () {
       color: var(--hv-accent, #4fd6e8);
       font-weight: 900;
     }
+    .hv-first-run-card-spinner {
+      display: none;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(79, 214, 232, 0.25);
+      border-top-color: var(--hv-accent, #4fd6e8);
+      border-radius: 50%;
+      animation: hvFirstRunSpin .75s linear infinite;
+    }
     .hv-first-run-model-card.on .hv-first-run-card-check {
       display: inline;
+    }
+    .hv-first-run-model-card.loading .hv-first-run-card-spinner {
+      display: inline-block;
+    }
+    .hv-first-run-model-card.loading .hv-first-run-card-check {
+      display: none !important;
+    }
+    .hv-first-run-model-card.loading {
+      border-color: rgba(79, 214, 232, 0.65);
+      box-shadow: 0 0 16px rgba(79, 214, 232, 0.22);
+    }
+    .hv-first-run-model-card:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+    @keyframes hvFirstRunSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
     .hv-first-run-card-tag {
       font-size: 9px;
@@ -2237,6 +2264,9 @@ window.HavalSplash = (function () {
       cursor: pointer;
       box-shadow: 0 4px 18px rgba(79, 214, 232, 0.35);
       transition: filter .15s ease, transform .12s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .hv-first-run-confirm-btn:hover {
       filter: brightness(1.1);
@@ -2244,6 +2274,22 @@ window.HavalSplash = (function () {
     .hv-first-run-confirm-btn:active {
       transform: scale(.985);
       filter: brightness(1.18);
+    }
+    .hv-first-run-btn-spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin-right: 8px;
+      border: 2px solid rgba(6, 18, 28, 0.35);
+      border-top-color: #06121c;
+      border-radius: 50%;
+      animation: hvFirstRunSpin .75s linear infinite;
+    }
+    .hv-first-run-confirm-btn.loading {
+      background: linear-gradient(135deg, #3dbdcf 0%, #1f8b9b 100%);
+      cursor: wait;
+      pointer-events: none;
+      opacity: .92;
     }
 
     .hv-layout-config-btn {
@@ -6899,9 +6945,10 @@ window.HavalSplash = (function () {
         <div class="hv-first-run-label">1. SELECT MODEL</div>
         <div class="hv-first-run-models">
           <sc-for list="{{ firstRunModels }}" as="frm">
-            <button type="button" class="hv-first-run-model-card {{ frm.activeClass }}" onClick="{{ frm.onClick }}">
+            <button type="button" class="hv-first-run-model-card {{ frm.activeClass }}" onClick="{{ frm.onClick }}" disabled="{{ frm.disabled }}">
               <div class="hv-first-run-card-header">
                 <span class="hv-first-run-card-title">{{ frm.name }}</span>
+                <span class="hv-first-run-card-spinner"></span>
                 <span class="hv-first-run-card-check">✓</span>
               </div>
               <div class="hv-first-run-card-tag">{{ frm.label }}</div>
@@ -6926,7 +6973,10 @@ window.HavalSplash = (function () {
       </div>
 
       <div class="hv-first-run-footer">
-        <button type="button" class="hv-first-run-confirm-btn" onClick="{{ confirmFirstRunSetup }}">CONFIRM & START</button>
+        <button type="button" class="hv-first-run-confirm-btn {{ confirmFirstRunBtnClass }}" onClick="{{ confirmFirstRunSetup }}" disabled="{{ confirmFirstRunDisabled }}">
+          <span class="hv-first-run-btn-spinner" style="display: {{ confirmFirstRunSpinnerDisplay }};"></span>
+          <span>{{ confirmFirstRunText }}</span>
+        </button>
       </div>
     </div>
   </div>
@@ -14294,6 +14344,18 @@ class Component extends DCLogic {
       ring: p.key === activeKey ? '#4fd6e8' : 'rgba(255,255,255,.22)',
       onClick: () => this.setColor(p.key),
     }));
+    const activeTrim = s.modelTrim || 'phev34';
+    const activeTrimObj = this._trims().find((t) => t.key === activeTrim);
+    const activeTargetBody = activeTrimObj ? activeTrimObj.body : 'hev';
+    const isModelCurrentlyLoading = !!(
+      s.loading ||
+      !!this._carSwapLabel ||
+      !!this._bodySwapTimer ||
+      (this._variantLoadState && this._variantLoadState[activeTargetBody] === 'loading') ||
+      (!this._variants || !this._variants[activeTargetBody])
+    );
+    const isPendingConfirm = !!this._firstRunPendingConfirm;
+
     const firstRunModelsList = [
       {
         key: 'gt',
@@ -14320,14 +14382,21 @@ class Component extends DCLogic {
         spec: 'Hybrid · FWD',
       },
     ].map((m) => {
-      const isSelected = (s.modelTrim || 'phev34') === m.key;
+      const isSelected = activeTrim === m.key;
+      const mTrimObj = this._trims().find((t) => t.key === m.key);
+      const mBody = mTrimObj ? mTrimObj.body : 'hev';
+      const isBodyLoading = (this._variantLoadState && this._variantLoadState[mBody] === 'loading')
+        || (isSelected && isModelCurrentlyLoading);
       return {
         key: m.key,
         name: m.name,
         label: m.label,
-        spec: m.spec,
-        activeClass: isSelected ? 'on' : '',
-        onClick: () => this._selectTrim(m.key),
+        spec: isBodyLoading ? 'LOADING 3D ASSETS…' : m.spec,
+        activeClass: (isSelected ? 'on' : '') + (isBodyLoading ? ' loading' : ''),
+        disabled: isPendingConfirm ? 'disabled' : undefined,
+        onClick: () => {
+          if (!isPendingConfirm) this._selectTrim(m.key);
+        },
       };
     });
     const firstRunColorsList = palette.map((p) => {
@@ -14337,7 +14406,9 @@ class Component extends DCLogic {
         hex: p.hex,
         title: p.title,
         activeClass: isSelected ? 'on' : '',
-        onClick: () => this.setColor(p.key),
+        onClick: () => {
+          if (!isPendingConfirm) this.setColor(p.key);
+        },
       };
     });
     const hv = (on) => this._hvBtn(!!on);
@@ -14352,6 +14423,12 @@ class Component extends DCLogic {
       firstRunModels: firstRunModelsList,
       firstRunColors: firstRunColorsList,
       firstRunSelectedColorName: activeColorObj.title,
+      confirmFirstRunText: isPendingConfirm
+        ? 'PREPARING 3D VEHICLE…'
+        : (isModelCurrentlyLoading ? 'LOADING 3D VEHICLE…' : 'CONFIRM & START'),
+      confirmFirstRunBtnClass: isPendingConfirm ? 'loading' : '',
+      confirmFirstRunDisabled: isPendingConfirm ? 'disabled' : undefined,
+      confirmFirstRunSpinnerDisplay: isPendingConfirm ? 'inline-block' : 'none',
       confirmFirstRunSetup: () => this._confirmFirstRunSetup(),
       containerRef: this.containerRef,
       outerRef: this.outerRef,
@@ -15688,14 +15765,18 @@ class Component extends DCLogic {
     return false;
   }
 
-  _checkFirstRunSetup() {
+  _checkFirstRunSetup(immediate) {
     if (this._firstRunChecked) return;
     if (this.state && this.state.loading && !this._viewerReady) return;
     this._firstRunChecked = true;
     if (!this._hasCompletedSetup()) {
-      setTimeout(() => {
+      if (immediate) {
         if (!this._unmounted) this.setState({ firstRunSetupOpen: true });
-      }, 350);
+      } else {
+        setTimeout(() => {
+          if (!this._unmounted) this.setState({ firstRunSetupOpen: true });
+        }, 100);
+      }
     }
   }
 
@@ -15704,13 +15785,72 @@ class Component extends DCLogic {
   }
 
   _confirmFirstRunSetup() {
+    const curTrim = this.state.modelTrim || 'phev34';
+    const curTrimObj = this._trims().find((t) => t.key === curTrim);
+    const targetBody = curTrimObj ? curTrimObj.body : 'hev';
+    const isModelLoading = !!(
+      this.state.loading ||
+      !!this._carSwapLabel ||
+      !!this._bodySwapTimer ||
+      (this._variantLoadState && this._variantLoadState[targetBody] === 'loading') ||
+      (!this._variants || !this._variants[targetBody])
+    );
+
+    if (isModelLoading) {
+      this._firstRunPendingConfirm = true;
+      if (!this._unmounted) this.setState({ firstRunLoadingConfirm: true });
+      this._checkPendingFirstRunConfirm();
+      return;
+    }
+
+    this._finishConfirmFirstRunSetup();
+  }
+
+  _checkPendingFirstRunConfirm() {
+    if (!this._firstRunPendingConfirm) return;
+    const curTrim = this.state.modelTrim || 'phev34';
+    const curTrimObj = this._trims().find((t) => t.key === curTrim);
+    const targetBody = curTrimObj ? curTrimObj.body : 'hev';
+    const isModelLoading = !!(
+      this.state.loading ||
+      !!this._carSwapLabel ||
+      !!this._bodySwapTimer ||
+      (this._variantLoadState && this._variantLoadState[targetBody] === 'loading') ||
+      (!this._variants || !this._variants[targetBody])
+    );
+    if (!isModelLoading) {
+      this._finishConfirmFirstRunSetup();
+    } else {
+      setTimeout(() => {
+        if (this._firstRunPendingConfirm) this._checkPendingFirstRunConfirm();
+      }, 100);
+    }
+  }
+
+  _finishConfirmFirstRunSetup() {
+    this._firstRunPendingConfirm = false;
     this._setupCompleted = true;
     try {
       localStorage.setItem('h6_setup_completed', '1');
       localStorage.setItem('h6_first_run_completed', '1');
     } catch (e) {}
-    this.setState({ firstRunSetupOpen: false }, () => {
+    this.setState({
+      firstRunSetupOpen: false,
+      firstRunLoadingConfirm: false,
+    }, () => {
       this.saveSettings();
+      if (this.controls) this.controls.enabled = this._shouldShowCar();
+      this._applyFitCamera(!!window.__androidPopupActive);
+      this._syncCamOrbit();
+      this._syncEventCamera();
+      document.body.classList.remove('hv-boot');
+      try {
+        const bridge = window.AppLauncherBridge;
+        if (bridge && typeof bridge.revealLauncher === 'function') bridge.revealLauncher();
+      } catch (e) {}
+      this._scheduleCamIconWarmup();
+      this._scheduleDesktopShot(3000);
+      if (this.requestRender) this.requestRender(60);
     });
   }
 
@@ -16057,8 +16197,8 @@ class Component extends DCLogic {
       // through the floor. Doors are shut at this point, so re-boxing across
       // the hinge transform is exact — its only rotation is about Y.
       box.applyMatrix4(inv.copy(node.parent.matrixWorld).invert());
-      const hingeY = node.parent.position.y || 0;
-      const hingeX = node.parent.position.x || 0;
+      const modelBox = new THREE.Box3().setFromObject(node);
+      modelBox.applyMatrix4(inv.copy(obj.matrixWorld).invert());
       this._windows.push({
         key: k,
         node: node,
@@ -16066,8 +16206,8 @@ class Component extends DCLogic {
         drop: (box.max.y - box.min.y) * 0.92,
         // Rest belt line and pane centre, in the model's own space, kept for
         // the door hotspot so it never has to re-measure a dropped pane.
-        restY: hingeY + box.min.y,
-        restX: hingeX + (box.min.x + box.max.x) * 0.5,
+        restY: modelBox.min.y,
+        restX: (modelBox.min.x + modelBox.max.x) * 0.5,
       });
     });
     console.log('[Haval H6] windows:',
@@ -21745,21 +21885,23 @@ class Component extends DCLogic {
     });
   }
 
-  _hsNodeAnchorLocal(node) {
-    if (!node || !this.model || !this.THREE) return null;
+  _hsNodeAnchorLocal(node, modelRoot) {
+    const model = modelRoot || this.model;
+    if (!node || !model || !this.THREE) return null;
     const THREE = this.THREE;
     const box = new THREE.Box3().setFromObject(node);
     if (box.isEmpty()) return null;
     const w = box.getCenter(new THREE.Vector3());
-    this.model.updateMatrixWorld(true);
-    const inv = new THREE.Matrix4().copy(this.model.matrixWorld).invert();
+    model.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
     return w.applyMatrix4(inv);
   }
 
-  _hsFindMeshByName(rx) {
-    if (!this.model) return null;
+  _hsFindMeshByName(rx, root) {
+    const model = root || this.model;
+    if (!model) return null;
     let found = null;
-    this.model.traverse((c) => {
+    model.traverse((c) => {
       if (found || !c.isMesh || !this._isWorldVisible(c)) return;
       if (rx.test(c.name || '')) found = c;
     });
@@ -21769,14 +21911,26 @@ class Component extends DCLogic {
   _hsBBoxAnchorLocal(model, placeFn) {
     if (!model || !this.THREE) return null;
     const THREE = this.THREE;
-    const box = new THREE.Box3().setFromObject(model);
+    const FLOOR_NAMES = new Set(['floor', 'ground', 'backdrop', 'plane']);
+    const normalizeFloorName = (n) => (n || '').toLowerCase().trim().replace(/\.\d+$/, '');
+    const isFloor = (c) => {
+      const mat = Array.isArray(c.material) ? c.material[0] : c.material;
+      return FLOOR_NAMES.has(normalizeFloorName(c.name)) || FLOOR_NAMES.has(normalizeFloorName(mat && mat.name));
+    };
+    const box = new THREE.Box3();
+    model.traverse((c) => {
+      if (c.isMesh && !isFloor(c)) {
+        box.expandByObject(c);
+      }
+    });
     if (box.isEmpty()) return null;
     model.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
-    const minL = box.min.clone().applyMatrix4(inv);
-    const maxL = box.max.clone().applyMatrix4(inv);
-    const cL = minL.clone().add(maxL).multiplyScalar(0.5);
-    const szL = maxL.clone().sub(minL);
+    box.applyMatrix4(inv);
+    const minL = box.min;
+    const maxL = box.max;
+    const cL = box.getCenter(new THREE.Vector3());
+    const szL = box.getSize(new THREE.Vector3());
     const p = new THREE.Vector3();
     placeFn(minL, maxL, cL, szL, p);
     return p;
@@ -22165,12 +22319,12 @@ class Component extends DCLogic {
   }
 
   _rebuildCamFabAnchor(root) {
-    if (!this.THREE || !this.model) {
+    const model = root || this.model;
+    if (!this.THREE || !model) {
       this._camFabAnchor = null;
       return;
     }
     const THREE = this.THREE;
-    const model = root || this.model;
     model.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
     let world = this._rearLeftWheelFabWorld();
@@ -22998,7 +23152,7 @@ class Component extends DCLogic {
     const THREE = this.THREE;
     const anchors = {};
     const put = (id, node) => {
-      const a = this._hsNodeAnchorLocal(node);
+      const a = this._hsNodeAnchorLocal(node, model);
       if (a) anchors[id] = a;
     };
 
@@ -23023,7 +23177,14 @@ class Component extends DCLogic {
       const hlBox = new THREE.Box3();
       hlMeshes.forEach((m) => hlBox.expandByObject(m));
       if (!hlBox.isEmpty()) {
-        const bodyBox = new THREE.Box3().setFromObject(model);
+        const FLOOR_NAMES = new Set(['floor', 'ground', 'backdrop', 'plane']);
+        const normalizeFloorName = (n) => (n || '').toLowerCase().trim().replace(/\.\d+$/, '');
+        const isFloor = (c) => {
+          const mat = Array.isArray(c.material) ? c.material[0] : c.material;
+          return FLOOR_NAMES.has(normalizeFloorName(c.name)) || FLOOR_NAMES.has(normalizeFloorName(mat && mat.name));
+        };
+        const bodyBox = new THREE.Box3();
+        model.traverse((c) => { if (c.isMesh && !isFloor(c)) bodyBox.expandByObject(c); });
         const w = hlBox.getCenter(new THREE.Vector3());
         w.y = bodyBox.min.y + (bodyBox.max.y - bodyBox.min.y) * 0.48;
         model.updateMatrixWorld(true);
@@ -23033,7 +23194,7 @@ class Component extends DCLogic {
     }
     if (!anchors.engine && this._powertrainRig) put('engine', this._powertrainRig);
     if (!anchors.engine) {
-      const hood = this._hsFindMeshByName(/hood|bonnet|front_hood|motor_hood/i);
+      const hood = this._hsFindMeshByName(/hood|bonnet|front_hood|motor_hood/i, model);
       if (hood) put('engine', hood);
     }
     if (!anchors.engine) {
@@ -23060,8 +23221,8 @@ class Component extends DCLogic {
       const wf = (this._windows || []).find((entry) => entry.key === frontKey);
       const wr = (this._windows || []).find((entry) => entry.key === rearKey);
       if (!wf || !wr) return false;
-      const af = this._hsNodeAnchorLocal(wf.node);
-      const ar = this._hsNodeAnchorLocal(wr.node);
+      const af = this._hsNodeAnchorLocal(wf.node, model);
+      const ar = this._hsNodeAnchorLocal(wr.node, model);
       if (!af || !ar) return false;
       const x0 = typeof wf.restX === 'number' ? wf.restX : af.x;
       const x1 = typeof wr.restX === 'number' ? wr.restX : ar.x;
@@ -23076,7 +23237,7 @@ class Component extends DCLogic {
     if (!midWindows('windowsL', 'fl', 'rl')) {
       const wn = (this._windows || []).find((entry) => entry.key === 'fl');
       if (wn) {
-        const a = this._hsNodeAnchorLocal(wn.node);
+        const a = this._hsNodeAnchorLocal(wn.node, model);
         if (a) {
           if (typeof wn.restY === 'number') a.y = wn.restY;
           if (typeof wn.restX === 'number') a.x = wn.restX;
@@ -23087,7 +23248,7 @@ class Component extends DCLogic {
     if (!midWindows('windowsR', 'fr', 'rr')) {
       const wn = (this._windows || []).find((entry) => entry.key === 'fr');
       if (wn) {
-        const a = this._hsNodeAnchorLocal(wn.node);
+        const a = this._hsNodeAnchorLocal(wn.node, model);
         if (a) {
           if (typeof wn.restY === 'number') a.y = wn.restY;
           if (typeof wn.restX === 'number') a.x = wn.restX;
@@ -23109,7 +23270,7 @@ class Component extends DCLogic {
     const putMirror = (id, side) => {
       const entry = this._mirrorFolds && this._mirrorFolds[side];
       if (entry && entry.group) {
-        const a = this._hsNodeAnchorLocal(entry.group);
+        const a = this._hsNodeAnchorLocal(entry.group, model);
         if (a) { anchors[id] = a; return; }
       }
     };
@@ -28840,12 +29001,14 @@ class Component extends DCLogic {
         clearInterval(this._bodySwapTimer);
         this._bodySwapTimer = null;
         this._syncPowertrainToBody();
+        this._checkPendingFirstRunConfirm();
       } else if (Date.now() - started > 20000) {
         // Give up rather than spin forever; sync with whatever we have.
         clearInterval(this._bodySwapTimer);
         this._bodySwapTimer = null;
         console.warn('[Powertrain] body swap never settled; syncing anyway');
         this._syncPowertrainToBody();
+        this._checkPendingFirstRunConfirm();
       }
     }, 200);
   }
@@ -32823,9 +32986,9 @@ class Component extends DCLogic {
     // Applied by default now (was a console-only test toggle); still
     // reachable as window.__archCapRough(false) to compare back.
     this._setArchCapRough(true);
-    this._captureVariant(profile.key, obj);
     this._rebuildCarPickMeshes(obj);
     this._rebuildHotspotAnchors(obj);
+    this._captureVariant(profile.key, obj);
 
     // If a secondary model delegates wheel rendering to a source variant, hide its
     // own (buggy) wheel meshes and redirect all wheel arrays to the validated source.
@@ -32987,7 +33150,8 @@ class Component extends DCLogic {
       '_sunroofFrontOrigRot', '_sunroofRange', 'sunroofCurtain', '_curtainParams', 'lightGroups',
       '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels', '_allWheels',
       '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels', '_steerOnlyMeshes',
-      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges', '_mirrorFolds', '_trunkHinge'];
+      '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges', '_mirrorFolds', '_trunkHinge',
+      '_windows', '_hsAnchors', '_carPickMeshes', '_camFabAnchor', '_xrayFabAnchor'];
   }
 
   /**
@@ -34254,25 +34418,21 @@ class Component extends DCLogic {
     const splash = window.HavalSplash;
     const afterFade = immediate ? 0 : (((splash && splash.fadeMs) || 0) + 100);
 
-    this._launcherRevealTimer = setTimeout(() => {
-      try {
-        const bridge = window.AppLauncherBridge;
-        if (bridge && typeof bridge.revealLauncher === 'function') bridge.revealLauncher();
-      } catch (e) {
-        console.warn('[Shell] revealLauncher failed', e);
-      }
-    }, afterFade);
+    if (this._hasCompletedSetup()) {
+      this._launcherRevealTimer = setTimeout(() => {
+        try {
+          const bridge = window.AppLauncherBridge;
+          if (bridge && typeof bridge.revealLauncher === 'function') bridge.revealLauncher();
+        } catch (e) {
+          console.warn('[Shell] revealLauncher failed', e);
+        }
+      }, afterFade);
 
-    this._widgetRevealTimer = setTimeout(() => {
-      document.body.classList.remove('hv-boot');
-    }, immediate ? 0 : afterFade + 2000);
-
-    if (!this._introActive) {
-      this._checkFirstRunSetup();
+      this._widgetRevealTimer = setTimeout(() => {
+        document.body.classList.remove('hv-boot');
+      }, immediate ? 0 : afterFade + 2000);
     } else {
-      setTimeout(() => {
-        this._checkFirstRunSetup();
-      }, 3500);
+      this._checkFirstRunSetup(true);
     }
   }
 
@@ -34798,6 +34958,14 @@ class Component extends DCLogic {
     if (splash && splash.fadeOut) splash.fadeOut();
     this.setState({ splashActive: false });
     this._revealShellChrome();
+
+    if (!this._hasCompletedSetup()) {
+      this._intro = null;
+      this._introActive = false;
+      if (this.controls) this.controls.enabled = false;
+      this._checkFirstRunSetup(true);
+      return;
+    }
 
     const home = this._homeCameraPose();
     const fadeSec = Math.max(0.2, ((splash && splash.fadeMs) || 1100) / 1000);
@@ -43804,6 +43972,7 @@ class Component extends DCLogic {
     this._endCarSwap();
     this._notifyViewerReady();
     this._scheduleCamIconWarmup();
+    this._checkPendingFirstRunConfirm();
     const pendingMedia = this._pendingMediaPayload;
     this._pendingMediaPayload = null;
     if (pendingMedia) {
@@ -43997,10 +44166,15 @@ class Component extends DCLogic {
     const shown = (this._swapHoldVariant && this._variants[this._swapHoldVariant])
       ? this._swapHoldVariant
       : this._currentVariantKey();
+    const activeVar = this._variants[shown];
+    const donorKey = activeVar && activeVar._inheritedWheelsFrom;
     Object.keys(this._variants).forEach((k) => {
       const r = this._variants[k] && this._variants[k].root;
-      if (r) r.visible = showCar && (k === shown);
+      if (r) r.visible = showCar && (k === shown || k === donorKey);
     });
+    if (donorKey && showCar) {
+      this._cullDonorMeshes(shown);
+    }
   }
 
   _activateVariant(key) {
@@ -44033,16 +44207,14 @@ class Component extends DCLogic {
     this._applyVariantVisibility();
 
     if (b._inheritedWheelsFrom) {
-      const srcV = this._variants[b._inheritedWheelsFrom];
-      if (srcV && srcV.root) {
-        srcV.root.visible = showCar;
-        this._cullDonorMeshes(key);
-      }
+      this._cullDonorMeshes(key);
     }
 
     // Swap the active per-model references.
     this._variantFields().forEach((f) => { this[f] = b[f]; });
     this.model = b.root;
+    this._rebuildCarPickMeshes(this.model);
+    this._rebuildHotspotAnchors(this.model);
     this._wheelsShareCarRoot = !b._inheritedWheelsFrom;
     this._originalWheelsState = null;
     this._snapshotOriginalWheelsState();
