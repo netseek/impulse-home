@@ -119,7 +119,7 @@ const MUTANTS = {
     "fuel: this._energyFuelUnit === 'l100' ? 'l100' : 'kml',", "fuel: this._energyFuelUnit === 'kml' ? 'kml' : 'l100',") }),
   'derived electric figure is labelled EST': (s) => ({ ...s, html: s.html.replace(" + (nowEv === '—' ? '' : ' · EST'),", ',') }),
   'no descendant span rules on the card': (s) => ({ ...s, html: s.html.replace(
-    '.hv-energy-stats li > small {', '.hv-energy-stats span, .hv-energy-stats li > small {') }),
+    '.hv-energy-tkv li > small {', '.hv-energy-tkv span, .hv-energy-tkv li > small {') }),
   'rail card has its own native painter': (s) => ({ ...s, java: s.java.replace(
     'case "consumption": drawEnergy(canvas, w, h, accent, muted, strong); break;', '') }),
   'native parses the seven-day bars': (s) => ({ ...s, java: s.java.replace(

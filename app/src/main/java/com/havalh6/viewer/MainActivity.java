@@ -8675,8 +8675,8 @@ public final class MainActivity extends Activity {
         quickClimateValue = (android.widget.TextView) climate.findViewWithTag("quickValue");
         row.addView(climate);
 
-        View consumption = makeQuickTextCard(density, 196, "ENERGIA", "—",
-                "Resumo de energia. Abre a tela de energia",
+        View consumption = makeQuickTextCard(density, 196, "CONSUMO", "—",
+                "Resumo de consumo. Abre a tela de consumo",
                 v -> callViewerDock("openConsumption"));
         quickConsumptionValue = (android.widget.TextView) consumption.findViewWithTag("quickValue");
         row.addView(consumption);
@@ -8861,8 +8861,8 @@ public final class MainActivity extends Activity {
 
         android.widget.TextView primary = new android.widget.TextView(this);
         primary.setTag("quickValue");
-        primary.setText(quickVisualPrimary(descriptor));
-        primary.setTextSize("clock".equals(descriptor.id) ? 24f : 21f);
+        primary.setText(quickVisualPrimaryText(descriptor));
+        primary.setTextSize("clock".equals(descriptor.id) || "consumption".equals(descriptor.id) ? 24f : 21f);
         primary.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         primary.setTextColor(dockLabelColor());
@@ -8873,7 +8873,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView detail = new android.widget.TextView(this);
         detail.setTag("frostSecondary");
         detail.setText(quickVisualDetail(descriptor));
-        detail.setTextSize(9.5f);
+        detail.setTextSize("consumption".equals(descriptor.id) ? 11f : 9.5f);
         detail.setLetterSpacing(0.025f);
         detail.setLineSpacing(0f, 1.02f);
         // The source badge is long and must never ellipsise into something that
@@ -8905,7 +8905,9 @@ public final class MainActivity extends Activity {
             if (descriptor.secondary.isEmpty()) return rear;
             return rear + (rear.isEmpty() ? "" : "\n") + descriptor.secondary;
         }
-        String metrics = descriptor.metricA;
+        // CONSUMO carries its unit beside the big number, so the detail is the
+        // trip line and the EV share only.
+        String metrics = "consumption".equals(descriptor.id) ? "" : descriptor.metricA;
         if (!descriptor.metricB.isEmpty()) {
             metrics += (metrics.isEmpty() ? "" : "  ·  ") + descriptor.metricB;
         }
@@ -9045,6 +9047,18 @@ public final class MainActivity extends Activity {
                 v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops")));
         card.addView(actions);
         workspaceActionsFace = actions;
+    /** {@link #quickVisualPrimary} with CONSUMO's unit set small after the number. */
+    private CharSequence quickVisualPrimaryText(BottomCardDescriptor descriptor) {
+        String primary = quickVisualPrimary(descriptor);
+        if (!"consumption".equals(descriptor.id) || descriptor.metricA.isEmpty()) return primary;
+        android.text.SpannableString text = new android.text.SpannableString(primary + " " + descriptor.metricA);
+        text.setSpan(new android.text.style.RelativeSizeSpan(0.4f), primary.length(), text.length(),
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.setSpan(new android.text.style.ForegroundColorSpan(dockUiLight ? 0xFF6B7480 : 0xFF7D8793), primary.length(),
+                text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return text;
+    }
+
         View layoutFace = makeWorkspaceLayoutFace(density);
         card.addView(layoutFace);
         workspaceLayoutFace = layoutFace;
@@ -11184,8 +11198,8 @@ public final class MainActivity extends Activity {
     private void updateBottomCardValues(List<BottomCardDescriptor> cards) {
         for (BottomCardDescriptor card : cards) {
             android.widget.TextView value = quickCardValues.get(card.id);
-            String primary = quickVisualPrimary(card);
-            if (value != null && !primary.equals(value.getText().toString())) {
+            CharSequence primary = quickVisualPrimaryText(card);
+            if (value != null && !primary.toString().equals(value.getText().toString())) {
                 value.setText(primary);
             }
             android.widget.TextView detail = quickCardDetails.get(card.id);

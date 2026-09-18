@@ -1,6 +1,6 @@
 /*
  * Behavioural test for the ENERGIA AGORA screen's pure logic (index.html):
- * _energyTenMinView (the last-10-minutes chart and its averages) and
+ * _energyChartView (the chart over minutes or km, its density and averages) and
  * _energyLevelView (a level bar, trip start against now). Lift the methods out,
  * run fixtures, then prove every mutant is caught.
  */
@@ -27,7 +27,12 @@ function methodText(html, name) {
 function load(html) {
   // eslint-disable-next-line no-new-func
   const fn = (name) => new Function(`return function ${methodText(html, name)}`)();
-  return { tenMin: fn('_energyTenMinView'), level: fn('_energyLevelView') };
+  const chart = fn('_energyChartView');
+  return {
+    tenMin: (samples, now) => chart(samples, now, { kind: 'time', span: 600000, points: 0 }),
+    chart: chart,
+    level: fn('_energyLevelView'),
+  };
 }
 
 const NOW = 1_800_000_000_000;
@@ -65,21 +70,40 @@ const SCENARIOS = {
     const v = tenMin(old.concat(series(5, () => ({ kw: 10, kmh: 50 }))), NOW);
     assert.equal(v.top, '40');
   },
+  'a km span keeps only the last N km': ({ chart }) => {
+    // 30 min at 60 km/h = 30 km; a 10 km window holds the last ~600 samples.
+    const s = series(1800, (i) => ({ kw: i < 1000 ? 90 : 10, kmh: 60, km: i / 60 }));
+    const v = chart(s, NOW, { kind: 'km', span: 10, points: 0 });
+    assert.equal(v.top, '40');
+    assert.ok(Math.abs(v.km - 10) < 0.2, 'window distance ' + v.km);
+  },
+  'density averages into buckets': ({ chart }) => {
+    const s = series(600, (i) => ({ kw: i % 2 ? 30 : 10, kmh: 50 }));
+    const raw = chart(s, NOW, { kind: 'time', span: 600000, points: 0 });
+    const coarse = chart(s, NOW, { kind: 'time', span: 600000, points: 20 });
+    const count = (d) => (d.match(/L/g) || []).length;
+    assert.ok(count(coarse.drive) < 30 && count(raw.drive) > 500, count(coarse.drive) + ' / ' + count(raw.drive));
+  },
+  'no fuel trace while the engine is off': ({ chart }) => {
+    const s = series(60, (i) => ({ kw: 10, kmh: 50, fuel: 7, ice: i < 30 }));
+    const v = chart(s, NOW, { kind: 'time', span: 600000, points: 0 });
+    assert.equal((v.fuel.match(/L/g) || []).length, 29);
+  },
   'a level that fell shows the used part from the start': ({ level }) => {
-    const v = level(72, 58, 'ev');
+    const v = level(72, 58, 'ev', 34);
     assert.equal(v.baseW, '58%');
     assert.equal(v.deltaL, '58%');
     assert.equal(v.deltaW, '14%');
     assert.equal(v.deltaClass, 'used');
     assert.equal(v.markL, '72%');
-    assert.equal(v.delta, 'início 72% · −14 p.p.');
+    assert.equal(v.delta, '−4.8 kWh · −14%');
   },
   'a refuel above the start is a gain': ({ level }) => {
-    const v = level(20, 80, 'fuel');
+    const v = level(20, 80, 'fuel', 55);
     assert.equal(v.baseW, '20%');
     assert.equal(v.deltaW, '60%');
     assert.equal(v.deltaClass, 'gain');
-    assert.equal(v.delta, 'início 20% · +60 p.p. abastecimento');
+    assert.equal(v.delta, '+33 L · +60%');
   },
   'no trip start shows the level alone': ({ level }) => {
     const v = level(undefined, 44, 'ev');
@@ -103,10 +127,13 @@ const clean = run(SOURCE);
 assert.deepEqual(clean, [], `AGORA scenarios failed: ${clean.join(', ')}`);
 
 const MUTANTS = {
-  'gaps never break a trace': ['if (!cur || !prev || s.t - prev.t > GAP) {', 'if (!cur || !prev) {'],
+  'gaps never break a trace': ['const joined = (a, b) => (n ? b.b - a.b === 1 : b.t - a.t <= GAP);', 'const joined = () => true;'],
+  'density ignored': ['const n = spec.points > 0 ? spec.points : 0;', 'const n = 0;'],
+  'km span ignored': ['const inside = byKm ? (s) => isFinite(s.km) && s.km > kmNow - SPAN', 'const inside = byKm ? (s) => true'],
   'electric share over all distance': ['evShare: knownKm >= 0.05 ? evKm / knownKm : NaN,', 'evShare: km >= 0.05 ? evKm / km : NaN,'],
   'kW scale floor removed': ['const hi = Math.max(40, Math.ceil(maxKw / 20) * 20);', 'const hi = Math.max(0, Math.ceil(maxKw / 20) * 20);'],
-  'old samples kept': ['const list = (samples || []).filter((s) => s && s.t > now - SPAN && s.t <= now);', 'const list = (samples || []).filter((s) => s);'],
+  'fuel drawn with the engine off': ['fuel: s.ice === false ? NaN : s.fuel,', 'fuel: s.fuel,'],
+  'old samples kept': [': (s) => s.t > now - SPAN;', ': (s) => true;'],
   'gain and used swapped': ["deltaClass: n > s ? 'gain' : 'used',", "deltaClass: n > s ? 'used' : 'gain',"],
   'fuel integrated per second instead of per km': ['if (isFinite(b.fuel)) fuelL += b.fuel * dkm / 100;', 'if (isFinite(b.fuel)) fuelL += b.fuel * dt / 100000;'],
 };
