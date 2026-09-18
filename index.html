@@ -9072,6 +9072,11 @@ const CAM_CURRENT_KEY = '__current';
 const CAM_CURRENT_POLL_MS = 900;
 // Camera tween when switching desktops (each desktop keeps its own view).
 const DESKTOP_CAM_FLY_SEC = 0.85;
+// Accent glow on 3D-only backgrounds: strength, radius (share of the panel)
+// and vertical centre. One knob to tune by eye: BG_TINT_ALPHA.
+const BG_TINT_ALPHA = 0.28;
+const BG_TINT_R = 0.62;
+const BG_TINT_Y = 0.46;
 // Desktop swipe: commit once the finger has travelled this share of the
 // panel (even while still touching); one desktop per gesture.
 const DESK_SWIPE_COMMIT_FRAC = 0.3;
@@ -14660,7 +14665,7 @@ class Component extends DCLogic {
       // Vignetted, so the very first paint already matches the settled 3D
       // background instead of stepping to it — see _shellBgCss.
       shellBg: this._shellBgCss(this._resolvedBg(), s.vignette && s.vignette.color,
-        s.vignette && s.vignette.intensity),
+        s.vignette && s.vignette.intensity, this._bgTintFor()),
       // Config panel docks over the left widget board (see configDock*).
       toolbarRight: (s.panelOpen ? 286 : 26) + 'px',
       configPanelRight: '26px',
@@ -15225,15 +15230,48 @@ class Component extends DCLogic {
    * duplicating ACES in JS or caching a probe render across boots, and the
    * first paint happens before the renderer exists either way.
    */
-  _shellBgCss(bg, vigColor, vigIntensity) {
+  _shellBgCss(bg, vigColor, vigIntensity, tint) {
     const a = Math.max(0, Math.min(1, (vigIntensity ?? 0) / 100));
-    if (!a) return bg;
+    // Accent glow (see BG_TINT_*): same ellipse as _makeBgTex draws, which the
+    // stretched background texture turns into this relative ellipse.
+    const t = this._rgbOf(tint);
+    const tintLayer = t
+      ? `radial-gradient(ellipse ${BG_TINT_R * 100}% ${BG_TINT_R * 100}% at 50% ${BG_TINT_Y * 100}%,`
+        + ` rgba(${t.r},${t.g},${t.b},${BG_TINT_ALPHA}) 0%, rgba(${t.r},${t.g},${t.b},0) 100%), `
+      : '';
+    if (!a) return tintLayer + bg;
     const h = (vigColor || '#000000').replace('#', '');
     const r = parseInt(h.slice(0, 2), 16) || 0;
     const g = parseInt(h.slice(2, 4), 16) || 0;
     const b = parseInt(h.slice(4, 6), 16) || 0;
     return `radial-gradient(ellipse 50% 50% at 50% 50%,`
-      + ` rgba(${r},${g},${b},0) 0%, rgba(${r},${g},${b},${a.toFixed(3)}) 100%), ${bg}`;
+      + ` rgba(${r},${g},${b},0) 0%, rgba(${r},${g},${b},${a.toFixed(3)}) 100%), ${tintLayer}${bg}`;
+  }
+
+  _setBgTintPass(tint) {
+    const m = this.bgTintMat;
+    if (!m) return;
+    if (tint) m.uniforms.uColor.value.set(tint);
+    m.uniforms.uAlpha.value = tint ? BG_TINT_ALPHA : 0;
+    this._postFxDirty = true;
+    if (this.requestRender) this.requestRender(2);
+  }
+
+  _rgbOf(hex) {
+    if (!hex || typeof hex !== 'string') return null;
+    const h = hex.replace('#', '');
+    if (h.length !== 6) return null;
+    return { r: parseInt(h.slice(0, 2), 16) || 0, g: parseInt(h.slice(2, 4), 16) || 0, b: parseInt(h.slice(4, 6), 16) || 0 };
+  }
+
+  /**
+   * Accent glow for a 3D-only background, so two 3D desktops look different
+   * and a swipe between them visibly moves. `d` defaults to the current one.
+   */
+  _bgTintFor(d) {
+    if (d) return this._desktopAccent(d.accentKey, d.accentColor, d.accentDark, d.accentLight).dark;
+    return this._desktopAccent(this.state.accentKey, this.state.accentColor,
+      this.state.accentDark, this.state.accentLight).dark;
   }
 
   _normalizeCenterFill(fill) {
@@ -15252,6 +15290,8 @@ class Component extends DCLogic {
 
   _applyBackground(night, dayBg, nightBg, vig, grain) {
     const bg = night ? nightBg : dayBg;
+    const tint = this._bgTintFor();
+    this._setBgTintPass(this._isMixedCenterFill() ? null : tint);
     const vc = vig.color || '#000000';
     const vi = vig.intensity ?? 0;
     // Mixed fill: Bing wallpaper shows through a transparent canvas.
@@ -15268,7 +15308,7 @@ class Component extends DCLogic {
         this.vignetteMat.uniforms.vignetteIntensity.value = vi / 100;
       }
       if (this.outerRef && this.outerRef.current) {
-        this.outerRef.current.style.background = this._shellBgCss(bg, vc, vi);
+        this.outerRef.current.style.background = this._shellBgCss(bg, vc, vi, tint);
         this.outerRef.current.classList.toggle('bg-grain', !!grain);
       }
       if (this.requestRender) this.requestRender(4);
@@ -15301,7 +15341,7 @@ class Component extends DCLogic {
     }
     // CSS background — loading state + behind the panel
     if (this.outerRef && this.outerRef.current) {
-      this.outerRef.current.style.background = this._shellBgCss(bg, vc, vi);
+      this.outerRef.current.style.background = this._shellBgCss(bg, vc, vi, tint);
       this.outerRef.current.classList.toggle('bg-grain', !!grain);
     }
     // Paint the native shell for the NEXT cold start. The WebView's own colour
@@ -28440,6 +28480,41 @@ class Component extends DCLogic {
       this.vignetteMat   = vignetteMat;
       this.vignetteScene = vignetteScene;
 
+      // Accent glow on a 3D-only background (_setBgTintPass). It cannot live in
+      // the background texture: ACES tone mapping plus the grade and vignette
+      // flattened even a 55% tint of the pale backdrop to +2 in one channel.
+      // Drawn after tone mapping instead, at depth 1.0 with EQUAL, so it lands
+      // only where nothing wrote depth -- the background, never the car.
+      const bgTintMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: new THREE.Color(1, 1, 1) },
+          uAlpha: { value: 0 },
+          uCenterY: { value: 1 - BG_TINT_Y },
+          uRadius: { value: BG_TINT_R },
+        },
+        vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }`,
+        fragmentShader: `
+          uniform vec3 uColor;
+          uniform float uAlpha;
+          uniform float uCenterY;
+          uniform float uRadius;
+          varying vec2 vUv;
+          void main(){
+            // Linear fall-off over a relative ellipse, like the CSS twin's
+            // radial-gradient(ellipse R% R% at 50% Y%).
+            float d = length((vUv - vec2(0.5, uCenterY)) / uRadius);
+            gl_FragColor = vec4(uColor, uAlpha * clamp(1.0 - d, 0.0, 1.0));
+          }`,
+        transparent: true,
+        depthTest: true,
+        depthFunc: THREE.EqualDepth,
+        depthWrite: false,
+      });
+      const bgTintScene = new THREE.Scene();
+      bgTintScene.add(new THREE.Mesh(quad, bgTintMat));
+      this.bgTintMat = bgTintMat;
+      this.bgTintScene = bgTintScene;
+
       // Settle the background NOW, not when the model lands. scene.background
       // was a flat colour until then and the vignette uniform sat at 0, so a
       // boot that reveals the shell before the GLB arrives (SKIP, or a slow
@@ -29015,6 +29090,14 @@ class Component extends DCLogic {
             scene.background = savedBg;
           }
           renderer.render(this.gradeScene, this.orthoCamera);
+          renderer.autoClear = true;
+        }
+
+        // Accent glow on the 3D background, just before the vignette (the same
+        // stacking as the CSS twin). Skipped while a swipe clears the canvas.
+        if (this.bgTintScene && this.bgTintMat.uniforms.uAlpha.value > 0 && !this._deskBgCleared) {
+          renderer.autoClear = false;
+          renderer.render(this.bgTintScene, this.orthoCamera);
           renderer.autoClear = true;
         }
 
@@ -36572,7 +36655,7 @@ class Component extends DCLogic {
     const bg = s.nightMode ? s.nightBg : s.dayBg;
     const vig = s.vignette || {};
     el.style.backgroundImage = '';
-    el.style.background = this._shellBgCss(bg, vig.color || '#000000', vig.intensity ?? 0);
+    el.style.background = this._shellBgCss(bg, vig.color || '#000000', vig.intensity ?? 0, this._bgTintFor(d));
   }
 
   /**
@@ -37454,6 +37537,9 @@ class Component extends DCLogic {
     }, () => {
       this._persistActiveDesktop();
       this._syncDockIndicators();
+      // The 3D background carries the accent as a glow.
+      const st = this.state;
+      this._applyBackground(st.nightMode, st.dayBg, st.nightBg, st.vignette, st.grainEnabled);
     });
   }
 
