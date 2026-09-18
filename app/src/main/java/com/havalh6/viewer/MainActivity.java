@@ -3277,34 +3277,166 @@ public final class MainActivity extends Activity {
 
         private void drawWallpaper(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
-            float padX = w * .18f, top = h * .16f, bottom = h * .72f;
-            float left = padX, right = w - padX;
-            float r = w * .06f;
+            String state = descriptor != null && descriptor.state != null ? descriptor.state : "car";
+            int prog = descriptor != null ? descriptor.progress : 33;
+            float strokeW = Math.max(1.8f, w * .030f);
 
-            // Frame outline
-            stroke(muted, Math.max(1.8f, w * .028f));
-            c.drawRoundRect(left, top, right, bottom, r, r, paint);
+            if ("car".equals(state)) {
+                // STATE 1: 3D Car Only
+                // Perspective ground ring / orbital floor
+                oval.set(w * .12f, h * .60f, w * .88f, h * .80f);
+                stroke(withAlpha(accent, 0xAA), Math.max(1.4f, w * .022f));
+                c.drawOval(oval, paint);
 
-            // Sun / circle - highlight with accent if wallpaper or mixed is active
-            boolean hasWallpaper = descriptor != null && !"car".equals(descriptor.state);
-            fill(hasWallpaper ? withAlpha(accent, 0xDD) : withAlpha(muted, 0x66));
-            float sunR = (bottom - top) * .17f;
-            c.drawCircle(left + (right - left) * .30f, top + (bottom - top) * .35f, sunR, paint);
+                // 3D Perspective SUV silhouette
+                android.graphics.Path car = new android.graphics.Path();
+                car.moveTo(w * .34f, h * .44f);
+                car.lineTo(w * .42f, h * .30f);
+                car.lineTo(w * .64f, h * .30f);
+                car.lineTo(w * .75f, h * .42f);
+                car.lineTo(w * .84f, h * .47f);
+                car.lineTo(w * .86f, h * .55f);
+                car.lineTo(w * .73f, h * .60f);
+                car.lineTo(w * .27f, h * .60f);
+                car.lineTo(w * .22f, h * .54f);
+                car.lineTo(w * .23f, h * .46f);
+                car.close();
 
-            // Mountain peaks
-            android.graphics.Path hills = new android.graphics.Path();
-            float baseW = right - left;
-            float baseH = bottom - top;
-            hills.moveTo(left + baseW * .10f, bottom - Math.max(1.8f, w * .028f));
-            hills.lineTo(left + baseW * .42f, top + baseH * .42f);
-            hills.lineTo(left + baseW * .65f, top + baseH * .68f);
-            hills.lineTo(left + baseW * .80f, top + baseH * .52f);
-            hills.lineTo(right - baseW * .08f, bottom - Math.max(1.8f, w * .028f));
-            stroke(hasWallpaper ? strong : muted, Math.max(2f, w * .032f));
-            c.drawPath(hills, paint);
+                fill(withAlpha(muted, 0x24));
+                c.drawPath(car, paint);
+                stroke(strong, strokeW);
+                c.drawPath(car, paint);
+
+                // Center B-pillar divider
+                stroke(withAlpha(muted, 0x88), Math.max(1.2f, w * .020f));
+                c.drawLine(w * .51f, h * .30f, w * .51f, h * .44f, paint);
+
+                // Front headlight accent glow
+                fill(accent);
+                oval.set(w * .78f, h * .48f, w * .84f, h * .53f);
+                c.drawOval(oval, paint);
+
+                // Wheels
+                float wheelR = Math.max(2.8f, w * .055f);
+                fill(withAlpha(muted, 0x40));
+                c.drawCircle(w * .36f, h * .62f, wheelR, paint);
+                c.drawCircle(w * .75f, h * .62f, wheelR, paint);
+                stroke(strong, strokeW);
+                c.drawCircle(w * .36f, h * .62f, wheelR, paint);
+                c.drawCircle(w * .75f, h * .62f, wheelR, paint);
+
+                // Accent side character line
+                stroke(accent, Math.max(1.4f, w * .022f));
+                c.drawLine(w * .41f, h * .52f, w * .68f, h * .52f, paint);
+
+            } else if ("wallpaper".equals(state)) {
+                // STATE 2: Wallpaper Only
+                float padX = w * .14f, top = h * .20f, bottom = h * .68f;
+                float left = padX, right = w - padX;
+                float r = w * .06f;
+
+                // Ultrawide display frame
+                stroke(muted, strokeW);
+                c.drawRoundRect(left, top, right, bottom, r, r, paint);
+
+                // Sun / horizon glow
+                float sunR = (bottom - top) * .18f;
+                fill(withAlpha(accent, 0x33));
+                c.drawCircle(left + (right - left) * .32f, top + (bottom - top) * .38f, sunR * 1.5f, paint);
+                fill(accent);
+                c.drawCircle(left + (right - left) * .32f, top + (bottom - top) * .38f, sunR, paint);
+
+                // Geometric mountain ridges
+                android.graphics.Path hills = new android.graphics.Path();
+                float baseW = right - left;
+                float baseH = bottom - top;
+                hills.moveTo(left + strokeW, bottom - strokeW);
+                hills.lineTo(left + baseW * .28f, top + baseH * .38f);
+                hills.lineTo(left + baseW * .48f, top + baseH * .62f);
+                hills.lineTo(left + baseW * .68f, top + baseH * .34f);
+                hills.lineTo(right - strokeW, bottom - strokeW);
+                stroke(strong, strokeW);
+                c.drawPath(hills, paint);
+
+                // Secondary subtle peak
+                android.graphics.Path subHill = new android.graphics.Path();
+                subHill.moveTo(left + baseW * .48f, top + baseH * .62f);
+                subHill.lineTo(left + baseW * .58f, top + baseH * .50f);
+                subHill.lineTo(left + baseW * .74f, top + baseH * .66f);
+                stroke(withAlpha(muted, 0x88), Math.max(1.2f, w * .020f));
+                c.drawPath(subHill, paint);
+
+            } else {
+                // STATE 3: Both (3D Car layered over Wallpaper)
+                float padX = w * .14f, top = h * .17f, bottom = h * .63f;
+                float left = padX, right = w - padX;
+                float r = w * .06f;
+
+                // Background wallpaper frame (softened)
+                stroke(withAlpha(muted, 0x88), strokeW * .9f);
+                c.drawRoundRect(left, top, right, bottom, r, r, paint);
+
+                // Background sun (accent)
+                float sunR = (bottom - top) * .16f;
+                fill(withAlpha(accent, 0xCC));
+                c.drawCircle(left + (right - left) * .28f, top + (bottom - top) * .36f, sunR, paint);
+
+                // Background mountain range (muted)
+                android.graphics.Path bgHills = new android.graphics.Path();
+                float baseW = right - left;
+                float baseH = bottom - top;
+                bgHills.moveTo(left + strokeW, bottom - strokeW);
+                bgHills.lineTo(left + baseW * .24f, top + baseH * .42f);
+                bgHills.lineTo(left + baseW * .42f, top + baseH * .60f);
+                bgHills.lineTo(left + baseW * .60f, top + baseH * .38f);
+                bgHills.lineTo(right - strokeW, bottom - strokeW);
+                stroke(withAlpha(muted, 0x99), strokeW * .9f);
+                c.drawPath(bgHills, paint);
+
+                // Foreground 3D SUV (sharp & prominent in foreground)
+                android.graphics.Path fgCar = new android.graphics.Path();
+                fgCar.moveTo(w * .38f, h * .50f);
+                fgCar.lineTo(w * .45f, h * .38f);
+                fgCar.lineTo(w * .65f, h * .38f);
+                fgCar.lineTo(w * .75f, h * .48f);
+                fgCar.lineTo(w * .84f, h * .53f);
+                fgCar.lineTo(w * .85f, h * .60f);
+                fgCar.lineTo(w * .74f, h * .66f);
+                fgCar.lineTo(w * .32f, h * .66f);
+                fgCar.lineTo(w * .27f, h * .60f);
+                fgCar.lineTo(w * .28f, h * .52f);
+                fgCar.close();
+
+                // Mask background under the car
+                fill(dockUiLight ? 0xF2FFFFFF : 0xF2121720);
+                c.drawPath(fgCar, paint);
+                stroke(strong, strokeW);
+                c.drawPath(fgCar, paint);
+
+                // Front headlight
+                fill(accent);
+                oval.set(w * .78f, h * .54f, w * .83f, h * .58f);
+                c.drawOval(oval, paint);
+
+                // Foreground Wheels
+                float wheelR = Math.max(2.6f, w * .050f);
+                fill(dockUiLight ? 0xFFFFFFFF : 0xFF161D27);
+                c.drawCircle(w * .40f, h * .67f, wheelR, paint);
+                c.drawCircle(w * .75f, h * .67f, wheelR, paint);
+                stroke(strong, strokeW);
+                c.drawCircle(w * .40f, h * .67f, wheelR, paint);
+                c.drawCircle(w * .75f, h * .67f, wheelR, paint);
+
+                // Foreground accent side contour
+                stroke(accent, Math.max(1.4f, w * .022f));
+                c.drawLine(w * .44f, h * .58f, w * .69f, h * .58f, paint);
+
+                // Shadow grounding the car
+                stroke(withAlpha(accent, 0x66), Math.max(1.2f, w * .018f));
+                c.drawLine(w * .24f, h * .74f, w * .88f, h * .74f, paint);
+            }
 
             // 3-step indicator dots at bottom: 3D -> Wallpaper -> Both
-            int prog = descriptor != null ? descriptor.progress : 0;
             drawStepDots(c, w, h, 3, prog, accent, muted);
         }
     }
@@ -8915,6 +9047,18 @@ public final class MainActivity extends Activity {
         return descriptor.secondary + (metrics.isEmpty() ? "" : "\n" + metrics);
     }
 
+    /** {@link #quickVisualPrimary} with CONSUMO's unit set small after the number. */
+    private CharSequence quickVisualPrimaryText(BottomCardDescriptor descriptor) {
+        String primary = quickVisualPrimary(descriptor);
+        if (!"consumption".equals(descriptor.id) || descriptor.metricA.isEmpty()) return primary;
+        android.text.SpannableString text = new android.text.SpannableString(primary + " " + descriptor.metricA);
+        text.setSpan(new android.text.style.RelativeSizeSpan(0.4f), primary.length(), text.length(),
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.setSpan(new android.text.style.ForegroundColorSpan(dockUiLight ? 0xFF6B7480 : 0xFF7D8793), primary.length(),
+                text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return text;
+    }
+
     private String quickVisualPrimary(BottomCardDescriptor descriptor) {
         String primary = descriptor.primary.isEmpty() ? descriptor.value : descriptor.primary;
         return "tires".equals(descriptor.id) ? labelTirePair("FL", "FR", primary) : primary;
@@ -9047,18 +9191,6 @@ public final class MainActivity extends Activity {
                 v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops")));
         card.addView(actions);
         workspaceActionsFace = actions;
-    /** {@link #quickVisualPrimary} with CONSUMO's unit set small after the number. */
-    private CharSequence quickVisualPrimaryText(BottomCardDescriptor descriptor) {
-        String primary = quickVisualPrimary(descriptor);
-        if (!"consumption".equals(descriptor.id) || descriptor.metricA.isEmpty()) return primary;
-        android.text.SpannableString text = new android.text.SpannableString(primary + " " + descriptor.metricA);
-        text.setSpan(new android.text.style.RelativeSizeSpan(0.4f), primary.length(), text.length(),
-                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        text.setSpan(new android.text.style.ForegroundColorSpan(dockUiLight ? 0xFF6B7480 : 0xFF7D8793), primary.length(),
-                text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        return text;
-    }
-
         View layoutFace = makeWorkspaceLayoutFace(density);
         card.addView(layoutFace);
         workspaceLayoutFace = layoutFace;
