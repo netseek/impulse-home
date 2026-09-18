@@ -5156,6 +5156,7 @@ window.HavalSplash = (function () {
       will-change: transform;
     }
     .hv-desk-slide-back.on { display: block; }
+    .hv-xfade { position: absolute; pointer-events: none; display: none; z-index: 1; }
     .hv-desk-slide-cover.on { opacity: 1; }
     .hv-desk-slide-fallback {
       position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -9093,8 +9094,8 @@ const CAM_CURRENT_KEY = '__current';
 const CAM_CURRENT_POLL_MS = 900;
 // Camera tween when switching desktops (each desktop keeps its own view).
 const DESKTOP_CAM_FLY_SEC = 0.85;
-// X-ray body fade between solid and glass, each way.
-const GHOST_FADE_MS = 520;
+// Screen-space dissolve used when x-ray switches on or off.
+const XFADE_MS = 450;
 // Measured wallpaper brightness by URL, so the auto widget theme is right on
 // the first frame of a desktop switch.
 const WALL_BRIGHT_KEY = 'h6_wall_bright_v1';
@@ -29039,6 +29040,9 @@ class Component extends DCLogic {
           renderer.render(this.vignetteScene, this.orthoCamera);
           renderer.autoClear = true;
         }
+        // _crossfadeCanvas copies the finished frame here, in the same task
+        // as the draw, while the (unpreserved) drawing buffer still holds it.
+        if (this._xfadeCapture) this._xfadeCapture();
 
         // Profiler + adaptive pixel ratio (rendered frames only). Keep CPU
         // submission time as a diagnostic, but use actual rAF cadence for DPR.
@@ -29860,15 +29864,10 @@ class Component extends DCLogic {
       shader.uniforms.uGhostEdge = { value: t.ghostEdge };
       shader.uniforms.uGhostPow = { value: t.ghostFalloff };
       shader.uniforms.uGhostColor = { value: new this.THREE.Color(t.ghostColor) };
-      shader.uniforms.uGhostMix = { value: 1 };
-      // Handles for _ghostFadeApply, which eases these between solid and glass.
-      mat.userData.ghostUniforms = shader.uniforms;
-      if (this._ghostFadeK != null) this._ghostFadeUniforms(shader.uniforms, this._ghostFadeK);
       shader.fragmentShader =
         'uniform float uGhostFace;' + NL + 'uniform float uGhostEdge;' + NL
         + 'uniform float uGhostPow;' + NL
         + 'uniform vec3 uGhostColor;' + NL
-        + 'uniform float uGhostMix;' + NL
         + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <dithering_fragment>',
@@ -29883,7 +29882,7 @@ class Component extends DCLogic {
           // gradually, and flattens the bottom so flat panels stay see-through.
           '  gRamp = gRamp * gRamp * ( 3.0 - 2.0 * gRamp );',
           '  float gAlpha = mix( uGhostFace, uGhostEdge, gRamp );',
-          '  gl_FragColor.rgb = mix( gl_FragColor.rgb, uGhostColor, uGhostMix );',
+          '  gl_FragColor.rgb = uGhostColor;',
           '  gl_FragColor.a *= gAlpha;',
         ].join(NL)
       );
@@ -29896,59 +29895,60 @@ class Component extends DCLogic {
   }
 
   /**
-   * Ease the ghost between a lit, car-coloured solid (k = 0) and the glass
-   * look (k = 1). Cutting straight from the textured body to a 0.12-opacity
-   * ghost read as the car vanishing. Uniform/material writes only -- no
-   * recompile -- and the ghost is one draw call, so the fade is free.
+   * Dissolve between two scene states. The next full frame (post passes and
+   * vignette included) is copied into a 2D canvas laid exactly over the WebGL
+   * one, `change` runs, and the copy fades out over the new scene. The copy is
+   * a GPU drawImage made in the same task as the draw (the WebGL buffer is not
+   * preserved), and the fade is compositor-only.
    */
-  _ghostFadeUniforms(u, k) {
-    const t = this._powertrainTuning();
-    if (u.uGhostFace) u.uGhostFace.value = 1 + (t.ghostFace - 1) * k;
-    if (u.uGhostEdge) u.uGhostEdge.value = 1 + (t.ghostEdge - 1) * k;
-    if (u.uGhostMix) u.uGhostMix.value = k;
-  }
-
-  _ghostFadeMaterials() {
-    const mats = [];
-    const add = (o) => {
-      (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m) mats.push(m); });
+  _crossfadeCanvas(change) {
+    const src = this.renderer && this.renderer.domElement;
+    if (!src || !src.parentNode || this._xfadeCapture) { if (change) change(); return; }
+    let done = false;
+    const run = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(this._xfadeCaptureTimer);
+      this._xfadeCapture = null;
+      let c = this._xfadeCanvas;
+      if (!c) {
+        c = document.createElement('canvas');
+        c.className = 'hv-xfade';
+        c.setAttribute('aria-hidden', 'true');
+        this._xfadeCanvas = c;
+      }
+      if (c.parentNode !== src.parentNode) src.parentNode.insertBefore(c, src.nextSibling);
+      if (c.width !== src.width || c.height !== src.height) { c.width = src.width; c.height = src.height; }
+      c.style.left = src.offsetLeft + 'px';
+      c.style.top = src.offsetTop + 'px';
+      c.style.width = src.clientWidth + 'px';
+      c.style.height = src.clientHeight + 'px';
+      try {
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0, 0, c.width, c.height);
+        ctx.drawImage(src, 0, 0);
+        clearTimeout(this._xfadeTimer);
+        c.style.transition = 'none';
+        c.style.opacity = '1';
+        c.style.display = 'block';
+      } catch (e) { c = null; }
+      if (change) change();
+      if (!c) return;
+      // Let the new scene be drawn underneath before the copy starts to fade.
+      const fade = () => {
+        c.style.transition = 'opacity ' + XFADE_MS + 'ms ease';
+        c.style.opacity = '0';
+        this._xfadeTimer = setTimeout(() => { c.style.display = 'none'; }, XFADE_MS + 60);
+      };
+      requestAnimationFrame(() => requestAnimationFrame(fade));
+      // rAF is not serviced while hidden; never leave the copy up.
+      setTimeout(() => { if (c.style.opacity === '1') fade(); }, 400);
+      if (this.requestRender) this.requestRender(4);
     };
-    if (this._ghostBody && this._ghostBody.visible) this._ghostBody.traverse((o) => { if (o.isMesh) add(o); });
-    if (this._ghostMats) this._ghostMats.forEach((e) => add(e.mesh));
-    return mats;
-  }
-
-  _ghostFadeApply(k) {
-    const THREE = this.THREE;
-    const t = this._powertrainTuning();
-    this._ghostFadeK = k;
-    if (!this._ghostFadeBody) this._ghostFadeBody = new THREE.Color();
-    this._ghostFadeBody.set(this.state.carColor || '#dddddd');
-    if (!this._ghostFadeGlass) this._ghostFadeGlass = new THREE.Color();
-    this._ghostFadeGlass.set(t.ghostColor);
-    this._ghostFadeBody.lerp(this._ghostFadeGlass, k);
-    this._ghostFadeMaterials().forEach((m) => {
-      m.opacity = 1 + (t.ghostOpacity - 1) * k;
-      if (m.color) m.color.copy(this._ghostFadeBody);
-      if (m.userData && m.userData.ghostUniforms) this._ghostFadeUniforms(m.userData.ghostUniforms, k);
-    });
-    this._postFxDirty = true;
+    // Picked up at the very end of the next rendered frame (see the loop).
+    this._xfadeCapture = run;
+    this._xfadeCaptureTimer = setTimeout(() => { this._xfadeCapture = null; if (!done) { done = true; if (change) change(); } }, 500);
     if (this.requestRender) this.requestRender(2);
-  }
-
-  /** Animate k to `to` on the wall clock; `done` runs once it arrives. */
-  _ghostFadeTo(to, done) {
-    cancelAnimationFrame(this._ghostFadeRaf);
-    const from = this._ghostFadeK != null ? this._ghostFadeK : (to ? 0 : 1);
-    const t0 = performance.now();
-    const step = (now) => {
-      const u = Math.min(1, (now - t0) / GHOST_FADE_MS);
-      const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-      this._ghostFadeApply(from + (to - from) * e);
-      if (u < 1) this._ghostFadeRaf = requestAnimationFrame(step);
-      else if (done) done();
-    };
-    this._ghostFadeRaf = requestAnimationFrame(step);
   }
 
   /** The contact shadow is sized for a solid car and reads far too heavy under
@@ -32397,24 +32397,20 @@ class Component extends DCLogic {
     }
   }
 
-  _applyPowertrainVisibility(on) {
+  _applyPowertrainVisibility(on, noFade) {
     clearTimeout(this._xrayFabRingTimer);
     this._xrayFabRingTimer = null;
-    if (!on && (this._ghostHidden || this._ghostMats) && !this._ghostFadingOut) {
-      // Fade the glass back to a solid silhouette first, then swap the real
-      // body in underneath it -- the reverse of the way in.
-      this._ghostFadingOut = true;
-      if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
-      this._ghostFadeTo(0, () => {
-        this._ghostFadingOut = false;
-        if (!this.state.powertrainOn) this._applyPowertrainVisibility(false);
-      });
-      return;
-    }
     if (!on) {
       if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
-      cancelAnimationFrame(this._ghostFadeRaf);
-      this._ghostFadeK = null;
+      // Dissolve from the x-ray frame to the solid car rather than cut.
+      // noFade: this IS the change the dissolve is waiting for -- fading
+      // again here would re-arm forever and x-ray would never turn off.
+      if (!noFade && (this._ghostHidden || this._ghostMats)) {
+        this._crossfadeCanvas(() => {
+          if (!this.state.powertrainOn) this._applyPowertrainVisibility(false, true);
+        });
+        return;
+      }
       this._setBodyGhost(false);
       this._setShadowSoft(false);
       this._clearPowertrainFx();
@@ -32459,23 +32455,23 @@ class Component extends DCLogic {
         if (!rig || !this.state.powertrainOn) { endBadge(); return; }
         this._applyPowertrainVariant();
         this._fitPowertrain();
-        rig.visible = true;
-        this._ghostFadingOut = false;
-        const wasGhost = !!(this._ghostHidden || this._ghostMats);
-        this._setBodyGhost(true);
-        // Start as the solid silhouette and ease to glass (a re-entry mid
-        // fade-out continues from where it is).
-        if (!wasGhost) this._ghostFadeApply(0);
-        this._ghostFadeTo(1);
-        this._setShadowSoft(true);
-        // Seed FX from the live / demo POWER card state immediately.
-        this._powertrainFxSig = '';
-        this._tickPowertrainFx(0, performance.now());
-        this._syncXrayWheelGlows(performance.now());
-        const wantBloom = !!this._powertrainFxTune().bloomOn;
-        this._setXrayBloomMeshes(wantBloom);
-        this._setXrayBloomStrength(wantBloom);
-        if (this.requestRender) this.requestRender(12);
+        // Dissolve from the solid car to the x-ray frame: cutting from the
+        // textured body to a 0.12-opacity ghost read as the car vanishing.
+        const show = () => {
+          if (!this.state.powertrainOn) return;
+          rig.visible = true;
+          this._setBodyGhost(true);
+          this._setShadowSoft(true);
+          this._powertrainFxSig = '';
+          this._tickPowertrainFx(0, performance.now());
+          this._syncXrayWheelGlows(performance.now());
+          const wantBloom = !!this._powertrainFxTune().bloomOn;
+          this._setXrayBloomMeshes(wantBloom);
+          this._setXrayBloomStrength(wantBloom);
+          if (this.requestRender) this.requestRender(12);
+        };
+        if (!(this._ghostHidden || this._ghostMats)) this._crossfadeCanvas(show);
+        else show();
         endBadge();
       }, (err) => {
         // Without this the badge would hang until the 25 s safety timer.
