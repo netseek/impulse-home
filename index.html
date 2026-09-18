@@ -9076,6 +9076,8 @@ const CAM_ICON_GAP_MAX_MS = 500;
 // Pseudo slot key for the live-view tile at the top of the CAMERA section.
 const CAM_CURRENT_KEY = '__current';
 const CAM_CURRENT_POLL_MS = 900;
+// Camera tween when switching desktops (each desktop keeps its own view).
+const DESKTOP_CAM_FLY_SEC = 0.85;
 const CAM_ICON_BG_GAP_MIN_MS = 120;
 const CAM_ICON_BG_GAP_MAX_MS = 800;
 // Distance the splash hand-off front pose sits at, in fit-distances. This is a
@@ -35915,6 +35917,7 @@ class Component extends DCLogic {
     this._cancelWidgetPicker();
     this._closeGraphEditor();
     if (!skipCapture) this._captureActiveDesktop();
+    this._rememberDesktopView();
     this._desktopIndex = nextIndex;
     const d = this._normalizeDesktop(this._desktops[nextIndex], 'Desktop ' + (nextIndex + 1));
     if (d.wallpaperSource === 'bing' && d.wallpaperAuto !== false) {
@@ -35970,6 +35973,11 @@ class Component extends DCLogic {
       appsFabOpen: false,
     }, () => {
       this._persistWidgets();
+      // Every desktop shares the appCar layout, so _applyFitCamera alone sees
+      // "same mode" and never moves the camera: one desktop's orbit showed on
+      // all of them. Fly to this desktop's own view first; the fit then only
+      // records the framing while the tween owns the camera.
+      this._flyToDesktopView();
       this._applyFitCamera();
       this._syncCarSceneForShell();
       this._syncWallpaperLayer();
@@ -35994,6 +36002,29 @@ class Component extends DCLogic {
       const bridge = window.AppLauncherBridge;
       if (bridge && typeof bridge.setShellMode === 'function') bridge.setShellMode(d.shellMode);
     } catch (e) {}
+  }
+
+  /**
+   * Session memory of each desktop's live view (not persisted): orbiting a
+   * desktop without saving still comes back when you return to it. A desktop
+   * not visited yet this session opens on its saved home.
+   */
+  _rememberDesktopView() {
+    const d = this._desktops && this._desktops[this._desktopIndex];
+    if (!d || !d.id || this._introActive) return;
+    const rel = this._captureCurrentLayoutCam();
+    if (!rel) return;
+    if (!this._desktopLiveViews) this._desktopLiveViews = {};
+    this._desktopLiveViews[d.id] = rel;
+  }
+
+  _flyToDesktopView() {
+    if (this._introActive || !this.camera || !this.controls || !this._shouldShowCar()) return;
+    const d = this._desktops && this._desktops[this._desktopIndex];
+    const live = d && d.id && this._desktopLiveViews && this._desktopLiveViews[d.id];
+    const pose = live ? this._relToPose(live) : this._layoutHomePose();
+    if (!pose) return;
+    this._animateCameraTo(pose, DESKTOP_CAM_FLY_SEC);
   }
 
   _previousDesktop() {
