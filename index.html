@@ -9093,6 +9093,8 @@ const CAM_CURRENT_KEY = '__current';
 const CAM_CURRENT_POLL_MS = 900;
 // Camera tween when switching desktops (each desktop keeps its own view).
 const DESKTOP_CAM_FLY_SEC = 0.85;
+// X-ray body fade between solid and glass, each way.
+const GHOST_FADE_MS = 520;
 // Measured wallpaper brightness by URL, so the auto widget theme is right on
 // the first frame of a desktop switch.
 const WALL_BRIGHT_KEY = 'h6_wall_bright_v1';
@@ -29858,10 +29860,15 @@ class Component extends DCLogic {
       shader.uniforms.uGhostEdge = { value: t.ghostEdge };
       shader.uniforms.uGhostPow = { value: t.ghostFalloff };
       shader.uniforms.uGhostColor = { value: new this.THREE.Color(t.ghostColor) };
+      shader.uniforms.uGhostMix = { value: 1 };
+      // Handles for _ghostFadeApply, which eases these between solid and glass.
+      mat.userData.ghostUniforms = shader.uniforms;
+      if (this._ghostFadeK != null) this._ghostFadeUniforms(shader.uniforms, this._ghostFadeK);
       shader.fragmentShader =
         'uniform float uGhostFace;' + NL + 'uniform float uGhostEdge;' + NL
         + 'uniform float uGhostPow;' + NL
         + 'uniform vec3 uGhostColor;' + NL
+        + 'uniform float uGhostMix;' + NL
         + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <dithering_fragment>',
@@ -29876,7 +29883,7 @@ class Component extends DCLogic {
           // gradually, and flattens the bottom so flat panels stay see-through.
           '  gRamp = gRamp * gRamp * ( 3.0 - 2.0 * gRamp );',
           '  float gAlpha = mix( uGhostFace, uGhostEdge, gRamp );',
-          '  gl_FragColor.rgb = uGhostColor;',
+          '  gl_FragColor.rgb = mix( gl_FragColor.rgb, uGhostColor, uGhostMix );',
           '  gl_FragColor.a *= gAlpha;',
         ].join(NL)
       );
@@ -29886,6 +29893,62 @@ class Component extends DCLogic {
     // above would share a cache entry with the patched lit ones.
     mat.customProgramCacheKey = () => 'hvGhostFresnel|' + mat.type;
     mat.needsUpdate = true;
+  }
+
+  /**
+   * Ease the ghost between a lit, car-coloured solid (k = 0) and the glass
+   * look (k = 1). Cutting straight from the textured body to a 0.12-opacity
+   * ghost read as the car vanishing. Uniform/material writes only -- no
+   * recompile -- and the ghost is one draw call, so the fade is free.
+   */
+  _ghostFadeUniforms(u, k) {
+    const t = this._powertrainTuning();
+    if (u.uGhostFace) u.uGhostFace.value = 1 + (t.ghostFace - 1) * k;
+    if (u.uGhostEdge) u.uGhostEdge.value = 1 + (t.ghostEdge - 1) * k;
+    if (u.uGhostMix) u.uGhostMix.value = k;
+  }
+
+  _ghostFadeMaterials() {
+    const mats = [];
+    const add = (o) => {
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m) mats.push(m); });
+    };
+    if (this._ghostBody && this._ghostBody.visible) this._ghostBody.traverse((o) => { if (o.isMesh) add(o); });
+    if (this._ghostMats) this._ghostMats.forEach((e) => add(e.mesh));
+    return mats;
+  }
+
+  _ghostFadeApply(k) {
+    const THREE = this.THREE;
+    const t = this._powertrainTuning();
+    this._ghostFadeK = k;
+    if (!this._ghostFadeBody) this._ghostFadeBody = new THREE.Color();
+    this._ghostFadeBody.set(this.state.carColor || '#dddddd');
+    if (!this._ghostFadeGlass) this._ghostFadeGlass = new THREE.Color();
+    this._ghostFadeGlass.set(t.ghostColor);
+    this._ghostFadeBody.lerp(this._ghostFadeGlass, k);
+    this._ghostFadeMaterials().forEach((m) => {
+      m.opacity = 1 + (t.ghostOpacity - 1) * k;
+      if (m.color) m.color.copy(this._ghostFadeBody);
+      if (m.userData && m.userData.ghostUniforms) this._ghostFadeUniforms(m.userData.ghostUniforms, k);
+    });
+    this._postFxDirty = true;
+    if (this.requestRender) this.requestRender(2);
+  }
+
+  /** Animate k to `to` on the wall clock; `done` runs once it arrives. */
+  _ghostFadeTo(to, done) {
+    cancelAnimationFrame(this._ghostFadeRaf);
+    const from = this._ghostFadeK != null ? this._ghostFadeK : (to ? 0 : 1);
+    const t0 = performance.now();
+    const step = (now) => {
+      const u = Math.min(1, (now - t0) / GHOST_FADE_MS);
+      const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+      this._ghostFadeApply(from + (to - from) * e);
+      if (u < 1) this._ghostFadeRaf = requestAnimationFrame(step);
+      else if (done) done();
+    };
+    this._ghostFadeRaf = requestAnimationFrame(step);
   }
 
   /** The contact shadow is sized for a solid car and reads far too heavy under
@@ -32337,8 +32400,21 @@ class Component extends DCLogic {
   _applyPowertrainVisibility(on) {
     clearTimeout(this._xrayFabRingTimer);
     this._xrayFabRingTimer = null;
+    if (!on && (this._ghostHidden || this._ghostMats) && !this._ghostFadingOut) {
+      // Fade the glass back to a solid silhouette first, then swap the real
+      // body in underneath it -- the reverse of the way in.
+      this._ghostFadingOut = true;
+      if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
+      this._ghostFadeTo(0, () => {
+        this._ghostFadingOut = false;
+        if (!this.state.powertrainOn) this._applyPowertrainVisibility(false);
+      });
+      return;
+    }
     if (!on) {
       if (this._xrayFabRing) this._xrayFabRing.classList.remove('on');
+      cancelAnimationFrame(this._ghostFadeRaf);
+      this._ghostFadeK = null;
       this._setBodyGhost(false);
       this._setShadowSoft(false);
       this._clearPowertrainFx();
@@ -32384,7 +32460,13 @@ class Component extends DCLogic {
         this._applyPowertrainVariant();
         this._fitPowertrain();
         rig.visible = true;
+        this._ghostFadingOut = false;
+        const wasGhost = !!(this._ghostHidden || this._ghostMats);
         this._setBodyGhost(true);
+        // Start as the solid silhouette and ease to glass (a re-entry mid
+        // fade-out continues from where it is).
+        if (!wasGhost) this._ghostFadeApply(0);
+        this._ghostFadeTo(1);
         this._setShadowSoft(true);
         // Seed FX from the live / demo POWER card state immediately.
         this._powertrainFxSig = '';
@@ -34253,13 +34335,14 @@ class Component extends DCLogic {
   _animateCameraTo(pose, durationSec, ease) {
     if (!pose || !this.camera || !this.controls) return;
     const { w, h } = this._viewportSize();
-    const pan = this._userPanPx || { x: 0, y: 0 };
+    const held = this._camAnim && this._camAnim.hold ? this._camAnim : null;
+    const pan = held ? held.fromPan : (this._userPanPx || { x: 0, y: 0 });
     this._camAnim = {
       fromPos: this.camera.position.clone(),
       fromTarget: this.controls.target.clone(),
       toPos: pose.position.clone(),
       toTarget: pose.target.clone(),
-      fromShift: this._currentViewShift(),
+      fromShift: held ? held.fromShift : this._currentViewShift(),
       toShift: pose.viewShift != null ? pose.viewShift : this._currentViewShift(),
       // Ease the user's pan out over the same move rather than dropping it on
       // the first frame - otherwise every preset tile starts with the car
@@ -34281,12 +34364,37 @@ class Component extends DCLogic {
   _tickCamAnim(dt) {
     if (!this._camAnim || !this.camera || !this.controls) return false;
     const a = this._camAnim;
+    if (a.hold) {
+      // Desktop switch in progress: pin the exact framing the user was looking
+      // at (pan and widget offset included) until the flight is aimed, so the
+      // rebuild cannot re-fit it and make the car step sideways.
+      this._setUserPan(a.fromPan.x, a.fromPan.y);
+      this._applyShellViewOffset(a.fromShift);
+      return false;
+    }
     a.t = Math.min(1, a.t + dt / a.dur);
     const e = a.ease === 'inOut'
       ? (a.t < 0.5 ? 4 * a.t * a.t * a.t : 1 - Math.pow(-2 * a.t + 2, 3) / 2)
       : 1 - Math.pow(1 - a.t, 3);
-    this.camera.position.lerpVectors(a.fromPos, a.toPos, e);
     this.controls.target.lerpVectors(a.fromTarget, a.toTarget, e);
+    // Orbit, don't cut across: a straight line between two points on a sphere
+    // dips toward the car, which read as a zoom in and back out mid-move.
+    // Azimuth takes the short way round, elevation and distance ease.
+    if (!a.sph) {
+      const THREE = this.THREE;
+      const s0 = new THREE.Spherical().setFromVector3(a.fromPos.clone().sub(a.fromTarget));
+      const s1 = new THREE.Spherical().setFromVector3(a.toPos.clone().sub(a.toTarget));
+      let dTheta = s1.theta - s0.theta;
+      while (dTheta > Math.PI) dTheta -= Math.PI * 2;
+      while (dTheta < -Math.PI) dTheta += Math.PI * 2;
+      a.sph = { s0, s1, dTheta, cur: new THREE.Spherical(), off: new THREE.Vector3() };
+    }
+    const sp = a.sph;
+    sp.cur.set(
+      sp.s0.radius + (sp.s1.radius - sp.s0.radius) * e,
+      sp.s0.phi + (sp.s1.phi - sp.s0.phi) * e,
+      sp.s0.theta + sp.dTheta * e);
+    this.camera.position.copy(this.controls.target).add(sp.off.setFromSpherical(sp.cur));
     const dist = this.camera.position.distanceTo(this.controls.target);
     this.camera.near = Math.max(0.05, dist / 120);
     this.camera.far = Math.max(100, dist * 120);
@@ -36026,6 +36134,7 @@ class Component extends DCLogic {
     this._closeGraphEditor();
     if (!skipCapture) this._captureActiveDesktop();
     this._rememberDesktopView();
+    this._holdCameraForSwitch();
     this._desktopIndex = nextIndex;
     const d = this._normalizeDesktop(this._desktops[nextIndex], 'Desktop ' + (nextIndex + 1));
     if (d.wallpaperSource === 'bing' && d.wallpaperAuto !== false) {
@@ -36087,12 +36196,8 @@ class Component extends DCLogic {
       // "same mode" and never moves the camera: one desktop's orbit showed on
       // all of them. Fly to this desktop's own view first; the fit then only
       // records the framing while the tween owns the camera.
-      if (!(opts && opts.camHandled)) this._flyToDesktopView();
-      // The flight was aimed with the OLD desktop's board gap; re-aim its
-      // framing at the new one now that the boards have been rebuilt.
-      if (this._camAnim) {
-        this._camAnim.toShift = this._shellCameraTarget(!!window.__androidPopupActive).viewShift || 0;
-      }
+      // The slide path starts the flight itself once its cover is off.
+      if (!(opts && opts.camHandled)) this._flyWhenFramesSettle(nextIndex);
       this._applyFitCamera();
       this._syncCarSceneForShell();
       this._syncWallpaperLayer();
@@ -36138,13 +36243,36 @@ class Component extends DCLogic {
     this._desktopLiveViews[d.id] = rel;
   }
 
-  _flyToDesktopView() {
-    if (this._introActive || !this.camera || !this.controls || !this._shouldShowCar()) return;
-    const d = this._desktops && this._desktops[this._desktopIndex];
-    const live = d && d.id && this._desktopLiveViews && this._desktopLiveViews[d.id];
-    const pose = live ? this._relToPose(live) : this._layoutHomePose();
-    if (!pose) return;
-    this._animateCameraTo(pose, DESKTOP_CAM_FLY_SEC);
+  /**
+   * Freeze the on-screen framing as the switch begins (see _tickCamAnim's
+   * hold). _flyWhenFramesSettle replaces it with the real flight.
+   */
+  _holdCameraForSwitch() {
+    if (this._introActive || !this.camera || !this.controls) return;
+    const pan = this._userPanPx || { x: 0, y: 0 };
+    this._camAnim = {
+      hold: true,
+      fromPos: this.camera.position.clone(),
+      fromTarget: this.controls.target.clone(),
+      fromShift: this._currentViewShift(),
+      fromPan: { x: pan.x || 0, y: pan.y || 0 },
+      t: 0,
+      dur: 1,
+    };
+    this._fitCamTo = null;
+    this.controls.enabled = false;
+    clearTimeout(this._camHoldSafety);
+    // Never leave the camera pinned if nothing comes to fly it.
+    this._camHoldSafety = setTimeout(() => this._releaseCameraHold(), DESKTOP_CAM_SETTLE_MAX_MS + 1500);
+  }
+
+  _releaseCameraHold() {
+    clearTimeout(this._camHoldSafety);
+    if (!this._camAnim || !this._camAnim.hold) return;
+    this._camAnim = null;
+    if (this.controls && !this._introActive) this.controls.enabled = true;
+    this._applyFitCamera();
+    if (this.requestRender) this.requestRender(4);
   }
 
   _previousDesktop() {
@@ -36423,7 +36551,12 @@ class Component extends DCLogic {
     const go = () => {
       if (this._desktopIndex !== toIndex) return;
       const pose = this._desktopViewPose(toIndex);
-      if (pose && this._shouldShowCar()) this._animateCameraTo(pose, DESKTOP_CAM_FLY_SEC, 'inOut');
+      if (pose && this._shouldShowCar()) {
+        clearTimeout(this._camHoldSafety);
+        this._animateCameraTo(pose, DESKTOP_CAM_FLY_SEC, 'inOut');
+      } else {
+        this._releaseCameraHold();
+      }
     };
     const tick = (now) => {
       quick = (now - last) < 40 ? quick + 1 : 0;
