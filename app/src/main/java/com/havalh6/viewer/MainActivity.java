@@ -1209,8 +1209,6 @@ public final class MainActivity extends Activity {
         final String splitPlates;
         final String dateSpineFormat;
         final String dateWording;
-        /** Quick-menu rows; empty for a card whose body opens something directly. */
-        final java.util.List<QuickMenuRow> menu;
         /** Rows for the ⋯ shown on this card in rail edit mode; empty when it has none. */
         java.util.List<QuickMenuRow> editMenu = java.util.Collections.emptyList();
 
@@ -1220,7 +1218,7 @@ public final class MainActivity extends Activity {
                 String[] seatBeltStates, int sunroofLevel, int curtainLevel, boolean demo,
                 String iconAction, String longAction, String glyph, String glyphText,
                 String clockFace, String clockHourFormat, String dialMarks, String splitPlates,
-                String dateSpineFormat, String dateWording, java.util.List<QuickMenuRow> menu) {
+                String dateSpineFormat, String dateWording) {
             this.id = id;
             this.title = title;
             this.value = value;
@@ -1251,7 +1249,6 @@ public final class MainActivity extends Activity {
             this.splitPlates = splitPlates == null ? "frost" : splitPlates;
             this.dateSpineFormat = dateSpineFormat == null ? "month-name" : dateSpineFormat;
             this.dateWording = dateWording == null ? "short" : dateWording;
-            this.menu = menu == null ? java.util.Collections.emptyList() : menu;
         }
     }
 
@@ -8420,6 +8417,9 @@ public final class MainActivity extends Activity {
         for (View v : all) {
             if (v == null) continue;
             if (v == show) {
+                // A fade-out queued by an earlier switch ends with GONE; cancel it
+                // first or it lands after this show and leaves the row blank.
+                v.animate().cancel();
                 v.setVisibility(View.VISIBLE);
                 if (fade) {
                     v.animate().alpha(1f).setDuration(180).start();
@@ -8430,9 +8430,10 @@ public final class MainActivity extends Activity {
                 if (fade) {
                     final View hide = v;
                     hide.animate().alpha(0f).setDuration(160).withEndAction(() -> {
-                        hide.setVisibility(View.GONE);
+                        if (hide.getAlpha() <= 0.01f) hide.setVisibility(View.GONE);
                     }).start();
                 } else {
+                    v.animate().cancel();
                     v.setAlpha(0f);
                     v.setVisibility(View.GONE);
                 }
@@ -8655,10 +8656,7 @@ public final class MainActivity extends Activity {
                 }
                 final BottomCardDescriptor cardDescriptor = descriptor;
                 View card = makeQuickVisualCard(density, descriptor, v -> {
-                    // A card with a menu shows it; the menu's own last row is
-                    // what reaches the full page.
-                    if (!cardDescriptor.menu.isEmpty()) showQuickMenu(v, cardDescriptor);
-                    else callViewerDock(cardDescriptor.action);
+                    callViewerDock(cardDescriptor.action);
                 });
                 card.setTag("bottomCard:" + descriptor.id);
                 android.widget.TextView valueView =
@@ -8850,7 +8848,7 @@ public final class MainActivity extends Activity {
             final String iconCommand = descriptor.iconAction;
             graphic.setClickable(true);
             graphic.setFocusable(true);
-            graphic.setContentDescription(descriptor.title + ". Change to the next setting");
+            graphic.setContentDescription(descriptor.title + ". Alterna para o próximo ajuste");
             graphic.setOnClickListener(v -> callViewerDock(iconCommand));
         }
         content.addView(graphic);
@@ -8881,7 +8879,7 @@ public final class MainActivity extends Activity {
         // The source badge is long and must never ellipsise into something that
         // reads like a different claim ("DEMO · SIMULATED · NOT VEHICLE..." is
         // not the same statement).
-        detail.setMaxLines("power".equals(descriptor.id) ? 4 : 3);
+        detail.setMaxLines("power".equals(descriptor.id) || DRIVING_CARD_IDS.contains(descriptor.id) ? 4 : 3);
         detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
@@ -10843,7 +10841,7 @@ public final class MainActivity extends Activity {
             String value = cleanBottomCardText(raw.optString("value", ""), 48);
             String action = raw.optString("action", "").trim();
             String primary = cleanBottomCardText(raw.optString("primary", ""), 32);
-            String secondary = cleanBottomCardText(raw.optString("secondary", ""), 48);
+            String secondary = cleanBottomCardText(raw.optString("secondary", ""), 64);
             String metricA = cleanBottomCardText(raw.optString("metricA", ""), 32);
             String metricB = cleanBottomCardText(raw.optString("metricB", ""), 32);
             int progress = Math.max(0, Math.min(100, raw.optInt("progress", 0)));
@@ -10871,7 +10869,6 @@ public final class MainActivity extends Activity {
             String dateWording = sanitizeClockOption(raw.optString("dateWording", "short"),
                     new String[] {"short", "long"}, "short");
             if ("power".equals(id)) glyphText = sanitizePowerDirections(raw.optString("glyphText", ""));
-            java.util.List<QuickMenuRow> menu = parseQuickMenu(raw.optJSONArray("menu"));
             String state = "range".equals(id)
                     ? ("gauge".equalsIgnoreCase(raw.optString("state", "")) ? "gauge" : "linear")
                     : ("tires".equals(id)
@@ -10905,7 +10902,7 @@ public final class MainActivity extends Activity {
                     action, primary, secondary, metricA, metricB, progress, state, powerVariant, socKnown, powerSoc, wheelStates,
                     openingStates, seatBeltStates, sunroofLevel, curtainLevel, demo,
                     iconAction, longAction, glyph, glyphText, clockFace, clockHourFormat,
-                    dialMarks, splitPlates, dateSpineFormat, dateWording, menu);
+                    dialMarks, splitPlates, dateSpineFormat, dateWording);
             descriptor.tirePressures = cleanBottomCardText(raw.optString("tirePressures", ""), 48);
             descriptor.tireTemperatures = cleanBottomCardText(raw.optString("tireTemperatures", ""), 48);
             descriptor.tirePressureUnit = cleanBottomCardText(raw.optString("tirePressureUnit", ""), 6);
@@ -10954,7 +10951,10 @@ public final class MainActivity extends Activity {
     }
 
     private String cleanBottomCardText(String value, int maxLength) {
-        String clean = cleanIndicator(value);
+        // Not cleanIndicator: that one caps at 48, which would silently win over
+        // any maxLength above it.
+        if (value == null) return "";
+        String clean = value.trim().replace('\n', ' ').replace('\r', ' ');
         return clean.length() > maxLength ? clean.substring(0, maxLength) : clean;
     }
 
@@ -10983,31 +10983,6 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * Quick-menu rows from the payload.
-     *
-     * A row's command is either one of the fixed allow-listed actions or a
-     * driving write, which carries a value and so cannot be a fixed token. The
-     * shape is checked here and the value itself is re-derived from the mode
-     * tables on the web side — this end only proves it looks like a write, never
-     * that it is a legal one.
-     */
-    private java.util.List<QuickMenuRow> parseQuickMenu(JSONArray raw) {
-        if (raw == null || raw.length() == 0) return java.util.Collections.emptyList();
-        java.util.List<QuickMenuRow> rows = new ArrayList<>();
-        int max = Math.min(raw.length(), 12);
-        for (int i = 0; i < max; i++) {
-            JSONObject item = raw.optJSONObject(i);
-            if (item == null) continue;
-            String label = cleanBottomCardText(item.optString("label", ""), 28);
-            String command = item.optString("command", "").trim();
-            if (label.isEmpty() || command.isEmpty()) continue;
-            if (!BOTTOM_CARD_ACTIONS.contains(command) && !isDrivingSetCommand(command)) continue;
-            rows.add(new QuickMenuRow(label, command, item.optBoolean("selected", false)));
-        }
-        return rows;
-    }
-
-    /**
      * Rows for a rail card's ⋯ in edit mode. Only two command shapes are
      * relayed: a destination (cardAction:...) and the clock face. The page
      * re-checks both; anything else is dropped here.
@@ -11033,23 +11008,6 @@ public final class MainActivity extends Activity {
         return command != null
                 && command.matches("cardAction:[A-Za-z0-9_]{1,32}:(popup|new|desktop:[A-Za-z0-9_-]{1,64})");
     }
-
-    /** `drivingSet:&lt;group&gt;:&lt;value&gt;`, letters/digits/underscore only. */
-    private boolean isDrivingSetCommand(String command) {
-        if (!command.startsWith(DRIVING_SET_PREFIX)) return false;
-        String rest = command.substring(DRIVING_SET_PREFIX.length());
-        int cut = rest.indexOf(':');
-        if (cut <= 0 || cut >= rest.length() - 1) return false;
-        for (int i = 0; i < rest.length(); i++) {
-            char c = rest.charAt(i);
-            boolean ok = c == ':' || c == '_' || (c >= '0' && c <= '9')
-                    || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-            if (!ok) return false;
-        }
-        return true;
-    }
-
-    private static final String DRIVING_SET_PREFIX = "drivingSet:";
 
     /** Rail cards that draw a driving mode glyph and accept an icon quick action. */
     private static final java.util.Set<String> DRIVING_CARD_IDS =
@@ -11847,17 +11805,6 @@ public final class MainActivity extends Activity {
         iv.setImageDrawable(dockToolGlyph(cmd, size, state));
     }
 
-    /**
-     * The card's quick menu: the mode list, then a way through to the full page.
-     *
-     * Anchored above the card rather than centred, so the thumb that opened it
-     * is not covering the choices — the rail sits at the bottom of a 720px panel
-     * and a centred dialog would land under the hand.
-     */
-    private void showQuickMenu(View anchor, BottomCardDescriptor descriptor) {
-        showQuickMenuRows(anchor, descriptor.menu, true);
-    }
-
     /** `lastIsExit`: the last row leaves the menu (the driving cards) and is styled apart. */
     private void showQuickMenuRows(View anchor, java.util.List<QuickMenuRow> rows, boolean lastIsExit) {
         if (rows == null || rows.isEmpty()) return;
@@ -12051,7 +11998,9 @@ public final class MainActivity extends Activity {
         MotionTrailLayout item = new MotionTrailLayout(this);
         item.setOrientation(android.widget.LinearLayout.VERTICAL);
         item.setGravity(android.view.Gravity.CENTER_HORIZONTAL | android.view.Gravity.TOP);
-        item.setAlpha(0f);
+        // Fully opaque: the per-icon entrance animation is gone (the strip fades
+        // as a whole in revealLauncherStrip), so nothing would raise it later.
+        item.setAlpha(1f);
         android.widget.LinearLayout.LayoutParams itemParams = new android.widget.LinearLayout.LayoutParams(
                 itemWidthPx, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
         itemParams.rightMargin = Math.round(12 * density);

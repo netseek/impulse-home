@@ -6586,7 +6586,7 @@ window.HavalSplash = (function () {
             </button>
           </sc-if>
           <sc-if value="{{ wg.isDriving }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-driving {{ wg.drivingSizeClass }}"><div class="hv-glance-head"><span>DRIVING</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
+            <div class="hv-driving {{ wg.drivingSizeClass }}"><div class="hv-glance-head"><span>CONDUÇÃO</span><small>{{ wg.drivingSource }}</small></div><div class="hv-driving-groups"><sc-for list="{{ wg.drivingRows }}" as="dr" hint-placeholder-count="4"><div class="hv-driving-row {{ dr.linesClass }}"><div class="hv-driving-row-head"><span>{{ dr.label }}</span></div><div class="hv-driving-row-chips {{ dr.colsClass }}"><sc-for list="{{ dr.chips }}" as="dc" hint-placeholder-count="3"><button type="button" class="hv-driving-chip {{ dc.cls }}" onClick="{{ dc.onClick }}" disabled="{{ wg.drivingControlsDisabled }}" aria-disabled="{{ wg.drivingControlsDisabled }}" title="{{ dc.title }}" aria-pressed="{{ dc.pressed }}"><sc-if value="{{ dc.hasIcon }}" hint-placeholder-val="{{ false }}"><svg class="hv-driving-chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ dc.icon }}"></path></svg></sc-if><span>{{ dc.label }}</span><sc-if value="{{ dc.hasState }}" hint-placeholder-val="{{ false }}"><em>{{ dc.state }}</em></sc-if></button></sc-for></div></div></sc-for></div></div>
           </sc-if>
           <sc-if value="{{ wg.isGraphs }}" hint-placeholder-val="{{ false }}">
             <div class="hv-graphs {{ wg.graphSizeClass }}" style="{{ wg.graphGridStyle }}">
@@ -8632,9 +8632,9 @@ const H6_BOTTOM_CARD_CATALOG = [
   // Three rail tiles, one destination. `action` fires on the card body and
   // opens the shared DRIVING popup; `iconAction` fires on the graphic alone
   // and is the per-mode quick change.
-  { id: 'driveMode', title: 'Drive mode', action: 'openDriving', iconAction: 'cycleDriveMode' },
-  { id: 'powerMode', title: 'Power mode', action: 'openDriving', iconAction: 'cyclePowerMode' },
-  { id: 'regen', title: 'Energy recovery', action: 'openDriving', iconAction: 'cycleRegenMode',
+  { id: 'driveMode', title: 'Modo de condução', action: 'openDriving', iconAction: 'cycleDriveMode' },
+  { id: 'powerMode', title: 'Modo de energia', action: 'openDriving', iconAction: 'cyclePowerMode' },
+  { id: 'regen', title: 'Recuperação de energia', action: 'openDriving', iconAction: 'cycleRegenMode',
     longAction: 'openDrivingOnePedal' },
 ];
 
@@ -8706,6 +8706,8 @@ CAR_MODE_STATE_BY_KEY[CAR_MODE_ONE_PEDAL.key] = CAR_MODE_ONE_PEDAL.stateKey;
 // addressed by name so a reordering of that array cannot silently repoint a
 // control at the wrong CAN key.
 const CAR_MODE_GROUP_INDEX = { drive: 0, power: 1, steer: 2, regen: 3 };
+/** How long a mode write may wait for the car's confirmation before we stop saying so. */
+const CAR_MODE_PENDING_MS = 8000;
 /** A mode value older than this is reported as STALE, never as current. */
 const CAR_MODE_FRESH_MS = 120000;
 /**
@@ -8751,7 +8753,7 @@ const CAR_DRIVE_MODE_CARD_STATES = {
 };
 const CAR_POWER_MODE_CARD_STATES = { '0': 'hev', '1': 'evp', '3': 'ev' };
 /** Spelled-out power modes for the rail card's value line. */
-const CAR_POWER_MODE_LONG_LABELS = { '0': 'Hybrid EV', '1': 'Prioritary EV', '3': 'Full Electric' };
+const CAR_POWER_MODE_LONG_LABELS = { '0': 'Híbrido', '1': 'Elétrico prioritário', '3': 'Totalmente elétrico' };
 /**
  * Drive modes drawn as a boxed code rather than a glyph. Same treatment as the
  * POWER card's HEV / EVP / EV, so the two identity-bearing cards match.
@@ -8771,28 +8773,41 @@ const CAR_REGEN_LEVEL_GLYPHS = {
 
 const CAR_MODE_OPTION_HINTS = {
   'car.drive_setting.drive_mode': {
-    '2': 'ROAD', '0': 'ROAD', '1': 'ROAD',
-    '3': 'TERRAIN', '4': 'TERRAIN', '5': 'TERRAIN', '11': 'TRACTION',
+    '2': 'ESTRADA', '0': 'ESTRADA', '1': 'ESTRADA',
+    '3': 'TERRENO', '4': 'TERRENO', '5': 'TERRENO', '11': 'TRAÇÃO',
   },
-  'car.ev_setting.power_model_config': { '0': 'HYBRID EV', '1': 'PRIORITARY EV', '3': 'FULL ELECTRIC' },
-  'car.ev_setting.energy_recovery_level': { '2': 'LEVEL 1', '0': 'LEVEL 2', '1': 'LEVEL 3' },
-  'car.drive_setting.steering_wheel_assist_mode': { '2': 'LIGHT', '0': 'STANDARD', '1': 'FIRM' },
+  'car.ev_setting.power_model_config': { '0': 'HÍBRIDO', '1': 'ELÉTRICO PRIORITÁRIO', '3': 'TOTALMENTE ELÉTRICO' },
+  'car.ev_setting.energy_recovery_level': { '2': 'NÍVEL 1', '0': 'NÍVEL 2', '1': 'NÍVEL 3' },
+  'car.drive_setting.steering_wheel_assist_mode': { '2': 'LEVE', '0': 'PADRÃO', '1': 'FIRME' },
 };
 /**
  * Widget types the DRIVING widget replaces. A desktop saved with the retired
  * `modes` widget keeps its slot and size; only the type changes, so nobody's
  * layout loses a card on upgrade.
  */
+/** Row heads for the widget, where the popup's long group label would not fit. */
+/** The rail cards' fixed second line: icon cycles, text opens the popup. */
+const DRIVING_RAIL_HINT = 'Clique no ícone para alternar e no texto para abrir o painel';
+/** What the rail's second line names while a write waits on the car. */
+const DRIVING_RAIL_PENDING_NAMES = {
+  'car.drive_setting.drive_mode': 'condução',
+  'car.ev_setting.power_model_config': 'energia',
+  'car.ev_setting.energy_recovery_level': 'recuperação',
+};
+const DRIVING_SHORT_LABELS = {
+  'MODO DE CONDUÇÃO': 'CONDUÇÃO',
+  'MODO DE ENERGIA': 'ENERGIA',
+  'RECUPERAÇÃO DE ENERGIA': 'RECUPERAÇÃO',
+  'ASSISTÊNCIA DA DIREÇÃO': 'DIREÇÃO',
+  'CONDUÇÃO COM PEDAL ÚNICO': 'PEDAL ÚNICO',
+  'CONTROLE DE ESTABILIDADE': 'ESP',
+};
 const H6_DRIVING_LEGACY_WIDGET_TYPES = { modes: 'driving' };
 
-/** Rail card id -> the CAR_MODE_GROUPS name its quick menu writes. */
-const H6_DRIVING_MENU_GROUPS = { driveMode: 'drive', powerMode: 'power', regen: 'regen' };
 /** Drive-mode values for Sport and Eco, and the accent colors the interface borrows while active. */
 const CAR_DRIVE_MODE_SPORT = '1';
 const CAR_DRIVE_MODE_ECO = '2';
 const CAR_SPORT_ACCENT = '#e0392c';
-/** Prefix for a quick-menu write. Everything after it is re-validated on arrival. */
-const H6_DRIVING_SET_PREFIX = 'drivingSet:';
 
 /**
  * Rail card id -> the focused workspace its body opens. A card absent from this
@@ -10709,16 +10724,35 @@ class Component extends DCLogic {
    * update happened to also carry a scene-affecting change, that change's own
    * setter has already requested its frame.
    */
-  _uiOnlySetState(patch) {
+  _uiOnlySetState(patch, done) {
     this._uiOnlyStateWrite = true;
-    this.setState(patch);
+    this.setState(patch, done);
+  }
+
+  /**
+   * A mode write the car has not confirmed yet. Expires: the rail's "Alterando…"
+   * line and the badge's PENDENTE must not hang forever on a write the car
+   * dropped, so an entry older than CAR_MODE_PENDING_MS no longer counts.
+   */
+  _modeIsPending(stateKey) {
+    const p = this._modePending && this._modePending[stateKey];
+    return !!p && Date.now() - p.at < CAR_MODE_PENDING_MS;
+  }
+
+  /** Repaint the native rail after a pending flag flips (a settle point, not a hot signal). */
+  _syncModeRail() {
+    if (!this._unmounted) this._syncDockIndicators();
   }
 
   _applyCarMode(stateKey, value) {
     const next = String(value == null ? '' : value);
+    const wasPending = !!(this._modePending && this._modePending[stateKey]);
     if (this._modePending) delete this._modePending[stateKey];
-    if (this.state[stateKey] === next) return;
-    this._uiOnlySetState({ [stateKey]: next });
+    if (this.state[stateKey] === next) {
+      if (wasPending) this._syncModeRail();
+      return;
+    }
+    this._uiOnlySetState({ [stateKey]: next }, wasPending ? () => this._syncModeRail() : undefined);
   }
 
   _setCarMode(stateKey, canKey, value) {
@@ -10733,8 +10767,18 @@ class Component extends DCLogic {
     if (!this._carReady || !window.TelemetryBridge
       || typeof window.TelemetryBridge.setCarData !== 'function') return;
     if (!this._modePending) this._modePending = {};
-    this._modePending[stateKey] = { value: next, at: Date.now() };
-    if (this.state[stateKey] !== next) this._uiOnlySetState({ [stateKey]: next });
+    const at = Date.now();
+    this._modePending[stateKey] = { value: next, at };
+    if (this.state[stateKey] !== next) {
+      this._uiOnlySetState({ [stateKey]: next }, () => this._syncModeRail());
+    } else {
+      this._syncModeRail();
+    }
+    // If the car never answers, drop the flag and repaint so the label recovers.
+    setTimeout(() => {
+      const p = this._modePending && this._modePending[stateKey];
+      if (p && p.at === at) { delete this._modePending[stateKey]; this._syncModeRail(); }
+    }, CAR_MODE_PENDING_MS + 50);
     try {
       if (window.TelemetryBridge && typeof window.TelemetryBridge.setCarData === 'function') {
         window.TelemetryBridge.setCarData(canKey, next);
@@ -38043,7 +38087,7 @@ class Component extends DCLogic {
         : (type === 'consumption' ? 'ENERGIA'
           : (type === 'tires' ? 'TYRE PRESSURE'
             : (type === 'status' ? 'STATUS DO VEÍCULO'
-              : (type === 'driving' ? 'DRIVING CONTROLS'
+              : (type === 'driving' ? 'CONTROLES DE CONDUÇÃO'
                 : (type === 'media' ? 'MEDIA'
                   : (type === 'power' ? 'POWER FLOW' : 'CLIMATE')))))),
       focusedCardIsClimate: type === 'climate', focusedCardIsConsumption: type === 'consumption',
@@ -41371,7 +41415,7 @@ class Component extends DCLogic {
     const hasSignal = !!(this._carSignalAt && this._carSignalAt[group.key]);
     const busLive = typeof this._carBusLive === 'function' && this._carBusLive();
     const fresh = hasSignal && (busLive || Date.now() - this._carSignalAt[group.key] <= CAR_MODE_FRESH_MS);
-    const pending = !!(this._modePending && this._modePending[group.stateKey]);
+    const pending = this._modeIsPending(group.stateKey);
     const preview = !this._androidApp || !!this._demoPreview;
     const fallback = group.options.findIndex((opt) => opt.value === demoValue);
     const shown = index >= 0 ? index : (preview ? fallback : -1);
@@ -41387,7 +41431,7 @@ class Component extends DCLogic {
       hasSignal: hasSignal,
       fresh: fresh,
       pending: pending,
-      state: pending ? 'PENDING' : (shown >= 0 ? group.options[shown].label.toUpperCase() : 'UNAVAILABLE'),
+      state: pending ? 'PENDENTE' : (shown >= 0 ? group.options[shown].label.toUpperCase() : 'INDISPONÍVEL'),
       options: group.options.map((opt, i) => ({
         label: opt.label,
         hint: hints[opt.value] || '',
@@ -41417,8 +41461,8 @@ class Component extends DCLogic {
     const known = raw === '1' || raw === '0';
     const on = raw === '1';
     const pick = (value) => ({
-      label: value === '1' ? 'ONE PEDAL' : 'OFF',
-      hint: value === '1' ? 'LIFT TO STOP' : 'NORMAL COAST',
+      label: value === '1' ? 'PEDAL ÚNICO' : 'DESLIGADO',
+      hint: value === '1' ? 'SOLTE PARA PARAR' : 'ROLAMENTO NORMAL',
       cls: (known || preview) && (value === '1') === on ? 'on' : '',
       pressed: (known || preview) && (value === '1') === on,
       disabled: !!controlsDisabled,
@@ -41427,13 +41471,13 @@ class Component extends DCLogic {
     return {
       key: CAR_MODE_ONE_PEDAL.key,
       stateKey: CAR_MODE_ONE_PEDAL.stateKey,
-      label: 'ONE-PEDAL DRIVING',
+      label: 'CONDUÇÃO COM PEDAL ÚNICO',
       colsClass: 'cols-2',
       hasSignal: hasSignal,
       index: known || preview ? (on ? 0 : 1) : -1,
       value: raw,
-      optionLabel: known || preview ? (on ? 'On' : 'Off') : '—',
-      state: known || preview ? (on ? 'ON' : 'OFF') : 'UNAVAILABLE',
+      optionLabel: known || preview ? (on ? 'Ligado' : 'Desligado') : '—',
+      state: known || preview ? (on ? 'LIGADO' : 'DESLIGADO') : 'INDISPONÍVEL',
       // The popup keeps explicit ON/OFF options; the widget renders the same
       // group as a single chip, so both surfaces share one source of truth.
       on: on && (known || preview),
@@ -41451,8 +41495,8 @@ class Component extends DCLogic {
     const on = raw === '1' || (raw === '' && preview);
     const known = raw === '1' || raw === '0';
     const pick = (value) => ({
-      label: value === '1' ? 'ESP ON' : 'ESP OFF',
-      hint: value === '1' ? 'DEFAULT' : 'REDUCED INTERVENTION',
+      label: value === '1' ? 'ESP LIGADO' : 'ESP DESLIGADO',
+      hint: value === '1' ? 'PADRÃO' : 'INTERVENÇÃO REDUZIDA',
       cls: known || preview ? ((value === '1') === on ? 'on' : '') : '',
       pressed: (known || preview) && (value === '1') === on,
       disabled: !!controlsDisabled,
@@ -41461,10 +41505,10 @@ class Component extends DCLogic {
     return {
       key: CAR_MODE_ESP.key,
       stateKey: CAR_MODE_ESP.stateKey,
-      label: 'STABILITY CONTROL',
+      label: 'CONTROLE DE ESTABILIDADE',
       colsClass: 'cols-3',
       hasSignal: hasSignal,
-      state: known || preview ? (on ? 'ESP ON' : 'ESP OFF') : 'UNAVAILABLE',
+      state: known || preview ? (on ? 'ESP LIGADO' : 'ESP DESLIGADO') : 'INDISPONÍVEL',
       on: on && (known || preview),
       known: known || preview,
       onToggle: () => {
@@ -41644,10 +41688,10 @@ class Component extends DCLogic {
 
     const group = (name, label, colsClass) => this._drivingGroupModel(
       CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX[name]], '0', label, colsClass, controlsDisabled);
-    const drive = group('drive', 'DRIVE MODE', '');
-    const power = group('power', 'POWER MODE', 'cols-3');
-    const regen = group('regen', 'ENERGY RECOVERY', 'cols-3');
-    const steer = group('steer', 'STEERING ASSIST', 'cols-3');
+    const drive = group('drive', 'MODO DE CONDUÇÃO', '');
+    const power = group('power', 'MODO DE ENERGIA', 'cols-3');
+    const regen = group('regen', 'RECUPERAÇÃO DE ENERGIA', 'cols-3');
+    const steer = group('steer', 'ASSISTÊNCIA DA DIREÇÃO', 'cols-3');
     const esp = this._drivingEspModel(controlsDisabled);
     const onePedal = this._drivingOnePedalModel(controlsDisabled);
     const primary = [drive, power, regen];
@@ -41655,28 +41699,28 @@ class Component extends DCLogic {
     const signalCount = primary.filter((g) => g.hasSignal).length;
     const pending = primary.some((g) => g.pending) || steer.pending;
 
-    let source = 'UNAVAILABLE · NO VEHICLE STATE';
+    let source = 'INDISPONÍVEL · SEM ESTADO DO VEÍCULO';
     let sourceClass = 'unavailable';
     if (demo) {
-      source = 'DEMO · SIMULATED · NOT VEHICLE';
+      source = 'DEMO · SIMULADO · NÃO É DO VEÍCULO';
       sourceClass = 'demo';
     } else if (browserPreview) {
-      source = 'LOCAL PREVIEW · NOT A VEHICLE SETTING';
+      source = 'PRÉVIA LOCAL · NÃO É AJUSTE DO VEÍCULO';
       sourceClass = 'preview';
     } else if (controlsDisabled) {
-      source = 'UNAVAILABLE · VEHICLE NOT READY';
+      source = 'INDISPONÍVEL · VEÍCULO NÃO PRONTO';
       sourceClass = 'unavailable';
     } else if (pending) {
-      source = 'PENDING · AWAITING VEHICLE STATE';
+      source = 'PENDENTE · AGUARDANDO O VEÍCULO';
       sourceClass = 'pending';
     } else if (freshCount === primary.length) {
-      source = 'VEHICLE · LIVE';
+      source = 'VEÍCULO · AO VIVO';
       sourceClass = 'live';
     } else if (freshCount > 0) {
-      source = 'PARTIAL · VEHICLE STATE';
+      source = 'PARCIAL · ESTADO DO VEÍCULO';
       sourceClass = 'stale';
     } else if (signalCount > 0) {
-      source = 'STALE · VEHICLE STATE';
+      source = 'DESATUALIZADO · ESTADO DO VEÍCULO';
       sourceClass = 'stale';
     }
 
@@ -41685,9 +41729,7 @@ class Component extends DCLogic {
     // the data to keep in step with the popup.
     const compact = w === 1 && h === 1;
     const roomy = w >= 2 && h >= 2;
-    const shortLabel = (group) => group.label.replace(' MODE', '')
-      .replace('-PEDAL DRIVING', ' PEDAL').replace('ENERGY ', '')
-      .replace(' ASSIST', '').replace('STABILITY CONTROL', 'ESP');
+    const shortLabel = (group) => DRIVING_SHORT_LABELS[group.label] || group.label;
     const chipRow = (group, chips) => {
       const cols = chips.length === 2 ? 2 : 3;
       return {
@@ -41723,7 +41765,7 @@ class Component extends DCLogic {
       icon: '',
       // A lit border is a weak way to say "on". Spell it out.
       hasState: group.known,
-      state: group.on ? 'ON' : 'OFF',
+      state: group.on ? 'LIG.' : 'DESL.',
       onClick: (ev) => { this._cardControlEvent(ev); group.onToggle(); },
     });
     // At 1x1 the drive row shows the three road modes only — seven buttons in a
@@ -41737,23 +41779,23 @@ class Component extends DCLogic {
     if (!compact) rows.push(chipRow(steer, steer.options));
     if (!compact) {
       rows.push({
-        label: 'ASSIST', state: '', colsClass: 'cols-2', linesClass: 'lines-1',
+        label: 'ASSISTÊNCIAS', state: '', colsClass: 'cols-2', linesClass: 'lines-1',
         chips: [toggleChip(onePedal), toggleChip(esp)],
       });
     }
 
     const resolved = primary.filter((g) => g.index >= 0).length;
     const summary = resolved
-      ? [drive.optionLabel, power.optionLabel, 'RECOVERY ' + regen.optionLabel]
+      ? [drive.optionLabel, power.optionLabel, 'RECUPERAÇÃO ' + regen.optionLabel]
         .join(' · ').toUpperCase()
-      : 'MODE STATE UNAVAILABLE';
+      : 'ESTADO DOS MODOS INDISPONÍVEL';
     const note = demo
-      ? 'Demo values. Nothing on this card is read from or written to a vehicle.'
+      ? 'Valores de demonstração. Nada neste cartão é lido nem enviado ao veículo.'
       : (browserPreview
-        ? 'Browser preview. A selection here is local and never reaches a vehicle.'
+        ? 'Prévia no navegador. A seleção aqui é local e nunca chega ao veículo.'
         : (controlsDisabled
-          ? 'Controls are disabled until the vehicle reports READY through the installed telemetry bridge. No command is sent while this card is disabled.'
-          : 'Each option writes its vehicle value directly. The selection shown is the state the vehicle reported back, not the request.'));
+          ? 'Os controles ficam desativados até o veículo informar PRONTO pela ponte de telemetria instalada. Nenhum comando é enviado enquanto este cartão estiver desativado.'
+          : 'Cada opção grava o valor diretamente no veículo. A seleção exibida é o estado que o veículo devolveu, não o pedido.'));
 
     return {
       drivingSizeClass: 'hv-driving-' + w + 'x' + h + (resolved ? '' : ' hv-driving-unavailable'),
@@ -41766,8 +41808,8 @@ class Component extends DCLogic {
       drivingShowNote: controlsDisabled,
       drivingMode: drive.optionLabel,
       drivingModeKicker: drive.index >= 0
-        ? ((CAR_MODE_OPTION_HINTS[drive.key] || {})[drive.value] || 'DRIVE MODE') + ' MODE'
-        : 'NO DRIVE MODE REPORTED',
+        ? 'MODO ' + ((CAR_MODE_OPTION_HINTS[drive.key] || {})[drive.value] || 'DE CONDUÇÃO')
+        : 'NENHUM MODO DE CONDUÇÃO INFORMADO',
       drivingGlyph: CAR_DRIVE_MODE_GLYPHS[drive.value] || CAR_DRIVE_MODE_GLYPHS['0'],
       drivingPower: power.optionLabel,
       drivingRegen: regen.optionLabel,
@@ -41776,14 +41818,14 @@ class Component extends DCLogic {
       drivingOnePedal: onePedal.state,
       drivingControlsDisabled: controlsDisabled,
       drivingGroups: [drive, power, regen, steer],
-      drivingAssistLabel: 'ASSIST',
+      drivingAssistLabel: 'ASSISTÊNCIAS',
       drivingToggles: [onePedal, esp].map((group) => ({
-        label: group.label.replace('-PEDAL DRIVING', '-PEDAL').replace('STABILITY CONTROL', 'ESP'),
-        hint: group.stateKey === CAR_MODE_ONE_PEDAL.stateKey ? 'LIFT TO STOP' : 'TRACTION AID',
+        label: shortLabel(group),
+        hint: group.stateKey === CAR_MODE_ONE_PEDAL.stateKey ? 'SOLTE PARA PARAR' : 'AUXÍLIO DE TRAÇÃO',
         cls: group.on ? 'on' : '',
         pressed: !!group.on,
         disabled: controlsDisabled,
-        state: group.known ? (group.on ? 'ON' : 'OFF') : '—',
+        state: group.known ? (group.on ? 'LIG.' : 'DESL.') : '—',
         onClick: () => group.onToggle(),
       })),
       // Reached from the widget's long-press menu (OPEN) and from the rail
@@ -42201,7 +42243,7 @@ class Component extends DCLogic {
       navigation: { label: 'NAVIGATION', title: 'Route preview', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2]] },
       media: { label: 'MEDIA', title: 'Now playing', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [2, 2], [3, 1], [3, 2]] },
       tires: { label: 'TIRES', title: 'Tire pressure', hint: '', sizes: [[2, 1], [2, 2], [3, 1], [3, 2]] },
-      driving: { label: 'DRIVING', title: 'Drive, power & recovery', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [2, 2], [3, 1], [3, 2]] },
+      driving: { label: 'CONDUÇÃO', title: 'Condução, energia e recuperação', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [2, 2], [3, 1], [3, 2]] },
       status: { label: 'STATUS', title: 'Vehicle overview', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1], [3, 2]] },
       range: { label: 'RANGE', title: 'Battery & range', hint: '', sizes: [[1, 1], [2, 1], [2, 2], [3, 1], [3, 2]] },
   power: { label: 'POWER', title: 'Energy flow', hint: '', sizes: [[1, 1], [1, 2], [2, 1], [3, 1], [2, 2], [3, 2]] },
@@ -42570,13 +42612,6 @@ class Component extends DCLogic {
    */
   dockCommand(cmd) {
     const c = String(cmd || '');
-    // Quick-menu writes carry a value, so they cannot be a fixed token in the
-    // switch below. They are validated against CAR_MODE_GROUPS on arrival
-    // rather than trusted for having reached us.
-    if (c.indexOf(H6_DRIVING_SET_PREFIX) === 0) {
-      this._applyDrivingMenuCommand(c);
-      return;
-    }
     // Rail edit (Layout manager → Cards): the native rail reorders and removes
     // its own tiles and reports the result here. Both writers re-check the id
     // against the desktop's cards; nothing is trusted for having arrived.
@@ -42797,10 +42832,12 @@ class Component extends DCLogic {
       const g = drivingGroup(index);
       return {
         primary: g.optionLabel,
-        secondary: driving.drivingSource,
-        // "TAP ICON TO CHANGE" and the group name repeat the affordance and
-        // the card title; only a real hint earns a line here.
-        metricA: driving.drivingControlsDisabled ? 'VEHICLE NOT READY' : '',
+        // A fixed instruction, not the data-provenance badge: "VEHICLE · LIVE"
+        // told the driver where the value came from, which they do not care
+        // about. The badge still lives on the widget and the popup, and the
+        // rail's DEMO chip reads it from `driving.drivingSource` below.
+        secondary: g.pending ? 'Alterando o modo de ' + DRIVING_RAIL_PENDING_NAMES[g.key] + '...' : DRIVING_RAIL_HINT,
+        metricA: driving.drivingControlsDisabled ? 'VEÍCULO NÃO PRONTO' : '',
         metricB: '',
         progress: g.index >= 0 ? Math.round((g.index + 1) * 100 / g.options.length) : 0,
         // The native graphic draws the selected mode's own glyph, so the rail,
@@ -42824,14 +42861,18 @@ class Component extends DCLogic {
     const onePedalOn = s.carOnePedal === '1';
     const regenVisual = drivingVisual(2, onePedalOn ? 'onepedal'
       : (drivingGroup(2).index >= 0 ? 'level' + (drivingGroup(2).index + 1) : 'unknown'));
+    // One-pedal is written through the same recovery tile.
+    if (this._modeIsPending(CAR_MODE_ONE_PEDAL.stateKey)) {
+      regenVisual.secondary = 'Alterando o modo de recuperação...';
+    }
     if (onePedalOn) {
-      regenVisual.primary = 'One pedal';
+      regenVisual.primary = 'Pedal único';
       regenVisual.metricA = driving.drivingControlsDisabled
-        ? 'VEHICLE NOT READY' : 'TAP ICON TO RESTORE LEVEL';
+        ? 'VEÍCULO NÃO PRONTO' : 'TOQUE NO ÍCONE PARA VOLTAR AO NÍVEL';
       regenVisual.metricB = '';
       regenVisual.progress = 100;
     } else if (!driving.drivingControlsDisabled) {
-      regenVisual.metricA = 'HOLD FOR ONE-PEDAL';
+      regenVisual.metricA = 'SEGURE PARA PEDAL ÚNICO';
     }
     const roofSignal = this._carSignalAt && (this._carSignalAt[CAR_SIGNALS.sunroof]
       || this._carSignalAt[CAR_SIGNALS.curtain]);
@@ -42861,7 +42902,7 @@ class Component extends DCLogic {
       tires: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / ')
         + (tires.tiresHasAnyPressure ? ' ' + tires.tiresUnit : ''),
       clock: clock.clockTime + ' · ' + clock.clockDate,
-      wallpaper: fill === 'car' ? '3D' : (fill === 'wallpaper' ? 'Wallpaper' : 'Both'),
+      wallpaper: fill === 'car' ? 'Carro 3D' : (fill === 'wallpaper' ? 'Wallpaper' : 'Carro + Fundo'),
       desktops: activeDesktopName,
       driveMode: driveModeVisual.primary,
       powerMode: powerModeVisual.primary,
@@ -42988,9 +43029,9 @@ class Component extends DCLogic {
         dateWording: bottomClock.dateWording,
       },
       wallpaper: {
-        primary: fill === 'car' ? '3D' : (fill === 'wallpaper' ? 'Wallpaper' : 'Both'),
-        secondary: fill === 'car' ? '3D MODEL' : (fill === 'wallpaper' ? (s.wallpaperSource ? s.wallpaperSource.toUpperCase() : 'WALLPAPER') : '3D + WALLPAPER'),
-        metricA: 'DISPLAY',
+        primary: fill === 'car' ? 'Carro 3D' : (fill === 'wallpaper' ? 'Wallpaper' : 'Carro + Fundo'),
+        secondary: fill === 'car' ? 'EXIBE O MODELO DO SEU CARRO' : (fill === 'wallpaper' ? 'IMAGEM DE FUNDO EM TELA CHEIA' : 'MODELO 3D SOBREPOSTO'),
+        metricA: fill === 'car' ? 'DIRETAMENTE NO DISPLAY' : (fill === 'wallpaper' ? 'PERSONALIZADA OU BING DIÁRIO' : 'AO PLANO DE FUNDO ESCOLHIDO'),
         metricB: '',
         progress: fill === 'car' ? 33 : (fill === 'wallpaper' ? 66 : 100),
         state: fill,
@@ -43027,9 +43068,9 @@ class Component extends DCLogic {
       wallpaper: false,
       desktops: false,
       tires: tires.tiresOverallState === 'demo',
-      driveMode: driveModeVisual.secondary,
-      powerMode: powerModeVisual.secondary,
-      regen: regenVisual.secondary,
+      driveMode: driving.drivingSource,
+      powerMode: driving.drivingSource,
+      regen: driving.drivingSource,
       roof: roofVisual.secondary,
     };
     const railEditing = !!(s.desktopStudioOpen && s.desktopStudioTab === 'cards');
@@ -43046,8 +43087,6 @@ class Component extends DCLogic {
         longAction: card.longAction || '',
         glyph: '',
         glyphText: '',
-        // Rows for the card's quick menu, empty for cards that have none.
-        menu: this._drivingMenuRows(card.id),
         // Rows for the ⋯ on a shaking rail card; only sent while editing.
         editMenu: railEditing ? this._railEditMenuRows(card.id) : [],
       }, bottomVisuals[card.id] || {}));
@@ -43194,53 +43233,6 @@ class Component extends DCLogic {
     }
     // The ticks in the rail's menu come from the payload.
     this._syncDockIndicators();
-  }
-
-  /**
-   * Rows for a rail card's quick menu, plus the way out to the full popup.
-   *
-   * Commands are minted from the live tables, so a row can only ever name a
-   * group and a value that exist. `_applyDrivingMenuCommand` re-derives both on
-   * receipt regardless — the native side is a courier, not a source of truth.
-   */
-  _drivingMenuRows(cardId) {
-    const name = H6_DRIVING_MENU_GROUPS[cardId];
-    if (!name) return [];
-    const group = CAR_MODE_GROUPS[CAR_MODE_GROUP_INDEX[name]];
-    const raw = String(this.state[group.stateKey] || '');
-    let at = group.options.findIndex((opt) => opt.value === raw);
-    // Same fallback the card itself draws — see _drivingGroupModel. On a real
-    // head unit an unreported mode marks nothing, which is the honest answer.
-    if (at < 0 && (!this._androidApp || this._demoPreview)) {
-      at = group.options.findIndex((opt) => opt.value === '0');
-    }
-    const rows = group.options.map((opt, i) => ({
-      label: opt.label,
-      command: H6_DRIVING_SET_PREFIX + name + ':' + opt.value,
-      selected: i === at,
-    }));
-    // Last, not first: the list is what the driver came for, and a settings row
-    // at the top is the one their thumb lands on by accident.
-    rows.push({ label: 'Open driving controls', command: 'openDriving', selected: false });
-    return rows;
-  }
-
-  /**
-   * Apply a quick-menu write. The string is treated as untrusted: the group name
-   * must be one we published and the value must exist in that group's options,
-   * or nothing is written.
-   */
-  _applyDrivingMenuCommand(command) {
-    const rest = String(command || '').slice(H6_DRIVING_SET_PREFIX.length);
-    const cut = rest.indexOf(':');
-    if (cut < 0) return;
-    const name = rest.slice(0, cut);
-    const value = rest.slice(cut + 1);
-    const index = CAR_MODE_GROUP_INDEX[name];
-    if (typeof index !== 'number') return;
-    const group = CAR_MODE_GROUPS[index];
-    if (!group || !group.options.some((opt) => opt.value === value)) return;
-    this._setCarMode(group.stateKey, group.key, value);
   }
 
   /**

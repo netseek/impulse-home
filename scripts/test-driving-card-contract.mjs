@@ -56,9 +56,9 @@ const catalogStart = html.indexOf('const H6_BOTTOM_CARD_CATALOG');
 assert.ok(catalogStart >= 0, 'missing bottom-card catalog');
 const catalog = html.slice(catalogStart, html.indexOf('];', catalogStart) + 2);
 const railTiles = [
-  ['driveMode', 'Drive mode', 'cycleDriveMode'],
-  ['powerMode', 'Power mode', 'cyclePowerMode'],
-  ['regen', 'Energy recovery', 'cycleRegenMode'],
+  ['driveMode', 'Modo de condução', 'cycleDriveMode'],
+  ['powerMode', 'Modo de energia', 'cyclePowerMode'],
+  ['regen', 'Recuperação de energia', 'cycleRegenMode'],
 ];
 for (const [id, title, iconAction] of railTiles) {
   assert.match(catalog,
@@ -146,10 +146,10 @@ includesAll(native, [
 
 includesAll(view, [
   'CAR_MODE_GROUP_INDEX[name]',
-  "group('drive', 'DRIVE MODE'",
-  "group('power', 'POWER MODE'",
-  "group('regen', 'ENERGY RECOVERY'",
-  "group('steer', 'STEERING ASSIST'",
+  "group('drive', 'MODO DE CONDUÇÃO'",
+  "group('power', 'MODO DE ENERGIA'",
+  "group('regen', 'RECUPERAÇÃO DE ENERGIA'",
+  "group('steer', 'ASSISTÊNCIA DA DIREÇÃO'",
 ], 'driving groups addressed by name');
 
 // The write gate is computed before the groups are built, so the card and the
@@ -177,17 +177,17 @@ assert.match(html, /key: 'car\.drive_setting\.esp_enable'/, 'ESP key');
 //    instead of showing something that reads like a vehicle value.
 // ---------------------------------------------------------------------------
 includesAll(view, [
-  "'DEMO · SIMULATED · NOT VEHICLE'",
-  "'LOCAL PREVIEW · NOT A VEHICLE SETTING'",
-  "'UNAVAILABLE · VEHICLE NOT READY'",
-  "'UNAVAILABLE · NO VEHICLE STATE'",
-  "'PENDING · AWAITING VEHICLE STATE'",
-  "'PARTIAL · VEHICLE STATE'",
-  "'STALE · VEHICLE STATE'",
-  "'VEHICLE · LIVE'",
+  "'DEMO · SIMULADO · NÃO É DO VEÍCULO'",
+  "'PRÉVIA LOCAL · NÃO É AJUSTE DO VEÍCULO'",
+  "'INDISPONÍVEL · VEÍCULO NÃO PRONTO'",
+  "'INDISPONÍVEL · SEM ESTADO DO VEÍCULO'",
+  "'PENDENTE · AGUARDANDO O VEÍCULO'",
+  "'PARCIAL · ESTADO DO VEÍCULO'",
+  "'DESATUALIZADO · ESTADO DO VEÍCULO'",
+  "'VEÍCULO · AO VIVO'",
 ], 'driving source vocabulary');
 assert.ok(!/'DEMO · LOCAL PREVIEW'/.test(view),
-  'a DEMO state must carry the full DEMO · SIMULATED · NOT VEHICLE badge');
+  'a DEMO state must carry the full DEMO · SIMULADO · NÃO É DO VEÍCULO badge');
 includesAll(view, [
   'this._carReady',
   'window.TelemetryBridge',
@@ -231,7 +231,7 @@ includesAll(setCarMode, [
 const focusFields = blockFrom(html, '  _focusedCardRenderFields(s) {', 'focused card fields');
 includesAll(focusFields, [
   "focusedCardIsDriving: type === 'driving'",
-  "'DRIVING CONTROLS'",
+  "'CONTROLES DE CONDUÇÃO'",
   "type === 'driving' ? this._drivingWidgetView(entry.item)",
 ], 'focused Driving workspace');
 includesAll(view, [
@@ -244,7 +244,7 @@ includesAll(view, [
 // says which way it is set, rather than two competing ON/OFF tiles.
 const popupToggles = html.slice(html.indexOf('drivingToggles: [onePedal, esp]'),
   html.indexOf('onDrivingOpen:', html.indexOf('drivingToggles: [onePedal, esp]')));
-includesAll(popupToggles, ["group.on ? 'ON' : 'OFF'", 'disabled: controlsDisabled'],
+includesAll(popupToggles, ["group.on ? 'LIG.' : 'DESL.'", 'disabled: controlsDisabled'],
   'popup toggles carry state and the write gate');
 
 // The widget shows every option, not a read-only hero: it was the one surface
@@ -310,7 +310,7 @@ includesAll(native, [
   'String glyphText = cleanBottomCardText(raw.optString("glyphText", ""), 6);',
 ], 'the rail draws the code badge');
 // A lit border is a weak way to say "on" for a toggle.
-assert.match(html, /state: group\.on \? 'ON' : 'OFF'/, 'toggles spell out their state');
+assert.match(html, /state: group\.on \? 'LIG\.' : 'DESL\.'/, 'toggles spell out their state');
 // The chip markup nests <sc-if> for the optional icon and state, so the block
 // has to be balanced rather than cut at the first close tag.
 function scIfBlock(source, start) {
@@ -344,28 +344,23 @@ includesAll(view, ['onEdit: (ev) =>'], 'the widget menu still opens the popup');
 // One source badge per surface: the widget said DEMO in the header and again
 // in a foot line, and the foot also spent a row on an affordance the whole
 // card already has.
-// The rail card opens a quick menu of the modes, with the full page as its last
-// row. A menu row carries a VALUE, so it cannot be one of the fixed action
-// tokens -- which makes it a wider door than anything else the dock accepts,
-// with setCarData on the other side. It is minted from the live tables and
-// re-derived from them on arrival; the native side only ever replays a string
-// it was given.
-includesAll(html, ["const H6_DRIVING_SET_PREFIX = 'drivingSet:';",
-  'H6_DRIVING_MENU_GROUPS = { driveMode:',
-  'menu: this._drivingMenuRows(card.id),'], 'the rail ships its quick menu');
-const menuApply = blockFrom(html, '  _applyDrivingMenuCommand(command) {', 'menu write');
-includesAll(menuApply, [
-  'const index = CAR_MODE_GROUP_INDEX[name];',
-  "if (typeof index !== 'number') return;",
-  'group.options.some((opt) => opt.value === value)',
-], 'a menu write is re-validated, never trusted');
-includesAll(blockFrom(html, '  dockCommand(cmd) {', 'dock command'),
-  ['if (c.indexOf(H6_DRIVING_SET_PREFIX) === 0)'], 'and is routed before the fixed switch');
+// The rail card BODY opens the Driving popup. It used to open a quick menu of
+// the modes (a value-carrying drivingSet:<group>:<value> command, with the
+// popup as the menu's last row); the owner replaced that with one tap on the
+// text -> popup, one tap on the icon -> cycle. The quick-menu path is gone, so
+// assert it stays gone: a second way to write a mode is a wider door into
+// setCarData than the fixed action tokens.
+assert.ok(!html.includes('drivingSet:') && !html.includes('_drivingMenuRows')
+    && !html.includes('_applyDrivingMenuCommand'),
+  'the driving quick menu must not come back');
+assert.ok(!native.includes('isDrivingSetCommand') && !native.includes('showQuickMenu(v,'),
+  'the native rail must not carry a driving quick menu');
 includesAll(native, [
-  'private boolean isDrivingSetCommand(String command)',
-  'if (!BOTTOM_CARD_ACTIONS.contains(command) && !isDrivingSetCommand(command)) continue;',
-  'if (!cardDescriptor.menu.isEmpty()) showQuickMenu(v, cardDescriptor);',
-], 'the native menu only replays allow-shaped commands');
+  'callViewerDock(cardDescriptor.action);',
+], 'the rail card body fires its action (openDriving)');
+assert.ok(html.includes("const DRIVING_RAIL_HINT = 'Clique no ícone para alternar e no texto para abrir o painel';"),
+  'the rail cards carry the fixed pt-BR instruction line');
+includesAll(html, ["'Alterando o modo de ' + DRIVING_RAIL_PENDING_NAMES[g.key] + '...' : DRIVING_RAIL_HINT,", "this._modeIsPending(CAR_MODE_ONE_PEDAL.stateKey)"], 'the tiles show the hint, or Alterando while a write waits on the car');
 // Each row is a pill with a centred label, the way Coffee OS draws them: it
 // reads as a set of choices rather than a dropdown, and every row gets a real
 // edge to aim at on a panel operated at arm's length.
@@ -407,8 +402,8 @@ assert.ok(!/case "eco": return dockAccentColor/.test(native),
 // A chip tap used to ask for a full 3D frame via componentDidUpdate, and the
 // widget card is backdrop-blurred, so repainting the canvas under it read as
 // the card flashing. Mode state changes nothing the scene draws.
-includesAll(blockFrom(html, '  _uiOnlySetState(patch) {', 'ui-only setState'),
-  ['this._uiOnlyStateWrite = true;', 'this.setState(patch);'], 'UI-only writes are marked');
+includesAll(blockFrom(html, '  _uiOnlySetState(patch, done) {', 'ui-only setState'),
+  ['this._uiOnlyStateWrite = true;', 'this.setState(patch, done);'], 'UI-only writes are marked');
 includesAll(blockFrom(html, '  componentDidUpdate() {', 'did update'),
   ['const uiOnly = this._uiOnlyStateWrite;', 'this._uiOnlyStateWrite = false;',
    'if (!uiOnly && this.requestRender)'], 'and skip the scene frame');
@@ -465,7 +460,7 @@ includesAll(html, ['{{ focusedDrivingNote }}', 'list="{{ focusedDrivingToggles }
   '{{ dtg.state }}'], 'popup note and assist toggles');
 
 includesAll(html, [
-  "driving: { label: 'DRIVING'",
+  "driving: { label: 'CONDUÇÃO'",
   "previewDriving: key === 'driving'",
   'class="hv-wpick-driving"',
   "isDriving: item.type === 'driving'",
@@ -473,8 +468,8 @@ includesAll(html, [
 ], 'Driving widget registration');
 
 // Sizes offered by the catalogue must cover the variants the card styles.
-const catalogueEntry = html.slice(html.indexOf("driving: { label: 'DRIVING'"),
-  html.indexOf('\n', html.indexOf("driving: { label: 'DRIVING'")));
+const catalogueEntry = html.slice(html.indexOf("driving: { label: 'CONDUÇÃO'"),
+  html.indexOf('\n', html.indexOf("driving: { label: 'CONDUÇÃO'")));
 for (const size of ['[1, 1]', '[1, 2]', '[2, 1]', '[2, 2]', '[3, 1]', '[3, 2]']) {
   assert.ok(catalogueEntry.includes(size), `Driving catalogue must offer ${size}`);
 }
@@ -569,10 +564,12 @@ includesAll(dockIndicators, [
   'driveMode: driveModeVisual,',
   'powerMode: powerModeVisual,',
   'regen: regenVisual,',
-  'driveMode: driveModeVisual.secondary,',
-  'powerMode: powerModeVisual.secondary,',
-  'regen: regenVisual.secondary,',
-  'secondary: driving.drivingSource,',
+  // The DEMO chip reads the real source badge; the tile's own second line is
+  // the fixed instruction, so the two must not share a value.
+  'driveMode: driving.drivingSource,',
+  'powerMode: driving.drivingSource,',
+  'regen: driving.drivingSource,',
+  ": DRIVING_RAIL_HINT,",
 ], 'native Driving quick cards');
 assert.ok(!dockIndicators.includes('driveMode: driveMode.secondary'),
   'demo sources must use driveModeVisual, not the undefined driveMode');
@@ -586,12 +583,12 @@ includesAll(dockIndicators, [
   'CAR_POWER_MODE_CARD_STATES[drivingGroup(1).value]',
 ], 'rail tiles share the card builder');
 // The graphic draws the code, so the value line spells the mode out.
-assert.match(html, /const CAR_POWER_MODE_LONG_LABELS = \{ '0': 'Hybrid EV', '1': 'Prioritary EV', '3': 'Full Electric' \};/,
+assert.match(html, /const CAR_POWER_MODE_LONG_LABELS = { '0': 'Híbrido', '1': 'Elétrico prioritário', '3': 'Totalmente elétrico' };/,
   'power modes need their spelled-out labels');
 includesAll(dockIndicators, ['CAR_POWER_MODE_LONG_LABELS[drivingGroup(1).value]'],
   'the power tile shows the long label');
 // One-pedal replaces the level rather than extending it, so the tile names it.
-includesAll(dockIndicators, ["onePedalOn ? 'onepedal'", "regenVisual.primary = 'One pedal'"],
+includesAll(dockIndicators, ["onePedalOn ? 'onepedal'", "regenVisual.primary = 'Pedal único'"],
   'the recovery tile reports one-pedal');
 assert.ok(!dockIndicators.includes('_modeCardVisual'),
   'the replaced per-mode quick-card builder must be gone');

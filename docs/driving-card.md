@@ -43,14 +43,14 @@ recovery) and follows `docs/widget-data-audit.md` rule 5:
 
 | State | Badge | When |
 | --- | --- | --- |
-| demo | `DEMO · SIMULATED · NOT VEHICLE` | `_demoPreview` (emulator) |
-| browser | `LOCAL PREVIEW · NOT A VEHICLE SETTING` | not the Android shell |
-| not ready | `UNAVAILABLE · VEHICLE NOT READY` | Android, no `READY` or no `setCarData` |
-| pending | `PENDING · AWAITING VEHICLE STATE` | a write is out, not yet acknowledged |
-| live | `VEHICLE · LIVE` | all three reported within 2 min |
-| partial | `PARTIAL · VEHICLE STATE` | some reported within 2 min |
-| stale | `STALE · VEHICLE STATE` | reported, but older than 2 min |
-| none | `UNAVAILABLE · NO VEHICLE STATE` | nothing ever reported |
+| demo | `DEMO · SIMULADO · NÃO É DO VEÍCULO` | `_demoPreview` (emulator) |
+| browser | `PRÉVIA LOCAL · NÃO É AJUSTE DO VEÍCULO` | not the Android shell |
+| not ready | `INDISPONÍVEL · VEÍCULO NÃO PRONTO` | Android, no `READY` or no `setCarData` |
+| pending | `PENDENTE · AGUARDANDO O VEÍCULO` | a write is out, not yet acknowledged |
+| live | `VEÍCULO · AO VIVO` | all three reported within 2 min |
+| partial | `PARCIAL · ESTADO DO VEÍCULO` | some reported within 2 min |
+| stale | `DESATUALIZADO · ESTADO DO VEÍCULO` | reported, but older than 2 min |
+| none | `INDISPONÍVEL · SEM ESTADO DO VEÍCULO` | nothing ever reported |
 
 The predecessor `_modeCardVisual` abbreviated the demo state to
 `DEMO · LOCAL PREVIEW`; the full badge is required and the contract test now
@@ -122,47 +122,28 @@ accent now rebuilds the rail. That bug predates this feature (any accent change
 in Desktop Studio hit it); Sport just changes the accent often enough to make it
 obvious.
 
-## The rail card opens a quick menu
+## The rail card has no quick menu, and its second line is fixed
 
-Coffee OS pops a short list of the modes when you touch the card, with the full
-settings page one step further in. That beats what came before it: the icon's
-cycle is fine for three road modes and useless for seven, where a list is one
-tap to any of them. The last row, under a rule, is `Open driving controls`.
+The rail card used to open a native popup of the modes when its body was
+touched, with the full page as the last row. It no longer does: **the text
+opens the DRIVING popup directly, and the icon cycles the mode.** The second
+line of all three tiles says so, fixed, in pt-BR:
 
-It is a native `PopupWindow`, because the rail card is native — the web side
-does not know where the card sits on screen. Anchored ABOVE the card, so the
-thumb that opened it is not covering the choices.
+> Clique no ícone para alternar e no texto para abrir o painel
 
-Each row is a **pill with a centred label**, the way Coffee OS draws them: it
-reads as a set of choices rather than as a dropdown, and every row gets a real
-edge to aim at, which matters more here than on a phone — this is a 720px panel
-operated at arm's length. The selected row carries the accent like every other
-control on the card; the last row stays outlined rather than filled, so the way
-out does not compete with the modes. `makeQuickMenuItemBackground` also gives
-each row a pressed state, since a button that does not answer a touch on a
-head unit reads as a missed tap.
+(`DRIVING_RAIL_HINT`). It replaces `VEHICLE · LIVE`, which is a provenance
+badge and told the driver nothing they could act on. Freshness has not gone
+anywhere: the widget and the popup still show the badge from
+`drivingSource`, and the rail's own DEMO chip reads `driving.drivingSource`
+too (`bottomCardDemoSources`), so the tile's second line and its DEMO state no
+longer share one value.
 
-**A menu row carries a value, and that makes it a wider door than anything else
-the dock accepts.** Every other command is a fixed allow-listed token, and
-`setCarData` is on the other side of this one. Three things keep it shut:
-
-1. rows are minted in `_drivingMenuRows` from the live `CAR_MODE_GROUPS`, so a
-   row can only ever name a group and a value that exist;
-2. the native side is a courier. `parseQuickMenu` accepts a command only if it
-   is an allow-listed action or matches the `drivingSet:<group>:<value>` shape,
-   and it never composes one of its own;
-3. `_applyDrivingMenuCommand` re-derives the group and the value from those same
-   tables on arrival. Verified on the emulator: `drivingSet:drive:999`,
-   `drivingSet:bogus:0`, `drivingSet:drive` and `drivingSet:` all write nothing,
-   while `drivingSet:drive:1` writes.
-
-The menu resolves its selection the way the card does, demo fallback included.
-They were compared against different values at first and contradicted each other
-on screen — the card showing Normal while the menu marked nothing.
-
-The panel is near-opaque on purpose. It borrows none of the card's frost: it
-sits over a widget board full of text rather than over the scene, and at the
-card's alpha the two read through each other.
+The menu machinery went with it: `_drivingMenuRows`,
+`_applyDrivingMenuCommand`, the `drivingSet:<group>:<value>` command and its
+native allow-list, and `parseQuickMenu` / `showQuickMenu`. That command was
+the one value-carrying door into `setCarData` besides the fixed action tokens;
+the contract test now asserts it stays gone. `showQuickMenuRows` remains — the
+rail's edit-mode ⋯ menu uses it.
 
 ## Gestures
 
@@ -170,7 +151,7 @@ Each rail tile carries up to three:
 
 | Gesture | What it does |
 | --- | --- |
-| tap the card body | opens the DRIVING popup |
+| tap the text | opens the DRIVING popup ("Controles de condução") |
 | tap the graphic | quick change for that one mode |
 | hold Energy recovery | opens the popup at the one-pedal control |
 

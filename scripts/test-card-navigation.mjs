@@ -45,9 +45,9 @@ includesAll(html, [
   "{ id: 'clock', title: 'Clock', action: 'openClockSettings' }",
   // The three driving tiles share one destination: the card body opens the
   // DRIVING popup, the icon keeps the per-mode quick change.
-  "{ id: 'driveMode', title: 'Drive mode', action: 'openDriving', iconAction: 'cycleDriveMode' }",
-  "{ id: 'powerMode', title: 'Power mode', action: 'openDriving', iconAction: 'cyclePowerMode' }",
-  "{ id: 'regen', title: 'Energy recovery', action: 'openDriving', iconAction: 'cycleRegenMode',",
+  "{ id: 'driveMode', title: 'Modo de condução', action: 'openDriving', iconAction: 'cycleDriveMode' }",
+  "{ id: 'powerMode', title: 'Modo de energia', action: 'openDriving', iconAction: 'cyclePowerMode' }",
+  "{ id: 'regen', title: 'Recuperação de energia', action: 'openDriving', iconAction: 'cycleRegenMode',",
   "case 'openNavigation':",
   "case 'openClimate':",
   "case 'openConsumption':",
@@ -112,12 +112,12 @@ includesAll(dockIndicators, [
 // a DEMO badge is never abbreviated, and an un-ready vehicle disables writes
 // rather than showing a plausible default.
 includesAll(method('_drivingWidgetView'), [
-  "'DEMO · SIMULATED · NOT VEHICLE'",
-  "'LOCAL PREVIEW · NOT A VEHICLE SETTING'",
-  "'UNAVAILABLE · VEHICLE NOT READY'",
-  "'PENDING · AWAITING VEHICLE STATE'",
-  "'VEHICLE · LIVE'",
-  "'STALE · VEHICLE STATE'",
+  "'DEMO · SIMULADO · NÃO É DO VEÍCULO'",
+  "'PRÉVIA LOCAL · NÃO É AJUSTE DO VEÍCULO'",
+  "'INDISPONÍVEL · VEÍCULO NÃO PRONTO'",
+  "'PENDENTE · AGUARDANDO O VEÍCULO'",
+  "'VEÍCULO · AO VIVO'",
+  "'DESATUALIZADO · ESTADO DO VEÍCULO'",
 ], 'live-first driving card state');
 includesAll(method('_setRoofLevelPopup'), [
   "classList.toggle('on'",
