@@ -9092,9 +9092,10 @@ const DESK_SWIPE_COMMIT_FRAC = 0.3;
 const DESK_SWIPE_SLIDE_MS = 260;
 const DESK_SWIPE_FADE_MS = 220;
 // Background swipe: the incoming image's soft leading edge (share of the
-// panel width) and how fast the outgoing one drifts under it.
+// panel width). The outgoing one stays still underneath -- letting it drift
+// uncovered a strip of the page's own background, which only the new image's
+// translucent feather covered: a light band with a hard edge on Drive -> Lounge.
 const DESK_BG_FEATHER = 0.3;
-const DESK_BG_PARALLAX = 0.35;
 // .hv-wallpaper fades its opacity over 0.7 s; hold the incoming pane past it.
 const DESK_WALL_SETTLE_MS = 760;
 // How far toward the next view the camera follows the finger before commit.
@@ -36436,8 +36437,6 @@ class Component extends DCLogic {
     this._deskSlideShapeBack(clamped < 0 ? -1 : 1);
     dom.back.style.transition = 'none';
     dom.back.style.transform = 'translate3d(' + this._deskBackX(clamped, clamped < 0 ? -1 : 1) + 'px,0,0)';
-    dom.out.style.transition = 'none';
-    dom.out.style.transform = 'translate3d(' + (clamped * DESK_BG_PARALLAX) + 'px,0,0)';
     this._deskSlidePaintDots(clamped);
     if (!slide.busy) {
       this._deskSlideCamAt(u * DESK_SWIPE_CAM_LEAD);
@@ -36775,8 +36774,6 @@ class Component extends DCLogic {
     this._deskSlideSetVars(targetDx, 0);
     dom.back.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
     dom.back.style.transform = 'translate3d(0,0,0)';
-    dom.out.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
-    dom.out.style.transform = 'translate3d(' + (targetDx * DESK_BG_PARALLAX) + 'px,0,0)';
     this._deskRailFade(0, DESK_SWIPE_FADE_MS);
     clearTimeout(this._deskSlideAnimTimer);
     this._deskSlideAnimTimer = setTimeout(() => {
@@ -36829,8 +36826,6 @@ class Component extends DCLogic {
     if (dom) {
       dom.back.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
       dom.back.style.transform = 'translate3d(' + this._deskBackX(0, dir < 0 ? -1 : 1) + 'px,0,0)';
-      dom.out.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
-      dom.out.style.transform = 'translate3d(0,0,0)';
     }
     if (slide.camFrom && this.camera) {
       const { w: vw, h: vh } = this._viewportSize();
