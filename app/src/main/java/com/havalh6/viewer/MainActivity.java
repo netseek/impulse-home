@@ -11390,8 +11390,8 @@ public final class MainActivity extends Activity {
                 || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return;
         View decor = getWindow().getDecorView();
         if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
-        final int w = Math.max(64, Math.min(960, width));
-        final int h = Math.max(24, Math.min(360, height));
+        final int w = Math.max(64, Math.min(1920, width));
+        final int h = Math.max(24, Math.min(720, height));
         final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         try {
             android.view.PixelCopy.request(getWindow(), new Rect(0, 0, decor.getWidth(), decor.getHeight()), bmp,

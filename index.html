@@ -5147,6 +5147,14 @@ window.HavalSplash = (function () {
       will-change: transform;
     }
     .hv-desk-slide-cover { z-index: 2; opacity: 0; transition: opacity .12s ease; }
+    /* Widgets-only panes: clipped to the widget rects, see through elsewhere. */
+    .hv-desk-slide-pane.widgets-only, .hv-desk-slide-cover.widgets-only { background-color: transparent; }
+    .hv-desk-slide-back {
+      position: absolute; inset: 0; z-index: 1; pointer-events: none; display: none;
+      background-size: cover; background-position: center; background-repeat: no-repeat;
+      will-change: transform;
+    }
+    .hv-desk-slide-back.on { display: block; }
     .hv-desk-slide-cover.on { opacity: 1; }
     .hv-desk-slide-fallback {
       position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -9078,6 +9086,9 @@ const CAM_CURRENT_KEY = '__current';
 const CAM_CURRENT_POLL_MS = 900;
 // Camera tween when switching desktops (each desktop keeps its own view).
 const DESKTOP_CAM_FLY_SEC = 0.85;
+// Swipe-pane copy of each desktop shot: the full panel, kept in memory only.
+const DESK_SHOT_HI_W = 1920;
+const DESK_SHOT_HI_H = 720;
 const CAM_ICON_BG_GAP_MIN_MS = 120;
 const CAM_ICON_BG_GAP_MAX_MS = 800;
 // Distance the splash hand-off front pose sits at, in fit-distances. This is a
@@ -35977,7 +35988,12 @@ class Component extends DCLogic {
       // "same mode" and never moves the camera: one desktop's orbit showed on
       // all of them. Fly to this desktop's own view first; the fit then only
       // records the framing while the tween owns the camera.
-      this._flyToDesktopView();
+      if (!(opts && opts.camHandled)) this._flyToDesktopView();
+      // The flight was aimed with the OLD desktop's board gap; re-aim its
+      // framing at the new one now that the boards have been rebuilt.
+      if (this._camAnim) {
+        this._camAnim.toShift = this._shellCameraTarget(!!window.__androidPopupActive).viewShift || 0;
+      }
       this._applyFitCamera();
       this._syncCarSceneForShell();
       this._syncWallpaperLayer();
@@ -36080,7 +36096,8 @@ class Component extends DCLogic {
   }
 
   _ensureDeskSlideDom() {
-    if (this._deskSlideDom && this._deskSlideDom.layer && this._deskSlideDom.layer.isConnected) {
+    if (this._deskSlideDom && this._deskSlideDom.layer && this._deskSlideDom.layer.isConnected
+      && this._deskSlideDom.back && this._deskSlideDom.back.isConnected) {
       return this._deskSlideDom;
     }
     const root = document.getElementById('hv-root');
@@ -36092,8 +36109,15 @@ class Component extends DCLogic {
       + '<div class="hv-desk-slide-pane incoming"><div class="hv-desk-slide-fallback"><strong></strong><span></span></div></div>'
       + '<div class="hv-desk-slide-cover"><div class="hv-desk-slide-fallback"><strong></strong><span></span></div></div>';
     root.appendChild(layer);
+    // Incoming wallpaper rides UNDER the car (same z as .hv-wallpaper); the
+    // widgets-only pane above it rides over the car.
+    const back = document.createElement('div');
+    back.className = 'hv-desk-slide-back';
+    back.setAttribute('aria-hidden', 'true');
+    root.appendChild(back);
     this._deskSlideDom = {
       layer: layer,
+      back: back,
       incoming: layer.querySelector('.hv-desk-slide-pane.incoming'),
       cover: layer.querySelector('.hv-desk-slide-cover'),
     };
@@ -36108,7 +36132,9 @@ class Component extends DCLogic {
       const el = root.children[i];
       const cls = el.classList;
       if (!cls) continue;
-      if (cls.contains('hv-canvas-host') || cls.contains('hv-wallpaper')
+      // The car canvas is NOT part of the stage: it stays put and the camera
+      // flies between the two desktops' views instead (_deskSlideCam*).
+      if (cls.contains('hv-wallpaper')
         || cls.contains('hv-widget-board')
         || cls.contains('hv-desktop-swipe-edge') || cls.contains('hv-car-stage-action')
         || cls.contains('hv-apps-pane') || cls.contains('hv-center-slot-zone')
@@ -36117,6 +36143,73 @@ class Component extends DCLogic {
       }
     }
     return out;
+  }
+
+  /**
+   * Swipe pane: the destination's hi-res shot clipped to its widget / button
+   * rectangles, so the car baked into the photo never shows -- the live car
+   * underneath is the only car on screen. The wallpaper goes on the back pane.
+   */
+  _fillDeskSlideWidgets(pane, back, index) {
+    const d = this._desktops[index] || {};
+    const hi = this._desktopShotsHi && this._desktopShotsHi[d.id];
+    const lo = this._deskSlideShotForIndex(index);
+    const shot = hi || (lo && lo.rects ? lo : null);
+    if (pane) {
+      pane.classList.add('widgets-only');
+      const clip = shot && shot.rects ? this._deskShotClipPath(shot.rects) : '';
+      if (shot && clip) {
+        pane.style.backgroundImage = 'url("' + shot.url + '")';
+        pane.style.clipPath = clip;
+        pane.style.webkitClipPath = clip;
+        pane.classList.add('has-shot');
+      } else {
+        // No rects yet (first visit): show nothing rather than a second car.
+        pane.style.backgroundImage = '';
+        pane.style.clipPath = 'inset(100%)';
+        pane.style.webkitClipPath = 'inset(100%)';
+        pane.classList.add('has-shot');
+      }
+    }
+    if (back) {
+      const wall = this._centerFillUsesWallpaper(d) && this._desktopWallpaperEntry
+        ? this._desktopWallpaperEntry(d) : null;
+      back.style.backgroundImage = wall && wall.url
+        ? 'url("' + String(wall.url).replace(/"/g, '%22') + '")' : '';
+    }
+  }
+
+  /** CSS path() of the recorded rects, rescaled to the current viewport. */
+  _deskShotClipPath(r) {
+    if (!r || !r.rects || !r.rects.length) return '';
+    const sx = (window.innerWidth || r.w) / (r.w || 1);
+    const sy = (window.innerHeight || r.h) / (r.h || 1);
+    const pad = 3;
+    let d = '';
+    for (const q of r.rects) {
+      const x = Math.round((q[0] - pad) * sx);
+      const y = Math.round((q[1] - pad) * sy);
+      const w = Math.round((q[2] + pad * 2) * sx);
+      const h = Math.round((q[3] + pad * 2) * sy);
+      d += 'M' + x + ' ' + y + 'h' + w + 'v' + h + 'h' + (-w) + 'Z';
+    }
+    return "path('" + d + "')";
+  }
+
+  /** Screen rects of everything on the desktop that is NOT the car. */
+  _collectDesktopShotRects() {
+    const out = [];
+    const nodes = document.querySelectorAll(
+      '.hv-widget-board .hv-widget-grid > :not(.hv-widget-cell), #hv-root > .hv-car-stage-action');
+    for (let i = 0; i < nodes.length; i++) {
+      const el = nodes[i];
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+      out.push([Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]);
+    }
+    return { w: window.innerWidth || 1920, h: window.innerHeight || 720, rects: out };
   }
 
   _fillDeskSlidePane(pane, index) {
@@ -36177,7 +36270,54 @@ class Component extends DCLogic {
     const incomingBase = clamped < 0 ? w : -w;
     dom.incoming.style.transition = 'none';
     dom.incoming.style.transform = 'translate3d(' + (incomingBase + clamped) + 'px,0,0)';
+    if (dom.back) {
+      dom.back.style.transition = 'none';
+      dom.back.style.transform = 'translate3d(' + (incomingBase + clamped) + 'px,0,0)';
+    }
     this._deskSlidePaintDots(clamped);
+    if (!slide.busy) this._deskSlideCamAt(Math.abs(clamped) / w);
+  }
+
+  /** Where the camera should end up on desktop `index`. */
+  _desktopViewPose(index) {
+    const d = this._desktops && this._desktops[index];
+    if (!d) return null;
+    const live = d.id && this._desktopLiveViews && this._desktopLiveViews[d.id];
+    const rel = live
+      || this._normalizeDesktopCam(d.cameras && d.cameras.appCar)
+      || (this._layoutCameras && this._layoutCameras.appCar);
+    return rel ? this._relToPose(rel) : null;
+  }
+
+  /** Finger-follow: put the camera `u` (0..1) of the way to the next view. */
+  _deskSlideCamAt(u) {
+    const slide = this._deskSlide;
+    if (!slide || !this.camera || !this.controls || !this._shouldShowCar()) return;
+    if (!slide.camFrom) {
+      const pan = this._userPanPx || { x: 0, y: 0 };
+      slide.camFrom = {
+        position: this.camera.position.clone(),
+        target: this.controls.target.clone(),
+        pan: { x: pan.x || 0, y: pan.y || 0 },
+      };
+    }
+    if (slide.camToIndex !== slide.toIndex) {
+      slide.camToIndex = slide.toIndex;
+      slide.camTo = this._desktopViewPose(slide.toIndex);
+    }
+    const to = slide.camTo;
+    if (!to) return;
+    const e = Math.max(0, Math.min(1, u));
+    const { w, h } = this._viewportSize();
+    this._camAnim = null;
+    this.camera.position.lerpVectors(slide.camFrom.position, to.position, e);
+    this.controls.target.lerpVectors(slide.camFrom.target, to.target, e);
+    const pf = slide.camFrom.pan;
+    this._setUserPan(pf.x + ((to.panX || 0) * w - pf.x) * e, pf.y + ((to.panY || 0) * h - pf.y) * e);
+    this._applyShellViewOffset(this._layoutViewShift || 0);
+    this.controls.update();
+    this._postFxDirty = true;
+    if (this.requestRender) this.requestRender(2);
   }
 
   /** Morph page dots toward the destination as the swipe nears commit. */
@@ -36226,7 +36366,8 @@ class Component extends DCLogic {
     if (!dom || !root) return false;
     const count = this._desktops.length;
     const idx = ((toIndex % count) + count) % count;
-    this._fillDeskSlidePane(dom.incoming, idx);
+    this._fillDeskSlideWidgets(dom.incoming, dom.back, idx);
+    dom.back.classList.add('on');
     dom.cover.classList.remove('on', 'has-shot');
     dom.cover.style.backgroundImage = '';
     dom.layer.classList.add('on');
@@ -36254,7 +36395,18 @@ class Component extends DCLogic {
       dom.incoming.style.transform = '';
       dom.incoming.style.transition = '';
       dom.incoming.style.backgroundImage = '';
-      dom.incoming.classList.remove('has-shot');
+      dom.incoming.style.clipPath = '';
+      dom.incoming.style.webkitClipPath = '';
+      dom.incoming.classList.remove('has-shot', 'widgets-only');
+      if (dom.back) {
+        dom.back.classList.remove('on');
+        dom.back.style.transform = '';
+        dom.back.style.transition = '';
+        dom.back.style.backgroundImage = '';
+      }
+      dom.cover.style.clipPath = '';
+      dom.cover.style.webkitClipPath = '';
+      dom.cover.classList.remove('widgets-only');
       dom.cover.classList.remove('on', 'has-shot');
       dom.cover.style.backgroundImage = '';
       dom.cover.style.opacity = '';
@@ -36297,10 +36449,16 @@ class Component extends DCLogic {
     }
     dom.incoming.style.transition = 'transform ' + duration + 'ms cubic-bezier(.2,.7,.2,1)';
     dom.incoming.style.transform = 'translate3d(0,0,0)';
+    if (dom.back) {
+      dom.back.style.transition = 'transform ' + duration + 'ms cubic-bezier(.2,.7,.2,1)';
+      dom.back.style.transform = 'translate3d(0,0,0)';
+    }
     clearTimeout(this._deskSlideAnimTimer);
     this._deskSlideAnimTimer = setTimeout(() => {
-      // Cover with the destination frame so the live rebuild is hidden.
-      this._fillDeskSlidePane(dom.cover, toIndex);
+      // Cover with the destination's widgets so the live rebuild is hidden --
+      // widgets only, so the live car (mid-flight) stays visible.
+      this._fillDeskSlideWidgets(dom.cover, null, toIndex);
+      dom.cover.classList.add('widgets-only');
       dom.cover.style.transition = 'none';
       dom.cover.style.opacity = '1';
       dom.cover.classList.add('on');
@@ -36312,6 +36470,12 @@ class Component extends DCLogic {
         if (done) return;
         done = true;
         clearTimeout(this._deskSlideSafety);
+        // Fly the rest of the way only NOW: the switch is a React commit that
+        // starves rAF, so a flight started before it froze mid-air and then
+        // jumped (measured: no frame from 206 ms to 849 ms on the emulator).
+        // Aimed after the switch, so it frames against the new boards.
+        const camTo = this._desktopViewPose(toIndex);
+        if (camTo && this._shouldShowCar()) this._animateCameraTo(camTo, DESKTOP_CAM_FLY_SEC);
         requestAnimationFrame(() => {
           setTimeout(() => {
             if (dom.cover) {
@@ -36325,7 +36489,7 @@ class Component extends DCLogic {
       };
       clearTimeout(this._deskSlideSafety);
       this._deskSlideSafety = setTimeout(finish, 6000);
-      this._switchDesktop(toIndex, false, false, { afterPaint: finish });
+      this._switchDesktop(toIndex, false, false, { afterPaint: finish, camHandled: true });
     }, duration + 8);
   }
 
@@ -36344,6 +36508,17 @@ class Component extends DCLogic {
     if (dom) {
       dom.incoming.style.transition = 'transform ' + duration + 'ms cubic-bezier(.2,.7,.2,1)';
       dom.incoming.style.transform = 'translate3d(' + (dir < 0 ? w : -w) + 'px,0,0)';
+      if (dom.back) {
+        dom.back.style.transition = 'transform ' + duration + 'ms cubic-bezier(.2,.7,.2,1)';
+        dom.back.style.transform = 'translate3d(' + (dir < 0 ? w : -w) + 'px,0,0)';
+      }
+    }
+    if (slide.camFrom && this.camera) {
+      const { w: vw, h: vh } = this._viewportSize();
+      this._animateCameraTo({
+        position: slide.camFrom.position, target: slide.camFrom.target,
+        panX: slide.camFrom.pan.x / vw, panY: slide.camFrom.pan.y / vh,
+      }, 0.3);
     }
     clearTimeout(this._deskSlideAnimTimer);
     this._deskSlideAnimTimer = setTimeout(() => this._deskSlideTeardown(), duration + 8);
@@ -36510,9 +36685,14 @@ class Component extends DCLogic {
     this._captureActiveDesktop();
     const current = this._desktops[this._desktopIndex || 0];
     const token = 's' + (++this._desktopShotSeq);
-    this._desktopShotReqs[token] = { id: current.id, sig: this._desktopShotSig(current), after: once };
+    const rects = this._collectDesktopShotRects();
+    this._desktopShotReqs[token] = { id: current.id, sig: this._desktopShotSig(current), rects, after: once };
+    // Full-panel copy for the swipe pane, memory only (too big to persist).
+    const hiToken = 'h' + this._desktopShotSeq;
+    this._desktopShotReqs[hiToken] = { id: current.id, sig: this._desktopShotSig(current), rects, hi: true };
     try {
       bridge.captureDesktopSnapshot(token, 960, 360);
+      bridge.captureDesktopSnapshot(hiToken, DESK_SHOT_HI_W, DESK_SHOT_HI_H);
     } catch (e) {
       delete this._desktopShotReqs[token];
       once(false);
@@ -36526,6 +36706,14 @@ class Component extends DCLogic {
     const req = this._desktopShotReqs && this._desktopShotReqs[token];
     if (!req) return;
     delete this._desktopShotReqs[token];
+    if (req.hi) {
+      if (typeof url === 'string' && url.indexOf('data:image/jpeg;base64,') === 0 && url.length < 3000000
+        && !this._desktopShotBlocked()) {
+        if (!this._desktopShotsHi) this._desktopShotsHi = {};
+        this._desktopShotsHi[req.id] = { url, sig: req.sig, rects: req.rects, at: Date.now() };
+      }
+      return;
+    }
     if (typeof url !== 'string' || url.indexOf('data:image/jpeg;base64,') !== 0 || url.length > 450000) {
       // Still unblock _openDesktopStudio — a bad frame must not strand the open.
       if (typeof req.after === 'function') req.after(false);
@@ -36539,7 +36727,7 @@ class Component extends DCLogic {
       if (typeof req.after === 'function') req.after(false);
       return;
     }
-    this._desktopShots[req.id] = { url, sig: req.sig, at: Date.now() };
+    this._desktopShots[req.id] = { url, sig: req.sig, rects: req.rects, at: Date.now() };
     this._saveDesktopShots();
     if (typeof req.after === 'function') req.after(true);
     if (this.state.desktopStudioOpen && this.state.desktopStudioTab === 'desktops') {
@@ -37373,7 +37561,8 @@ class Component extends DCLogic {
         const toIndex = ((this._desktopIndex || 0) + (dir < 0 ? 1 : -1) + count) % count;
         this._deskSlide.dir = dir;
         this._deskSlide.toIndex = toIndex;
-        this._fillDeskSlidePane(this._deskSlideDom && this._deskSlideDom.incoming, toIndex);
+        this._fillDeskSlideWidgets(this._deskSlideDom && this._deskSlideDom.incoming,
+          this._deskSlideDom && this._deskSlideDom.back, toIndex);
       }
     }
     if (this._deskSlide && !this._deskSlide.busy) {
