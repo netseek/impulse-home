@@ -9091,6 +9091,10 @@ const CAR_FADE_MS = 320;
 const DESK_SWIPE_COMMIT_FRAC = 0.3;
 const DESK_SWIPE_SLIDE_MS = 260;
 const DESK_SWIPE_FADE_MS = 220;
+// Background swipe: the incoming image's soft leading edge (share of the
+// panel width) and how fast the outgoing one drifts under it.
+const DESK_BG_FEATHER = 0.3;
+const DESK_BG_PARALLAX = 0.35;
 // .hv-wallpaper fades its opacity over 0.7 s; hold the incoming pane past it.
 const DESK_WALL_SETTLE_MS = 760;
 // How far toward the next view the camera follows the finger before commit.
@@ -36429,11 +36433,11 @@ class Component extends DCLogic {
     // never seen.
     const u = Math.min(1, Math.abs(clamped) / this._deskCommitPx());
     this._deskSlideSetVars(clamped, 1 - u);
-    const incomingBase = clamped < 0 ? w : -w;
+    this._deskSlideShapeBack(clamped < 0 ? -1 : 1);
     dom.back.style.transition = 'none';
-    dom.back.style.transform = 'translate3d(' + (incomingBase + clamped) + 'px,0,0)';
+    dom.back.style.transform = 'translate3d(' + this._deskBackX(clamped, clamped < 0 ? -1 : 1) + 'px,0,0)';
     dom.out.style.transition = 'none';
-    dom.out.style.transform = 'translate3d(' + clamped + 'px,0,0)';
+    dom.out.style.transform = 'translate3d(' + (clamped * DESK_BG_PARALLAX) + 'px,0,0)';
     this._deskSlidePaintDots(clamped);
     if (!slide.busy) {
       this._deskSlideCamAt(u * DESK_SWIPE_CAM_LEAD);
@@ -36610,6 +36614,36 @@ class Component extends DCLogic {
     return true;
   }
 
+  /**
+   * The incoming background is wider than the panel by a feather band on its
+   * leading edge, masked from transparent to opaque, so it dissolves over the
+   * outgoing one instead of meeting it at a hard line. Fully arrived (x 0),
+   * its solid part still covers the whole panel. dir: -1 = comes from the
+   * right, +1 = from the left.
+   */
+  _deskSlideShapeBack(dir) {
+    const dom = this._deskSlideDom;
+    if (!dom || dom.backDir === dir) return;
+    dom.backDir = dir;
+    const F = Math.round(this._deskSlideWidth() * DESK_BG_FEATHER);
+    const b = dom.back.style;
+    b.right = 'auto';
+    b.width = 'calc(100% + ' + F + 'px)';
+    b.left = dir < 0 ? (-F + 'px') : '0px';
+    const mask = 'linear-gradient(' + (dir < 0 ? 'to right' : 'to left')
+      + ', transparent 0px, #000 ' + F + 'px)';
+    b.webkitMaskImage = mask;
+    b.maskImage = mask;
+  }
+
+  /** Incoming pane x for a drag of `dx` (0 = parked just off-panel). */
+  _deskBackX(dx, dir) {
+    const w = this._deskSlideWidth();
+    const span = w + Math.round(w * DESK_BG_FEATHER);
+    const p = Math.min(1, Math.abs(dx) / w);
+    return (dir < 0 ? 1 : -1) * span * (1 - p);
+  }
+
   _deskSlideHideBack() {
     clearTimeout(this._deskBackTimer);
     const dom = this._deskSlideDom;
@@ -36620,6 +36654,12 @@ class Component extends DCLogic {
     dom.back.style.transition = '';
     dom.back.style.background = '';
     dom.back.style.backgroundImage = '';
+    dom.back.style.webkitMaskImage = '';
+    dom.back.style.maskImage = '';
+    dom.back.style.left = '';
+    dom.back.style.width = '';
+    dom.back.style.right = '';
+    dom.backDir = 0;
   }
 
   /** Incoming wallpaper, or nothing when that desktop shows no wallpaper. */
@@ -36736,7 +36776,7 @@ class Component extends DCLogic {
     dom.back.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
     dom.back.style.transform = 'translate3d(0,0,0)';
     dom.out.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
-    dom.out.style.transform = 'translate3d(' + targetDx + 'px,0,0)';
+    dom.out.style.transform = 'translate3d(' + (targetDx * DESK_BG_PARALLAX) + 'px,0,0)';
     this._deskRailFade(0, DESK_SWIPE_FADE_MS);
     clearTimeout(this._deskSlideAnimTimer);
     this._deskSlideAnimTimer = setTimeout(() => {
@@ -36788,7 +36828,7 @@ class Component extends DCLogic {
     this._deskSlideSetVars(0, 1);
     if (dom) {
       dom.back.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
-      dom.back.style.transform = 'translate3d(' + (dir < 0 ? w : -w) + 'px,0,0)';
+      dom.back.style.transform = 'translate3d(' + this._deskBackX(0, dir < 0 ? -1 : 1) + 'px,0,0)';
       dom.out.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
       dom.out.style.transform = 'translate3d(0,0,0)';
     }
