@@ -5144,6 +5144,11 @@ window.HavalSplash = (function () {
     }
     .hv-desk-slide-back.on { display: block; }
     body.hv-desk-sliding #hv-root { overflow: hidden; }
+    /* Car fade across a switch that hides/shows it (_carFade). */
+    body.hv-car-faded #hv-root > .hv-canvas-host { opacity: 0 !important; }
+    /* _carFadeSet: snap, don't animate (.hv-canvas-host has its own .18s transition). */
+    body.hv-car-faded:not(.hv-car-fading) #hv-root > .hv-canvas-host { transition: none !important; }
+    body.hv-car-fading #hv-root > .hv-canvas-host { transition: opacity 320ms ease !important; }
     body.hv-desk-sliding #hv-root > .hv-canvas-host { z-index: 2; }
     /* The panes stand in for the live wallpaper while sliding. */
     body.hv-desk-sliding #hv-root > .hv-wallpaper { visibility: hidden; }
@@ -5163,7 +5168,9 @@ window.HavalSplash = (function () {
 
     /* Desktops: a strip over the whole panel, not a framed popup. */
     .hv-desks { position: absolute; inset: 0; z-index: 84; display: flex; flex-direction: column; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .22s ease;
-      background: linear-gradient(to bottom, rgba(4,8,12,0) 0%, rgba(4,8,12,.56) 24%, rgba(4,8,12,.64) 50%, rgba(4,8,12,.56) 76%, rgba(4,8,12,0) 100%); }
+      /* Dark enough that the live desktop behind reads as backdrop, not
+         content: the thumbnails are what to look at. */
+      background: linear-gradient(to bottom, rgba(4,8,12,.62) 0%, rgba(4,8,12,.86) 18%, rgba(4,8,12,.9) 50%, rgba(4,8,12,.86) 82%, rgba(4,8,12,.62) 100%); }
     .hv-desks.on { opacity: 1; pointer-events: auto; }
     /* Framed Cards/Widgets/Appearance sit above; keep the strip visible behind. */
     .hv-desks.behind { z-index: 82; pointer-events: none; }
@@ -9072,6 +9079,8 @@ const CAM_CURRENT_KEY = '__current';
 const CAM_CURRENT_POLL_MS = 900;
 // Camera tween when switching desktops (each desktop keeps its own view).
 const DESKTOP_CAM_FLY_SEC = 0.85;
+// Car fade when a desktop switch hides or shows the 3D model.
+const CAR_FADE_MS = 320;
 // Accent glow on 3D-only backgrounds: strength, radius (share of the panel)
 // and vertical centre. One knob to tune by eye: BG_TINT_ALPHA.
 const BG_TINT_ALPHA = 0.28;
@@ -36193,6 +36202,23 @@ class Component extends DCLogic {
     const count = this._desktops.length;
     const nextIndex = ((parseInt(index, 10) || 0) % count + count) % count;
     if (nextIndex === this._desktopIndex && !force) return;
+    // Car -> no car: fade it out FIRST (the switch hides it in one frame).
+    // A swipe has already started this fade during its slide.
+    // Per-desktop test for both ends: _shouldShowCar() only checks the layout,
+    // and a wallpaper-only desktop hides the model by another route.
+    const carNow = this._desktopShowsCar(this._desktops[this._desktopIndex || 0]);
+    const carNext = this._desktopShowsCar(this._desktops[nextIndex]);
+    if (carNow && !carNext && !(opts && opts.carFaded)) {
+      this._carFade(false);
+      clearTimeout(this._carFadeSwitchTimer);
+      this._carFadeSwitchTimer = setTimeout(() => {
+        this._switchDesktop(index, skipCapture, force, Object.assign({}, opts, { carFaded: true }));
+      }, CAR_FADE_MS);
+      return;
+    }
+    // No car -> car: start invisible; the callback fades it in once drawn.
+    const carFadeIn = !carNow && carNext;
+    if (carFadeIn) this._carFadeSet(false, false);
     this._cancelWidgetPicker();
     this._closeGraphEditor();
     if (!skipCapture) this._captureActiveDesktop();
@@ -36255,6 +36281,13 @@ class Component extends DCLogic {
       appsFabOpen: false,
     }, () => {
       this._persistWidgets();
+      if (carFadeIn) {
+        if (this.requestRender) this.requestRender(4);
+        requestAnimationFrame(() => requestAnimationFrame(() => this._carFade(true)));
+      } else if (!carNext) {
+        // Hidden by the switch now; drop the fade classes without a flash.
+        setTimeout(() => this._carFadeClear(), 60);
+      }
       // Every desktop shares the appCar layout, so _applyFitCamera alone sees
       // "same mode" and never moves the camera: one desktop's orbit showed on
       // all of them. Fly to this desktop's own view first; the fit then only
@@ -36310,6 +36343,40 @@ class Component extends DCLogic {
    * Freeze the on-screen framing as the switch begins (see _tickCamAnim's
    * hold). _flyWhenFramesSettle replaces it with the real flight.
    */
+  /** Would desktop `d` show the car? (Mirrors _shouldShowCar for a desktop.) */
+  _desktopShowsCar(d) {
+    if (!d) return true;
+    return this._normalizeCenterFill(d.centerFill) !== 'wallpaper' && d.shellMode !== 'appsOnly';
+  }
+
+  /**
+   * Fade the car canvas in or out (body classes, so a template commit cannot
+   * wipe them). _carFadeSet jumps without a transition.
+   */
+  _carFade(show) {
+    const b = document.body;
+    if (!b) return;
+    clearTimeout(this._carFadeTimer);
+    b.classList.add('hv-car-fading');
+    b.classList.toggle('hv-car-faded', !show);
+    if (show) this._carFadeTimer = setTimeout(() => this._carFadeClear(), CAR_FADE_MS + 60);
+  }
+
+  _carFadeSet(show) {
+    const b = document.body;
+    if (!b) return;
+    clearTimeout(this._carFadeTimer);
+    b.classList.remove('hv-car-fading');
+    b.classList.toggle('hv-car-faded', !show);
+  }
+
+  _carFadeClear() {
+    const b = document.body;
+    if (!b) return;
+    clearTimeout(this._carFadeTimer);
+    b.classList.remove('hv-car-fading', 'hv-car-faded');
+  }
+
   _holdCameraForSwitch() {
     if (this._introActive || !this.camera || !this.controls) return;
     const pan = this._userPanPx || { x: 0, y: 0 };
@@ -36736,6 +36803,9 @@ class Component extends DCLogic {
     this._deskSlideApplyOffset(startDx);
     void document.body.offsetWidth;
     const ms = DESK_SWIPE_SLIDE_MS;
+    const carFaded = this._desktopShowsCar(this._desktops[this._desktopIndex || 0])
+      && !this._desktopShowsCar(this._desktops[toIndex]);
+    if (carFaded) this._carFade(false);
     document.body.classList.add('hv-desk-animating');
     this._deskSlideSetVars(targetDx, 0);
     dom.back.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
@@ -36774,7 +36844,7 @@ class Component extends DCLogic {
       };
       clearTimeout(this._deskSlideSafety);
       this._deskSlideSafety = setTimeout(finish, 6000);
-      this._switchDesktop(toIndex, false, false, { afterPaint: finish, camHandled: true });
+      this._switchDesktop(toIndex, false, false, { afterPaint: finish, camHandled: true, carFaded });
     }, ms + 8);
   }
 
