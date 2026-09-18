@@ -5145,9 +5145,8 @@ window.HavalSplash = (function () {
     .hv-desk-slide-back.on { display: block; }
     body.hv-desk-sliding #hv-root { overflow: hidden; }
     body.hv-desk-sliding #hv-root > .hv-canvas-host { z-index: 2; }
-    body.hv-desk-sliding #hv-root > .hv-wallpaper {
-      transform: translate3d(var(--hv-desk-wall-x, 0px), 0, 0); will-change: transform;
-    }
+    /* The panes stand in for the live wallpaper while sliding. */
+    body.hv-desk-sliding #hv-root > .hv-wallpaper { visibility: hidden; }
     body.hv-desk-sliding #hv-root > .hv-widget-board,
     body.hv-desk-sliding #hv-root > .hv-car-stage-action,
     body.hv-desk-sliding #hv-root > .hv-apps-pane,
@@ -5155,7 +5154,6 @@ window.HavalSplash = (function () {
     body.hv-desk-sliding #hv-root > .hv-shell-hud {
       opacity: var(--hv-desk-fade, 1) !important;
     }
-    body.hv-desk-animating #hv-root > .hv-wallpaper { transition: transform 260ms cubic-bezier(.2,.7,.2,1); }
     body.hv-desk-animating #hv-root > .hv-widget-board,
     body.hv-desk-animating #hv-root > .hv-car-stage-action,
     body.hv-desk-animating #hv-root > .hv-apps-pane,
@@ -36299,16 +36297,24 @@ class Component extends DCLogic {
 
   /** The incoming wallpaper pane (same layer as .hv-wallpaper, under the car). */
   _ensureDeskSlideDom() {
-    if (this._deskSlideDom && this._deskSlideDom.back && this._deskSlideDom.back.isConnected) {
+    if (this._deskSlideDom && this._deskSlideDom.back && this._deskSlideDom.back.isConnected
+      && this._deskSlideDom.out && this._deskSlideDom.out.isConnected) {
       return this._deskSlideDom;
     }
     const root = document.getElementById('hv-root');
     if (!root) return null;
-    const back = document.createElement('div');
-    back.className = 'hv-desk-slide-back';
-    back.setAttribute('aria-hidden', 'true');
-    root.appendChild(back);
-    this._deskSlideDom = { back };
+    const mk = () => {
+      const el = document.createElement('div');
+      el.className = 'hv-desk-slide-back';
+      el.setAttribute('aria-hidden', 'true');
+      root.appendChild(el);
+      return el;
+    };
+    // out = the background leaving, back = the one arriving. Both are page
+    // layers under the car, whatever the desktop's fill (see _deskBgSpec).
+    const out = mk();
+    const back = mk();
+    this._deskSlideDom = { out, back };
     return this._deskSlideDom;
   }
 
@@ -36353,6 +36359,8 @@ class Component extends DCLogic {
     const incomingBase = clamped < 0 ? w : -w;
     dom.back.style.transition = 'none';
     dom.back.style.transform = 'translate3d(' + (incomingBase + clamped) + 'px,0,0)';
+    dom.out.style.transition = 'none';
+    dom.out.style.transform = 'translate3d(' + clamped + 'px,0,0)';
     this._deskSlidePaintDots(clamped);
     if (!slide.busy) {
       this._deskSlideCamAt(u * DESK_SWIPE_CAM_LEAD);
@@ -36511,7 +36519,10 @@ class Component extends DCLogic {
     const count = this._desktops.length;
     const idx = ((toIndex % count) + count) % count;
     this._deskSlideFillBack(idx);
+    this._deskSlidePaintBg(dom.out, this._desktops[this._desktopIndex || 0]);
     dom.back.classList.add('on');
+    dom.out.classList.add('on');
+    this._deskSlideClearCanvasBg();
     document.body.classList.remove('hv-desk-animating');
     document.body.classList.add('hv-desk-sliding');
     this._deskSlide = {
@@ -36532,6 +36543,7 @@ class Component extends DCLogic {
     dom.back.classList.remove('on');
     dom.back.style.transform = '';
     dom.back.style.transition = '';
+    dom.back.style.background = '';
     dom.back.style.backgroundImage = '';
   }
 
@@ -36539,11 +36551,66 @@ class Component extends DCLogic {
   _deskSlideFillBack(index) {
     const dom = this._deskSlideDom;
     if (!dom) return;
-    const d = this._desktops[index] || {};
-    const wall = this._centerFillUsesWallpaper(d) && this._desktopWallpaperEntry
+    this._deskSlidePaintBg(dom.back, this._desktops[index] || {});
+  }
+
+  /**
+   * What desktop `d` shows behind the car: its wallpaper, or -- for a 3D-only
+   * desktop -- the same vignette gradient the WebGL background draws (the
+   * CSS twin _applyBackground already keeps on the shell).
+   */
+  _deskSlidePaintBg(el, d) {
+    if (!el) return;
+    const wall = d && this._centerFillUsesWallpaper(d) && this._desktopWallpaperEntry
       ? this._desktopWallpaperEntry(d) : null;
-    dom.back.style.backgroundImage = wall && wall.url
-      ? 'url("' + String(wall.url).replace(/"/g, '%22') + '")' : '';
+    if (wall && wall.url) {
+      el.style.background = '';
+      el.style.backgroundImage = 'url("' + String(wall.url).replace(/"/g, '%22') + '")';
+      return;
+    }
+    const s = this.state;
+    const bg = s.nightMode ? s.nightBg : s.dayBg;
+    const vig = s.vignette || {};
+    el.style.backgroundImage = '';
+    el.style.background = this._shellBgCss(bg, vig.color || '#000000', vig.intensity ?? 0);
+  }
+
+  /**
+   * For the length of a swipe the car is drawn on a transparent canvas, so the
+   * background panes sliding UNDER it are what the user sees. A 3D-only
+   * desktop's canvas is otherwise opaque and hid the incoming wallpaper.
+   */
+  _deskSlideClearCanvasBg() {
+    if (this._deskBgCleared || !this.renderer || !this.scene) return;
+    this._deskBgCleared = true;
+    this.scene.background = null;
+    this.renderer.setClearColor(0x000000, 0);
+    if (this.vignetteMat) {
+      this._deskVigWas = this.vignetteMat.uniforms.vignetteIntensity.value;
+      this.vignetteMat.uniforms.vignetteIntensity.value = 0;
+    }
+    this._postFxDirty = true;
+    if (this.requestRender) this.requestRender(2);
+  }
+
+  /** Put the current desktop's own background back on the canvas. */
+  _deskSlideRestoreCanvasBg() {
+    if (!this._deskBgCleared) return;
+    this._deskBgCleared = false;
+    const s = this.state;
+    this._applyBackground(s.nightMode, s.dayBg, s.nightBg, s.vignette, s.grainEnabled);
+    this._postFxDirty = true;
+    if (this.requestRender) this.requestRender(2);
+  }
+
+  _deskSlideHideOut() {
+    const dom = this._deskSlideDom;
+    if (!dom || !dom.out) return;
+    dom.out.classList.remove('on');
+    dom.out.style.transform = '';
+    dom.out.style.transition = '';
+    dom.out.style.background = '';
+    dom.out.style.backgroundImage = '';
   }
 
   _deskSlideTeardown() {
@@ -36590,6 +36657,8 @@ class Component extends DCLogic {
     this._deskSlideSetVars(targetDx, 0);
     dom.back.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
     dom.back.style.transform = 'translate3d(0,0,0)';
+    dom.out.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
+    dom.out.style.transform = 'translate3d(' + targetDx + 'px,0,0)';
     this._deskRailFade(0, DESK_SWIPE_FADE_MS);
     clearTimeout(this._deskSlideAnimTimer);
     this._deskSlideAnimTimer = setTimeout(() => {
@@ -36603,6 +36672,11 @@ class Component extends DCLogic {
         // image decode is never seen). Snap it home without a transition.
         document.body.classList.remove('hv-desk-animating');
         this._deskSlideSetVars(0, 0);
+        this._deskSlideHideOut();
+        // _switchDesktop has already put the new desktop's background on the
+        // canvas (_applyBackground); the incoming pane, the same picture,
+        // still covers the seam until it is lifted.
+        this._deskBgCleared = false;
         this._flyWhenFramesSettle(toIndex);
         requestAnimationFrame(() => {
           document.body.classList.add('hv-desk-animating');
@@ -36637,6 +36711,8 @@ class Component extends DCLogic {
     if (dom) {
       dom.back.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
       dom.back.style.transform = 'translate3d(' + (dir < 0 ? w : -w) + 'px,0,0)';
+      dom.out.style.transition = 'transform ' + ms + 'ms cubic-bezier(.2,.7,.2,1)';
+      dom.out.style.transform = 'translate3d(0,0,0)';
     }
     if (slide.camFrom && this.camera) {
       const { w: vw, h: vh } = this._viewportSize();
@@ -36648,8 +36724,10 @@ class Component extends DCLogic {
     clearTimeout(this._deskSlideAnimTimer);
     this._deskRailFade(1, ms);
     this._deskSlideAnimTimer = setTimeout(() => {
+      this._deskSlideRestoreCanvasBg();
       this._deskSlideTeardown();
       this._deskSlideHideBack();
+      this._deskSlideHideOut();
     }, ms + 8);
   }
 
