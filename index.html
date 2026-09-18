@@ -1193,12 +1193,57 @@ window.HavalSplash = (function () {
     }
     .hv-cam-save-row > button {
       flex: 1;
-      padding: 10px 6px;
-      border-radius: 7px;
+      padding: 11px 8px;
+      border-radius: 10px;
       cursor: pointer;
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 12px;
+      letter-spacing: .06em;
+      font-weight: 600;
+    }
+    /* Camera section: same type as the widgets and cards (Space Grotesk,
+       small bold caps labels, readable body), not the debug monospace. */
+    .hv-cam-label {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 600;
       letter-spacing: .08em;
+      opacity: .6;
+      margin-bottom: 8px;
+    }
+    .hv-cam-label-gap { margin-top: 16px; }
+    .hv-cam-hint {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 11px;
+      line-height: 1.4;
+      opacity: .5;
+      margin-top: 8px;
+    }
+    .hv-cam-fov {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .hv-cam-fov input { flex: 1; }
+    .hv-cam-fov-val {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      min-width: 38px;
+      text-align: right;
+    }
+    .hv-cam-options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .hv-cam-options > button {
+      padding: 11px 6px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 12px;
+      letter-spacing: .06em;
       font-weight: 600;
     }
     /* MMI WebView: a finger-drag on a range inside overflow-y:auto is treated
@@ -7829,7 +7874,7 @@ window.HavalSplash = (function () {
 
     <!-- ── CAMERA TAB ── -->
     <sc-if value="{{ sectionIsCamera }}" hint-placeholder-val="{{ false }}">
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">CAMERA</div>
+      <div class="hv-cam-label">SAVED VIEWS</div>
       <div class="hv-cam-grid">
         <sc-for list="{{ cameraPresets }}" as="cp" hint-placeholder-count="6">
           <button class="hv-cam-tile {{ cp.onClass }} {{ cp.emptyClass }} {{ cp.pickClass }} {{ cp.flashClass }} {{ cp.deleteClass }}" onClick="{{ cp.onClick }}" onTouchStart="{{ cp.onHoldStart }}" onTouchEnd="{{ cp.onHoldEnd }}" onTouchCancel="{{ cp.onHoldEnd }}" onMouseDown="{{ cp.onHoldStart }}" onMouseUp="{{ cp.onHoldEnd }}" onMouseLeave="{{ cp.onHoldEnd }}" onContextMenu="{{ cp.onContextMenu }}" title="{{ cp.title }}">
@@ -7854,20 +7899,26 @@ window.HavalSplash = (function () {
           <button onClick="{{ cancelCamSlotDelete }}" title="Keep this slot">CANCEL</button>
         </div>
       </sc-if>
-      <sc-if value="{{ camSaveToSlotVisible }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ camSaveDesktopVisible }}" hint-placeholder-val="{{ false }}">
         <div class="hv-cam-save-row">
-          <button onClick="{{ toggleCamSlotPick }}" title="{{ camSlotSaveHint }}" style="border: 1px solid {{ camSlotSaveBorder }}; background: {{ camSlotSaveBg }}; color: {{ camSlotSaveCol }};">{{ camSlotSaveLabel }}</button>
+          <button onClick="{{ saveCurrentDesktopCamera }}" title="Make the current view this desktop's home camera" style="border: 1px solid {{ camSaveDesktopBorder }}; background: {{ camSaveDesktopBg }}; color: {{ camSaveDesktopCol }};">{{ camSaveDesktopLabel }}</button>
         </div>
       </sc-if>
-      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">{{ camDesktopSaveHint }}</div>
+      <div class="hv-cam-hint">{{ camDesktopSaveHint }}</div>
 
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin: 16px 0 9px;">OPTIONS</div>
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <sc-for list="{{ cameraOptions }}" as="co" hint-placeholder-count="4">
-          <button onClick="{{ co.onClick }}" title="{{ co.title }}" style="width: 100%; padding: 9px 8px; border-radius: 7px; border: 1px solid {{ co.border }}; background: {{ co.bg }}; color: {{ co.col }}; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; font-weight: 600; text-align: left; line-height: 1.35;">{{ co.label }}</button>
+      <div class="hv-cam-label hv-cam-label-gap">FIELD OF VIEW</div>
+      <div class="hv-cam-fov">
+        <input type="range" min="{{ camFovMin }}" max="{{ camFovMax }}" step="1" value="{{ camFov }}" onInput="{{ onCamFov }}" onChange="{{ onCamFov }}" />
+        <span class="hv-cam-fov-val">{{ camFovLabel }}</span>
+      </div>
+
+      <div class="hv-cam-label hv-cam-label-gap">OPTIONS</div>
+      <div class="hv-cam-options">
+        <sc-for list="{{ cameraOptions }}" as="co" hint-placeholder-count="3">
+          <button onClick="{{ co.onClick }}" title="{{ co.title }}" style="border: 1px solid {{ co.border }}; background: {{ co.bg }}; color: {{ co.col }};">{{ co.label }}</button>
         </sc-for>
       </div>
-      <div style="font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .06em; opacity: .4; line-height: 1.45; margin-top: 8px;">Event: doors → top-left, roof → top facing left; returns after openings settle. Cycle steps saved slots while moving. Orbit is a slow spin. Orthographic removes perspective foreshortening.</div>
+      <div class="hv-cam-hint">Event: doors → top-left, roof → top facing left; returns after openings settle. Cycle steps saved views while moving. Orbit is a slow spin. Lower FOV flattens perspective.</div>
     </sc-if>
 
     <!-- ── ENV TAB ── -->
@@ -8453,8 +8504,8 @@ const CAR_POWER_DEMO_PACKED = [
 const CAR_WIDGET_HOLD_MS = 500;
 const H6_DESKTOPS_KEY = 'h6_desktops_v1';
 const H6_DESKTOPS_VERSION = 5;
-// Fresh-install desktops, captured from the car (2026-09-18). Cameras are
-// left out on purpose: they fall back to the layout builtin home pose.
+// Fresh-install desktops, captured from the car (2026-09-18). Cameras come
+// from H6_SEED_DESKTOP_CAMS; a desktop without one uses the builtin home.
 // X-ray is forced off -- it roughly doubles draw calls and never idles.
 const H6_SEED_DESKTOPS = [{"name":"Drive","shellMode":"appCar","centerFill":"mixed","wallpaperSource":"curated","wallpaperAuto":true,"wallpaperIdx":0,"wallpaperCuratedIdx":14,"wallpaperFavoritesIdx":0,"wallpaperWebUrl":"","wallpaperWebTitle":"","wallpaperWebCredit":"","wallpaperWebSourcePage":"","wallpaperCustomUrl":"","widgetThemeMode":"auto","accentKey":"cyan","accentColor":"#2aa7b7","accentDark":"#2aa7b7","accentLight":"#029eb6","dynamicColorSport":true,"dynamicColorEco":true,"dockMode":"cards","clockFace":"panorama","clockFormat":"24h","bottomCards":["clock","consumption","navigation","driveMode","powerMode","regen"],"bottomCardLimit":6,"cardActions":{},"cardFocus":{"power":{"id":"focus-power","type":"power","x":0,"y":0,"w":2,"h":2},"range":{"id":"focus-range","type":"range","x":0,"y":0,"w":2,"h":2},"consumption":{"id":"focus-consumption","type":"consumption","x":0,"y":0,"w":2,"h":2}},"widgetClock":{"version":1,"style":"twin","hourFormat":"system"},"bottomClock":{"version":2,"face":"date-spine","hourFormat":"system","dialMarks":"index","splitPlates":"frost","dateSpineFormat":"month-name","dateWording":"short"},"widgetLayout":{"version":2,"appCar":{"left":{"use":"widgets","items":[{"id":"w-range-mu5qryq2","type":"range","x":0,"y":0,"w":3,"h":2}]}}},"powertrainOn":false},{"name":"Focus","shellMode":"appCar","centerFill":"car","wallpaperSource":"bing","wallpaperAuto":true,"wallpaperIdx":0,"wallpaperCuratedIdx":0,"wallpaperFavoritesIdx":0,"wallpaperWebUrl":"","wallpaperWebTitle":"","wallpaperWebCredit":"","wallpaperWebSourcePage":"","wallpaperCustomUrl":"","widgetThemeMode":"dark","accentKey":"ice","accentColor":"#9ac8ff","accentDark":"#9ac8ff","accentLight":"#3c92fb","dynamicColorSport":true,"dynamicColorEco":true,"dockMode":"cards","clockFace":"panorama","clockFormat":"24h","bottomCards":["clock","media","navigation","status","range","climate","consumption","power","driveMode","powerMode","regen","wallpaper"],"bottomCardLimit":12,"cardActions":{},"cardFocus":{"range":{"id":"focus-range","type":"range","x":0,"y":0,"w":2,"h":2}},"widgetClock":{"version":1,"style":"twin","hourFormat":"system"},"bottomClock":{"version":2,"face":"meridian","hourFormat":"system","dialMarks":"index","splitPlates":"frost","dateSpineFormat":"month-name","dateWording":"short"},"widgetLayout":{"version":2,"appCar":{"left":{"use":"app","items":[]}}},"powertrainOn":false},{"name":"Lounge","shellMode":"appCar","centerFill":"wallpaper","wallpaperSource":"bing","wallpaperAuto":true,"wallpaperIdx":0,"wallpaperCuratedIdx":0,"wallpaperFavoritesIdx":0,"wallpaperWebUrl":"","wallpaperWebTitle":"","wallpaperWebCredit":"","wallpaperWebSourcePage":"","wallpaperCustomUrl":"","widgetThemeMode":"auto","accentKey":"amber","accentColor":"#f0bd65","accentDark":"#f0bd65","accentLight":"#e29208","dynamicColorSport":true,"dynamicColorEco":true,"dockMode":"cards","clockFace":"panorama","clockFormat":"24h","bottomCards":["climate","power","consumption","navigation","wallpaper"],"bottomCardLimit":5,"cardActions":{},"cardFocus":{"power":{"id":"focus-power","type":"power","x":0,"y":0,"w":2,"h":2}},"widgetClock":{"version":1,"style":"signal","hourFormat":"system"},"bottomClock":{"version":2,"face":"panorama","hourFormat":"system","dialMarks":"index","splitPlates":"frost","dateSpineFormat":"month-name","dateWording":"short"},"widgetLayout":{"version":2,"appCar":{"left":{"use":"widgets","items":[{"id":"w-clock-mu5qtzdb","type":"clock","x":0,"y":0,"w":2,"h":1},{"id":"w-status-mu5quxoi","type":"status","x":2,"y":0,"w":2,"h":2},{"id":"w-range-mu5qv5op","type":"range","x":4,"y":0,"w":2,"h":1},{"id":"w-media-mu5qx872","type":"media","x":0,"y":1,"w":2,"h":1},{"id":"w-consumption-mu5qxts2","type":"consumption","x":4,"y":1,"w":2,"h":1}]}}},"powertrainOn":false}];
 const H6_MAX_DESKTOPS = 6;
@@ -8989,13 +9040,23 @@ const CUSTOM_CAM_SLOTS = 6; // user slots in the CAMERA rail (empty until saved)
 // layout builtin home, i.e. the default starting camera. Only seeded when the
 // user has never saved slots, so a cleared sample stays cleared.
 const H6_SAMPLE_CAMS = [
-  // 1: default home -- rear 3/4, framed on the car at ~65% of the panel width.
-  { f: -0.4005, r: 0.4161, y: 0.2214, tf: 0, tr: 0, ty: 0, px: -0.123, py: 0.1168, viewShift: 0 },
+  // 1: default home -- rear 3/4, centred.
+  { f: -0.4005, r: 0.4161, y: 0.2214, tf: 0, tr: 0, ty: 0, px: 0, py: 0.1168, viewShift: 0 },
   // 2: side profile, centred, lifted clear of the cards like 1.
   { f: -0.0159, r: 0.601, y: 0.1454, tf: 0, tr: 0, ty: 0, px: 0, py: 0.1168, viewShift: 0 },
-  // 3: front 3/4, same pan as 1.
-  { f: 0.3631, r: 0.4593, y: 0.1994, tf: 0, tr: 0, ty: 0, px: -0.123, py: 0.1168, viewShift: 0 },
+  // 3: front 3/4, centred.
+  { f: 0.3631, r: 0.4593, y: 0.1994, tf: 0, tr: 0, ty: 0, px: 0, py: 0.1168, viewShift: 0 },
 ];
+// Per-desktop home cameras for the seeded desktops (by name). Focus has no
+// widget board, so its car sits right of centre, at ~65% of the panel width.
+const H6_SEED_DESKTOP_CAMS = {
+  Drive: H6_SAMPLE_CAMS[1],
+  Focus: Object.assign({}, H6_SAMPLE_CAMS[0], { px: -0.123 }),
+};
+// FOV slider range (degrees). The render camera is born at 30.
+const CAM_FOV_DEFAULT = 30;
+const CAM_FOV_MIN = 15;
+const CAM_FOV_MAX = 60;
 const CAM_ICON_GAP_MAX_MS = 500;
 const CAM_ICON_BG_GAP_MIN_MS = 120;
 const CAM_ICON_BG_GAP_MAX_MS = 800;
@@ -9197,6 +9258,7 @@ class Component extends DCLogic {
     camCycleEnabled: false,
     camOrbitEnabled: false,
     camOrthoEnabled: false,
+    camFov: CAM_FOV_DEFAULT,
     camSlotPickMode: false,
     camSlotDeleteKey: null,
     camSlotFlashKey: null,
@@ -10001,7 +10063,11 @@ class Component extends DCLogic {
     if (typeof saved.camEventEnabled === 'boolean') s.camEventEnabled = saved.camEventEnabled;
     if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
     if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
-    if (typeof saved.camOrthoEnabled === 'boolean') s.camOrthoEnabled = saved.camOrthoEnabled;
+    // Orthographic is retired in favour of the FOV slider; a saved true would
+    // otherwise leave the camera stuck in ortho with no control to undo it.
+    if (typeof saved.camFov === 'number' && isFinite(saved.camFov)) {
+      s.camFov = Math.max(CAM_FOV_MIN, Math.min(CAM_FOV_MAX, saved.camFov));
+    }
     const urlFill = readUrlCenterFill();
     if (urlFill) s.centerFill = urlFill;
     else if (saved.centerFill === 'car' || saved.centerFill === 'wallpaper' || saved.centerFill === 'mixed') {
@@ -14059,10 +14125,6 @@ class Component extends DCLogic {
     return true;
   }
 
-  toggleCamSlotPick() {
-    this.setState({ camSlotPickMode: !this.state.camSlotPickMode, camSlotDeleteKey: null });
-  }
-
   _clearCamSlotHold() {
     if (this._camSlotHoldTimer) {
       clearTimeout(this._camSlotHoldTimer);
@@ -14213,7 +14275,7 @@ class Component extends DCLogic {
       camEventEnabled: !!s.camEventEnabled,
       camCycleEnabled: !!s.camCycleEnabled,
       camOrbitEnabled: !!s.camOrbitEnabled,
-      camOrthoEnabled: !!s.camOrthoEnabled,
+      camFov: this._camFov(),
       centerFill: (s.centerFill === 'wallpaper' || s.centerFill === 'mixed') ? s.centerFill : 'car',
       wallpaperSource: ['bing', 'curated', 'web', 'favorites'].indexOf(s.wallpaperSource) !== -1 ? s.wallpaperSource : 'bing',
       wallpaperAuto: !!s.wallpaperAuto,
@@ -14640,7 +14702,6 @@ class Component extends DCLogic {
         });
       })(),
       saveCurrentDesktopCamera: () => this.saveCurrentDesktopCamera(),
-      toggleCamSlotPick: () => this.toggleCamSlotPick(),
       confirmCamSlotDelete: () => this._clearCamSlot(s.camSlotDeleteKey),
       cancelCamSlotDelete: () => this._cancelCamSlotDelete(),
       camSlotDeleteArmed: !!s.camSlotDeleteKey,
@@ -14650,28 +14711,27 @@ class Component extends DCLogic {
       camSlotDeleteBorder: 'rgba(255,92,92,.85)',
       camSlotDeleteBg: 'rgba(255,60,60,.18)',
       camSlotDeleteCol: '#ffb4b4',
-      camSaveToSlotVisible: this._hasFilledCamSlots() && !s.camSlotDeleteKey,
+      camSaveDesktopVisible: !s.camSlotDeleteKey,
+      camSaveDesktopLabel: s.camDesktopFlash ? 'SAVED TO DESKTOP' : 'SAVE TO DESKTOP',
+      camSaveDesktopBorder: hv(!!s.camDesktopFlash).border,
+      camSaveDesktopBg:     hv(!!s.camDesktopFlash).bg,
+      camSaveDesktopCol:    hv(!!s.camDesktopFlash).col,
+      camFov: this._camFov(),
+      camFovLabel: this._camFov() + '°',
+      camFovMin: CAM_FOV_MIN,
+      camFovMax: CAM_FOV_MAX,
+      onCamFov: (e) => this.setCamFov(e && e.target ? e.target.value : e),
       camDesktopSaveHint: this._desktopReady
         ? (s.camSlotDeleteKey
           ? 'Tap Delete to clear this slot, or Cancel to keep it.'
-          : s.camSlotPickMode
-          ? 'Pick a slot to overwrite with the current camera.'
-          : 'Header SAVE stores this angle as the home for the current layout on this desktop. Empty tiles (+) save a slot; SAVE TO SLOT replaces one. Hold a filled slot to delete it.')
+          : 'Tap a view to go there; tap + to save the current view. Hold a view to delete it. Save to desktop makes the current view this desktop’s home.')
         : 'Desktops are still loading.',
-      camSlotSaveLabel: s.camSlotPickMode ? 'CANCEL' : 'SAVE TO SLOT',
-      camSlotSaveHint: s.camSlotPickMode
-        ? 'Tap a slot to overwrite it, or Cancel.'
-        : 'Fade the slots and pick which one to update.',
-      camSlotSaveBorder: hv(!!s.camSlotPickMode).border,
-      camSlotSaveBg:     hv(!!s.camSlotPickMode).bg,
-      camSlotSaveCol:    hv(!!s.camSlotPickMode).col,
       ...this._wallpaperRenderFields(s),
       cameraOptions: (() => {
         const defs = [
           { key: 'camEventEnabled', label: 'ON EVENT', title: 'Doors → top (20° left). Roof/curtain → top facing left. Returns to the previous view ~2s after the opening settles.' },
           { key: 'camCycleEnabled', label: 'CYCLE 60s', title: 'Cycle every saved camera view every 60 seconds while the car is moving.' },
           { key: 'camOrbitEnabled', label: 'ORBIT', title: 'Very slow continuous orbit around the car.' },
-          { key: 'camOrthoEnabled', label: 'ORTHOGRAPHIC', title: 'Toggle orthographic projection (no perspective foreshortening).' },
         ];
         return defs.map((d) => {
           const on = !!s[d.key];
@@ -28219,7 +28279,10 @@ class Component extends DCLogic {
       this.streakComposer = streakComposer;
       this.sAnaPass = sAna;
       this._resizePostFX(w, h);
-      if (this.state && this.state.camOrthoEnabled) this._setCameraOrtho(true);
+      if (this._camFov() !== CAM_FOV_DEFAULT && camera.isPerspectiveCamera) {
+        camera.fov = this._camFov();
+        camera.updateProjectionMatrix();
+      }
 
       // Additive overlay material — reused for both bloom and streak.
       // setAdditiveKeepAlpha, not AdditiveBlending: both composers' RenderPass
@@ -33391,7 +33454,12 @@ class Component extends DCLogic {
     const { F, R } = this._carBasis();
     const c = this._fitCenter;
     const d = this._fitDist;
-    const off = this.camera.position.clone().sub(c);
+    // Store at the default FOV (see _relToPose) so a pose frames the same
+    // whatever the FOV slider is set to when it is replayed.
+    const k = this._camFovDollyK();
+    const camPos = this.camera.position.clone().sub(this.controls.target)
+      .multiplyScalar(1 / k).add(this.controls.target);
+    const off = camPos.sub(c);
     const offT = this.controls.target.clone().sub(c);
     const round = (n) => Math.round(n * 10000) / 10000;
     const { w, h } = this._viewportSize();
@@ -33434,6 +33502,10 @@ class Component extends DCLogic {
   _relToPose(rel) {
     if (!rel || !this._fitCenter || !this._fitDist) return null;
     const { position, target } = this._relPositionTarget(rel);
+    // Poses are stored at the default FOV; keep the car the same size on
+    // screen at any other FOV by dollying along the view direction.
+    const k = this._camFovDollyK();
+    if (k !== 1) position.sub(target).multiplyScalar(k).add(target);
     // f/r/y/tf/tr/ty are a saved VIEWING ANGLE - a deliberate human choice of
     // direction/elevation, independent of the widget layout. viewShift/distMul
     // fit that angle into whatever gap the boards currently leave open, so they
@@ -34297,6 +34369,54 @@ class Component extends DCLogic {
       && !this._introActive && !this._camAnim;
     this.controls.autoRotate = on;
     if (on) this.controls.autoRotateSpeed = CAM_ORBIT_SPEED;
+  }
+
+  _camFov() {
+    const v = this.state && this.state.camFov;
+    return (typeof v === 'number' && isFinite(v))
+      ? Math.max(CAM_FOV_MIN, Math.min(CAM_FOV_MAX, v))
+      : CAM_FOV_DEFAULT;
+  }
+
+  /** Distance multiplier that keeps framing constant at the current FOV. */
+  _camFovDollyK(fov) {
+    const f = fov != null ? fov : this._camFov();
+    if (f === CAM_FOV_DEFAULT) return 1;
+    const half = (deg) => Math.tan((deg * Math.PI / 180) / 2);
+    return half(CAM_FOV_DEFAULT) / half(f);
+  }
+
+  /** FOV slider: change perspective, not size - the camera dollies to match. */
+  setCamFov(value) {
+    const fov = Math.max(CAM_FOV_MIN, Math.min(CAM_FOV_MAX, Math.round(Number(value) || CAM_FOV_DEFAULT)));
+    const prevK = this._camFovDollyK();
+    this.state.camFov = fov;
+    const cam = this.camera;
+    if (cam && cam.isPerspectiveCamera && this.controls) {
+      const t = this.controls.target;
+      cam.position.sub(t).multiplyScalar(this._camFovDollyK(fov) / prevK).add(t);
+      cam.fov = fov;
+      const dist = cam.position.distanceTo(t);
+      cam.near = Math.max(0.05, dist / 120);
+      cam.far = Math.max(100, dist * 120);
+      cam.updateProjectionMatrix();
+      this.controls.update();
+      this._postFxDirty = true;
+      if (this.requestRender) this.requestRender(4);
+    }
+    this.setState({ camFov: fov });
+    clearTimeout(this._camFovSaveTimer);
+    this._camFovSaveTimer = setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(this._settingsStorageKey());
+        const saved = (raw ? JSON.parse(raw) : {}) || {};
+        saved.camFov = fov;
+        localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
+        if (this._savedSettings) this._savedSettings.camFov = fov;
+      } catch (e) {}
+      this._camIcons = {};
+      this._ensureCamIcons(0, { background: true });
+    }, 400);
   }
 
   _setCamOption(key, enabled) {
@@ -35664,7 +35784,11 @@ class Component extends DCLogic {
       } catch (e) {}
       if (!legacy) { try { legacy = localStorage.getItem('h6_widgets'); } catch (e) {} }
       if (!legacy) {
-        H6_SEED_DESKTOPS.forEach((d) => desktops.push(this._normalizeDesktop(this._cloneDesktopValue(d, {}), d.name)));
+        H6_SEED_DESKTOPS.forEach((d) => {
+          const seed = this._cloneDesktopValue(d, {});
+          if (H6_SEED_DESKTOP_CAMS[d.name]) seed.cameras = { appCar: Object.assign({}, H6_SEED_DESKTOP_CAMS[d.name]) };
+          desktops.push(this._normalizeDesktop(seed, d.name));
+        });
         // Start on Focus (no widget board, the car gets the whole centre).
         active = Math.max(0, desktops.findIndex((d) => d.name === 'Focus'));
       } else {
