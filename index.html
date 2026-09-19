@@ -8888,10 +8888,10 @@ const H6_RAIL_CARD_ICONS = {
   regen: 'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',
 };
 const H6_CLOCK_WIDGET_OPTIONS = [
-  { key: 'twin', label: 'Twin', hint: 'Digital time with an analog companion' },
-  { key: 'atelier', label: 'Atelier', hint: 'Analog-led with exact digital time' },
-  { key: 'signal', label: 'Signal', hint: 'Largest, calm typographic time' },
-  { key: 'datebook', label: 'Datebook', hint: 'Time with local date context' },
+  { key: 'meridian', label: 'Chronograph', hint: 'Precision dial with digital time' },
+  { key: 'panorama', label: 'Orbit', hint: 'Bold time with a live seconds sweep' },
+  { key: 'split', label: 'Monogram', hint: 'Sculpted digits and a date column' },
+  { key: 'date-spine', label: 'Dashboard', hint: 'Wide time with your week at a glance' },
 ];
 const H6_CLOCK_RAIL_OPTIONS = [
   { key: 'meridian', label: 'Chronograph', hint: 'Precision dial with digital time' },
@@ -37632,10 +37632,13 @@ class Component extends DCLogic {
         cls: (widget ? config.style : config.face) === option.key ? 'on' : '',
         checked: (widget ? config.style : config.face) === option.key,
         surface: widget ? 'widget' : 'rail', size: widget ? '2x1' : 'rail',
-        widgetStyle: widget ? option.key : 'twin', railFace: widget ? 'panorama' : option.key,
+        widgetStyle: option.key, railFace: option.key,
         hourFormat: config.hourFormat, dialMarks: config.dialMarks || 'index', splitPlates: config.splitPlates || 'frost',
         spineFormat: config.dateSpineFormat || 'month-name', dateWording: config.dateWording || 'short',
-        onClick: () => this._setClockConfig(scope, widget ? 'style' : 'face', option.key),
+        onClick: () => {
+          this._setClockConfig(scope, widget ? 'style' : 'face', option.key);
+          this._closeDesktopStudio();
+        },
       })),
       clockFormatItems: ['system', '24', '12'].map((format, i) => ({label: ['Device', '24 hour', '12 hour'][i],
         cls: config.hourFormat === format ? 'on' : '', checked: config.hourFormat === format,
@@ -44077,7 +44080,7 @@ class Component extends DCLogic {
       tires: [tires.tireFrontLeft, tires.tireFrontRight, tires.tireRearLeft, tires.tireRearRight].join(' / ')
         + (tires.tiresHasAnyPressure ? ' ' + tires.tiresUnit : ''),
       clock: clock.clockTime + ' · ' + clock.clockDate,
-      wallpaper: fill === 'car' ? 'Carro 3D' : (fill === 'wallpaper' ? 'Wallpaper' : '3D + Fundo'),
+      wallpaper: fill === 'car' ? 'Modelo 3D' : (fill === 'wallpaper' ? 'Papel de Parede' : 'Ambos'),
       desktops: activeDesktopName,
       driveMode: driveModeVisual.primary,
       powerMode: powerModeVisual.primary,
@@ -44204,9 +44207,9 @@ class Component extends DCLogic {
         dateWording: bottomClock.dateWording,
       },
       wallpaper: {
-        primary: fill === 'car' ? 'Carro 3D' : (fill === 'wallpaper' ? 'Wallpaper' : '3D + Fundo'),
-        secondary: fill === 'car' ? 'EXIBE O MODELO DO SEU CARRO' : (fill === 'wallpaper' ? 'IMAGEM DE FUNDO EM TELA CHEIA' : 'MODELO 3D SOBREPOSTO'),
-        metricA: fill === 'car' ? 'DIRETAMENTE NO DISPLAY' : (fill === 'wallpaper' ? 'PERSONALIZADA OU BING DIÁRIO' : 'AO PLANO DE FUNDO ESCOLHIDO'),
+        primary: fill === 'car' ? 'Modelo 3D' : (fill === 'wallpaper' ? 'Papel de Parede' : 'Ambos'),
+        secondary: fill === 'car' ? 'Clique no modelo e arraste para mudar o angulo de visao' : 'Clique para selecionar o fundo de tela',
+        metricA: '',
         metricB: '',
         progress: fill === 'car' ? 33 : (fill === 'wallpaper' ? 66 : 100),
         state: fill,

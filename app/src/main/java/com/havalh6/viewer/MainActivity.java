@@ -3289,11 +3289,11 @@ public final class MainActivity extends Activity {
                     Math.max(3f, w * .04f), paint);
         }
 
-        private static final String GLYPH_CAR_SUV =
-                "M 5 17 C 5 18.1 5.9 19 7 19 C 8.1 19 9 18.1 9 17 C 9 15.9 8.1 15 7 15 C 5.9 15 5 15.9 5 17 "
-                + "M 16 17 C 16 18.1 16.9 19 18 19 C 19.1 19 20 18.1 20 17 C 20 15.9 19.1 15 18 15 C 16.9 15 16 15.9 16 17 "
-                + "M 5 17 L 3 17 L 3 11 L 5 6 L 14 6 L 18 11 L 19 11 C 20.1 11 21 11.9 21 13 L 21 17 L 19 17 "
-                + "M 15 17 L 8 17 M 2 11 L 17 11 M 11 11 L 11 6";
+        private static final String GLYPH_CUBE_OUTER =
+                "M 21 16.05 L 21 7.95 C 21 7.24 20.62 6.58 20 6.22 L 13 2.22 C 12.38 1.86 11.62 1.86 11 2.22 L 4 6.22 C 3.38 6.58 3 7.24 3 7.95 L 3 16.15 C 3 16.86 3.38 17.52 4 17.88 L 11 21.88 C 11.62 22.24 12.38 22.24 13 21.88 L 20 17.88 C 20.62 17.52 21 16.86 21 16.15 Z";
+
+        private static final String GLYPH_CUBE_AXES =
+                "M 3.27 6.96 L 12 12 L 20.73 6.96 M 12 22.08 L 12 12";
 
         private static final String GLYPH_PHOTO =
                 "M 15 8 L 15.01 8 M 3 6 C 3 4.34 4.34 3 6 3 L 18 3 C 19.66 3 21 4.34 21 6 L 21 18 C 21 19.66 19.66 21 18 21 L 6 21 C 4.34 21 3 19.66 3 18 L 3 6 Z "
@@ -3315,11 +3315,9 @@ public final class MainActivity extends Activity {
             float strokeWidth = Math.max(2f, size * .085f);
 
             if ("car".equals(state)) {
-                // State 1: 3D Car Only -> Tabler SUV
-                drawGlyphPath(c, GLYPH_CAR_SUV, cx, cy, size, strong, strokeWidth);
-                // Subtle accent underglow / tire contact
-                stroke(accent, Math.max(1.5f, size * .055f));
-                c.drawLine(cx - size * .38f, cy + size * .32f, cx + size * .38f, cy + size * .32f, paint);
+                // State 1: 3D Model Only -> Pure Isometric 3D Cube with accent perspective axes
+                drawGlyphPath(c, GLYPH_CUBE_OUTER, cx, cy, size, strong, strokeWidth);
+                drawGlyphPath(c, GLYPH_CUBE_AXES, cx, cy, size, accent, strokeWidth);
             } else if ("wallpaper".equals(state)) {
                 // State 2: Wallpaper Only -> Tabler Photo
                 drawGlyphPath(c, GLYPH_PHOTO, cx, cy, size, strong, strokeWidth);
@@ -8906,7 +8904,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView primary = new android.widget.TextView(this);
         primary.setTag("quickValue");
         primary.setText(quickVisualPrimaryText(descriptor));
-        primary.setTextSize("clock".equals(descriptor.id) || "consumption".equals(descriptor.id) ? 24f : 21f);
+        primary.setTextSize("clock".equals(descriptor.id) || "consumption".equals(descriptor.id) ? 24f : ("wallpaper".equals(descriptor.id) ? 18.5f : 21f));
         primary.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         primary.setTextColor(dockLabelColor());
@@ -8923,7 +8921,7 @@ public final class MainActivity extends Activity {
         // The source badge is long and must never ellipsise into something that
         // reads like a different claim ("DEMO · SIMULATED · NOT VEHICLE..." is
         // not the same statement).
-        detail.setMaxLines("power".equals(descriptor.id) || DRIVING_CARD_IDS.contains(descriptor.id) ? 4 : 3);
+        detail.setMaxLines("power".equals(descriptor.id) || DRIVING_CARD_IDS.contains(descriptor.id) || "wallpaper".equals(descriptor.id) ? 4 : 3);
         detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
@@ -9004,6 +9002,7 @@ public final class MainActivity extends Activity {
         if ("roof".equals(id)) return 286;
         if ("status".equals(id) || "tires".equals(id)) return 270;
         if ("range".equals(id) || "consumption".equals(id)) return 258;
+        if ("wallpaper".equals(id)) return 248;
         if ("clock".equals(id)) return 224;
         return 238;
     }
