@@ -3275,165 +3275,63 @@ public final class MainActivity extends Activity {
                     Math.max(3f, w * .04f), paint);
         }
 
+        private static final String GLYPH_CAR_SUV =
+                "M 5 17 C 5 18.1 5.9 19 7 19 C 8.1 19 9 18.1 9 17 C 9 15.9 8.1 15 7 15 C 5.9 15 5 15.9 5 17 "
+                + "M 16 17 C 16 18.1 16.9 19 18 19 C 19.1 19 20 18.1 20 17 C 20 15.9 19.1 15 18 15 C 16.9 15 16 15.9 16 17 "
+                + "M 5 17 L 3 17 L 3 11 L 5 6 L 14 6 L 18 11 L 19 11 C 20.1 11 21 11.9 21 13 L 21 17 L 19 17 "
+                + "M 15 17 L 8 17 M 2 11 L 17 11 M 11 11 L 11 6";
+
+        private static final String GLYPH_PHOTO =
+                "M 15 8 L 15.01 8 M 3 6 C 3 4.34 4.34 3 6 3 L 18 3 C 19.66 3 21 4.34 21 6 L 21 18 C 21 19.66 19.66 21 18 21 L 6 21 C 4.34 21 3 19.66 3 18 L 3 6 Z "
+                + "M 3 16 L 8 11 C 8.93 10.11 10.07 10.11 11 11 L 16 16 M 14 14 L 15 13 C 15.93 12.11 17.07 12.11 18 13 L 21 16";
+
+        private static final String GLYPH_LAYER_BACK =
+                "M 8 6 C 8 4.9 8.9 4 10 4 L 18 4 C 19.1 4 20 4.9 20 6 L 20 14 C 20 15.1 19.1 16 18 16 L 10 16 C 8.9 16 8 15.1 8 14 Z";
+
+        private static final String GLYPH_LAYER_FRONT =
+                "M 4 10 C 4 8.9 4.9 8 6 8 L 14 8 C 15.1 8 16 8.9 16 10 L 16 18 C 16 19.1 15.1 20 14 20 L 6 20 C 4.9 20 4 19.1 4 18 Z";
+
         private void drawWallpaper(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
             String state = descriptor != null && descriptor.state != null ? descriptor.state : "car";
             int prog = descriptor != null ? descriptor.progress : 33;
-            float strokeW = Math.max(1.8f, w * .030f);
+            float cx = w * .5f;
+            float cy = h * .44f;
+            float size = Math.min(w, h) * .68f;
+            float strokeWidth = Math.max(2f, size * .085f);
 
             if ("car".equals(state)) {
-                // STATE 1: 3D Car Only
-                // Perspective ground ring / orbital floor
-                oval.set(w * .12f, h * .60f, w * .88f, h * .80f);
-                stroke(withAlpha(accent, 0xAA), Math.max(1.4f, w * .022f));
-                c.drawOval(oval, paint);
-
-                // 3D Perspective SUV silhouette
-                android.graphics.Path car = new android.graphics.Path();
-                car.moveTo(w * .34f, h * .44f);
-                car.lineTo(w * .42f, h * .30f);
-                car.lineTo(w * .64f, h * .30f);
-                car.lineTo(w * .75f, h * .42f);
-                car.lineTo(w * .84f, h * .47f);
-                car.lineTo(w * .86f, h * .55f);
-                car.lineTo(w * .73f, h * .60f);
-                car.lineTo(w * .27f, h * .60f);
-                car.lineTo(w * .22f, h * .54f);
-                car.lineTo(w * .23f, h * .46f);
-                car.close();
-
-                fill(withAlpha(muted, 0x24));
-                c.drawPath(car, paint);
-                stroke(strong, strokeW);
-                c.drawPath(car, paint);
-
-                // Center B-pillar divider
-                stroke(withAlpha(muted, 0x88), Math.max(1.2f, w * .020f));
-                c.drawLine(w * .51f, h * .30f, w * .51f, h * .44f, paint);
-
-                // Front headlight accent glow
-                fill(accent);
-                oval.set(w * .78f, h * .48f, w * .84f, h * .53f);
-                c.drawOval(oval, paint);
-
-                // Wheels
-                float wheelR = Math.max(2.8f, w * .055f);
-                fill(withAlpha(muted, 0x40));
-                c.drawCircle(w * .36f, h * .62f, wheelR, paint);
-                c.drawCircle(w * .75f, h * .62f, wheelR, paint);
-                stroke(strong, strokeW);
-                c.drawCircle(w * .36f, h * .62f, wheelR, paint);
-                c.drawCircle(w * .75f, h * .62f, wheelR, paint);
-
-                // Accent side character line
-                stroke(accent, Math.max(1.4f, w * .022f));
-                c.drawLine(w * .41f, h * .52f, w * .68f, h * .52f, paint);
-
+                // State 1: 3D Car Only -> Tabler SUV
+                drawGlyphPath(c, GLYPH_CAR_SUV, cx, cy, size, strong, strokeWidth);
+                // Subtle accent underglow / tire contact
+                stroke(accent, Math.max(1.5f, size * .055f));
+                c.drawLine(cx - size * .38f, cy + size * .32f, cx + size * .38f, cy + size * .32f, paint);
             } else if ("wallpaper".equals(state)) {
-                // STATE 2: Wallpaper Only
-                float padX = w * .14f, top = h * .20f, bottom = h * .68f;
-                float left = padX, right = w - padX;
-                float r = w * .06f;
-
-                // Ultrawide display frame
-                stroke(muted, strokeW);
-                c.drawRoundRect(left, top, right, bottom, r, r, paint);
-
-                // Sun / horizon glow
-                float sunR = (bottom - top) * .18f;
-                fill(withAlpha(accent, 0x33));
-                c.drawCircle(left + (right - left) * .32f, top + (bottom - top) * .38f, sunR * 1.5f, paint);
+                // State 2: Wallpaper Only -> Tabler Photo
+                drawGlyphPath(c, GLYPH_PHOTO, cx, cy, size, strong, strokeWidth);
+                // Glowing accent sun dot at (15, 8) on 24x24 grid
+                float sunX = cx + size * ((15f - 12f) / 24f);
+                float sunY = cy + size * ((8f - 12f) / 24f);
                 fill(accent);
-                c.drawCircle(left + (right - left) * .32f, top + (bottom - top) * .38f, sunR, paint);
-
-                // Geometric mountain ridges
-                android.graphics.Path hills = new android.graphics.Path();
-                float baseW = right - left;
-                float baseH = bottom - top;
-                hills.moveTo(left + strokeW, bottom - strokeW);
-                hills.lineTo(left + baseW * .28f, top + baseH * .38f);
-                hills.lineTo(left + baseW * .48f, top + baseH * .62f);
-                hills.lineTo(left + baseW * .68f, top + baseH * .34f);
-                hills.lineTo(right - strokeW, bottom - strokeW);
-                stroke(strong, strokeW);
-                c.drawPath(hills, paint);
-
-                // Secondary subtle peak
-                android.graphics.Path subHill = new android.graphics.Path();
-                subHill.moveTo(left + baseW * .48f, top + baseH * .62f);
-                subHill.lineTo(left + baseW * .58f, top + baseH * .50f);
-                subHill.lineTo(left + baseW * .74f, top + baseH * .66f);
-                stroke(withAlpha(muted, 0x88), Math.max(1.2f, w * .020f));
-                c.drawPath(subHill, paint);
-
+                c.drawCircle(sunX, sunY, Math.max(2.5f, size * .095f), paint);
             } else {
-                // STATE 3: Both (3D Car layered over Wallpaper)
-                float padX = w * .14f, top = h * .17f, bottom = h * .63f;
-                float left = padX, right = w - padX;
-                float r = w * .06f;
+                // State 3: Both -> Tabler Layers Intersect
+                // Upper-right layer (wallpaper) in muted with accent dot
+                drawGlyphPath(c, GLYPH_LAYER_BACK, cx, cy, size, withAlpha(muted, 0xC8), strokeWidth);
+                float sunDotX = cx + size * ((14f - 12f) / 24f);
+                float sunDotY = cy + size * ((8.5f - 12f) / 24f);
+                fill(withAlpha(accent, 0xDD));
+                c.drawCircle(sunDotX, sunDotY, Math.max(2f, size * .075f), paint);
 
-                // Background wallpaper frame (softened)
-                stroke(withAlpha(muted, 0x88), strokeW * .9f);
-                c.drawRoundRect(left, top, right, bottom, r, r, paint);
+                // Lower-left layer (3D car model) in strong
+                drawGlyphPath(c, GLYPH_LAYER_FRONT, cx, cy, size, strong, strokeWidth);
 
-                // Background sun (accent)
-                float sunR = (bottom - top) * .16f;
-                fill(withAlpha(accent, 0xCC));
-                c.drawCircle(left + (right - left) * .28f, top + (bottom - top) * .36f, sunR, paint);
-
-                // Background mountain range (muted)
-                android.graphics.Path bgHills = new android.graphics.Path();
-                float baseW = right - left;
-                float baseH = bottom - top;
-                bgHills.moveTo(left + strokeW, bottom - strokeW);
-                bgHills.lineTo(left + baseW * .24f, top + baseH * .42f);
-                bgHills.lineTo(left + baseW * .42f, top + baseH * .60f);
-                bgHills.lineTo(left + baseW * .60f, top + baseH * .38f);
-                bgHills.lineTo(right - strokeW, bottom - strokeW);
-                stroke(withAlpha(muted, 0x99), strokeW * .9f);
-                c.drawPath(bgHills, paint);
-
-                // Foreground 3D SUV (sharp & prominent in foreground)
-                android.graphics.Path fgCar = new android.graphics.Path();
-                fgCar.moveTo(w * .38f, h * .50f);
-                fgCar.lineTo(w * .45f, h * .38f);
-                fgCar.lineTo(w * .65f, h * .38f);
-                fgCar.lineTo(w * .75f, h * .48f);
-                fgCar.lineTo(w * .84f, h * .53f);
-                fgCar.lineTo(w * .85f, h * .60f);
-                fgCar.lineTo(w * .74f, h * .66f);
-                fgCar.lineTo(w * .32f, h * .66f);
-                fgCar.lineTo(w * .27f, h * .60f);
-                fgCar.lineTo(w * .28f, h * .52f);
-                fgCar.close();
-
-                // Mask background under the car
-                fill(dockUiLight ? 0xF2FFFFFF : 0xF2121720);
-                c.drawPath(fgCar, paint);
-                stroke(strong, strokeW);
-                c.drawPath(fgCar, paint);
-
-                // Front headlight
-                fill(accent);
-                oval.set(w * .78f, h * .54f, w * .83f, h * .58f);
-                c.drawOval(oval, paint);
-
-                // Foreground Wheels
-                float wheelR = Math.max(2.6f, w * .050f);
-                fill(dockUiLight ? 0xFFFFFFFF : 0xFF161D27);
-                c.drawCircle(w * .40f, h * .67f, wheelR, paint);
-                c.drawCircle(w * .75f, h * .67f, wheelR, paint);
-                stroke(strong, strokeW);
-                c.drawCircle(w * .40f, h * .67f, wheelR, paint);
-                c.drawCircle(w * .75f, h * .67f, wheelR, paint);
-
-                // Foreground accent side contour
-                stroke(accent, Math.max(1.4f, w * .022f));
-                c.drawLine(w * .44f, h * .58f, w * .69f, h * .58f, paint);
-
-                // Shadow grounding the car
-                stroke(withAlpha(accent, 0x66), Math.max(1.2f, w * .018f));
-                c.drawLine(w * .24f, h * .74f, w * .88f, h * .74f, paint);
+                // Accent inner tick / layer marker in front layer
+                stroke(accent, Math.max(1.8f, size * .075f));
+                float fL = cx + size * ((6.5f - 12f) / 24f);
+                float fR = cx + size * ((11.5f - 12f) / 24f);
+                float fY = cy + size * ((15f - 12f) / 24f);
+                c.drawLine(fL, fY, fR, fY, paint);
             }
 
             // 3-step indicator dots at bottom: 3D -> Wallpaper -> Both
