@@ -180,7 +180,21 @@ public final class MainActivity extends Activity {
                     "car.hvac.driver_temperature",
                     "car.hvac.cycle_mode",
                     "car.hvac.auto_enable",
-                    "car.hvac.anion_enable"
+                    "car.hvac.anion_enable",
+                    // CLIMA popup; Impulse allows these since 27a0c09c.
+                    "car.hvac.pass_temperature",
+                    "car.hvac.blower_mode",
+                    "car.hvac.sync_enable",
+                    "car.hvac.ac_enable",
+                    "car.hvac.front_defrost_enable",
+                    "car.hvac.rear_defrost_enable",
+                    "car.hvac.aqs_enable",
+                    "car.hvac.heating_enable",
+                    "car.hvac.setting.comfort_curve",
+                    "car.hvac.setting.auto_defrost_enable",
+                    "car.hvac.setting.limit_enable",
+                    "car.comfort_setting.driver_seat_ventilation_level",
+                    "car.comfort_setting.passenger_seat_ventilation_level"
             ));
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final String ASSET_HOST = "appassets.androidplatform.net";
@@ -190,7 +204,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v59-range-oem-fallback";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v60-clima-live";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -10913,7 +10927,9 @@ public final class MainActivity extends Activity {
             String dateWording = sanitizeClockOption(raw.optString("dateWording", "short"),
                     new String[] {"short", "long"}, "short");
             if ("power".equals(id)) glyphText = sanitizePowerDirections(raw.optString("glyphText", ""));
-            String state = "range".equals(id)
+            String state = ("wallpaper".equals(id) || "desktops".equals(id))
+                    ? raw.optString("state", "car")
+                    : ("range".equals(id)
                     ? ("gauge".equalsIgnoreCase(raw.optString("state", "")) ? "gauge" : "linear")
                     : ("tires".equals(id)
                     ? sanitizeTiresState(raw.optString("state",
@@ -10922,7 +10938,7 @@ public final class MainActivity extends Activity {
                             : ("power".equals(id) ? sanitizePowerState(raw.optString("state", "unavailable"))
                             : ("navigation".equals(id) ? sanitizeNavigationState(raw.optString("state", "unavailable"))
                             : (DRIVING_CARD_IDS.contains(id)
-                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : "")))));
+                                    ? sanitizeDrivingState(raw.optString("state", "unknown")) : ""))))));
             String[] wheelStates = ("tires".equals(id) || "status".equals(id))
                     ? sanitizeWheelStates(raw.optString("wheelStates",
                             raw.optString("tireWheelStates", "")))

@@ -91,11 +91,14 @@ const CHECKS = {
       && pop.includes("consumptionHistShowData: wide || histView === 'data'")
       && html.includes("this._consumptionWidgetView(entry.item, 'popup')");
   },
-  // Owner, 2026-09-14: zoom buttons only on the maximised map; the pane pans,
-  // pinches and opens the full map on a tap.
-  'zoom buttons only on the maximised map': ({ html }) => {
+  // Owner, 2026-09-19: no + / - anywhere (pinch and wheel zoom); both maps offer
+  // fit-the-route once the view has moved; the pane opens the full map on a tap.
+  'no zoom buttons, fit on the full map, tap opens it': ({ html }) => {
     const body = method(html, '_energyMapCreate') || '';
-    return /if \(maxMode\) \{\s*button\(H6_ENERGY_ICONS\.add,/.test(body) && /if \(tap && !maxMode\) this\._setEnergyMapMax\(true\);/.test(body);
+    return !body.includes('H6_ENERGY_ICONS.add') && !body.includes('H6_ENERGY_ICONS.remove')
+      && /followBtn = button\(H6_ENERGY_ICONS\.fitScreen,/.test(body)
+      && /followBtn\.style\.display = moved\(\) \? '' : 'none';/.test(body)
+      && /if \(tap && !maxMode\) this\._setEnergyMapMax\(true\);/.test(body);
   },
   // FINALIZAR VIAGEM ends a trip for good: the button only opens a confirmation.
   'finishing a trip asks for confirmation': ({ html }) => {
@@ -138,7 +141,9 @@ const MUTANTS = {
     "credit.textContent = '© OpenStreetMap contributors';", "credit.textContent = '';") }),
   'wide widget shows both panes': (s) => ({ ...s, html: s.html.replace(
     "consumptionTripShowData: !!t && (wide || tripView === 'data')", "consumptionTripShowData: !!t && tripView === 'data'") }),
-  'zoom buttons only on the maximised map': (s) => ({ ...s, html: s.html.replace('    if (maxMode) {\n      button(', '    if (true) {\n      button(') }),
+  'no zoom buttons, fit on the full map, tap opens it': (s) => ({ ...s, html: s.html.replace(
+    "    followBtn = button(H6_ENERGY_ICONS.fitScreen,",
+    "    button(H6_ENERGY_ICONS.add, 'Aproximar', () => zoomAt(1));\n    followBtn = button(H6_ENERGY_ICONS.fitScreen,") }),
   'finishing a trip asks for confirmation': (s) => ({ ...s, html: s.html.replace(
     '    this._uiOnlySetState({ energyFinishConfirm: true });', '    this._confirmFinishEnergyTrip(ev);') }),
 };

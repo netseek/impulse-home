@@ -87,7 +87,22 @@ const SCENARIOS = {
   'no fuel trace while the engine is off': ({ chart }) => {
     const s = series(60, (i) => ({ kw: 10, kmh: 50, fuel: 7, ice: i < 30 }));
     const v = chart(s, NOW, { kind: 'time', span: 600000, points: 0 });
-    assert.equal((v.fuel.match(/L/g) || []).length, 29);
+    // 30 engine-on points, then one drop back to 0 where the engine stops.
+    assert.equal((v.fuel.match(/L/g) || []).length, 30);
+    const zeroY = v.zero.split(' ')[1];
+    assert.ok(v.fuel.trim().endsWith(' ' + zeroY), v.fuel.slice(-30));
+  },
+  'fuel 0 sits on the kW zero line': ({ chart }) => {
+    const s = series(10, () => ({ kw: 10, kmh: 50, fuel: 0, ice: true }));
+    const v = chart(s, NOW, { kind: 'time', span: 600000, points: 0 });
+    const zeroY = v.zero.split(' ')[1];
+    assert.ok(v.fuel.includes(' ' + zeroY), v.fuel.slice(0, 40) + ' vs ' + zeroY);
+  },
+  'smooth densities draw curves, the finest does not': ({ chart }) => {
+    const s = series(600, (i) => ({ kw: 20 * Math.sin(i / 20), kmh: 50 }));
+    const soft = chart(s, NOW, { kind: 'time', span: 600000, points: 40, smooth: true });
+    const fine = chart(s, NOW, { kind: 'time', span: 600000, points: 300, smooth: false });
+    assert.ok(soft.drive.includes(' C') && !fine.drive.includes(' C'));
   },
   'a level that fell shows the used part from the start': ({ level }) => {
     const v = level(72, 58, 'ev', 34);
@@ -133,6 +148,9 @@ const MUTANTS = {
   'electric share over all distance': ['evShare: knownKm >= 0.05 ? evKm / knownKm : NaN,', 'evShare: km >= 0.05 ? evKm / km : NaN,'],
   'kW scale floor removed': ['const hi = Math.max(40, Math.ceil(maxKw / 20) * 20);', 'const hi = Math.max(0, Math.ceil(maxKw / 20) * 20);'],
   'fuel drawn with the engine off': ['fuel: s.ice === false ? NaN : s.fuel,', 'fuel: s.fuel,'],
+  'fuel scale off the zero line': ['const yf = (f) => (zeroY - Math.max(0, Math.min(20, f)) / 20 * zeroY).toFixed(1);', 'const yf = (f) => ((20 - Math.max(0, Math.min(20, f))) / 20 * H).toFixed(1);'],
+  'smoothing never applied': ['if (!spec.smooth || xy.length < 3)', 'if (true)'],
+  'fuel run left floating': ['if (after) xy.push([Number(x(after)), z]);', ''],
   'old samples kept': [': (s) => s.t > now - SPAN;', ': (s) => true;'],
   'gain and used swapped': ["deltaClass: n > s ? 'gain' : 'used',", "deltaClass: n > s ? 'used' : 'gain',"],
   'fuel integrated per second instead of per km': ['if (isFinite(b.fuel)) fuelL += b.fuel * dkm / 100;', 'if (isFinite(b.fuel)) fuelL += b.fuel * dt / 100000;'],

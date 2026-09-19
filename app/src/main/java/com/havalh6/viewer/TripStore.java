@@ -477,6 +477,32 @@ final class TripStore extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Every refuel and charge since {@code fromMs}, oldest first, with the levels
+     * either side: the page prices them (asking the driver) and blends each into
+     * what was left in the tank or pack.
+     */
+    String stopsJson(long fromMs) {
+        JSONArray out = new JSONArray();
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT kind, t, start_ms, level_before, level_after, amount FROM trip_stops WHERE t >= ? ORDER BY t",
+                new String[]{String.valueOf(fromMs)})) {
+            while (c.moveToNext()) {
+                JSONObject o = new JSONObject();
+                o.put("kind", c.getString(0));
+                o.put("t", c.getLong(1));
+                o.put("startMs", c.getLong(2));
+                o.put("before", real(c, 3));
+                o.put("after", real(c, 4));
+                o.put("amount", real(c, 5));
+                out.put(o);
+            }
+        } catch (JSONException e) {
+            return "[]";
+        }
+        return out.toString();
+    }
+
     private static double round(double v, int decimals) {
         double k = Math.pow(10, decimals);
         return Math.round(v * k) / k;

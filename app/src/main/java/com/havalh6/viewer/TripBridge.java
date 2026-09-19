@@ -96,6 +96,16 @@ final class TripBridge {
         recorder.finishTrip();
     }
 
+    /** Each refuel and charge since {@code fromMs} (as a string: see getTrip), oldest first. */
+    @JavascriptInterface
+    public String getStops(String fromMs) {
+        try {
+            return recorder.stopsJson(Long.parseLong(fromMs.trim()));
+        } catch (RuntimeException e) {
+            return "[]";
+        }
+    }
+
     /** Refuels and charges since {@code fromMs} (as a string: see getTrip): counts and level points added. */
     @JavascriptInterface
     public String getStopTotals(String fromMs) {
