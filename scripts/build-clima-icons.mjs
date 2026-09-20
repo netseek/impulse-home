@@ -24,6 +24,7 @@ const ICONS = {
   ac: 'air-conditioner',
   auto: 'fan-auto',
   sync: 'sync',
+  link: 'link-variant',
   recirc: 'autorenew',
   front: 'car-defrost-front',
   rear: 'car-defrost-rear',
