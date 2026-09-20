@@ -5242,6 +5242,9 @@ window.HavalSplash = (function () {
     .hv-clim svg.ci { width: 26px; height: 26px; fill: currentColor; flex: none; }
     .hv-clim button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
     .hv-clim .pending { animation: hv-clim-pend .8s ease-in-out infinite alternate; }
+    /* sent, not echoed yet: a slower, softer pulse while we try once more */
+    .hv-clim .pending.retry { animation: hv-clim-retry 1.1s ease-in-out infinite; }
+    @keyframes hv-clim-retry { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
     @keyframes hv-clim-pend { from { opacity: .45; } to { opacity: 1; } }
     .hv-clim.off .hv-clim-live, .hv-clim.nosig .hv-clim-live, .hv-clim.nosig [data-ca="power"] { opacity: .3; pointer-events: none; }
 
@@ -5324,7 +5327,7 @@ window.HavalSplash = (function () {
     .hv-clim-togs .hv-clim-ib[data-ca="power"].on::after { background: var(--clim-good); }
 
     /* wide side: AR across the top, AUTOMÁTICO across the bottom */
-    .hv-clim-side { display: none; min-width: 0; grid-template-rows: auto 1fr; row-gap: 10px; padding-left: 22px; border-left: 1px solid var(--clim-edge); }
+    .hv-clim-side { display: none; min-width: 0; grid-template-rows: auto 1fr auto; row-gap: 10px; padding-left: 22px; border-left: 1px solid var(--clim-edge); }
     .hv-clim-pop.wide .hv-clim-side { display: grid; }
     .hv-clim-sec { min-width: 0; }
     .hv-clim-colhead { display: flex; align-items: center; gap: 10px; height: 30px; }
@@ -5337,6 +5340,9 @@ window.HavalSplash = (function () {
     .hv-clim-airrow .hv-clim-ib { min-width: 74px; }
     .hv-clim-airrow .hv-clim-ib::after { display: none; }
     .hv-clim-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: 26px; align-content: start; }
+    .hv-clim-comfort { display: flex; align-items: center; gap: 16px; min-height: 56px; padding-top: 6px; border-top: 1px solid var(--clim-edge); }
+    .hv-clim-comfort .k { flex: 1; min-width: 0; font: 500 12.5px/1.2 'Space Grotesk',sans-serif; letter-spacing: .07em; text-transform: uppercase; }
+    .hv-clim-comfort .k small { display: block; margin-top: 3px; font: 400 11px/1.25 'Space Grotesk',sans-serif; letter-spacing: 0; text-transform: none; opacity: .6; }
     .hv-clim-row { width: 100%; text-align: left; display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--clim-edge) !important; }
     .hv-clim-row .k { flex: 1; min-width: 0; font: 500 12.5px/1.2 'Space Grotesk',sans-serif; letter-spacing: .07em; text-transform: uppercase; }
     .hv-clim-row .k small { display: block; margin-top: 3px; font: 400 11px/1.25 'Space Grotesk',sans-serif; letter-spacing: 0; text-transform: none; opacity: .6; }
@@ -7384,13 +7390,14 @@ window.HavalSplash = (function () {
           <section class="hv-clim-sec">
             <div class="hv-clim-colhead"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 13C6.14 13 4.59 14.28 4.14 16H2V18H4.14C4.59 19.72 6.14 21 8 21S11.41 19.72 11.86 18H22V16H11.86C11.41 14.28 9.86 13 8 13M8 19C6.9 19 6 18.1 6 17C6 15.9 6.9 15 8 15S10 15.9 10 17C10 18.1 9.1 19 8 19M19.86 6C19.41 4.28 17.86 3 16 3S12.59 4.28 12.14 6H2V8H12.14C12.59 9.72 14.14 11 16 11S19.41 9.72 19.86 8H22V6H19.86M16 9C14.9 9 14 8.1 14 7C14 5.9 14.9 5 16 5S18 5.9 18 7C18 8.1 17.1 9 16 9Z"></path></svg><span class="cap">AUTOMÁTICO</span></div>
             <div class="hv-clim-rows">
-              <div class="hv-clim-row" data-cp="comfort"><span class="k">Conforto<small>Intensidade do modo AUTO</small></span><div class="hv-clim-seg"><button type="button" data-ca="comfort" data-ccomfort="1">ECO</button><button type="button" data-ca="comfort" data-ccomfort="2">PADRÃO</button><button type="button" data-ca="comfort" data-ccomfort="3">FORTE</button></div></div>
+              
               <button type="button" class="hv-clim-row" data-ca="toggle" data-ct="autoDefrost" data-cp="autoDefrost"><span class="k">Desembaçamento automático</span><span class="hv-clim-sw"></span></button>
               <button type="button" class="hv-clim-row" data-ca="toggle" data-ct="limit" data-cp="limit"><span class="k">Limite de bateria<small>Desliga frio e calor com a bateria baixa</small></span><span class="hv-clim-sw"></span></button>
               <button type="button" class="hv-clim-row" data-ca="pref" data-ct="maxAcUnlock" data-cp="maxAcUnlock"><span class="k">Máx. A/C ao destravar<small>Impulse: resfria a cabine quente ao abrir o carro</small></span><span class="hv-clim-sw"></span></button>
               <button type="button" class="hv-clim-row" data-ca="pref" data-ct="ventWithAc" data-cp="ventWithAc"><span class="k">Ventilar bancos com o A/C<small>Impulse: liga a ventilação junto do A/C</small></span><span class="hv-clim-sw"></span></button>
             </div>
           </section>
+          <section class="hv-clim-sec hv-clim-bottom"><div class="hv-clim-comfort"><span class="k">CONFORTO<small>Intensidade do modo AUTO</small></span><div class="hv-clim-seg"><button type="button" data-ca="comfort" data-ccomfort="1">ECO</button><button type="button" data-ca="comfort" data-ccomfort="2">PADRÃO</button><button type="button" data-ca="comfort" data-ccomfort="3">FORTE</button></div></div></section>
         </aside>
       </div>
     </sc-if>
@@ -8653,7 +8660,9 @@ const CAR_HVAC_FIELD = Object.keys(CAR_HVAC).reduce((m, f) => { m[CAR_HVAC[f]] =
 const CLIM_BOOL = { power: 1, auto: 1, sync: 1, ac: 1, front: 1, rear: 1, anion: 1, aqs: 1, heating: 1, autoDefrost: 1, limit: 1, maxAcUnlock: 1, ventWithAc: 1 };
 // Long enough for a round trip through Impulse and the bus; a write that never
 // echoes reverts to what the car last said instead of showing a value it lacks.
-const CLIM_PENDING_MS = 4000;
+const CLIM_PENDING_MS = 6000;
+// One write, then two chances for the car to echo it before the screen gives in.
+const CLIM_CONFIRM_MS = 2000;
 // Weather for the rail card: refreshed every half hour, dropped after a day.
 const WEATHER_TTL_MS = 30 * 60 * 1000;
 const WEATHER_STALE_MS = 24 * 60 * 60 * 1000;
@@ -38949,9 +38958,10 @@ class Component extends DCLogic {
     const c = this._climModel();
     const out = Object.assign({}, c);
     const now = Date.now();
+    const held = this._climHold || {};
     Object.keys(this._climPend).forEach((f) => {
       const p = this._climPend[f];
-      if (!p.staged && now - p.at > CLIM_PENDING_MS) { delete this._climPend[f]; return; }
+      if (!p.staged && !held[f] && now - p.at > CLIM_PENDING_MS) { delete this._climPend[f]; return; }
       out[f] = p.v;
     });
     return out;
@@ -38970,16 +38980,62 @@ class Component extends DCLogic {
     return src === 'live' && !!window.TelemetryBridge && typeof window.TelemetryBridge.setCarData === 'function';
   }
 
-  /** Show a value now; send it after a short quiet period (taps and drags coalesce). */
-  _climStage(field, v) {
+  /**
+   * Show a value now and send it once the gesture settles.
+   *
+   * A drag HOLDS the field: nothing is sent while the finger is down, and
+   * _climPaint leaves that field alone, so a value arriving from the car
+   * mid-swipe cannot pull the number out from under the finger. Taps coalesce
+   * through the same timer, which is why two quick taps are one write.
+   */
+  _climStage(field, v, hold) {
     if (!this._climCanWrite()) return;
     this._climModel();
+    if (!this._climHold) this._climHold = {};
+    if (hold) this._climHold[field] = true;
     this._climPend[field] = { v, at: Date.now(), staged: true };
     if (field === 'driver' && this._climView().sync) this._climPend.pass = { v, at: Date.now(), staged: true };
     this._climPaint(true);
     clearTimeout(this._climStageTimer && this._climStageTimer[field]);
     if (!this._climStageTimer) this._climStageTimer = {};
-    this._climStageTimer[field] = setTimeout(() => this._climSend(field), 380);
+    if (hold) return;
+    this._climStageTimer[field] = setTimeout(() => this._climSend(field), 320);
+  }
+
+  /** Finger up: release the hold and send what the gesture landed on. */
+  _climRelease(field) {
+    if (this._climHold) delete this._climHold[field];
+    const p = this._climPend && this._climPend[field];
+    if (p && p.staged) this._climSend(field);
+    else this._climPaint(true);
+  }
+
+  /**
+   * The bus is reliable but not instant. Give it CLIM_CONFIRM_MS, then blink
+   * the readout and send once more, then give it that long again — and if the
+   * car still reports something else, believe the car rather than the screen.
+   */
+  _climWatchConfirm(field, v, attempt) {
+    clearTimeout(this._climWatch && this._climWatch[field]);
+    if (!this._climWatch) this._climWatch = {};
+    this._climWatch[field] = setTimeout(() => {
+      const conf = this._climModel()[field];
+      const pend = this._climPend[field];
+      if (!pend || this._climSame(field, conf, v)) { delete this._climPend[field]; this._climPaint(true); return; }
+      if (attempt === 0) {
+        pend.retry = true;
+        this._climPaint(true);
+        if (this._climSource() === 'demo') setTimeout(() => this._climDemoEcho(field, v), 200);
+        else {
+          const kv = this._climKeyValue(field, v);
+          try { window.TelemetryBridge.setCarData(kv[0], kv[1]); } catch (e) {}
+        }
+        this._climWatchConfirm(field, v, 1);
+        return;
+      }
+      delete this._climPend[field];
+      this._climPaint(true);
+    }, CLIM_CONFIRM_MS);
   }
 
   _climSend(field) {
@@ -38991,15 +39047,16 @@ class Component extends DCLogic {
     if (field === 'driver' && this._climPend.pass && this._climPend.pass.staged) {
       this._climPend.pass.staged = false; this._climPend.pass.at = at;
     }
-    setTimeout(() => this._climPaint(true), CLIM_PENDING_MS + 60);
     if (this._climSource() === 'demo') {
       setTimeout(() => this._climDemoEcho(field, v), 260);
+      this._climWatchConfirm(field, v, 0);
       this._climPaint(true);
       return;
     }
     const kv = this._climKeyValue(field, v);
     try { window.TelemetryBridge.setCarData(kv[0], kv[1]); }
     catch (e) { console.warn('[clima] setCarData failed', kv[0], kv[1], e); }
+    this._climWatchConfirm(field, v, 0);
     this._climPaint(true);
   }
 
@@ -39070,7 +39127,9 @@ class Component extends DCLogic {
       const air = CLIM_AIR_MODES.find((m) => m.v === v.blower);
       root.setAttribute('data-air', on ? (air ? air.id : 'face') : 'none');
       const fmt = (x) => (src === 'nosignal' ? '—' : this._climFmtTemp(x));
+      const held = this._climHold || {};
       ['driver', 'pass'].forEach((zone) => {
+        if (held[zone]) return;
         const t = v[zone];
         setHtml(root, '[data-cv="' + zone + '"]', fmt(t));
         // The wheel's neighbours are what say "you can swipe this".
@@ -39083,7 +39142,7 @@ class Component extends DCLogic {
       setText(root, '[data-cv="mode"]', src === 'nosignal' ? 'SEM SINAL DO CARRO'
         : (!v.power ? 'DESLIGADO' : (v.auto ? 'AUTOMÁTICO' : 'MANUAL')) + (src === 'demo' ? ' · DEMO' : ''));
       const fanMax = v.fanMax || 7;
-      root.querySelectorAll('[data-cfan] i').forEach((n, i) => {
+      if (!held.fan) root.querySelectorAll('[data-cfan] i').forEach((n, i) => {
         n.style.display = i < fanMax ? '' : 'none';
         n.classList.toggle('on', on && i < (v.fan || 0));
       });
@@ -39104,7 +39163,11 @@ class Component extends DCLogic {
       const pmOk = v.pm != null && isFinite(v.pm) && on;
       setText(root, '[data-cv="pm"]', pmOk ? String(Math.round(v.pm)) : '—');
       setText(root, '[data-cv="pmq"]', !pmOk ? '' : (v.pm <= 12 ? 'EXCELENTE' : (v.pm <= 35 ? 'BOM' : (v.pm <= 75 ? 'MODERADO' : 'RUIM'))));
-      root.querySelectorAll('[data-cp]').forEach((n) => n.classList.toggle('pending', !!pend[n.getAttribute('data-cp')]));
+      root.querySelectorAll('[data-cp]').forEach((n) => {
+        const f = n.getAttribute('data-cp');
+        n.classList.toggle('pending', !!pend[f]);
+        n.classList.toggle('retry', !!(pend[f] && pend[f].retry));
+      });
       const cabin = this._climCabinSrc(on ? (air ? air.id : 'face') : 'off');
       root.querySelectorAll('.hv-clim-car img').forEach((n) => { if (n.getAttribute('src') !== cabin) n.setAttribute('src', cabin); });
     });
@@ -39175,7 +39238,7 @@ class Component extends DCLogic {
         const r = bar.getBoundingClientRect();
         const max = this._climModel().fanMax || 7;
         const lvl = Math.max(1, Math.min(max, Math.ceil(((e.clientX - r.left) / r.width) * max)));
-        if (lvl !== drag.last) { drag.last = lvl; this._climStage('fan', lvl); }
+        if (lvl !== drag.last) { drag.last = lvl; this._climStage('fan', lvl, true); }
         e.preventDefault();
         return;
       }
@@ -39186,13 +39249,15 @@ class Component extends DCLogic {
       if (n === drag.last) return;
       drag.last = n;
       e.preventDefault();
-      if (drag.kind === 'temp') this._climStage(drag.zone, clampT(drag.start + n * 0.5));
+      if (drag.kind === 'temp') this._climStage(drag.zone, clampT(drag.start + n * 0.5), true);
     }, { passive: false, capture: true });
     const end = (e) => {
       if (!drag || (e && e.pointerId !== drag.id)) return;
       const d = drag; drag = null;
       d.el.classList.remove('scrub');
-      if (d.moved) { this._climSuppressClick = Date.now(); return; }
+      if (!d.moved) return;
+      this._climSuppressClick = Date.now();
+      this._climRelease(d.kind === 'temp' ? d.zone : 'fan');
     };
     document.addEventListener('pointerup', end, true);
     document.addEventListener('pointercancel', end, true);
