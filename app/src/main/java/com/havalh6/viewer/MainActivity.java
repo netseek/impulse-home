@@ -110,6 +110,8 @@ public final class MainActivity extends Activity {
                     // Retained for native shells installed before the three mode
                     // tiles were unified into one Driving controls card.
                     "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
+                    // CLIMA rail card: the icon alone toggles the climate.
+                    "toggleClimatePower",
                     "openRoofControls"
             ));
 
@@ -194,7 +196,10 @@ public final class MainActivity extends Activity {
                     "car.hvac.setting.auto_defrost_enable",
                     "car.hvac.setting.limit_enable",
                     "car.comfort_setting.driver_seat_ventilation_level",
-                    "car.comfort_setting.passenger_seat_ventilation_level"
+                    "car.comfort_setting.passenger_seat_ventilation_level",
+                    // Impulse's own settings, written through the same receiver.
+                    "app.impulse.max_ac_on_unlock",
+                    "app.impulse.seat_vent_with_ac"
             ));
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final String ASSET_HOST = "appassets.androidplatform.net";
@@ -1216,6 +1221,10 @@ public final class MainActivity extends Activity {
         String navEta = "";
         /** Idle-only glance: city (below the neighbourhood in primary) and a
          * tiny "start navigation" hint. Both empty while a turn is showing. */
+        String weatherIcon = "";
+        String forecast = "";
+        String insideText = "";
+        String hintText = "";
         String navIdleCity = "";
         String navIdleAction = "";
         final String clockHourFormat;
@@ -1775,6 +1784,8 @@ public final class MainActivity extends Activity {
                 new java.util.HashMap<>();
         private final java.util.Map<String, Bitmap> statusVehicleBitmaps =
                 new java.util.HashMap<>();
+        private final java.util.Map<String, Bitmap> weatherBitmaps =
+                new java.util.HashMap<>();
 
         QuickCardGraphicView(Context context, BottomCardDescriptor descriptor) {
             super(context);
@@ -1801,7 +1812,7 @@ public final class MainActivity extends Activity {
             switch (descriptor.id) {
                 case "range": drawRange(canvas, w, h, accent, muted, strong); break;
                 case "status": drawVehicleStatus(canvas, w, h, accent, muted, strong); break;
-                case "climate": drawClimate(canvas, w, h, accent, muted); break;
+                case "climate": drawClimate(canvas, w, h, accent, muted, strong); break;
                 case "consumption": drawEnergy(canvas, w, h, accent, muted, strong); break;
                 case "navigation": drawNavigation(canvas, w, h, accent, muted, strong); break;
                 case "tires": drawTires(canvas, w, h, accent, muted, strong); break;
@@ -2507,29 +2518,94 @@ public final class MainActivity extends Activity {
             stroke(strong, Math.max(1.5f, w * .018f)); c.drawPath(body, paint);
         }
 
+        /**
+         * CLIMATIZAÇÃO card: the sky on the left with the car's own outside
+         * temperature, the next days on the right, and the cabin temperature
+         * under it. Weather is a service (Open-Meteo); the temperatures are the
+         * car's, which is why the big number is not the forecast's.
+         */
         private void drawClimate(android.graphics.Canvas c, float w, float h,
-                int accent, int muted) {
-            float cx = w * .48f, cy = h * .52f;
-            stroke(muted, Math.max(2f, w * .035f));
-            c.drawCircle(cx, cy, w * .12f, paint);
-            for (int i = 0; i < 8; i++) {
-                float a = (float) Math.toRadians(i * 45f);
-                float r1 = w * .21f, r2 = w * .31f;
-                c.drawLine(cx + (float) Math.cos(a) * r1, cy + (float) Math.sin(a) * r1,
-                        cx + (float) Math.cos(a) * r2, cy + (float) Math.sin(a) * r2, paint);
+                int accent, int muted, int strong) {
+            boolean unknown = "unavailable".equals(descriptor.state);
+            String[] days = descriptor.forecast == null || descriptor.forecast.isEmpty()
+                    ? new String[0] : descriptor.forecast.split(";");
+            float pad = w * .045f;
+            float iconSize = Math.min(h * .40f, w * .17f);
+            float cy = h * .34f;
+
+            Bitmap sky = getWeatherBitmap(descriptor.weatherIcon);
+            float textLeft = pad;
+            if (sky != null) {
+                oval.set(pad, cy - iconSize / 2f, pad + iconSize, cy + iconSize / 2f);
+                paint.setColorFilter(new android.graphics.PorterDuffColorFilter(
+                        unknown ? muted : accent, android.graphics.PorterDuff.Mode.SRC_IN));
+                paint.setAlpha(255);
+                c.drawBitmap(sky, null, oval, paint);
+                paint.setColorFilter(null);
+                textLeft = pad + iconSize + w * .03f;
             }
-            fill(withAlpha(accent, 0x44));
-            c.drawCircle(cx, cy, w * .20f, paint);
-            fill(accent);
-            c.drawCircle(cx, cy, w * .09f, paint);
-            for (int i = 0; i < 3; i++) {
-                float a = (float) Math.toRadians(i * 120f - 90f);
-                oval.set(cx + (float) Math.cos(a) * w * .10f - w * .07f,
-                        cy + (float) Math.sin(a) * w * .10f - h * .035f,
-                        cx + (float) Math.cos(a) * w * .10f + w * .07f,
-                        cy + (float) Math.sin(a) * w * .10f + h * .035f);
-                c.drawOval(oval, paint);
+
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.NORMAL));
+            paint.setTextSize(Math.max(20f, h * .34f));
+            fill(strong);
+            c.drawText(descriptor.primary == null ? "" : descriptor.primary,
+                    textLeft, cy + h * .12f, paint);
+
+            // Next days, right to left so a narrow card drops the far ones.
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+            float colW = Math.min(w * .13f, h * .46f);
+            float right = w - pad;
+            for (int i = days.length - 1; i >= 0 && right - colW > textLeft + w * .18f; i--) {
+                String[] parts = days[i].split("[|]");
+                if (parts.length < 3) continue;
+                float cx = right - colW / 2f;
+                paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+                paint.setTextSize(Math.max(8f, h * .13f));
+                fill(muted);
+                c.drawText(parts[0], cx, h * .17f, paint);
+                Bitmap ic = getWeatherBitmap(parts[1]);
+                if (ic != null) {
+                    float s2 = colW * .58f;
+                    oval.set(cx - s2 / 2f, h * .22f, cx + s2 / 2f, h * .22f + s2);
+                    paint.setColorFilter(new android.graphics.PorterDuffColorFilter(
+                            strong, android.graphics.PorterDuff.Mode.SRC_IN));
+                    paint.setAlpha(210);
+                    c.drawBitmap(ic, null, oval, paint);
+                    paint.setColorFilter(null);
+                }
+                paint.setTextSize(Math.max(9f, h * .15f));
+                fill(strong);
+                c.drawText(parts[2], cx, h * .62f, paint);
+                right -= colW;
             }
+
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTextSize(Math.max(9f, h * .145f));
+            fill(muted);
+            String hint = descriptor.hintText == null ? "" : descriptor.hintText;
+            if (!hint.isEmpty()) c.drawText(ellipsizeStatusText(hint, w * .58f), pad, h * .88f, paint);
+            String inside = descriptor.insideText == null || descriptor.insideText.isEmpty()
+                    ? "" : "DENTRO " + descriptor.insideText;
+            if (!inside.isEmpty()) {
+                paint.setTextAlign(android.graphics.Paint.Align.RIGHT);
+                fill(unknown ? muted : strong);
+                c.drawText(inside, w - pad, h * .88f, paint);
+            }
+        }
+
+        private Bitmap getWeatherBitmap(String name) {
+            if (name == null || name.isEmpty()) return null;
+            if (weatherBitmaps.containsKey(name)) return weatherBitmaps.get(name);
+            Bitmap bitmap = null;
+            try (InputStream stream = getAssets().open("www/assets/ui/icons/weather/" + name + ".png")) {
+                bitmap = BitmapFactory.decodeStream(stream);
+            } catch (IOException | RuntimeException error) {
+                Log.w(TAG, "Optional weather asset unavailable: " + name, error);
+            }
+            weatherBitmaps.put(name, bitmap);
+            return bitmap;
         }
 
         /**
@@ -3327,23 +3403,11 @@ public final class MainActivity extends Activity {
                 fill(accent);
                 c.drawCircle(sunX, sunY, Math.max(2.5f, size * .095f), paint);
             } else {
-                // State 3: Both -> Tabler Layers Intersect
-                // Upper-right layer (wallpaper) in muted with accent dot
+                // State 3: Both -> Two overlapping squares: one gray, one accent color
+                // Upper-right square (wallpaper layer) in gray
                 drawGlyphPath(c, GLYPH_LAYER_BACK, cx, cy, size, withAlpha(muted, 0xC8), strokeWidth);
-                float sunDotX = cx + size * ((14f - 12f) / 24f);
-                float sunDotY = cy + size * ((8.5f - 12f) / 24f);
-                fill(withAlpha(accent, 0xDD));
-                c.drawCircle(sunDotX, sunDotY, Math.max(2f, size * .075f), paint);
-
-                // Lower-left layer (3D car model) in strong
-                drawGlyphPath(c, GLYPH_LAYER_FRONT, cx, cy, size, strong, strokeWidth);
-
-                // Accent inner tick / layer marker in front layer
-                stroke(accent, Math.max(1.8f, size * .075f));
-                float fL = cx + size * ((6.5f - 12f) / 24f);
-                float fR = cx + size * ((11.5f - 12f) / 24f);
-                float fY = cy + size * ((15f - 12f) / 24f);
-                c.drawLine(fL, fY, fR, fY, paint);
+                // Lower-left square (3D model layer) in accent color
+                drawGlyphPath(c, GLYPH_LAYER_FRONT, cx, cy, size, accent, strokeWidth);
             }
 
             // 3-step indicator dots at bottom: 3D -> Wallpaper -> Both
@@ -8872,7 +8936,8 @@ public final class MainActivity extends Activity {
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
         boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id)
-                || "navigation".equals(descriptor.id) || "range".equals(descriptor.id);
+                || "navigation".equals(descriptor.id) || "range".equals(descriptor.id)
+                || "climate".equals(descriptor.id);
         if (fullGraphicCard) {
             graphic.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                     0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
@@ -10926,7 +10991,10 @@ public final class MainActivity extends Activity {
             String dateWording = sanitizeClockOption(raw.optString("dateWording", "short"),
                     new String[] {"short", "long"}, "short");
             if ("power".equals(id)) glyphText = sanitizePowerDirections(raw.optString("glyphText", ""));
-            String state = ("wallpaper".equals(id) || "desktops".equals(id))
+            String state = "climate".equals(id)
+                    ? sanitizeClockOption(raw.optString("state", "unavailable"),
+                            new String[] {"on", "off", "unavailable"}, "unavailable")
+                    : ("wallpaper".equals(id) || "desktops".equals(id))
                     ? raw.optString("state", "car")
                     : ("range".equals(id)
                     ? ("gauge".equalsIgnoreCase(raw.optString("state", "")) ? "gauge" : "linear")
@@ -10969,6 +11037,10 @@ public final class MainActivity extends Activity {
             descriptor.navRemaining = cleanBottomCardText(raw.optString("navRemaining", ""), 16);
             descriptor.navDuration = cleanBottomCardText(raw.optString("navDuration", ""), 16);
             descriptor.navEta = cleanBottomCardText(raw.optString("navEta", ""), 8);
+            descriptor.weatherIcon = cleanBottomCardText(raw.optString("weatherIcon", ""), 20);
+            descriptor.forecast = cleanBottomCardText(raw.optString("forecast", ""), 96);
+            descriptor.insideText = cleanBottomCardText(raw.optString("inside", ""), 10);
+            descriptor.hintText = cleanBottomCardText(raw.optString("hint", ""), 64);
             descriptor.navIdleCity = cleanBottomCardText(raw.optString("navIdleCity", ""), 32);
             descriptor.navIdleAction = cleanBottomCardText(raw.optString("navIdleAction", ""), 48);
             if ("consumption".equals(id)) descriptor.energyBars = parseEnergyBars(raw.optString("energyBars", ""));

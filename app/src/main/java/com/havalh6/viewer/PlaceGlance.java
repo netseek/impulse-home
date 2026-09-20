@@ -155,6 +155,11 @@ final class PlaceGlance {
             o.put("city", place.city);
             o.put("street", place.street);
             o.put("provider", provider);
+            // Coarse position for the weather lookup on the CLIMATIZAÇÃO card.
+            // Two decimals is about a kilometre — all a forecast needs, and it
+            // keeps a precise fix from leaving the car.
+            o.put("lat", Math.round(best.getLatitude() * 100d) / 100d);
+            o.put("lon", Math.round(best.getLongitude() * 100d) / 100d);
             String json = o.toString();
             if (json.equals(lastJson)) return;
             lastJson = json;

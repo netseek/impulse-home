@@ -4708,7 +4708,25 @@ window.HavalSplash = (function () {
       backdrop-filter: blur(14px) saturate(1.18);
     }
     .hv-widget-card {
-      transition: transform .18s cubic-bezier(.2,.75,.2,1), border-color .18s ease, box-shadow .18s ease;
+      transition: transform .18s cubic-bezier(.2,.75,.2,1), border-color .18s ease, box-shadow .18s ease, filter .24s ease, opacity .24s ease;
+    }
+    .hv-widget-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(2, 6, 10, .58);
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .24s ease;
+      z-index: 25;
+    }
+    #hv-root.hv-card-pop-open .hv-widget-card {
+      filter: brightness(.6) saturate(.85);
+      opacity: .45;
+    }
+    #hv-root.hv-card-pop-open .hv-widget-card::after {
+      opacity: 1;
     }
     .hv-widget-card:active {
       transform: scale(.987);
@@ -5210,143 +5228,151 @@ window.HavalSplash = (function () {
 
     /* CLIMA: popup, widget and header extras share .hv-clim. Every value is
        painted by _climPaint; nothing here reads React state. No backdrop blur:
-       it would re-blur the live 3D canvas on the MMI. */
+       it would re-blur the live 3D canvas on the MMI.
+
+       Icons are MDI (Apache-2.0) plus Impulse's own four airflow glyphs —
+       scripts/build-clima-icons.mjs. Controls are icon-only: the labels were
+       carrying no information a driver needs mid-glance. */
     .hv-clim { --clim-tile: rgba(255,255,255,.06); --clim-edge: rgba(255,255,255,.13); --clim-track: rgba(255,255,255,.2); --clim-heat: #ff6b6b; --clim-good: #3ccf91;
       color: var(--hv-widget-fg,#edf5fa); font-family: 'Space Grotesk',sans-serif; min-width: 0; box-sizing: border-box; }
     #hv-root.hv-widgets-light .hv-clim { --clim-tile: #fff; --clim-edge: rgba(24,42,56,.11); --clim-track: rgba(24,42,56,.16); --clim-heat: #e5484d; --clim-good: #1f9d6a; }
     .hv-clim *, .hv-clim *::before, .hv-clim *::after { box-sizing: border-box; }
     .hv-clim .cap { font: 500 11px/1.15 'Space Grotesk',sans-serif; letter-spacing: .12em; text-transform: uppercase; }
     .hv-clim .dim { opacity: .62; }
-    .hv-clim svg.ci { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .hv-clim svg.ci { width: 26px; height: 26px; fill: currentColor; flex: none; }
     .hv-clim button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-    .hv-clim .hv-clim-tile { position: relative; display: flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid var(--clim-edge); border-radius: 14px; background: var(--clim-tile); transition: color .15s, border-color .15s; }
-    #hv-root.hv-widgets-light .hv-clim-tile, #hv-root.hv-widgets-light .hv-clim-steps, #hv-root.hv-widgets-light .hv-clim-fan > button { box-shadow: 0 1px 2px rgba(24,42,56,.07); }
-    .hv-clim-tile::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; border: 1.5px solid var(--hv-accent); background: var(--hv-accent); opacity: 0; pointer-events: none; transition: opacity .15s; }
-    .hv-clim-tile.on { color: var(--hv-readable-accent,var(--hv-accent)); border-color: transparent; }
-    .hv-clim-tile.on::after { opacity: .13; }
-    .hv-clim-tile:active { transform: scale(.98); }
     .hv-clim .pending { animation: hv-clim-pend .8s ease-in-out infinite alternate; }
     @keyframes hv-clim-pend { from { opacity: .45; } to { opacity: 1; } }
-    .hv-clim.off .hv-clim-live, .hv-clim.nosig .hv-clim-live, .hv-clim.nosig [data-ca="power"] { opacity: .36; pointer-events: none; }
+    .hv-clim.off .hv-clim-live, .hv-clim.nosig .hv-clim-live, .hv-clim.nosig [data-ca="power"] { opacity: .3; pointer-events: none; }
 
-    /* header extras: outside temp · mode, power */
-    .hv-clim-headx { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    /* icon-only control: no border, no fill; the accent and a bar under it
+       carry the on state, which is what the eye finds fastest on this panel. */
+    .hv-clim-ib { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      min-width: 52px; height: 52px; border-radius: 12px; color: var(--hv-widget-fg,#edf5fa); opacity: .55; transition: opacity .15s, color .15s; }
+    .hv-clim-ib::after { content: ''; position: absolute; bottom: 4px; width: 18px; height: 3px; border-radius: 2px; background: var(--hv-accent); opacity: 0; transition: opacity .15s; }
+    .hv-clim-ib.on { color: var(--hv-readable-accent,var(--hv-accent)); opacity: 1; }
+    .hv-clim-ib.on::after { opacity: 1; }
+    .hv-clim-ib:active { transform: scale(.94); }
+    /* Impulse's airflow glyphs are black-on-transparent PNGs, so their alpha
+       is the shape: used as a mask they take currentColor like the MDI ones,
+       which is what lets the selected mode turn accent. */
+    /* recirculation swaps glyph rather than colour alone: Impulse ships one
+       car with the air looping inside and one with it coming from outside. */
+    .hv-clim-rc { width: 30px; height: 30px; background: currentColor; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-position: center; mask-position: center; -webkit-mask-size: contain; mask-size: contain;
+      -webkit-mask-image: url(./assets/ui/icons/clima/recirc-out.png); mask-image: url(./assets/ui/icons/clima/recirc-out.png); }
+    .hv-clim-ib.on .hv-clim-rc { -webkit-mask-image: url(./assets/ui/icons/clima/recirc-in.png); mask-image: url(./assets/ui/icons/clima/recirc-in.png); }
+    .hv-clim-bl { width: 27px; height: 27px; background: currentColor; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-position: center; mask-position: center; -webkit-mask-size: contain; mask-size: contain; }
+
+    /* header extras: inside · outside, and nothing else */
+    .hv-clim-headx { margin-left: auto; display: flex; align-items: center; gap: 16px; }
     .hv-clim-headx .meta { opacity: .62; }
-    .hv-clim-headx .meta b { font-weight: 500; }
-    .hv-card-focus-head .hv-clim-headx button { margin-left: 0; width: auto; height: 38px; padding: 0 14px 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--clim-edge); border-radius: 12px; background: var(--clim-tile); font-size: 11px; }
-    .hv-clim-headx:not(.off):not(.nosig) [data-ca="power"] { color: var(--hv-readable-accent,var(--hv-accent)); border-color: var(--hv-accent); }
+    .hv-clim-headx .meta b { font-weight: 500; opacity: 1; }
     .hv-card-focus-head .hv-clim-headx ~ button { margin-left: 8px; }
 
     /* popup */
     .hv-clim-pop { height: calc(100% - 48px); display: grid; grid-template-columns: minmax(0,1fr) 0; }
     .hv-clim-pop.wide { grid-template-columns: 796px minmax(0,1fr); column-gap: 22px; }
-    .hv-clim-std { display: grid; grid-template-rows: minmax(0,1fr) 50px 34px 58px; row-gap: 11px; min-width: 0; min-height: 0; padding-top: 6px; }
-    .hv-clim-top { display: grid; grid-template-columns: minmax(0,1fr) 150px minmax(0,1fr); min-height: 0; }
-    .hv-clim-zone { display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 0 4px; min-width: 0; }
-    .hv-clim-zone.pass { align-items: flex-end; }
-    .hv-clim-temp { display: flex; align-items: center; gap: 16px; touch-action: none; }
-    .hv-clim-temp.pass, .pass > .hv-clim-temp { flex-direction: row-reverse; }
-    .hv-clim-steps { display: flex; flex-direction: column; flex: none; border: 1px solid var(--clim-edge); border-radius: 14px; overflow: hidden; background: var(--clim-tile); }
-    .hv-clim-steps button { width: 56px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 24px; line-height: 1; }
-    .hv-clim-steps button + button { border-top: 1px solid var(--clim-edge); }
-    .hv-clim-steps button:active { color: var(--hv-readable-accent,var(--hv-accent)); }
-    .hv-clim-tbox { min-width: 0; }
-    .hv-clim-tbox .cap { display: block; opacity: .62; margin-bottom: 4px; }
-    .pass .hv-clim-tbox { text-align: right; }
-    .hv-clim-tval { font: 400 72px/.95 'Space Grotesk',sans-serif; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .hv-clim-tval small { font-size: 32px; letter-spacing: 0; }
-    .hv-clim-tval sup { font-size: 34px; font-weight: 300; vertical-align: top; position: relative; top: 5px; }
-    .hv-clim-temp.scrub .hv-clim-tval { color: var(--hv-readable-accent,var(--hv-accent)); }
-    .hv-clim-seat { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; margin: 0 -10px; border-radius: 12px; }
-    .pass > .hv-clim-seat { flex-direction: row-reverse; }
-    .hv-clim-seat .txt { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-    .pass > .hv-clim-seat .txt { align-items: flex-end; }
-    .hv-clim-seat .cap { font-size: 10.5px; opacity: .62; }
-    .hv-clim-seat.lit > svg { color: var(--hv-accent); }
-    .hv-clim .dots { display: flex; gap: 5px; }
-    .hv-clim .dots i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .2; }
-    .hv-clim .dots i.on { background: var(--hv-accent); opacity: 1; }
+    .hv-clim-std { display: grid; grid-template-rows: 52px minmax(0,1fr) 40px 56px; row-gap: 8px; min-width: 0; min-height: 0; }
+    /* airflow row, centred over the cabin */
+    .hv-clim-air { display: flex; align-items: center; justify-content: center; gap: 22px; }
+    .hv-clim-top { display: grid; grid-template-columns: minmax(0,1fr) 232px minmax(0,1fr); align-items: stretch; min-height: 0; }
+    .hv-clim-zone { display: flex; align-items: flex-end; gap: 10px; min-width: 0; min-height: 0; padding-bottom: 8px; }
+    .hv-clim-zone.drv { justify-content: space-between; padding-right: 4px; }
+    .hv-clim-zone.pass { flex-direction: row-reverse; justify-content: space-between; padding-left: 4px; }
 
-    .hv-clim-car { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; }
-    .hv-clim-car > img, .hv-clim-car > svg { height: 100%; max-height: 222px; width: auto; display: block; }
-    .hv-clim-car > svg { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); overflow: visible; }
-    .hv-clim-car .glow { fill: none; stroke: var(--clim-heat); stroke-width: 7; stroke-linecap: round; opacity: 0; transition: opacity .3s; }
-    .hv-clim-car.front .glow.gf, .hv-clim-car.rear .glow.gr { opacity: .7; }
-    .hv-clim-car .vent { fill: var(--hv-accent); opacity: 0; transition: opacity .3s; }
-    .hv-clim-car.ventD .vent.vd, .hv-clim-car.ventP .vent.vp { opacity: .32; }
-    .hv-clim-car .f { fill: none; stroke: var(--hv-accent); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 11 13; opacity: 0; transition: opacity .3s; }
-    .hv-clim[data-air="face"] .f-face, .hv-clim[data-air="facefeet"] .f-face, .hv-clim[data-air="facefeet"] .f-feet,
-    .hv-clim[data-air="feet"] .f-feet, .hv-clim[data-air="feetglass"] .f-feet, .hv-clim[data-air="feetglass"] .f-glass { opacity: var(--clim-flow-o,.8); }
-    /* Stepped on purpose: a dash offset repaints the SVG on the main thread, so
-       15 paints a second instead of 60. Popup only; widgets hold still. */
-    .hv-clim-pop .f { animation: hv-clim-flow var(--clim-flow-s,1s) steps(15) infinite; }
-    .hv-clim-pop:not([data-air]) .f, .hv-clim-pop[data-air="none"] .f { animation: none; }
-    @keyframes hv-clim-flow { to { stroke-dashoffset: -48; } }
-    .hv-clim-car .ah { fill: var(--hv-accent); }
+    /* seat ventilation: icon over three level dots, no label */
+    .hv-clim-seat { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 62px; height: 66px; margin-bottom: 26px; justify-content: center; border-radius: 14px; color: var(--hv-widget-fg,#edf5fa); opacity: .5; transition: opacity .15s, color .15s; }
+    .hv-clim-seat.lit { opacity: 1; color: var(--hv-readable-accent,var(--hv-accent)); }
+    .hv-clim-seat:active { transform: scale(.94); }
+    .hv-clim-seat .leds { display: flex; gap: 5px; }
+    .hv-clim-seat .leds i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .22; }
+    .hv-clim-seat .leds i.on { opacity: 1; background: var(--hv-accent); }
 
-    .hv-clim-modes { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
-    .hv-clim-modes .cap { font-size: 11.5px; }
-    .hv-clim-fan { display: flex; align-items: center; gap: 12px; touch-action: none; }
-    .hv-clim-fan > .cap { width: 128px; display: flex; align-items: center; gap: 8px; }
-    .hv-clim-fan > .cap > span { opacity: .62; }
-    .hv-clim-fan > button { width: 46px; height: 34px; flex: none; border: 1px solid var(--clim-edge) !important; border-radius: 10px; background: var(--clim-tile) !important; font-size: 20px; line-height: 1; }
-    .hv-clim-fanbar { flex: 1; height: 34px; display: flex; align-items: center; gap: 6px; }
-    .hv-clim-fanbar i { flex: 1; height: 8px; border-radius: 4px; background: currentColor; opacity: .15; transition: height .12s; }
+    /* temperature: a wheel. The neighbouring half-degrees sit above and below,
+       greyed, so the swipe is discoverable without a caption; the stack slides
+       when the value changes. */
+    .hv-clim-wheel { position: relative; width: 176px; height: 176px; overflow: hidden; touch-action: none; display: flex; align-items: center; justify-content: center; }
+    .hv-clim-wheel .cap { position: absolute; top: 4px; left: 0; right: 0; text-align: center; opacity: .6; }
+    .hv-clim-stack { display: flex; flex-direction: column; align-items: center; width: 100%; transition: transform .2s cubic-bezier(.22,.7,.3,1); }
+    .hv-clim-stack .near { font: 400 24px/1.25 'Space Grotesk',sans-serif; opacity: .3; font-variant-numeric: tabular-nums; }
+    .hv-clim-stack .cur { font: 400 70px/1.02 'Space Grotesk',sans-serif; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .hv-clim-stack .cur small { font-size: 30px; letter-spacing: 0; }
+    .hv-clim-stack .cur sup { font-size: 32px; font-weight: 300; vertical-align: top; position: relative; top: 6px; }
+    .hv-clim-wheel.scrub .hv-clim-stack { transition: none; }
+    .hv-clim-wheel.scrub .cur { color: var(--hv-readable-accent,var(--hv-accent)); }
+    /* swipe affordance: two faint chevrons on the outer edge */
+
+    .hv-clim-car { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; height: 100%; }
+    .hv-clim-car > img { height: 100%; max-height: 260px; width: auto; display: block; margin: -14px 0; }
+
+    /* fan: one strip, an icon at each end, no boxes */
+    .hv-clim-fan { display: flex; align-items: center; gap: 14px; touch-action: none; }
+    .hv-clim-fan button { display: flex; align-items: center; justify-content: center; width: 44px; height: 40px; flex: none; opacity: .62; }
+    .hv-clim-fan button:active { opacity: 1; }
+    .hv-clim-fan button.lo svg { width: 19px; height: 19px; }
+    .hv-clim-fan button.hi svg { width: 30px; height: 30px; }
+    .hv-clim-fanbar { flex: 1; height: 40px; display: flex; align-items: center; gap: 7px; }
+    .hv-clim-fanbar i { flex: 1; height: 9px; border-radius: 5px; background: currentColor; opacity: .14; transition: height .12s; }
     .hv-clim-fanbar i.on { background: var(--hv-accent); opacity: 1; }
-    .hv-clim-fan.scrub .hv-clim-fanbar i.on { height: 12px; }
-    .hv-clim-fan [data-cv="fan"] { width: 52px; flex: none; text-align: right; font: 12px/1 'Space Mono',monospace; opacity: .7; }
-    .hv-clim-togs { display: grid; grid-template-columns: repeat(6,1fr); gap: 8px; }
-    .hv-clim-togs .hv-clim-tile { flex-direction: column; gap: 6px; padding: 0 4px; text-align: center; }
-    .hv-clim-togs .cap { font-size: 10.5px; letter-spacing: .08em; line-height: 1.2; }
+    .hv-clim-fan.scrub .hv-clim-fanbar i.on { height: 14px; }
 
-    /* wide-only side panel */
-    .hv-clim-side { display: none; min-width: 0; grid-template-columns: 1fr 1fr; column-gap: 30px; padding: 6px 0 0 22px; border-left: 1px solid var(--clim-edge); }
+    .hv-clim-togs { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 6px; }
+    .hv-clim-togs .hv-clim-ib { flex: 1; }
+    .hv-clim-togs .hv-clim-ib[data-ca="power"].on { color: var(--clim-good); }
+    .hv-clim-togs .hv-clim-ib[data-ca="power"].on::after { background: var(--clim-good); }
+
+    /* wide side: AR across the top, AUTOMÁTICO across the bottom */
+    .hv-clim-side { display: none; min-width: 0; grid-template-rows: auto 1fr; row-gap: 10px; padding-left: 22px; border-left: 1px solid var(--clim-edge); }
     .hv-clim-pop.wide .hv-clim-side { display: grid; }
-    .hv-clim-col { display: flex; flex-direction: column; min-width: 0; }
-    .hv-clim-colhead { display: flex; align-items: center; gap: 10px; height: 34px; margin-bottom: 4px; }
+    .hv-clim-sec { min-width: 0; }
+    .hv-clim-colhead { display: flex; align-items: center; gap: 10px; height: 30px; }
     .hv-clim-colhead .cap { font-size: 12.5px; letter-spacing: .14em; }
-    .hv-clim-colhead svg { color: var(--hv-accent); }
-    .hv-clim-row { width: 100%; text-align: left; display: flex; align-items: center; gap: 14px; min-height: 58px; border-bottom: 1px solid var(--clim-edge) !important; }
-    .hv-clim-row:last-child { border-bottom: 0 !important; }
-    .hv-clim-row .k { flex: 1; min-width: 0; font: 500 13px/1.2 'Space Grotesk',sans-serif; letter-spacing: .07em; text-transform: uppercase; }
-    .hv-clim-row .k small { display: block; margin-top: 3px; font: 400 11.5px/1.25 'Space Grotesk',sans-serif; letter-spacing: 0; text-transform: none; opacity: .6; }
-    .hv-clim-sw { position: relative; width: 46px; height: 28px; flex: none; border-radius: 14px; background: var(--clim-track); transition: background .15s; }
-    .hv-clim-sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.28); transition: transform .15s; }
+    .hv-clim-colhead svg { color: var(--hv-accent); width: 22px; height: 22px; }
+    .hv-clim-airrow { display: flex; align-items: center; gap: 22px; padding: 4px 0 10px; border-bottom: 1px solid var(--clim-edge); }
+    .hv-clim-pm { display: flex; align-items: baseline; gap: 9px; }
+    .hv-clim-pm b { font: 400 44px/1 'Space Grotesk',sans-serif; font-variant-numeric: tabular-nums; }
+    .hv-clim-pm .q { color: var(--clim-good); }
+    .hv-clim-airrow .hv-clim-ib { min-width: 74px; }
+    .hv-clim-airrow .hv-clim-ib::after { display: none; }
+    .hv-clim-rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: 26px; align-content: start; }
+    .hv-clim-row { width: 100%; text-align: left; display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--clim-edge) !important; }
+    .hv-clim-row .k { flex: 1; min-width: 0; font: 500 12.5px/1.2 'Space Grotesk',sans-serif; letter-spacing: .07em; text-transform: uppercase; }
+    .hv-clim-row .k small { display: block; margin-top: 3px; font: 400 11px/1.25 'Space Grotesk',sans-serif; letter-spacing: 0; text-transform: none; opacity: .6; }
+    .hv-clim-sw { position: relative; width: 44px; height: 26px; flex: none; border-radius: 13px; background: var(--clim-track); transition: background .15s; }
+    .hv-clim-sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.28); transition: transform .15s; }
     .hv-clim-row.on .hv-clim-sw { background: var(--hv-accent); }
     .hv-clim-row.on .hv-clim-sw::after { transform: translateX(18px); }
-    .hv-clim-pm { display: flex; align-items: baseline; gap: 10px; min-height: 76px; border-bottom: 1px solid var(--clim-edge); }
-    .hv-clim-pm b { font: 400 48px/1 'Space Grotesk',sans-serif; font-variant-numeric: tabular-nums; }
-    .hv-clim-pm .q { margin-left: auto; color: var(--clim-good); }
-    .hv-clim-seg { display: flex; flex: none; border: 1px solid var(--clim-edge); border-radius: 12px; overflow: hidden; background: var(--clim-tile); }
-    .hv-clim-seg button { position: relative; height: 38px; padding: 0 13px; font: 500 11px/1 'Space Grotesk',sans-serif; letter-spacing: .08em; }
+    .hv-clim-seg { display: flex; flex: none; border: 1px solid var(--clim-edge); border-radius: 12px; overflow: hidden; }
+    .hv-clim-seg button { position: relative; height: 36px; padding: 0 13px; font: 500 11px/1 'Space Grotesk',sans-serif; letter-spacing: .08em; }
     .hv-clim-seg button + button { border-left: 1px solid var(--clim-edge); }
     .hv-clim-seg button.on { color: var(--hv-readable-accent,var(--hv-accent)); }
     .hv-clim-seg button.on::after { content: ''; position: absolute; inset: 0; background: var(--hv-accent); opacity: .14; }
 
     /* widget */
-    .hv-clim-w { height: 100%; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
-    .hv-clim-whead { display: flex; align-items: center; gap: 10px; min-height: 22px; cursor: pointer; }
-    .hv-clim-whead > .cap:first-child { font-weight: 600; letter-spacing: .14em; }
+    .hv-clim-w { height: 100%; padding: 11px 13px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+    .hv-clim-whead { display: flex; align-items: center; gap: 9px; min-height: 20px; cursor: pointer; }
+    .hv-clim-whead > .cap:first-of-type { font-weight: 600; letter-spacing: .14em; }
     .hv-clim-whead .meta { margin-left: auto; opacity: .62; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .hv-clim-wmain { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .hv-clim-w .hv-clim-steps button { width: 44px; height: 40px; font-size: 20px; }
-    .hv-clim-w .hv-clim-temp { gap: 10px; }
-    .hv-clim-w .hv-clim-tval { font-size: 52px; }
-    .hv-clim-w .hv-clim-tval small { font-size: 24px; } .hv-clim-w .hv-clim-tval sup { font-size: 26px; top: 3px; }
+    .hv-clim-wmain { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .hv-clim-w .hv-clim-wheel { width: 132px; height: 104px; }
+    .hv-clim-w .hv-clim-stack .cur { font-size: 46px; }
+    .hv-clim-w .hv-clim-stack .cur small { font-size: 20px; } .hv-clim-w .hv-clim-stack .cur sup { font-size: 22px; top: 3px; }
+    .hv-clim-w .hv-clim-stack .near { font-size: 16px; }
+    .hv-clim-w .hv-clim-wheel .cap, .hv-clim-w .hv-clim-wheel .swipe { display: none; }
     .hv-clim-w .hv-clim-car { flex: 1; align-self: stretch; }
-    .hv-clim-w .hv-clim-car > img, .hv-clim-w .hv-clim-car > svg { max-height: 100%; }
-    .hv-clim-w .hv-clim-fan { height: 34px; }
-    .hv-clim-w .hv-clim-fan > .cap { width: auto; }
-    .hv-clim-w .hv-clim-fan > .cap > span, .hv-clim-w .hv-clim-fan [data-cv="fan"] { display: none; }
-    .hv-clim-wtogs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; height: 44px; flex: none; }
-    .hv-clim-wtogs .hv-clim-tile { gap: 7px; padding: 0 6px; }
-    .hv-clim-wtogs .cap { font-size: 10.5px; letter-spacing: .08em; }
-    .hv-clim-w .hv-clim-modes { height: 46px; flex: none; }
-    .hv-clim-w .hv-clim-modes .cap { font-size: 10px; }
+    .hv-clim-w .hv-clim-car > img { max-height: 100%; }
+    .hv-clim-w .hv-clim-fan { height: 32px; gap: 8px; }
+    .hv-clim-w .hv-clim-fan button { width: 32px; height: 32px; }
+    .hv-clim-w .hv-clim-air { gap: 14px; height: 40px; }
+    .hv-clim-w .hv-clim-ib { min-width: 40px; height: 40px; }
+    .hv-clim-w .hv-clim-togs { gap: 2px; padding: 0; height: 44px; flex: none; }
+    .hv-clim-w .hv-clim-togs .hv-clim-ib { min-width: 36px; height: 44px; }
+    .hv-clim-w .hv-clim-seat { width: 44px; height: 52px; }
     .hv-clim-w:not(.hv-clim-2x2) .hv-clim-car,
-    .hv-clim-w:not(.hv-clim-2x2) .hv-clim-modes,
-    .hv-clim-w:not(.hv-clim-2x2):not(.hv-clim-3x1) .xw { display: none; }
-    .hv-clim-1x1 .hv-clim-temp.pass, .hv-clim-1x1 .hv-clim-fan, .hv-clim-1x1 .x2 { display: none; }
+    .hv-clim-w:not(.hv-clim-2x2) .hv-clim-air { display: none; }
+    .hv-clim-1x1 .hv-clim-wheel.pass, .hv-clim-1x1 .hv-clim-fan, .hv-clim-1x1 .hv-clim-seat, .hv-clim-1x1 .x2 { display: none; }
     .hv-clim-1x1 .hv-clim-wmain { justify-content: center; }
     .hv-clim-1x1 .hv-clim-wtogs .cap { display: none; }
 
@@ -5597,7 +5623,7 @@ window.HavalSplash = (function () {
     .hv-card-focus-head .hv-energy-gear > svg { width:20px; height:20px; fill:currentColor; opacity:.8; }
     .hv-card-focus-head .hv-energy-gear.on { color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(255,255,255,.14); }
     /* Settings pane over the popup body. */
-    .hv-card-focus > .hv-energy-settings { position:absolute; left:16px; right:16px; top:64px; bottom:16px; z-index:25; overflow-y:auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-content:start; }
+    .hv-card-focus > .hv-energy-settings { position:absolute; left:16px; right:16px; top:60px; bottom:16px; z-index:25; overflow-y:auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-content:start; padding:12px; border-radius:16px; background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); }
     .hv-energy-settings > section { display:flex; flex-direction:column; gap:10px; padding:14px; border-radius:16px; background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.06); }
     .hv-energy-setrow { display:flex; flex-direction:column; gap:6px; }
     .hv-energy-setrow > small,.hv-energy-setnote { font:600 10px/1.3 'Space Mono',monospace; letter-spacing:.06em; opacity:.72; }
@@ -5628,7 +5654,9 @@ window.HavalSplash = (function () {
     .hv-energy-kvg.fuel { box-shadow:inset 3px 0 0 #f2994a; } .hv-energy-kvg.fuel > .hv-energy-zlabel { color:#f2994a; }
     .hv-energy-kvg.ev { box-shadow:inset 3px 0 0 #63d9e7; } .hv-energy-kvg.ev > .hv-energy-zlabel { color:var(--hv-readable-accent,#63d9e7); }
     .hv-energy-kvg.cost > .hv-energy-zlabel { color:#3ee08a; }
-    .hv-energy-kvg .hv-energy-kv { text-align:left; }
+    .hv-energy-kvg .hv-energy-kv { text-align:left; align-items:end; }
+    .hv-energy-kvg .hv-energy-kv > li { display:flex; flex-direction:column; justify-content:flex-end; height:100%; }
+    .hv-energy-kvg .hv-energy-kv li > small { white-space:normal; min-height:2.4em; display:flex; align-items:flex-end; }
     /* Refuel price prompt, over everything. */
     .hv-energy-ask { position:absolute; inset:0; z-index:95; display:grid; place-items:center; background:rgba(2,6,10,.55); }
     .hv-energy-ask-box { width:min(420px,calc(100vw - 48px)); display:flex; flex-direction:column; gap:12px; padding:20px; border-radius:22px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
@@ -6150,7 +6178,7 @@ window.HavalSplash = (function () {
     .hv-range-alt-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#38bdf8; margin-right:5px; animation:altPulse 1.2s infinite; }
 
 
-    .hv-card-focus-backdrop { position:absolute; inset:0; z-index:84; opacity:0; pointer-events:none; background:rgba(2,6,10,.72); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); transition:opacity .2s ease; }
+    .hv-card-focus-backdrop { position:absolute; inset:0; z-index:84; opacity:0; pointer-events:none; background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; transition:opacity .2s ease; }
     .hv-card-focus-backdrop.on { opacity:1; pointer-events:auto; }
     .hv-card-focus { position:absolute; z-index:85; left:var(--hv-popup-left, 24px); top:var(--hv-popup-top, 52px); bottom:var(--hv-popup-bottom-inset, 72px); width:min(760px,calc(100vw - 52px)); padding:16px; box-sizing:border-box; overflow:auto; color:var(--hv-widget-fg,#edf5fa); border:1px solid var(--hv-frost-edge,rgba(255,255,255,.18)); border-radius:22px; background:var(--hv-frost-bg,rgba(12,18,24,.88)); box-shadow:var(--hv-frost-shadow,0 18px 50px rgba(0,0,0,.38)); opacity:0; pointer-events:none; transform:translate(0,18px) scale(.985); transform-origin:left top; transition:opacity .2s ease,transform .24s cubic-bezier(.2,.75,.2,1); }
     .hv-card-focus.on { opacity:1; pointer-events:auto; transform:translate(0,0) scale(1); }
@@ -6822,11 +6850,11 @@ window.HavalSplash = (function () {
           </sc-if>
           <sc-if value="{{ wg.isClimate }}" hint-placeholder-val="{{ false }}">
             <div class="hv-clim hv-clim-w {{ wg.climateSizeClass }}">
-              <div class="hv-clim-whead" data-ca="open"><svg class="ci" style="color:var(--hv-accent)" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h20M12 2v20M20 16l-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4"></path></svg><span class="cap">CLIMA</span><span class="cap meta">FORA <span data-cv="outside">—</span> · <span data-cv="mode"></span></span></div>
-              <div class="hv-clim-wmain hv-clim-live"><div class="hv-clim-temp" data-ca="temp" data-zone="driver"><div class="hv-clim-steps"><button type="button" data-step="1" aria-label="Aumentar motorista">+</button><button type="button" data-step="-1" aria-label="Diminuir motorista">−</button></div><div class="hv-clim-tbox" data-cp="driver"><span class="cap">MOTORISTA</span><div class="hv-clim-tval" data-cv="driver">—</div></div></div><div class="hv-clim-car"><img src="./assets/ui/tires-top-view-v1.png" alt=""><svg viewBox="0 0 384 576" aria-hidden="true"><defs><marker id="hv-clim-ah-w" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="ah" d="M1 1 9 5 1 9Z"></path></marker></defs><path class="glow gf" d="M120 146Q192 118 264 146"></path><path class="glow gr" d="M128 506Q192 522 256 506"></path><rect class="vent vd" x="128" y="226" width="54" height="74" rx="18"></rect><rect class="vent vp" x="202" y="226" width="54" height="74" rx="18"></rect><g marker-end="url(#hv-clim-ah-w)"><path class="f f-face" d="M152 176C153 196 154 212 155 228"></path><path class="f f-face" d="M232 176C231 196 230 212 229 228"></path><path class="f f-face" d="M180 176C172 232 160 292 156 330"></path><path class="f f-face" d="M204 176C212 232 224 292 228 330"></path><path class="f f-feet" d="M126 182C104 210 102 244 110 276"></path><path class="f f-feet" d="M258 182C280 210 282 244 274 276"></path><path class="f f-feet" d="M166 312C154 336 150 360 154 384"></path><path class="f f-feet" d="M218 312C230 336 234 360 230 384"></path><path class="f f-glass" d="M146 172L138 140"></path><path class="f f-glass" d="M192 170V132"></path><path class="f f-glass" d="M238 172L246 140"></path></g></svg></div><div class="hv-clim-temp pass" data-ca="temp" data-zone="pass"><div class="hv-clim-steps"><button type="button" data-step="1" aria-label="Aumentar passageiro">+</button><button type="button" data-step="-1" aria-label="Diminuir passageiro">−</button></div><div class="hv-clim-tbox" data-cp="pass"><span class="cap">PASSAGEIRO</span><div class="hv-clim-tval" data-cv="pass">—</div></div></div></div>
-              <div class="hv-clim-modes hv-clim-live" data-cp="blower"><button type="button" class="hv-clim-tile" data-ca="air" data-cair="0"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="5.6" r="1.9"></circle><path d="M15 9.6 14.4 15h3.8l1.3 5M2.5 8.5h7M7.3 6l2.5 2.5-2.5 2.5"></path></svg><span class="cap">ROSTO</span></button><button type="button" class="hv-clim-tile" data-ca="air" data-cair="1"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="5.6" r="1.9"></circle><path d="M15 9.6 14.4 15h3.8l1.3 5M2.5 8.5h7M7.3 6l2.5 2.5-2.5 2.5M2.5 19h8M8.3 16.5l2.5 2.5-2.5 2.5"></path></svg><span class="cap">ROSTO + PÉS</span></button><button type="button" class="hv-clim-tile" data-ca="air" data-cair="2"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="5.6" r="1.9"></circle><path d="M15 9.6 14.4 15h3.8l1.3 5M2.5 19h8M8.3 16.5l2.5 2.5-2.5 2.5"></path></svg><span class="cap">PÉS</span></button><button type="button" class="hv-clim-tile" data-ca="air" data-cair="3"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="7.6" r="1.9"></circle><path d="M15 11.6l-.6 4h3.8l1.3 4.4M2.5 19h8M8.3 16.5l2.5 2.5-2.5 2.5M2 5.4c3.5-2 7.5-2 11 0M5 3.6l.7 3M9 3v3.2"></path></svg><span class="cap">PÉS + PARA-BRISA</span></button></div>
-              <div class="hv-clim-fan hv-clim-live " data-ca="fan" data-cp="fan"><span class="cap"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.83 16.38a6.08 6.08 0 0 1-8.62-7l5.41 1.45a6.08 6.08 0 0 1 7-8.62l-1.45 5.41a6.08 6.08 0 0 1 8.62 7l-5.41-1.45a6.08 6.08 0 0 1-7 8.62l1.45-5.41Z"></path><path d="M12 12v.01"></path></svg><span>VENTILADOR</span></span><button type="button" data-step="-1" aria-label="Diminuir ventilador">−</button><div class="hv-clim-fanbar" data-cfan><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><button type="button" data-step="1" aria-label="Aumentar ventilador">+</button><span data-cv="fan">—</span></div>
-              <div class="hv-clim-wtogs"><button type="button" class="hv-clim-tile" data-ca="power" data-cp="power"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.77.04"></path></svg><span class="cap" data-cv="power">—</span></button><button type="button" class="hv-clim-tile hv-clim-live" data-ca="toggle" data-ct="ac" data-cp="ac"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h20M12 2v20M20 16l-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4"></path></svg><span class="cap">A/C</span></button><button type="button" class="hv-clim-tile hv-clim-live" data-ca="toggle" data-ct="auto" data-cp="auto"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"></circle><path d="M8.6 16.3 12 7.6l3.4 8.7M9.8 13.2h4.4"></path></svg><span class="cap">AUTO</span></button><button type="button" class="hv-clim-tile hv-clim-live x2" data-ca="toggle" data-ct="recirc" data-cp="recirc"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18M5 19l1.7-4c.3-.7.9-1 1.6-1h7.4c.7 0 1.3.3 1.6 1L19 19"></path><path d="M8.5 9.5a3.5 3.5 0 0 1 6.6-1.6"></path><path d="M15.6 5.3l-.4 2.7-2.7-.4"></path></svg><span class="cap">RECIRC.</span></button><button type="button" class="hv-clim-tile hv-clim-live xw" data-ca="toggle" data-ct="sync" data-cp="sync"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg><span class="cap">SYNC</span></button><button type="button" class="hv-clim-tile hv-clim-live xw" data-ca="toggle" data-ct="front" data-cp="front"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8.5c6-3 12-3 18 0l-2.2 8.6c-4.6-1.7-9-1.7-13.6 0Z"></path><path d="M9 14.6c-.9-1.2.9-2.2 0-3.4M12 14c-.9-1.2.9-2.2 0-3.4M15 14.6c-.9-1.2.9-2.2 0-3.4"></path></svg><span class="cap">DESEMB.</span></button></div>
+              <div class="hv-clim-whead" data-ca="open"><span class="cap">CLIMA</span><span class="cap meta">DENTRO <b data-cv="inside">—</b> · FORA <b data-cv="outside">—</b></span></div>
+              <div class="hv-clim-air hv-clim-live x2" data-cp="blower"><button type="button" class="hv-clim-ib" data-ca="air" data-cair="0" aria-label="Rosto"><i class="hv-clim-bl" style="-webkit-mask-image:url(./assets/ui/icons/clima/blower-face.png);mask-image:url(./assets/ui/icons/clima/blower-face.png)"></i></button><button type="button" class="hv-clim-ib" data-ca="air" data-cair="1" aria-label="Rosto e pés"><i class="hv-clim-bl" style="-webkit-mask-image:url(./assets/ui/icons/clima/blower-facefeet.png);mask-image:url(./assets/ui/icons/clima/blower-facefeet.png)"></i></button><button type="button" class="hv-clim-ib" data-ca="air" data-cair="2" aria-label="Pés"><i class="hv-clim-bl" style="-webkit-mask-image:url(./assets/ui/icons/clima/blower-feet.png);mask-image:url(./assets/ui/icons/clima/blower-feet.png)"></i></button><button type="button" class="hv-clim-ib" data-ca="air" data-cair="3" aria-label="Pés e para-brisa"><i class="hv-clim-bl" style="-webkit-mask-image:url(./assets/ui/icons/clima/blower-feetglass.png);mask-image:url(./assets/ui/icons/clima/blower-feetglass.png)"></i></button></div>
+              <div class="hv-clim-wmain"><button type="button" class="hv-clim-seat hv-clim-live" data-ca="vent" data-cvent="ventD" data-cp="ventD" aria-label="Ventilação do banco do motorista"><svg class="ci" viewBox="0 0 33 33" aria-hidden="true"><path d="M8.27,32.5c0,0,7.709,0,10.98,0s5.68-2.082,6.309-4.439c2.021-7.591,3.977-15.011,6.074-24.066  c0.963-4.154-5.141-5.14-6.775,0s-7.01,17.756-7.01,17.756s-6.521,0.838-11.916-0.232c-4.264-0.848-6.191,3.621-3.27,7.943  C4.188,31.72,5.465,32.5,8.27,32.5z"></path><path d="M8.446,11.612l-0.793-1.529C7.557,9.899,7.403,9.6,7.307,9.416L6.514,7.888c-0.096-0.184-0.252-0.184-0.346,0L5.375,9.416  C5.28,9.6,5.125,9.899,5.03,10.083l-0.793,1.529c-0.096,0.184-0.004,0.332,0.201,0.332h1.203c-0.104,0.895-0.342,1.896-0.771,2.313  c-1.557,1.512-1.557,3.037-1.557,5.346v0.163h1.502v-0.163c-0.002-2.197-0.002-3.199,1.1-4.269c0.842-0.816,1.133-2.36,1.236-3.39  h1.092C8.45,11.944,8.54,11.796,8.446,11.612z"></path><path d="M14.137,11.612l-0.793-1.529c-0.096-0.184-0.252-0.483-0.348-0.667l-0.791-1.528c-0.096-0.184-0.252-0.184-0.346,0  l-0.793,1.528c-0.096,0.184-0.252,0.483-0.346,0.667l-0.793,1.529c-0.096,0.184-0.006,0.332,0.201,0.332h1.201  c-0.104,0.895-0.342,1.896-0.77,2.313c-1.559,1.512-1.557,3.037-1.557,5.346v0.163h1.5v-0.163c0-2.197,0-3.199,1.102-4.269  c0.842-0.816,1.133-2.36,1.236-3.39h1.092C14.141,11.944,14.231,11.796,14.137,11.612z"></path><path d="M19.827,11.612l-0.793-1.529c-0.096-0.184-0.25-0.483-0.346-0.667l-0.793-1.528c-0.094-0.184-0.25-0.184-0.346,0  l-0.793,1.528c-0.096,0.184-0.25,0.483-0.346,0.667l-0.793,1.529c-0.094,0.184-0.004,0.332,0.203,0.332h1.201  c-0.104,0.895-0.342,1.896-0.771,2.313c-1.557,1.512-1.557,3.037-1.555,5.346v0.163h1.5v-0.163c0-2.197,0-3.199,1.1-4.269  c0.842-0.816,1.135-2.36,1.236-3.39h1.094C19.831,11.944,19.922,11.796,19.827,11.612z"></path></svg><span class="leds"><i></i><i></i><i></i></span></button><div class="hv-clim-wheel drv" data-ca="temp" data-zone="driver" data-cp="driver"><span class="cap">MOTORISTA</span><div class="hv-clim-stack"><span class="near" data-cv="driverNext">—</span><span class="cur" data-cv="driver">—</span><span class="near" data-cv="driverPrev">—</span></div></div><div class="hv-clim-car"><img src="./assets/ui/clima/off-night.webp" alt=""></div><div class="hv-clim-wheel pass" data-ca="temp" data-zone="pass" data-cp="pass"><span class="cap">PASSAGEIRO</span><div class="hv-clim-stack"><span class="near" data-cv="passNext">—</span><span class="cur" data-cv="pass">—</span><span class="near" data-cv="passPrev">—</span></div></div><button type="button" class="hv-clim-seat hv-clim-live" data-ca="vent" data-cvent="ventP" data-cp="ventP" aria-label="Ventilação do banco do passageiro"><svg class="ci" viewBox="0 0 33 33" aria-hidden="true"><path d="M8.27,32.5c0,0,7.709,0,10.98,0s5.68-2.082,6.309-4.439c2.021-7.591,3.977-15.011,6.074-24.066  c0.963-4.154-5.141-5.14-6.775,0s-7.01,17.756-7.01,17.756s-6.521,0.838-11.916-0.232c-4.264-0.848-6.191,3.621-3.27,7.943  C4.188,31.72,5.465,32.5,8.27,32.5z"></path><path d="M8.446,11.612l-0.793-1.529C7.557,9.899,7.403,9.6,7.307,9.416L6.514,7.888c-0.096-0.184-0.252-0.184-0.346,0L5.375,9.416  C5.28,9.6,5.125,9.899,5.03,10.083l-0.793,1.529c-0.096,0.184-0.004,0.332,0.201,0.332h1.203c-0.104,0.895-0.342,1.896-0.771,2.313  c-1.557,1.512-1.557,3.037-1.557,5.346v0.163h1.502v-0.163c-0.002-2.197-0.002-3.199,1.1-4.269c0.842-0.816,1.133-2.36,1.236-3.39  h1.092C8.45,11.944,8.54,11.796,8.446,11.612z"></path><path d="M14.137,11.612l-0.793-1.529c-0.096-0.184-0.252-0.483-0.348-0.667l-0.791-1.528c-0.096-0.184-0.252-0.184-0.346,0  l-0.793,1.528c-0.096,0.184-0.252,0.483-0.346,0.667l-0.793,1.529c-0.096,0.184-0.006,0.332,0.201,0.332h1.201  c-0.104,0.895-0.342,1.896-0.77,2.313c-1.559,1.512-1.557,3.037-1.557,5.346v0.163h1.5v-0.163c0-2.197,0-3.199,1.102-4.269  c0.842-0.816,1.133-2.36,1.236-3.39h1.092C14.141,11.944,14.231,11.796,14.137,11.612z"></path><path d="M19.827,11.612l-0.793-1.529c-0.096-0.184-0.25-0.483-0.346-0.667l-0.793-1.528c-0.094-0.184-0.25-0.184-0.346,0  l-0.793,1.528c-0.096,0.184-0.25,0.483-0.346,0.667l-0.793,1.529c-0.094,0.184-0.004,0.332,0.203,0.332h1.201  c-0.104,0.895-0.342,1.896-0.771,2.313c-1.557,1.512-1.557,3.037-1.555,5.346v0.163h1.5v-0.163c0-2.197,0-3.199,1.1-4.269  c0.842-0.816,1.135-2.36,1.236-3.39h1.094C19.831,11.944,19.922,11.796,19.827,11.612z"></path></svg><span class="leds"><i></i><i></i><i></i></span></button></div>
+              <div class="hv-clim-fan hv-clim-live" data-ca="fan" data-cp="fan"><button type="button" class="lo" data-step="-1" aria-label="Diminuir ventilador"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12.5,2C17,2 17.11,5.57 14.75,6.75C13.76,7.24 13.32,8.29 13.13,9.22C13.61,9.42 14.03,9.73 14.35,10.13C18.05,8.13 22.03,8.92 22.03,12.5C22.03,17 18.46,17.1 17.28,14.73C16.78,13.74 15.72,13.3 14.79,13.11C14.59,13.59 14.28,14 13.88,14.34C15.87,18.03 15.08,22 11.5,22C7,22 6.91,18.42 9.27,17.24C10.25,16.75 10.69,15.71 10.89,14.79C10.4,14.59 9.97,14.27 9.65,13.87C5.96,15.85 2,15.07 2,11.5C2,7 5.56,6.89 6.74,9.26C7.24,10.25 8.29,10.68 9.22,10.87C9.41,10.39 9.73,9.97 10.14,9.65C8.15,5.96 8.94,2 12.5,2Z"></path></svg></button><div class="hv-clim-fanbar" data-cfan><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><button type="button" class="hi" data-step="1" aria-label="Aumentar ventilador"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12.5,2C17,2 17.11,5.57 14.75,6.75C13.76,7.24 13.32,8.29 13.13,9.22C13.61,9.42 14.03,9.73 14.35,10.13C18.05,8.13 22.03,8.92 22.03,12.5C22.03,17 18.46,17.1 17.28,14.73C16.78,13.74 15.72,13.3 14.79,13.11C14.59,13.59 14.28,14 13.88,14.34C15.87,18.03 15.08,22 11.5,22C7,22 6.91,18.42 9.27,17.24C10.25,16.75 10.69,15.71 10.89,14.79C10.4,14.59 9.97,14.27 9.65,13.87C5.96,15.85 2,15.07 2,11.5C2,7 5.56,6.89 6.74,9.26C7.24,10.25 8.29,10.68 9.22,10.87C9.41,10.39 9.73,9.97 10.14,9.65C8.15,5.96 8.94,2 12.5,2Z"></path></svg></button></div>
+              <div class="hv-clim-togs "><button type="button" class="hv-clim-ib" data-ca="power" data-cp="power" aria-label="Ligar ou desligar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.56,5.44L15.11,6.89C16.84,7.94 18,9.83 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12C6,9.83 7.16,7.94 8.88,6.88L7.44,5.44C5.36,6.88 4,9.28 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12C20,9.28 18.64,6.88 16.56,5.44M13,3H11V13H13"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="ac" data-cp="ac" aria-label="A/C"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.59,0.66C8.93,-1.15 11.47,1.06 12.04,4.5C12.47,4.5 12.89,4.62 13.27,4.84C13.79,4.24 14.25,3.42 14.07,2.5C13.65,0.35 16.06,-1.39 18.35,1.58C20.16,3.92 17.95,6.46 14.5,7.03C14.5,7.46 14.39,7.89 14.16,8.27C14.76,8.78 15.58,9.24 16.5,9.06C18.63,8.64 20.38,11.04 17.41,13.34C15.07,15.15 12.53,12.94 11.96,9.5C11.53,9.5 11.11,9.37 10.74,9.15C10.22,9.75 9.75,10.58 9.93,11.5C10.35,13.64 7.94,15.39 5.65,12.42C3.83,10.07 6.05,7.53 9.5,6.97C9.5,6.54 9.63,6.12 9.85,5.74C9.25,5.23 8.43,4.76 7.5,4.94C5.37,5.36 3.62,2.96 6.59,0.66M5,16H7A2,2 0 0,1 9,18V24H7V22H5V24H3V18A2,2 0 0,1 5,16M5,18V20H7V18H5M12.93,16H15L12.07,24H10L12.93,16M18,16H21V18H18V22H21V24H18A2,2 0 0,1 16,22V18A2,2 0 0,1 18,16Z"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="auto" data-cp="auto" aria-label="Automático"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 2C8.93 2 8.14 5.96 10.13 9.65C9.72 9.97 9.4 10.39 9.21 10.87C8.28 10.68 7.23 10.25 6.73 9.26C5.56 6.89 2 7 2 11.5C2 15.07 5.95 15.85 9.64 13.87C9.96 14.27 10.39 14.59 10.88 14.79C10.68 15.71 10.24 16.75 9.26 17.24C6.9 18.42 7 22 11.5 22C12.31 22 13 21.78 13.5 21.41C13.19 20.67 13 19.86 13 19C13 17.59 13.5 16.3 14.3 15.28C14.17 14.97 14.03 14.65 13.86 14.34C14.26 14 14.57 13.59 14.77 13.11C15.26 13.21 15.78 13.39 16.25 13.67C17.07 13.25 18 13 19 13C20.05 13 21.03 13.27 21.89 13.74C21.95 13.37 22 12.96 22 12.5C22 8.92 18.03 8.13 14.33 10.13C14 9.73 13.59 9.42 13.11 9.22C13.3 8.29 13.74 7.24 14.73 6.75C17.09 5.57 17 2 12.5 2M12 11C12.54 11 13 11.45 13 12C13 12.55 12.54 13 12 13C11.43 13 11 12.55 11 12C11 11.45 11.43 11 12 11M18 15C16.89 15 16 15.9 16 17V23H18V21H20V23H22V17C22 15.9 21.1 15 20 15M18 17H20V19H18Z"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="sync" data-cp="sync" aria-label="Sincronizar temperaturas"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,18A6,6 0 0,1 6,12C6,11 6.25,10.03 6.7,9.2L5.24,7.74C4.46,8.97 4,10.43 4,12A8,8 0 0,0 12,20V23L16,19L12,15M12,4V1L8,5L12,9V6A6,6 0 0,1 18,12C18,13 17.75,13.97 17.3,14.8L18.76,16.26C19.54,15.03 20,13.57 20,12A8,8 0 0,0 12,4Z"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="recirc" data-cp="recirc" aria-label="Recircular o ar"><i class="hv-clim-rc"></i></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="front" data-cp="front" aria-label="Desembaçar dianteiro"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M15,23C14.7,23 14.5,22.9 14.3,22.7C13.9,22.3 14,21.7 14.4,21.3V21.3C14.9,20.9 16.1,19.5 16.1,18.4C16.1,17.8 15.7,17.2 15.3,16.5C14.8,15.7 14.1,14.7 14.1,13.5C14.1,11.2 15.4,10.3 15.6,10.2C16.1,9.9 16.7,10.1 17,10.5C17.3,11 17.1,11.6 16.7,11.9V11.9C16.7,11.9 16.2,12.3 16.2,13.5C16.2,14.1 16.6,14.7 17,15.4C17.5,16.2 18.2,17.2 18.2,18.4C18.2,20.6 16.1,22.6 15.9,22.8C15.5,22.9 15.2,23 15,23M11.7,22.7C11.9,22.5 14,20.5 14,18.3C14,17.1 13.4,16.1 12.8,15.3C12.4,14.6 12,14 12,13.4C12,12.2 12.5,11.8 12.5,11.8V11.8C13,11.5 13.1,10.9 12.8,10.4C12.5,9.9 11.9,9.8 11.4,10.1C11.2,10.2 9.9,11.1 9.9,13.4C9.9,14.6 10.5,15.6 11.1,16.4C11.5,17.1 11.9,17.7 11.9,18.3C11.9,19.4 10.7,20.8 10.2,21.2V21.2C9.8,21.6 9.8,22.2 10.1,22.6C10.3,22.8 10.6,22.9 10.8,22.9C11.2,23 11.5,22.9 11.7,22.7M7.7,22.7C7.9,22.5 10,20.5 10,18.3C10,17.1 9.4,16.1 8.8,15.3C8.4,14.7 8,14.1 8,13.4C8,12.2 8.5,11.8 8.5,11.8V11.8C9,11.5 9.1,10.9 8.8,10.4C8.6,10 7.9,9.9 7.5,10.1C7.3,10.2 6,11.1 6,13.4C6,14.6 6.6,15.6 7.2,16.4C7.6,17.1 8,17.7 8,18.3C8,19.4 6.8,20.8 6.3,21.2V21.2C5.9,21.6 5.9,22.2 6.2,22.6C6.5,22.9 6.7,23 7,23C7.2,23 7.5,22.9 7.7,22.7M12,3C9.4,3 1,3.3 1,7C1,9.4 2.2,15.4 2.8,18H4L4.8,18H5V16H4.4C3.8,13.1 3,8.8 3,7C3,6 7.4,5 12,5C16.6,5 21,6 21,7C21,8.8 20.2,13.1 19.6,16H19V18H19.2L20,18H21.2C21.8,15.4 23,9.4 23,7C23,3.3 14.6,3 12,3Z"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="rear" data-cp="rear" aria-label="Desembaçar traseiro"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M10,18.3C10,20.5 7.9,22.5 7.7,22.7C7.5,22.9 7.2,23 7,23C6.7,23 6.5,22.9 6.2,22.6C5.9,22.2 5.9,21.6 6.3,21.2C6.8,20.8 8,19.4 8,18.3C8,17.7 7.6,17.1 7.2,16.4C6.6,15.6 6,14.6 6,13.4C6,11.1 7.3,10.2 7.5,10.1C7.9,9.9 8.6,10 8.8,10.4C9.1,10.9 9,11.5 8.5,11.8C8.5,11.8 8,12.2 8,13.4C8,14.1 8.4,14.7 8.8,15.3C9.4,16.1 10,17.1 10,18.3M12,13.4C12,12.2 12.5,11.8 12.5,11.8C13,11.5 13.1,10.9 12.8,10.4C12.5,9.9 11.9,9.8 11.4,10.1C11.2,10.2 9.9,11.1 9.9,13.4C9.9,14.6 10.5,15.6 11.1,16.4C11.5,17.1 11.9,17.7 11.9,18.3C11.9,19.4 10.7,20.8 10.2,21.2C9.8,21.6 9.8,22.2 10.1,22.6C10.3,22.8 10.6,22.9 10.8,22.9C11.2,23 11.5,22.9 11.7,22.7C11.9,22.5 14,20.5 14,18.3C14,17.1 13.4,16.1 12.8,15.3C12.4,14.6 12,14 12,13.4M20,3H4A2,2 0 0,0 2,5V16A2,2 0 0,0 4,18H5V16H4V5H20V16H19V18H20A2,2 0 0,0 22,16V5A2,2 0 0,0 20,3M16.2,13.5C16.2,12.3 16.7,11.9 16.7,11.9C17.1,11.6 17.3,11 17,10.5C16.7,10.1 16.1,9.9 15.6,10.2C15.4,10.3 14.1,11.2 14.1,13.5C14.1,14.7 14.8,15.7 15.3,16.5C15.7,17.2 16.1,17.8 16.1,18.4C16.1,19.5 14.9,20.9 14.4,21.3C14,21.7 13.9,22.3 14.3,22.7C14.5,22.9 14.7,23 15,23C15.2,23 15.5,22.9 15.9,22.8C16.1,22.6 18.2,20.6 18.2,18.4C18.2,17.2 17.5,16.2 17,15.4C16.6,14.7 16.2,14.1 16.2,13.5Z"></path></svg></button></div>
             </div>
           </sc-if>
           <sc-if value="{{ wg.isConsumption }}" hint-placeholder-val="{{ false }}">
@@ -7299,7 +7327,7 @@ window.HavalSplash = (function () {
   <sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedConsumptionGrowClass }}" onClick="{{ focusedConsumptionWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedConsumptionShrinkClass }}" onClick="{{ focusedConsumptionWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
   <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedClimateGrowClass }}" onClick="{{ focusedClimateWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedClimateShrinkClass }}" onClick="{{ focusedClimateWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
   <section class="hv-card-focus {{ focusedCardPopupClass }}" role="dialog" aria-label="{{ focusedCardTitle }}">
-    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-tabs hv-energy-headtabs" role="tablist" aria-label="Visões de consumo"><button type="button" role="tab" class="{{ focusedConsumptionTabNowClass }}" aria-selected="{{ focusedConsumptionTabNowOn }}" onClick="{{ focusedConsumptionTabNow }}">AGORA</button><button type="button" role="tab" class="{{ focusedConsumptionTabTripsClass }}" aria-selected="{{ focusedConsumptionTabTripsOn }}" onClick="{{ focusedConsumptionTabTrips }}">VIAGENS</button><button type="button" role="tab" class="{{ focusedConsumptionTabHistoryClass }}" aria-selected="{{ focusedConsumptionTabHistoryOn }}" onClick="{{ focusedConsumptionTabHistory }}">HISTÓRICO</button></div><button type="button" class="hv-energy-gear {{ focusedConsumptionSettingsClass }}" onClick="{{ focusedConsumptionSettingsToggle }}" aria-label="Configurações de consumo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></button></sc-if><sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><div class="hv-clim hv-clim-headx"><span class="cap meta">FORA <b data-cv="outside">—</b> · <span data-cv="mode"></span></span><button type="button" data-ca="power" data-cp="power" aria-label="Ligar ou desligar climatização"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.77.04"></path></svg><span class="cap" data-cv="power">—</span></button></div></sc-if><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><span class="hv-head-spacer"></span><sc-if value="{{ focusedConsumptionHeadDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle hv-energy-headtitle"><strong>{{ focusedConsumptionDetailTitle }}</strong><small data-en-live="{{ focusedConsumptionDetailLiveMeta }}">{{ focusedConsumptionDetailMeta }}</small></div></sc-if></sc-if><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
+    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-tabs hv-energy-headtabs" role="tablist" aria-label="Visões de consumo"><button type="button" role="tab" class="{{ focusedConsumptionTabNowClass }}" aria-selected="{{ focusedConsumptionTabNowOn }}" onClick="{{ focusedConsumptionTabNow }}">AGORA</button><button type="button" role="tab" class="{{ focusedConsumptionTabTripsClass }}" aria-selected="{{ focusedConsumptionTabTripsOn }}" onClick="{{ focusedConsumptionTabTrips }}">VIAGENS</button><button type="button" role="tab" class="{{ focusedConsumptionTabHistoryClass }}" aria-selected="{{ focusedConsumptionTabHistoryOn }}" onClick="{{ focusedConsumptionTabHistory }}">HISTÓRICO</button></div><button type="button" class="hv-energy-gear {{ focusedConsumptionSettingsClass }}" onClick="{{ focusedConsumptionSettingsToggle }}" aria-label="Configurações de consumo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></button></sc-if><sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><div class="hv-clim hv-clim-headx"><span class="cap meta">DENTRO <b data-cv="inside">—</b> · FORA <b data-cv="outside">—</b> · <span data-cv="mode"></span></span></div></sc-if><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><span class="hv-head-spacer"></span><sc-if value="{{ focusedConsumptionHeadDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle hv-energy-headtitle"><strong>{{ focusedConsumptionDetailTitle }}</strong><small data-en-live="{{ focusedConsumptionDetailLiveMeta }}">{{ focusedConsumptionDetailMeta }}</small></div></sc-if></sc-if><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></header>
         <sc-if value="{{ focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ false }}">
           <div class="hv-energy-settings slim-scrollbar" role="dialog" aria-label="Configurações de consumo">
             <section>
@@ -7334,18 +7362,35 @@ window.HavalSplash = (function () {
     <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}">
       <div class="hv-clim hv-clim-pop {{ focusedClimateWideClass }}">
         <section class="hv-clim-std">
-          <div class="hv-clim-top hv-clim-live">
-            <div class="hv-clim-zone drv"><div class="hv-clim-temp" data-ca="temp" data-zone="driver"><div class="hv-clim-steps"><button type="button" data-step="1" aria-label="Aumentar motorista">+</button><button type="button" data-step="-1" aria-label="Diminuir motorista">−</button></div><div class="hv-clim-tbox" data-cp="driver"><span class="cap">MOTORISTA</span><div class="hv-clim-tval" data-cv="driver">—</div></div></div><button type="button" class="hv-clim-seat" data-ca="vent" data-cvent="ventD" data-cp="ventD"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.83 16.38a6.08 6.08 0 0 1-8.62-7l5.41 1.45a6.08 6.08 0 0 1 7-8.62l-1.45 5.41a6.08 6.08 0 0 1 8.62 7l-5.41-1.45a6.08 6.08 0 0 1-7 8.62l1.45-5.41Z"></path><path d="M12 12v.01"></path></svg><span class="txt"><span class="cap">VENTILAÇÃO</span><span class="dots"><i></i><i></i><i></i></span></span></button></div>
-            <div class="hv-clim-car"><img src="./assets/ui/tires-top-view-v1.png" alt=""><svg viewBox="0 0 384 576" aria-hidden="true"><defs><marker id="hv-clim-ah-pop" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="ah" d="M1 1 9 5 1 9Z"></path></marker></defs><path class="glow gf" d="M120 146Q192 118 264 146"></path><path class="glow gr" d="M128 506Q192 522 256 506"></path><rect class="vent vd" x="128" y="226" width="54" height="74" rx="18"></rect><rect class="vent vp" x="202" y="226" width="54" height="74" rx="18"></rect><g marker-end="url(#hv-clim-ah-pop)"><path class="f f-face" d="M152 176C153 196 154 212 155 228"></path><path class="f f-face" d="M232 176C231 196 230 212 229 228"></path><path class="f f-face" d="M180 176C172 232 160 292 156 330"></path><path class="f f-face" d="M204 176C212 232 224 292 228 330"></path><path class="f f-feet" d="M126 182C104 210 102 244 110 276"></path><path class="f f-feet" d="M258 182C280 210 282 244 274 276"></path><path class="f f-feet" d="M166 312C154 336 150 360 154 384"></path><path class="f f-feet" d="M218 312C230 336 234 360 230 384"></path><path class="f f-glass" d="M146 172L138 140"></path><path class="f f-glass" d="M192 170V132"></path><path class="f f-glass" d="M238 172L246 140"></path></g></svg></div>
-            <div class="hv-clim-zone pass"><div class="hv-clim-temp pass" data-ca="temp" data-zone="pass"><div class="hv-clim-steps"><button type="button" data-step="1" aria-label="Aumentar passageiro">+</button><button type="button" data-step="-1" aria-label="Diminuir passageiro">−</button></div><div class="hv-clim-tbox" data-cp="pass"><span class="cap">PASSAGEIRO</span><div class="hv-clim-tval" data-cv="pass">—</div></div></div><button type="button" class="hv-clim-seat" data-ca="vent" data-cvent="ventP" data-cp="ventP"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.83 16.38a6.08 6.08 0 0 1-8.62-7l5.41 1.45a6.08 6.08 0 0 1 7-8.62l-1.45 5.41a6.08 6.08 0 0 1 8.62 7l-5.41-1.45a6.08 6.08 0 0 1-7 8.62l1.45-5.41Z"></path><path d="M12 12v.01"></path></svg><span class="txt"><span class="cap">VENTILAÇÃO</span><span class="dots"><i></i><i></i><i></i></span></span></button></div>
+          <div class="hv-clim-air hv-clim-live " data-cp="blower"><button type="button" class="hv-clim-ib" data-ca="air" data-cair="0" aria-label="Rosto"><i class="hv-clim-bl" style="-webkit-mask-image:url(./assets/ui/icons/clima/blower-face.png);mask-image:url(./assets/ui/icons/clima/blower-face.png)"></i></button><button type="button" class="hv-clim-ib" data-ca="air" data-cair="1" aria-label="Rosto e pés"><i class="hv-clim-bl" style="-webkit-mask-image:url(./assets/ui/icons/clima/blower-facefeet.png);mask-image:url(./assets/ui/icons/clima/blower-facefeet.png)"></i></button><button type="button" class="hv-clim-ib" data-ca="air" data-cair="2" aria-label="Pés"><i class="hv-clim-bl" style="-webkit-mask-image:url(./assets/ui/icons/clima/blower-feet.png);mask-image:url(./assets/ui/icons/clima/blower-feet.png)"></i></button><button type="button" class="hv-clim-ib" data-ca="air" data-cair="3" aria-label="Pés e para-brisa"><i class="hv-clim-bl" style="-webkit-mask-image:url(./assets/ui/icons/clima/blower-feetglass.png);mask-image:url(./assets/ui/icons/clima/blower-feetglass.png)"></i></button></div>
+          <div class="hv-clim-top">
+            <div class="hv-clim-zone drv"><button type="button" class="hv-clim-seat hv-clim-live" data-ca="vent" data-cvent="ventD" data-cp="ventD" aria-label="Ventilação do banco do motorista"><svg class="ci" viewBox="0 0 33 33" aria-hidden="true"><path d="M8.27,32.5c0,0,7.709,0,10.98,0s5.68-2.082,6.309-4.439c2.021-7.591,3.977-15.011,6.074-24.066  c0.963-4.154-5.141-5.14-6.775,0s-7.01,17.756-7.01,17.756s-6.521,0.838-11.916-0.232c-4.264-0.848-6.191,3.621-3.27,7.943  C4.188,31.72,5.465,32.5,8.27,32.5z"></path><path d="M8.446,11.612l-0.793-1.529C7.557,9.899,7.403,9.6,7.307,9.416L6.514,7.888c-0.096-0.184-0.252-0.184-0.346,0L5.375,9.416  C5.28,9.6,5.125,9.899,5.03,10.083l-0.793,1.529c-0.096,0.184-0.004,0.332,0.201,0.332h1.203c-0.104,0.895-0.342,1.896-0.771,2.313  c-1.557,1.512-1.557,3.037-1.557,5.346v0.163h1.502v-0.163c-0.002-2.197-0.002-3.199,1.1-4.269c0.842-0.816,1.133-2.36,1.236-3.39  h1.092C8.45,11.944,8.54,11.796,8.446,11.612z"></path><path d="M14.137,11.612l-0.793-1.529c-0.096-0.184-0.252-0.483-0.348-0.667l-0.791-1.528c-0.096-0.184-0.252-0.184-0.346,0  l-0.793,1.528c-0.096,0.184-0.252,0.483-0.346,0.667l-0.793,1.529c-0.096,0.184-0.006,0.332,0.201,0.332h1.201  c-0.104,0.895-0.342,1.896-0.77,2.313c-1.559,1.512-1.557,3.037-1.557,5.346v0.163h1.5v-0.163c0-2.197,0-3.199,1.102-4.269  c0.842-0.816,1.133-2.36,1.236-3.39h1.092C14.141,11.944,14.231,11.796,14.137,11.612z"></path><path d="M19.827,11.612l-0.793-1.529c-0.096-0.184-0.25-0.483-0.346-0.667l-0.793-1.528c-0.094-0.184-0.25-0.184-0.346,0  l-0.793,1.528c-0.096,0.184-0.25,0.483-0.346,0.667l-0.793,1.529c-0.094,0.184-0.004,0.332,0.203,0.332h1.201  c-0.104,0.895-0.342,1.896-0.771,2.313c-1.557,1.512-1.557,3.037-1.555,5.346v0.163h1.5v-0.163c0-2.197,0-3.199,1.1-4.269  c0.842-0.816,1.135-2.36,1.236-3.39h1.094C19.831,11.944,19.922,11.796,19.827,11.612z"></path></svg><span class="leds"><i></i><i></i><i></i></span></button><div class="hv-clim-wheel drv" data-ca="temp" data-zone="driver" data-cp="driver"><span class="cap">MOTORISTA</span><div class="hv-clim-stack"><span class="near" data-cv="driverNext">—</span><span class="cur" data-cv="driver">—</span><span class="near" data-cv="driverPrev">—</span></div></div></div>
+            <div class="hv-clim-car"><img src="./assets/ui/clima/off-night.webp" alt=""></div>
+            <div class="hv-clim-zone pass"><button type="button" class="hv-clim-seat hv-clim-live" data-ca="vent" data-cvent="ventP" data-cp="ventP" aria-label="Ventilação do banco do passageiro"><svg class="ci" viewBox="0 0 33 33" aria-hidden="true"><path d="M8.27,32.5c0,0,7.709,0,10.98,0s5.68-2.082,6.309-4.439c2.021-7.591,3.977-15.011,6.074-24.066  c0.963-4.154-5.141-5.14-6.775,0s-7.01,17.756-7.01,17.756s-6.521,0.838-11.916-0.232c-4.264-0.848-6.191,3.621-3.27,7.943  C4.188,31.72,5.465,32.5,8.27,32.5z"></path><path d="M8.446,11.612l-0.793-1.529C7.557,9.899,7.403,9.6,7.307,9.416L6.514,7.888c-0.096-0.184-0.252-0.184-0.346,0L5.375,9.416  C5.28,9.6,5.125,9.899,5.03,10.083l-0.793,1.529c-0.096,0.184-0.004,0.332,0.201,0.332h1.203c-0.104,0.895-0.342,1.896-0.771,2.313  c-1.557,1.512-1.557,3.037-1.557,5.346v0.163h1.502v-0.163c-0.002-2.197-0.002-3.199,1.1-4.269c0.842-0.816,1.133-2.36,1.236-3.39  h1.092C8.45,11.944,8.54,11.796,8.446,11.612z"></path><path d="M14.137,11.612l-0.793-1.529c-0.096-0.184-0.252-0.483-0.348-0.667l-0.791-1.528c-0.096-0.184-0.252-0.184-0.346,0  l-0.793,1.528c-0.096,0.184-0.252,0.483-0.346,0.667l-0.793,1.529c-0.096,0.184-0.006,0.332,0.201,0.332h1.201  c-0.104,0.895-0.342,1.896-0.77,2.313c-1.559,1.512-1.557,3.037-1.557,5.346v0.163h1.5v-0.163c0-2.197,0-3.199,1.102-4.269  c0.842-0.816,1.133-2.36,1.236-3.39h1.092C14.141,11.944,14.231,11.796,14.137,11.612z"></path><path d="M19.827,11.612l-0.793-1.529c-0.096-0.184-0.25-0.483-0.346-0.667l-0.793-1.528c-0.094-0.184-0.25-0.184-0.346,0  l-0.793,1.528c-0.096,0.184-0.25,0.483-0.346,0.667l-0.793,1.529c-0.094,0.184-0.004,0.332,0.203,0.332h1.201  c-0.104,0.895-0.342,1.896-0.771,2.313c-1.557,1.512-1.557,3.037-1.555,5.346v0.163h1.5v-0.163c0-2.197,0-3.199,1.1-4.269  c0.842-0.816,1.135-2.36,1.236-3.39h1.094C19.831,11.944,19.922,11.796,19.827,11.612z"></path></svg><span class="leds"><i></i><i></i><i></i></span></button><div class="hv-clim-wheel pass" data-ca="temp" data-zone="pass" data-cp="pass"><span class="cap">PASSAGEIRO</span><div class="hv-clim-stack"><span class="near" data-cv="passNext">—</span><span class="cur" data-cv="pass">—</span><span class="near" data-cv="passPrev">—</span></div></div></div>
           </div>
-          <div class="hv-clim-modes hv-clim-live" data-cp="blower"><button type="button" class="hv-clim-tile" data-ca="air" data-cair="0"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="5.6" r="1.9"></circle><path d="M15 9.6 14.4 15h3.8l1.3 5M2.5 8.5h7M7.3 6l2.5 2.5-2.5 2.5"></path></svg><span class="cap">ROSTO</span></button><button type="button" class="hv-clim-tile" data-ca="air" data-cair="1"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="5.6" r="1.9"></circle><path d="M15 9.6 14.4 15h3.8l1.3 5M2.5 8.5h7M7.3 6l2.5 2.5-2.5 2.5M2.5 19h8M8.3 16.5l2.5 2.5-2.5 2.5"></path></svg><span class="cap">ROSTO + PÉS</span></button><button type="button" class="hv-clim-tile" data-ca="air" data-cair="2"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="5.6" r="1.9"></circle><path d="M15 9.6 14.4 15h3.8l1.3 5M2.5 19h8M8.3 16.5l2.5 2.5-2.5 2.5"></path></svg><span class="cap">PÉS</span></button><button type="button" class="hv-clim-tile" data-ca="air" data-cair="3"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="7.6" r="1.9"></circle><path d="M15 11.6l-.6 4h3.8l1.3 4.4M2.5 19h8M8.3 16.5l2.5 2.5-2.5 2.5M2 5.4c3.5-2 7.5-2 11 0M5 3.6l.7 3M9 3v3.2"></path></svg><span class="cap">PÉS + PARA-BRISA</span></button></div>
-          <div class="hv-clim-fan hv-clim-live " data-ca="fan" data-cp="fan"><span class="cap"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.83 16.38a6.08 6.08 0 0 1-8.62-7l5.41 1.45a6.08 6.08 0 0 1 7-8.62l-1.45 5.41a6.08 6.08 0 0 1 8.62 7l-5.41-1.45a6.08 6.08 0 0 1-7 8.62l1.45-5.41Z"></path><path d="M12 12v.01"></path></svg><span>VENTILADOR</span></span><button type="button" data-step="-1" aria-label="Diminuir ventilador">−</button><div class="hv-clim-fanbar" data-cfan><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><button type="button" data-step="1" aria-label="Aumentar ventilador">+</button><span data-cv="fan">—</span></div>
-          <div class="hv-clim-togs hv-clim-live"><button type="button" class="hv-clim-tile" data-ca="toggle" data-ct="ac" data-cp="ac"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h20M12 2v20M20 16l-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4"></path></svg><span class="cap">A/C</span></button><button type="button" class="hv-clim-tile" data-ca="toggle" data-ct="auto" data-cp="auto"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"></circle><path d="M8.6 16.3 12 7.6l3.4 8.7M9.8 13.2h4.4"></path></svg><span class="cap">AUTO</span></button><button type="button" class="hv-clim-tile" data-ca="toggle" data-ct="sync" data-cp="sync"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg><span class="cap">SYNC</span></button><button type="button" class="hv-clim-tile" data-ca="toggle" data-ct="recirc" data-cp="recirc"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19h18M5 19l1.7-4c.3-.7.9-1 1.6-1h7.4c.7 0 1.3.3 1.6 1L19 19"></path><path d="M8.5 9.5a3.5 3.5 0 0 1 6.6-1.6"></path><path d="M15.6 5.3l-.4 2.7-2.7-.4"></path></svg><span class="cap">RECIRCULAR</span></button><button type="button" class="hv-clim-tile" data-ca="toggle" data-ct="front" data-cp="front"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8.5c6-3 12-3 18 0l-2.2 8.6c-4.6-1.7-9-1.7-13.6 0Z"></path><path d="M9 14.6c-.9-1.2.9-2.2 0-3.4M12 14c-.9-1.2.9-2.2 0-3.4M15 14.6c-.9-1.2.9-2.2 0-3.4"></path></svg><span class="cap">DESEMBAÇAR<br>DIANTEIRO</span></button><button type="button" class="hv-clim-tile" data-ca="toggle" data-ct="rear" data-cp="rear"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="11" rx="2"></rect><path d="M8 13.2c-.8-1 .8-2 0-3.2M12 13.2c-.8-1 .8-2 0-3.2M16 13.2c-.8-1 .8-2 0-3.2M9 20h6"></path></svg><span class="cap">DESEMBAÇAR<br>TRASEIRO</span></button></div>
+          <div class="hv-clim-fan hv-clim-live" data-ca="fan" data-cp="fan"><button type="button" class="lo" data-step="-1" aria-label="Diminuir ventilador"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12.5,2C17,2 17.11,5.57 14.75,6.75C13.76,7.24 13.32,8.29 13.13,9.22C13.61,9.42 14.03,9.73 14.35,10.13C18.05,8.13 22.03,8.92 22.03,12.5C22.03,17 18.46,17.1 17.28,14.73C16.78,13.74 15.72,13.3 14.79,13.11C14.59,13.59 14.28,14 13.88,14.34C15.87,18.03 15.08,22 11.5,22C7,22 6.91,18.42 9.27,17.24C10.25,16.75 10.69,15.71 10.89,14.79C10.4,14.59 9.97,14.27 9.65,13.87C5.96,15.85 2,15.07 2,11.5C2,7 5.56,6.89 6.74,9.26C7.24,10.25 8.29,10.68 9.22,10.87C9.41,10.39 9.73,9.97 10.14,9.65C8.15,5.96 8.94,2 12.5,2Z"></path></svg></button><div class="hv-clim-fanbar" data-cfan><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><button type="button" class="hi" data-step="1" aria-label="Aumentar ventilador"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12.5,2C17,2 17.11,5.57 14.75,6.75C13.76,7.24 13.32,8.29 13.13,9.22C13.61,9.42 14.03,9.73 14.35,10.13C18.05,8.13 22.03,8.92 22.03,12.5C22.03,17 18.46,17.1 17.28,14.73C16.78,13.74 15.72,13.3 14.79,13.11C14.59,13.59 14.28,14 13.88,14.34C15.87,18.03 15.08,22 11.5,22C7,22 6.91,18.42 9.27,17.24C10.25,16.75 10.69,15.71 10.89,14.79C10.4,14.59 9.97,14.27 9.65,13.87C5.96,15.85 2,15.07 2,11.5C2,7 5.56,6.89 6.74,9.26C7.24,10.25 8.29,10.68 9.22,10.87C9.41,10.39 9.73,9.97 10.14,9.65C8.15,5.96 8.94,2 12.5,2Z"></path></svg></button></div>
+          <div class="hv-clim-togs hv-clim-live"><button type="button" class="hv-clim-ib" data-ca="power" data-cp="power" aria-label="Ligar ou desligar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.56,5.44L15.11,6.89C16.84,7.94 18,9.83 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12C6,9.83 7.16,7.94 8.88,6.88L7.44,5.44C5.36,6.88 4,9.28 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12C20,9.28 18.64,6.88 16.56,5.44M13,3H11V13H13"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="ac" data-cp="ac" aria-label="A/C"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.59,0.66C8.93,-1.15 11.47,1.06 12.04,4.5C12.47,4.5 12.89,4.62 13.27,4.84C13.79,4.24 14.25,3.42 14.07,2.5C13.65,0.35 16.06,-1.39 18.35,1.58C20.16,3.92 17.95,6.46 14.5,7.03C14.5,7.46 14.39,7.89 14.16,8.27C14.76,8.78 15.58,9.24 16.5,9.06C18.63,8.64 20.38,11.04 17.41,13.34C15.07,15.15 12.53,12.94 11.96,9.5C11.53,9.5 11.11,9.37 10.74,9.15C10.22,9.75 9.75,10.58 9.93,11.5C10.35,13.64 7.94,15.39 5.65,12.42C3.83,10.07 6.05,7.53 9.5,6.97C9.5,6.54 9.63,6.12 9.85,5.74C9.25,5.23 8.43,4.76 7.5,4.94C5.37,5.36 3.62,2.96 6.59,0.66M5,16H7A2,2 0 0,1 9,18V24H7V22H5V24H3V18A2,2 0 0,1 5,16M5,18V20H7V18H5M12.93,16H15L12.07,24H10L12.93,16M18,16H21V18H18V22H21V24H18A2,2 0 0,1 16,22V18A2,2 0 0,1 18,16Z"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="auto" data-cp="auto" aria-label="Automático"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 2C8.93 2 8.14 5.96 10.13 9.65C9.72 9.97 9.4 10.39 9.21 10.87C8.28 10.68 7.23 10.25 6.73 9.26C5.56 6.89 2 7 2 11.5C2 15.07 5.95 15.85 9.64 13.87C9.96 14.27 10.39 14.59 10.88 14.79C10.68 15.71 10.24 16.75 9.26 17.24C6.9 18.42 7 22 11.5 22C12.31 22 13 21.78 13.5 21.41C13.19 20.67 13 19.86 13 19C13 17.59 13.5 16.3 14.3 15.28C14.17 14.97 14.03 14.65 13.86 14.34C14.26 14 14.57 13.59 14.77 13.11C15.26 13.21 15.78 13.39 16.25 13.67C17.07 13.25 18 13 19 13C20.05 13 21.03 13.27 21.89 13.74C21.95 13.37 22 12.96 22 12.5C22 8.92 18.03 8.13 14.33 10.13C14 9.73 13.59 9.42 13.11 9.22C13.3 8.29 13.74 7.24 14.73 6.75C17.09 5.57 17 2 12.5 2M12 11C12.54 11 13 11.45 13 12C13 12.55 12.54 13 12 13C11.43 13 11 12.55 11 12C11 11.45 11.43 11 12 11M18 15C16.89 15 16 15.9 16 17V23H18V21H20V23H22V17C22 15.9 21.1 15 20 15M18 17H20V19H18Z"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="sync" data-cp="sync" aria-label="Sincronizar temperaturas"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M12,18A6,6 0 0,1 6,12C6,11 6.25,10.03 6.7,9.2L5.24,7.74C4.46,8.97 4,10.43 4,12A8,8 0 0,0 12,20V23L16,19L12,15M12,4V1L8,5L12,9V6A6,6 0 0,1 18,12C18,13 17.75,13.97 17.3,14.8L18.76,16.26C19.54,15.03 20,13.57 20,12A8,8 0 0,0 12,4Z"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="recirc" data-cp="recirc" aria-label="Recircular o ar"><i class="hv-clim-rc"></i></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="front" data-cp="front" aria-label="Desembaçar dianteiro"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M15,23C14.7,23 14.5,22.9 14.3,22.7C13.9,22.3 14,21.7 14.4,21.3V21.3C14.9,20.9 16.1,19.5 16.1,18.4C16.1,17.8 15.7,17.2 15.3,16.5C14.8,15.7 14.1,14.7 14.1,13.5C14.1,11.2 15.4,10.3 15.6,10.2C16.1,9.9 16.7,10.1 17,10.5C17.3,11 17.1,11.6 16.7,11.9V11.9C16.7,11.9 16.2,12.3 16.2,13.5C16.2,14.1 16.6,14.7 17,15.4C17.5,16.2 18.2,17.2 18.2,18.4C18.2,20.6 16.1,22.6 15.9,22.8C15.5,22.9 15.2,23 15,23M11.7,22.7C11.9,22.5 14,20.5 14,18.3C14,17.1 13.4,16.1 12.8,15.3C12.4,14.6 12,14 12,13.4C12,12.2 12.5,11.8 12.5,11.8V11.8C13,11.5 13.1,10.9 12.8,10.4C12.5,9.9 11.9,9.8 11.4,10.1C11.2,10.2 9.9,11.1 9.9,13.4C9.9,14.6 10.5,15.6 11.1,16.4C11.5,17.1 11.9,17.7 11.9,18.3C11.9,19.4 10.7,20.8 10.2,21.2V21.2C9.8,21.6 9.8,22.2 10.1,22.6C10.3,22.8 10.6,22.9 10.8,22.9C11.2,23 11.5,22.9 11.7,22.7M7.7,22.7C7.9,22.5 10,20.5 10,18.3C10,17.1 9.4,16.1 8.8,15.3C8.4,14.7 8,14.1 8,13.4C8,12.2 8.5,11.8 8.5,11.8V11.8C9,11.5 9.1,10.9 8.8,10.4C8.6,10 7.9,9.9 7.5,10.1C7.3,10.2 6,11.1 6,13.4C6,14.6 6.6,15.6 7.2,16.4C7.6,17.1 8,17.7 8,18.3C8,19.4 6.8,20.8 6.3,21.2V21.2C5.9,21.6 5.9,22.2 6.2,22.6C6.5,22.9 6.7,23 7,23C7.2,23 7.5,22.9 7.7,22.7M12,3C9.4,3 1,3.3 1,7C1,9.4 2.2,15.4 2.8,18H4L4.8,18H5V16H4.4C3.8,13.1 3,8.8 3,7C3,6 7.4,5 12,5C16.6,5 21,6 21,7C21,8.8 20.2,13.1 19.6,16H19V18H19.2L20,18H21.2C21.8,15.4 23,9.4 23,7C23,3.3 14.6,3 12,3Z"></path></svg></button><button type="button" class="hv-clim-ib hv-clim-live" data-ca="toggle" data-ct="rear" data-cp="rear" aria-label="Desembaçar traseiro"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M10,18.3C10,20.5 7.9,22.5 7.7,22.7C7.5,22.9 7.2,23 7,23C6.7,23 6.5,22.9 6.2,22.6C5.9,22.2 5.9,21.6 6.3,21.2C6.8,20.8 8,19.4 8,18.3C8,17.7 7.6,17.1 7.2,16.4C6.6,15.6 6,14.6 6,13.4C6,11.1 7.3,10.2 7.5,10.1C7.9,9.9 8.6,10 8.8,10.4C9.1,10.9 9,11.5 8.5,11.8C8.5,11.8 8,12.2 8,13.4C8,14.1 8.4,14.7 8.8,15.3C9.4,16.1 10,17.1 10,18.3M12,13.4C12,12.2 12.5,11.8 12.5,11.8C13,11.5 13.1,10.9 12.8,10.4C12.5,9.9 11.9,9.8 11.4,10.1C11.2,10.2 9.9,11.1 9.9,13.4C9.9,14.6 10.5,15.6 11.1,16.4C11.5,17.1 11.9,17.7 11.9,18.3C11.9,19.4 10.7,20.8 10.2,21.2C9.8,21.6 9.8,22.2 10.1,22.6C10.3,22.8 10.6,22.9 10.8,22.9C11.2,23 11.5,22.9 11.7,22.7C11.9,22.5 14,20.5 14,18.3C14,17.1 13.4,16.1 12.8,15.3C12.4,14.6 12,14 12,13.4M20,3H4A2,2 0 0,0 2,5V16A2,2 0 0,0 4,18H5V16H4V5H20V16H19V18H20A2,2 0 0,0 22,16V5A2,2 0 0,0 20,3M16.2,13.5C16.2,12.3 16.7,11.9 16.7,11.9C17.1,11.6 17.3,11 17,10.5C16.7,10.1 16.1,9.9 15.6,10.2C15.4,10.3 14.1,11.2 14.1,13.5C14.1,14.7 14.8,15.7 15.3,16.5C15.7,17.2 16.1,17.8 16.1,18.4C16.1,19.5 14.9,20.9 14.4,21.3C14,21.7 13.9,22.3 14.3,22.7C14.5,22.9 14.7,23 15,23C15.2,23 15.5,22.9 15.9,22.8C16.1,22.6 18.2,20.6 18.2,18.4C18.2,17.2 17.5,16.2 17,15.4C16.6,14.7 16.2,14.1 16.2,13.5Z"></path></svg></button></div>
         </section>
         <aside class="hv-clim-side hv-clim-live">
-          <div class="hv-clim-col"><div class="hv-clim-colhead"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg><span class="cap">AR</span></div><div class="hv-clim-pm"><b data-cv="pm">—</b><span class="cap dim">PM2.5 · <span style="text-transform:none">µg/m³</span></span><span class="cap q" data-cv="pmq"></span></div><button type="button" class="hv-clim-row" data-ca="toggle" data-ct="anion" data-cp="anion"><span class="k">Ionizador<small>Purifica o ar da cabine</small></span><span class="hv-clim-sw"></span></button><button type="button" class="hv-clim-row" data-ca="toggle" data-ct="aqs" data-cp="aqs"><span class="k">AQS<small>Recircula sozinho quando o ar de fora piora</small></span><span class="hv-clim-sw"></span></button><button type="button" class="hv-clim-row" data-ca="toggle" data-ct="heating" data-cp="heating"><span class="k">Aquecimento</span><span class="hv-clim-sw"></span></button></div>
-          <div class="hv-clim-col"><div class="hv-clim-colhead"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7h-9M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg><span class="cap">AUTOMÁTICO</span></div><div class="hv-clim-row" data-cp="comfort"><span class="k">Conforto<small>Intensidade do modo AUTO</small></span><div class="hv-clim-seg"><button type="button" data-ca="comfort" data-ccomfort="1">ECO</button><button type="button" data-ca="comfort" data-ccomfort="2">PADRÃO</button><button type="button" data-ca="comfort" data-ccomfort="3">FORTE</button></div></div><button type="button" class="hv-clim-row" data-ca="toggle" data-ct="autoDefrost" data-cp="autoDefrost"><span class="k">Desembaçamento automático</span><span class="hv-clim-sw"></span></button><button type="button" class="hv-clim-row" data-ca="toggle" data-ct="limit" data-cp="limit"><span class="k">Limite de bateria<small>Desliga frio e calor com a bateria baixa</small></span><span class="hv-clim-sw"></span></button></div>
+          <section class="hv-clim-sec">
+            <div class="hv-clim-colhead"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M19,18.31V20A2,2 0 0,1 17,22H7A2,2 0 0,1 5,20V16.3C4.54,16.12 3.95,16 3,16A1,1 0 0,1 2,15A1,1 0 0,1 3,14C3.82,14 4.47,14.08 5,14.21V12.3C4.54,12.12 3.95,12 3,12A1,1 0 0,1 2,11A1,1 0 0,1 3,10C3.82,10 4.47,10.08 5,10.21V8.3C4.54,8.12 3.95,8 3,8A1,1 0 0,1 2,7A1,1 0 0,1 3,6C3.82,6 4.47,6.08 5,6.21V4A2,2 0 0,1 7,2H17A2,2 0 0,1 19,4V6.16C20.78,6.47 21.54,7.13 21.71,7.29C22.1,7.68 22.1,8.32 21.71,8.71C21.32,9.1 20.8,9.09 20.29,8.71V8.71C20.29,8.71 19.25,8 17,8C15.74,8 14.91,8.41 13.95,8.9C12.91,9.41 11.74,10 10,10C9.64,10 9.31,10 9,9.96V7.95C9.3,8 9.63,8 10,8C11.26,8 12.09,7.59 13.05,7.11C14.09,6.59 15.27,6 17,6V4H7V20H17V18C18.5,18 18.97,18.29 19,18.31M17,10C15.27,10 14.09,10.59 13.05,11.11C12.09,11.59 11.26,12 10,12C9.63,12 9.3,12 9,11.95V13.96C9.31,14 9.64,14 10,14C11.74,14 12.91,13.41 13.95,12.9C14.91,12.42 15.74,12 17,12C19.25,12 20.29,12.71 20.29,12.71V12.71C20.8,13.1 21.32,13.1 21.71,12.71C22.1,12.32 22.1,11.69 21.71,11.29C21.5,11.08 20.25,10 17,10M17,14C15.27,14 14.09,14.59 13.05,15.11C12.09,15.59 11.26,16 10,16C9.63,16 9.3,16 9,15.95V17.96C9.31,18 9.64,18 10,18C11.74,18 12.91,17.41 13.95,16.9C14.91,16.42 15.74,16 17,16C19.25,16 20.29,16.71 20.29,16.71V16.71C20.8,17.1 21.32,17.1 21.71,16.71C22.1,16.32 22.1,15.69 21.71,15.29C21.5,15.08 20.25,14 17,14Z"></path></svg><span class="cap">AR</span></div>
+            <div class="hv-clim-airrow">
+              <div class="hv-clim-pm"><b data-cv="pm">—</b><span class="cap dim">PM2.5 · <span style="text-transform:none">µg/m³</span></span><span class="cap q" data-cv="pmq"></span></div>
+              <button type="button" class="hv-clim-ib" data-ca="toggle" data-ct="anion" data-cp="anion" aria-label="Ionizador"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M11,9A4,4 0 0,1 15,13A4,4 0 0,1 11,17A4,4 0 0,1 7,13A4,4 0 0,1 11,9M11,11A2,2 0 0,0 9,13A2,2 0 0,0 11,15A2,2 0 0,0 13,13A2,2 0 0,0 11,11M7,4H14A4,4 0 0,1 18,8V9H16V8A2,2 0 0,0 14,6H7A2,2 0 0,0 5,8V20H16V18H18V22H3V8A4,4 0 0,1 7,4M16,11C18.5,11 18.5,9 21,9V11C18.5,11 18.5,13 16,13V11M16,15C18.5,15 18.5,13 21,13V15C18.5,15 18.5,17 16,17V15Z"></path></svg><span class="cap">ÍONS</span></button>
+              <button type="button" class="hv-clim-ib" data-ca="toggle" data-ct="aqs" data-cp="aqs" aria-label="AQS"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M19,18.31V20A2,2 0 0,1 17,22H7A2,2 0 0,1 5,20V16.3C4.54,16.12 3.95,16 3,16A1,1 0 0,1 2,15A1,1 0 0,1 3,14C3.82,14 4.47,14.08 5,14.21V12.3C4.54,12.12 3.95,12 3,12A1,1 0 0,1 2,11A1,1 0 0,1 3,10C3.82,10 4.47,10.08 5,10.21V8.3C4.54,8.12 3.95,8 3,8A1,1 0 0,1 2,7A1,1 0 0,1 3,6C3.82,6 4.47,6.08 5,6.21V4A2,2 0 0,1 7,2H17A2,2 0 0,1 19,4V6.16C20.78,6.47 21.54,7.13 21.71,7.29C22.1,7.68 22.1,8.32 21.71,8.71C21.32,9.1 20.8,9.09 20.29,8.71V8.71C20.29,8.71 19.25,8 17,8C15.74,8 14.91,8.41 13.95,8.9C12.91,9.41 11.74,10 10,10C9.64,10 9.31,10 9,9.96V7.95C9.3,8 9.63,8 10,8C11.26,8 12.09,7.59 13.05,7.11C14.09,6.59 15.27,6 17,6V4H7V20H17V18C18.5,18 18.97,18.29 19,18.31M17,10C15.27,10 14.09,10.59 13.05,11.11C12.09,11.59 11.26,12 10,12C9.63,12 9.3,12 9,11.95V13.96C9.31,14 9.64,14 10,14C11.74,14 12.91,13.41 13.95,12.9C14.91,12.42 15.74,12 17,12C19.25,12 20.29,12.71 20.29,12.71V12.71C20.8,13.1 21.32,13.1 21.71,12.71C22.1,12.32 22.1,11.69 21.71,11.29C21.5,11.08 20.25,10 17,10M17,14C15.27,14 14.09,14.59 13.05,15.11C12.09,15.59 11.26,16 10,16C9.63,16 9.3,16 9,15.95V17.96C9.31,18 9.64,18 10,18C11.74,18 12.91,17.41 13.95,16.9C14.91,16.42 15.74,16 17,16C19.25,16 20.29,16.71 20.29,16.71V16.71C20.8,17.1 21.32,17.1 21.71,16.71C22.1,16.32 22.1,15.69 21.71,15.29C21.5,15.08 20.25,14 17,14Z"></path></svg><span class="cap">AQS</span></button>
+              <button type="button" class="hv-clim-ib" data-ca="toggle" data-ct="heating" data-cp="heating" aria-label="Aquecimento"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4.5L5.4 9.5L8.5 14.7L5.2 20.5L3.4 19.6L6.1 14.7L3 9.5L6.7 3.6L8.5 4.5M14.7 4.4L11.6 9.5L14.7 14.5L11.4 20.3L9.6 19.4L12.3 14.5L9.2 9.5L12.9 3.5L14.7 4.4M21 4.4L17.9 9.5L21 14.5L17.7 20.3L15.9 19.4L18.6 14.5L15.5 9.5L19.2 3.5L21 4.4"></path></svg><span class="cap">CALOR</span></button>
+            </div>
+          </section>
+          <section class="hv-clim-sec">
+            <div class="hv-clim-colhead"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 13C6.14 13 4.59 14.28 4.14 16H2V18H4.14C4.59 19.72 6.14 21 8 21S11.41 19.72 11.86 18H22V16H11.86C11.41 14.28 9.86 13 8 13M8 19C6.9 19 6 18.1 6 17C6 15.9 6.9 15 8 15S10 15.9 10 17C10 18.1 9.1 19 8 19M19.86 6C19.41 4.28 17.86 3 16 3S12.59 4.28 12.14 6H2V8H12.14C12.59 9.72 14.14 11 16 11S19.41 9.72 19.86 8H22V6H19.86M16 9C14.9 9 14 8.1 14 7C14 5.9 14.9 5 16 5S18 5.9 18 7C18 8.1 17.1 9 16 9Z"></path></svg><span class="cap">AUTOMÁTICO</span></div>
+            <div class="hv-clim-rows">
+              <div class="hv-clim-row" data-cp="comfort"><span class="k">Conforto<small>Intensidade do modo AUTO</small></span><div class="hv-clim-seg"><button type="button" data-ca="comfort" data-ccomfort="1">ECO</button><button type="button" data-ca="comfort" data-ccomfort="2">PADRÃO</button><button type="button" data-ca="comfort" data-ccomfort="3">FORTE</button></div></div>
+              <button type="button" class="hv-clim-row" data-ca="toggle" data-ct="autoDefrost" data-cp="autoDefrost"><span class="k">Desembaçamento automático</span><span class="hv-clim-sw"></span></button>
+              <button type="button" class="hv-clim-row" data-ca="toggle" data-ct="limit" data-cp="limit"><span class="k">Limite de bateria<small>Desliga frio e calor com a bateria baixa</small></span><span class="hv-clim-sw"></span></button>
+              <button type="button" class="hv-clim-row" data-ca="pref" data-ct="maxAcUnlock" data-cp="maxAcUnlock"><span class="k">Máx. A/C ao destravar<small>Impulse: resfria a cabine quente ao abrir o carro</small></span><span class="hv-clim-sw"></span></button>
+              <button type="button" class="hv-clim-row" data-ca="pref" data-ct="ventWithAc" data-cp="ventWithAc"><span class="k">Ventilar bancos com o A/C<small>Impulse: liga a ventilação junto do A/C</small></span><span class="hv-clim-sw"></span></button>
+            </div>
+          </section>
         </aside>
       </div>
     </sc-if>
@@ -8595,13 +8640,24 @@ const CAR_HVAC = {
   ventD: 'car.comfort_setting.driver_seat_ventilation_level',
   ventP: 'car.comfort_setting.passenger_seat_ventilation_level',
   ventMax: 'car.comfort_setting.seat_ventilation_max_level',
+  // Impulse's own settings, not CAN: published by Impulse on the same bus and
+  // written back through the same allowlisted broadcast.
+  maxAcUnlock: 'app.impulse.max_ac_on_unlock',
+  ventWithAc: 'app.impulse.seat_vent_with_ac',
   outside: 'car.basic.outside_temp',
+  // Cabin temperature. Impulse already monitors it; its own Max-AC routine
+  // treats >= 85 / <= -40 as the sensor not being ready, and so do we.
+  inside: 'car.basic.inside_temp',
 };
 const CAR_HVAC_FIELD = Object.keys(CAR_HVAC).reduce((m, f) => { m[CAR_HVAC[f]] = f; return m; }, {});
-const CLIM_BOOL = { power: 1, auto: 1, sync: 1, ac: 1, front: 1, rear: 1, anion: 1, aqs: 1, heating: 1, autoDefrost: 1, limit: 1 };
+const CLIM_BOOL = { power: 1, auto: 1, sync: 1, ac: 1, front: 1, rear: 1, anion: 1, aqs: 1, heating: 1, autoDefrost: 1, limit: 1, maxAcUnlock: 1, ventWithAc: 1 };
 // Long enough for a round trip through Impulse and the bus; a write that never
 // echoes reverts to what the car last said instead of showing a value it lacks.
 const CLIM_PENDING_MS = 4000;
+// Weather for the rail card: refreshed every half hour, dropped after a day.
+const WEATHER_TTL_MS = 30 * 60 * 1000;
+const WEATHER_STALE_MS = 24 * 60 * 60 * 1000;
+const WEATHER_DAY_NAMES = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 const CLIM_AIR_MODES = [
   { v: 0, id: 'face' }, { v: 1, id: 'facefeet' }, { v: 2, id: 'feet' }, { v: 3, id: 'feetglass' },
 ];
@@ -8901,7 +8957,9 @@ const H6_CLOCK_RAIL_OPTIONS = [
 ];
 const H6_BOTTOM_CARD_CATALOG = [
   { id: 'navigation', title: 'Navigation', action: 'openNavigation' },
-  { id: 'climate', title: 'Climate', action: 'openClimate' },
+  // Tapping the icon turns the climate on or off; the card body opens CLIMA.
+  // The card is a weather glance that opens CLIMA; power lives in the popup.
+  { id: 'climate', title: 'Climatização', action: 'openClimate' },
   { id: 'consumption', title: 'Consumo', action: 'openConsumption' },
   { id: 'media', title: 'Media', action: 'openMediaApp', longAction: 'openMedia' },
   { id: 'range', title: 'Range', action: 'openRange' },
@@ -10697,6 +10755,9 @@ class Component extends DCLogic {
     if (key === CAR_SIGNALS.aaSession) { this._applyAaSession(value); return; }
     if (key === CAR_SIGNALS.navDirections) { this._applyNavDirections(value); return; }
     if (key === CAR_SIGNALS.place) { this._applyPlaceGlance(value); return; }
+    // Impulse's own settings ride the same bus but are not the car talking:
+    // they must not keep doors/tyres/modes looking live while the CAN is quiet.
+    if (key === CAR_HVAC.maxAcUnlock || key === CAR_HVAC.ventWithAc) { this._applyClimateSignal(key, value); return; }
     this._carBusAt = this._carSignalAt[key];
     if (CAR_HVAC_FIELD[key]) { this._applyClimateSignal(key, value); return; }
     // Drive-time bus load, surfaced through window.__perf() -> TelemetryBridge
@@ -10876,6 +10937,9 @@ class Component extends DCLogic {
       try { obj = JSON.parse(text); } catch (e) { return; }
     }
     if (!obj || typeof obj !== 'object') return;
+    // Coarse position (2 decimals) rides along for the weather lookup.
+    const lat = Number(obj.lat), lon = Number(obj.lon);
+    if (isFinite(lat) && isFinite(lon)) this._weatherAt(lat, lon);
     const neighborhood = String(obj.neighborhood == null ? '' : obj.neighborhood).trim();
     const city = String(obj.city == null ? '' : obj.city).trim();
     const street = String(obj.street == null ? '' : obj.street).trim();
@@ -14942,7 +15006,8 @@ class Component extends DCLogic {
       labelColor: s.nightMode ? '#c8daea' : '#2b3037',
       hintColor: s.nightMode ? 'rgba(180,210,235,0.55)' : '#6a7077',
       rootClass: (effTheme === 'light' ? 'hv-widgets-light' : '')
-        + (s.centerFill === 'mixed' ? ' hv-fill-mixed' : ''),
+        + (s.centerFill === 'mixed' ? ' hv-fill-mixed' : '')
+        + (s.focusedCardType ? ' hv-card-pop-open' : ''),
       widgetThemeLabel: themeMode === 'auto'
         ? 'AUTO'
         : (effTheme === 'light' ? 'ESCURO' : 'CLARO'),
@@ -37771,6 +37836,10 @@ class Component extends DCLogic {
   }
 
   _openFocusedCard(type) {
+    if (this.state.focusedCardType === type) {
+      this._closeFocusedCard();
+      return;
+    }
     const action = this._cardAction(type);
     if (action.kind === 'desktop' && action.desktopId) {
       const i = (this._desktops || []).findIndex((d) => d.id === action.desktopId);
@@ -38385,6 +38454,14 @@ class Component extends DCLogic {
       // ENERGIA and RANGE carry action buttons beside the close button.
       focusedCardHeadClass: '',
       closeFocusedCard: () => this._closeFocusedCard(),
+      // The expand tab, the compact pill and the two full-pane overlays are
+      // keyed from here for every card, so none of them can keep a stale
+      // Consumo value while another card is open.
+      focusedConsumptionGrowClass: type === 'consumption' && !this._energyPopupWideOn() ? 'on' : '',
+      focusedConsumptionShrinkClass: type === 'consumption' && this._energyPopupWideOn() ? 'on' : '',
+      focusedConsumptionMapMaxOpen: false,
+      focusedConsumptionSettingsOpen: false,
+      focusedConsumptionHeadDetail: false,
       // Price of a refuel / charge just detected (owner, 2026-09-19).
       energyAskOpen: !!this.state.energyAsk,
       energyAskTitle: this.state.energyAsk ? this.state.energyAsk.title : '',
@@ -38816,7 +38893,8 @@ class Component extends DCLogic {
         Object.assign(this._climConf, {
           power: true, driver: 22, pass: 22, fan: 3, auto: true, recirc: false, blower: 0, sync: true,
           ac: true, front: false, rear: false, anion: true, aqs: true, heating: false, pm: 8,
-          comfort: 2, autoDefrost: true, limit: true, ventD: 1, ventP: 0, ventMax: 3, outside: 27,
+          comfort: 2, autoDefrost: true, limit: true, ventD: 1, ventP: 0, ventMax: 3, outside: 27, inside: 26,
+          maxAcUnlock: false, ventWithAc: false,
         });
       }
     }
@@ -38843,7 +38921,9 @@ class Component extends DCLogic {
       return n.length ? Math.max.apply(null, n) : null;
     }
     const n = Number(s);
-    return isFinite(n) ? n : null;
+    if (!isFinite(n)) return null;
+    if ((field === 'inside' || field === 'outside') && (n >= 85 || n <= -40)) return null;
+    return n;
   }
 
   _applyClimateSignal(key, value) {
@@ -38942,6 +39022,12 @@ class Component extends DCLogic {
     this._climSchedulePaint();
   }
 
+  /** "22,5°" for the wheel's greyed neighbours. */
+  _climTempText(v) {
+    if (v == null || !isFinite(v)) return '';
+    return String(Math.round(v * 2) / 2).replace('.', ',') + '°';
+  }
+
   _climFmtTemp(v) {
     if (v == null || !isFinite(v)) return '—';
     const w = Math.floor(v);
@@ -38983,23 +39069,26 @@ class Component extends DCLogic {
       root.classList.toggle('nosig', src === 'nosignal');
       const air = CLIM_AIR_MODES.find((m) => m.v === v.blower);
       root.setAttribute('data-air', on ? (air ? air.id : 'face') : 'none');
-      root.style.setProperty('--clim-flow-s', (1.7 - Math.max(1, v.fan || 1) * 0.17).toFixed(2) + 's');
-      root.style.setProperty('--clim-flow-o', (0.35 + Math.max(1, v.fan || 1) * 0.09).toFixed(2));
-      setHtml(root, '[data-cv="driver"]', src === 'nosignal' ? '—' : this._climFmtTemp(v.driver));
-      setHtml(root, '[data-cv="pass"]', src === 'nosignal' ? '—' : this._climFmtTemp(v.pass));
-      const outside = v.outside != null && isFinite(v.outside) ? Math.round(v.outside) + '°' : '—';
-      setText(root, '[data-cv="outside"]', outside);
+      const fmt = (x) => (src === 'nosignal' ? '—' : this._climFmtTemp(x));
+      ['driver', 'pass'].forEach((zone) => {
+        const t = v[zone];
+        setHtml(root, '[data-cv="' + zone + '"]', fmt(t));
+        // The wheel's neighbours are what say "you can swipe this".
+        setText(root, '[data-cv="' + zone + 'Prev"]', t == null || src === 'nosignal' || t <= v.tMin ? '' : this._climTempText(t - 0.5));
+        setText(root, '[data-cv="' + zone + 'Next"]', t == null || src === 'nosignal' || t >= v.tMax ? '' : this._climTempText(t + 0.5));
+      });
+      const deg = (x) => (x == null || !isFinite(x) ? '—' : String(Math.round(x * 2) / 2).replace('.', ',') + '°');
+      setText(root, '[data-cv="outside"]', deg(v.outside));
+      setText(root, '[data-cv="inside"]', deg(v.inside));
       setText(root, '[data-cv="mode"]', src === 'nosignal' ? 'SEM SINAL DO CARRO'
         : (!v.power ? 'DESLIGADO' : (v.auto ? 'AUTOMÁTICO' : 'MANUAL')) + (src === 'demo' ? ' · DEMO' : ''));
-      setText(root, '[data-cv="power"]', v.power ? 'LIGADO' : 'DESLIGADO');
       const fanMax = v.fanMax || 7;
-      setText(root, '[data-cv="fan"]', on ? (v.fan || 0) + ' / ' + fanMax : '—');
       root.querySelectorAll('[data-cfan] i').forEach((n, i) => {
         n.style.display = i < fanMax ? '' : 'none';
         n.classList.toggle('on', on && i < (v.fan || 0));
       });
       root.querySelectorAll('[data-ct]').forEach((n) => n.classList.toggle('on', !!v[n.getAttribute('data-ct')]));
-      root.querySelectorAll('.hv-clim-tile[data-ca="power"]').forEach((n) => n.classList.toggle('on', src !== 'nosignal' && !!v.power));
+      root.querySelectorAll('[data-ca="power"]').forEach((n) => n.classList.toggle('on', src !== 'nosignal' && !!v.power));
       root.querySelectorAll('[data-cair]').forEach((n) => n.classList.toggle('on', on && Number(n.getAttribute('data-cair')) === v.blower));
       root.querySelectorAll('[data-ccomfort]').forEach((n) => n.classList.toggle('on', Number(n.getAttribute('data-ccomfort')) === v.comfort));
       root.querySelectorAll('[data-cvent]').forEach((n) => {
@@ -39007,27 +39096,39 @@ class Component extends DCLogic {
         const lvl = v[f] || 0;
         n.style.display = v.ventMax > 0 ? '' : 'none';
         n.classList.toggle('lit', lvl > 0);
-        const cap = n.querySelector('.cap');
-        const text = 'VENTILAÇÃO · ' + (lvl ? lvl : 'DESL.');
-        if (cap && cap.textContent !== text) cap.textContent = text;
-        n.querySelectorAll('.dots i').forEach((d, i) => {
+        n.querySelectorAll('.leds i').forEach((d, i) => {
           d.style.display = i < v.ventMax ? '' : 'none';
           d.classList.toggle('on', i < lvl);
         });
       });
       const pmOk = v.pm != null && isFinite(v.pm) && on;
       setText(root, '[data-cv="pm"]', pmOk ? String(Math.round(v.pm)) : '—');
-      const q = !pmOk ? '' : (v.pm <= 12 ? 'EXCELENTE' : (v.pm <= 35 ? 'BOM' : (v.pm <= 75 ? 'MODERADO' : 'RUIM')));
-      setText(root, '[data-cv="pmq"]', q);
+      setText(root, '[data-cv="pmq"]', !pmOk ? '' : (v.pm <= 12 ? 'EXCELENTE' : (v.pm <= 35 ? 'BOM' : (v.pm <= 75 ? 'MODERADO' : 'RUIM'))));
       root.querySelectorAll('[data-cp]').forEach((n) => n.classList.toggle('pending', !!pend[n.getAttribute('data-cp')]));
-      const car = root.querySelector('.hv-clim-car');
-      if (car) {
-        car.classList.toggle('front', on && !!v.front);
-        car.classList.toggle('rear', !!v.rear);
-        car.classList.toggle('ventD', (v.ventD || 0) > 0);
-        car.classList.toggle('ventP', (v.ventP || 0) > 0);
-      }
+      const cabin = this._climCabinSrc(on ? (air ? air.id : 'face') : 'off');
+      root.querySelectorAll('.hv-clim-car img').forEach((n) => { if (n.getAttribute('src') !== cabin) n.setAttribute('src', cabin); });
     });
+  }
+
+  /**
+   * The cabin render for an airflow mode, in the widget theme now on screen.
+   * Built by scripts/build-clima-cabin.mjs from assets/_source/clima.
+   */
+  _climCabinSrc(mode) {
+    const root = document.getElementById('hv-root');
+    const theme = root && root.classList.contains('hv-widgets-light') ? 'day' : 'night';
+    if (!this._climCabinWarm) {
+      // Swapped on a tap: without this the first switch shows an empty frame.
+      this._climCabinWarm = [];
+      ['off', 'face', 'facefeet', 'feet', 'feetglass'].forEach((m) => {
+        ['day', 'night'].forEach((t) => {
+          const img = new Image();
+          img.src = './assets/ui/clima/' + m + '-' + t + '.webp';
+          this._climCabinWarm.push(img);
+        });
+      });
+    }
+    return './assets/ui/clima/' + mode + '-' + theme + '.webp';
   }
 
   _climatePopupWideOn() {
@@ -39066,15 +39167,26 @@ class Component extends DCLogic {
     }, true);
     document.addEventListener('pointermove', (e) => {
       if (!drag || e.pointerId !== drag.id) return;
-      const d = drag.kind === 'temp' ? drag.y - e.clientY : e.clientX - drag.x;
+      if (drag.kind === 'fan') {
+        const bar = drag.el.querySelector('[data-cfan]');
+        if (!bar) return;
+        if (!drag.moved && Math.abs(e.clientX - drag.x) < 8) return;
+        if (!drag.moved) { drag.moved = true; drag.el.classList.add('scrub'); }
+        const r = bar.getBoundingClientRect();
+        const max = this._climModel().fanMax || 7;
+        const lvl = Math.max(1, Math.min(max, Math.ceil(((e.clientX - r.left) / r.width) * max)));
+        if (lvl !== drag.last) { drag.last = lvl; this._climStage('fan', lvl); }
+        e.preventDefault();
+        return;
+      }
+      const d = drag.y - e.clientY;
       if (!drag.moved && Math.abs(d) < 8) return;
       if (!drag.moved) { drag.moved = true; drag.el.classList.add('scrub'); }
-      const n = Math.round(d / (drag.kind === 'temp' ? 22 : 44));
+      const n = Math.round(d / (drag.kind === 'temp' ? 34 : 44));
       if (n === drag.last) return;
       drag.last = n;
-      if (drag.kind === 'temp') this._climStage(drag.zone, clampT(drag.start + n * 0.5));
-      else this._climStage('fan', clampF(drag.start + n));
       e.preventDefault();
+      if (drag.kind === 'temp') this._climStage(drag.zone, clampT(drag.start + n * 0.5));
     }, { passive: false, capture: true });
     const end = (e) => {
       if (!drag || (e && e.pointerId !== drag.id)) return;
@@ -39096,6 +39208,7 @@ class Component extends DCLogic {
       if (!this._climCanWrite()) return;
       const v = view();
       if (act === 'power') { this._climWrite('power', !v.power); return; }
+      if (act === 'pref') { const f = el.getAttribute('data-ct'); this._climWrite(f, !v[f]); return; }
       if (!v.power) return;
       if (act === 'temp') {
         const step = t.closest('[data-step]');
@@ -39109,7 +39222,7 @@ class Component extends DCLogic {
         else if (seg) this._climStage('fan', clampF(Array.prototype.indexOf.call(seg.parentNode.children, seg) + 1));
         return;
       }
-      if (act === 'toggle') { const f = el.getAttribute('data-ct'); this._climWrite(f, !v[f]); return; }
+      if (act === 'toggle' || act === 'pref') { const f = el.getAttribute('data-ct'); this._climWrite(f, !v[f]); return; }
       if (act === 'air') { this._climWrite('blower', Number(el.getAttribute('data-cair'))); return; }
       if (act === 'comfort') { this._climWrite('comfort', Number(el.getAttribute('data-ccomfort'))); return; }
       if (act === 'vent') {
@@ -39119,21 +39232,122 @@ class Component extends DCLogic {
     }, true);
   }
 
-  /** Rail card text. */
+  // ── Weather, for the CLIMATIZAÇÃO rail card ─────────────────────────────
+  //
+  // Open-Meteo: no key, CORS-open, and it answers with WMO codes. The car
+  // supplies the temperature (its own sensor is what the driver trusts); the
+  // service supplies the SKY — now and the next days.
+  //
+  // Position comes from PlaceGlance rounded to 2 decimals (~1 km). Nothing is
+  // fetched until the car reports a fix, the answer is cached for
+  // WEATHER_TTL_MS, and a failed or offline lookup simply leaves the card
+  // without a sky rather than showing a stale one.
+
+  _weatherAt(lat, lon) {
+    const at = { lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100 };
+    const prev = this._wxAt;
+    this._wxAt = at;
+    const moved = !prev || Math.abs(prev.lat - at.lat) > 0.05 || Math.abs(prev.lon - at.lon) > 0.05;
+    if (moved) this._weatherFetch(true);
+    else this._weatherFetch(false);
+  }
+
+  _weatherModel() {
+    if (this._wx === undefined) {
+      this._wx = null;
+      try {
+        const raw = localStorage.getItem('h6_weather');
+        const saved = raw ? JSON.parse(raw) : null;
+        // A forecast older than a day says nothing about today's sky.
+        if (saved && Date.now() - saved.at < WEATHER_STALE_MS) this._wx = saved;
+      } catch (e) {}
+      if (!this._androidApp || this._demoPreview) {
+        const day = (n) => WEATHER_DAY_NAMES[(new Date().getDay() + n) % 7];
+        this._wx = { at: Date.now(), demo: true, code: 1, days: [
+          { d: day(1), code: 3, max: 29 }, { d: day(2), code: 80, max: 27 },
+          { d: day(3), code: 0, max: 31 }, { d: day(4), code: 61, max: 24 }] };
+      }
+    }
+    return this._wx;
+  }
+
+  _weatherFetch(force) {
+    const at = this._wxAt;
+    if (!at || typeof fetch !== 'function') return;
+    const now = Date.now();
+    if (!force && this._wxFetchedAt && now - this._wxFetchedAt < WEATHER_TTL_MS) return;
+    if (this._wxFetching) return;
+    this._wxFetching = true;
+    this._wxFetchedAt = now;
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + at.lat + '&longitude=' + at.lon
+      + '&current=weather_code&daily=weather_code,temperature_2m_max&forecast_days=5&timezone=auto';
+    fetch(url).then((r) => (r.ok ? r.json() : null)).then((j) => {
+      this._wxFetching = false;
+      if (!j || !j.current || !j.daily || !Array.isArray(j.daily.time)) return;
+      const days = [];
+      for (let i = 1; i < j.daily.time.length && days.length < 4; i++) {
+        const when = new Date(j.daily.time[i] + 'T12:00:00');
+        days.push({
+          d: WEATHER_DAY_NAMES[when.getDay()],
+          code: Number(j.daily.weather_code[i]),
+          max: Math.round(Number(j.daily.temperature_2m_max[i])),
+        });
+      }
+      this._wx = { at: Date.now(), code: Number(j.current.weather_code), days: days };
+      try { localStorage.setItem('h6_weather', JSON.stringify(this._wx)); } catch (e) {}
+      this._syncDockIndicators();
+    }).catch(() => { this._wxFetching = false; });
+  }
+
+  /** WMO weather code -> one of assets/ui/icons/weather. */
+  _weatherIconFor(code) {
+    const c = Number(code);
+    if (!isFinite(c)) return '';
+    if (c === 0) return this.state.nightMode ? 'night' : 'sunny';
+    if (c <= 2) return 'partly-cloudy';
+    if (c === 3) return 'cloudy';
+    if (c === 45 || c === 48) return 'fog';
+    if (c >= 95) return 'lightning';
+    if (c >= 71 && c <= 77) return 'snowy';
+    if (c >= 80 && c <= 82) return 'pouring';
+    if (c >= 51 && c <= 67) return 'rainy';
+    return 'cloudy';
+  }
+
+  /**
+   * Rail card. The big number is the CABIN temperature — what you feel, and
+   * the reason you would reach for the card — with outside and the set point
+   * under it. Tapping the icon alone toggles the climate (iconAction);
+   * tapping the card opens the popup, like every other rail card.
+   */
   _climRail() {
     const v = this._climView();
     const src = this._climSource();
-    if (src === 'nosignal') return { summary: 'Sem sinal do carro', primary: '—°', secondary: 'SEM SINAL', metricA: '', metricB: '', progress: 0 };
-    const t = (x) => (x == null || !isFinite(x) ? '—' : (Math.round(x * 2) / 2).toString().replace('.', ',')) + '°';
-    if (!v.power) return { summary: 'Desligado · fora ' + t(v.outside), primary: t(v.driver), secondary: 'DESLIGADO', metricA: 'FORA ' + t(v.outside), metricB: '', progress: 0 };
-    return {
-      summary: t(v.driver) + (v.sync ? '' : ' / ' + t(v.pass)) + ' · Vent. ' + (v.fan || 0),
-      primary: t(v.driver),
-      secondary: v.auto ? 'AUTOMÁTICO' : 'MANUAL',
-      metricA: 'VENT. ' + (v.fan || 0) + '/' + (v.fanMax || 7),
-      metricB: v.ac ? 'A/C' : '',
-      progress: Math.round(((v.fan || 0) / (v.fanMax || 7)) * 100),
+    const wx = this._weatherModel();
+    const t = (x) => (x == null || !isFinite(x) ? '—' : String(Math.round(x * 2) / 2).replace('.', ',')) + '°';
+    const forecast = !wx || !wx.days ? ''
+      : wx.days.map((d) => d.d + '|' + this._weatherIconFor(d.code) + '|' + d.max + '°').join(';');
+    const base = {
+      weatherIcon: wx ? this._weatherIconFor(wx.code) : '',
+      forecast: forecast,
+      inside: src === 'nosignal' ? '' : t(v.inside),
+      hint: 'Toque para abrir os controles',
     };
+    if (src === 'nosignal') {
+      return Object.assign(base, { summary: 'Sem sinal do carro', primary: '—°', secondary: 'SEM SINAL DO CARRO',
+        metricA: '', metricB: '', progress: 0, state: 'unavailable' });
+    }
+    return Object.assign(base, {
+      // The rail summary is one line of text for shells that show no graphic.
+      summary: 'Fora ' + t(v.outside) + ' · dentro ' + t(v.inside)
+        + (v.power ? ' · ajuste ' + t(v.driver) : ' · desligado'),
+      primary: t(v.outside),
+      secondary: v.power ? (v.auto ? 'AUTOMÁTICO' : 'MANUAL') : 'DESLIGADO',
+      metricA: 'DENTRO ' + t(v.inside),
+      metricB: v.power ? 'AJUSTE ' + t(v.driver) : '',
+      progress: v.power ? Math.round(((v.fan || 0) / (v.fanMax || 7)) * 100) : 0,
+      state: v.power ? 'on' : 'off',
+    });
   }
 
   _climateWidgetView(item) {
@@ -43942,6 +44156,9 @@ class Component extends DCLogic {
       case 'openNavigation':
         this._openNavigationApp();
         break;
+      case 'toggleClimatePower':
+        this._climWrite('power', !this._climView().power);
+        break;
       case 'cycleDriveMode':
         this._cycleDriveRoadMode();
         break;
@@ -44116,11 +44333,16 @@ class Component extends DCLogic {
         appPackage: navigation.navigationAppPackage || '',
       },
       climate: {
+        state: climRail.state,
         primary: climRail.primary,
         secondary: climRail.secondary,
         metricA: climRail.metricA,
         metricB: climRail.metricB,
         progress: climRail.progress,
+        weatherIcon: climRail.weatherIcon,
+        forecast: climRail.forecast,
+        inside: climRail.inside,
+        hint: climRail.hint,
       },
       consumption: {
         primary: energyRail.primary,
