@@ -2582,7 +2582,7 @@ public final class MainActivity extends Activity {
             }
 
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setTextSize(Math.max(9f, h * .145f));
+            paint.setTextSize(Math.max(8f, h * .13f));
             fill(muted);
             String hint = descriptor.hintText == null ? "" : descriptor.hintText;
             if (!hint.isEmpty()) c.drawText(ellipsizeStatusText(hint, w * .58f), pad, h * .88f, paint);
