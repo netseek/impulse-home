@@ -242,7 +242,7 @@ assert.match(html, /sunroofLevel:\s*status\.statusSunroofPct/,
   'web status bridge must forward sunroof position');
 // The widget stage is the popup's tap target; controls are its siblings,
 // never buttons nested inside the stage button.
-assert.match(html, /<div class="hv-status \{\{ wg\.statusSizeClass \}\}"[^>]*>\s*<button type="button" class="hv-status-stage"/,
+assert.match(html, /<div class="hv-status \{\{ wg\.statusSizeClass \}\}"[^>]*>\s*(?:<sc-if[^>]*>)?\s*<button type="button" class="hv-status-stage"/,
   'status widget controls must sit beside the stage, not inside it');
 assert.match(html, /\.hv-status-card-tire\.front-left \{ left:-62%/,
   'compact web tire pressures must sit outside the vehicle');
