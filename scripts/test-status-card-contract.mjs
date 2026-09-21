@@ -101,12 +101,13 @@ all(html, ['this._carDoorSlots = slots.slice()', 'this._carDoorSlots = null;', '
 const statusView = block(html, '  _statusWidgetView(');
 assert.ok(!html.includes('Estados alternados automaticamente'),
   'demo mode must not show redundant automatic-state explanatory copy');
-all(statusView, ['statusAriaLabel', 'onStatusOpen', 'statusMetrics', 'statusRoof', 'statusWindows', 'statusSeatBelts', 'statusTires', 'statusWindowControls', 'statusSunroofInput', 'statusCurtainInput', 'this._openRoofLevelPopup()'], 'widget accessibility, unified data, and opening');
+all(statusView, ['statusAriaLabel', 'onStatusOpen', 'statusRoof', 'statusWindows', 'statusSeatBelts', 'statusTires', 'statusWindowControls', 'statusSunroofInput', 'statusCurtainInput', 'this._openRoofLevelPopup()'], 'widget accessibility, unified data, and opening');
 assert.match(statusView, /statusOpenRoofControls: .*_openRoofLevelPopup\(\)/, 'roof area must reuse the canonical roof popup');
 assert.match(statusView, /statusSunroofInput: roofInput\('sunroof'\)/, 'large status surface must reuse the canonical sunroof range handler');
 assert.match(statusView, /statusCurtainInput: roofInput\('curtain'\)/, 'large status surface must reuse the canonical sunshade range handler');
-all(statusView, ['statusIsFull: false', 'statusIsCompact: true', 'statusDoorStat', 'statusGlassStat', 'statusBeltStat', 'statusTireStat'],
-  'status widgets must stay within the compact catalog sizes');
+all(statusView, ['statusShowSummary', 'statusShowActions', 'statusShowSliders', 'statusDoorStat', 'statusGlassStat', 'statusBeltStat', 'statusTireStat'],
+  'status widgets must pick their content per catalog size');
+assert.ok(!/statusIsFull|statusMetrics/.test(html), 'the dead full-size status widget and its metric strip must stay gone');
 all(statusView, ['statusWindowsToggleAll', 'statusRoofToggleAll', 'statusTrunkToggle'],
   'unified status surfaces must expose contextual whole-vehicle toggles');
 assert.match(statusView, /statusTrunkToggle:[\s\S]*?_toggleStatusTrunk/,
@@ -141,8 +142,8 @@ assert.equal((popupMarkup.match(/data-hs-roof-context="secondary" data-hs-roof-a
   'the right-hand action below both roof sliders must always be open');
 assert.ok(!popupMarkup.includes('data-hs-roof-toggle='),
   'popup must not retain the redundant fourth roof control beside either slider');
-assert.equal((popupMarkup.match(/data-hs-toggle-all=/g) || []).length, 3,
-  'popup footer must contain window, roof and tailgate toggles');
+assert.equal((popupMarkup.match(/data-hs-toggle-all=/g) || []).length, 2,
+  'popup must keep exactly the roof and tailgate whole-car toggles under the car');
 assert.ok(!popupMarkup.includes('data-hs-roof-close-all') && !popupMarkup.includes('data-hs-roof-open-all'),
   'popup must not retain separate one-way roof footer buttons');
 const envelope = block(html, '  _statusEnvelopeSnapshot(');
@@ -239,8 +240,10 @@ assert.match(html, /seatBeltStates:\s*status\.statusSeatBelts\.map/,
   'web status bridge must forward individual restraint states');
 assert.match(html, /sunroofLevel:\s*status\.statusSunroofPct/,
   'web status bridge must forward sunroof position');
-assert.match(html, /\.hv-status-1x1 \.hv-status-copy[^}]*display:none/,
-  'compact web status cards must remove the competing text-summary column');
+// The widget stage is the popup's tap target; controls are its siblings,
+// never buttons nested inside the stage button.
+assert.match(html, /<div class="hv-status \{\{ wg\.statusSizeClass \}\}"[^>]*>\s*<button type="button" class="hv-status-stage"/,
+  'status widget controls must sit beside the stage, not inside it');
 assert.match(html, /\.hv-status-card-tire\.front-left \{ left:-62%/,
   'compact web tire pressures must sit outside the vehicle');
 // Asserts the INTENT -- the readout hangs off the bodywork -- not one offset,
@@ -272,10 +275,11 @@ all(statusView, ['contextualRoofActions', "pct <= 2", "action('open', 'ABRIR')",
 const roofSnap = block(html, '  _snapRoofControlLevel(');
 all(roofSnap, ["kind === 'sunroof'", '_snapSunroofVentLevel', "kind === 'curtain'", '50', 'band'],
   'roof sliders must snap to ventilation and curtain half-open presets');
-assert.match(popupMarkup, /<small>ABERTURAS<\/small><strong data-hs-vehicle-doors>/,
-  'vehicle status strip must render a two-row label and larger value');
-assert.match(html, /\.hv-hs-vehicle-stats \{[^}]*bottom:-39px/,
-  'vehicle status cards must align vertically with the three popup footer actions');
+// Owner, 2026-09-21: the count strip repeated what the car picture shows, and
+// FECHAR VIDROS duplicated the window panel's own buttons.
+assert.ok(!popupMarkup.includes('data-hs-vehicle-doors'), 'popup must not bring back the count strip');
+assert.ok(!popupMarkup.includes('data-hs-toggle-all="windows"'), 'popup must not bring back the redundant close-windows action');
+assert.ok(popupMarkup.includes('data-hs-status-cfg>') && popupMarkup.includes('data-hs-pressure-unit='), 'popup must offer the tire-unit settings');
 const widgetSizes = block(html, '  _widgetSizes(');
 assert.ok(!widgetSizes.includes('concat([[cols, rows]])'),
   'the 6x2 board size must not be injected into every widget');

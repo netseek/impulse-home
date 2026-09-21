@@ -516,7 +516,7 @@ for (const gone of ['ecoGlyph', 'boltGlyph', 'snowGlyph', 'duneGlyph', 'mudGlyph
 // ---------------------------------------------------------------------------
 const cssStart = html.indexOf('    .hv-driving { height:100%;');
 assert.ok(cssStart >= 0, 'missing .hv-driving styles');
-const css = html.slice(cssStart, html.indexOf('    .hv-status-body {', cssStart));
+const css = html.slice(cssStart, html.indexOf('    .hv-status { border:0;', cssStart));
 assert.ok(!/rgba\(255,\s*255,\s*255/.test(css),
   'Driving card styles must use theme tokens, not hard-coded white');
 includesAll(css, [
