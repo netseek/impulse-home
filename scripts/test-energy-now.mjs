@@ -59,22 +59,34 @@ const SCENARIOS = {
     assert.equal(moves(v.drive), 2);
     assert.equal(moves(v.fuel), 2);
   },
-  'the kW scale grows in 20 kW steps and never below -20..40': ({ tenMin }) => {
+  // Owner, 2026-09-20: the scale fits the window in round steps, so the traces
+  // fill the box; with no regen the floor is zero.
+  'the kW scale fits the data, in round steps': ({ tenMin }) => {
     const small = tenMin(series(10, () => ({ kw: 5 })), NOW);
-    assert.deepEqual([small.top, small.bottom], ['40', '-20']);
+    assert.equal(small.bottom, '0', 'no regen: floor at zero');
+    assert.ok(+small.top >= 5 && +small.top <= 10, 'small top ' + small.top);
     const big = tenMin(series(10, (i) => ({ kw: i % 2 ? 57 : -31 })), NOW);
-    assert.deepEqual([big.top, big.bottom], ['60', '-40']);
+    assert.ok(+big.top >= 57 && +big.top <= 75, 'big top ' + big.top);
+    assert.ok(+big.bottom <= -31 && +big.bottom >= -50, 'big bottom ' + big.bottom);
+  },
+  'the fuel scale fits the window too': ({ tenMin }) => {
+    const thirsty = tenMin(series(10, () => ({ kw: 5, fuel: 18, ice: true })), NOW);
+    assert.ok(+thirsty.fuelTop >= 18, 'top ' + thirsty.fuelTop);
+    const thrifty = tenMin(series(10, () => ({ kw: 5, fuel: 4, ice: true })), NOW);
+    assert.ok(+thrifty.fuelTop < +thirsty.fuelTop, 'thrifty ' + thrifty.fuelTop);
   },
   'samples older than ten minutes are not drawn': ({ tenMin }) => {
     const old = [{ t: NOW - 700000, kw: 90, kmh: 50 }];
     const v = tenMin(old.concat(series(5, () => ({ kw: 10, kmh: 50 }))), NOW);
-    assert.equal(v.top, '40');
+    // The 90 kW sample is outside the window, so it cannot stretch the scale.
+    assert.ok(+v.top <= 20, 'top ' + v.top);
   },
   'a km span keeps only the last N km': ({ chart }) => {
     // 30 min at 60 km/h = 30 km; a 10 km window holds the last ~600 samples.
     const s = series(1800, (i) => ({ kw: i < 1000 ? 90 : 10, kmh: 60, km: i / 60 }));
     const v = chart(s, NOW, { kind: 'km', span: 10, points: 0 });
-    assert.equal(v.top, '40');
+    // Only the last 10 km are in view, and they are the 10 kW stretch.
+    assert.ok(+v.top <= 20, 'top ' + v.top);
     assert.ok(Math.abs(v.km - 10) < 0.2, 'window distance ' + v.km);
   },
   'density averages into buckets': ({ chart }) => {
@@ -89,20 +101,36 @@ const SCENARIOS = {
     const v = chart(s, NOW, { kind: 'time', span: 600000, points: 0 });
     // 30 engine-on points, then one drop back to 0 where the engine stops.
     assert.equal((v.fuel.match(/L/g) || []).length, 30);
-    const zeroY = v.zero.split(' ')[1];
-    assert.ok(v.fuel.trim().endsWith(' ' + zeroY), v.fuel.slice(-30));
+    const zeroY = Number(v.zero.split(' ')[1]);
+    const lastY = Number(v.fuel.trim().split(' ').pop());
+    assert.equal(lastY, zeroY, v.fuel.slice(-30));
   },
   'fuel 0 sits on the kW zero line': ({ chart }) => {
-    const s = series(10, () => ({ kw: 10, kmh: 50, fuel: 0, ice: true }));
+    // Some regen, so the zero line sits above the floor and the two scales can differ.
+    const s = series(10, (i) => ({ kw: i === 0 ? -20 : 10, kmh: 50, fuel: 0, ice: true }));
     const v = chart(s, NOW, { kind: 'time', span: 600000, points: 0 });
-    const zeroY = v.zero.split(' ')[1];
-    assert.ok(v.fuel.includes(' ' + zeroY), v.fuel.slice(0, 40) + ' vs ' + zeroY);
+    assert.ok(Number(v.bottom) < 0, 'expected a regen floor, got ' + v.bottom);
+    const zeroY = Number(v.zero.split(' ')[1]);
+    const ys = (v.fuel.match(/[ML][\d.]+ ([\d.]+)/g) || []).map((m) => Number(m.split(' ')[1]));
+    assert.ok(ys.length > 0 && ys.every((y) => y === zeroY), v.fuel.slice(0, 40) + ' vs ' + zeroY);
   },
   'smooth densities draw curves, the finest does not': ({ chart }) => {
     const s = series(600, (i) => ({ kw: 20 * Math.sin(i / 20), kmh: 50 }));
     const soft = chart(s, NOW, { kind: 'time', span: 600000, points: 40, smooth: true });
     const fine = chart(s, NOW, { kind: 'time', span: 600000, points: 300, smooth: false });
     assert.ok(soft.drive.includes(' C') && !fine.drive.includes(' C'));
+  },
+  'averaged points do not shift as the window slides': ({ chart }) => {
+    const s = series(600, (i) => ({ kw: 10 + 10 * Math.sin(i / 7), kmh: 50 }));
+    const spec = { kind: 'time', span: 600000, points: 60 };
+    const a = chart(s, NOW, spec);
+    const b = chart(s.concat([{ t: NOW + 1000, kw: 12, kmh: 50 }]), NOW + 1000, spec);
+    const xs = (d) => (d.match(/[ML]-?[\d.]+/g) || []).map((m) => +m.slice(1));
+    const shift = xs(a.drive)[3] - xs(b.drive)[3];
+    // One second of a 10-minute window is one pixel of 600, not a re-cut bucket,
+    // and every averaged point sits where its own timestamp falls in the window.
+    assert.ok(shift > 0.5 && shift < 1.5, 'shift ' + shift);
+    assert.ok(xs(a.drive).every((x) => x >= -20 && x <= 620), 'off-window x: ' + xs(a.drive).slice(0, 3));
   },
   'a level that fell shows the used part from the start': ({ level }) => {
     const v = level(72, 58, 'ev', 34);
@@ -146,9 +174,12 @@ const MUTANTS = {
   'density ignored': ['const n = spec.points > 0 ? spec.points : 0;', 'const n = 0;'],
   'km span ignored': ['const inside = byKm ? (s) => isFinite(s.km) && s.km > kmNow - SPAN', 'const inside = byKm ? (s) => true'],
   'electric share over all distance': ['evShare: knownKm >= 0.05 ? evKm / knownKm : NaN,', 'evShare: km >= 0.05 ? evKm / km : NaN,'],
-  'kW scale floor removed': ['const hi = Math.max(40, Math.ceil(maxKw / 20) * 20);', 'const hi = Math.max(0, Math.ceil(maxKw / 20) * 20);'],
+  'kW scale ignores the data': ['    const hi = topFor(kwStep);', '    const hi = 40;'],
+  'fuel scale ignores the data': ['const fuelTop = Math.max(5, nice(Math.max(1, maxFuel / 2)) * 2);', 'const fuelTop = 20;'],
+  'buckets cut from the window edge again': ['const keyOf = byKm ? (s) => Math.floor(s.km / wide) : (s) => Math.floor(s.t / wide);',
+    'const keyOf = byKm ? (s) => Math.floor((s.km - (kmNow - SPAN)) / wide) : (s) => Math.floor((s.t - (now - SPAN)) / wide);'],
   'fuel drawn with the engine off': ['fuel: s.ice === false ? NaN : s.fuel,', 'fuel: s.fuel,'],
-  'fuel scale off the zero line': ['const yf = (f) => (zeroY - Math.max(0, Math.min(20, f)) / 20 * zeroY).toFixed(1);', 'const yf = (f) => ((20 - Math.max(0, Math.min(20, f))) / 20 * H).toFixed(1);'],
+  'fuel scale off the zero line': ['const yf = (f) => (zeroY - Math.max(0, Math.min(fuelTop, f)) / fuelTop * zeroY).toFixed(1);', 'const yf = (f) => ((fuelTop - Math.max(0, Math.min(fuelTop, f))) / fuelTop * H).toFixed(1);'],
   'smoothing never applied': ['if (!spec.smooth || xy.length < 3)', 'if (true)'],
   'fuel run left floating': ['if (after) xy.push([Number(x(after)), z]);', ''],
   'old samples kept': [': (s) => s.t > now - SPAN;', ': (s) => true;'],

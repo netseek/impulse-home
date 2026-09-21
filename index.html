@@ -5400,36 +5400,76 @@ window.HavalSplash = (function () {
     .hv-energy small.demo,.hv-energy small.estimate { color:#f0bd65; opacity:1; }
     .hv-energy-grid { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr); gap:10px 16px; align-content:start; }
     .hv-energy-note { display:block; font-size:11px; line-height:1.35; opacity:.72; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .hv-energy-bars { flex:1; min-height:24px; display:flex; align-items:flex-end; gap:5px; }
-    .hv-energy-bars > i { flex:1; min-width:4px; border-radius:3px 3px 1px 1px; background:currentColor; opacity:.18; }
-    .hv-energy-bars > i.on { opacity:.5; }
-    .hv-energy-bars > i.today { background:var(--hv-accent); opacity:.95; }
-    /* Glance sizes (owner, 2026-09-18): the popup's zones, fewer of them.
-       1x1 now · 2x1 now+trip · 3x1 now+trip+week · 1x2 now+trip+levels
-       2x2 now+trip / levels+week · 3x2 now+trip+levels / week. */
-    .hv-energy-glance { gap:8px; padding:10px 11px; }
-    .hv-energy-glance .hv-energy-grid { gap:8px; align-content:stretch; grid-auto-rows:minmax(0,1fr); }
-    .hv-energy-glance .hv-energy-zone { padding:8px 11px; gap:4px; justify-content:center; }
-    .hv-energy-glance .hv-energy-big > b { font-size:30px; line-height:1.2; }
+    /* Widgets (owner, 2026-09-20), built from the compact AGORA pieces:
+       1x1 trip · 2x1 instant | trip · 3x1 instant | trip | chart
+       1x2 instant / trip / levels · 2x2 and 3x2 the compact popup: instant and
+       trip on the left, the 10-minute chart and the levels on the right. */
+    .hv-energy-glance { gap:6px; padding:10px 11px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
     .hv-energy-glance .hv-energy-head { line-height:1.3; }
-    .hv-energy-glance .hv-energy-big > small { font-size:12px; }
-    .hv-energy-glance .hv-energy-instant { gap:10px; }
-    .hv-energy-glance .hv-energy-instant .hv-energy-zlabel { font-size:10px; opacity:.72; }
-    .hv-energy-glance .hv-energy-tkv { gap:4px 10px; }
-    .hv-energy-glance .hv-energy-tkv li > b { font-size:15px; }
-    .hv-energy-glance .hv-energy-lrow > b { font-size:20px; }
-    .hv-energy-glance .hv-energy-week { justify-content:stretch; }
-    .hv-energy-1x1 .hv-energy-trip,.hv-energy-1x1 .hv-energy-week,.hv-energy-1x1 .hv-energy-z-levels,
-    .hv-energy-2x1 .hv-energy-week,.hv-energy-2x1 .hv-energy-z-levels,
-    .hv-energy-3x1 .hv-energy-z-levels,.hv-energy-1x2 .hv-energy-week { display:none; }
-    .hv-energy-1x1 .hv-energy-instant,.hv-energy-1x2 .hv-energy-instant { grid-template-columns:1fr 1fr; gap:8px; }
-    .hv-energy-1x1 .hv-energy-big > b { font-size:34px; }
-    .hv-energy-1x2 .hv-energy-big > b { font-size:26px; }
-    .hv-energy-2x1 .hv-energy-grid,.hv-energy-2x2 .hv-energy-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
-    .hv-energy-3x1 .hv-energy-grid,.hv-energy-3x2 .hv-energy-grid { grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr); }
-    .hv-energy-3x2 .hv-energy-week { grid-column:1 / -1; }
-    .hv-energy-2x2 .hv-energy-big > b,.hv-energy-3x2 .hv-energy-big > b { font-size:40px; }
-    .hv-energy-2x2 .hv-energy-tkv li > b,.hv-energy-3x2 .hv-energy-tkv li > b { font-size:18px; }
+    .hv-energy-glance .hv-energy-grid { gap:8px; align-content:stretch; grid-auto-rows:minmax(0,1fr); }
+    .hv-energy-glance .hv-energy-zone { padding:8px 10px; gap:4px; justify-content:center; }
+    .hv-energy-glance .hv-energy-g-trip { justify-content:space-evenly; }
+    .hv-energy-glance .hv-energy-zlabel { font-size:10px; }
+    .hv-energy-glance .hv-energy-zlabel > em { font-size:10px; }
+    .hv-energy-glance .hv-energy-instant { display:flex; justify-content:space-around; gap:8px; }
+    .hv-energy-glance .hv-energy-instant > div { flex:1 1 0; align-items:center; text-align:center; }
+    .hv-energy-glance .hv-energy-instant .hv-energy-big { flex-direction:column; align-items:center; gap:1px; }
+    .hv-energy-glance .hv-energy-big > b { font-size:30px; line-height:1.1; }
+    .hv-energy-glance .hv-energy-big > small { font-size:11px; }
+    .hv-energy-glance .hv-energy-instant .hv-energy-big.off > b { font-size:13px; min-height:34px; }
+    .hv-energy-glance .hv-energy-tkv-main,.hv-energy-glance .hv-energy-tkv-sub { grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px 8px; text-align:center; }
+    .hv-energy-glance .hv-energy-tkv-main li > b { display:flex; flex-direction:column; align-items:center; font-size:22px; line-height:1.1; }
+    .hv-energy-glance .hv-energy-tkv-main li > b > u { margin:0; font-size:10px; }
+    .hv-energy-glance .hv-energy-tkv-sub { margin-top:4px; padding-top:6px; }
+    .hv-energy-glance .hv-energy-tkv-sub li > b { font-size:14px; }
+    .hv-energy-glance .hv-energy-tkv li > small { font-size:9px; }
+    .hv-energy-glance .hv-energy-g-chart .hv-energy-tenmin { padding:0 0 2px; }
+    .hv-energy-glance .hv-energy-g-levels { display:grid; grid-template-columns:1fr 1fr; align-content:center; gap:4px 14px; }
+    .hv-energy-glance .hv-energy-lrow > b { font-size:16px; }
+    /* which pieces each size shows (owner, 2026-09-21)
+       1x1 instant over the trip · 2x1 instant | trip, chart under both
+       3x1 instant + levels | the whole trip | chart · 1x2 instant, trip, levels, chart */
+    .hv-energy-1x1 .hv-energy-g-chart,.hv-energy-1x1 .hv-energy-g-levels,.hv-energy-1x1 .hv-energy-tkv-sub,
+    .hv-energy-2x1 .hv-energy-g-levels,.hv-energy-2x1 .hv-energy-tkv-sub { display:none; }
+    /* 1x1: instant on top, the trip's three figures under it */
+    .hv-energy-1x1 .hv-energy-grid { grid-template-rows:auto minmax(0,1fr); grid-auto-rows:auto; gap:6px; }
+    .hv-energy-1x1 .hv-energy-zone { padding:6px 8px; }
+    .hv-energy-1x1 .hv-energy-big > b { font-size:24px; }
+    .hv-energy-1x1 .hv-energy-instant .hv-energy-big.off > b { font-size:11px; min-height:28px; }
+    .hv-energy-1x1 .hv-energy-tkv-main li > b { font-size:18px; }
+    .hv-energy-1x1 .hv-energy-g-trip .hv-energy-zlabel > em { display:none; }
+    /* 2x1: instant | trip on top, the chart across the bottom */
+    .hv-energy-2x1 .hv-energy-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.3fr); grid-template-rows:auto minmax(0,1fr); grid-auto-rows:auto; gap:6px; }
+    .hv-energy-2x1 .hv-energy-g-chart { grid-column:1 / -1; }
+    .hv-energy-2x1 .hv-energy-g-chart > .hv-energy-zlabel { display:none; }
+    .hv-energy-2x1 .hv-energy-zone { padding:6px 10px; }
+    .hv-energy-2x1 .hv-energy-big > b { font-size:24px; }
+    .hv-energy-2x1 .hv-energy-tkv-main li > b { font-size:18px; }
+    /* 3x1: instant with the levels under it | the whole trip | the chart */
+    .hv-energy-3x1 .hv-energy-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) minmax(0,1.1fr); grid-template-rows:auto minmax(0,1fr); grid-auto-rows:auto; }
+    .hv-energy-3x1 .hv-energy-g-instant { grid-column:1; grid-row:1; }
+    .hv-energy-3x1 .hv-energy-g-levels { grid-column:1; grid-row:2; grid-template-columns:1fr; gap:2px; }
+    .hv-energy-3x1 .hv-energy-g-trip { grid-column:2; grid-row:1 / span 2; }
+    .hv-energy-3x1 .hv-energy-g-chart { grid-column:3; grid-row:1 / span 2; }
+    .hv-energy-3x1 .hv-energy-big > b { font-size:26px; }
+    .hv-energy-3x1 .hv-energy-lrow > b { font-size:14px; }
+    /* 1x2: instant, trip, levels and the chart at the foot */
+    .hv-energy-1x2 .hv-energy-grid { grid-template-rows:auto auto auto minmax(0,1fr); grid-auto-rows:auto; gap:6px; }
+    .hv-energy-1x2 .hv-energy-g-instant { grid-row:1; } .hv-energy-1x2 .hv-energy-g-trip { grid-row:2; }
+    .hv-energy-1x2 .hv-energy-g-levels { grid-row:3; grid-template-columns:1fr; }
+    .hv-energy-1x2 .hv-energy-g-chart { grid-row:4; }
+    .hv-energy-1x2 .hv-energy-g-chart > .hv-energy-zlabel { display:none; }
+    .hv-energy-1x2 .hv-energy-tkv-sub { display:none; }
+    /* 2x2 / 3x2 (owner, 2026-09-21): instant with the levels under it on the left,
+       VIAGEM ATUAL on the right, the 10-minute chart across the bottom. */
+    .hv-energy-2x2 .hv-energy-grid,.hv-energy-3x2 .hv-energy-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr); grid-auto-rows:auto; }
+    .hv-energy-2x2 .hv-energy-g-instant,.hv-energy-3x2 .hv-energy-g-instant { grid-column:1; grid-row:1; }
+    .hv-energy-2x2 .hv-energy-g-levels,.hv-energy-3x2 .hv-energy-g-levels { grid-column:1; grid-row:2; grid-template-columns:1fr; }
+    .hv-energy-2x2 .hv-energy-g-trip,.hv-energy-3x2 .hv-energy-g-trip { grid-column:2; grid-row:1 / span 2; }
+    .hv-energy-2x2 .hv-energy-g-chart,.hv-energy-3x2 .hv-energy-g-chart { grid-column:1 / -1; grid-row:3; }
+    .hv-energy-3x2 .hv-energy-big > b { font-size:34px; }
+    .hv-energy-3x2 .hv-energy-tkv-main li > b { font-size:26px; }
+    .hv-energy-3x2 .hv-energy-g-levels { grid-template-columns:1fr 1fr; }
 
     /* ENERGY popup */
     /* Every ENERGIA pane fills the popup (owner, 2026-09-13): no scrolling; a
@@ -5565,8 +5605,12 @@ window.HavalSplash = (function () {
     .hv-energy-wide .hv-energy-big > b { font-size:52px; }
     .hv-energy-zsub { font-size:12px; opacity:.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .hv-energy-z-tenmin { gap:6px; }
+    /* The title keeps its width; the legend wraps under it when the pane is narrow. */
+    .hv-energy-z-tenmin > .hv-energy-zlabel { flex-wrap:wrap; white-space:normal; row-gap:2px; }
+    .hv-energy-z-tenmin > .hv-energy-zlabel > .hv-energy-charttitle { flex:none; overflow:visible; }
     .hv-energy-tlegend { display:inline-flex; align-items:center; gap:5px; font:400 12px/1 'Space Mono',monospace; letter-spacing:0; opacity:.85; }
     .hv-energy-tlegend > i { width:12px; height:4px; margin-left:8px; border-radius:2px; }
+    .hv-energy-tlegend > i.avg { background:linear-gradient(90deg,#f2994a 0 45%,transparent 45% 55%,#63d9e7 55% 100%); }
     .hv-energy-tlegend > i.drive { background:#63d9e7; } .hv-energy-tlegend > i.regen { background:#3ee08a; } .hv-energy-tlegend > i.fuel { background:#f2994a; } .hv-energy-tlegend > i.ev { background:#2fbf71; }
     .hv-energy-tenmin { position:relative; flex:1; min-height:0; padding:0 30px 16px 34px; }
     .hv-energy-tenmin > svg { display:block; width:100%; height:100%; overflow:visible; }
@@ -5576,6 +5620,9 @@ window.HavalSplash = (function () {
     .hv-energy-tenmin path.drive { fill:rgba(99,217,231,.3); stroke:#63d9e7; stroke-width:1.4; }
     .hv-energy-tenmin path.regen { fill:rgba(62,224,138,.3); stroke:#3ee08a; stroke-width:1.4; }
     .hv-energy-tenmin path.fuel { fill:none; stroke:#f2994a; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    /* The window's averages: a dashed line each (owner, 2026-09-20). */
+    .hv-energy-tenmin path.avgdrive { fill:none; stroke:#63d9e7; stroke-width:1.4; stroke-dasharray:6 5; opacity:.9; }
+    .hv-energy-tenmin path.avgfuel { fill:none; stroke:#f2994a; stroke-width:1.4; stroke-dasharray:6 5; opacity:.9; }
     .hv-energy-tenmin > span { position:absolute; font:12px/1 'Space Mono',monospace; opacity:.75; }
     /* Gas on the left, electric on the right (owner, 2026-09-19): fuel scale left, kW right. */
     .hv-energy-tenmin > .yl { right:0; width:30px; text-align:left; }
@@ -5683,17 +5730,26 @@ window.HavalSplash = (function () {
     .hv-card-focus-head .hv-energy-headtabs button { width:auto; height:auto; margin-left:0; min-height:36px; padding:0 12px; font:600 12px/1 'Space Mono',monospace; letter-spacing:.04em; }
     /* AGORA (owner, 2026-09-20): instant and a tall VIAGEM ATUAL on the left, the
        chart on the right with the two level bars under it. */
-    .hv-card-focus .hv-energy-focus .hv-energy-now2 { grid-template-columns:minmax(0,360px) minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) auto; }
+    .hv-card-focus .hv-energy-focus .hv-energy-now2 { grid-template-columns:minmax(0,360px) minmax(0,1fr); grid-template-rows:minmax(0,0.85fr) minmax(0,1fr) auto; }
     .hv-card-focus .hv-energy-focus .hv-energy-now2 > .hv-energy-zone:nth-child(1) { grid-column:1; grid-row:1; }
     .hv-card-focus .hv-energy-focus .hv-energy-now2 > .hv-energy-zone:nth-child(3) { grid-column:1; grid-row:2 / span 2; justify-content:space-evenly; }
     .hv-card-focus .hv-energy-focus .hv-energy-now2 > .hv-energy-z-tenmin { grid-column:2; grid-row:1 / span 2; }
     .hv-card-focus .hv-energy-focus .hv-energy-now2 > .hv-energy-z-levels { grid-column:2; grid-row:3; display:grid; grid-template-columns:1fr 1fr; align-content:center; gap:6px 18px; }
-    /* VIAGEM ATUAL has the room now: bigger figures. */
-    .hv-card-focus .hv-energy-focus .hv-energy-tkv-main li > b { font-size:26px; }
-    .hv-card-focus .hv-energy-focus .hv-energy-tkv-main li > b > u { font-size:11px; }
-    .hv-card-focus .hv-energy-focus .hv-energy-tkv-sub li > b { font-size:16px; }
-    .hv-card-focus .hv-energy-focus .hv-energy-tkv li > small { font-size:11px; }
-    .hv-card-focus .hv-energy-focus .hv-energy-zone > .hv-energy-zlabel { font-size:12px; }
+    /* VIAGEM ATUAL has the room now: values centred, unit on its own line under
+       each one, and even columns (owner, 2026-09-20). */
+    .hv-card-focus .hv-energy-focus .hv-energy-tkv-main,
+    .hv-card-focus .hv-energy-focus .hv-energy-tkv-sub { grid-template-columns:repeat(3,minmax(0,1fr)); justify-content:stretch; gap:6px 12px; text-align:center; }
+    .hv-card-focus .hv-energy-focus .hv-energy-tkv-main li > b { display:flex; flex-direction:column; align-items:center; font-size:32px; line-height:1.1; }
+    .hv-card-focus .hv-energy-focus .hv-energy-tkv-main li > b > u { margin:0; font-size:12px; }
+    .hv-card-focus .hv-energy-focus .hv-energy-tkv-sub { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .hv-card-focus .hv-energy-focus .hv-energy-tkv-sub li > b { font-size:22px; }
+    .hv-card-focus .hv-energy-focus .hv-energy-tkv li > small { font-size:12px; }
+    .hv-card-focus .hv-energy-focus .hv-energy-zone > .hv-energy-zlabel { font-size:13px; }
+    .hv-card-focus .hv-energy-focus .hv-energy-z-instant { padding-top:16px; padding-bottom:16px; justify-content:center; }
+    .hv-card-focus .hv-energy-focus .hv-energy-instant .hv-energy-big > b { font-size:42px; }
+    .hv-card-focus .hv-energy-focus .hv-energy-instant .hv-energy-big > small { font-size:14px; }
+    .hv-card-focus .hv-energy-focus .hv-energy-instant .hv-energy-big.off > b { font-size:18px; min-height:64px; }
+    .hv-card-focus .hv-energy-focus .hv-energy-instant .hv-energy-zlabel { font-size:12px; }
     /* Expanded: the levels float over the chart's bottom-left corner. */
     .hv-card-focus.wide .hv-energy-focus .hv-energy-now2 { position:relative; grid-template-rows:auto minmax(0,1fr); }
     .hv-card-focus.wide .hv-energy-focus .hv-energy-now2 > .hv-energy-z-tenmin { grid-row:1 / span 2; }
@@ -5725,7 +5781,12 @@ window.HavalSplash = (function () {
     .hv-energy-wide .hv-energy-tkv-main li > b { font-size:28px; }
     .hv-energy-wide .hv-energy-tkv-sub { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 14px; }
     .hv-energy-wide .hv-energy-tkv-sub li > b { font-size:16px; }
-    .hv-energy-level { display:flex; flex-direction:column; gap:3px; }
+    /* One row per level (owner, 2026-09-20): value, bar, change since the start. */
+    .hv-energy-level { display:grid; grid-template-columns:auto minmax(28px,1fr) auto; align-items:center; gap:3px 8px; }
+    .hv-energy-level > .hv-energy-lrow { display:contents; }
+    .hv-energy-level > .hv-energy-lrow > b { order:1; }
+    .hv-energy-level > .hv-energy-ltrack { order:2; }
+    .hv-energy-level > .hv-energy-lrow > span { order:3; flex:none; overflow:visible; text-align:right; font-size:11px; white-space:nowrap; }
     .hv-energy-lrow { display:flex; justify-content:space-between; align-items:baseline; gap:8px; white-space:nowrap; font-variant-numeric:tabular-nums; }
     .hv-energy-lrow > b { font-size:18px; font-weight:560; } .hv-energy-lrow > b.ev { color:var(--hv-readable-accent,#63d9e7); } .hv-energy-lrow > b.fuel { color:#f2994a; }
     .hv-energy-lrow > span { min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:12px; opacity:.75; }
@@ -6886,11 +6947,10 @@ window.HavalSplash = (function () {
           </sc-if>
           <sc-if value="{{ wg.isConsumption }}" hint-placeholder-val="{{ false }}">
             <sc-if value="{{ wg.consumptionGlance }}" hint-placeholder-val="{{ true }}">
-              <div class="hv-energy hv-energy-glance {{ wg.consumptionSizeClass }}">
+              <div class="hv-energy hv-energy-glance {{ wg.consumptionSizeClass }}" onClick="{{ wg.consumptionOpen }}" role="button" aria-label="Abrir consumo">
                 <div class="hv-energy-head"><span>CONSUMO</span><sc-if value="{{ wg.consumptionShowSource }}" hint-placeholder-val="{{ false }}"><small class="{{ wg.consumptionSourceClass }}">DEMO</small></sc-if></div>
                 <div class="hv-energy-grid">
-                  <section class="hv-energy-zone hv-energy-now">
-                    <p class="hv-energy-zlabel">INSTANTÂNEO</p>
+                  <section class="hv-energy-zone hv-energy-g-instant">
                     <div class="hv-energy-instant">
                       <div>
                         <p class="hv-energy-zlabel">COMBUSTÍVEL</p>
@@ -6902,25 +6962,32 @@ window.HavalSplash = (function () {
                       </div>
                     </div>
                   </section>
-                  <section class="hv-energy-zone hv-energy-trip">
-                    <p class="hv-energy-zlabel"><span data-en="tripLabel">{{ wg.consumptionTripLabel }}</span></p>
-                    <div class="hv-energy-big"><b data-en="tripFuel">{{ wg.consumptionTripFuel }}</b><small data-en="tripFuelUnit">{{ wg.consumptionTripFuelUnit }}</small></div>
-                    <ul class="hv-energy-tkv"><li><small>DISTÂNCIA</small><b data-en="tripKm">{{ wg.consumptionTripKm }}</b></li><li><small>TEMPO</small><b data-en="tripTime">{{ wg.consumptionTripTime }}</b></li><li><small>ELÉTRICO</small><b data-en="tripEvShare">{{ wg.consumptionTripEvShare }}</b></li></ul>
+                  <section class="hv-energy-zone hv-energy-g-trip">
+                    <p class="hv-energy-zlabel"><span data-en="tripLabel">{{ wg.consumptionTripLabel }}</span><em data-en="tripSince">{{ wg.consumptionTripSince }}</em></p>
+                    <ul class="hv-energy-tkv hv-energy-tkv-main">
+                      <li><small>DISTÂNCIA</small><b><i data-en="tripKmValue">{{ wg.consumptionTripKmValue }}</i><u>km</u></b></li>
+                      <li><small>COMBUSTÍVEL</small><b><i data-en="tripFuelEco">{{ wg.consumptionTripFuelEco }}</i><u data-en="tripFuelEcoUnit">{{ wg.consumptionTripFuelEcoUnit }}</u></b></li>
+                      <li><small>ELÉTRICO</small><b><i data-en="tripEvEco">{{ wg.consumptionTripEvEco }}</i><u data-en="tripEvEcoUnit">{{ wg.consumptionTripEvEcoUnit }}</u></b></li>
+                    </ul>
+                    <ul class="hv-energy-tkv hv-energy-tkv-sub">
+                      <li><small>GASOLINA</small><b data-en="tripFuelL">{{ wg.consumptionTripFuelL }}</b></li>
+                      <li><small>BATERIA</small><b data-en="tripKwh">{{ wg.consumptionTripKwh }}</b></li>
+                      <li><small>RECUPERADO</small><b data-en="tripKwhIn">{{ wg.consumptionTripKwhIn }}</b></li>
+                    </ul>
                   </section>
-                  <section class="hv-energy-zone hv-energy-z-levels">
-                    <p class="hv-energy-zlabel">NÍVEIS</p>
+                  <section class="hv-energy-zone hv-energy-g-chart">
+                    <p class="hv-energy-zlabel"><span>ÚLTIMOS 10 MIN</span></p>
+                    <div class="hv-energy-tenmin" data-fixed="10m" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg></div>
+                  </section>
+                  <section class="hv-energy-zone hv-energy-z-levels hv-energy-g-levels">
                     <div class="hv-energy-level">
-                      <div class="hv-energy-lrow"><b class="fuel" data-en="fuelText">{{ wg.consumptionFuelText }}</b><span>tanque</span></div>
-                      <div class="hv-energy-ltrack"><i class="base fuel" data-en-w="fuelBaseW" style="width:{{ wg.consumptionFuelBaseW }}"></i></div>
+                      <div class="hv-energy-lrow"><b class="fuel" data-en="fuelText">{{ wg.consumptionFuelText }}</b><span data-en="fuelDelta">{{ wg.consumptionFuelDelta }}</span></div>
+                      <div class="hv-energy-ltrack"><i class="base fuel" data-en-w="fuelBaseW" style="width:{{ wg.consumptionFuelBaseW }}"></i><i class="delta fuel {{ wg.consumptionFuelDeltaClass }}" data-en-cls="fuelDeltaClass" data-en-base="delta fuel" data-en-l="fuelDeltaL" data-en-w="fuelDeltaW" style="left:{{ wg.consumptionFuelDeltaL }};width:{{ wg.consumptionFuelDeltaW }}"></i></div>
                     </div>
                     <div class="hv-energy-level">
-                      <div class="hv-energy-lrow"><b class="ev" data-en="socText">{{ wg.consumptionSocText }}</b><span>bateria</span></div>
-                      <div class="hv-energy-ltrack"><i class="base ev" data-en-w="socBaseW" style="width:{{ wg.consumptionSocBaseW }}"></i></div>
+                      <div class="hv-energy-lrow"><b class="ev" data-en="socText">{{ wg.consumptionSocText }}</b><span data-en="socDelta">{{ wg.consumptionSocDelta }}</span></div>
+                      <div class="hv-energy-ltrack"><i class="base ev" data-en-w="socBaseW" style="width:{{ wg.consumptionSocBaseW }}"></i><i class="delta ev {{ wg.consumptionSocDeltaClass }}" data-en-cls="socDeltaClass" data-en-base="delta ev" data-en-l="socDeltaL" data-en-w="socDeltaW" style="left:{{ wg.consumptionSocDeltaL }};width:{{ wg.consumptionSocDeltaW }}"></i></div>
                     </div>
-                  </section>
-                  <section class="hv-energy-zone hv-energy-week">
-                    <p class="hv-energy-zlabel">{{ wg.consumptionBarsLabel }}</p>
-                    <div class="hv-energy-bars" aria-hidden="true"><sc-for list="{{ wg.consumptionBars }}" as="eb" hint-placeholder-count="7"><i class="{{ eb.cls }}" style="{{ eb.style }}"></i></sc-for></div>
                   </section>
                 </div>
               </div>
@@ -6977,14 +7044,14 @@ window.HavalSplash = (function () {
                       </div>
                     </section>
                     <section class="hv-energy-zone hv-energy-z-tenmin">
-                      <p class="hv-energy-zlabel"><span class="hv-energy-charttitle" data-en="chartTitle">{{ wg.consumptionChartTitle }}</span><span class="hv-energy-tlegend"><i class="fuel"></i>L/100 km<i class="drive"></i>kW tração<i class="regen"></i>kW regen.</span></p>
-                      <div class="hv-energy-tenmin" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path></svg><span class="yl ytop">40</span><span class="yl ymid">0</span><span class="yl ybot">-20</span><span class="yr rtop">20</span><span class="yr rbot">0</span><span class="xl x0">−10 min</span><span class="xl x5">−5</span><span class="xl x10">agora</span></div>
+                      <p class="hv-energy-zlabel"><span class="hv-energy-charttitle" data-en="chartTitle">{{ wg.consumptionChartTitle }}</span><span class="hv-energy-tlegend"><i class="fuel"></i>L/100 km<i class="drive"></i>kW tração<i class="regen"></i>kW regen.<i class="avg"></i>médias</span></p>
+                      <div class="hv-energy-tenmin" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg><span class="yl ytop">40</span><span class="yl ymid">0</span><span class="yl ybot">-20</span><span class="yr rtop">20</span><span class="yr rbot">0</span><span class="xl x0">−10 min</span><span class="xl x5">−5</span><span class="xl x10">agora</span></div>
                       <small class="hv-energy-zsub" data-en="tenMinAvg">{{ wg.consumptionTenMinAvg }}</small>
                     </section>
                     <section class="hv-energy-zone">
                       <p class="hv-energy-zlabel"><span data-en="tripLabel">{{ wg.consumptionTripLabel }}</span><em data-en="tripSince">{{ wg.consumptionTripSince }}</em></p>
                       <ul class="hv-energy-tkv hv-energy-tkv-main">
-                        <li><small>DISTÂNCIA</small><b data-en="tripKm">{{ wg.consumptionTripKm }}</b></li>
+                        <li><small>DISTÂNCIA</small><b><i data-en="tripKmValue">{{ wg.consumptionTripKmValue }}</i><u>{{ wg.consumptionTripKmUnit }}</u></b></li>
                         <li><small>COMBUSTÍVEL</small><b><i data-en="tripFuelEco">{{ wg.consumptionTripFuelEco }}</i><u data-en="tripFuelEcoUnit">{{ wg.consumptionTripFuelEcoUnit }}</u></b></li>
                         <li><small>ELÉTRICO</small><b><i data-en="tripEvEco">{{ wg.consumptionTripEvEco }}</i><u data-en="tripEvEcoUnit">{{ wg.consumptionTripEvEcoUnit }}</u></b></li>
                       </ul>
@@ -6992,7 +7059,7 @@ window.HavalSplash = (function () {
                         <li><small>GASOLINA</small><b data-en="tripFuelL">{{ wg.consumptionTripFuelL }}</b></li>
                         <li><small>BATERIA</small><b data-en="tripKwh">{{ wg.consumptionTripKwh }}</b></li>
                         <li><small>RECUPERADO</small><b data-en="tripKwhIn">{{ wg.consumptionTripKwhIn }}</b></li>
-                        <li><small>% ELÉTRICO</small><b data-en="tripEvShare">{{ wg.consumptionTripEvShare }}</b></li>
+                        
                       </ul>
                     </section>
                     <section class="hv-energy-zone hv-energy-z-levels">
@@ -7451,15 +7518,15 @@ window.HavalSplash = (function () {
               </div>
             </section>
             <section class="hv-energy-zone hv-energy-z-tenmin">
-              <p class="hv-energy-zlabel"><span class="hv-energy-charttitle" data-en="chartTitle">{{ focusedConsumptionChartTitle }}</span><span class="hv-energy-tlegend"><i class="fuel"></i>L/100 km<i class="drive"></i>kW tração<i class="regen"></i>kW regen.</span></p>
+              <p class="hv-energy-zlabel"><span class="hv-energy-charttitle" data-en="chartTitle">{{ focusedConsumptionChartTitle }}</span><span class="hv-energy-tlegend"><i class="fuel"></i>L/100 km<i class="drive"></i>kW tração<i class="regen"></i>kW regen.<i class="avg"></i>médias</span></p>
               <sc-if value="{{ focusedConsumptionChartControls }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-chartctl"><div class="hv-energy-seg" role="group" aria-label="Intervalo"><sc-for list="{{ focusedConsumptionChartSpans }}" as="cs" hint-placeholder-count="6"><button type="button" class="{{ cs.cls }}" onClick="{{ cs.onClick }}">{{ cs.label }}</button></sc-for></div><div class="hv-energy-seg" role="group" aria-label="Detalhe"><sc-for list="{{ focusedConsumptionChartDensities }}" as="cd" hint-placeholder-count="3"><button type="button" class="{{ cd.cls }}" onClick="{{ cd.onClick }}">{{ cd.label }}</button></sc-for></div></div></sc-if>
-              <div class="hv-energy-tenmin" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path></svg><span class="yl ytop">40</span><span class="yl ymid">0</span><span class="yl ybot">-20</span><span class="yr rtop">20</span><span class="yr rbot">0</span><span class="xl x0">−10 min</span><span class="xl x5">−5</span><span class="xl x10">agora</span></div>
+              <div class="hv-energy-tenmin" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg><span class="yl ytop">40</span><span class="yl ymid">0</span><span class="yl ybot">-20</span><span class="yr rtop">20</span><span class="yr rbot">0</span><span class="xl x0">−10 min</span><span class="xl x5">−5</span><span class="xl x10">agora</span></div>
               <small class="hv-energy-zsub" data-en="tenMinAvg">{{ focusedConsumptionTenMinAvg }}</small>
             </section>
             <section class="hv-energy-zone">
               <p class="hv-energy-zlabel"><span data-en="tripLabel">{{ focusedConsumptionTripLabel }}</span><em data-en="tripSince">{{ focusedConsumptionTripSince }}</em></p>
               <ul class="hv-energy-tkv hv-energy-tkv-main">
-                <li><small>DISTÂNCIA</small><b data-en="tripKm">{{ focusedConsumptionTripKm }}</b></li>
+                <li><small>DISTÂNCIA</small><b><i data-en="tripKmValue">{{ focusedConsumptionTripKmValue }}</i><u>{{ focusedConsumptionTripKmUnit }}</u></b></li>
                 <li><small>COMBUSTÍVEL</small><b><i data-en="tripFuelEco">{{ focusedConsumptionTripFuelEco }}</i><u data-en="tripFuelEcoUnit">{{ focusedConsumptionTripFuelEcoUnit }}</u></b></li>
                 <li><small>ELÉTRICO</small><b><i data-en="tripEvEco">{{ focusedConsumptionTripEvEco }}</i><u data-en="tripEvEcoUnit">{{ focusedConsumptionTripEvEcoUnit }}</u></b></li>
               </ul>
@@ -7467,7 +7534,7 @@ window.HavalSplash = (function () {
                 <li><small>GASOLINA</small><b data-en="tripFuelL">{{ focusedConsumptionTripFuelL }}</b></li>
                 <li><small>BATERIA</small><b data-en="tripKwh">{{ focusedConsumptionTripKwh }}</b></li>
                 <li><small>RECUPERADO</small><b data-en="tripKwhIn">{{ focusedConsumptionTripKwhIn }}</b></li>
-                <li><small>% ELÉTRICO</small><b data-en="tripEvShare">{{ focusedConsumptionTripEvShare }}</b></li>
+                
               </ul>
             </section>
             <section class="hv-energy-zone hv-energy-z-levels">
@@ -8930,7 +8997,7 @@ const H6_ENERGY_ICONS = {
   evStation: 'M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V9c0-.69-.28-1.32-.73-1.77zM18 10c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM8 18v-4.5H6L10 6v5h2l-4 7z',
 };
 // AGORA zone readouts, painted in place at 1 Hz (_energyTick / _paintEnergyCards).
-const H6_ENERGY_NOW_KEYS = ['chartTitle', 'nowFuelShown', 'nowFuelState', 'nowEvState', 'nowEvValue', 'nowEvUnitShort', 'tripFuelEco', 'tripFuelEcoUnit', 'tripEvEco', 'tripEvEcoUnit', 'tenMinAvg', 'tripSince', 'tripEconomy', 'tripFuelL', 'tripKwh', 'tripKwhIn', 'socText', 'socDelta', 'socBaseW', 'socDeltaL', 'socDeltaW', 'socDeltaClass', 'socMarkL', 'socMarkClass', 'fuelText', 'fuelDelta', 'fuelBaseW', 'fuelDeltaL', 'fuelDeltaW', 'fuelDeltaClass', 'fuelMarkL', 'fuelMarkClass'];
+const H6_ENERGY_NOW_KEYS = ['chartTitle', 'tripKmValue', 'nowFuelShown', 'nowFuelState', 'nowEvState', 'nowEvValue', 'nowEvUnitShort', 'tripFuelEco', 'tripFuelEcoUnit', 'tripEvEco', 'tripEvEcoUnit', 'tenMinAvg', 'tripSince', 'tripEconomy', 'tripFuelL', 'tripKwh', 'tripKwhIn', 'socText', 'socDelta', 'socBaseW', 'socDeltaL', 'socDeltaW', 'socDeltaClass', 'socMarkL', 'socMarkClass', 'fuelText', 'fuelDelta', 'fuelBaseW', 'fuelDeltaL', 'fuelDeltaW', 'fuelDeltaClass', 'fuelMarkL', 'fuelMarkClass'];
 const H6_DESKTOP_ACCENTS = [
   { key: 'cyan', name: 'Ciano', dark: '#2aa7b7', light: '#029eb6' },
   { key: 'mint', name: 'Menta', dark: '#66dfb1', light: '#02cf9c' },
@@ -39736,6 +39803,10 @@ class Component extends DCLogic {
       this._paintEnergyCards(m);
     }
     this._paintEnergyChart(m.tenMin);
+    if (document.querySelector('.hv-energy-tenmin[data-fixed]')) {
+      this._paintEnergyChart(this._energyChartView(this._energySamples || [], now,
+        { kind: 'time', span: 600000, points: 120, smooth: true }), true);
+    }
     const rail = this._energyRailCard(m);
     const railSig = [rail.primary, rail.unit, rail.secondary, rail.ev, rail.bars, rail.source].join('|');
     if (railSig !== this._energyRailSig) {
@@ -39919,13 +39990,16 @@ class Component extends DCLogic {
       tripFuel: evHero ? tripEv : tripFuel,
       tripFuelUnit: evHero ? this._energyEvUnitLabel(units) : this._energyFuelUnitLabel(units),
       tripKm: trip ? this._energyKm(trip.km) : '—',
+      tripKmValue: trip && isFinite(trip.km) ? (trip.km >= 100 ? Math.round(trip.km) : Number(trip.km).toFixed(1)) : '—',
+      tripKmUnit: 'km',
       tripTime: trip ? this._energyDuration((trip.driveMs || 0) + (trip.idleMs || 0)) : '—',
       tripEvShare: trip ? this._energyPct(trip.evShare) : '—',
       tenMin: tenMin,
       chartTitle: chartSpec.title,
       tenMinAvg: tenMinParts.length ? 'Médias ' + chartSpec.title.replace('ÚLTIMOS ', '').toLowerCase() + ': ' + tenMinParts.join(' · ') : '',
-      tripSince: !trip ? '' : this._energyDuration((trip.driveMs || 0) + (trip.idleMs || 0)) + ' · '
-        + (trip === driving ? 'desde ' + hm(trip.startMs) : this._energyWhen(trip.startMs)),
+      // Header line (owner, 2026-09-20): how long, then how much of it was electric.
+      tripSince: !trip ? '' : this._energyDuration((trip.driveMs || 0) + (trip.idleMs || 0))
+        + (this._energyPct(trip.evShare) === '—' ? '' : ' · ' + this._energyPct(trip.evShare) + ' elétrico'),
       // Engine off: a quiet label instead of a fuel figure; regen: green (owner, 2026-09-18).
       nowFuelShown: nowFuelOff ? 'Motor\ndesligado' : nowFuel,
       nowFuelState: nowFuelOff ? 'off' : '',
@@ -40030,7 +40104,9 @@ class Component extends DCLogic {
       '50km': { kind: 'km', span: 50, title: 'ÚLTIMOS 50 KM', x0: '−50 km', x5: '−25' },
       '100km': { kind: 'km', span: 100, title: 'ÚLTIMOS 100 KM', x0: '−100 km', x5: '−50' },
     };
-    const points = { low: 40, mid: 120, high: 300 };
+    // DETALHADO draws every sample (points: 0); the other two average into buckets
+    // over time and are smoothed between them (owner, 2026-09-20).
+    const points = { low: 40, mid: 120, high: 0 };
     const smooth = { low: true, mid: true, high: false };
     const st = this.state || {};
     let span = st.energyChartSpan;
@@ -40486,6 +40562,16 @@ class Component extends DCLogic {
     // Averages over the same window: distance from speed, fuel from L/100 km along
     // it, net pack energy from kW, and the electric share of the distance whose
     // engine state is known.
+    let kwSum = 0;
+    let kwN = 0;
+    let fuelSum = 0;
+    let fuelN = 0;
+    list.forEach((s) => {
+      if (isFinite(s.kw)) { kwSum += s.kw; kwN++; }
+      if (isFinite(s.fuel) && s.ice !== false) { fuelSum += s.fuel; fuelN++; }
+    });
+    const avgKw = kwN ? kwSum / kwN : null;
+    const avgFuel = fuelN ? fuelSum / fuelN : null;
     let km = 0;
     let fuelL = 0;
     let kwh = 0;
@@ -40517,6 +40603,9 @@ class Component extends DCLogic {
       kmPerL: fuelL >= 0.01 && km > 0 ? km / fuelL : NaN,
       kwhPer100: km >= 0.1 ? kwh * 100 / km : NaN,
       evShare: knownKm >= 0.05 ? evKm / knownKm : NaN,
+      // Flat lines for the window's averages: pack power and, while the engine ran, fuel.
+      avgKw: avgKw == null ? '' : 'M0 ' + y(avgKw) + ' H600',
+      avgFuel: avgFuel == null ? '' : 'M0 ' + yf(avgFuel) + ' H600',
       title: spec.title || '',
       x0: spec.x0 || '',
       x5: spec.x5 || '',
@@ -40557,9 +40646,11 @@ class Component extends DCLogic {
   }
 
   /** Draws the last-10-minutes chart into every mounted .hv-energy-tenmin, in place (1 Hz, never a commit). */
-  _paintEnergyChart(v) {
+  _paintEnergyChart(v, fixed) {
     if (!v) return;
-    const hosts = document.querySelectorAll('.hv-energy-tenmin');
+    // Widgets draw a fixed 10-minute chart (owner, 2026-09-20); the popup follows
+    // its span setting. Each host is painted by the view it belongs to.
+    const hosts = document.querySelectorAll(fixed ? '.hv-energy-tenmin[data-fixed]' : '.hv-energy-tenmin:not([data-fixed])');
     for (let i = 0; i < hosts.length; i++) {
       const h = hosts[i];
       const path = (cls, d) => {
@@ -40571,6 +40662,8 @@ class Component extends DCLogic {
       path('drive', v.drive);
       path('regen', v.regen);
       path('fuel', v.fuel);
+      path('avgdrive', v.avgKw);
+      path('avgfuel', v.avgFuel);
       const text = (cls, t) => {
         const s = h.querySelector('.' + cls);
         if (s && s.textContent !== t) s.textContent = t;
@@ -40636,16 +40729,6 @@ class Component extends DCLogic {
     });
   }
 
-  /**
-   * Bars (owner, 2026-09-18): each day's average consumption in the same
-   * measure as the big number, so a card reads as one thing.
-   */
-  _energyDayConsumption(m) {
-    return m.tripEvHero
-      ? (row) => (Number(row.km) > 0.5 ? (Number(row.kwhOut) || 0) * 100 / Number(row.km) : 0)
-      : (row) => (Number(row.fuelL) > 0.05 ? (Number(row.km) || 0) / Number(row.fuelL) : 0);
-  }
-
   _energyRailCard(m) {
     // Rail card (owner, 2026-09-18): the trip's ELECTRIC consumption is the big
     // number, the bars are daily kWh/100 km to match, and the detail reads
@@ -40686,7 +40769,6 @@ class Component extends DCLogic {
     const m = this._energyModel(now);
     const w = Math.max(1, (item && item.w) || 1);
     const h = Math.max(1, (item && item.h) || 1);
-    const series = this._energyDaySeries(m.hist, 7, now);
     // A board widget 4x2 or wider is the whole workspace, with map / graph and
     // data side by side (owner, 2026-09-14). The popup is 3x2 with MAPA | DADOS
     // toggles, or that same full workspace once maximised to the board's width.
@@ -40694,6 +40776,13 @@ class Component extends DCLogic {
     const wide = popup ? this._energyPopupWideOn() : (w >= 4 && h >= 2);
     const view = {
       consumptionSizeClass: 'hv-energy-' + Math.min(3, w) + 'x' + Math.min(2, h),
+      // Every size opens the popup on a tap (owner, 2026-09-21); the hold menu still wins.
+      consumptionOpen: (ev) => {
+        this._cardControlEvent(ev);
+        if (this._widgetSuppressClick || this.state.widgetMenuId || this.state.widgetPlaceType
+          || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return;
+        this._openFocusedCard('consumption');
+      },
       consumptionGlance: !wide,
       consumptionWide: wide,
       consumptionSource: m.source,
@@ -40709,8 +40798,6 @@ class Component extends DCLogic {
       consumptionTripKm: m.tripKm,
       consumptionTripTime: m.tripTime,
       consumptionTripEvShare: m.tripEvShare,
-      consumptionBars: this._energyBarsFrom(series, (e) => 'DSTQQSS'.charAt(e.date.getDay()), this._energyDayConsumption(m)),
-      consumptionBarsLabel: '7 DIAS · ' + (m.tripEvHero ? this._energyEvUnitLabel(m.units) : this._energyFuelUnitLabel(m.units)),
     };
     // AGORA zones; repainted in place at 1 Hz by _paintEnergyCards.
     H6_ENERGY_NOW_KEYS.forEach((k) => { view['consumption' + k.charAt(0).toUpperCase() + k.slice(1)] = m[k]; });
