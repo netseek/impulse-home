@@ -317,6 +317,50 @@ evaluate — the WebView navigates after attach and wipes anything you injected
 into the first document), recording `performance.getEntriesByType('resource')`
 plus a `longtask` observer and a poll for `__app._viewerReady`.
 
+## The boot intro: a warm reload lies, and "after the intro" needs a real test
+
+**Measured 2026-09-22 on the car.** The intro looked fine on a page reload
+(34 fps) and ran at **0.4-3.6 fps on a real cold start**, with a 2-4 s freeze
+before the car appeared. A reload keeps the GPU driver's program cache hot;
+only a force-stop + launch reproduces a real boot. The probe that does that,
+attributes every long task and can A/B, is `scripts/device-boot-probe.mjs`:
+
+```bash
+node scripts/device-boot-probe.mjs --cold --arms default,gt,hev --reps 2
+node scripts/device-boot-probe.mjs --cold --arms default,default@h6_revealPrewarm=0 --reps 3
+node scripts/device-boot-probe.mjs --cold --arms default --profile   # V8 profile per long task
+```
+
+It restores `h6_settings_v1`, waits 6 s after any localStorage write before
+force-stopping (WebView persists it lazily -- skip that and every "GT" arm
+silently boots the saved body), and reports `vis`/focus: if another app has
+focus at launch the page stays `hidden` and **boot makes no progress at all**
+(no `__app` after 40 s). Measured with YouTube, the OEM HVAC and media windows.
+
+Five separate things were landing in the ~2.5 s intro. All fixed; after, all
+three bodies measured **2.5 s, 9-17 fps, worst frame 281-354 ms**:
+
+| Cost in the intro | Fix |
+|---|---|
+| Car's first visible draw (upload + link): 1.6-2.0 s, clip frozen | `_prewarmCarReveal` draws it in the splash gap (1x1 scissor, REAL framebuffer: in r137 a non-XR render target forces LinearEncoding into the program key, so a scratch target compiles the wrong programs). Off: `localStorage.h6_revealPrewarm='0'` |
+| First camera tile render 0.8-1.8 s; light warm-up keys 0.4-0.6 s | gated on `_revealSettled()` |
+| X-ray boot desktop: material-clone ghost recompiled every car program, 1.8-2.4 s | `_notifyViewerReady` fetches rig + ghost but shows x-ray only after settle |
+| Native layout reply to `revealLauncher()` committed React mid-orbit | held in `_introShellPatch`, flushed by `_endIntroAnimation` |
+| `_preloadPowertrain` / `_preloadXrayAssets` on flat timers from model-ready | gated on `_revealSettled()` |
+
+**`!_introActive` does not mean "after the intro".** It is also false for the
+4-6 s between the model landing and the clip ending, which is exactly how the
+tile render and the warm-up both got in. Use `_revealSettled()`: intro played,
+not active, and `REVEAL_SETTLE_MS` since it ended (without the settle, every
+held job resumed on the landing frame and froze it 1.1-2.7 s, right as the
+widget boards fade in). And a job that re-arms its own timer has to re-check
+on every step, not only when the chain starts.
+
+When a long task has no app method in it, profile before guessing. The last
+stall here was blamed on the SVG grain layer, which an A/B cleared in one
+run; the profile named it at once (`loop > render > ... > Ps`, a program link)
+and `renderer.info.programs` diffed per frame named the material.
+
 ## Card, widget, popup are three different surfaces
 
 Three things get called "the card" and a change verified on one can be broken

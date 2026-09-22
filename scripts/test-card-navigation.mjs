@@ -83,13 +83,8 @@ includesAll(html, [
   'value="{{ wg.isDriving }}"',
   'value="{{ wg.isStatus }}"',
   'value="{{ wg.isRange }}"',
-  "previewProfile: key === 'profile'",
   "previewClock: key === 'clock'",
-  "previewNavigation: key === 'navigation'",
-  "previewTires: key === 'tires'",
-  "previewDriving: key === 'driving'",
-  "previewStatus: key === 'status'",
-  "previewRange: key === 'range'",
+  "hasShot: key !== 'clock'",
 ], 'visual widget catalog');
 includesAll(method('_widgetRenderFields'), [
   "this._hasWidgetType(mode, 'power')",

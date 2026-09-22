@@ -65,6 +65,23 @@ const SCENARIOS = {
     assert.ok(Math.abs(capTop(mon) - capTop(time)) <= 1.5, `weekday top ${capTop(mon)} vs time top ${capTop(time)}`);
     assert.ok(Math.abs(num(pill, 'y') + num(pill, 'height') - num(am, 'y')) <= 1, 'month pill bottom on the AM baseline');
   },
+  // Chronograph 2x2 ran "10:30" and "SEPTEMBER 2026" off the right edge
+  // (owner screenshot, 2026-09-21). Widest realistic strings, every face/size.
+  'no text runs off any face': ({ render, names }) => {
+    const wide = snap({ time: '10:30', dayPeriod: 'PM', weekdayShort: 'Wed', weekdayLong: 'Wednesday',
+      monthShort: 'Sep', monthLong: 'September', year: '2026', day: '23', dateKey: '2026-09-23' });
+    const em = (t) => [...t].reduce((a, c) => a + (/[0-9]/.test(c) ? 0.556 : c === ' ' ? 0.278 : c === ':' ? 0.333 : /[A-Z]/.test(c) ? 0.72 : 0.6), 0);
+    for (const face of Object.keys(names)) for (const size of ['1x1', '1x2', '2x1', '2x2', 'rail']) {
+      const svg = render(face, wide, { size });
+      const W = Number(svg.match(/viewBox="0 0 ([\d.]+)/)[1]);
+      for (const m of svg.matchAll(/<text x="([\d.-]+)"[^>]*font-size="([\d.]+)"[^>]*text-anchor="(\w+)"([^>]*)>([^<]*)<\/text>/g)) {
+        const [, x, fs, anchor, rest, t] = m;
+        const w = Number((rest.match(/textLength="([\d.]+)"/) || [])[1]) || em(t) * fs;
+        const x0 = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : Number(x);
+        assert.ok(x0 >= -0.5 && x0 + w <= W - 4, `${face} ${size} "${t}" spans ${x0.toFixed(1)}..${(x0 + w).toFixed(1)} of ${W}`);
+      }
+    }
+  },
   'a label too long for its pill shrinks instead of overflowing': ({ render }) => {
     const el = textFor(render('panorama', snap({ weekdayShort: 'Wednesday', monthShort: 'September' })), 'WEDNESDAY 14 SEPTEMBER');
     assert.ok(el, 'long label rendered');
@@ -90,6 +107,7 @@ const MUTANTS = {
   'Dashboard month stretched again': ["label(String(snap.monthShort).toUpperCase(), 186.5, 70, 11, ground, 700, 'middle', 31);", "text(String(snap.monthShort).toUpperCase(), 186.5, 70, 11, ground, 700, 'middle', 31);"],
   'Dashboard date back up': ['rect(163, 54, 47, 24, 8, accent);', 'rect(163, 42, 47, 24, 8, accent);'],
   'Dashboard weekday back up': ["186, 41, 10, muted, 600, 'middle', 47);", "186, 30, 10, muted, 600, 'middle', 47);"],
+  'Chronograph 2x2 time unfitted again': ["label(snap.time, 138, 90, 38, ink, 700, 'start', 98);", "text(snap.time, 168, 90, 38, ink, 700, 'start');"],
   'long labels never shrink': ['var fitted = em > 0 && em * size > maxWidth ?', 'var fitted = false ?'],
 };
 

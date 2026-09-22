@@ -461,8 +461,7 @@ includesAll(html, ['{{ focusedDrivingNote }}', 'list="{{ focusedDrivingToggles }
 
 includesAll(html, [
   "driving: { label: 'CONDUÇÃO'",
-  "previewDriving: key === 'driving'",
-  'class="hv-wpick-driving"',
+  "shotDark: key === 'clock' ? '' : 'assets/ui/widget-thumbs/' + key + '-dark.webp'",
   "isDriving: item.type === 'driving'",
   "if (item.type === 'driving') Object.assign(view, this._drivingWidgetView(item));",
 ], 'Driving widget registration');
