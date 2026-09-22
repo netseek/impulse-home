@@ -24,11 +24,11 @@ import java.util.Map;
  * trip summaries and daily totals are kept forever. Monthly totals are a GROUP
  * BY over {@code days}, not a table of their own.
  */
-final class TripStore extends SQLiteOpenHelper {
+final class TripStore extends SQLiteOpenHelper implements RangeLedger.Store {
     static final int DETAIL_TRIPS = 30;
     private static final String DB_NAME = "trips.db";
     static final int ROUTE_POINTS = 300;
-    private static final int DB_VERSION = 4;
+    private static final int DB_VERSION = 5;
 
     TripStore(Context context) {
         super(context.getApplicationContext(), DB_NAME, null, DB_VERSION);
@@ -64,6 +64,24 @@ final class TripStore extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE open_trip (id INTEGER PRIMARY KEY CHECK (id = 1),"
                 + "state TEXT NOT NULL, updated_ms INTEGER NOT NULL)");
         createStops(db);
+        createRangeCycles(db);
+    }
+
+    /**
+     * The battery range forecast, checked (RangeLedger): one row per cycle, and a
+     * sample per SOC point. A few hundred rows a month; pruned to the newest
+     * {@link RangeLedger#KEEP_CYCLES} cycles.
+     */
+    private static void createRangeCycles(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE range_cycles (id INTEGER PRIMARY KEY, start_kind TEXT,"
+                + "soc0 REAL, oem0 REAL, hist0 REAL, odo0 REAL, ev_km REAL NOT NULL DEFAULT 0,"
+                + "km REAL NOT NULL DEFAULT 0, end_ms INTEGER, end_kind TEXT,"
+                + "last_soc REAL, last_oem REAL, last_hist REAL, samples INTEGER NOT NULL DEFAULT 0,"
+                + "last_odo REAL, km_at_odo REAL, trip_start INTEGER, trip_ev REAL, trip_km REAL,"
+                + "zero_from_km REAL, sample_soc REAL, sample_ev REAL)");
+        db.execSQL("CREATE TABLE range_samples (cycle_id INTEGER NOT NULL, t INTEGER NOT NULL,"
+                + "soc REAL, ev_km REAL, km REAL, oem REAL, hist REAL)");
+        db.execSQL("CREATE INDEX range_samples_cycle ON range_samples(cycle_id, t)");
     }
 
     /** Refuels and charges, kept forever (a few rows a month). */
@@ -100,6 +118,9 @@ final class TripStore extends SQLiteOpenHelper {
             // on top of a tiles-only image. Redraw them.
             db.execSQL("UPDATE trips SET snapshot_path = NULL, map_attempts = 0"
                     + " WHERE snapshot_path IS NOT NULL AND snapshot_path != ''");
+        }
+        if (oldVersion < 5) {
+            createRangeCycles(db);
         }
     }
 
@@ -769,6 +790,150 @@ final class TripStore extends SQLiteOpenHelper {
     }
 
     /** org.json throws on NaN, and SQLite has no NaN: both become null. */
+    // ── Range forecast check (RangeLedger.Store) ───────────────────────────
+
+    @Override
+    public RangeLedger.Cycle loadLatestCycle() {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT id, start_kind, soc0, oem0, hist0, odo0, ev_km, km, end_ms, end_kind, last_soc, last_oem,"
+                        + " last_hist, samples, last_odo, km_at_odo, trip_start, trip_ev, trip_km, zero_from_km,"
+                        + " sample_soc, sample_ev FROM range_cycles ORDER BY id DESC LIMIT 1", null)) {
+            if (!c.moveToFirst()) return null;
+            RangeLedger.Cycle r = new RangeLedger.Cycle();
+            r.id = c.getLong(0);
+            r.startKind = c.getString(1);
+            r.soc0 = nan(c, 2);
+            r.oem0 = nan(c, 3);
+            r.hist0 = nan(c, 4);
+            r.odo0 = nan(c, 5);
+            r.evKm = zero(nan(c, 6));
+            r.km = zero(nan(c, 7));
+            r.endMs = c.isNull(8) ? 0 : c.getLong(8);
+            r.endKind = c.isNull(9) ? null : c.getString(9);
+            r.lastSoc = nan(c, 10);
+            r.lastOem = nan(c, 11);
+            r.lastHist = nan(c, 12);
+            r.samples = c.getInt(13);
+            r.lastOdo = nan(c, 14);
+            r.kmAtOdo = zero(nan(c, 15));
+            r.tripStart = c.isNull(16) ? 0 : c.getLong(16);
+            r.tripEv = zero(nan(c, 17));
+            r.tripKm = zero(nan(c, 18));
+            r.zeroFromKm = nan(c, 19);
+            r.sampleSoc = nan(c, 20);
+            r.sampleEv = zero(nan(c, 21));
+            return r;
+        }
+    }
+
+    @Override
+    public void saveCycle(RangeLedger.Cycle r) {
+        ContentValues v = new ContentValues();
+        v.put("id", r.id);
+        v.put("start_kind", r.startKind);
+        putReal(v, "soc0", r.soc0);
+        putReal(v, "oem0", r.oem0);
+        putReal(v, "hist0", r.hist0);
+        putReal(v, "odo0", r.odo0);
+        v.put("ev_km", r.evKm);
+        v.put("km", r.km);
+        if (r.endKind == null) {
+            v.putNull("end_ms");
+            v.putNull("end_kind");
+        } else {
+            v.put("end_ms", r.endMs);
+            v.put("end_kind", r.endKind);
+        }
+        putReal(v, "last_soc", r.lastSoc);
+        putReal(v, "last_oem", r.lastOem);
+        putReal(v, "last_hist", r.lastHist);
+        v.put("samples", r.samples);
+        putReal(v, "last_odo", r.lastOdo);
+        v.put("km_at_odo", r.kmAtOdo);
+        v.put("trip_start", r.tripStart);
+        v.put("trip_ev", r.tripEv);
+        v.put("trip_km", r.tripKm);
+        putReal(v, "zero_from_km", r.zeroFromKm);
+        putReal(v, "sample_soc", r.sampleSoc);
+        v.put("sample_ev", r.sampleEv);
+        getWritableDatabase().insertWithOnConflict("range_cycles", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    @Override
+    public void addSample(long cycleId, RangeLedger.Sample s) {
+        ContentValues v = new ContentValues();
+        v.put("cycle_id", cycleId);
+        v.put("t", s.t);
+        putReal(v, "soc", s.soc);
+        putReal(v, "ev_km", s.evKm);
+        putReal(v, "km", s.km);
+        putReal(v, "oem", s.oem);
+        putReal(v, "hist", s.hist);
+        getWritableDatabase().insert("range_samples", null, v);
+    }
+
+    @Override
+    public void pruneCycles(int keep) {
+        SQLiteDatabase db = getWritableDatabase();
+        String cut = "(SELECT id FROM range_cycles ORDER BY id DESC LIMIT -1 OFFSET " + keep + ")";
+        db.execSQL("DELETE FROM range_samples WHERE cycle_id IN " + cut);
+        db.execSQL("DELETE FROM range_cycles WHERE id IN " + cut);
+    }
+
+    /**
+     * The newest {@code limit} cycles, newest first. The newest also carries its
+     * samples as [t, soc, evKm, km, oem, hist]: it is the one the page draws.
+     */
+    String rangeCyclesJson(int limit) {
+        JSONArray out = new JSONArray();
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT id, start_kind, soc0, oem0, hist0, ev_km, km, end_ms, end_kind, last_soc, last_oem, last_hist,"
+                        + " samples FROM range_cycles ORDER BY id DESC LIMIT ?",
+                new String[]{String.valueOf(Math.max(1, limit))})) {
+            while (c.moveToNext()) {
+                JSONObject o = new JSONObject();
+                long id = c.getLong(0);
+                o.put("id", id);
+                o.put("start", c.getString(1));
+                o.put("soc0", real(c, 2));
+                o.put("oem0", real(c, 3));
+                o.put("hist0", real(c, 4));
+                o.put("evKm", real(c, 5));
+                o.put("km", real(c, 6));
+                o.put("endMs", c.isNull(7) ? JSONObject.NULL : c.getLong(7));
+                o.put("end", c.isNull(8) ? JSONObject.NULL : c.getString(8));
+                o.put("lastSoc", real(c, 9));
+                o.put("lastOem", real(c, 10));
+                o.put("lastHist", real(c, 11));
+                o.put("samples", c.getInt(12));
+                if (out.length() == 0) o.put("points", rangeSamples(id));
+                out.put(o);
+            }
+        } catch (JSONException e) {
+            return "[]";
+        }
+        return out.toString();
+    }
+
+    private JSONArray rangeSamples(long cycleId) throws JSONException {
+        JSONArray pts = new JSONArray();
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT t, soc, ev_km, km, oem, hist FROM range_samples WHERE cycle_id = ? ORDER BY t",
+                new String[]{String.valueOf(cycleId)})) {
+            while (c.moveToNext()) {
+                JSONArray p = new JSONArray();
+                p.put(c.getLong(0));
+                for (int i = 1; i <= 5; i++) p.put(c.isNull(i) ? JSONObject.NULL : round(c.getDouble(i), 2));
+                pts.put(p);
+            }
+        }
+        return pts;
+    }
+
+    private static double nan(Cursor c, int col) {
+        return c.isNull(col) ? Double.NaN : c.getDouble(col);
+    }
+
     private static Object num(double v) {
         return Double.isNaN(v) || Double.isInfinite(v) ? JSONObject.NULL : v;
     }

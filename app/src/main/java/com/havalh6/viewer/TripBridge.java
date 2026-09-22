@@ -96,6 +96,30 @@ final class TripBridge {
         recorder.finishTrip();
     }
 
+    /**
+     * The page's history-based EV range in km and the SOC it was worked out for,
+     * as strings ("" when it has none). The page calls this on change, a few
+     * times a minute at most; the recorder stores it with the next sample.
+     */
+    @JavascriptInterface
+    public void setRangeForecast(String evKm, String atSoc) {
+        recorder.rangeForecast(parse(evKm), parse(atSoc));
+    }
+
+    /** The newest range-forecast cycles, newest first; the newest carries its samples. */
+    @JavascriptInterface
+    public String getRangeCycles(int limit) {
+        return recorder.rangeCyclesJson(Math.max(1, Math.min(40, limit)));
+    }
+
+    private static double parse(String raw) {
+        try {
+            return raw == null || raw.trim().isEmpty() ? Double.NaN : Double.parseDouble(raw.trim());
+        } catch (NumberFormatException e) {
+            return Double.NaN;
+        }
+    }
+
     /** Each refuel and charge since {@code fromMs} (as a string: see getTrip), oldest first. */
     @JavascriptInterface
     public String getStops(String fromMs) {

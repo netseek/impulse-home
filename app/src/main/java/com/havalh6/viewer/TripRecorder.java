@@ -61,7 +61,8 @@ final class TripRecorder implements TripEngine.Listener {
     private static final Set<String> KEYS = new HashSet<>(Arrays.asList(
             TripEngine.KEY_READY, TripEngine.KEY_SPEED, TripEngine.KEY_ODOMETER,
             TripEngine.KEY_VOLTAGE, TripEngine.KEY_CURRENT, TripEngine.KEY_FUEL_INST,
-            TripEngine.KEY_ICE, TripEngine.KEY_FLOW, TripEngine.KEY_FUEL_PCT, TripEngine.KEY_NAV, TripEngine.KEY_SOC));
+            TripEngine.KEY_ICE, TripEngine.KEY_FLOW, TripEngine.KEY_FUEL_PCT, TripEngine.KEY_NAV, TripEngine.KEY_SOC,
+            RangeLedger.KEY_EV_RANGE));
 
     private static TripRecorder instance;
 
@@ -71,6 +72,8 @@ final class TripRecorder implements TripEngine.Listener {
     private volatile TripStore store;
     private volatile TripMapWorker maps;
     private TripEngine engine;
+    /** The range forecast check; null only if the store could not open. */
+    private RangeLedger ledger;
     /** Points not saved yet. The bridge thread copies them for the live map, so both are guarded by the list. */
     private final List<TripPoint> pending = new ArrayList<>();
     private long pendingStartMs;
@@ -136,6 +139,7 @@ final class TripRecorder implements TripEngine.Listener {
                 TripStore s = new TripStore(app);
                 engine = new TripEngine(this);
                 store = s;
+                ledger = new RangeLedger(s);
                 maps = new TripMapWorker(app, s);
                 // Catch up on trips closed while offline or recorded before maps existed.
                 maps.sweepSoon(20_000L);
@@ -228,6 +232,22 @@ final class TripRecorder implements TripEngine.Listener {
         return s == null ? "[]" : s.stopsJson(fromMs);
     }
 
+    /**
+     * The page's history-based EV range and the SOC it was worked out for
+     * (RangeLedger.onHistForecast). NaN when it has none.
+     */
+    void rangeForecast(double km, double atSoc) {
+        worker.post(() -> {
+            RangeLedger l = ledger;
+            if (l != null) l.onHistForecast(km, atSoc, now());
+        });
+    }
+
+    String rangeCyclesJson(int limit) {
+        TripStore s = store;
+        return s == null ? "[]" : s.rangeCyclesJson(limit);
+    }
+
     String tripMapDataUrl(long startMs) {
         TripMapWorker m = maps;
         return m == null ? "" : m.dataUrl(startMs);
@@ -279,6 +299,8 @@ final class TripRecorder implements TripEngine.Listener {
         TripStore s = store;
         if (s == null) return;
         s.insertStop(startMs, stop);
+        RangeLedger l = ledger;
+        if (l != null && TripStop.CHARGE.equals(stop.kind)) l.onCharge();
         Log.w(TAG, String.format(Locale.US, "trip stop %d: %s %.0f%% -> %.0f%% (%.1f)",
                 startMs, stop.kind, stop.before, stop.after, stop.amount));
     }
@@ -299,6 +321,8 @@ final class TripRecorder implements TripEngine.Listener {
 
     private void onSignal(String key, String value, long t) {
         if (engine == null) return;
+        RangeLedger l = ledger;
+        if (l != null) l.onSignal(key, value);
         if (TripEngine.KEY_NAV.equals(key)) {
             onNavigation(value, t);
             return;
@@ -347,6 +371,16 @@ final class TripRecorder implements TripEngine.Listener {
         engine.tick(t);
         TripSummary live = engine.live(t);
         liveJson = live == null ? "" : TripStore.summaryJson(live);
+        RangeLedger l = ledger;
+        if (l != null) {
+            // Its own guard: a failure here must never stop a trip being recorded.
+            try {
+                if (live == null) l.onTick(t, 0L, 0, 0);
+                else l.onTick(t, live.startMs, live.evKm, live.km);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "range ledger tick failed", e);
+            }
+        }
         setGps(engine.isOpen());
         if (engine.isOpen() && t - lastCheckpointAt >= CHECKPOINT_MS) persist(t);
     }
@@ -367,6 +401,14 @@ final class TripRecorder implements TripEngine.Listener {
     private void persist(long t) {
         TripStore s = store;
         if (s == null || engine == null) return;
+        RangeLedger l = ledger;
+        if (l != null) {
+            try {
+                l.flush(t);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "range ledger flush failed", e);
+            }
+        }
         lastCheckpointAt = t;
         if (engine.isOpen()) {
             flushPoints();

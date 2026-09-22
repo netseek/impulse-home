@@ -1431,6 +1431,35 @@ that path has to keep right:
 - **Staying silent is correct when it fails.** Offline, the card shows `—`
   rather than a stale or invented city.
 
+## Range forecast check: native records it, the expanded range popup draws it
+
+**Added 2026-09-22, NOT YET SEEN ON THE CAR.** The history range estimate in
+`_rangeTelemetry` used to be recomputed per render and thrown away, so there
+was no way to tell whether it was right. `RangeLedger` (native, fed by
+`TripRecorder`) now keeps one cycle per charge in `trips.db` (`range_cycles` /
+`range_samples`, DB v5): the forecast at the start (the car's EV range off the
+bus, and the page's history estimate), then a sample per SOC point. The range
+popup's maximised view (`_rangeBurnView`) plots EV km driven + range still quoted
+against the starting forecast: flat means the forecast was right.
+
+Things that are easy to break:
+
+- **The history estimate only exists in JS**, so `_startRangeForecastReporter`
+  sends it down (`TripBridge.setRangeForecast`) every 15 s, with the SOC it was
+  worked out for. The ledger ignores it when that SOC is not the car's current
+  one; right after a charge the page is still quoting the old level. Do not copy
+  the formula into Java instead: two copies of it will drift apart.
+- **Charges are detected by the ledger itself** (SOC >= 8 points above the last
+  sample), not by TripEngine's CHARGE stop, which becomes final only minutes into
+  the next drive; by then that driving would be credited to the old cycle.
+  `RangeLedgerTest` pins this.
+- **An odometer jump that no trip accounts for ends the cycle as `gap`**, so
+  driving the recorder missed is never read as a bad forecast.
+- **Every cycle starts at a charge** (owner's call): nothing is recorded before
+  the first charge after install, and after `gap` or `depleted` the next cycle
+  waits for a charge too. TripEngine's CHARGE stop (`onCharge`) is only the
+  fallback for when there is no earlier SOC to compare against.
+
 ## Media visualisers
 
 They have **no audio input**. `_graphVizLevel` derives its level from EV power

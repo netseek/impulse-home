@@ -26,12 +26,21 @@ function method(name) {
 
 for (const token of [
   "{ id: 'range', title: 'Range', action: 'openRange' }", "case 'openRange':",
-  'focusedCardIsRange', 'class="hv-range-focus"', 'h6_range_unit',
+  'focusedCardIsRange', 'h6_range_unit',
   'CAR_SIGNALS.evRange', 'CAR_SIGNALS.fuelRange', 'DEMO · SIMULATED · NOT VEHICLE',
 ]) assert.ok(html.includes(token), `missing ${token}`);
 for (const name of ['_rangeTelemetry', '_rangeDistanceUnit', '_openRangeCard']) {
   assert.ok(method(name).includes(name), `range method contract ${name}`);
 }
 assert.ok(native.includes('"openRange"'), 'Android native shell must accept Range action');
+// The popup root keeps its class whatever else it gains (the maximised view adds one).
+assert.ok(/class="hv-range-focus[\s"]/.test(html), 'missing the hv-range-focus popup root');
+// Forecast check: the history estimate reaches native on a timer, and the expanded popup draws what native recorded.
+assert.ok(/\.setRangeForecast\(/.test(method('_startRangeForecastReporter')), 'history estimate must be reported to TripBridge.setRangeForecast');
+assert.ok(html.slice(html.indexOf('async componentDidMount()'), html.indexOf('async componentDidMount()') + 4000).includes('this._startRangeForecastReporter()'), 'the reporter must start at mount, not only when a range widget renders');
+assert.ok(/\.getRangeCycles\(/.test(method('_rangeCycles')), 'the expanded popup reads TripBridge.getRangeCycles');
+assert.ok(/this\._rangeBurnView\(/.test(method('_rangeWidgetView')), 'the range popup view carries the forecast check');
+assert.ok(html.includes('{{ focusedRangeBurnHistPath }}') && html.includes('{{ focusedRangeWideToggle }}'), 'expanded range popup markup is missing');
+assert.ok(/histEvKmNum: !demo && hasHistEv/.test(method('_rangeTelemetry')), 'only a real history estimate may be reported, never demo or the OEM fallback');
 assert.ok(!method('_rangeTelemetry').includes('this._powerSource()'), 'range freshness cannot inherit generic power flow');
 console.log('range-card contracts: ok');

@@ -6263,6 +6263,49 @@ window.HavalSplash = (function () {
     .hv-range-focus .hv-range-2x2-body { height:100%; box-sizing:border-box; }
     .hv-range-focus .hv-range-2x2-trackers { flex:1; min-height:0; margin:0; justify-content:space-evenly; }
     .hv-range-focus .hv-range-2x2-body { border-radius:18px; background:linear-gradient(140deg,rgba(255,255,255,.065),rgba(255,255,255,.018)); padding:18px; }
+    /* Maximised: today's gauges keep the 3x2 width on the left, the forecast check fills the rest. */
+    .hv-range-focus.wide { display:flex; gap:16px; }
+    .hv-range-focus.wide > .hv-range-2x2-body { flex:0 0 calc(var(--hv-pop-width, 900px) - 32px); }
+    .hv-range-burn { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:10px; padding:14px 16px; border-radius:18px; background:linear-gradient(140deg,rgba(255,255,255,.065),rgba(255,255,255,.018)); box-sizing:border-box; --rb-hist:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); --rb-oem:var(--hv-widget-fg,#edf5fa); }
+    .hv-range-burn-head { display:flex; align-items:baseline; gap:12px; font:700 12px/1 'Space Mono',monospace; letter-spacing:.08em; }
+    .hv-range-burn-title { color:var(--rb-hist); }
+    .hv-range-burn-sum { opacity:.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hv-range-burn-demo { margin-left:auto; padding:3px 7px; border-radius:6px; background:rgba(242,153,74,.18); color:#f2994a; }
+    .hv-range-burn-stats { display:flex; gap:10px; }
+    .hv-range-burn-stat { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:4px; padding:8px 10px; border:1px solid var(--hv-widget-border); border-radius:12px; font:700 11px/1.1 'Space Mono',monospace; letter-spacing:.06em; }
+    .hv-range-burn-stat.driven { flex:0 0 auto; }
+    .hv-range-burn-stat > span { opacity:.7; }
+    .hv-range-burn-stat.hist > span { color:var(--rb-hist); opacity:1; }
+    .hv-range-burn-stat > div { display:flex; align-items:baseline; gap:5px; white-space:nowrap; }
+    .hv-range-burn-stat strong { font-size:22px; font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+    .hv-range-burn-stat small { opacity:.65; font-size:10.5px; }
+    .hv-range-burn-stat > b, .hv-range-burn-row > b { font-size:13px; font-variant-numeric:tabular-nums; }
+    .hv-range-burn b.ok { color:#3ec77a; } .hv-range-burn b.under { color:#f2994a; } .hv-range-burn b.over { color:var(--rb-hist); }
+    .hv-range-burn-chart { position:relative; flex:1 1 auto; min-height:120px; display:grid; grid-template-columns:34px minmax(0,1fr); grid-template-rows:minmax(0,1fr) auto; column-gap:6px; }
+    .hv-range-burn-chart > svg { grid-column:2; grid-row:1; width:100%; height:100%; overflow:visible; }
+    .hv-range-burn-y { grid-column:1; grid-row:1; display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; font:700 10.5px/1 'Space Mono',monospace; opacity:.6; font-variant-numeric:tabular-nums; }
+    .hv-range-burn-x { grid-column:2; grid-row:2; display:flex; justify-content:space-between; padding-top:4px; font:700 10.5px/1 'Space Mono',monospace; opacity:.6; }
+    .hv-range-burn-chart path { fill:none; vector-effect:non-scaling-stroke; stroke-linecap:round; stroke-linejoin:round; }
+    .hv-rb-grid { stroke:var(--hv-widget-border); stroke-width:1; }
+    .hv-rb-area { fill:var(--rb-hist) !important; opacity:.12; stroke:none; }
+    .hv-rb-driven { stroke:var(--rb-hist); stroke-width:1; opacity:.5; }
+    .hv-rb-f0 { stroke-width:1.5; stroke-dasharray:6 5; opacity:.75; }
+    .hv-rb-f0.hist, .hv-rb-proj.hist { stroke:var(--rb-hist); }
+    .hv-rb-f0.oem, .hv-rb-proj.oem { stroke:var(--rb-oem); }
+    .hv-rb-proj { stroke-width:2.5; }
+    .hv-rb-proj.oem { stroke-width:2; stroke-dasharray:2 4; opacity:.8; }
+    .hv-range-burn-legend { display:flex; flex-wrap:wrap; gap:4px 14px; font:700 10.5px/1.2 'Space Mono',monospace; opacity:.75; }
+    .hv-range-burn-legend i { display:inline-block; width:16px; vertical-align:middle; margin-right:5px; border-top:2.5px solid var(--rb-hist); }
+    .hv-range-burn-legend .oem i { border-top:2px dotted var(--rb-oem); }
+    .hv-range-burn-legend .f0 i { border-top:1.5px dashed currentColor; }
+    .hv-range-burn-legend .driven i { height:8px; border:0; background:var(--rb-hist); opacity:.3; }
+    .hv-range-burn-empty { flex:1 1 auto; display:flex; align-items:center; justify-content:center; text-align:center; padding:0 24px; font:700 12px/1.5 'Space Mono',monospace; opacity:.65; border:1px dashed var(--hv-widget-border); border-radius:12px; }
+    .hv-range-burn-past { display:flex; flex-direction:column; gap:3px; font:700 11px/1.3 'Space Mono',monospace; }
+    .hv-range-burn-row { display:grid; grid-template-columns:52px 76px minmax(0,1fr) 58px 58px 58px; gap:6px; align-items:baseline; font-variant-numeric:tabular-nums; }
+    .hv-range-burn-row.head { opacity:.55; font-size:10px; letter-spacing:.08em; }
+    .hv-range-burn-row > b { font-size:11px; text-align:right; }
+    .hv-range-burn-row.head > span:nth-child(n+4) { text-align:right; }
+    .hv-range-burn-row > span:nth-child(4) { text-align:right; }
     .hv-card-focus-head .hv-range-toggle-group { width:auto !important; max-width:none !important; height:38px !important; display:inline-flex; align-items:center; gap:10px; padding:0 4px !important; margin-left:auto; margin-right:8px; background:transparent !important; border:none !important; border-radius:0 !important; box-shadow:none !important; cursor:pointer; color:var(--hv-widget-fg,#edf5fa); transition:all .2s ease; -webkit-tap-highlight-color:transparent; flex-shrink:0; box-sizing:border-box; }
     .hv-card-focus-head .hv-range-toggle-group:hover, .hv-card-focus-head .hv-range-toggle-group:active { background:transparent !important; border:none !important; }
     .hv-card-focus-head .hv-range-toggle-group.on { background:transparent !important; border:none !important; box-shadow:none !important; }
@@ -7551,6 +7594,7 @@ window.HavalSplash = (function () {
   <div class="hv-card-focus-backdrop {{ focusedCardBackdropClass }}" onClick="{{ closeFocusedCard }}"></div>
   <sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedConsumptionGrowClass }}" onClick="{{ focusedConsumptionWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedConsumptionShrinkClass }}" onClick="{{ focusedConsumptionWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
   <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedClimateGrowClass }}" onClick="{{ focusedClimateWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedClimateShrinkClass }}" onClick="{{ focusedClimateWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
+  <sc-if value="{{ focusedCardIsRange }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedRangeGrowClass }}" onClick="{{ focusedRangeWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedRangeShrinkClass }}" onClick="{{ focusedRangeWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
   <section class="hv-card-focus {{ focusedCardPopupClass }}" role="dialog" aria-label="{{ focusedCardTitle }}">
     <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-tabs hv-energy-headtabs" role="tablist" aria-label="Visões de consumo"><button type="button" role="tab" class="{{ focusedConsumptionTabNowClass }}" aria-selected="{{ focusedConsumptionTabNowOn }}" onClick="{{ focusedConsumptionTabNow }}">AGORA</button><button type="button" role="tab" class="{{ focusedConsumptionTabTripsClass }}" aria-selected="{{ focusedConsumptionTabTripsOn }}" onClick="{{ focusedConsumptionTabTrips }}">VIAGENS</button><button type="button" role="tab" class="{{ focusedConsumptionTabHistoryClass }}" aria-selected="{{ focusedConsumptionTabHistoryOn }}" onClick="{{ focusedConsumptionTabHistory }}">HISTÓRICO</button></div><button type="button" class="hv-energy-gear {{ focusedConsumptionSettingsClass }}" onClick="{{ focusedConsumptionSettingsToggle }}" aria-label="Configurações de consumo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></button></sc-if><sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><div class="hv-clim hv-clim-headx"><span class="cap meta">DENTRO <b data-cv="inside">—</b> · FORA <b data-cv="outside">—</b> · <span data-cv="mode"></span></span></div></sc-if><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><span class="hv-head-spacer"></span><sc-if value="{{ focusedConsumptionHeadDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle hv-energy-headtitle"><strong>{{ focusedConsumptionDetailTitle }}</strong><small data-en-live="{{ focusedConsumptionDetailLiveMeta }}">{{ focusedConsumptionDetailMeta }}</small></div></sc-if></sc-if><sc-if value="{{ focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-back" onClick="{{ focusedConsumptionSettingsToggle }}" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg><span>VOLTAR</span></button></sc-if><sc-if value="{{ !focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Close">×</button></sc-if></header>
         <sc-if value="{{ focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ false }}">
@@ -7782,7 +7826,7 @@ window.HavalSplash = (function () {
       </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsRange }}" hint-placeholder-val="{{ false }}">
-      <div class="hv-range-focus">
+      <div class="hv-range-focus {{ focusedRangeWideClass }}">
         <div class="hv-range-2x2-body">
           <div class="hv-range-2x2-top">
             <div class="hv-range-total">
@@ -7877,6 +7921,45 @@ window.HavalSplash = (function () {
             <button type="button" class="hv-range-toggle-group hv-range-toggle-inline {{ focusedRangeSourceModeClass }}" onClick="{{ focusedRangeToggleSourceMode }}" role="switch" aria-checked="{{ focusedRangeSourceIsOn }}" title="Alternar estimativas por histórico"><span class="hv-range-toggle-label">Usar estimativa média por histórico</span><span class="hv-range-toggle-control"><span class="hv-range-toggle-track"><span class="hv-range-toggle-thumb"></span></span><span class="hv-range-toggle-state">{{ focusedRangeSourceStateText }}</span></span></button>
           </div>
         </div>
+        <sc-if value="{{ focusedRangeWide }}" hint-placeholder-val="{{ false }}">
+          <div class="hv-range-burn">
+            <div class="hv-range-burn-head">
+              <span class="hv-range-burn-title">PREVISÃO × REAL · BATERIA</span>
+              <span class="hv-range-burn-sum">{{ focusedRangeBurnSummary }}</span>
+              <sc-if value="{{ focusedRangeBurnDemo }}" hint-placeholder-val="{{ false }}"><span class="hv-range-burn-demo">DEMO</span></sc-if>
+            </div>
+            <div class="hv-range-burn-stats">
+              <div class="hv-range-burn-stat hist"><span>HISTÓRICO</span><div><small>previsto</small><strong>{{ focusedRangeBurnHist0 }}</strong><small>→ agora</small><strong>{{ focusedRangeBurnHistNow }}</strong><small>{{ focusedRangeBurnUnit }}</small></div><b class="{{ focusedRangeBurnHistErrClass }}">{{ focusedRangeBurnHistErr }}</b></div>
+              <div class="hv-range-burn-stat oem"><span>VEÍCULO</span><div><small>previsto</small><strong>{{ focusedRangeBurnOem0 }}</strong><small>→ agora</small><strong>{{ focusedRangeBurnOemNow }}</strong><small>{{ focusedRangeBurnUnit }}</small></div><b class="{{ focusedRangeBurnOemErrClass }}">{{ focusedRangeBurnOemErr }}</b></div>
+              <div class="hv-range-burn-stat driven"><span>RODADO EV</span><div><strong>{{ focusedRangeBurnDriven }}</strong><small>{{ focusedRangeBurnUnit }}</small></div></div>
+            </div>
+            <sc-if value="{{ focusedRangeBurnHasChart }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-range-burn-chart">
+                <div class="hv-range-burn-y"><span>{{ focusedRangeBurnYMax }}</span><span>{{ focusedRangeBurnYMid }}</span><span>0</span></div>
+                <svg viewBox="0 0 600 240" preserveAspectRatio="none" role="img" aria-label="Rodado mais autonomia restante, comparado à previsão feita no início do ciclo">
+                  <path class="hv-rb-grid" d="M 0 120 H 600 M 0 239.5 H 600"></path>
+                  <path class="hv-rb-area" d="{{ focusedRangeBurnDrivenArea }}"></path>
+                  <path class="hv-rb-driven" d="{{ focusedRangeBurnDrivenPath }}"></path>
+                  <path class="hv-rb-f0 oem" d="{{ focusedRangeBurnOem0Path }}"></path>
+                  <path class="hv-rb-f0 hist" d="{{ focusedRangeBurnHist0Path }}"></path>
+                  <path class="hv-rb-proj oem" d="{{ focusedRangeBurnOemPath }}"></path>
+                  <path class="hv-rb-proj hist" d="{{ focusedRangeBurnHistPath }}"></path>
+                </svg>
+                <div class="hv-range-burn-x"><span>0</span><span>distância total no ciclo</span><span>{{ focusedRangeBurnXMax }}</span></div>
+              </div>
+              <div class="hv-range-burn-legend"><span class="hist"><i></i>rodado + restante · histórico</span><span class="oem"><i></i>rodado + restante · veículo</span><span class="f0"><i></i>previsão no início</span><span class="driven"><i></i>rodado EV</span></div>
+            </sc-if>
+            <sc-if value="{{ focusedRangeBurnEmpty }}" hint-placeholder-val="{{ true }}"><div class="hv-range-burn-empty">{{ focusedRangeBurnEmptyText }}</div></sc-if>
+            <sc-if value="{{ focusedRangeBurnHasPast }}" hint-placeholder-val="{{ false }}">
+              <div class="hv-range-burn-past">
+                <div class="hv-range-burn-row head"><span>INÍCIO</span><span>SOC</span><span>FIM</span><span>RODADO</span><span>HIST.</span><span>VEÍC.</span></div>
+                <sc-for list="{{ focusedRangeBurnPast }}" as="rc" hint-placeholder-count="0">
+                  <div class="hv-range-burn-row"><span>{{ rc.when }}</span><span>{{ rc.socs }}</span><span>{{ rc.end }}</span><span>{{ rc.driven }}</span><b class="{{ rc.histErrClass }}">{{ rc.approx }}{{ rc.histErr }}</b><b class="{{ rc.oemErrClass }}">{{ rc.approx }}{{ rc.oemErr }}</b></div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
       </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsPower }}" hint-placeholder-val="{{ false }}">
@@ -27873,6 +27956,7 @@ class Component extends DCLogic {
     // and _setCarSceneVisible both no-op until the scene exists.
     window.__app = this;
     this._ensureDemoDoorTicker();
+    this._startRangeForecastReporter();
     // Keep the legacy/native widget channel pointed at the active desktop.
     // The versioned store remains authoritative for all desktop snapshots.
     this._persistWidgets();
@@ -38709,7 +38793,7 @@ class Component extends DCLogic {
         + (type === 'media' ? ' narrow' : '')
         + (type === 'consumption' && this._energyPopupWideOn() ? ' wide' : '')
         + (type === 'climate' && this._climatePopupWideOn() ? ' wide' : '')
-        + (type === 'range' ? ' range-popup fit' : ''),
+        + (type === 'range' ? (this._rangePopupWideOn() ? ' range-popup wide' : ' range-popup fit') : ''),
       focusedCardBackdropClass: type ? 'on' : '',
       focusedCardTitle: type === 'range' ? 'AUTONOMIA'
         : (type === 'consumption' ? 'CONSUMO'
@@ -38748,7 +38832,7 @@ class Component extends DCLogic {
     const view = type === 'climate' ? this._climateWidgetView(entry.item)
         : (type === 'tires' ? this._tiresWidgetView(entry.item)
           : (type === 'status' ? this._statusWidgetView(entry.item)
-            : (type === 'range' ? this._rangeWidgetView({ type: 'range', w: 2, h: 2 })
+            : (type === 'range' ? this._rangeWidgetView({ type: 'range', w: 2, h: 2, popup: true })
               : (type === 'driving' ? this._drivingWidgetView(entry.item)
                 : (type === 'media' ? this._mediaWidgetView(entry.item)
                   : (type === 'power' ? this._powerWidgetView(entry.item)
@@ -43859,7 +43943,15 @@ class Component extends DCLogic {
     const is2x2 = (item.w || 1) >= 2 && (item.h || 1) >= 2;
     // Only the 3+ wide board has room for the per-bar averages and pack sizes, and for the tap-to-reveal switch.
     const wide = is2x2 && (item.w || 1) >= 3;
+    // The popup's maximised view carries the forecast check (_rangeBurnView).
+    const popWide = !!item.popup && this._rangePopupWideOn();
     return {
+      ...(popWide ? this._rangeBurnView(Date.now()) : {}),
+      rangeWide: popWide,
+      rangeWideClass: popWide ? 'wide' : '',
+      rangeGrowClass: item.popup && !popWide ? 'on' : '',
+      rangeShrinkClass: popWide ? 'on' : '',
+      rangeWideToggle: (ev) => this._toggleRangePopupWide(ev),
       rangeSizeClass: 'hv-range-card-' + (item.w || 1) + 'x' + (item.h || 1),
       rangeIs2x2: is2x2,
       rangeIsNot2x2: !is2x2,
@@ -44036,10 +44128,216 @@ class Component extends DCLogic {
       evDelta, fuelDelta, totalDelta, evDeltaClass, fuelDeltaClass, totalDeltaClass,
       cardStyle, sourceMode, activeMode, isAlt: sourceMode === 'alt',
       batteryPack, fuelTank, evEnergy, fuelVolume, evConsume, fuelAvg, travelTime, powertrainMode,
-      v12Str, v12Val, v12Charging, v12State, v12Pct, v12FillW
+      v12Str, v12Val, v12Charging, v12State, v12Pct, v12FillW,
+      // Raw, for the native range-forecast check (_startRangeForecastReporter):
+      // only a real history estimate for a real SOC, never the OEM fallback.
+      histEvKmNum: !demo && hasHistEv && isFinite(socValue) ? histEvKm : NaN,
+      socValueNum: !demo && isFinite(socValue) ? socNum : NaN
     };
   }
   _openRangeCard(ev, toggleOnly) { this._cardControlEvent(ev); if (this._widgetSuppressClick || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return; if (toggleOnly) this._showRangeToggle(); else this._openFocusedCard('range'); }
+  /**
+   * Native RangeLedger checks the battery range forecast against what is then
+   * driven. The car's own EV range it reads off the bus; the history estimate
+   * exists only here, so it is sent down. A timer rather than a render hook, so
+   * it runs with no range widget on screen; at 15 s it is well inside the
+   * ledger's 2 min freshness window, and hidden-page 1 Hz timer clamping cannot
+   * starve it. Re-sent at least once a minute even unchanged, for that window.
+   */
+  _startRangeForecastReporter() {
+    const b = window.TripBridge;
+    if (this._rangeReportTimer || !b || typeof b.setRangeForecast !== 'function') return;
+    const report = () => {
+      if (this._unmounted) return;
+      let km = '';
+      let soc = '';
+      try {
+        const r = this._rangeTelemetry(Date.now());
+        if (isFinite(r.histEvKmNum) && isFinite(r.socValueNum)) {
+          km = String(Math.round(r.histEvKmNum * 10) / 10);
+          soc = String(r.socValueNum);
+        }
+      } catch (e) {}
+      const sig = km + '|' + soc;
+      if (sig === this._rangeReportSig && Date.now() - (this._rangeReportAt || 0) < 60000) return;
+      this._rangeReportSig = sig;
+      this._rangeReportAt = Date.now();
+      try { b.setRangeForecast(km, soc); } catch (e) {}
+    };
+    this._rangeReportTimer = setInterval(report, 15000);
+    setTimeout(report, 3000);
+  }
+
+  _rangePopupWideOn() {
+    if (this._rangeWide == null) {
+      try { this._rangeWide = localStorage.getItem('h6_range_popup_wide') === '1'; } catch (e) { this._rangeWide = false; }
+    }
+    return this._rangeWide;
+  }
+
+  /** Maximise / restore beside the popup: the 3x2 frame, or the board's full width with the forecast check. */
+  _toggleRangePopupWide(ev) {
+    this._cardControlEvent(ev);
+    this._rangeWide = !this._rangePopupWideOn();
+    try { localStorage.setItem('h6_range_popup_wide', this._rangeWide ? '1' : '0'); } catch (e) {}
+    this._rangeCyclesCache = null;
+    this._uiOnlySetState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }));
+  }
+
+  /**
+   * Cycles from native RangeLedger, newest first; the newest carries its
+   * samples [t, soc, evKm, km, oem, hist]. Read on a 20 s cache: it only grows
+   * a sample per SOC point, and this is reached from render.
+   */
+  _rangeCycles(now) {
+    const c = this._rangeCyclesCache;
+    if (c && now - c.at < 20000) return c;
+    const b = window.TripBridge;
+    let list = null;
+    let demo = false;
+    if (b && typeof b.getRangeCycles === 'function') {
+      try { list = JSON.parse(b.getRangeCycles(8)); } catch (e) { list = null; }
+      if (!Array.isArray(list)) list = [];
+    } else if (this._demoPreview || this._energyDemoOn()) {
+      list = this._rangeDemoCycles(now);
+      demo = true;
+    } else {
+      list = [];
+    }
+    this._rangeCyclesCache = { at: now, list, demo };
+    return this._rangeCyclesCache;
+  }
+
+  /** No bridge (desktop preview): one drive-down that runs ~12% short of its forecast, and two past cycles. */
+  _rangeDemoCycles(now) {
+    const pts = [];
+    for (let i = 0; i <= 30; i++) {
+      const km = i * 3.1;
+      const ev = km * 0.92;
+      const soc = 92 - i * 1.6;
+      const hist = Math.max(0, (soc - 15) * 1.7 - i * 0.6);
+      const oem = Math.max(0, (soc - 15) * 1.9 - i * 1.2);
+      pts.push([now - (30 - i) * 600000, soc, ev, km, oem, hist]);
+    }
+    const last = pts[pts.length - 1];
+    return [
+      { id: now - 18000000, start: 'charge', soc0: 92, oem0: pts[0][4], hist0: pts[0][5], evKm: last[2], km: last[3], end: null, lastSoc: last[1], lastOem: last[4], lastHist: last[5], points: pts },
+      { id: now - 3 * 86400000, start: 'charge', soc0: 95, oem0: 148, hist0: 131, evKm: 118, km: 131, end: 'depleted', lastSoc: 16, lastOem: 0, lastHist: 2 },
+      { id: now - 6 * 86400000, start: 'charge', soc0: 88, oem0: 139, hist0: 122, evKm: 71, km: 80, end: 'charge', lastSoc: 44, lastOem: 58, lastHist: 49 },
+    ];
+  }
+
+  /**
+   * The expanded range popup's forecast check. x is total km since the cycle
+   * began (always grows, engine charging included), y is EV km: driven so far,
+   * and driven + the range still quoted, for the history estimate and the car's
+   * own. A forecast that was right stays flat on its starting value; one that
+   * slopes down was optimistic. SVG paths in a fixed 600x240 box drawn with
+   * non-scaling strokes, labels in HTML.
+   */
+  _rangeBurnView(now) {
+    const unitKey = this._rangeDistanceUnit();
+    const k = unitKey === 'mi' ? 0.621371 : 1;
+    const unit = unitKey.toUpperCase();
+    const fmt = (km) => (isFinite(km) ? String(Math.round(Math.max(0, km) * k)) : '—');
+    const pct = (x) => (isFinite(x) ? (x >= 0 ? '+' : '−') + Math.abs(Math.round(x * 100)) + '%' : '—');
+    const { list, demo } = this._rangeCycles(now);
+    const cur = list[0];
+    const pts = cur && Array.isArray(cur.points) ? cur.points : [];
+    const has = pts.length >= 2;
+    const W = 600;
+    const H = 240;
+    let kmMax = 10;
+    let yMax = 10;
+    const fin = (v) => v != null && isFinite(v);
+    pts.forEach((p) => {
+      if (fin(p[3])) kmMax = Math.max(kmMax, p[3]);
+      [p[2], fin(p[4]) ? p[2] + p[4] : null, fin(p[5]) ? p[2] + p[5] : null].forEach((v) => { if (fin(v)) yMax = Math.max(yMax, v); });
+    });
+    if (cur) [cur.hist0, cur.oem0].forEach((v) => { if (fin(v)) yMax = Math.max(yMax, v); });
+    yMax = Math.ceil(yMax * 1.1 / 10) * 10;
+    const X = (km) => (km / kmMax * W).toFixed(1);
+    const Y = (v) => (H - v / yMax * H).toFixed(1);
+    const line = (valueOf) => {
+      let d = '';
+      let pen = false;
+      pts.forEach((p) => {
+        const v = valueOf(p);
+        if (!fin(v) || !fin(p[3])) { pen = false; return; }
+        d += (pen ? ' L ' : ' M ') + X(p[3]) + ' ' + Y(v);
+        pen = true;
+      });
+      return d.trim();
+    };
+    const flat = (v) => (fin(v) ? 'M 0 ' + Y(v) + ' H ' + W : '');
+    const driven = line((p) => p[2]);
+    const drivenArea = has && driven ? driven + ' L ' + X(pts[pts.length - 1][3]) + ' ' + H + ' L ' + X(pts[0][3]) + ' ' + H + ' Z' : '';
+    // Actual vs forecast: what the cycle delivers (EV km driven, plus what is
+    // still quoted if it has not run empty) over what was forecast at its start.
+    const proj = (c, rem) => (fin(c.evKm) ? c.evKm + (c.end === 'depleted' ? 0 : (fin(rem) ? rem : NaN)) : NaN);
+    const err = (c, f0, rem) => (fin(f0) && f0 > 1 ? proj(c, rem) / f0 - 1 : NaN);
+    const errClass = (x) => (!isFinite(x) ? '' : (Math.abs(x) <= 0.05 ? 'ok' : (x < 0 ? 'under' : 'over')));
+    const curHistErr = cur ? err(cur, cur.hist0, cur.lastHist) : NaN;
+    const curOemErr = cur ? err(cur, cur.oem0, cur.lastOem) : NaN;
+    const day = (ms) => {
+      const d = new Date(ms);
+      return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+    };
+    const endText = (c) => (c.end === 'depleted' ? 'ESGOTOU' : (c.end === 'charge' ? 'RECARREGOU' : (c.end === 'gap' ? 'INCOMPLETO' : 'EM ANDAMENTO')));
+    const past = list.slice(1, 4).map((c) => {
+      const he = err(c, c.hist0, c.lastHist);
+      const oe = err(c, c.oem0, c.lastOem);
+      return {
+        key: String(c.id),
+        when: day(c.id),
+        socs: (fin(c.soc0) ? Math.round(c.soc0) : '—') + '→' + (fin(c.lastSoc) ? Math.round(c.lastSoc) : '—') + '%',
+        end: endText(c),
+        // Recharged or cut short: the result still leans on the last quote.
+        approx: c.end === 'depleted' ? '' : '≈',
+        driven: fmt(c.evKm),
+        histErr: pct(he),
+        histErrClass: errClass(he),
+        oemErr: pct(oe),
+        oemErrClass: errClass(oe),
+      };
+    });
+    // Every cycle starts at a charge (RangeLedger): with none open, the next one waits for one.
+    const summary = !cur ? 'SEM CICLO AINDA · COMEÇA APÓS A PRÓXIMA RECARGA'
+      : (cur.end ? 'ÚLTIMO CICLO · ' + endText(cur) + ' · ' + day(cur.id) + ' · AGUARDANDO RECARGA'
+        : 'DESDE A CARGA DE ' + day(cur.id) + ' · '
+          + (fin(cur.soc0) ? Math.round(cur.soc0) : '—') + '% → ' + (fin(cur.lastSoc) ? Math.round(cur.lastSoc) : '—') + '% · '
+          + fmt(cur.km) + ' ' + unit + ' RODADOS');
+    return {
+      rangeBurnDemo: demo,
+      rangeBurnSummary: summary,
+      rangeBurnHasChart: has,
+      rangeBurnEmpty: !has,
+      rangeBurnEmptyText: cur ? 'Gravando · o gráfico aparece a partir do segundo ponto de SOC.'
+        : 'Nada gravado ainda. O primeiro ciclo começa na primeira condução após uma recarga.',
+      rangeBurnHist0: cur ? fmt(cur.hist0) : '—',
+      rangeBurnOem0: cur ? fmt(cur.oem0) : '—',
+      rangeBurnDriven: cur ? fmt(cur.evKm) : '—',
+      rangeBurnHistNow: cur ? fmt(proj(cur, cur.lastHist)) : '—',
+      rangeBurnOemNow: cur ? fmt(proj(cur, cur.lastOem)) : '—',
+      rangeBurnHistErr: pct(curHistErr),
+      rangeBurnHistErrClass: errClass(curHistErr),
+      rangeBurnOemErr: pct(curOemErr),
+      rangeBurnOemErrClass: errClass(curOemErr),
+      rangeBurnUnit: unit,
+      rangeBurnYMax: fmt(yMax),
+      rangeBurnYMid: fmt(yMax / 2),
+      rangeBurnXMax: fmt(kmMax) + ' ' + unit,
+      rangeBurnHist0Path: cur ? flat(cur.hist0) : '',
+      rangeBurnOem0Path: cur ? flat(cur.oem0) : '',
+      rangeBurnHistPath: line((p) => (fin(p[5]) ? p[2] + p[5] : null)),
+      rangeBurnOemPath: line((p) => (fin(p[4]) ? p[2] + p[4] : null)),
+      rangeBurnDrivenPath: driven,
+      rangeBurnDrivenArea: drivenArea,
+      rangeBurnPast: past,
+      rangeBurnHasPast: past.length > 0,
+    };
+  }
+
   /** On the wide (3+) range widget a tap reveals the history-estimate switch for 5 s instead of opening the popup. */
   _showRangeToggle() {
     this._rangeToggleUntil = Date.now() + 5000;
@@ -46960,6 +47258,7 @@ class Component extends DCLogic {
     clearTimeout(this._desktopDotHoldTimer);
     clearTimeout(this._camSlotHoldTimer);
     clearInterval(this._energyTimer);
+    clearInterval(this._rangeReportTimer);
     clearTimeout(this._consumptionRefreshTimer);
     clearTimeout(this._powerRefreshTimer);
     clearTimeout(this._powerFreshTimer);
