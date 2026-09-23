@@ -59,16 +59,16 @@ function Wait-ForCar([string]$Adb, [int]$TimeoutSec = 7200, [int]$PollSec = 8) {
     # 2. Check Tailscale host (100.121.41.52)
     if (Test-TcpPort $tailscaleIp 5555 900) {
       Write-Host "Tailscale port 5555 open on $tailscaleIp! Connecting ADB ..."
-      Connect-Adb $Adb "$tailscaleIp:5555"
-      if ((Wait-AdbDevice $Adb "$tailscaleIp:5555" 6) -and (Test-Mmi $Adb "$tailscaleIp:5555")) {
-        return "$tailscaleIp:5555"
+      Connect-Adb $Adb "${tailscaleIp}:5555"
+      if ((Wait-AdbDevice $Adb "${tailscaleIp}:5555" 6) -and (Test-Mmi $Adb "${tailscaleIp}:5555")) {
+        return "${tailscaleIp}:5555"
       }
     }
 
     # 3. Check hinted serial
     if (Test-Path $CarHintFile) {
       $hint = ([string](Get-Content $CarHintFile -Raw)).Trim()
-      if ($hint -and $hint -ne "$tailscaleIp:5555") {
+      if ($hint -and $hint -ne "${tailscaleIp}:5555") {
         $hostOnly = ($hint -replace ':\d+$', '')
         if (Test-TcpPort $hostOnly 5555 500) {
           Write-Host "Hint port 5555 open on $hint! Connecting ADB ..."

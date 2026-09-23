@@ -2499,7 +2499,7 @@ window.HavalSplash = (function () {
     .hv-card-focus.power-popup .hv-card-focus-head { height:38px; gap:8px; }
     .hv-power[data-power-size="popup"] { position:relative; inset:auto; grid-template-columns:minmax(0,1.1fr) minmax(300px,1fr); grid-template-rows:1fr; gap:18px; padding:0; overflow:visible; align-items:center; }
     .hv-power[data-power-size="popup"] .hv-power-stage { grid-column:1; grid-row:1; display:flex; justify-content:center; align-items:center; }
-    .hv-power[data-power-size="popup"] .hv-power-canvas { height:410px; width:186px; }
+    .hv-power[data-power-size="popup"] .hv-power-canvas { height:min(410px, calc(100vh - 340px)); width:auto; }
     .hv-power[data-power-size="popup"] .hv-power-metrics { grid-column:2; grid-row:1; grid-template-columns:1fr 1fr; gap:20px 16px; padding:20px 22px; margin-right:18px; border:1px solid var(--hv-widget-border,rgba(255,255,255,.12)); border-radius:16px; background:var(--hv-frost-inner,rgba(255,255,255,.025)); align-self:center; }
     .hv-power-state { grid-column:1 / -1; min-width:0; }
     .hv-power-state .hv-power-title { display:block; font-size:28px; font-weight:600; letter-spacing:-.03em; line-height:1.1; }
@@ -2509,7 +2509,7 @@ window.HavalSplash = (function () {
     .hv-power-electrical-line { display:block; margin-top:4px; font-style:normal; font-size:13px; color:var(--hv-widget-muted,#a8b7c2); font-variant-numeric:tabular-nums; }
     .hv-power-electrical-line b { font-weight:600; color:var(--hv-widget-fg,#edf5fa); }
     .hv-power[data-power-size="popup"] .hv-power-history { padding-top:10px; }
-    .hv-power[data-power-size="popup"] .hv-power-history svg { height:112px; margin:6px 0 0; }
+    .hv-power[data-power-size="popup"] .hv-power-history svg { height:min(112px, calc(100vh - 620px)); min-height:48px; margin:6px 0 0; }
     .hv-power-history { grid-column:1 / -1; min-width:0; border-top:1px solid var(--hv-widget-border,rgba(255,255,255,.12)); padding-top:14px; }
     .hv-power-history-head { display:flex; justify-content:space-between; gap:10px; font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:1.4; color:var(--hv-widget-muted,#a8b7c2); }
     .hv-power-history-head b { color:var(--hv-widget-fg,#edf5fa); }
@@ -2529,6 +2529,13 @@ window.HavalSplash = (function () {
       .hv-power[data-power-size="popup"] .hv-power-canvas { max-width:460px; }
       .hv-power[data-power-size="popup"] .hv-power-metrics { grid-column:1; grid-row:2; gap:12px; padding:12px; }
     }
+    /* Stepped on purpose: every change repaints the whole overlay SVG. Measured
+       on the car (Hybrid 4x4, popup open, 3 interleaved pairs): smooth animation
+       cut bare rAF from ~57/s to 35-39/s (p90 61-69 ms); stepped it is 56-57/s,
+       p90 ~19.5 ms -- the same as idle. Keep new overlay animations stepped. */
+    .hv-power-flow-track,.hv-power-route .hv-power-flow-head,.hv-power-hub { animation-timing-function:steps(12); }
+    .hv-power-highlight.active,.hv-power-pack-edge,.hv-power-pack-glow,.hv-power-bolt { animation-timing-function:steps(14); }
+    .hv-power-cell-pulse,.hv-power-cell-wave,.hv-power-charge-sweep { animation-timing-function:steps(16); }
     @media (prefers-reduced-motion:reduce) { .hv-power-flow-track,.hv-power-flow-head,.hv-power-cell-pulse,.hv-power-cell-wave,.hv-power-hub,.hv-power-highlight,.hv-power-pack-edge,.hv-power-bolt,.hv-power-charge-sweep,.hv-power-pack-glow,.hv-power-art::before { animation:none !important; } .hv-power-flow-track { stroke-dashoffset:0; } .hv-power-cell-wave,.hv-power-hub,.hv-power-charge-sweep { display:none; } .hv-power-cell-fill,.hv-power-route,.hv-power-highlight { transition:none !important; } }
     .hv-graphs {
       position: absolute;

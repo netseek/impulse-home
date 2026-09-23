@@ -194,7 +194,7 @@ async function build(key, cfg) {
   // slivers of the engine.
   const parts = [cfg.engine, cfg.frontMotor, cfg.rearMotor, cfg.battery].filter(Boolean);
   const inPart = (i) => { const x = i % W, y = (i / W) | 0; return parts.some(([a, b, c, d]) => x >= a - 6 && x <= c + 6 && y >= b - 6 && y <= d + 6); };
-  const seen = new Uint8Array(N), comp = new Int32Array(N);
+  const seen = new Uint8Array(N), comp = new Int32Array(N), shade = new Uint8Array(N);
   let pockets = 0;
   for (let s = 0; s < N; s++) {
     if (ground[s] || seen[s] || !passable(s)) continue;
@@ -207,6 +207,10 @@ async function build(key, cfg) {
       }
     }
     if (t >= 80 && !touchesPart && sum / t >= 212) { for (let k = 0; k < t; k++) ground[comp[k]] = 1; pockets++; }
+    // Dimmer smooth pockets (floor seen through the frame, 165-212) stay opaque
+    // but are shaded: cutting them risks silver suspension arms, and left as-is
+    // they read as a bright rim on a dark card. A shaded arm just looks shaded.
+    else if (t >= 40 && sum / t >= 165) { for (let k = 0; k < t; k++) if (!inPart(comp[k])) shade[comp[k]] = 1; }
   }
   if (pockets) console.log(`  ${key}: ${pockets} enclosed ground pockets`);
   // Close pinholes: an isolated non-ground pixel surrounded by ground is noise.
@@ -228,6 +232,7 @@ async function build(key, cfg) {
       continue;
     }
     let r = data[s], g = data[s + 1], b = data[s + 2], a = 1;
+    if (shade[i]) { r *= 0.3; g *= 0.3; b *= 0.3; }
     // Edge band: unmix the backdrop out of pixels that straddle the silhouette.
     let nearGround = false;
     for (let j = -1; j <= 1 && !nearGround; j++) for (let k = -1; k <= 1; k++) {
@@ -281,8 +286,44 @@ async function build(key, cfg) {
     .extract({ left: minX, top: minY, width: cw, height: ch }).raw().toBuffer();
   const cropped = await sharp(crop, { raw: { width: cw, height: ch, channels: 4 } }).rotate(90)
     .resize(dw, dh, { kernel: 'lanczos3', fit: 'fill' }).raw().toBuffer();
-  const png = await sharp({ create: { width: OUT_W, height: OUT_H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-    .composite([{ input: cropped, raw: { width: dw, height: dh, channels: 4 }, left: offX, top: offY }])
+  const layer = await sharp({ create: { width: OUT_W, height: OUT_H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: cropped, raw: { width: dw, height: dh, channels: 4 }, left: offX, top: offY }]).raw().toBuffer();
+
+  // Edge choke: the outermost ring of the silhouette still carries some of the
+  // white studio backdrop after resampling and reads as a light outline on a
+  // dark card. Darken any pixel that has a mostly-transparent neighbour.
+  const car = Buffer.from(layer), NN = OUT_W * OUT_H;
+  for (let y = 0; y < OUT_H; y++) for (let x = 0; x < OUT_W; x++) {
+    const o = (y * OUT_W + x) * 4; if (layer[o + 3] < 8) continue;
+    let edge = false;
+    for (let j = -1; j <= 1 && !edge; j++) for (let k = -1; k <= 1; k++) {
+      const X = x + k, Y = y + j;
+      if (X < 0 || Y < 0 || X >= OUT_W || Y >= OUT_H || layer[(Y * OUT_W + X) * 4 + 3] < 96) { edge = true; break; }
+    }
+    if (!edge) continue;
+    for (let c = 0; c < 3; c++) car[o + c] = Math.round(layer[o + c] * 0.45);
+  }
+
+  // Contact / ambient-occlusion shadow from the car's own silhouette: a tight
+  // dark contact line plus a soft falloff, black, UNDER the car. It grounds the
+  // art on light cards and swallows whatever fringe is left on dark ones.
+  const solid = Buffer.alloc(NN);
+  for (let i = 0; i < NN; i++) solid[i] = layer[i * 4 + 3] > 150 ? 255 : 0;
+  // Read back with the channel count sharp reports: a 1-channel blur is not
+  // guaranteed to come back as 1 channel, and a wrong stride stripes the shadow.
+  const blurA = async (sigma) => {
+    const { data: d, info } = await sharp(solid, { raw: { width: OUT_W, height: OUT_H, channels: 1 } }).blur(sigma).raw().toBuffer({ resolveWithObject: true });
+    const out = Buffer.alloc(NN);
+    for (let i = 0; i < NN; i++) out[i] = d[i * info.channels];
+    return out;
+  };
+  const [tight, soft] = await Promise.all([blurA(1.6), blurA(5)]);
+  const shadow = Buffer.alloc(NN * 4);
+  for (let i = 0; i < NN; i++) {
+    shadow[i * 4 + 3] = Math.round(Math.min(255, tight[i] * 0.55 + soft[i] * 0.4));
+  }
+  const png = await sharp(shadow, { raw: { width: OUT_W, height: OUT_H, channels: 4 } })
+    .composite([{ input: car, raw: { width: OUT_W, height: OUT_H, channels: 4 } }])
     .png({ compressionLevel: 9, palette: false }).toBuffer();
   fs.writeFileSync(path.join(outDir, `approved-${key}-chassis.png`), png);
 

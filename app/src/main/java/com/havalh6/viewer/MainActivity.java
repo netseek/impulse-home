@@ -2553,11 +2553,14 @@ public final class MainActivity extends Activity {
             c.drawText(descriptor.primary == null ? "" : descriptor.primary,
                     textLeft, cy + h * .12f, paint);
 
-            // Next days, right to left so a narrow card drops the far ones.
+            // Next days, at most three, right to left so a narrow card drops the
+            // far ones. The stop is the temperature's MEASURED width: a fixed
+            // w*.18 let "20,5°" run under the first day on the car.
+            float tempRight = textLeft + paint.measureText(descriptor.primary == null ? "" : descriptor.primary) + w * .04f;
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
-            float colW = Math.min(w * .13f, h * .46f);
+            float colW = Math.min(w * .15f, h * .5f);
             float right = w - pad;
-            for (int i = days.length - 1; i >= 0 && right - colW > textLeft + w * .18f; i--) {
+            for (int i = Math.min(days.length, 3) - 1; i >= 0 && right - colW >= tempRight; i--) {
                 String[] parts = days[i].split("[|]");
                 if (parts.length < 3) continue;
                 float cx = right - colW / 2f;
