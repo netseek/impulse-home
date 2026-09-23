@@ -41347,7 +41347,27 @@ class Component extends DCLogic {
    * averages the window into that many buckets (the density setting); 0 draws
    * every sample. Averages always use every sample.
    */
+  // Memoised per second of `now` and per sample count. Building the view walks
+  // the whole window and builds SVG path strings: measured on the car while
+  // driving, 62 ms/call, 2.6 calls/s (the 1 Hz energy tick plus every
+  // _syncDockIndicators via _energyModel), i.e. ~16% of the main thread in
+  // 60-175 ms blocks the 3D wheels could not get a frame through. Within one
+  // second the samples are the same and the window slides by < 1 px of 600.
   _energyChartView(samples, now, spec) {
+    const src0 = samples || [];
+    const last0 = src0.length ? src0[src0.length - 1] : null;
+    const memoKey = [Math.floor(now / 1000), src0.length, last0 ? last0.t : 0,
+      spec.kind, spec.span, spec.points, spec.smooth ? 1 : 0].join('|');
+    const memo = this._energyChartMemo || (this._energyChartMemo = new Map());
+    const hit = memo.get(memoKey);
+    if (hit && hit.samples === src0) return hit.view;
+    const view = this._energyChartViewBuild(samples, now, spec);
+    if (memo.size > 8) memo.clear();
+    memo.set(memoKey, { samples: src0, view });
+    return view;
+  }
+
+  _energyChartViewBuild(samples, now, spec) {
     const W = 600;
     const H = 160;
     const GAP = 3000;
