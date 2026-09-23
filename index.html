@@ -5360,7 +5360,13 @@ window.HavalSplash = (function () {
     .hv-clim-fan button.lo svg { width: 19px; height: 19px; }
     .hv-clim-fan button.hi svg { width: 30px; height: 30px; }
     .hv-clim-fanbar { flex: 1; height: 40px; display: flex; align-items: center; gap: 7px; }
-    .hv-clim-fanbar i { flex: 1; height: 9px; border-radius: 5px; background: currentColor; opacity: .14; transition: height .12s; }
+    .hv-clim-fanbar i { position: relative; flex: 1; height: 9px; border-radius: 5px; background: currentColor; opacity: .14; transition: height .12s; }
+    /* The bar is 9px of paint in a 40px row, which is a small target in a moving car.
+       This pseudo-element enlarges the HIT area to the full row height and across the
+       gaps between segments, without changing the look or the layout: it is absolutely
+       positioned, so nothing reflows, and a pseudo-element is never the event target,
+       so the handler's closest('[data-cfan] i') still resolves to the segment. */
+    .hv-clim-fanbar i::after { content: ''; position: absolute; top: -14px; bottom: -14px; left: -3.5px; right: -3.5px; }
     .hv-clim-fanbar i.on { background: var(--hv-accent); opacity: 1; }
     .hv-clim-fan.scrub .hv-clim-fanbar i.on { height: 14px; }
 
