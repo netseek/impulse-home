@@ -38452,11 +38452,31 @@ class Component extends DCLogic {
    * frame: a single press arrives as 0 -> 2 -> 0 and a knob turn produces a burst, hence the
    * coalescing window. See the `_live` seam notes in CLAUDE.md for why that matters.
    */
+  /**
+   * Whether Impulse is really holding the OEM A/C app back for us.
+   *
+   * Native pushes this as a synthetic bus key, but that push can happen BEFORE the page is
+   * loaded -- it did on the car, on every viewer restart, leaving the flag undefined and the
+   * popup dead. So the first read falls back to the native cache, which is where signals that
+   * arrived during boot are kept.
+   */
+  _climateHandoffOn() {
+    if (this._climateHandoffActive != null) return this._climateHandoffActive;
+    try {
+      const bridge = window.TelemetryBridge;
+      if (bridge && typeof bridge.getCarData === 'function') {
+        this._climateHandoffActive = bridge.getCarData(CAR_CLIMATE_HANDOFF) === '1';
+        return this._climateHandoffActive;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   _onCarClimatePanelRequest(value) {
     // Only the rising edge. The trailing 0 is the car closing a panel we never opened.
     const wants = String(value != null ? value : '').trim();
     if (!wants || wants === '0') return;
-    if (!this._climateHandoffActive) return;
+    if (!this._climateHandoffOn()) return;
 
     const now = Date.now();
     if (this._climatePanelAt && (now - this._climatePanelAt) < CLIMATE_PANEL_COALESCE_MS

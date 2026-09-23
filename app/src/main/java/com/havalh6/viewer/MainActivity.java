@@ -7229,6 +7229,10 @@ public final class MainActivity extends Activity {
         endSplashOverlay();
         if (launcherRevealed) return;
         launcherRevealed = true;
+        // Only now can the page draw its own A/C popup, so only now is it honest to ask Impulse
+        // to take the car's away. Asking at onCreate left the car with NO climate panel for the
+        // whole cold start.
+        if (climateHandoff != null) climateHandoff.onViewerReady();
         mainHandler.removeCallbacks(launcherRevealFallback);
         updateAppsOnlyChrome();
         if (SHELL_APPS.equals(shellMode)) {
