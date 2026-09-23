@@ -27,8 +27,8 @@ function method(source, name) {
   throw new Error(`unterminated ${name}()`);
 }
 
-assert.ok(html.includes("{ id: 'power', title: 'Power flow', action: 'openPower' }"));
-assert.ok(html.includes("power: { label: 'POWER', title: 'Energy flow'"));
+assert.ok(html.includes("{ id: 'power', title: 'Fluxo de energia', action: 'openPower' }"));
+assert.ok(html.includes("power: { label: 'ENERGIA', title: 'Fluxo de energia'"));
 assert.ok(html.includes("[3, 2]"), '3x2 Power widget size is required');
 assert.equal((html.match(/value="\{\{ wg\.isPower \}\}"/g) || []).length, 1,
   'Power widget markup must exist on the widget board');
@@ -45,10 +45,19 @@ for (const token of ['CAR_POWER_GRAPHICS', '_powerGraphicsVariant', '_powerGraph
 for (const key of ['phev19', 'phev34', 'hev2']) {
   assert.ok(html.includes(`approved-${key}-chassis.png`), `missing transparent ${key} chassis crop`);
 }
-assert.ok(html.includes('filterUnits="userSpaceOnUse"'),
-  'flow glow must not use a zero-height/width object bounding box');
-assert.ok(html.includes('markerUnits="userSpaceOnUse"'),
-  'wheel-end chevrons must retain a stable, unclipped size');
+// Every animated frame repaints the overlay SVG, and a filter is re-rasterised
+// on each repaint -- glows are layered strokes instead. (Markers were the old
+// wheel-end chevrons; the comet head replaced them.)
+const overlayMarkup = method(html, '_powerGraphicMarkup');
+assert.ok(!/<filter|filter=|<marker|marker-end/.test(overlayMarkup),
+  'Power overlay must not use SVG filters or markers');
+// Motion is paused by default and runs only on .is-running (flow active AND on
+// screen), so a hidden or idle card never animates.
+for (const cls of ['hv-power-flow-track', 'hv-power-flow-head', 'hv-power-hub', 'hv-power-cell-wave', 'hv-power-cell-pulse', 'hv-power-bolt', 'hv-power-charge-sweep']) {
+  const rule = html.match(new RegExp(`\\n\\s*(?:\\.hv-power-route )?\\.${cls} \\{[^}]*\\}`));
+  assert.ok(rule && rule[0].includes('animation-play-state:paused'), `${cls} must start paused`);
+  assert.ok(new RegExp(`\\.hv-power-canvas\\.is-running [^{]*\\.${cls}`).test(html), `${cls} must run only under .is-running`);
+}
 assert.ok(html.includes('.hv-power-canvas { position:relative;') && html.includes('overflow:visible;'),
   'Power canvas must permit the wheel-end glow to paint past the route bounds');
 assert.ok(html.includes("case 'openPower':\n        this._openFocusedCard('power');"));
@@ -85,6 +94,6 @@ assert.ok(java.includes('sanitizePowerVariant'));
 assert.ok(java.includes('drawPowerBatteryCells'));
 assert.ok(java.includes('drawPowerTopRoute'));
 assert.ok(java.includes('www/assets/power/graphics/'));
-assert.ok(java.includes('Opens power flow details.'));
+assert.ok(java.includes('Abre os detalhes do fluxo de energia.'));
 
 console.log('power card contract: OK');

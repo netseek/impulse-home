@@ -92,11 +92,11 @@ try{
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
       canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;ctx.drawImage(image,0,0);
       const corner=ctx.getImageData(0,0,1,1).data[3];
-      const centre=ctx.getImageData((canvas.width/2)|0,(canvas.height/2)|0,1,1).data[3];
-      return {corner,centre};
+      const vehicle=ctx.getImageData((canvas.width/2)|0,((canvas.height * 0.16)|0),1,1).data[3];
+      return {corner,vehicle};
     });
   });
-  if(!transparentChassis.length||transparentChassis.some(sample=>sample.corner!==0||sample.centre===0)){
+  if(!transparentChassis.length||transparentChassis.some(sample=>sample.corner!==0||sample.vehicle===0)){
     throw Error('approved chassis crop lost its transparent ground: '+JSON.stringify(transparentChassis));
   }
   await page.setViewportSize({width:1920,height:720});
@@ -125,17 +125,20 @@ try{
     return canvas ? {variant:canvas.dataset.powerVariant,running:canvas.classList.contains('is-running'),
       cells:canvas.querySelectorAll('[data-module]').length,routes:canvas.querySelectorAll('.hv-power-route.active').length} : null;
   });
-  if(!liveGraphic||liveGraphic.variant!=='phev34'||!liveGraphic.running||liveGraphic.cells!==10||liveGraphic.routes!==6){
+  if(!liveGraphic||liveGraphic.variant!=='phev34'||!liveGraphic.running||liveGraphic.cells!==10||liveGraphic.routes!==8){
     throw Error('production Power graphic did not reach the expected live AWD state: '+JSON.stringify(liveGraphic));
   }
   const flowEdges=await page.evaluate(()=>{
     const svg=document.querySelector('.hv-power[data-power-size="popup"] .hv-power-overlay');
-    const filter=svg?.querySelector('filter'),markers=[...svg?.querySelectorAll('marker')||[]];
-    return {filterUnits:filter?.getAttribute('filterUnits'), markerUnits:markers.map(m=>m.getAttribute('markerUnits')),
-      visible:getComputedStyle(svg).overflow, routes:svg?.querySelectorAll('.hv-power-route.active').length||0};
+    // No filters: each animated frame repaints the SVG and a blur would be
+    // re-rasterised every time. Glows are layered strokes instead.
+    const running=[...svg.querySelectorAll('.hv-power-flow-track,.hv-power-flow-head,.hv-power-hub')]
+      .filter(el=>el.getAnimations().some(a=>a.playState==='running')).length;
+    return {filters:svg?.querySelectorAll('filter').length||0, visible:getComputedStyle(svg).overflow,
+      routes:svg?.querySelectorAll('.hv-power-route.active').length||0, hubs:svg?.querySelectorAll('.hv-power-hub').length||0, running};
   });
-  if(flowEdges.filterUnits!=='userSpaceOnUse'||flowEdges.markerUnits.some(unit=>unit!=='userSpaceOnUse')
-    ||flowEdges.visible!=='visible'||flowEdges.routes!==6){
+  if(flowEdges.filters!==0||flowEdges.visible!=='visible'||flowEdges.routes!==8||flowEdges.hubs!==4
+    ||flowEdges.running!==8*2+4){
     throw Error('wheel-end flow paint regression: '+JSON.stringify(flowEdges));
   }
   await page.screenshot({path:path.join(root,'docs/power-redesign-app-popup.png')});
@@ -150,14 +153,14 @@ try{
     const anim=active[0]?.getAnimations()[0];
     if(!anim)return {error:'charging pulse missing'};
     anim.pause();
-    const values=[0,900,1800].map(t=>{anim.currentTime=t;return Number(getComputedStyle(active[0]).opacity);});
+    const values=[0,800,1600].map(t=>{anim.currentTime=t;return Number(getComputedStyle(active[0]).opacity);});
     const staticLevels=cells.map(c=>Number(c.style.getPropertyValue('--cell-level')));
     const filter=getComputedStyle(active[0]).filter,shadow=getComputedStyle(active[0]).boxShadow;
     const card=canvas.closest('.hv-power');card.style.display='none';app._syncPowerGraphicMotion(canvas);
     const paused=!canvas.classList.contains('is-running');card.style.display='';app._syncPowerGraphicMotion(canvas);
     return {active:active.length,values,staticLevels,filter,shadow,paused};
   });
-  if(pulseCheck.error||pulseCheck.active!==1||Math.abs(pulseCheck.values[0])>.001||Math.abs(pulseCheck.values[1]-.2)>.001||Math.abs(pulseCheck.values[2])>.001||pulseCheck.filter!=='none'||pulseCheck.shadow!=='none'||!pulseCheck.paused){
+  if(pulseCheck.error||pulseCheck.active!==1||Math.abs(pulseCheck.values[0]-.06)>.001||Math.abs(pulseCheck.values[1]-.2)>.001||Math.abs(pulseCheck.values[2]-.06)>.001||pulseCheck.filter!=='none'||pulseCheck.shadow!=='none'||!pulseCheck.paused){
     throw Error('Battery pulse regression: '+JSON.stringify(pulseCheck));
   }
   await page.emulateMedia({reducedMotion:'reduce'});
@@ -166,6 +169,6 @@ try{
     return {opacity:Number(getComputedStyle(cell).opacity),animation:getComputedStyle(cell).animationName};
   });
   if(Math.abs(reduced.opacity-.2)>.001||reduced.animation!=='none')throw Error('Reduced motion must preserve proportional SOC: '+JSON.stringify(reduced));
-  console.log('Pulse: 0 → 20% → 0 for the 12% boundary cell; no glow; hidden and reduced-motion states OK');
+  console.log('Pulse: 6% → 20% → 6% for the 12% boundary cell; no glow; hidden and reduced-motion states OK');
   console.log('transparent chassis, unclipped wheel-end flow, production markup size/theme captures + app popup captured');
 }finally{await browser?.close();server.close();}

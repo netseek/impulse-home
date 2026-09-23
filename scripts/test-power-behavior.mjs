@@ -26,14 +26,14 @@ let model = app._powerModel(1);
 assert.equal(model.stateKey, 'live');
 assert.equal(model.kw, '18.0', 'battery magnitude does not infer regeneration from current polarity');
 assert.equal(model.tone, 'ev');
-assert.equal(model.frontLabel, 'Driving');
-assert.equal(model.rearLabel, 'Inactive', 'front-only packet must not invent AWD');
+assert.equal(model.frontLabel, 'Tracionando');
+assert.equal(model.rearLabel, 'Inativo', 'front-only packet must not invent AWD');
 assert.equal(model.driveToken, '1,0,0');
 app.state.modelTrim = 'phev19';
 publish(keys.powerFlow, 'flow', 'v1|ev|0|1|1');
 model = app._powerModel(1);
 assert.equal(model.rearDir, 0, 'PHEV19 topology suppresses inferred rear activity');
-assert.equal(model.rearLabel, 'Not driven');
+assert.equal(model.rearLabel, 'Sem tração');
 assert.equal(model.driveToken, '1,0,0');
 assert.equal(model.graphic.key, 'phev19');
 app.state.modelTrim = 'hev';
@@ -71,7 +71,7 @@ app._powerHistory = [{ at: now - 5000, kw: 12 }, { at: now, kw: 15 }];
 assert.equal((app._powerHistoryView(now, false).powerHistoryPath.match(/M/g) || []).length, 2, 'gaps must not be interpolated');
 assert.equal(app._powerHistoryView(now + 61000, false).powerHistoryHasData, false);
 const before = JSON.stringify(app._powerHistory);
-assert.equal(app._powerHistoryView(now, true).powerHistoryLabel, 'Simulated example');
+assert.equal(app._powerHistoryView(now, true).powerHistoryLabel, 'Exemplo simulado');
 assert.equal(JSON.stringify(app._powerHistory), before, 'demo must never contaminate recorded history');
 console.log('Power behavior: fresh/stale signals, independent axles, polarity, malformed packets and history gaps OK');
 
@@ -87,7 +87,7 @@ for (const trim of ['phev19','phev34','hev2']) {
     assert.equal(visual.mode,'standby');assert.equal(visual.pulse,false);
     const svg=app._powerGraphicMarkup(m,'popup','test-'+trim);
     assert.equal((svg.match(/data-module=/g)||[]).length,10);
-    assert.ok(svg.includes('HIGH VOLTAGE')&&svg.includes('BATTERY'));
+    assert.ok(svg.includes('BATERIA DE ALTA TENSÃO'));
     const widths=[...svg.matchAll(/width="([\d.]+)"[^>]*class="hv-power-cell-fill/g)].map(m=>m[1]);
     assert.equal(widths.length,10);assert.equal(new Set(widths).size,1,'SOC never resizes a face');
   }
@@ -117,3 +117,32 @@ app.state.modelTrim='phev34';publish(keys.batterySoc,'soc',64);
 publish(keys.powerFlow,'flow','v1|hybrid|1|1|-1');
 assert.equal(app._powerBatteryVisual(app._powerModel(1)).mode,'standby','mixed axles do not establish net pack direction');
 console.log('Battery display: exact ten segments, fractional intensity, mode colors, edge pulse and stale/full/mixed handling OK');
+
+// Engine running with the car standing is the generator filling the pack, on
+// every body (HEV2 included): the battery animates as charging.
+for (const trim of ['phev19', 'phev34', 'hev2']) {
+  app.state.modelTrim = trim; publish(keys.batterySoc, 'soc', 40);
+  publish(keys.powerFlow, 'flow', 'v1|idle|1|0|0');
+  const v = app._powerBatteryVisual(app._powerModel(1));
+  assert.equal(v.mode, 'charging', trim + ': engine idling charges the pack');
+  assert.equal(v.pulse, true);
+  publish(keys.powerFlow, 'flow', 'v1|idle|0|0|0');
+  assert.equal(app._powerBatteryVisual(app._powerModel(1)).mode, 'standby', trim + ': engine off is not charging');
+}
+// 4x4 only when both axles really drive, and only an AWD body can.
+app.state.modelTrim = 'phev34';
+publish(keys.powerFlow, 'flow', 'v1|ev|0|1|1');
+assert.equal(app._powerModel(1).state, 'Elétrico 4x4');
+publish(keys.powerFlow, 'flow', 'v1|ev|0|1|0');
+assert.equal(app._powerModel(1).state, 'Elétrico');
+publish(keys.powerFlow, 'flow', 'v1|hybrid|1|1|1');
+assert.equal(app._powerModel(1).state, 'Híbrido 4x4');
+app.state.modelTrim = 'phev19';
+publish(keys.powerFlow, 'flow', 'v1|ev|0|1|1');
+assert.equal(app._powerModel(1).state, 'Elétrico', 'PHEV19 cannot report 4x4');
+// Native card cuts metric lines at 32 characters.
+for (const flow of ['v1|regen|0|-1|0', 'v1|charge|0|0|0', 'v1|hybrid|1|1|1', 'v1|ice|1|0|0', 'v1|ev|0|1|1', 'v1|idle|1|0|0', 'v1|idle|0|0|0']) {
+  app.state.modelTrim = 'phev34'; publish(keys.powerFlow, 'flow', flow);
+  assert.ok(app._powerModel(1).flowSummary.length <= 32, flow + ' flow line fits the native card');
+}
+console.log('Engine charging, 4x4 labels and native-length flow lines OK');

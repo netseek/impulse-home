@@ -2871,46 +2871,164 @@ public final class MainActivity extends Activity {
             if(known){String[] parts=token.split(",");front=Integer.parseInt(parts[0]);rear=Integer.parseInt(parts[1]);ice=Integer.parseInt(parts[2]);}
             boolean awd="phev34".equals(variant),hev="hev2".equals(variant);
             if(!awd)rear=0;
-            float fit=Math.min(w/770f,h/350f)*.96f;
+            // Same geometry as CAR_POWER_GRAPHICS in index.html -- both are printed by
+            // scripts/build-approved-chassis-assets.mjs; regenerate, do not nudge.
+            // inlet / chargePath / chargeExt are the one hand-placed exception (the
+            // renders have no body): a schematic port on the right rear quarter.
+            float[] battery,engine,frontMotor,rearMotor=null;float[][] frontPath,fl,fr,rearPath=null,rl=null,rr=null,hubs,iceL,iceR,iceBatt,chargePath=null,chargeExt=null;float[] inlet=null;
+            if(awd){
+                battery=new float[]{77.8f,259.1f,179.7f,285.1f};engine=new float[]{170.5f,96.5f,72.7f,76.1f};
+                frontMotor=new float[]{103f,97.5f,59.4f,87.9f};rearMotor=new float[]{133.9f,608.4f,76f,76f};
+                frontPath=new float[][]{{136.3f,259.1f},{136.3f,221.1f},{132.9f,185.4f}};
+                fl=new float[][]{{162.4f,137.9f},{271.7f,138.8f}};fr=new float[][]{{103f,137.9f},{69.7f,138.8f}};
+                rearPath=new float[][]{{171.9f,544.2f},{171.9f,577.5f},{171.9f,608.4f}};
+                rl=new float[][]{{209.9f,633.1f},{273.2f,632.2f}};rr=new float[][]{{133.9f,633.1f},{69.7f,632.2f}};
+                hubs=new float[][]{{302.6f,138.8f},{38.8f,138.8f},{302.6f,632.2f},{38.8f,632.2f}};
+                iceL=new float[][]{{243.2f,148.8f},{273.2f,148.8f}};iceR=new float[][]{{170.5f,148.8f},{69.7f,148.8f}};
+                iceBatt=new float[][]{{202.8f,172.6f},{202.8f,221.1f},{202.8f,259.1f}};
+                inlet=new float[]{322f,572f};chargePath=new float[][]{{322f,572f},{290f,572f},{290f,530f},{257.5f,530f}};
+                chargeExt=new float[][]{{342f,730f},{342f,598f},{322f,572f}};
+            }else if(hev){
+                battery=new float[]{146.2f,468.2f,72.5f,77.6f};engine=new float[]{187.2f,99.8f,65.3f,83.5f};
+                frontMotor=new float[]{126.3f,106.6f,56.4f,67.6f};
+                frontPath=new float[][]{{157.9f,468.2f},{123.6f,451.6f},{122.7f,318.5f},{144.4f,212.6f},{151.1f,174.2f}};
+                fl=new float[][]{{182.7f,141.8f},{270.5f,143.6f}};fr=new float[][]{{126.3f,141.8f},{85.8f,143.6f}};
+                hubs=new float[][]{{304.3f,144.9f},{49.7f,145.8f},{304.3f,620.7f},{47.5f,620.7f}};
+                iceL=new float[][]{{252.5f,153.9f},{270.5f,153.9f}};iceR=new float[][]{{187.2f,153.9f},{85.8f,153.9f}};
+                iceBatt=new float[][]{{207.4f,183.3f},{238.1f,214.8f},{238.1f,451.6f},{198.4f,468.2f}};
+            }else{
+                battery=new float[]{100.5f,287.1f,152.7f,193.5f};engine=new float[]{186.1f,101.5f,64.8f,87.9f};
+                frontMotor=new float[]{114.3f,103.8f,67.2f,74.1f};
+                frontPath=new float[][]{{151.4f,287.1f},{151.4f,235.7f},{149.1f,177.9f}};
+                fl=new float[][]{{181.5f,143.2f},{274.1f,144.1f}};fr=new float[][]{{114.3f,143.2f},{81.9f,144.1f}};
+                hubs=new float[][]{{304.2f,145.5f},{47.2f,145.5f},{304.2f,626.8f},{47.2f,626.8f}};
+                iceL=new float[][]{{250.9f,154.7f},{274.1f,154.7f}};iceR=new float[][]{{186.1f,154.7f},{81.9f,154.7f}};
+                iceBatt=new float[][]{{218.5f,189.4f},{218.5f,240.4f},{218.5f,287.1f}};
+                inlet=new float[]{324f,566f};chargePath=new float[][]{{324f,566f},{288f,566f},{288f,460f},{253.2f,460f}};
+                chargeExt=new float[][]{{342f,730f},{342f,592f},{324f,566f}};
+            }
+            boolean incoming=front<0||rear<0,outgoing=front>0||rear>0;
+            // Engine running with the car standing is the generator filling the pack.
+            boolean iceCharging=known&&ice==1&&"idle".equals(state);
+            boolean charging=known&&(("charge".equals(state)&&!hev)||incoming&&!outgoing||iceCharging);
+            boolean discharging=known&&outgoing&&!incoming&&("ev".equals(state)||"hybrid".equals(state));
+            boolean plug="charge".equals(state)&&charging&&inlet!=null;
+            boolean plugFull=plug&&descriptor.socKnown&&descriptor.powerSoc>=100;
+            boolean packCharging=(plug&&!plugFull)||iceCharging;
+            boolean motion=powerMotionEnabled();
+            double seconds=android.os.SystemClock.uptimeMillis()/1000.0;
+            float breathe=motion?(float)(.775+.225*Math.cos(seconds*Math.PI*2/2.2)):1f;
+            float chargeBreathe=motion?(float)(.7+.3*Math.cos(seconds*Math.PI*2/1.8)):1f;
+
+            // The car is drawn rotated (front to the right); the battery % sits
+            // upright UNDER it, so keep a strip free at the bottom for it.
+            float dp=getResources().getDisplayMetrics().density;
+            float labelH=17*dp;
+            float fit=Math.min(w/770f,(h-labelH)/350f)*.96f;
+            float ox=w*.5f,oy=(h-labelH)*.5f;
             int saved=c.save();
-            c.translate(w*.5f,h*.5f);c.scale(fit,fit);c.rotate(90f);c.translate(-175f,-385f);
+            c.translate(ox,oy);c.scale(fit,fit);c.rotate(90f);c.translate(-175f,-385f);
+            if(plug&&!plugFull){
+                // Charging ring on the floor: a circle under the middle of the car.
+                float ringR=175f*(.96f+.06f*(chargeBreathe-.7f)/.6f);
+                paint.setShader(new android.graphics.RadialGradient(175f,385f,ringR,
+                        new int[]{0x3D53ED91,0x1A53ED91,0x0053ED91},new float[]{0,.74f,1},android.graphics.Shader.TileMode.CLAMP));
+                fill(0xFFFFFFFF);c.drawCircle(175f,385f,ringR,paint);paint.setShader(null);
+                stroke(withAlpha(0xFF53ED91,Math.round(.14f*255*chargeBreathe)),22f);c.drawCircle(175f,385f,ringR+10f,paint);
+                stroke(withAlpha(0xFF7CF571,Math.round(.95f*255*chargeBreathe)),5f);c.drawCircle(175f,385f,ringR,paint);
+            }
             if(car!=null){
                 oval.set(0,0,350,770);fill(0xFFFFFFFF);paint.setFilterBitmap(true);
                 c.drawBitmap(car,null,oval,paint);
                 paint.setFilterBitmap(false);
             }
-            boolean incoming=front<0||rear<0,outgoing=front>0||rear>0;
-            boolean charging=known&&(("charge".equals(state)&&!hev)||incoming&&!outgoing);
-            boolean discharging=known&&outgoing&&!incoming&&("ev".equals(state)||"hybrid".equals(state));
-            float px=awd?118:hev?127:121,py=awd?371:hev?538:375;
-            float pw=hev?91:115,ph=awd?134:hev?90:130;
-            float bx=awd?123:hev?132:126,by=hev?567:409,bw=hev?81:105,bh=awd?49:hev?22:45;
-            fill(0xFF626B71);c.drawRoundRect(px,py,px+pw,py+ph,4,4,paint);
-            stroke(0xFF9AA1A5,1);c.drawRoundRect(px,py,px+pw,py+ph,4,4,paint);
-            boolean pulse=drawPowerBatteryCells(c,bx,by,bw,bh,descriptor.socKnown,descriptor.powerSoc,charging,discharging);
-            float[][] frontPath=awd?new float[][]{{177,248},{177,221},{177,173}}
-                    :hev?new float[][]{{172,534},{111,514},{111,246},{177,216},{177,173}}
-                    :new float[][]{{178,340},{178,252},{178,173}};
-            drawPowerTopRoute(c,frontPath,front,accent);
-            drawPowerTopRoute(c,new float[][]{{177,173},{57,144}},front,accent);
-            drawPowerTopRoute(c,new float[][]{{177,173},{289,144}},front,accent);
-            if(awd){
-                drawPowerTopRoute(c,new float[][]{{177,567},{177,594},{177,640}},rear,accent);
-                drawPowerTopRoute(c,new float[][]{{177,640},{57,654}},rear,accent);
-                drawPowerTopRoute(c,new float[][]{{177,640},{289,654}},rear,accent);
+            if(ice==1)drawPowerHighlight(c,engine,0xFFFFB65C,motion?(float)(.775+.225*Math.cos(seconds*Math.PI*2/1.1)):1f);
+            if(front!=0)drawPowerHighlight(c,frontMotor,front>0?0xFF22C9FF:0xFF53ED91,breathe);
+            if(awd&&rear!=0)drawPowerHighlight(c,rearMotor,rear>0?0xFF22C9FF:0xFF53ED91,breathe);
+            if(plug&&!plugFull){
+                android.graphics.Path lead=new android.graphics.Path();
+                lead.moveTo(chargeExt[0][0],chargeExt[0][1]);
+                for(int i=1;i<chargeExt.length;i++)lead.lineTo(chargeExt[i][0],chargeExt[i][1]);
+                stroke(0xF2F3FFF5,5f);c.drawPath(lead,paint);
+                drawPowerTopRoute(c,chargeExt,1,seconds,motion,0xFF53ED91);
+                drawPowerTopRoute(c,chargePath,1,seconds,motion,0xFF53ED91);
             }
-            if(ice==1){fill(0x28FFB65C);c.drawRoundRect(137,61,217,131,4,4,paint);}
-            fill(0xFFF2F5F7);paint.setTextAlign(android.graphics.Paint.Align.CENTER);
-            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(hev?19:23);
-            c.drawText(descriptor.socKnown?Math.round(descriptor.powerSoc)+"%":"—",bx+bw/2,by-9,paint);
-            paint.setTypeface(android.graphics.Typeface.DEFAULT);paint.setTextSize(9);
-            c.drawText("HIGH VOLTAGE",bx+bw/2,by+bh+15,paint);
-            c.drawText("BATTERY",bx+bw/2,by+bh+27,paint);
-            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            boolean iceWheels=ice==1&&("ice".equals(state)||"hybrid".equals(state));
+            if(iceWheels){
+                drawPowerTopRoute(c,iceL,1,seconds,motion,0xFFFFB65C);
+                drawPowerTopRoute(c,iceR,1,seconds,motion,0xFFFFB65C);
+            }else if(ice==1)drawPowerTopRoute(c,iceBatt,1,seconds,motion,0xFFFFB65C);
+            drawPowerTopRoute(c,frontPath,front,seconds,motion);
+            drawPowerTopRoute(c,fl,front,seconds,motion);
+            drawPowerTopRoute(c,fr,front,seconds,motion);
+            if(awd){
+                drawPowerTopRoute(c,rearPath,rear,seconds,motion);
+                drawPowerTopRoute(c,rl,rear,seconds,motion);
+                drawPowerTopRoute(c,rr,rear,seconds,motion);
+            }
+            int hubDir=front!=0?front:(iceWheels?1:0),hubColor=front==0&&iceWheels?0xFFFFB65C:0;
+            drawPowerHub(c,hubs[0],hubDir,seconds,motion,hubColor);drawPowerHub(c,hubs[1],hubDir,seconds,motion,hubColor);
+            if(awd){drawPowerHub(c,hubs[2],rear,seconds,motion);drawPowerHub(c,hubs[3],rear,seconds,motion);}
+            if(plug){
+                // Charger post outside the car, and the port with a plug glyph.
+                float px=chargeExt[0][0],py=chargeExt[0][1];
+                oval.set(px-9,py-4,px+9,py+22);
+                fill(0xFFF6FFF8);c.drawRoundRect(oval,4,4,paint);
+                stroke(0xFF2FB94F,2f);c.drawRoundRect(oval,4,4,paint);
+                android.graphics.Path pb=new android.graphics.Path();
+                pb.moveTo(px+1.5f,py+1);pb.lineTo(px-3.5f,py+10);pb.lineTo(px+.5f,py+10);pb.lineTo(px-1.5f,py+18);
+                pb.lineTo(px+4,py+8);pb.lineTo(px,py+8);pb.close();
+                fill(0xFF2FB94F);c.drawPath(pb,paint);
+                if(!plugFull)drawPowerHub(c,inlet,-1,seconds,motion);
+                fill(0xFFF6FFF8);c.drawCircle(inlet[0],inlet[1],12,paint);
+                stroke(0xFF53ED91,2.5f);c.drawCircle(inlet[0],inlet[1],12,paint);
+                float ix=inlet[0],iy=inlet[1];
+                stroke(0xFF1F9D45,2f);
+                c.drawLine(ix-4,iy-7,ix-4,iy-3,paint);c.drawLine(ix+4,iy-7,ix+4,iy-3,paint);
+                oval.set(ix-6.5f,iy-5f,ix+6.5f,iy+5f);c.drawArc(oval,0,180,false,paint);
+                c.drawLine(ix-6.5f,iy-3,ix+6.5f,iy-3,paint);c.drawLine(ix-6.5f,iy-3,ix-6.5f,iy,paint);c.drawLine(ix+6.5f,iy-3,ix+6.5f,iy,paint);
+                c.drawLine(ix,iy+5,ix,iy+8,paint);
+            }
+            if(packCharging){
+                // Wide two-layer glow while the pack is actually filling.
+                oval.set(battery[0]-9,battery[1]-9,battery[0]+battery[2]+9,battery[1]+battery[3]+9);
+                stroke(withAlpha(0xFF53ED91,Math.round(.07f*255*chargeBreathe)),26f);c.drawRoundRect(oval,16,16,paint);
+                oval.set(battery[0]-5,battery[1]-5,battery[0]+battery[2]+5,battery[1]+battery[3]+5);
+                stroke(withAlpha(0xFF53ED91,Math.round(.15f*255*chargeBreathe)),12f);c.drawRoundRect(oval,13,13,paint);
+            }
+            if(charging||discharging){
+                stroke(withAlpha(charging?0xFF53ED91:0xFF22C9FF,Math.round(255*breathe)),3f);
+                oval.set(battery[0]-2,battery[1]-2,battery[0]+battery[2]+2,battery[1]+battery[3]+2);
+                c.drawRoundRect(oval,10,10,paint);
+            }
+            boolean pulse=drawPowerBatteryCells(c,battery,descriptor.socKnown,descriptor.powerSoc,charging,discharging,seconds,motion);
+            if(packCharging&&pulse&&motion)drawPowerChargeSweep(c,battery,seconds);
             c.restoreToCount(saved);
+
+            // Battery % upright, under the car, centred beneath the pack.
+            // Rotation maps image (x, y) to screen (ox - fit*(y-385), oy + fit*(x-175)).
+            float packCenterY=battery[1]+battery[3]/2;
+            float lx=ox-fit*(packCenterY-385f),ly=oy+fit*175f+12.5f*dp;
+            String socText=descriptor.socKnown?Math.round(descriptor.powerSoc)+"%":"—";
+            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(12.5f*dp);
+            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            boolean bolt=plug||iceCharging;
+            float tw=paint.measureText(socText),bs=11f*dp;
+            float textX=bolt?lx+bs*.45f:lx;
+            fill(strong);c.drawText(socText,textX,ly,paint);
+            if(bolt){
+                float bx=textX-tw/2-bs*.95f,by=ly-bs*.95f;
+                android.graphics.Path bp=new android.graphics.Path();
+                bp.moveTo(bx+.62f*bs,by);bp.lineTo(bx+.12f*bs,by+.58f*bs);bp.lineTo(bx+.46f*bs,by+.58f*bs);
+                bp.lineTo(bx+.34f*bs,by+bs);bp.lineTo(bx+.88f*bs,by+.4f*bs);bp.lineTo(bx+.54f*bs,by+.4f*bs);bp.close();
+                fill(withAlpha(0xFF2FB94F,Math.round(255*chargeBreathe)));c.drawPath(bp,paint);
+            }
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             // Only this small view repaints; no WebView telemetry or 3D render loop.
-            // View invalidation resumes naturally after becoming visible again.
-            if(pulse&&powerMotionEnabled()&&getGlobalVisibleRect(powerVisibleRect))postInvalidateDelayed(33);
+            // ~30 fps while something moves, and only while it is actually on screen.
+            boolean animating=pulse||front!=0||rear!=0||ice==1||plug;
+            if(animating&&motion&&getGlobalVisibleRect(powerVisibleRect))postInvalidateDelayed(33);
         }
 
         private final android.graphics.Rect powerVisibleRect=new android.graphics.Rect();
@@ -2928,52 +3046,114 @@ public final class MainActivity extends Activity {
             if(hasFocus&&descriptor!=null&&"power".equals(descriptor.id))invalidate();
         }
 
-        private boolean drawPowerBatteryCells(android.graphics.Canvas c,float x,float y,float w,float h,
-                boolean socKnown,double soc,boolean charging,boolean discharging){
+        /** Ten modules, 2 x 5, filled from the rear row forward (see _powerBatteryLayout). */
+        private boolean drawPowerBatteryCells(android.graphics.Canvas c,float[] b,
+                boolean socKnown,double soc,boolean charging,boolean discharging,double seconds,boolean motion){
             double total=socKnown?Math.max(0,Math.min(100,soc))/10:0;
             int last=(int)Math.ceil(total)-1;
             boolean pulse=last>=0&&(discharging||charging&&soc<100);
-            boolean animate=pulse&&powerMotionEnabled();
-            double seconds=android.os.SystemClock.uptimeMillis()/1000.0;
-            float gap=2.5f,cw=(w-gap*9)/10;
+            boolean animate=pulse&&motion;
+            boolean compact=b[2]<110;
+            float inset=compact?b[2]*.1f:b[2]*.13f,labelH=compact?0:Math.max(44,Math.min(70,b[3]*.24f));
+            float x0=b[0]+inset,x1=b[0]+b[2]-inset;
+            float y0=b[1]+(compact?b[3]*.1f:labelH),y1=b[1]+b[3]-(compact?b[3]*.1f:b[3]*.06f);
+            float gapX=compact?3:6,gapY=compact?2.5f:4;
+            float cw=(x1-x0-gapX)/2,ch=(y1-y0-gapY*4)/5;
+            int lo=discharging?0xFF1287D6:0xFF2FB94F,hi=discharging?0xFF4FDCFF:0xFF7CF571;
             for(int i=0;i<10;i++){
-                float cx=x+i*(cw+gap),level=(float)Math.max(0,Math.min(1,total-i));
-                fill(0xFF141D22);c.drawRoundRect(cx,y,cx+cw,y+h,4,4,paint);
-                stroke(0xFF929A9F,1.3f);c.drawRoundRect(cx,y,cx+cw,y+h,4,4,paint);
-                if(animate&&level>0&&(discharging||i==last)){
-                    double delay=discharging?(last-i)*.14:0;
-                    double phase=((seconds-delay)%1.8+1.8)%1.8/1.8;
-                    level*=(float)(1-Math.abs(2*phase-1));
+                int row=i/2,col=i%2;
+                float cx=x0+col*(cw+gapX),cy=y1-(row+1)*ch-row*gapY;
+                float level=(float)Math.max(0,Math.min(1,total-i));
+                fill(0xC7060B0F);oval.set(cx,cy,cx+cw,cy+ch);c.drawRoundRect(oval,3,3,paint);
+                stroke(0x6BB0C0CA,1f);c.drawRoundRect(oval,3,3,paint);
+                // Every module stays full size: brightness alone encodes its fraction.
+                if(animate&&charging&&i==last){
+                    double phase=(seconds%1.6)/1.6;
+                    level*=(float)(.3+.7*(.5-.5*Math.cos(phase*Math.PI*2)));
                 }
-                fill(withAlpha(discharging?0xFF22C9FF:0xFF65EC55,Math.round(level*255)));
-                c.drawRoundRect(cx+1,y+1.5f,cx+cw-1,y+h-1.5f,4,4,paint);
+                if(level>0){
+                    paint.setShader(new android.graphics.LinearGradient(0,cy+ch,0,cy,lo,hi,android.graphics.Shader.TileMode.CLAMP));
+                    fill(0xFFFFFFFF);paint.setAlpha(Math.round(level*255));
+                    oval.set(cx+1,cy+1,cx+cw-1,cy+ch-1);c.drawRoundRect(oval,2,2,paint);
+                    paint.setShader(null);
+                }
+                if(animate&&level>0){
+                    // Shimmer climbing while charging, running rearward while supplying.
+                    int rank=charging?i:last-i;
+                    double p=(((seconds-rank*.11)%1.6)+1.6)%1.6/1.6;
+                    float a=p<.1?(float)(p/.1)*.5f:p<.32?(float)((.32-p)/.22)*.5f:0f;
+                    if(a>0){fill(withAlpha(0xFFFFFFFF,Math.round(a*255)));c.drawRoundRect(oval,2,2,paint);}
+                }
             }
             return pulse;
         }
 
-        private void drawPowerTopRoute(android.graphics.Canvas c, float[][] points,
-                int direction, int accent) {
+        private void drawPowerHighlight(android.graphics.Canvas c,float[] b,int color,float alpha){
+            oval.set(b[0]-3,b[1]-3,b[0]+b[2]+3,b[1]+b[3]+3);
+            fill(withAlpha(color,Math.round(.16f*255*alpha)));c.drawRoundRect(oval,9,9,paint);
+            stroke(withAlpha(color,Math.round(255*alpha)),2.5f);c.drawRoundRect(oval,9,9,paint);
+        }
+
+        /** Soft ribbon, core line, and a comet (tail + bright head) every 48 units. */
+        private void drawPowerTopRoute(android.graphics.Canvas c,float[][] points,
+                int direction,double seconds,boolean motion){
+            drawPowerTopRoute(c,points,direction,seconds,motion,0);
+        }
+
+        /** colorOverride 0 = direction colour (drive cyan / regen green). */
+        private void drawPowerTopRoute(android.graphics.Canvas c,float[][] points,
+                int direction,double seconds,boolean motion,int colorOverride){
             if(direction==0||points==null||points.length<2)return;
-            int color=direction>0?0xFF22C9FF:0xFF53ED91;
+            int color=colorOverride!=0?colorOverride:direction>0?0xFF22C9FF:0xFF53ED91;
             android.graphics.Path p=new android.graphics.Path();
             int start=direction>0?0:points.length-1,step=direction>0?1:-1;
             p.moveTo(points[start][0],points[start][1]);
             for(int i=start+step;i>=0&&i<points.length;i+=step)p.lineTo(points[i][0],points[i][1]);
-            stroke(withAlpha(color,0x28),48f);c.drawPath(p,paint);
-            stroke(withAlpha(color,0x78),34f);c.drawPath(p,paint);
-            stroke(color,7f);c.drawPath(p,paint);
-            for(int i=start;i+step>=0&&i+step<points.length;i+=step){
-                float[] a=points[i],b=points[i+step];
-                drawPowerChevron(c,(a[0]+b[0])/2f,(a[1]+b[1])/2f,b[0]-a[0],b[1]-a[1],color);
-            }
+            stroke(withAlpha(color,0x24),34f);c.drawPath(p,paint);
+            stroke(withAlpha(color,0x48),16f);c.drawPath(p,paint);
+            stroke(withAlpha(color,0xCC),4f);c.drawPath(p,paint);
+            float march=motion?(float)((seconds%1.0)*48):0f;
+            stroke(withAlpha(color,0xF2),9f);
+            paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{18,30},48-march));
+            c.drawPath(p,paint);
+            stroke(0xFFF4FDFF,12f);
+            paint.setPathEffect(new android.graphics.DashPathEffect(new float[]{.01f,47.99f},30-march));
+            c.drawPath(p,paint);
+            paint.setPathEffect(null);
         }
 
-        private void drawPowerChevron(android.graphics.Canvas c,float x,float y,float dx,float dy,int color){
-            float len=(float)Math.hypot(dx,dy);if(len<1f)return;
-            float ux=dx/len,uy=dy/len,backX=x-ux*13f,backY=y-uy*13f;
-            stroke(color,7f);
-            c.drawLine(backX-uy*10f,backY+ux*10f,x,y,paint);
-            c.drawLine(backX+uy*10f,backY-ux*10f,x,y,paint);
+        /** A soft green band rising through the module area while plugged in (web: .hv-power-charge-sweep). */
+        private void drawPowerChargeSweep(android.graphics.Canvas c,float[] b,double seconds){
+            boolean compact=b[2]<110;
+            float inset=compact?b[2]*.1f:b[2]*.13f,labelH=compact?0:Math.max(44,Math.min(70,b[3]*.24f));
+            float x0=b[0]+inset,x1=b[0]+b[2]-inset;
+            float y0=b[1]+(compact?b[3]*.1f:labelH),y1=b[1]+b[3]-(compact?b[3]*.1f:b[3]*.06f);
+            float band=(y1-y0)*.45f;
+            double p=(seconds%2.4)/2.4,e=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+            float top=y1-(float)e*(y1-y0+band);
+            int saved=c.save();
+            c.clipRect(x0,y0,x1,y1);
+            paint.setShader(new android.graphics.LinearGradient(0,top+band,0,top,
+                    new int[]{0x007CF571,0x8CB6FFAE,0x007CF571},new float[]{0,.55f,1},android.graphics.Shader.TileMode.CLAMP));
+            fill(0xFFFFFFFF);c.drawRect(x0,top,x1,top+band,paint);
+            paint.setShader(null);
+            c.restoreToCount(saved);
+        }
+
+        /** A ring at a driven wheel: radiates out on drive, gathers in on regen. */
+        private void drawPowerHub(android.graphics.Canvas c,float[] hub,int direction,double seconds,boolean motion){
+            drawPowerHub(c,hub,direction,seconds,motion,0);
+        }
+
+        private void drawPowerHub(android.graphics.Canvas c,float[] hub,int direction,double seconds,boolean motion,int colorOverride){
+            if(direction==0||hub==null||!motion)return;
+            double t=(seconds%1.4)/1.4;
+            if(direction<0)t=1-t;
+            float eased=(float)(1-Math.pow(1-t,2));
+            float r=17f*(.45f+eased);
+            int color=colorOverride!=0?colorOverride:direction>0?0xFF22C9FF:0xFF53ED91;
+            stroke(withAlpha(color,Math.round(.9f*(1-eased)*255)),4f);
+            c.drawCircle(hub[0],hub[1],r,paint);
         }
 
         /** Cache successful and failed top-down chassis loads once per variant. */
@@ -8969,7 +9149,8 @@ public final class MainActivity extends Activity {
         android.widget.TextView primary = new android.widget.TextView(this);
         primary.setTag("quickValue");
         primary.setText(quickVisualPrimaryText(descriptor));
-        primary.setTextSize("clock".equals(descriptor.id) || "consumption".equals(descriptor.id) ? 24f : ("wallpaper".equals(descriptor.id) ? 18.5f : 21f));
+        primary.setTextSize("power".equals(descriptor.id) ? 25f
+                : "clock".equals(descriptor.id) || "consumption".equals(descriptor.id) ? 24f : ("wallpaper".equals(descriptor.id) ? 18.5f : 21f));
         primary.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         primary.setTextColor(dockLabelColor());
@@ -8980,7 +9161,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView detail = new android.widget.TextView(this);
         detail.setTag("frostSecondary");
         detail.setText(quickVisualDetail(descriptor));
-        detail.setTextSize("consumption".equals(descriptor.id) ? 11f : 9.5f);
+        detail.setTextSize("power".equals(descriptor.id) ? 11f : ("consumption".equals(descriptor.id) ? 11f : 9.5f));
         detail.setLetterSpacing(0.025f);
         detail.setLineSpacing(0f, 1.02f);
         // The source badge is long and must never ellipsise into something that
@@ -9005,7 +9186,9 @@ public final class MainActivity extends Activity {
 
     private String quickVisualDetail(BottomCardDescriptor descriptor) {
         if ("power".equals(descriptor.id)) {
-            return descriptor.metricA + "\n" + descriptor.metricB + "\n" + descriptor.secondary;
+            // Flow line, then volts / amps. The source stays out: the header
+            // chip already carries DEMO, and a second copy read as clutter.
+            return descriptor.metricA + (descriptor.metricB.isEmpty() ? "" : "\n" + descriptor.metricB);
         }
         if ("tires".equals(descriptor.id)) {
             String rear = labelTirePair("RL", "RR", descriptor.metricA);
@@ -9025,6 +9208,14 @@ public final class MainActivity extends Activity {
     /** {@link #quickVisualPrimary} with CONSUMO's unit set small after the number. */
     private CharSequence quickVisualPrimaryText(BottomCardDescriptor descriptor) {
         String primary = quickVisualPrimary(descriptor);
+        if ("power".equals(descriptor.id)) {
+            android.text.SpannableString text = new android.text.SpannableString(primary + " kW");
+            text.setSpan(new android.text.style.RelativeSizeSpan(0.45f), primary.length(), text.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new android.text.style.ForegroundColorSpan(dockUiLight ? 0xFF6B7480 : 0xFF7D8793), primary.length(),
+                    text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            return text;
+        }
         if (!"consumption".equals(descriptor.id) || descriptor.metricA.isEmpty()) return primary;
         android.text.SpannableString text = new android.text.SpannableString(primary + " " + descriptor.metricA);
         text.setSpan(new android.text.style.RelativeSizeSpan(0.4f), primary.length(), text.length(),
@@ -11363,12 +11554,12 @@ public final class MainActivity extends Activity {
             return "Wallpaper and display fill. " + descriptor.primary + ". " + descriptor.secondary;
         }
         if ("power".equals(descriptor.id)) {
-            StringBuilder description = new StringBuilder("Power flow. ");
-            description.append(descriptor.primary.isEmpty() ? "Power flow unavailable" : descriptor.primary);
+            StringBuilder description = new StringBuilder("Fluxo de energia. ");
+            description.append(descriptor.primary.isEmpty() ? "Fluxo de energia indisponível" : descriptor.primary + " kW");
             if (!descriptor.metricA.isEmpty()) description.append(". ").append(descriptor.metricA);
             if (!descriptor.metricB.isEmpty()) description.append(". ").append(descriptor.metricB);
             if (!descriptor.secondary.isEmpty()) description.append(". Source ").append(descriptor.secondary);
-            description.append(". Opens power flow details.");
+            description.append(". Abre os detalhes do fluxo de energia.");
             return description.toString();
         }
         if ("status".equals(descriptor.id)) {
