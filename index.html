@@ -10087,6 +10087,8 @@ class Component extends DCLogic {
       // spin freezes or runs backwards — the wagon-wheel effect, and the
       // reason a rim can look motionless at 20 km/h on a 14-22 fps panel.
       stepFrac: 0.45,
+      // Roll by the smoothed frame interval, not the raw one — see the loop.
+      stepSmooth: true,
       // Where the sprite takes over. The sharp rim is GONE by blurFullKmh and
       // fades in over the fadeKmh below it — an ADDITIVE span, not the
       // multiplicative `fadeSpan: 1.7` this replaced (which put `full` at 51
@@ -17426,8 +17428,8 @@ class Component extends DCLogic {
       // looked fine. lightRollSign stays as a global override for A/B-ing.
       const sign = (this._wheelSpinTune && typeof this._wheelSpinTune.lightRollSign === 'number')
         ? this._wheelSpinTune.lightRollSign : 1;
-      const _n = new THREE.Vector3();
-      const _q = new THREE.Quaternion();
+      const _n = scratch.discNormal || (scratch.discNormal = new THREE.Vector3());
+      const _q = scratch.discQuat || (scratch.discQuat = new THREE.Quaternion());
       this._blurredDiscs.forEach((d) => {
         const u = d.material && d.material.uniforms;
         if (!u) return;
@@ -18281,26 +18283,6 @@ class Component extends DCLogic {
       return { rad: TWO_PI / guess, order: guess, corr: pick.corr, weak: true, from: 'capture' };
     }
     return { rad: TWO_PI / pick.order, order: pick.order, corr: pick.corr, weak: false, from: 'capture' };
-  }
-
-  // Trailing debounce around _generateBlurredWheelTexture.
-  //
-  // The capture is not cheap — measured 5.6 ms single-layer and 44 ms two-layer
-  // on the emulator, and the MMI is a good deal slower. The tint handlers fire
-  // on every `input` event, so dragging a slider used to queue one capture per
-  // pixel of travel. Same shape as _requestTweenShadow / _settleTweenShadow:
-  // coalesce the burst, and a final update is guaranteed because a trailing
-  // debounce only ever fires after the last event.
-  _requestBlurCapture(delayMs) {
-    const t = this._wheelSpinTune || {};
-    const wait = typeof delayMs === 'number' ? delayMs
-      : (typeof t.captureDebounceMs === 'number' ? t.captureDebounceMs : 200);
-    if (this._blurCaptureTimer) clearTimeout(this._blurCaptureTimer);
-    this._blurCaptureTimer = setTimeout(() => {
-      this._blurCaptureTimer = null;
-      try { this._generateBlurredWheelTexture(); }
-      catch (e) { console.warn('[WheelBlur] debounced capture failed', e && e.message); }
-    }, wait);
   }
 
   _initWheelBlur() {
@@ -20321,8 +20303,87 @@ class Component extends DCLogic {
         
         this._backingDiscs.push(backingDisc);
       });
+      this._scheduleSpriteWarm();
     }
     this._snapshotOriginalWheelsState();
+  }
+
+  // Link the spin sprite's programs before the car first crosses the blur
+  // handover. The discs sit hidden until then, so their first visible frame
+  // used to link two ShaderMaterial programs mid-drive: measured on the car,
+  // one 184 ms long task at the first 27 km/h crossing after every load.
+  //
+  // renderer.compile() on the disc materials is NOT enough, measured: the
+  // handover still linked 9 programs, because keys depend on the render
+  // context (shadow pass, sort state), not only on the material. So this does
+  // what _prewarmCarReveal does: puts the wheels in their full-blur state,
+  // draws the REAL scene once through a 1x1 scissor on the default framebuffer
+  // (a scratch target would key a different encoding), and puts everything
+  // back. Held until _revealSettled() so it never lands in the intro.
+  // A/B: localStorage.h6_spriteWarm = '0'.
+  _scheduleSpriteWarm() {
+    clearTimeout(this._spriteWarmTimer);
+    const discs = (this._blurredDiscs || []).concat(this._backingDiscs || []);
+    if (!discs.length) return;
+    try { if (localStorage.getItem('h6_spriteWarm') === '0') return; } catch (e) {}
+    const tryWarm = () => {
+      this._spriteWarmTimer = 0;
+      if (discs !== this._spriteWarmPending) return;   // superseded by a rebuild
+      if (!this.renderer || !this.camera || (this._revealSettled && !this._revealSettled())) {
+        this._spriteWarmTimer = setTimeout(tryWarm, 500);
+        return;
+      }
+      // Not while moving (the loop owns the wheels then) or while hidden.
+      if (this._currentMotionSpeed() !== 0 || !this._carSceneVisible || this.state.loading) {
+        this._spriteWarmTimer = setTimeout(tryWarm, 2000);
+        return;
+      }
+      this._spriteWarmPending = null;
+      const THREE = this.THREE;
+      const r = this.renderer;
+      const t0 = performance.now();
+      if (!this._live) this._live = {};
+      const hadSpeed = Object.prototype.hasOwnProperty.call(this._live, 'motionSpeed');
+      const prevSpeed = this._live.motionSpeed;
+      const prevLatch = this._blurLatched;
+      const unculled = [];
+      const prevAutoClear = r.autoClear;
+      const prevScissorTest = r.getScissorTest();
+      const prevViewport = r.getViewport(new THREE.Vector4());
+      const prevScissor = r.getScissor(new THREE.Vector4());
+      const prevRt = r.getRenderTarget();
+      try {
+        // Well past the handover, so blend is 1 and every handover toggle
+        // (sprite, backing, spokes off, hub hidden) is in its moving state.
+        this._live.motionSpeed = (this._blurSpeedWindow().full + 20) / 40;
+        this._applyWheelTransforms();
+        discs.forEach((o) => { if (o.frustumCulled) { o.frustumCulled = false; unculled.push(o); } });
+        r.shadowMap.needsUpdate = true;
+        r.setRenderTarget(null);
+        r.autoClear = false;
+        r.setScissorTest(true);
+        r.setViewport(0, 0, 1, 1);
+        r.setScissor(0, 0, 1, 1);
+        r.render(this.scene, this.camera);
+      } catch (e) {
+        console.warn('[wheel] sprite warm-up skipped', e);
+      } finally {
+        unculled.forEach((o) => { o.frustumCulled = true; });
+        r.setViewport(prevViewport);
+        r.setScissor(prevScissor);
+        r.setScissorTest(prevScissorTest);
+        r.autoClear = prevAutoClear;
+        r.setRenderTarget(prevRt);
+        if (hadSpeed) this._live.motionSpeed = prevSpeed; else delete this._live.motionSpeed;
+        this._blurLatched = prevLatch;
+        this._applyWheelTransforms();
+        r.shadowMap.needsUpdate = true;
+        if (this.requestRender) this.requestRender(2);
+      }
+      this._spriteWarmMs = +(performance.now() - t0).toFixed(1);
+    };
+    this._spriteWarmPending = discs;
+    this._spriteWarmTimer = setTimeout(tryWarm, 500);
   }
 
   // Injects "Hemisphere Teleportation Flow" directly into the PMREM reflectVec of
@@ -29383,7 +29444,14 @@ class Component extends DCLogic {
           // Note the clamp is applied to the ACTUAL frame interval, not a
           // smoothed one: aliasing is decided by the real gap between the two
           // frames the eye sees, so a long frame genuinely must step less.
-          const idealDelta = delta * speed * 15.2;
+          //
+          // stepSmooth: advance by the SMOOTHED interval instead of the raw one.
+          // The raw delta hands the frame jitter straight to the rim (measured
+          // parked on the car at a held 20 km/h: step 3.8-32.4 deg, CV 0.43-0.49),
+          // which reads as the wheel hitching. An even step per drawn frame is
+          // what film does; a long frame then costs one late frame, not a jump.
+          const rollDt = this._wheelSpinTune.stepSmooth ? this._motionDt : delta;
+          const idealDelta = rollDt * speed * 15.2;
           const maxStep = (this._rimRepeatRad || (Math.PI * 2 / 5)) * this._wheelSpinTune.stepFrac;
           const rollDelta = Math.max(-maxStep, Math.min(maxStep, idealDelta));
           this._rollClamped = Math.abs(idealDelta) > maxStep + 1e-9;

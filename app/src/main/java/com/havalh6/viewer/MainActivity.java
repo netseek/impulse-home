@@ -588,6 +588,18 @@ public final class MainActivity extends Activity {
             mainHandler.post(() -> applyQuickClockFace(safeRevision, sequence, bitmap));
         }
 
+        /**
+         * Geometry of the panorama seconds sweep (H6ClockFaces.sweep), or empty
+         * for none. When set, the page sends the face WITHOUT the sweep once a
+         * minute and the card strokes it here every second: re-encoding the
+         * face per second cost the WebView main thread 25-160 ms/s on the car.
+         */
+        @JavascriptInterface
+        public void setClockCardSweep(String revision, String json) {
+            final ClockSweep sweep = ClockSweep.parse(json);
+            mainHandler.post(() -> applyQuickClockSweep(sweep));
+        }
+
         @JavascriptInterface
         public String getInstalledApps() {
             JSONArray appsArray = new JSONArray();
@@ -1067,6 +1079,56 @@ public final class MainActivity extends Activity {
     private Bitmap quickClockFaceBitmap;
     private String quickClockFaceRevision = "";
     private int quickClockFaceSequence = -1;
+    /** Panorama seconds sweep drawn natively over quickClockFaceBitmap, or null. */
+    private ClockSweep quickClockSweep;
+
+    /** H6ClockFaces.sweep(): a rounded rect in SVG viewBox units, stroked for second/60. */
+    private static final class ClockSweep {
+        final float viewW, viewH, x, y, w, h, rx, stroke;
+        final int color;
+        final android.graphics.Path path = new android.graphics.Path();
+        final float length;
+
+        private ClockSweep(org.json.JSONObject o) {
+            viewW = (float) o.optDouble("viewW", 224);
+            viewH = (float) o.optDouble("viewH", 124);
+            x = (float) o.optDouble("x", 4);
+            y = (float) o.optDouble("y", 4);
+            w = (float) o.optDouble("w", 216);
+            h = (float) o.optDouble("h", 116);
+            rx = Math.max(0f, Math.min((float) o.optDouble("rx", 16), Math.min(w, h) / 2f));
+            stroke = (float) o.optDouble("stroke", 3);
+            color = android.graphics.Color.parseColor(o.optString("color", "#8cebc9"));
+            // SVG's rect path order: start at (x + rx, y), clockwise. The sweep is
+            // a dash of the first second/60 of THIS path, so the start point and
+            // direction must match or the arc grows from the wrong corner.
+            float r = rx, r2 = rx * 2f;
+            path.moveTo(x + r, y);
+            path.lineTo(x + w - r, y);
+            if (r > 0f) path.arcTo(new android.graphics.RectF(x + w - r2, y, x + w, y + r2), -90f, 90f, false);
+            path.lineTo(x + w, y + h - r);
+            if (r > 0f) path.arcTo(new android.graphics.RectF(x + w - r2, y + h - r2, x + w, y + h), 0f, 90f, false);
+            path.lineTo(x + r, y + h);
+            if (r > 0f) path.arcTo(new android.graphics.RectF(x, y + h - r2, x + r2, y + h), 90f, 90f, false);
+            path.lineTo(x, y + r);
+            if (r > 0f) path.arcTo(new android.graphics.RectF(x, y, x + r2, y + r2), 180f, 90f, false);
+            path.close();
+            length = new android.graphics.PathMeasure(path, false).getLength();
+        }
+
+        static ClockSweep parse(String json) {
+            if (json == null || json.isEmpty()) return null;
+            try { return new ClockSweep(new org.json.JSONObject(json)); }
+            catch (Exception e) { Log.w(TAG, "bad clock sweep", e); return null; }
+        }
+    }
+
+    private void applyQuickClockSweep(ClockSweep sweep) {
+        quickClockSweep = sweep;
+        for (QuickClockCardView clock : quickClockCards.values()) {
+            if (clock != null) clock.setSweep(sweep);
+        }
+    }
     /** Accent DEMO markers in web-configured card headers, keyed by card id. */
     private final java.util.Map<String, android.widget.TextView> quickCardDemoBadges =
             new java.util.HashMap<>();
@@ -1287,6 +1349,17 @@ public final class MainActivity extends Activity {
                         | android.graphics.Paint.FILTER_BITMAP_FLAG);
         private ClockSnapshot snapshot;
         private Bitmap renderedFace;
+        private ClockSweep sweep;
+        private final android.graphics.Path sweepSegment = new android.graphics.Path();
+        private final android.graphics.PathMeasure sweepMeasure = new android.graphics.PathMeasure();
+        private final android.graphics.Paint sweepPaint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final Runnable secondTick = new Runnable() {
+            @Override public void run() {
+                invalidate();
+                scheduleSecondTick();
+            }
+        };
         private final Runnable minuteTick = new Runnable() {
             @Override public void run() {
                 refreshNow();
@@ -1312,6 +1385,43 @@ public final class MainActivity extends Activity {
             invalidate();
         }
 
+        void setSweep(ClockSweep next) {
+            sweep = next;
+            if (sweep != null) {
+                sweepMeasure.setPath(sweep.path, false);
+                if (isAttachedToWindow()) scheduleSecondTick();
+            } else {
+                mainHandler.removeCallbacks(secondTick);
+            }
+            invalidate();
+        }
+
+        private void scheduleSecondTick() {
+            mainHandler.removeCallbacks(secondTick);
+            if (sweep == null) return;
+            long delay = 1000L - (System.currentTimeMillis() % 1000L) + 20L;
+            mainHandler.postDelayed(secondTick, delay);
+        }
+
+        /** Same dash the SVG draws: the first second/60 of the path, round caps. */
+        private void drawSweep(android.graphics.Canvas canvas, float w, float h) {
+            ClockSweep s = sweep;
+            if (s == null || s.length <= 0f) return;
+            int second = (int) ((System.currentTimeMillis() / 1000L) % 60L);
+            if (second <= 0) return;
+            sweepSegment.reset();
+            if (!sweepMeasure.getSegment(0f, s.length * second / 60f, sweepSegment, true)) return;
+            sweepPaint.setStyle(android.graphics.Paint.Style.STROKE);
+            sweepPaint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            sweepPaint.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+            sweepPaint.setStrokeWidth(s.stroke);
+            sweepPaint.setColor(s.color);
+            int save = canvas.save();
+            canvas.scale(w / s.viewW, h / s.viewH);
+            canvas.drawPath(sweepSegment, sweepPaint);
+            canvas.restoreToCount(save);
+        }
+
         void refreshNow() {
             snapshot = ClockSnapshot.from(descriptor, getContext());
             invalidate();
@@ -1327,10 +1437,12 @@ public final class MainActivity extends Activity {
             super.onAttachedToWindow();
             refreshNow();
             scheduleMinuteTick();
+            scheduleSecondTick();
         }
 
         @Override protected void onDetachedFromWindow() {
             mainHandler.removeCallbacks(minuteTick);
+            mainHandler.removeCallbacks(secondTick);
             super.onDetachedFromWindow();
         }
 
@@ -1341,6 +1453,7 @@ public final class MainActivity extends Activity {
             if (renderedFace != null) {
                 canvas.drawBitmap(renderedFace, null,
                         new android.graphics.RectF(0f, 0f, w, h), paint);
+                drawSweep(canvas, w, h);
                 return;
             }
             if (snapshot == null || descriptor == null) return;
@@ -9298,6 +9411,7 @@ public final class MainActivity extends Activity {
         clock.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         if (quickClockFaceBitmap != null) clock.setRenderedFace(quickClockFaceBitmap);
+        clock.setSweep(quickClockSweep);
         card.addView(clock);
         quickClockCards.put(descriptor.id, clock);
         return card;
