@@ -70,6 +70,8 @@ final class ClimateHandoff {
 
     private static final long FIRST_RETRY_MS = 2000L;
     private static final long MAX_RETRY_MS = 60000L;
+    /** Grace before handing the popup back on pause, so app-switching does not thrash pm. */
+    private static final long BACKGROUND_RELEASE_DELAY_MS = 1500L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -78,6 +80,8 @@ final class ClimateHandoff {
     private boolean active;
     private boolean stopped;
     private boolean ready;
+    /** Whether this activity is in front. Starts true: onResume follows onCreate. */
+    private boolean foreground = true;
     private long retryDelayMs = FIRST_RETRY_MS;
 
     ClimateHandoff(Context context, PendingIntent callerToken, Listener listener) {
@@ -174,6 +178,7 @@ final class ClimateHandoff {
         }
         stopped = true;
         handler.removeCallbacks(rebind);
+        handler.removeCallbacks(releaseForBackground);
         unbindQuietly();
         impulse = null;
         setActive(false);
@@ -195,6 +200,43 @@ final class ClimateHandoff {
      * when a button press would have raised our popup behind a loading screen - i.e. no A/C panel
      * at all. Called from revealLauncherStrip(), which the page drives.
      */
+    /**
+     * Takes the lease while this activity is in front and gives it back when it is not.
+     *
+     * A minimised viewer cannot show its own popup: Chromium stops servicing a hidden WebView, so
+     * with the OEM app suppressed a press on the A/C controls produced NO panel at all - reported
+     * from the car 2026-09-23. The car owning its popup is the right fallback whenever we are not
+     * the app on screen.
+     *
+     * The release is delayed slightly so ordinary app-switching does not disable and re-enable a
+     * system package on every pause; coming back cancels it.
+     */
+    void setForeground(boolean value) {
+        if (foreground == value) return;
+        foreground = value;
+        handler.removeCallbacks(releaseForBackground);
+        if (value) {
+            requestControl();
+        } else {
+            handler.postDelayed(releaseForBackground, BACKGROUND_RELEASE_DELAY_MS);
+        }
+    }
+
+    private final Runnable releaseForBackground = () -> {
+        if (foreground) return;
+        releaseControl();
+    };
+
+    /** Drops the lease without unbinding, so the car shows its own popup again. */
+    private void releaseControl() {
+        if (impulse == null) return;
+        try {
+            impulse.send(Message.obtain(null, MSG_RELEASE_CLIMATE_CONTROL));
+        } catch (RemoteException e) {
+            Log.w(TAG, "Could not hand the climate lease back: " + e.getMessage());
+        }
+    }
+
     void onViewerReady() {
         if (ready) return;
         ready = true;
@@ -204,7 +246,7 @@ final class ClimateHandoff {
     private void requestControl() {
         // Bound but not ready yet: the lease is taken at onViewerReady instead, so the car keeps
         // its own popup until we can actually show ours.
-        if (impulse == null || !ready) return;
+        if (impulse == null || !ready || !foreground) return;
         Message message = Message.obtain(null, MSG_TAKE_CLIMATE_CONTROL);
         Bundle data = new Bundle();
         data.putParcelable(EXTRA_CALLER, callerToken);

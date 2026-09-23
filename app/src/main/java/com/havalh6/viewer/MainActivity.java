@@ -14070,6 +14070,10 @@ public final class MainActivity extends Activity {
         // onDestroy.
         // Keep the 3D surface alive while a freeform slot has focus.
         if (!hasOverlayWindow()) webView.onPause();
+        // Hand the A/C popup back to the car while we are not in front. A hidden WebView is not
+        // serviced by Chromium, so our popup could not be drawn - and the car's is suppressed
+        // while we hold the lease, which would leave a button press with NO panel at all.
+        if (climateHandoff != null) climateHandoff.setForeground(false);
         super.onPause();
     }
 
@@ -14078,6 +14082,8 @@ public final class MainActivity extends Activity {
         super.onResume();
         webView.onResume();
         enterImmersiveMode();
+        // Back in front: take the popup over again (no-op until the page has revealed).
+        if (climateHandoff != null) climateHandoff.setForeground(true);
         mediaNowPlaying.start();
         // Permission may have been granted via adb while we were paused; retry.
         mainHandler.removeCallbacks(mediaVizPoll);
