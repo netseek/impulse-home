@@ -5323,12 +5323,16 @@ window.HavalSplash = (function () {
        when the value changes. */
     .hv-clim-wheel { position: relative; width: 176px; height: 176px; overflow: hidden; touch-action: none; display: flex; align-items: center; justify-content: center; }
     .hv-clim-wheel .cap { position: absolute; top: 4px; left: 0; right: 0; text-align: center; opacity: .6; }
-    .hv-clim-stack { display: flex; flex-direction: column; align-items: center; width: 100%; transition: transform .2s cubic-bezier(.22,.7,.3,1); }
+    /* No CSS transition here on purpose: the roll is tweened in JS so the three
+       numbers can grow and fade as they pass the middle, which a transform on the
+       block alone cannot express. See _climWheelFrame. */
+    .hv-clim-stack { display: flex; flex-direction: column; align-items: center; width: 100%; }
+    .hv-clim-stack > span { transform-origin: center center; }
     .hv-clim-stack .near { font: 400 24px/1.25 'Space Grotesk',sans-serif; opacity: .3; font-variant-numeric: tabular-nums; }
     .hv-clim-stack .cur { font: 400 70px/1.02 'Space Grotesk',sans-serif; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .hv-clim-stack .cur small { font-size: 30px; letter-spacing: 0; }
     .hv-clim-stack .cur sup { font-size: 32px; font-weight: 300; vertical-align: top; position: relative; top: 6px; }
-    .hv-clim-wheel.scrub .hv-clim-stack { transition: none; }
+
     /* Up/down steps. Absolutely positioned inside the wheel, which is a fixed
        176px box, so they add no layout: they sit over the dim neighbour values
        they refer to. Hidden in the compact widget, where .cap goes too. */
@@ -5341,7 +5345,7 @@ window.HavalSplash = (function () {
     .hv-clim-step svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .hv-clim-step:active { opacity: .85; }
     .hv-clim-wheel.scrub .hv-clim-step { opacity: .12; }
-    @media (prefers-reduced-motion: reduce) { .hv-clim-stack { transition: none; } }
+
     .hv-clim-wheel.scrub .cur { color: var(--hv-readable-accent,var(--hv-accent)); }
     /* swipe affordance: two faint chevrons on the outer edge */
 
@@ -39960,32 +39964,108 @@ class Component extends DCLogic {
   }
 
   /**
-   * Rolls the stack when the value changes from anything that is NOT a drag: the
-   * step arrows, a tap, or the car itself. Warmer arrives from above, so the stack
-   * starts shifted up and slides down into place.
+   * One frame of the wheel, at scroll fraction [f] in -1..1 (positive = dragged
+   * DOWN, so the warmer number above is coming in).
    *
-   * Skipped while scrubbing - the drag already carries the stack, and fighting it
-   * here would stutter.
+   * The OEM climate app does the same thing and it is what makes its wheel read as
+   * a wheel: com.beantechs.hvac's TempScrollViewV3.updateUIByChanging computes
+   * offset/itemH and interpolates EACH item's text size between two dimens
+   * (scroll_temp_text_main_unselect_ts 40px -> scroll_temp_text_main_ts 56px) plus
+   * its colour (40% -> 80% white), so a value grows as it reaches the middle and
+   * shrinks as it leaves. Sliding the block as one piece - which is what this did
+   * first - moves the right distance and still looks wrong.
+   *
+   * We interpolate with a transform rather than the font size: changing text size
+   * on every frame relayouts the popup, and this panel cannot afford that.
+   */
+  _climWheelFrame(wheel, f) {
+    const stack = wheel && wheel.querySelector('.hv-clim-stack');
+    if (!stack) return;
+    const cur = wheel.querySelector('.cur');
+    const nears = wheel.querySelectorAll('.near');
+    const pitch = this._climStackPitch(wheel);
+    const k = this._climWheelRatio(wheel);
+    const a = Math.min(1, Math.abs(f));
+    stack.style.transform = 'translateY(' + (f * pitch).toFixed(1) + 'px)';
+    if (cur) {
+      cur.style.transform = 'scale(' + (1 - a * (1 - 1 / k)).toFixed(3) + ')';
+      cur.style.opacity = (1 - a * 0.7).toFixed(3);
+    }
+    // Only the one moving INTO the middle grows; the other is on its way out and
+    // already reads as a neighbour.
+    const incoming = nears[f > 0 ? 0 : 1];
+    const outgoing = nears[f > 0 ? 1 : 0];
+    if (incoming) {
+      incoming.style.transform = 'scale(' + (1 + a * (k - 1)).toFixed(3) + ')';
+      incoming.style.opacity = (0.3 + a * 0.7).toFixed(3);
+    }
+    if (outgoing) { outgoing.style.transform = ''; outgoing.style.opacity = ''; }
+  }
+
+  /** Ratio between the current value's type size and a neighbour's, from the live
+   *  layout - the popup and the widget differ, and it is cached per wheel. */
+  _climWheelRatio(wheel) {
+    if (wheel._climRatio) return wheel._climRatio;
+    const cur = wheel.querySelector('.cur');
+    const near = wheel.querySelector('.near');
+    let k = 2.9;
+    if (cur && near) {
+      const a = parseFloat(getComputedStyle(cur).fontSize);
+      const b = parseFloat(getComputedStyle(near).fontSize);
+      if (a > 0 && b > 0) k = a / b;
+    }
+    wheel._climRatio = k;
+    return k;
+  }
+
+  /** Clears a wheel back to its resting state. */
+  _climWheelRest(wheel) {
+    const stack = wheel && wheel.querySelector('.hv-clim-stack');
+    if (!stack) return;
+    stack.style.transform = '';
+    wheel.querySelectorAll('.cur, .near').forEach((n) => { n.style.transform = ''; n.style.opacity = ''; });
+  }
+
+  /**
+   * Eases the wheel from fraction [f0] back to rest, running [_climWheelFrame] per
+   * frame so the numbers keep interpolating on the way. Used both when a drag is
+   * released and when the value changes from a tap, an arrow or the car.
+   */
+  _climTweenWheel(wheel, f0) {
+    if (!wheel) return;
+    if (wheel._climTween) cancelAnimationFrame(wheel._climTween);
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || !f0) { wheel._climTween = 0; this._climWheelRest(wheel); return; }
+    const dur = 200;
+    const t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    const step = () => {
+      const now = (window.performance && performance.now) ? performance.now() : Date.now();
+      const t = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - t, 3);
+      if (t >= 1) { wheel._climTween = 0; this._climWheelRest(wheel); return; }
+      this._climWheelFrame(wheel, f0 * (1 - e));
+      wheel._climTween = requestAnimationFrame(step);
+    };
+    wheel._climTween = requestAnimationFrame(step);
+  }
+
+  /**
+   * Rolls the wheel when the value changes from anything that is NOT a drag: the
+   * step arrows, a tap, or the car. Warmer arrives from above, so the wheel starts
+   * one step down the way and eases back.
+   *
+   * One change repaints several times - staged, sent, confirmed, and once per
+   * mounted root - and each repaint would restart the roll, so it never settled.
+   * Measured in a browser: one arrow press called this 12 times.
    */
   _climRollStack(wheel, from, to) {
     if (!wheel || wheel.classList.contains('scrub')) return;
     if (from == null || to == null || from === to) return;
-    const stack = wheel.querySelector('.hv-clim-stack');
-    if (!stack) return;
-    // One change repaints several times - staged, sent, confirmed - and each repaint
-    // would re-pin the stack at the start of the roll, so it never eased back at all.
-    // Measured in the browser: a single arrow press produced 12 calls here.
     const now = Date.now();
     if (wheel._climRollAt && now - wheel._climRollAt < 220) return;
     wheel._climRollAt = now;
-    const pitch = this._climStackPitch(wheel) * (to > from ? -1 : 1);
-    stack.style.transition = 'none';
-    stack.style.transform = 'translateY(' + pitch.toFixed(1) + 'px)';
-    void stack.offsetHeight; // commit that position before the eased return
-    stack.style.transition = '';
-    stack.style.transform = '';
+    this._climTweenWheel(wheel, to > from ? -1 : 1);
   }
-
   _climSchedulePaint() {
     if (this._climPaintQueued) return;
     this._climPaintQueued = true;
@@ -40027,6 +40107,12 @@ class Component extends DCLogic {
         if (held[zone] && !pend[zone]) return;
         const t = v[zone];
         const wheel = root.querySelector('.hv-clim-wheel[data-zone="' + zone + '"]');
+        // Self-heal: a tween that was interrupted - the page hidden mid-roll, which
+        // stops rAF on this WebView - would otherwise leave the wheel displaced.
+        if (wheel && !wheel._climTween && !wheel.classList.contains('scrub')
+            && wheel.querySelector('.hv-clim-stack').style.transform) {
+          this._climWheelRest(wheel);
+        }
         const was = root['_climLast' + zone];
         root['_climLast' + zone] = t;
         setHtml(root, '[data-cv="' + zone + '"]', fmt(t));
@@ -40132,7 +40218,8 @@ class Component extends DCLogic {
       const zone = el.getAttribute('data-zone');
       drag = { el, kind: el.getAttribute('data-ca'), zone, x: e.clientX, y: e.clientY, moved: false, last: 0,
         start: el.getAttribute('data-ca') === 'temp' ? view()[zone] : (view().fan || 1), target: e.target, id: e.pointerId,
-        stack: el.querySelector('.hv-clim-stack'), pitch: this._climStackPitch(el) };
+        stack: el.querySelector('.hv-clim-stack'), pitch: this._climStackPitch(el), frac: 0 };
+      if (el._climTween) { cancelAnimationFrame(el._climTween); el._climTween = 0; }
       e.stopPropagation();
     }, true);
     document.addEventListener('pointermove', (e) => {
@@ -40158,12 +40245,12 @@ class Component extends DCLogic {
       if (!drag.moved) { drag.moved = true; drag.el.classList.add('scrub'); }
       e.preventDefault();
       const n = Math.round(d / drag.pitch);
-      // Between steps the stack tracks the finger, so the movement is continuous
-      // rather than a jump every 0.5 deg.
-      if (drag.stack) {
-        const off = Math.max(-drag.pitch, Math.min(drag.pitch, d - n * drag.pitch));
-        drag.stack.style.transform = 'translateY(' + off.toFixed(1) + 'px)';
-      }
+      // Between steps the wheel tracks the finger: the block moves AND the numbers
+      // grow or shrink as they pass the middle, which is what makes it read as a
+      // wheel rather than a list sliding past.
+      const off = Math.max(-drag.pitch, Math.min(drag.pitch, d - n * drag.pitch));
+      drag.frac = off / drag.pitch;
+      this._climWheelFrame(drag.el, drag.frac);
       if (n === drag.last) return;
       drag.last = n;
       if (drag.kind === 'temp') this._climStage(drag.zone, clampT(drag.start + n * 0.5), true);
@@ -40171,10 +40258,10 @@ class Component extends DCLogic {
     const end = (e) => {
       if (!drag || (e && e.pointerId !== drag.id)) return;
       const d = drag; drag = null;
-      // 'scrub' first: it is what suppresses the transition, so clearing the
-      // offset afterwards eases back to centre instead of snapping.
       d.el.classList.remove('scrub');
-      if (d.stack) d.stack.style.transform = '';
+      // Ease from wherever the finger left it rather than snapping, and keep
+      // interpolating the numbers on the way back.
+      this._climTweenWheel(d.el, d.frac || 0);
       if (!d.moved) return;
       this._climSuppressClick = Date.now();
       this._climRelease(d.kind === 'temp' ? d.zone : 'fan');
