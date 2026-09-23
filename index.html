@@ -9498,8 +9498,32 @@ const SHADOW_OVERLAY_LAYER = 4;
 const GRADE_MASK_LAYER = 5;
 const GRADE_STENCIL_FLOOR = 1;
 // Contact shadow under the car — dirLight PCFSoft penumbra + catcher opacity.
-const CAR_SHADOW_RADIUS = 19;   // was 15; subtle edge softening only
-const CAR_SHADOW_OPACITY = 0.80;
+// NOTE: three r137 ignores shadow.radius under PCFSoftShadowMap (only PCF and
+// VSM read it), so this value currently has no visible effect.
+const CAR_SHADOW_RADIUS = 19;
+// Sun shadow filter, A/B-able without a rebuild:
+//   localStorage.h6_shadowType = 'vsm' | 'pcf' | 'pcfsoft' (default), reload.
+// VSM is the only one of the three whose penumbra actually widens with radius,
+// but it blurs the map on every shadow update (door tweens refresh every 3rd
+// frame), so it runs on a 1024 map. NOT YET MEASURED ON THE CAR.
+const CAR_SHADOW_TYPE = (() => {
+  try {
+    const v = localStorage.getItem('h6_shadowType');
+    return v === 'vsm' || v === 'pcf' ? v : 'pcfsoft';
+  } catch (e) { return 'pcfsoft'; }
+})();
+const CAR_SHADOW_VSM_RADIUS = 6;
+const CAR_SHADOW_VSM_SAMPLES = 12;
+const CAR_SHADOW_PCF_RADIUS = 3;
+const CAR_SHADOW_OPACITY = 0.90;   // was 0.80
+// Baked occlusion under the car (setupContactShadow): the lower body seen from
+// the ground, blurred, on one quad. Re-baked only once the scene settles, so a
+// frame pays one draw call for it. Live-tunable: window.__contactShadow({...}).
+const CONTACT_SHADOW_OPACITY = 0.9;
+const CONTACT_SHADOW_DARKNESS = 2.0;
+// Wide on purpose: the bake is a footprint of the underbody, so a narrow blur
+// stays hidden under the car. It has to spread past the sills to be seen.
+const CONTACT_SHADOW_BLUR = 7;
 
 // Night mode used to zero hemi+dir so the car sat in IBL-only darkness. Prefer
 // keeping day car lighting and only swapping the background + ground pools.
@@ -16662,9 +16686,6 @@ class Component extends DCLogic {
       this._syncCarSceneForShell();
       if (next === 'car' || next === 'mixed') {
         this._kickShadowRefresh(16);
-        if (typeof this.renderContactShadow === 'function') {
-          try { this.renderContactShadow(); } catch (e) {}
-        }
         if (this.requestRender) this.requestRender(8);
       }
       if (this.state.widgetThemeMode === 'auto') this._refreshAutoWidgetThemeSample(true);
@@ -17914,6 +17935,7 @@ class Component extends DCLogic {
 
     this._applyWheelTransforms();
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    this._requestContactShadow();
     if (this.requestRender) this.requestRender(4);
   }
 
@@ -20600,7 +20622,7 @@ class Component extends DCLogic {
       this.shadowCatcher.visible = this._carSceneVisible !== false;
     }
     if (this.contactShadow) {
-      this.contactShadow.visible = this._carSceneVisible !== false;
+      this.contactShadow.visible = (this._carSceneVisible !== false) && !this.contactShadow.userData.disabled;
     }
     // Wheel/brake interiors: cut envMapIntensity at night so they don't read as
     // sun-lit. IBL is the only remaining light source after hemi+dir are zeroed,
@@ -20685,7 +20707,7 @@ class Component extends DCLogic {
       this.shadowCatcher.visible = this._carSceneVisible !== false;
     }
     if (this.contactShadow) {
-      this.contactShadow.visible = this._carSceneVisible !== false;
+      this.contactShadow.visible = (this._carSceneVisible !== false) && !this.contactShadow.userData.disabled;
     }
     // First night entry adds 13 SpotLights and recompiles every lit shader over
     // several frames. shadowMap.autoUpdate is off, so one needsUpdate in
@@ -20699,6 +20721,7 @@ class Component extends DCLogic {
   _kickShadowRefresh(frames = 6) {
     this._shadowRefreshLeft = Math.max(this._shadowRefreshLeft || 0, frames);
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
+    this._requestContactShadow();
     if (this.requestRender) this.requestRender(frames);
   }
 
@@ -21190,7 +21213,6 @@ class Component extends DCLogic {
   }
 
   // Soft elliptical contact shadow rendered as a textured plane under the car.
-  _ellipse(ctx, x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); }
 
   // Procedural metallic-flake normal map. Tiny random sub-pixel normals that,
   // tiled densely under the clearcoat, read as fine metallic sparkle.
@@ -21218,9 +21240,6 @@ class Component extends DCLogic {
     return t;
   }
 
-  // Realistic baked contact shadow: a soft underbody pool PLUS four tighter,
-  // darker wheel contacts (a single blurry ellipse reads as fake & "missing"
-  // under the wheels — real car shadows are darkest right at the tyre contact).
   // ShadowMaterial-based shadow catcher: a thin plane at car base that is
   // invisible except where the directional light's shadow falls — no depth-pass
   // artifacts from glass or complex underbody geometry.
@@ -21239,17 +21258,26 @@ class Component extends DCLogic {
     this.scene.add(plane);
     this.shadowCatcher = plane;
   }
-  // car from directly below with a depth material into a render target, blur it
-  // horizontally + vertically, and show it on a ground plane. The result follows
-  // the actual car silhouette with a soft penumbra — like the reference render.
+  // Baked contact shadow / ambient occlusion. Render the lower body from the
+  // ground looking up with a depth material (black, alpha falling off with
+  // height), blur it twice, and lay it on one ground quad. It follows the real
+  // silhouette and is darkest where the tyres and sills meet the floor, which
+  // the sun's shadow map alone cannot give.
+  //
+  // It is NOT redrawn per frame: _requestContactShadow re-bakes it on a trailing
+  // debounce once a tween, ride-height change or model swap settles, and never
+  // while the boot reveal is running. During a door swing the sun shadow (which
+  // already refreshes every 3rd tween frame) carries the moving part; the bake
+  // only sees the lowest ~40% of the car, which a door barely changes.
   setupContactShadow(center, size, baseY) {
     const THREE = this.THREE;
     const renderer = this.renderer;
+    if (!THREE.HorizontalBlurShader || !THREE.VerticalBlurShader) return;
     const W = size.x * 1.35, H = size.z * 1.5;   // plane footprint
-    const CAM_H = size.y * 0.42;                  // only lower body → light contact shadow
-    const RES = 1024;
-    const darkness = 1.15;
-    const blurAmount = 2.6;
+    const CAM_H = size.y * 0.42;                  // only the lower body
+    // Blurred to a soft pool anyway, so 512 costs a quarter of the fill of
+    // 1024 for no visible loss.
+    const RES = 512;
 
     const group = new THREE.Group();
     group.position.set(center.x, baseY + 0.004, center.z);
@@ -21262,10 +21290,13 @@ class Component extends DCLogic {
 
     const planeGeo = new THREE.PlaneGeometry(W, H).rotateX(Math.PI / 2);
     const plane = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({
-      map: rt.texture, transparent: true, opacity: 1, depthWrite: false, toneMapped: false,
+      map: rt.texture, transparent: true, opacity: CONTACT_SHADOW_OPACITY,
+      depthWrite: false, toneMapped: false,
     }));
     plane.renderOrder = 2;
-    plane.scale.y = -1;   // texture Y is flipped
+    plane.scale.y = -1;   // texture Y is flipped (also turns the face back up)
+    plane.visible = false; // until the first bake lands
+    plane.userData.rt = rt;
     group.add(plane);
 
     const blurPlane = new THREE.Mesh(planeGeo);
@@ -21278,7 +21309,7 @@ class Component extends DCLogic {
 
     // MeshDepthMaterial tweaked to go black→transparent with distance from ground
     const depthMat = new THREE.MeshDepthMaterial();
-    depthMat.userData.darkness = { value: darkness };
+    depthMat.userData.darkness = { value: CONTACT_SHADOW_DARKNESS };
     depthMat.onBeforeCompile = (shader) => {
       shader.uniforms.darkness = depthMat.userData.darkness;
       shader.fragmentShader = 'uniform float darkness;\n' + shader.fragmentShader.replace(
@@ -21302,69 +21333,106 @@ class Component extends DCLogic {
       blurPlane.visible = true;
       blurPlane.material = hBlur;
       hBlur.uniforms.tDiffuse.value = rt.texture;
-      hBlur.uniforms.h.value = (amount * 1) / RES;
+      hBlur.uniforms.h.value = amount / RES;
       renderer.setRenderTarget(rtBlur);
       renderer.render(blurPlane, shadowCam);
       blurPlane.material = vBlur;
       vBlur.uniforms.tDiffuse.value = rtBlur.texture;
-      vBlur.uniforms.v.value = (amount * 1) / RES;
+      vBlur.uniforms.v.value = amount / RES;
       renderer.setRenderTarget(rt);
       renderer.render(blurPlane, shadowCam);
       blurPlane.visible = false;
     };
 
-    // Render the shadow once (car + shadow are static)
+    const tune = {
+      opacity: CONTACT_SHADOW_OPACITY, darkness: CONTACT_SHADOW_DARKNESS,
+      blur: CONTACT_SHADOW_BLUR, lastMs: 0, bakes: 0,
+    };
+    this._contactShadowTune = tune;
+
     this.renderContactShadow = () => {
+      const t0 = performance.now();
       const scene = this.scene;
+      const prevTarget = renderer.getRenderTarget();
       const prevBg = scene.background;
-      const prevClear = renderer.getClearAlpha();
-      // Exclude the ground floor and the shadow plane itself from the depth pass —
-      // otherwise the big floor fills the frame as a solid black rectangle.
-      const floorWasVisible = this.floorMesh ? this.floorMesh.visible : null;
-      if (this.floorMesh) this.floorMesh.visible = false;
-      plane.visible = false;
+      const prevClearAlpha = renderer.getClearAlpha();
+      const prevClearColor = renderer.getClearColor(new THREE.Color());
+      const prevAutoClear = renderer.autoClear;
+      // Nothing that lies ON the ground may enter the depth pass, or it fills
+      // the target as a solid black rectangle.
+      const hide = [this.floorMesh, this.nightFloor, this.shadowCatcher, plane, this._windGroup]
+        .filter((o) => o && o.visible);
+      hide.forEach((o) => { o.visible = false; });
+      // Sit just above the floor wherever it currently is: ride height moves the
+      // floor, and a plane even 0.5 mm under it is depth-tested out entirely.
+      if (this.floorMesh) {
+        const fy = this.floorMesh.getWorldPosition(new THREE.Vector3()).y;
+        const want = Math.max(baseY + 0.004, fy + 0.003);
+        if (group.parent) group.position.y = want - group.parent.getWorldPosition(new THREE.Vector3()).y;
+        group.updateMatrixWorld(true);
+      }
+      depthMat.userData.darkness.value = tune.darkness;
       scene.background = null;
       scene.overrideMaterial = depthMat;
-      renderer.setClearAlpha(0);
+      // Black, not the scene clear colour: the blur spreads rgb into the
+      // alpha-0 border, and a light clear colour greys the penumbra.
+      renderer.setClearColor(0x000000, 0);
+      renderer.autoClear = true;
       renderer.setRenderTarget(rt);
       renderer.clear();
       renderer.render(scene, shadowCam);
       scene.overrideMaterial = null;
-      blur(blurAmount);
-      blur(blurAmount * 0.4);
-      renderer.setRenderTarget(null);
-      renderer.setClearAlpha(prevClear);
+      blur(tune.blur);
+      blur(tune.blur * 0.4);
+      renderer.setRenderTarget(prevTarget);
+      renderer.setClearColor(prevClearColor, prevClearAlpha);
+      renderer.autoClear = prevAutoClear;
       scene.background = prevBg;
-      plane.visible = true;
-      if (this.floorMesh) this.floorMesh.visible = floorWasVisible;
+      hide.forEach((o) => { o.visible = true; });
+      plane.material.opacity = tune.opacity;
+      plane.visible = this._carSceneVisible !== false;
+      tune.lastMs = +(performance.now() - t0).toFixed(1);
+      tune.bakes++;
     };
-    this.renderContactShadow();
     this.contactShadow = plane;
+    this._requestContactShadow(0);
+
+    window.__contactShadow = (patch) => {
+      if (patch && typeof patch === 'object') {
+        Object.keys(patch).forEach((k) => {
+          if (k in tune && typeof patch[k] === 'number') tune[k] = patch[k];
+        });
+        if ('on' in patch) plane.userData.disabled = !patch.on;
+        this._requestContactShadow(0);
+      }
+      return { ...tune, on: !plane.userData.disabled, visible: plane.visible };
+    };
   }
 
-  _unusedBakedShadow(center, size, baseY) {
-    const THREE = this.THREE;
-    const S = 1024;
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = S;
-    const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, S, S);
-    const cx = S / 2, cy = S / 2;
-    const lenK = 1.4, widK = 1.5;
-    const halfL = (1 / lenK) / 2 * S;
-    const halfW = (1 / widK) / 2 * S;
-    ctx.filter = 'blur(16px)';
-    ctx.fillStyle = 'rgba(0,0,0,0.34)';
-    this._ellipse(ctx, cx, cy, halfL * 0.9, halfW * 0.72);
-    ctx.filter = 'none';
-    const tex = new THREE.CanvasTexture(cv);
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(size.x * lenK, size.z * widK),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 1, toneMapped: false })
-    );
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.set(center.x, baseY + 0.008, center.z);
-    this.scene.add(plane);
+  // Trailing debounce for the contact-shadow bake: several settle paths fire
+  // together (a model swap kicks the shadow, the height and the visibility),
+  // and one bake covers them. Held while the boot reveal runs -- a scene render
+  // there freezes the intro -- and while a door/trunk tween is still moving.
+  _requestContactShadow(delayMs = 220) {
+    if (typeof this.renderContactShadow !== 'function') return;
+    clearTimeout(this._contactShadowTimer);
+    this._contactShadowTimer = setTimeout(() => {
+      this._contactShadowTimer = null;
+      const plane = this.contactShadow;
+      if (!plane || !this.renderer) return;
+      if (plane.userData.disabled) {
+        plane.visible = false;
+        if (this.requestRender) this.requestRender(2);
+        return;
+      }
+      if (this.state.loading || this._introActive || this._tweenShadowWasActive
+          || (typeof this._revealSettled === 'function' && !this._revealSettled())) {
+        this._requestContactShadow(400);
+        return;
+      }
+      try { this.renderContactShadow(); } catch (e) { console.warn('[Shadow] contact bake failed', e); }
+      if (this.requestRender) this.requestRender(2);
+    }, delayMs);
   }
 
   onLight(e) {
@@ -21609,7 +21677,12 @@ class Component extends DCLogic {
     if (!active && this._tweenShadowWasActive && this.renderer) {
       this.renderer.shadowMap.needsUpdate = true;
       this._tweenShadowPhase = 0;
+      this._requestContactShadow();
     }
+    // The on-demand loop can stop on the tween's LAST active frame, and then
+    // the settle above never runs until something unrelated asks for a frame.
+    // Guarantee the frame that sees active === false.
+    if (active && this.requestRender) this.requestRender(2, true);
     this._tweenShadowWasActive = active;
   }
 
@@ -28283,7 +28356,8 @@ class Component extends DCLogic {
       if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.shadowMap.enabled = true;
       // Soft PCF is a per-fragment cost every frame; low tier uses hard PCF.
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.type = CAR_SHADOW_TYPE === 'vsm' ? THREE.VSMShadowMap
+        : CAR_SHADOW_TYPE === 'pcf' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
       // The car and sun are static, so the soft shadow never changes frame to
       // frame — re-rendering a 2048² PCF-soft map every frame is pure waste.
       // Update it only on demand; the shadowMap.needsUpdate=true calls already
@@ -28423,9 +28497,16 @@ class Component extends DCLogic {
       const dir = new THREE.DirectionalLight(0xffffff, this.state.lightIntensity);
       dir.position.copy(sun).multiplyScalar(26);
       dir.castShadow = true;
-      dir.shadow.mapSize.set(2048, 2048);
-      dir.shadow.bias = -0.0003;
-      dir.shadow.radius = CAR_SHADOW_RADIUS;
+      if (CAR_SHADOW_TYPE === 'vsm') {
+        dir.shadow.mapSize.set(1024, 1024);
+        dir.shadow.bias = -0.0005;
+        dir.shadow.radius = CAR_SHADOW_VSM_RADIUS;
+        dir.shadow.blurSamples = CAR_SHADOW_VSM_SAMPLES;
+      } else {
+        dir.shadow.mapSize.set(2048, 2048);
+        dir.shadow.bias = -0.0003;
+        dir.shadow.radius = CAR_SHADOW_TYPE === 'pcf' ? CAR_SHADOW_PCF_RADIUS : CAR_SHADOW_RADIUS;
+      }
       scene.add(dir);
       this.dirLight = dir;
       const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0b4bc, 0.28);
@@ -34225,6 +34306,7 @@ class Component extends DCLogic {
     // shadow map. No depth-pass artifacts from glass — glass is excluded from
     // castShadow so it doesn't punch a fake opaque hole in the shadow.
     this.addShadowCatcher(center3, size3, groundY);
+    this.setupContactShadow(center3, size3, groundY);
     this._setupNightSceneLights(center3, size3, groundY);
     this._setupWindLines(center3, size3, groundY);
     const radius = Math.max(size3.x, size3.y, size3.z) * 0.6;
@@ -35837,7 +35919,7 @@ class Component extends DCLogic {
     // transparent black, so they composite over the wallpaper same as the
     // baked contact shadow does. Only the solid floor is excluded.
     if (this.shadowCatcher) this.shadowCatcher.visible = show;
-    if (this.contactShadow) this.contactShadow.visible = show;
+    if (this.contactShadow) this.contactShadow.visible = (show) && !this.contactShadow.userData.disabled;
     if (this.floorMesh) this.floorMesh.visible = show && !(this.state && this.state.nightMode) && !mixedFill;
     if (this.nightFloor) this.nightFloor.visible = show && !!(this.state && this.state.nightMode);
     // _updateWindLines owns the speed threshold (WIND_ON = 1.0, i.e. 40 km/h)
@@ -35850,11 +35932,6 @@ class Component extends DCLogic {
 
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     if (show && !wasShow) {
-      if (typeof this.renderContactShadow === 'function') {
-        try { this.renderContactShadow(); } catch (e) {
-          console.warn('[Shadow] contact refresh failed', e);
-        }
-      }
       this._kickShadowRefresh(16);
     }
     if (this.requestRender) this.requestRender(show && !wasShow ? 8 : 4);
