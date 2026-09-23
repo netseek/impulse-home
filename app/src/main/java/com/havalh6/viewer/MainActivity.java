@@ -2558,7 +2558,7 @@ public final class MainActivity extends Activity {
             // w*.18 let "20,5°" run under the first day on the car.
             float tempRight = textLeft + paint.measureText(descriptor.primary == null ? "" : descriptor.primary) + w * .04f;
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
-            float colW = Math.min(w * .15f, h * .5f);
+            float colW = Math.min(w * .13f, h * .46f);
             float right = w - pad;
             for (int i = Math.min(days.length, 3) - 1; i >= 0 && right - colW >= tempRight; i--) {
                 String[] parts = days[i].split("[|]");
