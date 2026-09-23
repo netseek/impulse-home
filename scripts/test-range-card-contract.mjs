@@ -25,7 +25,7 @@ function method(name) {
 }
 
 for (const token of [
-  "{ id: 'range', title: 'Range', action: 'openRange' }", "case 'openRange':",
+  "{ id: 'range', title: 'Autonomia', action: 'openRange' }", "case 'openRange':",
   'focusedCardIsRange', 'h6_range_unit',
   'CAR_SIGNALS.evRange', 'CAR_SIGNALS.fuelRange', 'DEMO · SIMULATED · NOT VEHICLE',
 ]) assert.ok(html.includes(token), `missing ${token}`);

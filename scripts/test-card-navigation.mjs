@@ -35,7 +35,7 @@ function includesAll(text, values, label) {
 // Native card payloads must name the page commands; Consumption must never
 // regress to the generic widget-picker route.
 includesAll(html, [
-  "{ id: 'navigation', title: 'Navigation', action: 'openNavigation' }",
+  "{ id: 'navigation', title: 'Navegação', action: 'openNavigation' }",
   "{ id: 'climate', title: 'Climate', action: 'openClimate' }",
   // The card id stays `consumption` (saved layouts, native allow-list); the
   // workspace it opens was renamed ENERGY (docs/energy-workspace-plan.md).

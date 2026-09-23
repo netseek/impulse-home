@@ -29,13 +29,13 @@ function all(source, values, label) {
 }
 
 all(html, [
-  "{ id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' }",
+  "{ id: 'status', title: 'Status do veículo', action: 'openVehicleStatus' }",
   "case 'openVehicleStatus':", 'this._openRoofLevelPopup()',
   'hv-hs-roof-stack', 'data-hs-vehicle-art', 'data-hs-vehicle-layer', 'data-hs-vehicle-cavity',
   'data-hs-vehicle-window', 'data-hs-vehicle-belt', '_syncRoofVehicleStatus',
   './assets/ui/vehicle-status/base.png',
 ], 'unified status and canonical roof surface');
-assert.ok(!html.includes("{ id: 'status', title: 'Vehicle status', action: 'openDesktopStudio' }"),
+assert.ok(!html.includes("{ id: 'status', title: 'Status do veículo', action: 'openDesktopStudio' }"),
   'status must never fall back to Desktop Studio');
 
 const snapshot = block(html, '  _statusDoorSnapshot(');
@@ -150,7 +150,7 @@ const envelope = block(html, '  _statusEnvelopeSnapshot(');
 all(envelope, ['CAR_SIGNALS.sunroof', 'CAR_SIGNALS.curtain', "'unfastened'", "'fastened'", "'unknown'", 'DEMO', 'this._tiresWidgetView', 'tires.wheels'], 'envelope telemetry, seatbelt, and tire semantics');
 assert.match(envelope, /if \(!demo && !doors\.open\.length && beltAttention\.length\)/,
   'alternating demo headline must keep naming its door phase');
-assert.match(envelope, /key: 'rc', label: 'Rear center belt'/, 'seat map must contain two front and three rear belts');
+assert.match(envelope, /key: 'rc', label: 'Cinto traseiro central'/, 'seat map must contain two front and three rear belts');
 assert.equal((popupMarkup.match(/data-hs-vehicle-belt=/g) || []).length, 5, 'popup must render all five seat positions');
 const layerBuilder = block(html, '  _statusVehicleImageLayers(');
 all(layerBuilder, ['door-', 'cavity-v1.png', 'closed-v4.png', 'open-v3.png', 'tailgate-open-v2.png', 'window-', "state + '-v2.png'"], 'repository image layer mapping');

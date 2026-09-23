@@ -71,9 +71,9 @@ for (const key of [
 
 const powerStatus = method(html, '_powerStatus');
 for (const label of [
-  "'LIVE · REPORTED FLOW'",
-  "'PARTIAL · VEHICLE POWER SIGNALS'",
-  "'STALE · POWER SIGNAL'",
+  "'AO VIVO · FLUXO INFORMADO'",
+  "'PARCIAL · SINAIS DE POTÊNCIA DO VEÍCULO'",
+  "'DESATUALIZADO · SINAL DE POTÊNCIA'",
   "'UNAVAILABLE · NO POWER SIGNAL'",
   "'DEMO · SIMULATED · NOT VEHICLE'",
 ]) assert.ok(powerStatus.includes(label), `missing power state: ${label}`);

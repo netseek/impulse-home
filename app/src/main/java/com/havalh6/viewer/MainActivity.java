@@ -1100,7 +1100,7 @@ public final class MainActivity extends Activity {
      *
      * populateQuickCardsRow drops every media view and builds fresh ones, and
      * an accent change rebuilds the whole rail — so without this the card
-     * reverts to "Nothing playing" with its transport greyed out and stays
+     * reverts to "Nada tocando" with its transport greyed out and stays
      * that way until the player happens to publish an update.
      */
     private JSONObject lastMediaPayload;
@@ -5253,7 +5253,7 @@ public final class MainActivity extends Activity {
         ed.putString("uiMode", uiMode);
         ed.apply();
         try {
-            android.widget.Toast.makeText(this, "Side by Side saved as default", android.widget.Toast.LENGTH_SHORT).show();
+            android.widget.Toast.makeText(this, "Lado a lado salvo como padrão", android.widget.Toast.LENGTH_SHORT).show();
         } catch (Exception ignored) {}
         Log.w(TAG, "Saved APP+APP default ratio=" + splitRatio
                 + " left=" + activePopupPackage + " right=" + activeMediaPackage);
@@ -7492,7 +7492,7 @@ public final class MainActivity extends Activity {
     private void setupSplashSkip(FrameLayout root) {
         float d = getResources().getDisplayMetrics().density;
         android.widget.TextView skip = new android.widget.TextView(this);
-        skip.setText("SKIP");
+        skip.setText("PULAR");
         skip.setTextColor(0xE8FFFFFF);
         skip.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
         skip.setLetterSpacing(0.16f);
@@ -7852,7 +7852,7 @@ public final class MainActivity extends Activity {
                     toggleDockSurface();
                     selectStripMode(STRIP_APPS);
                 });
-        modeCollapsedBtn.setContentDescription("Show quick cards");
+        modeCollapsedBtn.setContentDescription("Mostrar cards rápidos");
         modeCollapsedBtn.setOnLongClickListener(v -> {
             callViewerDock("openDesktopStudio");
             return true;
@@ -8200,11 +8200,11 @@ public final class MainActivity extends Activity {
         String eff = dockWidgetThemeEffective != null ? dockWidgetThemeEffective : "dark";
         String label;
         if ("auto".equals(mode)) {
-            label = "Appearance · Auto";
+            label = "Aparência · Automático";
         } else if ("light".equals(mode)) {
-            label = "Appearance · Light";
+            label = "Aparência · Claro";
         } else {
-            label = "Appearance · Dark";
+            label = "Aparência · Escuro";
         }
         if (layoutThemeLabel != null) layoutThemeLabel.setText(label);
         styleDockLabel(layoutThemeLabel, false);
@@ -8657,7 +8657,7 @@ public final class MainActivity extends Activity {
                     ? "Launcher" : "Cards");
             modeSurfaceBtn.setContentDescription(DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
                     ? "Show launcher. Long press to customize"
-                    : "Show quick cards. Long press to customize");
+                    : "Mostrar cards rápidos. Toque longo para personalizar");
             setModeCellLabelVisible(modeSurfaceBtn, true);
         }
         if (modeDrawer != null && dockCellPx > 0) {
@@ -8745,7 +8745,7 @@ public final class MainActivity extends Activity {
             if (label != null) label.setText(cards ? "Launcher" : "Cards");
             modeSurfaceBtn.setContentDescription(cards
                     ? "Show launcher. Long press to customize"
-                    : "Show quick cards. Long press to customize");
+                    : "Mostrar cards rápidos. Toque longo para personalizar");
             if (modeSurfaceBtn.getVisibility() == View.VISIBLE) {
                 setModeCellSelected(modeSurfaceBtn, cards);
                 setModeCellLabelVisible(modeSurfaceBtn, true);
@@ -9754,7 +9754,7 @@ public final class MainActivity extends Activity {
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setTag("frostSecondary");
-        heading.setText("MEDIA");
+        heading.setText("MÍDIA");
         heading.setTextSize(10.5f);
         heading.setLetterSpacing(0.11f);
         heading.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
@@ -9766,7 +9766,7 @@ public final class MainActivity extends Activity {
         copy.addView(headRow);
         quickMediaTitle = new android.widget.TextView(this);
         quickMediaTitle.setTag("quickValue");
-        quickMediaTitle.setText("Nothing playing");
+        quickMediaTitle.setText("Nada tocando");
         quickMediaTitle.setTextSize(15f);
         quickMediaTitle.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
@@ -9775,7 +9775,7 @@ public final class MainActivity extends Activity {
         copy.addView(quickMediaTitle);
         quickMediaArtist = new android.widget.TextView(this);
         quickMediaArtist.setTag("frostSecondary");
-        quickMediaArtist.setText("Choose a media app");
+        quickMediaArtist.setText("Escolha um app de mídia");
         quickMediaArtist.setTextSize(9.5f);
         quickMediaArtist.setMaxLines(1);
         quickMediaArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -10119,12 +10119,12 @@ public final class MainActivity extends Activity {
         String artist = payload.optString("artist", "");
         String app = payload.optString("appLabel", "");
         String display = hasTrack && !title.isEmpty() ? title
-                : (!app.isEmpty() ? app : "Nothing playing");
+                : (!app.isEmpty() ? app : "Nada tocando");
         if (quickMediaTitle != null) quickMediaTitle.setText(display);
         if (quickMediaArtist != null) {
             String album = payload.optString("album", "");
             quickMediaArtist.setText(!artist.isEmpty() ? artist
-                    : (hasTrack ? album : "Choose a media app"));
+                    : (hasTrack ? album : "Escolha um app de mídia"));
             quickMediaArtist.setVisibility(
                     quickMediaArtist.getText().length() == 0 ? View.INVISIBLE : View.VISIBLE);
         }
@@ -10294,7 +10294,7 @@ public final class MainActivity extends Activity {
         desktopControls.setGravity(android.view.Gravity.CENTER_VERTICAL);
         View prev = makeWideDockChip(density, Math.round(64 * density), iconPx,
                 "‹", v -> callViewerDock("previousDesktop"));
-        prev.setContentDescription("Previous desktop");
+        prev.setContentDescription("Área de trabalho anterior");
         desktopControls.addView(prev);
         View current = makeDesktopStatusChip(density, Math.round(178 * density), iconPx);
         current.setOnClickListener(v -> callViewerDock("openDesktopStudio"));
@@ -10305,11 +10305,11 @@ public final class MainActivity extends Activity {
         desktopControls.addView(current);
         View next = makeWideDockChip(density, Math.round(64 * density), iconPx,
                 "›", v -> callViewerDock("nextDesktop"));
-        next.setContentDescription("Next desktop");
+        next.setContentDescription("Próxima área de trabalho");
         desktopControls.addView(next);
         View customize = makeWideDockChip(density, Math.round(118 * density), iconPx,
                 "Customize", v -> callViewerDock("openDesktopStudio"));
-        customize.setContentDescription("Customize desktop");
+        customize.setContentDescription("Personalizar área de trabalho");
         desktopControls.addView(customize);
         row.addView(makeLayoutGroup(density, "DESKTOP", desktopControls));
         row.addView(makeLayoutDivider(density));
@@ -10319,14 +10319,14 @@ public final class MainActivity extends Activity {
         bottomControls.setGravity(android.view.Gravity.CENTER_VERTICAL);
         layoutLauncherSurfaceChip = makeWideDockChip(density, Math.round(116 * density), iconPx,
                 "Launcher", v -> chooseDockSurface(DOCK_SURFACE_LAUNCHER, true));
-        layoutLauncherSurfaceChip.setContentDescription("Show app launcher. Long press to customize");
+        layoutLauncherSurfaceChip.setContentDescription("Mostrar apps. Toque longo para personalizar");
         layoutLauncherSurfaceChip.setOnLongClickListener(v -> {
             callViewerDock("openDesktopStudio");
             return true;
         });
         layoutCardsSurfaceChip = makeWideDockChip(density, Math.round(102 * density), iconPx,
                 "Cards", v -> chooseDockSurface(DOCK_SURFACE_CARDS, true));
-        layoutCardsSurfaceChip.setContentDescription("Show quick cards. Long press to customize");
+        layoutCardsSurfaceChip.setContentDescription("Mostrar cards rápidos. Toque longo para personalizar");
         layoutCardsSurfaceChip.setOnLongClickListener(v -> {
             callViewerDock("openDesktopStudio");
             return true;
@@ -10344,14 +10344,14 @@ public final class MainActivity extends Activity {
         refreshCenterFillChip();
 
         layoutAddWidgetChip = makeWideDockChip(density, Math.round(126 * density), iconPx,
-                "Add card", v -> callViewerDock("addWidget"));
-        layoutAddWidgetChip.setContentDescription("Add card");
+                "Adicionar card", v -> callViewerDock("addWidget"));
+        layoutAddWidgetChip.setContentDescription("Adicionar card");
         otherControls.addView(layoutAddWidgetChip);
 
         layoutThemeChip = makeWideDockChip(density, Math.round(142 * density), iconPx,
                 "Appearance", v -> callViewerDock("cycleWidgetTheme"));
         layoutThemeLabel = findDockChipLabel(layoutThemeChip);
-        layoutThemeChip.setContentDescription("Cycle appearance theme");
+        layoutThemeChip.setContentDescription("Alternar tema de aparência");
         otherControls.addView(layoutThemeChip);
         row.addView(makeLayoutGroup(density, "OTHER", otherControls));
 
@@ -10455,7 +10455,7 @@ public final class MainActivity extends Activity {
                         android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         lp.rightMargin = Math.round(8 * density);
         cell.setLayoutParams(lp);
-        cell.setContentDescription("Center background");
+        cell.setContentDescription("Fundo central");
 
         int plateH = Math.round(iconPx + 10 * density);
         View plate = new View(this);
@@ -10517,7 +10517,7 @@ public final class MainActivity extends Activity {
         layoutCenterFillGear.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         layoutCenterFillGear.setClickable(true);
         layoutCenterFillGear.setFocusable(true);
-        layoutCenterFillGear.setContentDescription("Configure wallpaper");
+        layoutCenterFillGear.setContentDescription("Configurar papel de parede");
         layoutCenterFillGear.setOnClickListener(v -> callViewerDock("configureWallpaper"));
         layoutCenterFillGear.setVisibility(View.GONE);
         inner.addView(layoutCenterFillGear);
@@ -12090,7 +12090,7 @@ public final class MainActivity extends Activity {
             quickClimateValue.setText(display);
             View parent = quickClimateValue.getParent() instanceof View
                     ? (View) quickClimateValue.getParent() : null;
-            if (parent != null) parent.setContentDescription("Climate summary: " + display);
+            if (parent != null) parent.setContentDescription("Resumo do clima: " + display);
         }
 
         String consumption = cleanIndicator(o.optString("consumptionSummary", ""));
@@ -12109,7 +12109,7 @@ public final class MainActivity extends Activity {
             quickConsumptionValue.setText(display);
             View parent = quickConsumptionValue.getParent() instanceof View
                     ? (View) quickConsumptionValue.getParent() : null;
-            if (parent != null) parent.setContentDescription("Consumption summary: " + display);
+            if (parent != null) parent.setContentDescription("Resumo do consumo: " + display);
         }
     }
 
@@ -12758,7 +12758,7 @@ public final class MainActivity extends Activity {
             sideBySideItem.setTag(Boolean.TRUE);
             plate.setBackground(makeLauncherIconPlateDrawable(density, true));
         }
-        sideBySideItem.setContentDescription("Side by Side: two apps split the screen");
+        sideBySideItem.setContentDescription("Lado a lado: dois apps dividem a tela");
     }
 
     private Drawable makeSideBySideGlyph(int sizePx) {
@@ -13587,7 +13587,7 @@ public final class MainActivity extends Activity {
         box.setPadding(pad, Math.round(10 * d), pad, Math.round(10 * d));
 
         android.widget.TextView title = new android.widget.TextView(this);
-        title.setText("Hidden apps");
+        title.setText("Apps ocultos");
         title.setTextColor(0x99FFFFFF);
         title.setTextSize(14f);
         title.setPadding(Math.round(6 * d), 0, Math.round(6 * d), Math.round(6 * d));

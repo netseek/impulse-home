@@ -41,7 +41,7 @@ check(SOURCE);
 
 const MUTANTS = {
   'a thumbnail file is missing': [SOURCE, (f) => !f.endsWith('media-light.webp') && existsSync(f)],
-  'a new widget type with no shots': [SOURCE.replace("      clock: { label: 'CLOCK'", "      weather: { label: 'WEATHER', title: '', hint: '', sizes: [[2, 1]] },\n      clock: { label: 'CLOCK'")],
+  'a new widget type with no shots': [SOURCE.replace("      clock: { label: 'RELÓGIO'", "      weather: { label: 'WEATHER', title: '', hint: '', sizes: [[2, 1]] },\n      clock: { label: 'RELÓGIO'")],
   'studio copy lost the light shot': [SOURCE.replace(/(<img class="hv-wpick-shot hv-wpick-shot-light" src="\{\{ pi\.shotLight \}\}"[^>]*>)([\s\S]*?)<img class="hv-wpick-shot hv-wpick-shot-light"[^>]*>/, '$1$2')],
   'light theme never swaps': [SOURCE.replace('#hv-root.hv-widgets-light .hv-wpick-shot-light { display:block; }', '')],
 };

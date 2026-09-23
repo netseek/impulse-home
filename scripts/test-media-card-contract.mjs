@@ -62,7 +62,7 @@ const catalogStart = html.indexOf('const H6_BOTTOM_CARD_CATALOG');
 assert.ok(catalogStart >= 0, 'missing bottom-card catalog');
 const catalog = html.slice(catalogStart, html.indexOf('];', catalogStart) + 2);
 assert.match(catalog,
-  /id:\s*'media'\s*,\s*title:\s*'Media'\s*,\s*action:\s*'openMediaApp'\s*,\s*longAction:\s*'openMedia'/,
+  /id:\s*'media'\s*,\s*title:\s*'Mídia'\s*,\s*action:\s*'openMediaApp'\s*,\s*longAction:\s*'openMedia'/,
   "the media rail card's body opens the player and a hold opens the popup");
 assert.doesNotMatch(catalog, /id:\s*'media'[^}]*action:\s*'addWidget'/,
   'the media card must not open the widget picker');
@@ -207,8 +207,8 @@ assert.match(mediaView, /this\._openMediaApp\(ev\);/,
 //    strings are the ones docs/widget-data-audit.md fixes for this card.
 // ---------------------------------------------------------------------------
 includesAll(mediaView, [
-  "'MEDIA · NO TRACK'",
-  "'MEDIA ACCESS REQUIRED'",
+  "'MÍDIA · SEM FAIXA'",
+  "'ACESSO À MÍDIA NECESSÁRIO'",
 ], 'idle vocabulary from the widget data audit');
 assert.match(mediaView, /source = 'MEDIA UNAVAILABLE · NO MEDIA BRIDGE';/,
   'a shell with no MediaBridge must say so rather than claim there is no track');
