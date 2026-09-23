@@ -8845,6 +8845,18 @@ const CAR_HVAC = {
   // treats >= 85 / <= -40 as the sensor not being ready, and so do we.
   inside: 'car.basic.inside_temp',
 };
+// The car asking for its climate panel: pulses 0 -> 2 -> 0 on every press of a physical A/C
+// button or knob, ~450 ms apart, and is pushed by the CAR, not by the OEM app -- measured on
+// the car 2026-09-22, it still fires with com.beantechs.hvac disabled. That is what lets our
+// popup stand in for the car's own.
+const CAR_HVAC_PANEL_NOTIFY = 'car.hvac.panel_display_notify';
+// 1 while Impulse is really holding the OEM A/C app back for us (ClimateHandoff). Without it
+// we would open our popup on top of the car's own.
+const CAR_CLIMATE_HANDOFF = 'app.viewer.climate_handoff';
+// How long the popup stays up after a press, and the window that folds one press's 0/2/0
+// pulse (plus the burst a knob turn produces) into a single opening.
+const CLIMATE_PANEL_HOLD_MS = 10000;
+const CLIMATE_PANEL_COALESCE_MS = 600;
 const CAR_HVAC_FIELD = Object.keys(CAR_HVAC).reduce((m, f) => { m[CAR_HVAC[f]] = f; return m; }, {});
 const CLIM_BOOL = { power: 1, auto: 1, sync: 1, ac: 1, front: 1, rear: 1, anion: 1, aqs: 1, heating: 1, autoDefrost: 1, limit: 1, maxAcUnlock: 1, ventWithAc: 1 };
 // Long enough for a round trip through Impulse and the bus; a write that never
@@ -10976,6 +10988,8 @@ class Component extends DCLogic {
     // they must not keep doors/tyres/modes looking live while the CAN is quiet.
     if (key === CAR_HVAC.maxAcUnlock || key === CAR_HVAC.ventWithAc) { this._applyClimateSignal(key, value); return; }
     this._carBusAt = this._carSignalAt[key];
+    if (key === CAR_CLIMATE_HANDOFF) { this._climateHandoffActive = (String(value) === '1'); return; }
+    if (key === CAR_HVAC_PANEL_NOTIFY) { this._onCarClimatePanelRequest(value); return; }
     if (CAR_HVAC_FIELD[key]) { this._applyClimateSignal(key, value); return; }
     // Drive-time bus load, surfaced through window.__perf() -> TelemetryBridge
     // .reportPerf -> logcat. The bus is almost silent parked, so this question
@@ -38426,6 +38440,56 @@ class Component extends DCLogic {
     // One card popup at a time: the roof popup (Status card) is not React state.
     if (this._hsRoofPopOpen) this._setRoofLevelPopup(false);
     this.setState({ focusedCardType: type, desktopStudioOpen: false, panelOpen: false });
+  }
+
+  /**
+   * The car wants its climate panel shown. Raises OUR popup instead, for
+   * CLIMATE_PANEL_HOLD_MS, and only while Impulse is actually holding the OEM app back --
+   * otherwise both would appear.
+   *
+   * This is a USER ACTION (a button or knob press), not a per-tick signal, so a React commit
+   * here is the same cost as tapping the card. What must not happen is one commit per bus
+   * frame: a single press arrives as 0 -> 2 -> 0 and a knob turn produces a burst, hence the
+   * coalescing window. See the `_live` seam notes in CLAUDE.md for why that matters.
+   */
+  _onCarClimatePanelRequest(value) {
+    // Only the rising edge. The trailing 0 is the car closing a panel we never opened.
+    const wants = String(value != null ? value : '').trim();
+    if (!wants || wants === '0') return;
+    if (!this._climateHandoffActive) return;
+
+    const now = Date.now();
+    if (this._climatePanelAt && (now - this._climatePanelAt) < CLIMATE_PANEL_COALESCE_MS
+        && this.state.focusedCardType === 'climate') {
+      // Same press, or the next step of the same knob turn: just hold it up longer.
+      this._climatePanelAt = now;
+      this._armClimatePanelHold();
+      return;
+    }
+    this._climatePanelAt = now;
+
+    if (this.state.focusedCardType !== 'climate') {
+      // _openFocusedCard TOGGLES, so it would close an already-open climate popup.
+      this._openFocusedCard('climate');
+      // setState is async, so state cannot be re-read here - we know we opened it because the
+      // branch above only runs when the popup was not already on climate.
+      this._climatePanelOpened = true;
+    }
+    this._armClimatePanelHold();
+  }
+
+  /**
+   * Closes the popup once the hold expires -- but only if the car opened it and the user has
+   * not moved on. A popup the user opened themselves is theirs to close.
+   */
+  _armClimatePanelHold() {
+    if (this._climatePanelTimer) clearTimeout(this._climatePanelTimer);
+    this._climatePanelTimer = setTimeout(() => {
+      this._climatePanelTimer = null;
+      if (!this._climatePanelOpened) return;
+      this._climatePanelOpened = false;
+      if (this.state.focusedCardType === 'climate') this._closeFocusedCard();
+    }, CLIMATE_PANEL_HOLD_MS);
   }
 
   _closeFocusedCard() { if (this.state.focusedCardType) this.setState({ focusedCardType: null, energyFinishConfirm: false, energyMapMax: false }); }

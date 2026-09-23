@@ -3607,6 +3607,9 @@ public final class MainActivity extends Activity {
     private final List<MotionTrailLayout> launcherItems = new ArrayList<>();
     private ProjectionPresence projectionPresence;
     private PlaceGlance placeGlance;
+    private ClimateHandoff climateHandoff;
+    /** Synthetic key pushed to the page: 1 while WE own the A/C popup, 0 while the car does. */
+    private static final String CLIMATE_HANDOFF_KEY = "app.viewer.climate_handoff";
     private TripRecorder tripRecorder;
     private final java.util.Map<String, Bitmap> packageIconBitmaps =
             new java.util.concurrent.ConcurrentHashMap<>();
@@ -6830,6 +6833,19 @@ public final class MainActivity extends Activity {
                     null);
         });
         placeGlance.start();
+
+        // Asks Impulse to hold the car's own A/C popup back so the page can show its own. The
+        // lease is refused unless the owner enabled it over there, so this is a request, not a
+        // decision - the page only takes over while onClimateHandoffChanged says it is active.
+        climateHandoff = new ClimateHandoff(this, apiCallerToken(), active -> {
+            telemetryCache.put(CLIMATE_HANDOFF_KEY, active ? "1" : "0");
+            if (webView == null) return;
+            webView.evaluateJavascript(
+                    String.format("if(window.onCarDataUpdate){window.onCarDataUpdate('%s','%s');}",
+                            CLIMATE_HANDOFF_KEY, active ? "1" : "0"),
+                    null);
+        });
+        climateHandoff.start();
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -14097,6 +14113,9 @@ public final class MainActivity extends Activity {
         dismissDockEditMenu();
         if (projectionPresence != null) projectionPresence.stop();
         if (placeGlance != null) placeGlance.stop();
+        // Drops the lease so Impulse restores the car's A/C app. A crash skips this, which is
+        // why Impulse also watches this process die.
+        if (climateHandoff != null) climateHandoff.stop();
         // Not stopped: the recorder outlives this activity. An activity
         // recreation (measured on the emulator 2026-09-13) must not reset the
         // open trip; only make sure what it holds is on disk.
