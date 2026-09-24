@@ -9564,6 +9564,14 @@ const CONTACT_SHADOW_DARKNESS = 2.0;
 // Wide on purpose: the bake is a footprint of the underbody, so a narrow blur
 // stays hidden under the car. It has to spread past the sills to be seen.
 const CONTACT_SHADOW_BLUR = 7;
+// Second, TIGHT layer: only what sits within CONTACT_TIGHT_H of the floor --
+// in practice the tyre contact patches -- barely blurred. The wide pool above
+// has to be blurred so far that it averages a 20 cm contact patch away into the
+// same grey as the body; this puts the dark line back where rubber meets floor.
+const CONTACT_TIGHT_H = 0.08;
+const CONTACT_TIGHT_DARKNESS = 2.0;
+const CONTACT_TIGHT_BLUR = 2;
+const CONTACT_TIGHT_OPACITY = 1;
 
 // Night mode used to zero hemi+dir so the car sat in IBL-only darkness. Prefer
 // keeping day car lighting and only swapping the background + ground pools.
@@ -21355,6 +21363,18 @@ class Component extends DCLogic {
     plane.userData.rt = rt;
     group.add(plane);
 
+    // The tight contact layer rides on the pool plane as a child, so every
+    // path that shows or hides this.contactShadow carries it too. Same depth,
+    // drawn after (renderOrder), both depth-tested without writing.
+    const rtTight = new THREE.WebGLRenderTarget(RES, RES);
+    rtTight.texture.generateMipmaps = false;
+    const tightPlane = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({
+      map: rtTight.texture, transparent: true, opacity: CONTACT_TIGHT_OPACITY,
+      depthWrite: false, toneMapped: false,
+    }));
+    tightPlane.renderOrder = 3;
+    plane.add(tightPlane);
+
     const blurPlane = new THREE.Mesh(planeGeo);
     blurPlane.visible = false;
     group.add(blurPlane);
@@ -21362,6 +21382,9 @@ class Component extends DCLogic {
     const shadowCam = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 0, CAM_H);
     shadowCam.rotation.x = Math.PI / 2;   // look straight up from the ground
     group.add(shadowCam);
+    const tightCam = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 0, CONTACT_TIGHT_H);
+    tightCam.rotation.x = Math.PI / 2;
+    group.add(tightCam);
 
     // MeshDepthMaterial tweaked to go black→transparent with distance from ground
     const depthMat = new THREE.MeshDepthMaterial();
@@ -21385,24 +21408,28 @@ class Component extends DCLogic {
     const vBlur = new THREE.ShaderMaterial(THREE.VerticalBlurShader);
     vBlur.depthTest = false;
 
-    const blur = (amount) => {
+    // rtBlur is the scratch for both layers: the passes run one after another.
+    const blur = (target, amount) => {
       blurPlane.visible = true;
       blurPlane.material = hBlur;
-      hBlur.uniforms.tDiffuse.value = rt.texture;
+      hBlur.uniforms.tDiffuse.value = target.texture;
       hBlur.uniforms.h.value = amount / RES;
       renderer.setRenderTarget(rtBlur);
       renderer.render(blurPlane, shadowCam);
       blurPlane.material = vBlur;
       vBlur.uniforms.tDiffuse.value = rtBlur.texture;
       vBlur.uniforms.v.value = amount / RES;
-      renderer.setRenderTarget(rt);
+      renderer.setRenderTarget(target);
       renderer.render(blurPlane, shadowCam);
       blurPlane.visible = false;
     };
 
     const tune = {
       opacity: CONTACT_SHADOW_OPACITY, darkness: CONTACT_SHADOW_DARKNESS,
-      blur: CONTACT_SHADOW_BLUR, lastMs: 0, bakes: 0,
+      blur: CONTACT_SHADOW_BLUR,
+      tightOpacity: CONTACT_TIGHT_OPACITY, tightDarkness: CONTACT_TIGHT_DARKNESS,
+      tightBlur: CONTACT_TIGHT_BLUR, tightH: CONTACT_TIGHT_H, tightOn: 1,
+      lastMs: 0, bakes: 0,
     };
     this._contactShadowTune = tune;
 
@@ -21437,15 +21464,28 @@ class Component extends DCLogic {
       renderer.setRenderTarget(rt);
       renderer.clear();
       renderer.render(scene, shadowCam);
+      if (tune.tightOn) {
+        // Same depth material: fragCoordZ is relative to the camera's range, so
+        // the tight camera's short far plane stretches the whole 0..1 falloff
+        // over the contact band.
+        if (tightCam.far !== tune.tightH) { tightCam.far = tune.tightH; tightCam.updateProjectionMatrix(); }
+        depthMat.userData.darkness.value = tune.tightDarkness;
+        renderer.setRenderTarget(rtTight);
+        renderer.clear();
+        renderer.render(scene, tightCam);
+      }
       scene.overrideMaterial = null;
-      blur(tune.blur);
-      blur(tune.blur * 0.4);
+      blur(rt, tune.blur);
+      blur(rt, tune.blur * 0.4);
+      if (tune.tightOn && tune.tightBlur > 0) blur(rtTight, tune.tightBlur);
       renderer.setRenderTarget(prevTarget);
       renderer.setClearColor(prevClearColor, prevClearAlpha);
       renderer.autoClear = prevAutoClear;
       scene.background = prevBg;
       hide.forEach((o) => { o.visible = true; });
       plane.material.opacity = tune.opacity;
+      tightPlane.material.opacity = tune.tightOpacity;
+      tightPlane.visible = !!tune.tightOn;
       plane.visible = this._carSceneVisible !== false;
       tune.lastMs = +(performance.now() - t0).toFixed(1);
       tune.bakes++;
