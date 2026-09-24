@@ -9721,6 +9721,8 @@ const WHEEL_RAD_PER_S_PER_KMH = 15.2 / 40;
 // (see motionSpeedLabel, which renders Math.abs(motionSpeed) * 40 + ' km/h').
 // X-ray bloom rebuild ceiling, Hz. See the note at the _tickPowertrainFx call.
 const PT_POSTFX_HZ = 5;
+// Power card DOM refresh ceiling from the widget loop, ms. See _drawGraphs.
+const POWER_CARD_PAINT_MS = 100;
 const CAR_SPEED_KMH_PER_UNIT = 40;
 
 // Event / cycle / orbit camera behaviour (CAMERA → OPTIONS).
@@ -10496,6 +10498,13 @@ class Component extends DCLogic {
     this._graphVizHueDeg = 186;
     this._graphVizTrackKey = '';
     this._graphRaf = 0;
+    // TEMPORARY A/B switch for the cluster-lag test (docs/cluster-ab-plan.md):
+    // false restores the pre-2026-09-23 widget loop -- power card refreshed
+    // and rewritten every tick, visibility read with getBoundingClientRect.
+    // Live via window.__powerLean(bool); persisted so a WebView reload cannot
+    // silently change arm. Delete once the car numbers are in.
+    this._powerLean = true;
+    try { if (localStorage.getItem('h6_powerLean') === '0') this._powerLean = false; } catch (e) {}
     this._graphEditorOffset = { x: 0, y: 0 };
     this._graphEditorDrag = null;
     this._widgetHoldTimer = 0;
@@ -12133,7 +12142,8 @@ class Component extends DCLogic {
     const plug = this._powerPlugCharging(model);
     canvas.classList.toggle('plug-charging', plug && !(model.socKnown && model.socPct >= 100));
     const active = !!(model.frontDir || model.rearDir || model.iceClass || this._powerBatteryVisual(model).pulse);
-    canvas.setAttribute('data-flow-active', active ? '1' : '0');
+    const flowActive = active ? '1' : '0';
+    if (!this._powerLean || canvas.getAttribute('data-flow-active') !== flowActive) canvas.setAttribute('data-flow-active', flowActive);
     if (!canvas._powerObserved && typeof IntersectionObserver === 'function') {
       if (!this._powerIntersectionObserver) {
         this._powerIntersectionObserver = new IntersectionObserver((entries) => {
@@ -12151,11 +12161,21 @@ class Component extends DCLogic {
 
   _syncPowerGraphicMotion(canvas) {
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const visible = document.visibilityState !== 'hidden' && rect.width > 0 && rect.height > 0
-      && rect.bottom > 0 && rect.right > 0
-      && rect.top < (window.innerHeight || document.documentElement.clientHeight)
-      && rect.left < (window.innerWidth || document.documentElement.clientWidth);
+    let onScreen;
+    if (canvas._powerObserved && this._powerLean) {
+      // The IntersectionObserver already tracks this, and calls back here when
+      // it changes. Reading getBoundingClientRect() instead ran once per card
+      // per widget-loop frame, straight after the text writes above, i.e. a
+      // forced style + layout on every frame.
+      onScreen = canvas.classList.contains('is-in-view');
+    } else {
+      const rect = canvas.getBoundingClientRect();
+      onScreen = rect.width > 0 && rect.height > 0
+        && rect.bottom > 0 && rect.right > 0
+        && rect.top < (window.innerHeight || document.documentElement.clientHeight)
+        && rect.left < (window.innerWidth || document.documentElement.clientWidth);
+    }
+    const visible = document.visibilityState !== 'hidden' && onScreen;
     canvas.classList.toggle('is-running', canvas.getAttribute('data-flow-active') === '1' && visible);
   }
 
@@ -12246,13 +12266,24 @@ class Component extends DCLogic {
     for (let i = 0; i < cards.length; i++) {
       const el = cards[i];
       const size = el.getAttribute('data-power-size') || '2x1';
-      ['ev', 'hybrid', 'ice', 'regen', 'charge', 'idle', 'stale', 'unavailable'].forEach((tone) => el.classList.remove(tone));
-      el.classList.add(model.tone);
-      el.setAttribute('aria-label', model.ariaLabel);
+      // Runs from the widget rAF loop, so every write here is a write per
+      // frame. Touch the DOM only when the value actually changed: a
+      // remove-8-classes-then-add, repeated per frame, is a class mutation and
+      // a style invalidation even when the card ends up exactly as it was.
+      const force = !this._powerLean;
+      if (force || el._powerTone !== model.tone || !el.classList.contains(model.tone)) {
+        ['ev', 'hybrid', 'ice', 'regen', 'charge', 'idle', 'stale', 'unavailable'].forEach((tone) => {
+          if (force || tone !== model.tone) el.classList.remove(tone);
+        });
+        el.classList.add(model.tone);
+        el._powerTone = model.tone;
+      }
+      if (force || el.getAttribute('aria-label') !== model.ariaLabel) el.setAttribute('aria-label', model.ariaLabel);
       const source = el.querySelector('.hv-power-source');
       if (source) {
-        source.className = 'hv-power-source ' + model.sourceClass;
-        source.textContent = model.sourceShort;
+        const sourceClass = 'hv-power-source ' + model.sourceClass;
+        if (force || source.className !== sourceClass) source.className = sourceClass;
+        if (force || source.textContent !== model.sourceShort) source.textContent = model.sourceShort;
       }
       const text = (selector, value) => {
         el.querySelectorAll(selector).forEach((node) => { if (node.textContent !== value) node.textContent = value; });
@@ -13082,7 +13113,15 @@ class Component extends DCLogic {
     this._graphSmooth('evPowerKw', now);
     this._graphSmooth('evInst', now);
     if (this._graphLiveKeys.fuelInst) this._graphSmooth('fuelInst', now);
-    this._updatePowerCards(now);
+    // The power card is text and a keyed SVG, fed by a bus that moves a few
+    // times a second: it has nothing to show at 60 Hz. Its animation is CSS
+    // and runs on its own. Event-driven refreshes (_commitPowerRefresh, the
+    // history ticker, visibilitychange) call _updatePowerCards directly and
+    // are not throttled.
+    if (!this._powerLean || !this._powerCardPaintAt || now - this._powerCardPaintAt >= POWER_CARD_PAINT_MS) {
+      this._powerCardPaintAt = now;
+      this._updatePowerCards(now);
+    }
 
     if (!this._graphCanvasCacheAt || now - this._graphCanvasCacheAt > 500) {
       this._graphCanvasCache = document.querySelectorAll('.hv-graphs-canvas');
@@ -13128,16 +13167,17 @@ class Component extends DCLogic {
     const mode = paneEl.querySelector('.hv-graphs-mode');
     const val = paneEl.querySelector('.hv-graphs-value');
     const unit = paneEl.querySelector('.hv-graphs-unit');
-    if (kicker) kicker.textContent = readout.title;
-    if (mode) {
-      mode.textContent = readout.mode;
-      mode.className = 'hv-graphs-mode' + (readout.regen ? ' regen' : '');
-    }
-    if (val) {
-      val.textContent = readout.value;
-      val.className = 'hv-graphs-value' + (readout.regen ? ' regen' : '');
-    }
-    if (unit) unit.textContent = readout.unit;
+    // Called per painted frame: assigning textContent replaces the text node
+    // even when the string is the same, which dirties layout every frame.
+    const force = !this._powerLean;
+    const setText = (node, value) => { const v = String(value); if (node && (force || node.textContent !== v)) node.textContent = v; };
+    const setClass = (node, value) => { if (node && (force || node.className !== value)) node.className = value; };
+    setText(kicker, readout.title);
+    setText(mode, readout.mode);
+    setClass(mode, 'hv-graphs-mode' + (readout.regen ? ' regen' : ''));
+    setText(val, readout.value);
+    setClass(val, 'hv-graphs-value' + (readout.regen ? ' regen' : ''));
+    setText(unit, readout.unit);
   }
 
   _paintGraphCanvas(canvas, pane, now, spanStart) {
@@ -28803,11 +28843,19 @@ class Component extends DCLogic {
         if (this.state.powertrainOn) { this._setBodyGhost(false); this._setBodyGhost(true); }
         return this._xrayGhostModel;
       };
+      // TEMPORARY, see _powerLean in the constructor.
+      window.__powerLean = (on) => {
+        if (on == null) return this._powerLean;
+        this._powerLean = !!on;
+        try { localStorage.setItem('h6_powerLean', this._powerLean ? '1' : '0'); } catch (e) {}
+        return this._powerLean;
+      };
       window.__perf = () => ({ ...this._perf, idle: (this._renderFrames || 0) <= 0,
         resTier: this._resTier,
         busPerSec: this._busRate || 0,
         speedPerSec: this._busSpeedRate || 0,
         rendersPerSec: this._setStateRate || 0,
+        powerLean: this._powerLean,
         // NOTE: mainCalls/mainTris are captured in the loop BEFORE the overlay
         // passes overwrite renderer.info, because info.autoReset resets the
         // counters on every render() call. Read them from here, never from
@@ -48216,6 +48264,12 @@ class Component extends DCLogic {
     this._hdriRequestId = (this._hdriRequestId || 0) + 1;
     if (this._raf) cancelAnimationFrame(this._raf);
     if (this._warmupRaf) cancelAnimationFrame(this._warmupRaf);
+    // The widget loop is a second rAF chain and re-arms itself; it needs its
+    // own stop, and so does the gate timer that would restart it.
+    this._graphLoopWanted = false;
+    clearTimeout(this._graphGateTimer);
+    this._graphGateTimer = 0;
+    this._stopGraphLoop();
     ['turnL', 'turnR', 'hazard'].forEach((key) => this._stopBlink(key));
     this.exitAssignMode();
     this._teardownHotspots();
