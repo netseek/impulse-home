@@ -7603,7 +7603,7 @@ window.HavalSplash = (function () {
         <div class="hv-energy-pad">
           <sc-for list="{{ energyAskKeys }}" as="k" hint-placeholder-count="12"><button type="button" class="{{ k.cls }}" aria-label="{{ k.label }}" onClick="{{ k.onClick }}">{{ k.text }}</button></sc-for>
         </div>
-        <div class="hv-energy-confirm-actions"><button type="button" onClick="{{ energyAskSkip }}">PULAR</button><sc-if value="{{ energyAskHasDefault }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-energy-askdef" onClick="{{ energyAskDefault }}">{{ energyAskDefaultText }}</button></sc-if></div>
+        <div class="hv-energy-confirm-actions"><button type="button" class="hv-energy-askdef" onClick="{{ energyAskAlt }}">{{ energyAskAltText }}</button></div>
       </div>
     </div>
   </sc-if>
@@ -39746,10 +39746,8 @@ class Component extends DCLogic {
       energyAskUnit: this.state.energyAsk ? this.state.energyAsk.unit : '',
       energyAskValue: this._energyAskDisplay(),
       energyAskKeys: this._energyAskKeys(),
-      energyAskHasDefault: isFinite(this._energyAskDefaultPrice()),
-      energyAskDefaultText: 'CANCELAR · ' + this._energyMoney(this._energyAskDefaultPrice()),
-      energyAskDefault: (ev) => this._answerEnergyAskDefault(ev),
-      energyAskSkip: (ev) => this._answerEnergyAsk(false, ev),
+      energyAskAltText: this._energyAskAltLabel(),
+      energyAskAlt: (ev) => this._answerEnergyAskAlt(ev),
     };
     if (!type) return base;
     const entry = this._focusedCardEntry(type);
@@ -41628,18 +41626,34 @@ class Component extends DCLogic {
     return v > 0 ? v : NaN;
   }
 
+  /** PADRAO with the price on it, or PULAR when there is no default to offer yet. */
+  _energyAskAltLabel() {
+    const v = this._energyAskDefaultPrice();
+    return isFinite(v) ? 'PADRÃO · ' + this._energyMoney(v) : 'PULAR';
+  }
+
   /**
-   * CANCELAR: price this stop at the default rather than typing it. Distinct from
-   * PULAR, which records no price at all -- the stop stays in the history but pays
-   * nothing into the blended tank price. The default is NOT rewritten here: it already
-   * is this value, and re-saving it would make a string of cancels look like a string
-   * of confirmations.
+   * The secondary action: price this stop at the default rather than typing it.
+   *
+   * There used to be a PULAR beside it, and it was redundant -- `_energyPriceLineFor`
+   * already falls back to the default for any stop with no price of its own, so
+   * skipping and accepting the default produced the SAME blended tank price. The one
+   * difference favoured writing it down: a skipped stop resolves against `pr.fuel` at
+   * READ time, so a default changed later silently rewrote the price of a fill from
+   * months ago. Writing the value pins it to what the fuel actually cost.
+   *
+   * With no default there is nothing to offer and this has to stay an escape from the
+   * prompt, so it skips instead -- the label says which it is doing.
+   *
+   * The default is NOT rewritten here: it already is this value, and re-saving it would
+   * make a run of these read as a run of confirmations.
    */
-  _answerEnergyAskDefault(ev) {
+  _answerEnergyAskAlt(ev) {
+    const v = this._energyAskDefaultPrice();
+    if (!isFinite(v)) return this._answerEnergyAsk(false, ev);
     this._cardControlEvent(ev);
     const ask = this.state.energyAsk;
-    const v = this._energyAskDefaultPrice();
-    if (!ask || !isFinite(v)) return;
+    if (!ask) return;
     const pr = this._energyPrices();
     pr.paid[ask.key] = v;
     this._saveEnergyPrices();
