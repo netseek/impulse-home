@@ -5812,7 +5812,11 @@ window.HavalSplash = (function () {
     .hv-energy-kvg .hv-energy-kv > li { display:flex; flex-direction:column; justify-content:flex-end; height:100%; }
     .hv-energy-kvg .hv-energy-kv li > small { white-space:normal; min-height:2.4em; display:flex; align-items:flex-end; }
     /* Refuel price prompt, over everything. */
-    .hv-energy-ask { position:absolute; inset:0; z-index:95; display:grid; place-items:center; background:rgba(2,6,10,.55); }
+    /* Anchored where the popups are (owner, 2026-09-23): the same left edge and the
+       same band between the header and the dock, so the prompt arrives where the eye
+       already looks for a panel instead of over the car. The scrim stays -- this one
+       wants an answer, so unlike a popup it is not dismissed by tapping outside. */
+    .hv-energy-ask { position:absolute; inset:0; z-index:95; display:grid; place-items:center start; padding:var(--hv-popup-top,52px) 0 var(--hv-popup-bottom-inset,72px) var(--hv-popup-left,24px); box-sizing:border-box; background:rgba(2,6,10,.55); }
     .hv-energy-ask-box { width:min(468px,calc(100vw - 48px)); display:flex; flex-direction:column; gap:12px; padding:20px; border-radius:22px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
     .hv-energy-ask-box > strong { font:600 18px/1.2 'Space Grotesk',sans-serif; }
     .hv-energy-ask-box > p { margin:0; font-size:14px; opacity:.78; }
@@ -5831,6 +5835,7 @@ window.HavalSplash = (function () {
        the day blue, so one colour serves both. */
     .hv-energy-pad > .k-ok { grid-column:4; grid-row:3 / span 2; background:var(--hv-accent,#2aa7b7); color:#08131a; font:600 18px/1 'Space Mono',monospace; letter-spacing:.06em; }
     .hv-energy-pad > .k-zero { grid-column:1 / span 3; }
+    .hv-energy-confirm-actions > .hv-energy-askdef { font-size:13px; letter-spacing:.04em; }
     .hv-energy-pad > button { min-height:54px; border:0; border-radius:14px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:500 22px/1 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; cursor:pointer; }
     .hv-energy-pad > button:active { background:rgba(255,255,255,.2); }
     .hv-energy-pad > button.act { font:600 14px/1 'Space Mono',monospace; letter-spacing:.06em; opacity:.8; }
@@ -7598,7 +7603,7 @@ window.HavalSplash = (function () {
         <div class="hv-energy-pad">
           <sc-for list="{{ energyAskKeys }}" as="k" hint-placeholder-count="12"><button type="button" class="{{ k.cls }}" aria-label="{{ k.label }}" onClick="{{ k.onClick }}">{{ k.text }}</button></sc-for>
         </div>
-        <div class="hv-energy-confirm-actions"><button type="button" onClick="{{ energyAskSkip }}">PULAR</button></div>
+        <div class="hv-energy-confirm-actions"><button type="button" onClick="{{ energyAskSkip }}">PULAR</button><sc-if value="{{ energyAskHasDefault }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-energy-askdef" onClick="{{ energyAskDefault }}">{{ energyAskDefaultText }}</button></sc-if></div>
       </div>
     </div>
   </sc-if>
@@ -39707,6 +39712,9 @@ class Component extends DCLogic {
       energyAskUnit: this.state.energyAsk ? this.state.energyAsk.unit : '',
       energyAskValue: this._energyAskDisplay(),
       energyAskKeys: this._energyAskKeys(),
+      energyAskHasDefault: isFinite(this._energyAskDefaultPrice()),
+      energyAskDefaultText: 'CANCELAR · ' + this._energyMoney(this._energyAskDefaultPrice()),
+      energyAskDefault: (ev) => this._answerEnergyAskDefault(ev),
       energyAskSkip: (ev) => this._answerEnergyAsk(false, ev),
     };
     if (!type) return base;
@@ -41571,6 +41579,37 @@ class Component extends DCLogic {
     this._cardControlEvent(ev);
     this._energyAskDraft = '';
     this._liveSet('energyAskCents', 0);
+  }
+
+  /**
+   * The standing price for what was just put in -- which _answerEnergyAsk keeps as the
+   * last price paid, so it is the usual price at the usual pump. NaN before anything
+   * has ever been priced, which is when CANCELAR has nothing to offer and is not shown.
+   */
+  _energyAskDefaultPrice() {
+    const ask = this.state.energyAsk;
+    if (!ask) return NaN;
+    const pr = this._energyPrices();
+    const v = Number(ask.charge ? pr.kwh : pr.fuel);
+    return v > 0 ? v : NaN;
+  }
+
+  /**
+   * CANCELAR: price this stop at the default rather than typing it. Distinct from
+   * PULAR, which records no price at all -- the stop stays in the history but pays
+   * nothing into the blended tank price. The default is NOT rewritten here: it already
+   * is this value, and re-saving it would make a string of cancels look like a string
+   * of confirmations.
+   */
+  _answerEnergyAskDefault(ev) {
+    this._cardControlEvent(ev);
+    const ask = this.state.energyAsk;
+    const v = this._energyAskDefaultPrice();
+    if (!ask || !isFinite(v)) return;
+    const pr = this._energyPrices();
+    pr.paid[ask.key] = v;
+    this._saveEnergyPrices();
+    this.setState({ energyAsk: null }, () => this._energyCheckPriceAsk());
   }
 
   _energyParsePrice(text) {
