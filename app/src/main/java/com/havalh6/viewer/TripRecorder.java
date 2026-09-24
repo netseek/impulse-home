@@ -136,6 +136,8 @@ final class TripRecorder implements TripEngine.Listener {
         worker = new Handler(thread.getLooper());
         worker.post(() -> {
             try {
+                // Before the DB is opened: a fresh install takes the shared-storage copy.
+                PersistBackup.restoreIfFresh(app);
                 TripStore s = new TripStore(app);
                 engine = new TripEngine(this);
                 store = s;
@@ -161,12 +163,37 @@ final class TripRecorder implements TripEngine.Listener {
                 Log.w(TAG, "trip telemetry receiver not registered", e);
             }
             worker.post(tick);
+            worker.postDelayed(backupTick, BACKUP_MS);
         });
+    }
+
+    /** trips.db copied to shared storage (PersistBackup) this often, and on persistSoon. */
+    private static final long BACKUP_MS = 10 * 60_000L;
+
+    private final Runnable backupTick = new Runnable() {
+        @Override
+        public void run() {
+            backupNow();
+            worker.postDelayed(this, BACKUP_MS);
+        }
+    };
+
+    private void backupNow() {
+        TripStore s = store;
+        if (s == null) return;
+        try {
+            PersistBackup.backupTrips(app, s.getWritableDatabase());
+        } catch (RuntimeException e) {
+            Log.w(TAG, "trips backup failed", e);
+        }
     }
 
     /** Called when the activity goes away: put what is held on disk, keep recording. */
     void persistSoon() {
-        worker.post(() -> persist(now()));
+        worker.post(() -> {
+            persist(now());
+            backupNow();
+        });
     }
 
     /** FINALIZAR VIAGEM from the page: end the open trip now; keep recording if still READY. */

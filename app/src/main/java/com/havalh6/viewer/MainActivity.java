@@ -439,10 +439,14 @@ public final class MainActivity extends Activity {
          *
          * Debug builds only — this is a measurement tool, not telemetry, and it
          * should not spam a release logcat.
+         *
+         * Log.w, not Log.i: this ROM drops the app's INFO lines, so at Log.i the
+         * H6Perf stream was always empty on the car (reported from a fork,
+         * 2026-09-23). CarSignal above is at Log.w for the same reason.
          */
         @JavascriptInterface
         public void reportPerf(String json) {
-            if (isDebuggableBuild()) Log.i(PERF_TAG, json);
+            if (isDebuggableBuild()) Log.w(PERF_TAG, json);
         }
     }
 
@@ -1849,17 +1853,23 @@ public final class MainActivity extends Activity {
     private void ensurePlaceLocationPermission() {
         if (placeLocationAsked) return;
         placeLocationAsked = true;
+        // Storage rides the same dialog (PersistBackup): Android shows one
+        // request at a time, and a second one raised here would be dropped.
+        java.util.ArrayList<String> want = new java.util.ArrayList<>();
         if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
-                == android.content.pm.PackageManager.PERMISSION_GRANTED
-                || checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
-                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            return;
+                != android.content.pm.PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            want.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
+            want.add(android.Manifest.permission.ACCESS_COARSE_LOCATION);
         }
+        if (!PersistBackup.hasPermission(this)) {
+            want.add(android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            want.add(android.Manifest.permission.READ_EXTERNAL_STORAGE);
+        }
+        if (want.isEmpty()) return;
         try {
-            requestPermissions(new String[]{
-                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
-            }, REQ_PLACE_LOCATION);
+            requestPermissions(want.toArray(new String[0]), REQ_PLACE_LOCATION);
         } catch (Throwable t) {
             Log.w(TAG, "location permission request failed", t);
         }
@@ -1871,14 +1881,50 @@ public final class MainActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_PLACE_LOCATION) {
             boolean granted = false;
-            for (int result : grantResults) {
-                if (result == android.content.pm.PackageManager.PERMISSION_GRANTED) granted = true;
+            boolean storage = false;
+            for (int i = 0; i < grantResults.length && i < permissions.length; i++) {
+                if (grantResults[i] != android.content.pm.PackageManager.PERMISSION_GRANTED) continue;
+                if (android.Manifest.permission.WRITE_EXTERNAL_STORAGE.equals(permissions[i])) storage = true;
+                else if (permissions[i].contains("LOCATION")) granted = true;
+            }
+            if (storage && PersistBackup.restorePending(this)) {
+                // Reinstalled with a backup on disk: trips.db is already open and
+                // the page already booted empty, so restart and restore from scratch.
+                Log.w(TAG, "storage granted with a backup pending: restarting to restore");
+                restartForRestore();
+                return;
             }
             Log.w(TAG, "PlaceGlance location permission " + (granted ? "granted" : "denied"));
             // The worker is already ticking; poke it so the city does not wait
             // out the remainder of the current 45 s gap.
             if (granted && placeGlance != null) placeGlance.pokeNow();
             return;
+        }
+    }
+
+    private void restartForRestore() {
+        android.content.Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
+        if (launch == null) return;
+        launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        android.app.PendingIntent pi = android.app.PendingIntent.getActivity(this, 0, launch,
+                android.app.PendingIntent.FLAG_CANCEL_CURRENT);
+        android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(ALARM_SERVICE);
+        if (am == null) return;
+        am.set(android.app.AlarmManager.RTC, System.currentTimeMillis() + 600, pi);
+        finishAffinity();
+        android.os.Process.killProcess(android.os.Process.myPid());
+    }
+
+    /** Settings copy on shared storage; see PersistBackup and the head of index.html. */
+    private final class PersistBridge {
+        @android.webkit.JavascriptInterface
+        public String readSettings() {
+            return PersistBackup.readSettings(MainActivity.this);
+        }
+
+        @android.webkit.JavascriptInterface
+        public void writeSettings(String json) {
+            PersistBackup.writeSettings(MainActivity.this, json);
         }
     }
 
@@ -6936,6 +6982,7 @@ public final class MainActivity extends Activity {
         // Process-scoped and fed by its own receiver: see TripRecorder.get.
         tripRecorder = TripRecorder.get(this);
         webView.addJavascriptInterface(new TripBridge(tripRecorder), "TripBridge");
+        webView.addJavascriptInterface(new PersistBridge(), "PersistBridge");
 
         placeGlance = new PlaceGlance(this, mainHandler, json -> {
             telemetryCache.put(PlaceGlance.KEY, json);

@@ -4,6 +4,52 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Haval H6 3D</title>
+<script>
+/* Settings survive an uninstall (PersistBackup.java): localStorage is mirrored
+   to /sdcard/HavalH6Viewer/settings.json. Restore runs first, before anything
+   reads a setting, and only into an EMPTY store -- a running install is never
+   overwritten by its own older copy. Writes are debounced: setItem sites fire
+   in bursts, and the native side refuses them until the install is "armed". */
+(function () {
+  var B = window.PersistBridge;
+  if (!B || !window.localStorage) return;
+  var SKIP = { h6_wallpaper_cache_v2_br: 1, h6_desktop_shots_v2: 1, h6_weather: 1, hv_shell_boot_v1: 1 };
+  var MAX_VALUE = 256 * 1024;
+  try {
+    if (localStorage.getItem('h6_settings_v1') == null) {
+      var raw = B.readSettings();
+      var saved = raw ? JSON.parse(raw) : null;
+      if (saved && saved.keys) {
+        for (var k in saved.keys) {
+          if (Object.prototype.hasOwnProperty.call(saved.keys, k) && !SKIP[k]) localStorage.setItem(k, saved.keys[k]);
+        }
+      }
+    }
+  } catch (e) {}
+  var timer = 0;
+  function flush() {
+    timer = 0;
+    try {
+      var keys = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (SKIP[k]) continue;
+        var v = localStorage.getItem(k);
+        if (v != null && v.length <= MAX_VALUE) keys[k] = v;
+      }
+      if (keys.h6_settings_v1 == null) return; // nothing worth keeping yet
+      B.writeSettings(JSON.stringify({ v: 1, savedAt: Date.now(), keys: keys }));
+    } catch (e) {}
+  }
+  function schedule(k) {
+    if (SKIP[k] || timer) return;
+    timer = setTimeout(flush, 3000);
+  }
+  var P = Storage.prototype, set = P.setItem, rem = P.removeItem;
+  P.setItem = function (k, v) { set.call(this, k, v); if (this === localStorage) schedule(String(k)); };
+  P.removeItem = function (k) { rem.call(this, k); if (this === localStorage) schedule(String(k)); };
+})();
+</script>
 <script src="./support.js"></script>
 <script src="./telemetryClient.js"></script>
 <script src="./appLauncherClient.js"></script>

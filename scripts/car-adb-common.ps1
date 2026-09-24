@@ -66,7 +66,7 @@ function Install-CarApk([string]$Adb, [string]$Serial, [string]$Apk) {
   & $Adb -s $Serial push $Apk /data/local/tmp/havalh6-viewer.apk
   if ($LASTEXITCODE -ne 0) { throw "adb push failed ($LASTEXITCODE)" }
   $ErrorActionPreference = 'Continue'
-  $pm = & $Adb -s $Serial shell "pm install -r -i $installer /data/local/tmp/havalh6-viewer.apk" 2>&1 | Out-String
+  $pm = & $Adb -s $Serial shell "pm install -r -g -i $installer /data/local/tmp/havalh6-viewer.apk" 2>&1 | Out-String
   $ErrorActionPreference = $callerEap
   Write-Host $pm.Trim()
   if ($pm -notmatch '(?m)^Success' -and $LASTEXITCODE -ne 0) {
