@@ -9529,14 +9529,17 @@ const CAR_SHADOW_RADIUS = 19;
 //   localStorage.h6_shadowType = 'vsm' | 'pcf' | 'pcfsoft' (default), reload.
 // VSM is the only one of the three whose penumbra actually widens with radius,
 // but it blurs the map on every shadow update (door tweens refresh every 3rd
-// frame), so it runs on a 1024 map. NOT YET MEASURED ON THE CAR.
+// frame). The blur is in shadow-map TEXELS, so on a 1024 map radius 6 smeared
+// thin casters (mirrors, pillars) away on the car; 2048 + radius 3 keeps the
+// soft edge on broad shapes and the contour on thin ones. Live: window.__vsm(size, radius).
 const CAR_SHADOW_TYPE = (() => {
   try {
     const v = localStorage.getItem('h6_shadowType');
     return v === 'vsm' || v === 'pcf' ? v : 'pcfsoft';
   } catch (e) { return 'pcfsoft'; }
 })();
-const CAR_SHADOW_VSM_RADIUS = 6;
+const CAR_SHADOW_VSM_RADIUS = 3;
+const CAR_SHADOW_VSM_MAP = 2048;
 const CAR_SHADOW_VSM_SAMPLES = 12;
 const CAR_SHADOW_PCF_RADIUS = 3;
 const CAR_SHADOW_OPACITY = 0.90;   // was 0.80
@@ -28522,7 +28525,7 @@ class Component extends DCLogic {
       dir.position.copy(sun).multiplyScalar(26);
       dir.castShadow = true;
       if (CAR_SHADOW_TYPE === 'vsm') {
-        dir.shadow.mapSize.set(1024, 1024);
+        dir.shadow.mapSize.set(CAR_SHADOW_VSM_MAP, CAR_SHADOW_VSM_MAP);
         dir.shadow.bias = -0.0005;
         dir.shadow.radius = CAR_SHADOW_VSM_RADIUS;
         dir.shadow.blurSamples = CAR_SHADOW_VSM_SAMPLES;
@@ -28533,6 +28536,17 @@ class Component extends DCLogic {
       }
       scene.add(dir);
       this.dirLight = dir;
+      // Shadow-filter tuning from devtools, no reload: __vsm(2048, 3[, samples]).
+      window.__vsm = (size, radius, samples) => {
+        const sh = dir.shadow;
+        if (size) sh.mapSize.set(size, size);
+        if (radius != null) sh.radius = radius;
+        if (samples) sh.blurSamples = samples;
+        if (sh.map) { sh.map.dispose(); sh.map = null; }
+        if (sh.mapPass) { sh.mapPass.dispose(); sh.mapPass = null; }
+        this._kickShadowRefresh(8);
+        return { type: renderer.shadowMap.type, size: sh.mapSize.x, radius: sh.radius, samples: sh.blurSamples };
+      };
       const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb0b4bc, 0.28);
       this.hemiLight = hemiLight;
       scene.add(hemiLight);
@@ -31409,6 +31423,10 @@ class Component extends DCLogic {
         // Per-wheel traction outline: one box ON each wheel instead of one bar
         // spanning the axle. Border and halo only, no fill, blinking while that
         // axle works. wheelBoxOn 0 restores the axle bars.
+        // Master switch for everything this block draws on the floor: the
+        // per-wheel boxes / axle bars AND the drive-state side labels. Off on
+        // request -- read as clutter projected under the car.
+        floorBadgesOn: 0,
         wheelBoxOn: 1,
         wheelBoxLen: 0.82,      // along the car, a little longer than the tyre
         wheelBoxWide: 0.46,     // across the track, wider than the tyre
@@ -31892,11 +31910,12 @@ class Component extends DCLogic {
       if (b.glowTex) b.glowTex.dispose();
     });
     this._powertrainBadges = [];
+    const tune = this._powertrainFxTune();
+    if (!tune.floorBadgesOn) return;
     const anchors = manifest.anchors || {};
     const fl = anchors.hubFL || anchors.hubFR;
     const rl = anchors.hubRL || anchors.hubRR;
     if (!fl || !rl) return;
-    const tune = this._powertrainFxTune();
 // One label per axle PER SIDE, each sitting outboard of its own hub. Both
     // sides carry the same wording, which is also why nothing follows the
     // camera any more. Each label's half turn is baked in at build time from
