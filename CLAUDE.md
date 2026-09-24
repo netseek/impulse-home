@@ -388,6 +388,36 @@ Three traps worth knowing before you touch any of them:
   widget-view key starting with the card type, prefixed with `focused`. Build the
   popup's data in the widget view builder and let the prefixing carry it.
 
+## Retiring an asset: move it, do not delete it
+
+`aapt` drops any assets directory whose name starts with `_`, so **`assets/_archive/`
+never reaches the APK** — same reason `_backup`, `_source` and `_blender` do not, and
+it holds no matter what `app/build.gradle` excludes. Proof: the Gradle `syncViewerAssets`
+task copies `assets/_blender/**` into the staging dir and the packaged APK still has no
+entry for it.
+
+So a superseded asset **moves to `assets/_archive/<group>/`**. It keeps the design history,
+and it stops costing APK size the moment it lands there. `assets/_archive/README.md` holds
+the log of what went where and why.
+
+Measured 2026-09-24: 42 files, 17.2 MB of the web payload, were never referenced. Archiving
+them took a clean debug APK from **75.05 MB to 57.06 MB (-24%)**.
+
+**Find them against the built APK, not against the tree.** List `assets/www/**` out of the
+APK and check each name against the source. Two traps, both of which produced false
+positives here:
+
+- **A path built by concatenation is invisible to a name search.** `backgrounds/`,
+  `ui/widget-thumbs/`, `ui/clima/*-day|night.webp`, `wheel-thumbnails/` and `power/tex/`
+  are all assembled at runtime or emitted by a build script. Treat those directories as
+  live unless you have read the code that builds the name.
+- **Scan the ROOT scripts too.** `support.js` loads React, ReactDOM and Babel from
+  `vendor/react/`; a scan that only reads `index.html` reports 3 MB of live vendor code as
+  dead.
+
+Then rebuild and load the page: no request for an archived path, and the live ones still
+200. That is the check that actually settles it.
+
 ## Editing GLB assets
 
 Shipped car models are tuned for **load time**, not just appearance. Before
