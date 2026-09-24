@@ -36755,6 +36755,21 @@ class Component extends DCLogic {
       return;
     }
 
+    // Land WITH the ground shadow. If the pre-reveal gap did not bake it (the
+    // model arrived after the splash clip -- every emulator boot, and any slow
+    // car boot), bake it now: the car is about to be shown and nothing moves
+    // yet, so a cold bake (~400 ms, program compile included) only delays the
+    // orbit's start instead of freezing it mid-flight. The intro takes its
+    // start time below, after this.
+    const cst = this._contactShadowTune;
+    if (cst && cst.bakes === 0 && typeof this.renderContactShadow === 'function'
+        && this.contactShadow && !this.contactShadow.userData.disabled) {
+      try {
+        if (!this._carSceneVisible) this._setCarSceneVisible(true);
+        this.renderContactShadow();
+      } catch (e) { console.warn('[Shadow] intro bake failed', e); }
+    }
+
     this._introPlayed = true;
     this._introActive = true;
     if (this._introKickTimer) {
