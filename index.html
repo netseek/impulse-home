@@ -9602,22 +9602,18 @@ const CAR_SHADOW_VSM_MAP = 2048;
 const CAR_SHADOW_VSM_SAMPLES = 12;
 const CAR_SHADOW_PCF_RADIUS = 3;
 const CAR_SHADOW_OPACITY = 0.90;   // was 0.80
-// Baked occlusion under the car (setupContactShadow): the lower body seen from
-// the ground, blurred, on one quad. Re-baked only once the scene settles, so a
-// frame pays one draw call for it. Live-tunable: window.__contactShadow({...}).
-const CONTACT_SHADOW_OPACITY = 0.9;
-const CONTACT_SHADOW_DARKNESS = 2.0;
-// Wide on purpose: the bake is a footprint of the underbody, so a narrow blur
-// stays hidden under the car. It has to spread past the sills to be seen.
-const CONTACT_SHADOW_BLUR = 7;
-// Second, TIGHT layer: only what sits within CONTACT_TIGHT_H of the floor --
-// in practice the tyre contact patches -- barely blurred. The wide pool above
-// has to be blurred so far that it averages a 20 cm contact patch away into the
-// same grey as the body; this puts the dark line back where rubber meets floor.
-const CONTACT_TIGHT_H = 0.08;
-const CONTACT_TIGHT_DARKNESS = 2.0;
-const CONTACT_TIGHT_BLUR = 2;
-const CONTACT_TIGHT_OPACITY = 1;
+// Baked ground shadows (setupContactShadow): AO + the sun's shadow on the floor,
+// both with contact hardening -- the penumbra is minR + k * (blocker distance
+// above the floor), in metres. Live-tunable: window.__contactShadow({...}).
+const GROUND_SUN_STRENGTH = 0.85;  // replaces the catcher's CAR_SHADOW_OPACITY on the floor
+const GROUND_SUN_MIN_R = 0.01;
+const GROUND_SUN_K = 0.05;         // ~2.9 deg apparent light size: soft, not blurry
+const GROUND_AO_STRENGTH = 1.3;
+const GROUND_AO_MIN_R = 0.02;
+const GROUND_AO_K = 0.4;
+const GROUND_AO_FALLOFF = 1.5;     // how much less a HIGH blocker occludes
+const GROUND_AO_H = 0.6;           // blockers above this height add no AO
+const GROUND_SMOOTH = 1.5;         // final blur, texels: hides the tap pattern
 
 // Night mode used to zero hemi+dir so the car sat in IBL-only darkness. Prefer
 // keeping day car lighting and only swapping the background + ground pools.
@@ -21408,116 +21404,203 @@ class Component extends DCLogic {
     this.scene.add(plane);
     this.shadowCatcher = plane;
   }
-  // Baked contact shadow / ambient occlusion. Render the lower body from the
-  // ground looking up with a depth material (black, alpha falling off with
-  // height), blur it twice, and lay it on one ground quad. It follows the real
-  // silhouette and is darkest where the tyres and sills meet the floor, which
-  // the sun's shadow map alone cannot give.
+  // Baked ground shadows: ambient occlusion + the sun's shadow on the floor,
+  // both with CONTACT HARDENING -- the penumbra widens with how far the blocker
+  // is above the floor, the way a real one does (PCSS, run at bake time only).
   //
-  // It is NOT redrawn per frame: _requestContactShadow re-bakes it on a trailing
-  // debounce once a tween, ride-height change or model swap settles, and never
-  // while the boot reveal is running. During a door swing the sun shadow (which
-  // already refreshes every 3rd tween frame) carries the moving part; the bake
-  // only sees the lowest ~40% of the car, which a door barely changes.
+  // 1. Every shadow-casting mesh is drawn into floor space by a vertex shader
+  //    that slides each vertex down its light ray onto the floor plane and
+  //    stores the distance it travelled. The depth test keeps the blocker
+  //    NEAREST the floor per texel. AO uses straight down; the sun layer uses
+  //    the real dirLight direction, so it lands where the shadow map puts it.
+  // 2. A filter pass averages that coverage over a disc whose radius is
+  //    minR + k * blockerDistance (blocker distance found first, over the
+  //    widest disc the penumbra could reach). A tyre contact stays crisp and
+  //    black, the sills go soft, the roof's shadow goes very soft.
+  //    AO also weights each blocker by (1 - height)^falloff: a panel 60 cm up
+  //    hides much less sky than the rubber on the floor.
+  // 3. A light separable blur removes the tap pattern.
+  //
+  // Frame cost is one textured quad per layer. The bake (two scene renders
+  // plus the filters) runs on _requestContactShadow's debounce, and every 3rd
+  // frame of a door/trunk tween so a swinging door's shadow still moves.
+  // The sun layer REPLACES the ShadowMaterial catcher on the floor (the car's
+  // self-shadowing still comes from the shadow map); sunOn: 0 hands the floor
+  // back to the catcher for A/B.
   setupContactShadow(center, size, baseY) {
     const THREE = this.THREE;
     const renderer = this.renderer;
     if (!THREE.HorizontalBlurShader || !THREE.VerticalBlurShader) return;
-    const W = size.x * 1.35, H = size.z * 1.5;   // plane footprint
-    const CAM_H = size.y * 0.42;                  // only the lower body
-    // Blurred to a soft pool anyway, so 512 costs a quarter of the fill of
-    // 1024 for no visible loss.
-    const RES = 512;
+    const N_TAPS = 40;
 
     const group = new THREE.Group();
-    group.position.set(center.x, baseY + 0.004, center.z);
+    group.position.set(0, baseY + 0.004, 0);
     this.scene.add(group);
 
-    const rt = new THREE.WebGLRenderTarget(RES, RES);
-    rt.texture.generateMipmaps = false;
-    const rtBlur = new THREE.WebGLRenderTarget(RES, RES);
-    rtBlur.texture.generateMipmaps = false;
-
-    const planeGeo = new THREE.PlaneGeometry(W, H).rotateX(Math.PI / 2);
-    const plane = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({
-      map: rt.texture, transparent: true, opacity: CONTACT_SHADOW_OPACITY,
-      depthWrite: false, toneMapped: false,
-    }));
-    plane.renderOrder = 2;
-    plane.scale.y = -1;   // texture Y is flipped (also turns the face back up)
-    plane.visible = false; // until the first bake lands
-    plane.userData.rt = rt;
-    group.add(plane);
-
-    // The tight contact layer rides on the pool plane as a child, so every
-    // path that shows or hides this.contactShadow carries it too. Same depth,
-    // drawn after (renderOrder), both depth-tested without writing.
-    const rtTight = new THREE.WebGLRenderTarget(RES, RES);
-    rtTight.texture.generateMipmaps = false;
-    const tightPlane = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({
-      map: rtTight.texture, transparent: true, opacity: CONTACT_TIGHT_OPACITY,
-      depthWrite: false, toneMapped: false,
-    }));
-    tightPlane.renderOrder = 3;
-    plane.add(tightPlane);
-
-    const blurPlane = new THREE.Mesh(planeGeo);
-    blurPlane.visible = false;
-    group.add(blurPlane);
-
-    const shadowCam = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 0, CAM_H);
-    shadowCam.rotation.x = Math.PI / 2;   // look straight up from the ground
-    group.add(shadowCam);
-    const tightCam = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 0, CONTACT_TIGHT_H);
-    tightCam.rotation.x = Math.PI / 2;
-    group.add(tightCam);
-
-    // MeshDepthMaterial tweaked to go black→transparent with distance from ground
-    const depthMat = new THREE.MeshDepthMaterial();
-    depthMat.userData.darkness = { value: CONTACT_SHADOW_DARKNESS };
-    depthMat.onBeforeCompile = (shader) => {
-      shader.uniforms.darkness = depthMat.userData.darkness;
-      shader.fragmentShader = 'uniform float darkness;\n' + shader.fragmentShader.replace(
-        'gl_FragColor = vec4( vec3( 1.0 - fragCoordZ ), opacity );',
-        'gl_FragColor = vec4( vec3( 0.0 ), ( 1.0 - fragCoordZ ) * darkness );'
-      );
+    const mkRT = (res, depth) => {
+      const t = new THREE.WebGLRenderTarget(res, res, { depthBuffer: !!depth });
+      t.texture.generateMipmaps = false;
+      return t;
     };
-    depthMat.depthTest = false;
-    depthMat.depthWrite = false;
-    // Double-sided so the shadow camera (looking up from below) still captures
-    // underbody panels whose normals face away from it — otherwise backface
-    // culling leaves a "light through the middle" gap in the shadow.
-    depthMat.side = THREE.DoubleSide;
+    const mkLayer = (res, renderOrder) => {
+      const layer = { res, bake: mkRT(res, true), out: mkRT(res, false), tmp: mkRT(res, false) };
+      const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+      layer.plane = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        color: 0x000000, map: layer.out.texture, transparent: true,
+        depthWrite: false, toneMapped: false,
+      }));
+      layer.plane.renderOrder = renderOrder;
+      layer.plane.visible = false;       // until the first bake lands
+      group.add(layer.plane);
+      return layer;
+    };
+    const sun = mkLayer(1024, 2);
+    const ao = mkLayer(512, 3);
 
+    // Floor-space projection. region = (centre x, centre z, size x, size z).
+    const projMat = new THREE.ShaderMaterial({
+      uniforms: {
+        L: { value: new THREE.Vector3(0, 1, 0) },
+        y0: { value: 0 },
+        tMax: { value: 1 },
+        region: { value: new THREE.Vector4(0, 0, 1, 1) },
+      },
+      vertexShader: [
+        'uniform vec3 L; uniform float y0; uniform float tMax; uniform vec4 region;',
+        'varying float vT;',
+        'void main() {',
+        '  vec4 w = modelMatrix * vec4(position, 1.0);',
+        '  float t = max(w.y - y0, 0.0) / L.y;',
+        '  vec2 f = w.xz - L.xz * t;',
+        '  vT = clamp(t / tMax, 0.0, 1.0);',
+        '  gl_Position = vec4((f.x - region.x) / region.z * 2.0,',
+        '                     -(f.y - region.y) / region.w * 2.0,',
+        '                     vT * 2.0 - 1.0, 1.0);',
+        '}',
+      ].join('\n'),
+      fragmentShader: 'varying float vT; void main() { gl_FragColor = vec4(vT, 0.0, 0.0, 1.0); }',
+      side: THREE.DoubleSide,
+      depthTest: true,
+      depthWrite: true,
+    });
+
+    // Golden-angle disc, uniform over the area.
+    const taps = [];
+    for (let i = 0; i < N_TAPS; i++) {
+      const r = Math.sqrt((i + 0.5) / N_TAPS), a = i * 2.399963;
+      taps.push(new THREE.Vector2(Math.cos(a) * r, Math.sin(a) * r));
+    }
+    const filterMat = new THREE.ShaderMaterial({
+      uniforms: {
+        tMask: { value: null },
+        taps: { value: taps },
+        regionSize: { value: new THREE.Vector2(1, 1) },   // metres
+        tMax: { value: 1 },       // metres represented by mask value 1.0
+        minR: { value: 0.01 },    // metres
+        k: { value: 0.1 },        // penumbra metres per metre of blocker distance
+        falloff: { value: 0 },    // 0 = solid (sun); >0 = AO height weighting
+        strength: { value: 1 },
+      },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: [
+        '#define N ' + N_TAPS,
+        'uniform sampler2D tMask; uniform vec2 taps[N]; uniform vec2 regionSize;',
+        'uniform float tMax; uniform float minR; uniform float k; uniform float falloff; uniform float strength;',
+        'varying vec2 vUv;',
+        'void main() {',
+        '  vec2 toUv = 1.0 / regionSize;',
+        '  float searchR = minR + k * tMax;',
+        '  float tb = 0.0; float nb = 0.0;',
+        '  for (int i = 0; i < N; i++) {',
+        '    vec4 s = texture2D(tMask, vUv + taps[i] * searchR * toUv);',
+        '    if (s.a > 0.5) { tb += s.r; nb += 1.0; }',
+        '  }',
+        '  vec4 c = texture2D(tMask, vUv);',
+        '  if (c.a > 0.5) { tb += c.r; nb += 1.0; }',
+        '  if (nb < 0.5) { gl_FragColor = vec4(0.0); return; }',
+        '  float r = minR + k * (tb / nb) * tMax;',
+        '  float occ = 0.0;',
+        '  for (int i = 0; i < N; i++) {',
+        '    vec4 s = texture2D(tMask, vUv + taps[i] * r * toUv);',
+        '    float w = falloff > 0.0 ? pow(1.0 - s.r, falloff) : 1.0;',
+        '    occ += s.a * w;',
+        '  }',
+        '  occ /= float(N);',
+        '  gl_FragColor = vec4(0.0, 0.0, 0.0, clamp(occ * strength, 0.0, 1.0));',
+        '}',
+      ].join('\n'),
+      depthTest: false,
+      depthWrite: false,
+    });
     const hBlur = new THREE.ShaderMaterial(THREE.HorizontalBlurShader);
     hBlur.depthTest = false;
     const vBlur = new THREE.ShaderMaterial(THREE.VerticalBlurShader);
     vBlur.depthTest = false;
-
-    // rtBlur is the scratch for both layers: the passes run one after another.
-    const blur = (target, amount) => {
-      blurPlane.visible = true;
-      blurPlane.material = hBlur;
-      hBlur.uniforms.tDiffuse.value = target.texture;
-      hBlur.uniforms.h.value = amount / RES;
-      renderer.setRenderTarget(rtBlur);
-      renderer.render(blurPlane, shadowCam);
-      blurPlane.material = vBlur;
-      vBlur.uniforms.tDiffuse.value = rtBlur.texture;
-      vBlur.uniforms.v.value = amount / RES;
+    const fsQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), filterMat);
+    fsQuad.frustumCulled = false;
+    const fsCam = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
+    // The projection shader ignores the camera, but three still frustum-culls
+    // against it -- so hand it one that contains everything.
+    const bakeCam = new THREE.OrthographicCamera(-500, 500, 500, -500, -500, 500);
+    const fs = (mat, target) => {
+      fsQuad.material = mat;
       renderer.setRenderTarget(target);
-      renderer.render(blurPlane, shadowCam);
-      blurPlane.visible = false;
+      renderer.render(fsQuad, fsCam);
     };
 
     const tune = {
-      opacity: CONTACT_SHADOW_OPACITY, darkness: CONTACT_SHADOW_DARKNESS,
-      blur: CONTACT_SHADOW_BLUR,
-      tightOpacity: CONTACT_TIGHT_OPACITY, tightDarkness: CONTACT_TIGHT_DARKNESS,
-      tightBlur: CONTACT_TIGHT_BLUR, tightH: CONTACT_TIGHT_H, tightOn: 1,
+      sunOn: 1, sunStrength: GROUND_SUN_STRENGTH, sunMinR: GROUND_SUN_MIN_R, sunK: GROUND_SUN_K,
+      aoOn: 1, aoStrength: GROUND_AO_STRENGTH, aoMinR: GROUND_AO_MIN_R, aoK: GROUND_AO_K,
+      aoFalloff: GROUND_AO_FALLOFF, aoH: GROUND_AO_H,
+      smooth: GROUND_SMOOTH,
       lastMs: 0, bakes: 0,
     };
     this._contactShadowTune = tune;
+
+    const box = new THREE.Box3(), tmpBox = new THREE.Box3();
+    const Ldir = new THREE.Vector3(), corner = new THREE.Vector3();
+
+    const bakeLayer = (layer, L, y0, pad, opts) => {
+      // Floor-space region: the casters' footprint slid along L, padded by the
+      // widest penumbra so nothing is clipped at the edge.
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, hMax = 0;
+      for (let i = 0; i < 8; i++) {
+        corner.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z);
+        const t = Math.max(corner.y - y0, 0) / L.y;
+        hMax = Math.max(hMax, t);
+        const fx = corner.x - L.x * t, fz = corner.z - L.z * t;
+        x0 = Math.min(x0, fx, corner.x); x1 = Math.max(x1, fx, corner.x);
+        z0 = Math.min(z0, fz, corner.z); z1 = Math.max(z1, fz, corner.z);
+      }
+      const tMax = opts.tMax || hMax || 1;
+      const margin = opts.minR + opts.k * tMax + pad;
+      x0 -= margin; x1 += margin; z0 -= margin; z1 += margin;
+      const sx = x1 - x0, sz = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      const u = projMat.uniforms;
+      u.L.value.copy(L); u.y0.value = y0; u.tMax.value = tMax;
+      u.region.value.set(cx, cz, sx, sz);
+      renderer.setRenderTarget(layer.bake);
+      renderer.setClearColor(0xff0000, 0);    // r = 1 (farthest), no coverage
+      renderer.clear(true, true, false);
+      renderer.render(this.scene, bakeCam);
+      const f = filterMat.uniforms;
+      f.tMask.value = layer.bake.texture;
+      f.regionSize.value.set(sx, sz);
+      f.tMax.value = tMax; f.minR.value = opts.minR; f.k.value = opts.k;
+      f.falloff.value = opts.falloff; f.strength.value = opts.strength;
+      renderer.setClearColor(0x000000, 0);
+      fs(filterMat, layer.out);
+      if (tune.smooth > 0) {
+        hBlur.uniforms.tDiffuse.value = layer.out.texture;
+        hBlur.uniforms.h.value = tune.smooth / layer.res;
+        fs(hBlur, layer.tmp);
+        vBlur.uniforms.tDiffuse.value = layer.tmp.texture;
+        vBlur.uniforms.v.value = tune.smooth / layer.res;
+        fs(vBlur, layer.out);
+      }
+      layer.plane.position.set(cx, 0, cz);
+      layer.plane.scale.set(sx, 1, sz);
+    };
 
     this.renderContactShadow = () => {
       const t0 = performance.now();
@@ -21527,56 +21610,82 @@ class Component extends DCLogic {
       const prevClearAlpha = renderer.getClearAlpha();
       const prevClearColor = renderer.getClearColor(new THREE.Color());
       const prevAutoClear = renderer.autoClear;
-      // Nothing that lies ON the ground may enter the depth pass, or it fills
-      // the target as a solid black rectangle.
-      const hide = [this.floorMesh, this.nightFloor, this.shadowCatcher, plane, this._windGroup]
-        .filter((o) => o && o.visible);
-      hide.forEach((o) => { o.visible = false; });
-      // Sit just above the floor wherever it currently is: ride height moves the
-      // floor, and a plane even 0.5 mm under it is depth-tested out entirely.
-      if (this.floorMesh) {
-        const fy = this.floorMesh.getWorldPosition(new THREE.Vector3()).y;
-        const want = Math.max(baseY + 0.004, fy + 0.003);
-        if (group.parent) group.position.y = want - group.parent.getWorldPosition(new THREE.Vector3()).y;
-        group.updateMatrixWorld(true);
+      const prevShadowAuto = renderer.shadowMap.autoUpdate;
+      const prevShadowNeeds = renderer.shadowMap.needsUpdate;
+
+      // Only what casts in the shadow map casts here (glass is excluded there
+      // for a reason). Everything else is hidden for the two renders, and the
+      // casters' world box is gathered on the same walk.
+      const hidden = [];
+      box.makeEmpty();
+      scene.traverseVisible((o) => {
+        if (o === group) return;
+        if (o.isMesh || o.isLine || o.isPoints || o.isSprite) {
+          if (o.isMesh && o.castShadow) {
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+            tmpBox.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+            box.union(tmpBox);
+          } else {
+            hidden.push(o);
+          }
+        }
+      });
+      const groupWas = group.visible;
+      group.visible = false;
+      hidden.forEach((o) => { o.visible = false; });
+
+      // Sit just above the floor wherever it currently is: ride height moves
+      // the floor, and a plane even 0.5 mm under it is depth-tested out.
+      let y0 = baseY;
+      if (this.floorMesh) y0 = this.floorMesh.getWorldPosition(new THREE.Vector3()).y;
+      group.position.y = Math.max(baseY + 0.004, y0 + 0.003);
+
+      const dl = this.dirLight;
+      const sunLive = !!(tune.sunOn && dl && dl.visible && dl.intensity > 0 && dl.castShadow);
+      if (!box.isEmpty()) {
+        scene.background = null;
+        scene.overrideMaterial = projMat;
+        renderer.autoClear = false;
+        renderer.shadowMap.autoUpdate = false;
+      renderer.shadowMap.needsUpdate = false;
+        if (tune.aoOn) {
+          Ldir.set(0, 1, 0);
+          bakeLayer(ao, Ldir, y0, 0.02, {
+            tMax: tune.aoH, minR: tune.aoMinR, k: tune.aoK,
+            falloff: tune.aoFalloff, strength: tune.aoStrength,
+          });
+        }
+        if (sunLive) {
+          Ldir.copy(dl.position);
+          if (dl.target) Ldir.sub(dl.target.getWorldPosition(corner));
+          Ldir.normalize();
+          if (Ldir.y < 0.05) Ldir.y = 0.05;    // a grazing sun would smear to infinity
+          bakeLayer(sun, Ldir, y0, 0.02, {
+            tMax: 0, minR: tune.sunMinR, k: tune.sunK,
+            falloff: 0, strength: tune.sunStrength,
+          });
+        }
+        scene.overrideMaterial = null;
       }
-      depthMat.userData.darkness.value = tune.darkness;
-      scene.background = null;
-      scene.overrideMaterial = depthMat;
-      // Black, not the scene clear colour: the blur spreads rgb into the
-      // alpha-0 border, and a light clear colour greys the penumbra.
-      renderer.setClearColor(0x000000, 0);
-      renderer.autoClear = true;
-      renderer.setRenderTarget(rt);
-      renderer.clear();
-      renderer.render(scene, shadowCam);
-      if (tune.tightOn) {
-        // Same depth material: fragCoordZ is relative to the camera's range, so
-        // the tight camera's short far plane stretches the whole 0..1 falloff
-        // over the contact band.
-        if (tightCam.far !== tune.tightH) { tightCam.far = tune.tightH; tightCam.updateProjectionMatrix(); }
-        depthMat.userData.darkness.value = tune.tightDarkness;
-        renderer.setRenderTarget(rtTight);
-        renderer.clear();
-        renderer.render(scene, tightCam);
-      }
-      scene.overrideMaterial = null;
-      blur(rt, tune.blur);
-      blur(rt, tune.blur * 0.4);
-      if (tune.tightOn && tune.tightBlur > 0) blur(rtTight, tune.tightBlur);
+
       renderer.setRenderTarget(prevTarget);
       renderer.setClearColor(prevClearColor, prevClearAlpha);
       renderer.autoClear = prevAutoClear;
+      renderer.shadowMap.autoUpdate = prevShadowAuto;
+      renderer.shadowMap.needsUpdate = prevShadowNeeds;
       scene.background = prevBg;
-      hide.forEach((o) => { o.visible = true; });
-      plane.material.opacity = tune.opacity;
-      tightPlane.material.opacity = tune.tightOpacity;
-      tightPlane.visible = !!tune.tightOn;
-      plane.visible = this._carSceneVisible !== false;
+      hidden.forEach((o) => { o.visible = true; });
+      group.visible = groupWas;
+      ao.plane.visible = !!tune.aoOn && !box.isEmpty();
+      sun.plane.visible = sunLive && !box.isEmpty();
+      // The floor gets its sun shadow from the bake now; the catcher would
+      // double it. material.visible, not .visible: several paths rewrite the
+      // mesh's visibility with the rest of the scene.
+      if (this.shadowCatcher) this.shadowCatcher.material.visible = !sun.plane.visible;
       tune.lastMs = +(performance.now() - t0).toFixed(1);
       tune.bakes++;
     };
-    this.contactShadow = plane;
+    this.contactShadow = group;
     this._requestContactShadow(0);
 
     window.__contactShadow = (patch) => {
@@ -21584,10 +21693,11 @@ class Component extends DCLogic {
         Object.keys(patch).forEach((k) => {
           if (k in tune && typeof patch[k] === 'number') tune[k] = patch[k];
         });
-        if ('on' in patch) plane.userData.disabled = !patch.on;
+        if ('on' in patch) group.userData.disabled = !patch.on;
+        if (group.userData.disabled && this.shadowCatcher) this.shadowCatcher.material.visible = true;
         this._requestContactShadow(0);
       }
-      return { ...tune, on: !plane.userData.disabled, visible: plane.visible };
+      return { ...tune, on: !group.userData.disabled, visible: group.visible };
     };
   }
 
@@ -21852,6 +21962,12 @@ class Component extends DCLogic {
     this._tweenShadowPhase = (this._tweenShadowPhase || 0) + 1;
     if (this._tweenShadowPhase % 3 === 1 && this.renderer) {
       this.renderer.shadowMap.needsUpdate = true;
+      // The ground bake follows a swinging door on the same cadence. Direct,
+      // not _requestContactShadow: that one waits for the tween to end.
+      if (typeof this.renderContactShadow === 'function' && this.contactShadow
+          && !this.contactShadow.userData.disabled && this._revealSettled && this._revealSettled()) {
+        try { this.renderContactShadow(); } catch (e) {}
+      }
     }
   }
 
