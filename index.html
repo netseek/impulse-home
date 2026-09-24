@@ -5773,6 +5773,16 @@ window.HavalSplash = (function () {
     .hv-energy-ask-box label { display:flex; flex-direction:column; gap:6px; }
     .hv-energy-ask-box label > small { font:600 10px/1.3 'Space Mono',monospace; letter-spacing:.06em; opacity:.72; }
     .hv-energy-ask-box input { height:48px; padding:0 14px; border:1px solid rgba(255,255,255,.2); border-radius:12px; background:rgba(255,255,255,.06); color:inherit; font:500 20px/1 'Space Grotesk',sans-serif; }
+    /* Own keypad, not an <input>: the system IME covers most of a 720 px panel and
+       its decimal key is a guess per locale. Entry is cents-first (owner,
+       2026-09-23), so the digits fill from the right and no separator is typed. */
+    .hv-energy-askamt { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:6px 14px; border:1px solid rgba(255,255,255,.2); border-radius:12px; background:rgba(255,255,255,.06); }
+    .hv-energy-askamt > small { font:600 10px/1.3 'Space Mono',monospace; letter-spacing:.06em; opacity:.72; }
+    .hv-energy-askamt > output { font:500 30px/1.1 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; }
+    .hv-energy-pad { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .hv-energy-pad > button { min-height:54px; border:0; border-radius:14px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:500 22px/1 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; cursor:pointer; }
+    .hv-energy-pad > button:active { background:rgba(255,255,255,.2); }
+    .hv-energy-pad > button.act { font:600 14px/1 'Space Mono',monospace; letter-spacing:.06em; opacity:.8; }
     .hv-energy-ask-box .primary { color:#fff; background:var(--hv-accent,#2aa7b7); }
     .hv-energy-chartctl { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 10px; }
     .hv-energy-chartctl .hv-energy-seg button { min-height:38px; padding:0 12px; font-size:13px; }
@@ -7533,7 +7543,10 @@ window.HavalSplash = (function () {
       <div class="hv-energy-ask-box">
         <strong>{{ energyAskTitle }}</strong>
         <p>{{ energyAskText }}</p>
-        <label><small>{{ energyAskUnit }}</small><input type="text" inputmode="decimal" placeholder="0,00" onInput="{{ energyAskInput }}" onChange="{{ energyAskInput }}" /></label>
+        <div class="hv-energy-askamt"><small>{{ energyAskUnit }}</small><output data-energy-ask-value>{{ energyAskValue }}</output></div>
+        <div class="hv-energy-pad">
+          <sc-for list="{{ energyAskKeys }}" as="k" hint-placeholder-count="12"><button type="button" class="{{ k.cls }}" aria-label="{{ k.label }}" onClick="{{ k.onClick }}">{{ k.text }}</button></sc-for>
+        </div>
         <div class="hv-energy-confirm-actions"><button type="button" onClick="{{ energyAskSkip }}">PULAR</button><button type="button" class="primary" onClick="{{ energyAskSave }}">SALVAR</button></div>
       </div>
     </div>
@@ -9764,6 +9777,15 @@ const CAM_ICON_BG_GAP_MAX_MS = 800;
 // The layout still owns where the intro ORBITS TO; it no longer owns where it
 // starts from. Measured on the running scene: _fitDist 14.84 m, so 11.77 m.
 const INTRO_FRONT_DIST_MUL = 0.793;
+// FOV the splash-matching front pose is framed at. Like INTRO_FRONT_DIST_MUL
+// this is a property of the CLIP: the cross-fade was measured against
+// assets/app-splash.mp4 with the camera at the stock 30 deg. The FOV slider
+// then moved the car's size on screen out from under that match, so the hold
+// pins this value and the orbit eases to whatever the user actually has set.
+const INTRO_FRONT_FOV = 30;
+
+// Scratch for the intro orbit arc (_tickIntro runs per frame).
+let _introFromDir = null, _introToDir = null, _introQa = null, _introQb = null;
 // View shift for the front hold while the first-run modal is up: moves the
 // car into the right half of the panel, clear of the left-anchored modal.
 const FIRST_RUN_VIEW_SHIFT = 0.24;
@@ -17763,6 +17785,13 @@ class Component extends DCLogic {
     this._liveDefine('progress', {
       epsilon: 1,       // one whole percent - finer than the readout shows
       paint(v) { this._paintLoadProgress(v); },
+    });
+    // The fuel-price keypad: every press repaints this one <output> and commits nothing.
+    this._liveDefine('energyAskCents', {
+      paint(v) {
+        const out = document.querySelector('[data-energy-ask-value]');
+        if (out) out.textContent = this._energyAskDisplay(Number(v) || 0);
+      },
     });
   }
 
@@ -36243,6 +36272,8 @@ class Component extends DCLogic {
     this.controls.target.copy(poses.center);
     this.camera.near = Math.max(0.05, poses.defaultDist / 120);
     this.camera.far = Math.max(200, poses.defaultDist * 120);
+    // The clip match is a distance AND a FOV - see INTRO_FRONT_FOV.
+    if (this.camera.isPerspectiveCamera) this.camera.fov = INTRO_FRONT_FOV;
     this.camera.updateProjectionMatrix();
     // Zero shift AND zero pan — see _introFrontPoses. _applyShellViewOffset
     // ADDS _userPanPx, so a shift of 0 is not the same as centred.
@@ -36463,6 +36494,12 @@ class Component extends DCLogic {
     if (!this._fitCam) this._fitCam = this._shellCameraTarget(!!window.__androidPopupActive);
     const poses = this._introFrontPoses();
     if (!poses) {
+      // No front pose to hold, so nothing eases the FOV back off
+      // INTRO_FRONT_FOV that _parkIntroCamera may already have pinned.
+      if (this.camera && this.camera.isPerspectiveCamera) {
+        this.camera.fov = this._camFov();
+        this.camera.updateProjectionMatrix();
+      }
       this._introActive = false;
       if (this.controls) this.controls.enabled = true;
       this._setCarSceneVisible(true);
@@ -36478,6 +36515,8 @@ class Component extends DCLogic {
     this.controls.target.copy(poses.center);
     this.camera.near = Math.max(0.05, poses.defaultDist / 120);
     this.camera.far = Math.max(200, poses.defaultDist * 120);
+    // The clip match is a distance AND a FOV - see INTRO_FRONT_FOV.
+    if (this.camera.isPerspectiveCamera) this.camera.fov = INTRO_FRONT_FOV;
     this.camera.updateProjectionMatrix();
     // Centred means shift 0 AND pan 0 — see _introFrontPoses.
     this._setUserPan(0, 0);
@@ -36515,6 +36554,9 @@ class Component extends DCLogic {
       camTo: home ? home.position.clone() : poses.front.clone(),
       camToTarget: home ? home.target.clone() : poses.center.clone(),
       viewShiftFrom: 0,
+      // Hold at the clip's FOV, ease to the user's over the orbit.
+      fovFrom: INTRO_FRONT_FOV,
+      fovTo: this._camFov(),
       viewShiftTo: (home && home.viewShift != null)
         ? home.viewShift
         : ((this._fitCam && this._fitCam.viewShift) || 0),
@@ -36548,6 +36590,8 @@ class Component extends DCLogic {
       camTo: home.position.clone(),
       camToTarget: home.target.clone(),
       viewShiftFrom: this._currentViewShift(),
+      fovFrom: (this.camera.isPerspectiveCamera ? this.camera.fov : this._camFov()),
+      fovTo: this._camFov(),
       viewShiftTo: home.viewShift != null
         ? home.viewShift
         : ((this._fitCam && this._fitCam.viewShift) || 0),
@@ -36560,6 +36604,11 @@ class Component extends DCLogic {
 
   _endIntroAnimation() {
     this._introEndedAt = performance.now();
+    // The orbit ran the camera off state.camFov (see fovAt); land exactly on it.
+    if (this.camera && this.camera.isPerspectiveCamera) {
+      this.camera.fov = this._camFov();
+      this.camera.updateProjectionMatrix();
+    }
     if (this.model && this._modelHomePos) this.model.position.copy(this._modelHomePos);
     this._intro = null;
     this._introActive = false;
@@ -36594,6 +36643,11 @@ class Component extends DCLogic {
 
   _tickIntro(dt) {
     if (!this._intro || !this.camera || !this.controls) return false;
+    const THREE = window.THREE;
+    if (!_introFromDir) {
+      _introFromDir = new THREE.Vector3(); _introToDir = new THREE.Vector3();
+      _introQa = new THREE.Quaternion(); _introQb = new THREE.Quaternion();
+    }
     const intro = this._intro;
     intro.t += dt;
 
@@ -36605,12 +36659,45 @@ class Component extends DCLogic {
       this._setUserPan(from.x + (to.x - from.x) * e, from.y + (to.y - from.y) * e);
     };
 
+    // The intro's FOV is not the camera's settled FOV: the hold sits at the
+    // clip's (INTRO_FRONT_FOV) and the orbit eases to whatever the slider is
+    // set to, so the hand-off matches the video and the landing matches the
+    // desktop. Written straight onto the camera - state.camFov is the user's
+    // setting and must not move.
+    const fovAt = (e) => {
+      if (!this.camera.isPerspectiveCamera) return;
+      const a = intro.fovFrom != null ? intro.fovFrom : this.camera.fov;
+      const b = intro.fovTo != null ? intro.fovTo : a;
+      this.camera.fov = a + (b - a) * e;
+    };
+
     const applyCamLerp = (fromPos, toPos, fromTarget, toTarget, e, viewShift) => {
-      this.camera.position.lerpVectors(fromPos, toPos, e);
       this.controls.target.lerpVectors(fromTarget, toTarget, e);
-      const dist = this.camera.position.distanceTo(this.controls.target);
+      // ORBIT on an arc, do not lerp across the chord. A straight lerp between
+      // two points around the car cuts the corner, so the camera dips closer
+      // mid-move and the whole transition reads as a zoom in and back out -
+      // most visible on the wide front-to-three-quarter swing out of the
+      // splash. Interpolating DIRECTION and RADIUS about the (moving) target
+      // separately keeps the distance monotonic between the two endpoints.
+      const t = this.controls.target;
+      const from = _introFromDir.subVectors(fromPos, fromTarget);
+      const to = _introToDir.subVectors(toPos, toTarget);
+      const rFrom = from.length();
+      const rTo = to.length();
+      if (rFrom > 1e-6 && rTo > 1e-6) {
+        from.divideScalar(rFrom);
+        to.divideScalar(rTo);
+        _introQa.setFromUnitVectors(from, to);
+        _introQb.identity().slerp(_introQa, e);
+        this.camera.position.copy(from).applyQuaternion(_introQb)
+          .multiplyScalar(rFrom + (rTo - rFrom) * e).add(t);
+      } else {
+        this.camera.position.lerpVectors(fromPos, toPos, e);
+      }
+      const dist = this.camera.position.distanceTo(t);
       this.camera.near = Math.max(0.05, dist / 120);
       this.camera.far = Math.max(200, dist * 120);
+      fovAt(e);
       this.camera.updateProjectionMatrix();
       panAt(e);
       if (viewShift != null) this._applyShellViewOffset(viewShift);
@@ -36624,6 +36711,7 @@ class Component extends DCLogic {
       const dist = this.camera.position.distanceTo(this.controls.target);
       this.camera.near = Math.max(0.05, dist / 120);
       this.camera.far = Math.max(200, dist * 120);
+      fovAt(0);
       this.camera.updateProjectionMatrix();
       panAt(0);
       this._applyShellViewOffset(0);
@@ -36634,6 +36722,8 @@ class Component extends DCLogic {
           // No orbit to run, so the pan has nothing to ride in on — hand the
           // layout's own framing over directly rather than settling on zero.
           panAt(1);
+          fovAt(1);
+          this.camera.updateProjectionMatrix();
           this._applyShellViewOffset(intro.viewShiftTo || 0);
           this._endIntroAnimation();
           return true;
@@ -36655,6 +36745,8 @@ class Component extends DCLogic {
         this.camera.position.copy(intro.camTo);
         this.controls.target.copy(intro.camToTarget);
         panAt(1);
+        fovAt(1);
+        this.camera.updateProjectionMatrix();
         this._applyShellViewOffset(intro.viewShiftTo || 0);
         this._endIntroAnimation();
       }
@@ -39348,7 +39440,8 @@ class Component extends DCLogic {
       energyAskTitle: this.state.energyAsk ? this.state.energyAsk.title : '',
       energyAskText: this.state.energyAsk ? this.state.energyAsk.text : '',
       energyAskUnit: this.state.energyAsk ? this.state.energyAsk.unit : '',
-      energyAskInput: (e) => { this._energyAskDraft = e && e.target ? e.target.value : ''; },
+      energyAskValue: this._energyAskDisplay(),
+      energyAskKeys: this._energyAskKeys(),
       energyAskSave: (ev) => this._answerEnergyAsk(true, ev),
       energyAskSkip: (ev) => this._answerEnergyAsk(false, ev),
     };
@@ -41158,6 +41251,57 @@ class Component extends DCLogic {
 
   _energyMoney(v) { return isFinite(v) ? 'R$ ' + v.toFixed(2).replace('.', ',') : '—'; }
 
+  /**
+   * The price prompt's own keypad. `_energyAskDraft` holds DIGITS only and is read
+   * as cents, so typing 1-2-5 walks 0,01 -> 0,12 -> 1,25 and no separator is ever
+   * typed -- which also removes the "is it a comma or a dot" question the system
+   * IME asks in a locale it may not share with the page.
+   *
+   * Nothing here goes through setState. A React commit costs 197 ms p50 on this car
+   * (CLAUDE.md), which on a keypad is one lost keypress in every press, so the
+   * readout is painted straight into the DOM through the _live seam and React sees
+   * the value once, when SALVAR is pressed.
+   */
+  _energyAskCents() { return Number(String(this._energyAskDraft || '').replace(/\D/g, '')) || 0; }
+
+  _energyAskDisplay(cents) {
+    const c = cents === undefined ? this._energyAskCents() : cents;
+    return (c / 100).toFixed(2).replace('.', ',');
+  }
+
+  /** Digits 1-9, then CLEAR / 0 / backspace -- the phone layout, bottom row reversed. */
+  _energyAskKeys() {
+    const keys = [];
+    for (let d = 1; d <= 9; d++) {
+      keys.push({ text: String(d), label: String(d), cls: '', onClick: (ev) => this._energyAskDigit(d, ev) });
+    }
+    keys.push({ text: 'C', label: 'Limpar', cls: 'act', onClick: (ev) => this._energyAskClear(ev) });
+    keys.push({ text: '0', label: '0', cls: '', onClick: (ev) => this._energyAskDigit(0, ev) });
+    keys.push({ text: '⌫', label: 'Apagar', cls: 'act', onClick: (ev) => this._energyAskBack(ev) });
+    return keys;
+  }
+
+  _energyAskDigit(d, ev) {
+    this._cardControlEvent(ev);
+    const next = String(this._energyAskDraft || '').replace(/\D/g, '') + String(d);
+    // Six digits is R$ 9999,99 -- past anything _energyParsePrice would accept anyway.
+    if (next.replace(/^0+/, '').length > 6) return;
+    this._energyAskDraft = next;
+    this._liveSet('energyAskCents', this._energyAskCents());
+  }
+
+  _energyAskBack(ev) {
+    this._cardControlEvent(ev);
+    this._energyAskDraft = String(this._energyAskDraft || '').replace(/\D/g, '').slice(0, -1);
+    this._liveSet('energyAskCents', this._energyAskCents());
+  }
+
+  _energyAskClear(ev) {
+    this._cardControlEvent(ev);
+    this._energyAskDraft = '';
+    this._liveSet('energyAskCents', 0);
+  }
+
   _energyParsePrice(text) {
     const v = parseFloat(String(text || '').replace(/[^0-9,.]/g, '').replace(',', '.'));
     return isFinite(v) && v > 0 && v < 1000 ? v : NaN;
@@ -41286,6 +41430,7 @@ class Component extends DCLogic {
     const charge = next.kind === 'charge';
     const qty = charge ? Math.max(0, (Number(next.after) || 0) - (Number(next.before) || 0)) * spec.batteryKwh / 100 : Number(next.amount) || 0;
     this._energyAskDraft = '';
+    this._liveSet('energyAskCents', 0);
     this.setState({ energyAsk: {
       key: (charge ? 'charge:' : 'refuel:') + next.t,
       charge: charge,
@@ -41300,7 +41445,8 @@ class Component extends DCLogic {
     const ask = this.state.energyAsk;
     if (!ask) return;
     const pr = this._energyPrices();
-    const v = this._energyParsePrice(this._energyAskDraft);
+    const cents = this._energyAskCents();
+    const v = cents > 0 && cents < 100000 ? cents / 100 : NaN;
     if (save && isFinite(v)) {
       pr.paid[ask.key] = v;
       // The last price paid is the best guess for the next one.
