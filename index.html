@@ -10279,6 +10279,31 @@ class Component extends DCLogic {
       fastOnMargin: 0.02,
       fastOffMargin: 0.25,
       minBlurKmh: 8,          // never blur at parking speeds
+      // Shutter motion blur for the 3D band below the handover. When on, the
+      // sprite replaces the sharp rim from mbFromKmh, smearing the SHARP capture
+      // over the arc the wheel really turned since the previous frame (centred
+      // on the rim's current angle, so it cannot sit off the rim the way the
+      // fixed preBlend arc did). A late frame then reads as a longer smear
+      // instead of the spokes stopping. It crossfades to the baked smear across
+      // the normal window. shutter is the fraction of the frame the "shutter" is
+      // open (1 = the whole inter-frame arc). ON after an A/B on the parked car
+      // 2026-09-24 (owner: "astonishing" at speed); __wheelSpin({motionBlur:false})
+      // reverts. Not yet measured on a real drive.
+      motionBlur: true,
+      mbFromKmh: 6,
+      mbFadeKmh: 3,
+      shutter: 0.6,
+      // Smear floor that grows with speed: 0 at mbFloorFromKmh, then mbDegPerKmh
+      // per km/h. The per-frame arc alone is only ~8 deg at 15 km/h and ~12 at 22,
+      // too little to read as speed. Tuned by eye on the car 2026-09-24: 1 deg/km/h
+      // from 0 looked right at 22 and too blurred at low speed, so the floor
+      // starts at 10 and climbs faster -- same ~22 deg at 22 km/h, 9 at 15.
+      mbFloorFromKmh: 10,
+      mbDegPerKmh: 1.8,
+      // Brightness of the shutter sprite. The baked sprite is boosted
+      // (_blurSpriteGain, measured 1.46 on the car) to match bloom at speed; the
+      // shutter sprite stands in for a sharp rim and read ~46% too bright with it.
+      mbGain: 1.0,
       // A low-opacity smear laid over the STILL-SHARP rim, easing in from
       // preBlendFromKmh up to the fade, meant to low-pass the angular detail
       // that judders in the 12-27 km/h band the handover cannot reach.
@@ -17593,6 +17618,18 @@ class Component extends DCLogic {
       const k = Math.min(1.0, (speedKmh - winStart) / span);
       blend = Math.max(blend, (pre + (MAX_BLUR_OPACITY - pre) * k));
     }
+    // Shutter motion blur: the sprite takes over from mbFromKmh, showing the
+    // sharp capture smeared by this frame's travel (uMotion 1), and crossfades to
+    // the baked smear across the normal window (uMotion 0 by winFull).
+    const mb = !!spinTune.motionBlur;
+    let motion = 0;
+    if (mb && speedKmh > (spinTune.mbFromKmh || 0)) {
+      blend = Math.max(blend, Math.min(1, (speedKmh - (spinTune.mbFromKmh || 0)) / Math.max(0.5, spinTune.mbFadeKmh || 3)));
+      motion = 1 - Math.max(0, Math.min(1, (speedKmh - winStart) / Math.max(1e-3, winFull - winStart)));
+    }
+    const shutterMax = (this._rimRepeatRad || (Math.PI * 2 / 5)) * 0.8;
+    const shutter = Math.min(shutterMax, Math.max(this._shutterRad || 0,
+      Math.max(0, speedKmh - (spinTune.mbFloorFromKmh || 0)) * (spinTune.mbDegPerKmh || 0) * Math.PI / 180));
 
     // The spokes vanish once the sprite is effectively opaque and come back a
     // little lower, so a speed hovering on the handover cannot pop them in and
@@ -17623,6 +17660,11 @@ class Component extends DCLogic {
         const u = d.material && d.material.uniforms;
         if (!u) return;
         u.uOpacity.value = blend;
+        if (u.uMotion) {
+          u.uMotion.value = motion;
+          u.uShutter.value = shutter;
+          u.uMotionGain.value = typeof spinTune.mbGain === 'number' ? spinTune.mbGain : 1;
+        }
         const axis = d._rollAxis;
         let hand = 1;
         if (axis) {
@@ -17643,7 +17685,9 @@ class Component extends DCLogic {
     // double image. It returns the moment the sprite fades out.
     if (this._steerOnlyMeshes && this._wheelSpinTune) {
       const hm = this._wheelSpinTune.hubMode;
-      const hideBrake = (hm === 'capture' || hm === 'hide') && isFast;
+      // Not while the shutter smear dominates: its spoke gaps are real holes at
+      // low speed, and the brake behind them really does not turn.
+      const hideBrake = (hm === 'capture' || hm === 'hide') && isFast && motion < 0.5;
       ['fl', 'fr', 'rl', 'rr'].forEach(k => {
         (this._steerOnlyMeshes[k] || []).forEach(m => { m.visible = !hideBrake; });
       });
@@ -19090,6 +19134,8 @@ class Component extends DCLogic {
     if (this._spriteMats) {
       this._spriteMats.forEach((m) => {
         m.uniforms.uTwoLayer.value = twoLayer ? 1 : 0;
+        // The shutter smear must start from the same picture the baked base does.
+        if (m.uniforms.tSharp) m.uniforms.tSharp.value = twoLayer ? this._rtFlat.texture : this._rtSource.texture;
         m.uniforms.uBaseGain.value = this._blurFlatGain || 1;
         m.uniforms.uSpriteGain.value = spriteGain;
       });
@@ -20315,6 +20361,13 @@ class Component extends DCLogic {
           uTwoLayer: { value: 0 },
           uBaseGain: { value: 1 },
           uSpriteGain: { value: 1 },
+          // Shutter motion blur (_wheelSpinTune.motionBlur): the UNSMEARED
+          // capture the baked smear is made from, the arc turned this frame, and
+          // how much of the base comes from it rather than from the baked smear.
+          tSharp:    { value: this._rtSource.texture },
+          uShutter:  { value: 0 },
+          uMotion:   { value: 0 },
+          uMotionGain: { value: 1 },
         },
         vertexShader: `
           varying vec2 vUv;
@@ -20326,14 +20379,33 @@ class Component extends DCLogic {
         fragmentShader: `
           uniform sampler2D tBase;
           uniform sampler2D tLight;
+          uniform sampler2D tSharp;
           uniform float uRoll;
           uniform float uOpacity;
           uniform float uTwoLayer;
           uniform float uBaseGain;
           uniform float uSpriteGain;
+          uniform float uShutter;
+          uniform float uMotion;
+          uniform float uMotionGain;
           varying vec2 vUv;
           void main() {
             vec4 base = texture2D(tBase, vUv);
+            if (uMotion > 0.001) {
+              // Same arc average as the capture's blur pass, over this frame's
+              // real travel and CENTRED on the rim's angle. Plain mean, so it stays
+              // premultiplied by coverage exactly like tBase -- alpha is the mask,
+              // never un-premultiply (see the blur pass).
+              vec2 q = vUv - 0.5;
+              vec4 acc = vec4(0.0);
+              const int TAPS = 12;
+              for (int i = 0; i < TAPS; i++) {
+                float a = (float(i) / float(TAPS - 1) - 0.5) * uShutter;
+                float ca = cos(a), sa = sin(a);
+                acc += texture2D(tSharp, vec2(q.x * ca - q.y * sa, q.x * sa + q.y * ca) + 0.5);
+              }
+              base = mix(base, acc / float(TAPS), uMotion);
+            }
             // The mesh carries the roll, so anything sampled at vUv spins with
             // it. Counter-rotating the lighting lookup by -uRoll pins that layer
             // to the world instead: the highlight stays where the light is and
@@ -20346,7 +20418,7 @@ class Component extends DCLogic {
             // well as brightens. Decoded from the x0.5 encoding, and forced neutral
             // when the two-layer path is off so the single-layer sprite is untouched.
             vec3 shade = mix(vec3(1.0), light * 4.0, uTwoLayer);
-            vec3 rgb = base.rgb * uSpriteGain * mix(1.0, uBaseGain, uTwoLayer) * shade;
+            vec3 rgb = base.rgb * mix(uSpriteGain, uMotionGain, uMotion) * mix(1.0, uBaseGain, uTwoLayer) * shade;
             rgb = min(rgb, vec3(base.a));
             gl_FragColor = vec4(rgb, base.a) * uOpacity;
           }
@@ -29897,6 +29969,10 @@ class Component extends DCLogic {
           const maxStep = (this._rimRepeatRad || (Math.PI * 2 / 5)) * this._wheelSpinTune.stepFrac;
           const rollDelta = Math.max(-maxStep, Math.min(maxStep, idealDelta));
           this._rollClamped = Math.abs(idealDelta) > maxStep + 1e-9;
+          // Shutter arc for the motion-blur sprite: how far the wheel REALLY turned
+          // over the frame the eye just waited through (raw delta, not smoothed),
+          // so a late frame smears further rather than looking stopped.
+          this._shutterRad = Math.abs(delta * speed * 15.2) * (this._wheelSpinTune.shutter || 0);
           if (this._allWheels || this._tireWheels) {
             // Deduped union — see the matching note in _applyWheelTransforms:
             // tires can be excluded from _allWheels (custom/catalog wheels)
