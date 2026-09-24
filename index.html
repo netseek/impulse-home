@@ -21962,12 +21962,18 @@ class Component extends DCLogic {
     this._tweenShadowPhase = (this._tweenShadowPhase || 0) + 1;
     if (this._tweenShadowPhase % 3 === 1 && this.renderer) {
       this.renderer.shadowMap.needsUpdate = true;
-      // The ground bake follows a swinging door on the same cadence. Direct,
-      // not _requestContactShadow: that one waits for the tween to end.
-      if (typeof this.renderContactShadow === 'function' && this.contactShadow
-          && !this.contactShadow.userData.disabled && this._revealSettled && this._revealSettled()) {
-        try { this.renderContactShadow(); } catch (e) {}
-      }
+    }
+    // The ground bake follows a swinging door too. Throttled by TIME, not by
+    // the phase above: this runs once per active tween per frame, so with four
+    // doors and the tailgate moving the phase hits 1 almost every frame
+    // (measured ~50 bakes/s on desktop). Direct, not _requestContactShadow:
+    // that one waits for the tween to end.
+    const bakeNow = performance.now();
+    if (bakeNow - (this._tweenBakeAt || 0) > 120
+        && typeof this.renderContactShadow === 'function' && this.contactShadow
+        && !this.contactShadow.userData.disabled && this._revealSettled && this._revealSettled()) {
+      this._tweenBakeAt = bakeNow;
+      try { this.renderContactShadow(); } catch (e) {}
     }
   }
 
