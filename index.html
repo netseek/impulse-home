@@ -36676,6 +36676,15 @@ class Component extends DCLogic {
       r.setViewport(0, 0, 1, 1);
       r.setScissor(0, 0, 1, 1);
       r.render(this.scene, this.camera);
+      // Bake the ground shadows here too. They are world-space, so the camera
+      // does not matter, and this gap is the one place a ~400 ms first bake
+      // (program compile included) cannot freeze anything visible. Without it
+      // the shadow popped in only after the intro had settled.
+      if (typeof this.renderContactShadow === 'function'
+          && this.contactShadow && !this.contactShadow.userData.disabled) {
+        r.setScissorTest(false);
+        this.renderContactShadow();
+      }
     } catch (e) {
       console.warn('[Reveal] prewarm failed', e);
     } finally {
