@@ -41879,18 +41879,24 @@ class Component extends DCLogic {
   _energyChartView(samples, now, spec) {
     const src0 = samples || [];
     const last0 = src0.length ? src0[src0.length - 1] : null;
+    // The SVG paths are the expensive part and only a MOUNTED chart reads them.
+    // Measured on the car 2026-09-24, driving, no chart on screen: the build
+    // still grew with the trip's history to 76 ms at ~1940 samples, ~26% of
+    // the main thread with the rest of the energy work. Without a chart, build
+    // the averages only; _paintEnergyChart asks again with paths when one mounts.
+    const withPaths = typeof document === 'undefined' || !!document.querySelector('.hv-energy-tenmin');
     const memoKey = [Math.floor(now / 1000), src0.length, last0 ? last0.t : 0,
-      spec.kind, spec.span, spec.points, spec.smooth ? 1 : 0].join('|');
+      spec.kind, spec.span, spec.points, spec.smooth ? 1 : 0, withPaths ? 1 : 0].join('|');
     const memo = this._energyChartMemo || (this._energyChartMemo = new Map());
     const hit = memo.get(memoKey);
     if (hit && hit.samples === src0) return hit.view;
-    const view = this._energyChartViewBuild(samples, now, spec);
+    const view = this._energyChartViewBuild(samples, now, spec, withPaths);
     if (memo.size > 8) memo.clear();
     memo.set(memoKey, { samples: src0, view });
     return view;
   }
 
-  _energyChartViewBuild(samples, now, spec) {
+  _energyChartViewBuild(samples, now, spec, withPaths = true) {
     const W = 600;
     const H = 160;
     const GAP = 3000;
@@ -42014,7 +42020,7 @@ class Component extends DCLogic {
     // A fuel run starts and ends at 0 L/100 km when something (the engine being
     // off, no reading) sits either side of it; only the window edges stay open.
     pts.forEach((q, i) => { q.i = i; });
-    const line = runs((q) => isFinite(q.fuel)).map((r) => {
+    const line = () => runs((q) => isFinite(q.fuel)).map((r) => {
       const xy = coords(r, (q) => yf(q.fuel));
       const z = Number(yf(0));
       // Ramp over the neighbouring point, not a vertical step: a step at one x
@@ -42058,9 +42064,12 @@ class Component extends DCLogic {
     return {
       grid: 'M0 ' + y(hi) + ' H600 M0 ' + y(lo) + ' H600',
       zero: 'M0 ' + y(0) + ' H600',
-      drive: area((k) => Math.max(0, k)),
-      regen: area((k) => Math.min(0, k)),
-      fuel: line,
+      drive: withPaths ? area((k) => Math.max(0, k)) : '',
+      regen: withPaths ? area((k) => Math.min(0, k)) : '',
+      fuel: withPaths ? line() : '',
+      // No paths: _paintEnergyChart rebuilds from these before drawing.
+      lite: !withPaths,
+      spec: spec,
       top: String(hi),
       bottom: String(lo),
       fuelTop: String(fuelTop),
@@ -42117,6 +42126,9 @@ class Component extends DCLogic {
     // Widgets draw a fixed 10-minute chart (owner, 2026-09-20); the popup follows
     // its span setting. Each host is painted by the view it belongs to.
     const hosts = document.querySelectorAll(fixed ? '.hv-energy-tenmin[data-fixed]' : '.hv-energy-tenmin:not([data-fixed])');
+    if (!hosts.length) return;
+    // Built while no chart was mounted, so it carries averages but no paths.
+    if (v.lite && v.spec) v = this._energyChartView(this._energySamples || [], Date.now(), v.spec);
     for (let i = 0; i < hosts.length; i++) {
       const h = hosts[i];
       const path = (cls, d) => {

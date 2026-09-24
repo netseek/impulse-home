@@ -27,7 +27,8 @@ function methodText(html, name) {
 function load(html) {
   // eslint-disable-next-line no-new-func
   const fn = (name) => new Function(`return function ${methodText(html, name)}`)();
-  const chart = fn('_energyChartView');
+  // The pure builder: _energyChartView is its per-second memo and needs `this`.
+  const chart = fn('_energyChartViewBuild');
   return {
     tenMin: (samples, now) => chart(samples, now, { kind: 'time', span: 600000, points: 0 }),
     chart: chart,
@@ -41,6 +42,21 @@ const series = (n, f) => Array.from({ length: n }, (_, i) => Object.assign({ t: 
 const moves = (d) => (d.match(/M/g) || []).length;
 
 const SCENARIOS = {
+  // No chart mounted: the averages are still needed (the widget's avg line),
+  // the SVG paths are not, and they are what grows with the trip's history.
+  'without paths the averages match and no trace is built': ({ chart }) => {
+    const samples = series(300, (i) => ({ kw: i % 2 ? 10 : -4, fuel: 5, kmh: 36, ice: i % 3 !== 0 }));
+    const spec = { kind: 'time', span: 600000, points: 0 };
+    const full = chart(samples, NOW, spec);
+    const lite = chart(samples, NOW, spec, false);
+    for (const k of ['km', 'kmPerL', 'kwhPer100', 'evShare', 'avgKw', 'avgFuel', 'top', 'bottom', 'zeroPct']) {
+      assert.deepEqual(lite[k], full[k], k);
+    }
+    assert.ok(full.drive && full.regen && full.fuel, 'full view has traces');
+    assert.equal(lite.drive + lite.regen + lite.fuel, '');
+    assert.equal(lite.lite, true);
+    assert.equal(full.lite, false);
+  },
   'averages over the window: km/L, net kWh/100 km': ({ tenMin }) => {
     // 36 km/h is 0.01 km a second; 5 L/100 km; 10 kW out.
     const v = tenMin(series(120, () => ({ kmh: 36, fuel: 5, kw: 10, ice: true })), NOW);
