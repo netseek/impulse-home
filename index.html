@@ -8997,6 +8997,7 @@ const DEMO_NAV_SEQUENCE = [
   { idle: true },
 ];
 function formatNavMeters(meters) {
+  if (meters == null || meters === '') return '';
   const value = Number(meters);
   if (!isFinite(value) || value < 0) return '';
   if (value < 1000) return Math.round(value) + ' m';
@@ -9005,6 +9006,7 @@ function formatNavMeters(meters) {
   return (Math.round(km * 10) / 10) + ' km';
 }
 function formatNavDuration(seconds) {
+  if (seconds == null || seconds === '') return '';
   const value = Number(seconds);
   if (!isFinite(value) || value < 0) return '';
   if (value < 45) return '<1 min';
@@ -9015,12 +9017,26 @@ function formatNavDuration(seconds) {
   return rest ? hours + ' h ' + rest + ' min' : hours + ' h';
 }
 function formatNavEta(seconds, now) {
+  // Number(null) is 0 in JS — without this guard a missing remaining_s paints
+  // the wall clock as the ETA, which is exactly the "imprecise / wrong" look
+  // Waze hit when DestDistanceData was absent on a tick.
+  if (seconds == null || seconds === '') return '';
   const value = Number(seconds);
   if (!isFinite(value) || value < 0) return '';
   const eta = new Date((now || new Date()).getTime() + value * 1000);
   const hrs = String(eta.getHours()).padStart(2, '0');
   const mins = String(eta.getMinutes()).padStart(2, '0');
   return hrs + ':' + mins;
+}
+/** Prefer Impulse's absolute AA clock string; only invent one from remaining_s. */
+function resolveNavEta(etaText, remainingS, now) {
+  const text = String(etaText == null ? '' : etaText).trim();
+  if (text) return text;
+  return formatNavEta(remainingS, now);
+}
+function emptyNavLive() {
+  return { active: false, street: '', distance: '', distanceM: null, turn: '',
+    remainingM: null, remainingS: null, eta: '' };
 }
 /**
  * How long after the last bus frame of ANY kind the vehicle data is still
@@ -10496,7 +10512,7 @@ class Component extends DCLogic {
     this._powerLive = { soc: '', evRange: '', fuelRange: '', fuelLevel: '',
                         voltage: '', current: '', cycleEv: '', evInst: '', flow: '' };
     this._aaSession = 'stopped';
-    this._navLive = { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    this._navLive = emptyNavLive();
     this._placeLive = { neighborhood: '', city: '', street: '' };
     this._navAppIconByPkg = {};
     this._demoNavPhase = 0;
@@ -11329,7 +11345,7 @@ class Component extends DCLogic {
     if (this._aaSession === next) return;
     this._aaSession = next;
     if (next !== 'active' && this._navLive && this._navLive.active) {
-      this._navLive = { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+      this._navLive = emptyNavLive();
     }
     this._queueNavRefresh(true);
   }
@@ -11357,14 +11373,24 @@ class Component extends DCLogic {
   _applyNavDirections(value) {
     const parsed = this._parseNavDirections(value);
     if (!parsed) return;
-    const prev = this._navLive || { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    const prev = this._navLive || emptyNavLive();
+    // Waze (and sometimes Maps mid-reroute) publishes manoeuvre frames without
+    // DestDistanceData. Impulse used to null remaining_* / eta on those; even
+    // after that is fixed, keep the last trip totals so the ETA column does not
+    // blink out between 1 Hz position ticks.
+    if (parsed.active && prev.active) {
+      if (parsed.remainingM == null && prev.remainingM != null) parsed.remainingM = prev.remainingM;
+      if (parsed.remainingS == null && prev.remainingS != null) parsed.remainingS = prev.remainingS;
+      if (!parsed.eta && prev.eta) parsed.eta = prev.eta;
+    }
     const same = !!prev.active === !!parsed.active
       && prev.street === parsed.street
       && prev.turn === parsed.turn
       && prev.distance === parsed.distance
       && prev.distanceM === parsed.distanceM
       && prev.remainingM === parsed.remainingM
-      && prev.remainingS === parsed.remainingS;
+      && prev.remainingS === parsed.remainingS
+      && prev.eta === parsed.eta;
     if (same) return;
     const identity = !!prev.active !== !!parsed.active
       || prev.street !== parsed.street
@@ -11375,20 +11401,22 @@ class Component extends DCLogic {
 
   /**
    * Impulse publishes `{"active":false}` when guidance is off, and a full
-   * object while Maps is guiding. Malformed payloads are ignored so a bad
-   * frame cannot blank a live manoeuvre.
+   * object while guiding. Prefer the absolute `eta` string AA already shows
+   * ("10:35"); `remaining_s` alone is a coarse fallback and is what made Waze
+   * look imprecise. Malformed payloads are ignored so a bad frame cannot blank
+   * a live manoeuvre.
    */
   _parseNavDirections(value) {
-    if (value == null || value === '') return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    if (value == null || value === '') return emptyNavLive();
     let obj = value;
     if (typeof value === 'string') {
       const text = value.trim();
-      if (!text) return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+      if (!text) return emptyNavLive();
       try { obj = JSON.parse(text); } catch (e) { return null; }
     }
     if (!obj || typeof obj !== 'object') return null;
     const active = obj.active === true || obj.active === 'true' || obj.active === 1;
-    if (!active) return { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    if (!active) return emptyNavLive();
     const street = String(obj.street == null ? '' : obj.street).trim();
     const turn = String(obj.turn == null ? '' : obj.turn).trim();
     const distanceM = this._carNumber(obj.distance_m);
@@ -11399,8 +11427,9 @@ class Component extends DCLogic {
     const remainingSRaw = this._carNumber(obj.remaining_s);
     const remainingM = isFinite(remainingMRaw) ? Math.max(0, Math.round(remainingMRaw)) : null;
     const remainingS = isFinite(remainingSRaw) ? Math.max(0, Math.round(remainingSRaw)) : null;
+    const eta = String(obj.eta == null ? '' : obj.eta).trim();
     return { active: true, street: street, distance: distance, distanceM: metres, turn: turn,
-      remainingM: remainingM, remainingS: remainingS };
+      remainingM: remainingM, remainingS: remainingS, eta: eta };
   }
 
   _navTurnFamily(turn) {
@@ -44045,7 +44074,7 @@ class Component extends DCLogic {
 
   _navigationWidgetView(item) {
     this._ensureDemoNavTicker();
-    const live = this._navLive || { active: false, street: '', distance: '', distanceM: null, turn: '', remainingM: null, remainingS: null };
+    const live = this._navLive || emptyNavLive();
     const session = this._aaSession === 'active';
     const guiding = !!live.active;
     const demo = !!this._demoPreview && !guiding && !session;
@@ -44060,12 +44089,13 @@ class Component extends DCLogic {
     const glyph = NAV_TURN_GLYPHS[family] || NAV_TURN_GLYPHS.turn_right;
     const iconUrl = NAV_TURN_ICONS[family] || '';
     const now = new Date();
-    let source, street, distance, remainingM, remainingS, cardState, showTurn;
+    let source, street, distance, remainingM, remainingS, etaText, cardState, showTurn;
     if (demo && !demoIdle) {
       source = 'DEMO · PRÉVIA DA ROTA';
       street = demoFrame.street || '';
       remainingM = demoFrame.remainingM;
       remainingS = demoFrame.remainingS;
+      etaText = '';
       distance = formatNavMeters(demoFrame.distanceM);
       cardState = family;
       showTurn = true;
@@ -44075,6 +44105,7 @@ class Component extends DCLogic {
       distance = '';
       remainingM = null;
       remainingS = null;
+      etaText = '';
       cardState = 'idle';
       showTurn = false;
     } else if (guiding) {
@@ -44083,6 +44114,7 @@ class Component extends DCLogic {
       distance = live.distance || formatNavMeters(live.distanceM);
       remainingM = live.remainingM;
       remainingS = live.remainingS;
+      etaText = live.eta || '';
       cardState = family;
       showTurn = true;
     } else if (session) {
@@ -44091,6 +44123,7 @@ class Component extends DCLogic {
       distance = '';
       remainingM = null;
       remainingS = null;
+      etaText = '';
       cardState = 'idle';
       showTurn = false;
     } else {
@@ -44099,13 +44132,14 @@ class Component extends DCLogic {
       distance = '';
       remainingM = null;
       remainingS = null;
+      etaText = '';
       cardState = 'unavailable';
       showTurn = false;
     }
     // Every size carries the full glance; the metric row wraps instead.
     let remaining = showTurn ? formatNavMeters(remainingM) : '';
     let duration = showTurn ? formatNavDuration(remainingS) : '';
-    let eta = showTurn ? formatNavEta(remainingS, now) : '';
+    let eta = showTurn ? resolveNavEta(etaText, remainingS, now) : '';
     const trip = [remaining, duration].filter(Boolean).join('  |  ');
     // place.neighborhood is the finest-grained hit (suburb-level); place.city is
     // the city/town that contains it. Both come from the same reverse geocode,

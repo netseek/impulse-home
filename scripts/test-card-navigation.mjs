@@ -227,9 +227,10 @@ includesAll(navView, [
 includesAll(navView, [
   'formatNavMeters',
   'formatNavDuration',
-  'formatNavEta',
+  'resolveNavEta',
   'live.remainingM',
   'live.remainingS',
+  'live.eta',
   'metricSlots',
 ], 'Impulse remaining distance / time / ETA');
 includesAll(htmlRoot, [
@@ -276,8 +277,18 @@ includesAll(method('_parseNavDirections'), [
   'obj.turn',
   'obj.remaining_m',
   'obj.remaining_s',
+  'obj.eta',
   'return null',
 ], 'directions JSON shape');
+includesAll(htmlRoot, [
+  'resolveNavEta(',
+  'formatNavEta(',
+], 'prefer Impulse ETA string over now+remaining_s');
+includesAll(method('_applyNavDirections'), [
+  'parsed.remainingM == null && prev.remainingM != null',
+  'parsed.remainingS == null && prev.remainingS != null',
+  '!parsed.eta && prev.eta',
+], 'retain trip totals across partial Waze frames');
 includesAll(method('_queueNavRefresh'), [
   'setTimeout',
   '250',
