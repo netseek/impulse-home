@@ -5813,7 +5813,7 @@ window.HavalSplash = (function () {
     .hv-energy-kvg .hv-energy-kv li > small { white-space:normal; min-height:2.4em; display:flex; align-items:flex-end; }
     /* Refuel price prompt, over everything. */
     .hv-energy-ask { position:absolute; inset:0; z-index:95; display:grid; place-items:center; background:rgba(2,6,10,.55); }
-    .hv-energy-ask-box { width:min(420px,calc(100vw - 48px)); display:flex; flex-direction:column; gap:12px; padding:20px; border-radius:22px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
+    .hv-energy-ask-box { width:min(468px,calc(100vw - 48px)); display:flex; flex-direction:column; gap:12px; padding:20px; border-radius:22px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
     .hv-energy-ask-box > strong { font:600 18px/1.2 'Space Grotesk',sans-serif; }
     .hv-energy-ask-box > p { margin:0; font-size:14px; opacity:.78; }
     .hv-energy-ask-box label { display:flex; flex-direction:column; gap:6px; }
@@ -5825,7 +5825,12 @@ window.HavalSplash = (function () {
     .hv-energy-askamt { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:6px 14px; border:1px solid rgba(255,255,255,.2); border-radius:12px; background:rgba(255,255,255,.06); }
     .hv-energy-askamt > small { font:600 10px/1.3 'Space Mono',monospace; letter-spacing:.06em; opacity:.72; }
     .hv-energy-askamt > output { font:500 30px/1.1 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; }
-    .hv-energy-pad { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .hv-energy-pad { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    /* Dark ink, not white: --hv-accent is a pale blue in the day theme, where white
+       on it reads at ~1.8:1. Near-black clears 6.8:1 on the night teal and 10.7:1 on
+       the day blue, so one colour serves both. */
+    .hv-energy-pad > .k-ok { grid-column:4; grid-row:3 / span 2; background:var(--hv-accent,#2aa7b7); color:#08131a; font:600 18px/1 'Space Mono',monospace; letter-spacing:.06em; }
+    .hv-energy-pad > .k-zero { grid-column:1 / span 3; }
     .hv-energy-pad > button { min-height:54px; border:0; border-radius:14px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:500 22px/1 'Space Grotesk',sans-serif; font-variant-numeric:tabular-nums; cursor:pointer; }
     .hv-energy-pad > button:active { background:rgba(255,255,255,.2); }
     .hv-energy-pad > button.act { font:600 14px/1 'Space Mono',monospace; letter-spacing:.06em; opacity:.8; }
@@ -7593,7 +7598,7 @@ window.HavalSplash = (function () {
         <div class="hv-energy-pad">
           <sc-for list="{{ energyAskKeys }}" as="k" hint-placeholder-count="12"><button type="button" class="{{ k.cls }}" aria-label="{{ k.label }}" onClick="{{ k.onClick }}">{{ k.text }}</button></sc-for>
         </div>
-        <div class="hv-energy-confirm-actions"><button type="button" onClick="{{ energyAskSkip }}">PULAR</button><button type="button" class="primary" onClick="{{ energyAskSave }}">SALVAR</button></div>
+        <div class="hv-energy-confirm-actions"><button type="button" onClick="{{ energyAskSkip }}">PULAR</button></div>
       </div>
     </div>
   </sc-if>
@@ -39702,7 +39707,6 @@ class Component extends DCLogic {
       energyAskUnit: this.state.energyAsk ? this.state.energyAsk.unit : '',
       energyAskValue: this._energyAskDisplay(),
       energyAskKeys: this._energyAskKeys(),
-      energyAskSave: (ev) => this._answerEnergyAsk(true, ev),
       energyAskSkip: (ev) => this._answerEnergyAsk(false, ev),
     };
     if (!type) return base;
@@ -41529,15 +41533,22 @@ class Component extends DCLogic {
     return (c / 100).toFixed(2).replace('.', ',');
   }
 
-  /** Digits 1-9, then CLEAR / 0 / backspace -- the phone layout, bottom row reversed. */
+  /**
+   * Digits 1-9 over three columns with erase / clear / OK down a fourth, and a wide
+   * zero across the bottom -- the ATM layout. OK confirms from the pad itself, so the
+   * price is entered and accepted without the thumb leaving the keys (owner,
+   * 2026-09-23); SALVAR was there all along but sits away from where you are typing.
+   */
   _energyAskKeys() {
     const keys = [];
-    for (let d = 1; d <= 9; d++) {
-      keys.push({ text: String(d), label: String(d), cls: '', onClick: (ev) => this._energyAskDigit(d, ev) });
-    }
-    keys.push({ text: 'C', label: 'Limpar', cls: 'act', onClick: (ev) => this._energyAskClear(ev) });
-    keys.push({ text: '0', label: '0', cls: '', onClick: (ev) => this._energyAskDigit(0, ev) });
+    const digit = (d, cls) => ({ text: String(d), label: String(d), cls: cls || '', onClick: (ev) => this._energyAskDigit(d, ev) });
+    for (let d = 1; d <= 3; d++) keys.push(digit(d));
     keys.push({ text: '⌫', label: 'Apagar', cls: 'act', onClick: (ev) => this._energyAskBack(ev) });
+    for (let d = 4; d <= 6; d++) keys.push(digit(d));
+    keys.push({ text: 'C', label: 'Limpar', cls: 'act', onClick: (ev) => this._energyAskClear(ev) });
+    for (let d = 7; d <= 9; d++) keys.push(digit(d));
+    keys.push({ text: 'OK', label: 'Confirmar', cls: 'k-ok', onClick: (ev) => this._answerEnergyAsk(true, ev) });
+    keys.push(digit(0, 'k-zero'));
     return keys;
   }
 
