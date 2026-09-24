@@ -9608,6 +9608,9 @@ const CAR_SHADOW_OPACITY = 0.90;   // was 0.80
 const GROUND_SUN_STRENGTH = 0.85;  // replaces the catcher's CAR_SHADOW_OPACITY on the floor
 const GROUND_SUN_MIN_R = 0.01;
 const GROUND_SUN_K = 0.05;         // ~2.9 deg apparent light size: soft, not blurry
+// Fade with blocker distance: sky light fills in under a HIGH blocker, so the
+// roof and mirrors cast lighter shadows than the sills. Weight (1 - t)^this.
+const GROUND_SUN_FALLOFF = 0.7;
 const GROUND_AO_STRENGTH = 1.3;
 const GROUND_AO_MIN_R = 0.02;
 const GROUND_AO_K = 0.4;
@@ -21498,7 +21501,7 @@ class Component extends DCLogic {
         tMax: { value: 1 },       // metres represented by mask value 1.0
         minR: { value: 0.01 },    // metres
         k: { value: 0.1 },        // penumbra metres per metre of blocker distance
-        falloff: { value: 0 },    // 0 = solid (sun); >0 = AO height weighting
+        falloff: { value: 0 },    // 0 = solid; >0 = weaker for higher blockers
         strength: { value: 1 },
       },
       vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -21550,6 +21553,7 @@ class Component extends DCLogic {
 
     const tune = {
       sunOn: 1, sunStrength: GROUND_SUN_STRENGTH, sunMinR: GROUND_SUN_MIN_R, sunK: GROUND_SUN_K,
+      sunFalloff: GROUND_SUN_FALLOFF,
       aoOn: 1, aoStrength: GROUND_AO_STRENGTH, aoMinR: GROUND_AO_MIN_R, aoK: GROUND_AO_K,
       aoFalloff: GROUND_AO_FALLOFF, aoH: GROUND_AO_H,
       smooth: GROUND_SMOOTH,
@@ -21662,7 +21666,7 @@ class Component extends DCLogic {
           if (Ldir.y < 0.05) Ldir.y = 0.05;    // a grazing sun would smear to infinity
           bakeLayer(sun, Ldir, y0, 0.02, {
             tMax: 0, minR: tune.sunMinR, k: tune.sunK,
-            falloff: 0, strength: tune.sunStrength,
+            falloff: tune.sunFalloff, strength: tune.sunStrength,
           });
         }
         scene.overrideMaterial = null;
