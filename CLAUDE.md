@@ -1238,6 +1238,44 @@ chasing a "regression" that was one debug line. If a capture looks wrong,
 reload the page before believing any measurement taken after you have poked at
 texture state from devtools.
 
+## A refuel does not need the car switched off
+
+`TripEngine.onLevel` only ever compared the gauge against the level at READY-off,
+so a fill taken with the car still READY was discarded on its first line and no
+`trip_stops` row was ever written for it. Measured on the car 2026-09-23, from
+`trips.db`: the open trip ran 17:36 -> 19:47 with **1711 points and no gap over
+11 s** (READY never dropped), its own `fuelPctStart`/`fuelPctEnd` recorded
+**8 -> 100** correctly, and `trip_stops` held three rows, all `charge`, newest
+three days earlier. `REFUEL_MIN_PCT` was never the obstacle — a 92-point jump
+clears it 23x — the reading simply never reached the threshold test.
+
+The evidence was already on disk one field over, which is the tell for this
+class of bug: **when a detector is gated on a state transition, check whether
+the thing it is trying to notice is already recorded by something that is not.**
+
+There are now two baselines, and the in-trip one needs its own coarser gain:
+
+| arm | baseline | min gain |
+|---|---|---|
+| parked | level at READY-off, at the parking spot | `REFUEL_MIN_PCT` 4.0 |
+| in-trip | level once stood still `STAND_ARM_MS`, where it stood | `STAND_REFUEL_MIN_PCT` 10.0 |
+
+`STAND_ARM_MS` (60 s) exists because a baseline taken the instant the wheels
+stop is sometimes a slosh trough, and `STAND_REFUEL_MIN_PCT` is 10 points
+(5.5 L) for the same reason — above any slosh, below any real fill. READY-off
+has no such problem, hence the two thresholds. Driving off settles a pending
+fill immediately; standing still settles it after `STAND_SETTLE_MS`.
+
+Two traps found by the tests rather than by reading:
+
+- **`duringStop` is also true for the 3 minutes after setting off**
+  (`LEVEL_SETTLE_MS`). With no READY-off baseline there is nothing for the
+  parked arm to compare against, so it must fall THROUGH to the in-trip arm
+  rather than returning — a fill early in a trip was invisible until it did.
+- A negative control is worth the minute it costs: disabling the in-trip arm
+  fails exactly the two positive tests, and dropping the in-trip threshold to
+  4.0 fails exactly the slosh test. Neither was decoration.
+
 ## There is no fuel-litres signal — it is derived, and the constant is shared
 
 `CAR_SIGNALS` carries fuel *consumption* (`fuelInst`, `fuelTrip`, `fuelAvg`,

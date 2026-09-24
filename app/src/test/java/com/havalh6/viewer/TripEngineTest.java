@@ -601,6 +601,81 @@ public class TripEngineTest {
     }
 
     @Test
+    public void refuelWithTheCarStillReadyIsOneStop() {
+        // The owner's 2026-09-23 fill: parked at the pump, filled 8% -> 100%, READY
+        // never dropped. 1711 trip points with no gap over 11 s and not one refuel row.
+        signal(TripEngine.KEY_FUEL_PCT, "8", T0 - 1000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "50", T0);
+        engine.onLocation(-22.9061, -43.1057, 14, 5, T0 + 1000);
+        for (long t = T0; t <= T0 + 60_000; t += 1000) engine.tick(t);
+
+        long stopped = T0 + 61_000;
+        signal(TripEngine.KEY_SPEED, "0", stopped);
+        // Standing at the pump, engine ready. The baseline arms after STAND_ARM_MS.
+        for (long t = stopped; t <= stopped + TripEngine.STAND_ARM_MS + 5000; t += 1000) engine.tick(t);
+        assertTrue("nothing to report while the gauge sits still", stops.isEmpty());
+
+        long fill = stopped + TripEngine.STAND_ARM_MS + 10_000;
+        signal(TripEngine.KEY_FUEL_PCT, "64", fill);
+        signal(TripEngine.KEY_FUEL_PCT, "100", fill + 20_000);
+        for (long t = fill; t <= fill + 30_000; t += 1000) engine.tick(t);
+        assertTrue("still settling", stops.isEmpty());
+
+        // The gauge stops climbing: the fill is done without any READY cycle.
+        for (long t = fill + 30_000; t <= fill + 20_000 + TripEngine.STAND_SETTLE_MS + 2000; t += 1000) {
+            engine.tick(t);
+        }
+
+        assertEquals(1, stops.size());
+        TripStop s = stops.get(0);
+        assertEquals(TripStop.REFUEL, s.kind);
+        assertEquals(8, s.before, 1e-9);
+        assertEquals(100, s.after, 1e-9);
+        assertEquals(92 * 55 / 100.0, s.amount, 1e-9);
+        assertEquals("credited to where it stood", -22.9061, s.lat, 1e-9);
+        assertEquals(T0, (long) stopTrips.get(0));
+    }
+
+    @Test
+    public void drivingOffEndsAnInTripFillWithoutWaitingToSettle() {
+        signal(TripEngine.KEY_FUEL_PCT, "8", T0 - 1000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "0", T0);
+        engine.onLocation(-22.9, -43.1, 10, 5, T0 + 1000);
+        for (long t = T0; t <= T0 + TripEngine.STAND_ARM_MS + 5000; t += 1000) engine.tick(t);
+        long fill = T0 + TripEngine.STAND_ARM_MS + 10_000;
+        signal(TripEngine.KEY_FUEL_PCT, "88", fill);
+        engine.tick(fill);
+        assertTrue(stops.isEmpty());
+
+        signal(TripEngine.KEY_SPEED, "30", fill + 2000);
+        engine.tick(fill + 2000);
+
+        assertEquals(1, stops.size());
+        assertEquals(80 * 55 / 100.0, stops.get(0).amount, 1e-9);
+    }
+
+    @Test
+    public void gaugeSloshAtATrafficLightIsNotARefuel() {
+        // The baseline is re-taken at each real stop, so a level that dipped while
+        // driving cannot leave a low baseline for a later reading to clear against.
+        signal(TripEngine.KEY_FUEL_PCT, "50", T0 - 1000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "50", T0);
+        for (long t = T0; t <= T0 + 30_000; t += 1000) engine.tick(t);
+        signal(TripEngine.KEY_FUEL_PCT, "44", T0 + 31_000);   // sloshed down at speed
+
+        long light = T0 + 40_000;
+        signal(TripEngine.KEY_SPEED, "0", light);
+        for (long t = light; t <= light + TripEngine.STAND_ARM_MS + 5000; t += 1000) engine.tick(t);
+        signal(TripEngine.KEY_FUEL_PCT, "53", light + TripEngine.STAND_ARM_MS + 10_000);
+        for (long t = light; t <= light + TripEngine.STAND_ARM_MS + 60_000; t += 1000) engine.tick(t);
+
+        assertTrue("a 9-point recovery over the armed baseline is not a fill", stops.isEmpty());
+    }
+
+    @Test
     public void refuelWhileParkedBetweenTripsAttachesToTheNextTrip() {
         // After a restart: the last stored trip ended with 20% in the tank. The
         // snapshot replay delivers the refilled gauge before READY=0, so the stop

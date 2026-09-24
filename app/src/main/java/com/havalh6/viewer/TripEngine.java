@@ -92,6 +92,22 @@ final class TripEngine {
     static final double CHARGE_MIN_PCT = 8.0;
     /** Level readings this soon after setting off still belong to the stop: gauges settle slowly. */
     static final long LEVEL_SETTLE_MS = 3 * 60_000L;
+    /**
+     * Standing still this long with READY on arms the in-trip level baseline. A fill
+     * does not need the car switched off -- the owner refuelled 8% -> 100% on
+     * 2026-09-23 without READY ever dropping and the stop was missed entirely -- but a
+     * baseline taken the moment the wheels stop would track gauge slosh at every light.
+     */
+    static final long STAND_ARM_MS = 60_000L;
+    /** An in-trip fill whose gauge has not climbed for this long is finished. */
+    static final long STAND_SETTLE_MS = 45_000L;
+    /**
+     * The in-trip arm needs a coarser gain than {@link #REFUEL_MIN_PCT}. Its baseline is
+     * the level when the car came to rest, which can be a slosh trough, so a few points
+     * of recovery while it stands reads as a gain against it; READY-off has no such
+     * baseline problem. 10 points is 5.5 L -- above any slosh, below any real fill.
+     */
+    static final double STAND_REFUEL_MIN_PCT = 10.0;
 
     interface Listener {
         void onTripOpened(long startMs);
@@ -123,6 +139,14 @@ final class TripEngine {
     private long resumedAt;
     private TripStop refuelCandidate;
     private TripStop chargeCandidate;
+    // The in-trip arm: since when the car has stood still with READY on, and what the
+    // gauges read once it had stood STAND_ARM_MS. Not checkpointed -- a fill spanning a
+    // process restart is caught by the parked arm's primeParked instead.
+    private long standingSince;
+    private double standFuelPct = Double.NaN;
+    private double standSoc = Double.NaN;
+    /** When a candidate last grew, so an in-trip fill settles without a READY cycle. */
+    private long candGrewAt;
     private final java.util.List<TripStop> pendingStops = new java.util.ArrayList<>();
     private int fuelMode = TripSignals.FUEL_UNKNOWN;
     private double fuelRate = Double.NaN;
@@ -316,32 +340,82 @@ final class TripEngine {
         }
         parkedAt = t;
         resumedAt = 0;
+        standingSince = 0;
+        standFuelPct = Double.NaN;
+        standSoc = Double.NaN;
     }
 
     /**
-     * A fuel or battery level reading. One taken while parked, or within
-     * {@link #LEVEL_SETTLE_MS} of setting off, that is clearly above the level at
-     * READY-off is a refuel / charge at the parking spot. A gauge that keeps
-     * climbing as it settles grows the same stop rather than adding another.
+     * A fuel or battery level reading. A level clearly above the baseline is a refuel /
+     * charge, and there are two baselines because there are two ways to fill a car:
+     *
+     * <ul>
+     *   <li>switched off -- the level at READY-off, credited to the parking spot. Read
+     *       while parked or within {@link #LEVEL_SETTLE_MS} of setting off again.</li>
+     *   <li>still READY -- the level once the car had stood still for
+     *       {@link #STAND_ARM_MS}, credited to where it stood. Without this arm a fill
+     *       taken without switching off is invisible; see {@link #STAND_ARM_MS}.</li>
+     * </ul>
+     *
+     * A gauge that keeps climbing as it settles grows the same stop rather than adding
+     * another, whichever arm opened it.
      */
     private void onLevel(boolean fuel, double v, long t) {
-        double parked = fuel ? parkedFuelPct : parkedSoc;
-        if (Double.isNaN(parked)) return;
-        boolean duringStop = !Boolean.TRUE.equals(ready) || (resumedAt > 0 && t - resumedAt <= LEVEL_SETTLE_MS);
-        if (!duringStop) return;
         TripStop c = fuel ? refuelCandidate : chargeCandidate;
         if (c != null) {
             if (v > c.after) {
                 c.after = v;
                 c.amount = amountOf(fuel, c.before, v);
+                candGrewAt = t;
             }
             return;
         }
-        double gain = v - parked;
-        if (gain < (fuel ? REFUEL_MIN_PCT : CHARGE_MIN_PCT)) return;
-        TripStop stop = new TripStop(fuel ? TripStop.REFUEL : TripStop.CHARGE, parkedAt > 0 ? parkedAt : t,
-                parkedLat, parkedLon, parked, v, amountOf(fuel, parked, v));
+        double parked = fuel ? parkedFuelPct : parkedSoc;
+        boolean duringStop = !Boolean.TRUE.equals(ready) || (resumedAt > 0 && t - resumedAt <= LEVEL_SETTLE_MS);
+        // Only return when the parked arm really owns the reading: the settle window after
+        // setting off is also duringStop, and with no READY-off baseline there is nothing
+        // for it to compare against -- a fill that early must still reach the in-trip arm.
+        if (duringStop && !Double.isNaN(parked)) {
+            openCandidate(fuel, parked, v, parkedAt > 0 ? parkedAt : t, parkedLat, parkedLon, t,
+                    fuel ? REFUEL_MIN_PCT : CHARGE_MIN_PCT);
+            return;
+        }
+        double stood = fuel ? standFuelPct : standSoc;
+        if (standingSince > 0 && !Double.isNaN(stood)) {
+            openCandidate(fuel, stood, v, standingSince, lat, lon, t,
+                    fuel ? STAND_REFUEL_MIN_PCT : CHARGE_MIN_PCT);
+        }
+    }
+
+    /** A gain of at least {@code minGain} over {@code before} becomes the pending candidate. */
+    private void openCandidate(boolean fuel, double before, double v, long at,
+                               double atLat, double atLon, long t, double minGain) {
+        if (v - before < minGain) return;
+        TripStop stop = new TripStop(fuel ? TripStop.REFUEL : TripStop.CHARGE, at,
+                atLat, atLon, before, v, amountOf(fuel, before, v));
         if (fuel) refuelCandidate = stop; else chargeCandidate = stop;
+        candGrewAt = t;
+    }
+
+    /**
+     * Arms, holds or drops the in-trip baseline. Driving off ends a fill -- nobody fills
+     * a moving car -- and the baseline is re-taken from scratch at the next real stop, so
+     * a gauge that sloshed down during the drive cannot leave a low baseline behind for a
+     * later reading to clear {@link #STAND_REFUEL_MIN_PCT} against.
+     */
+    private void trackStanding(long t, boolean moving) {
+        if (moving) {
+            flushCandidates();
+            standingSince = 0;
+            standFuelPct = Double.NaN;
+            standSoc = Double.NaN;
+            return;
+        }
+        if (standingSince == 0) standingSince = t;
+        if (t - standingSince < STAND_ARM_MS) return;
+        if (Double.isNaN(standFuelPct)) standFuelPct = fuelPct;
+        if (Double.isNaN(standSoc)) standSoc = soc;
+        if (candGrewAt > 0 && t - candGrewAt >= STAND_SETTLE_MS) flushCandidates();
     }
 
     /** Litres the way Impulse derives them (percent x 55 L); percentage points for a charge. */
@@ -363,6 +437,7 @@ final class TripEngine {
         if (chargeCandidate != null) emitStop(chargeCandidate);
         refuelCandidate = null;
         chargeCandidate = null;
+        candGrewAt = 0;
     }
 
     /** To the open trip, or held for the next one when the car is parked between trips. */
@@ -380,6 +455,7 @@ final class TripEngine {
             return;
         }
         boolean moving = !Double.isNaN(kmh) && kmh >= MOVING_KMH;
+        trackStanding(t, moving);
         long interval = moving ? POINT_MOVING_MS : POINT_STOPPED_MS;
         if (st.lastPointT == 0 || t - st.lastPointT >= interval) {
             st.lastPointT = t;
