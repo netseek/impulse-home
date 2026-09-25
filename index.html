@@ -5326,6 +5326,11 @@ window.HavalSplash = (function () {
     @keyframes hv-clim-retry { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
     @keyframes hv-clim-pend { from { opacity: .45; } to { opacity: 1; } }
     .hv-clim.off .hv-clim-live, .hv-clim.nosig .hv-clim-live, .hv-clim.nosig [data-ca="power"] { opacity: .3; pointer-events: none; }
+    /* Fan and temp turn the climate on (with the power button), so they stay
+       reachable while off — dimmed, but not dead. */
+    .hv-clim.off .hv-clim-live[data-ca="fan"],
+    .hv-clim.off .hv-clim-live[data-ca="temp"],
+    .hv-clim.off .hv-clim-wheel[data-ca="temp"] { pointer-events: auto; opacity: .55; }
 
     /* icon-only control: no border, no fill; the accent and a bar under it
        carry the on state, which is what the eye finds fastest on this panel. */
@@ -5390,11 +5395,12 @@ window.HavalSplash = (function () {
     /* Up/down steps. Absolutely positioned inside the wheel, which is a fixed
        176px box, so they add no layout: they sit over the dim neighbour values
        they refer to. Hidden in the compact widget, where .cap goes too. */
-    /* The band covers the dim neighbour's row and stops at the big number, so a tap
-       on the value itself still starts a drag. The chevrons sit on each wheel's INNER
-       edge - the one facing the car - so the two sets mirror each other around it. */
-    .hv-clim-wheel .hv-clim-step { position: absolute; left: 0; right: 0; height: 40px; display: flex; align-items: center; justify-content: flex-end; padding: 0 8px 0 0; margin: 0; border: 0; background: none; color: inherit; opacity: .3; -webkit-tap-highlight-color: transparent; }
-    .hv-clim-wheel.pass .hv-clim-step { justify-content: flex-start; padding: 0 0 0 8px; }
+    /* Pin each chevron to the INNER edge (facing the cabin). left+right stretch
+       shrink-wrapped to the SVG on this WebView and left both sides' arrows on
+       the left of the number. */
+    .hv-clim-wheel .hv-clim-step { position: absolute; width: 36px; height: 40px; display: flex; align-items: center; justify-content: center; padding: 0; margin: 0; border: 0; background: none; color: inherit; opacity: .3; -webkit-tap-highlight-color: transparent; }
+    .hv-clim-wheel.drv .hv-clim-step { left: auto; right: 4px; }
+    .hv-clim-wheel.pass .hv-clim-step { left: 4px; right: auto; }
     .hv-clim-step.up { top: 14px; }
     .hv-clim-step.down { bottom: 14px; }
     .hv-clim-step svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -28025,6 +28031,8 @@ class Component extends DCLogic {
 
             item.arr.push(cloneMesh);
             this._customClonedWheels.push(cloneMesh);
+            const cloneMats = Array.isArray(cloneMesh.material) ? cloneMesh.material : [cloneMesh.material];
+            cloneMats.forEach((m) => { if (m) this._tuneTireMaterial(m); });
           }
         });
       });
@@ -40564,8 +40572,21 @@ class Component extends DCLogic {
       this._climWrite('power', false);
       return;
     }
-    if (!this._climView().power) this._climWrite('power', true);
+    this._climPowerOn({ skipFan: true });
     this._climStage('fan', n);
+  }
+
+  /**
+   * Turn the climate on. A bare power_mode write often does not stick on this car
+   * (the A/C button works because it also writes ac_enable); match the demo echo
+   * and ensure a fan level so the unit actually comes up. skipFan when the caller
+   * is about to write the fan itself.
+   */
+  _climPowerOn(opts) {
+    if (this._climView().power) return;
+    this._climWrite('power', true);
+    if (opts && opts.skipFan) return;
+    if (!(this._climView().fan > 0)) this._climWrite('fan', 1);
   }
 
   /** "22,5°" for the wheel's greyed neighbours. */
@@ -40625,8 +40646,11 @@ class Component extends DCLogic {
     const nears = wheel.querySelectorAll('.near');
     const pitch = this._climStackPitch(wheel);
     const k = this._climWheelRatio(wheel);
-    // How close a slot is to centre in 0..1 (1 = fully selected size).
+    // How close a slot is to centre in 0..1 (1 = on the selection line).
     const focus = (dist) => Math.max(0, 1 - Math.min(1, Math.abs(dist)));
+    // Neighbours may grow, but never up to the active size. Measured on the car:
+    // full grow made the approaching value larger than centre mid-drag.
+    const NEAR_GROW = 0.35;
     stack.style.transform = 'translateY(' + (f * pitch).toFixed(1) + 'px)';
     if (cur) {
       const a = focus(f);
@@ -40635,16 +40659,14 @@ class Component extends DCLogic {
       cur.style.opacity = (0.3 + a * 0.7).toFixed(3);
     }
     // nears[0] is the warmer value above, nears[1] the cooler below.
-    if (nears[0]) {
-      const a = focus(f - 1);
-      nears[0].style.transform = 'scale(' + (1 + a * (k - 1)).toFixed(3) + ')';
-      nears[0].style.opacity = (0.3 + a * 0.7).toFixed(3);
-    }
-    if (nears[1]) {
-      const a = focus(f + 1);
-      nears[1].style.transform = 'scale(' + (1 + a * (k - 1)).toFixed(3) + ')';
-      nears[1].style.opacity = (0.3 + a * 0.7).toFixed(3);
-    }
+    const nearStyle = (el, dist) => {
+      if (!el) return;
+      const a = focus(dist);
+      el.style.transform = 'scale(' + (1 + a * (k - 1) * NEAR_GROW).toFixed(3) + ')';
+      el.style.opacity = (0.3 + a * 0.35).toFixed(3);
+    };
+    nearStyle(nears[0], f - 1);
+    nearStyle(nears[1], f + 1);
   }
 
   /** Ratio between the current value's type size and a neighbour's, from the live
@@ -40874,9 +40896,7 @@ class Component extends DCLogic {
       const el = e.target && e.target.closest && e.target.closest('.hv-clim [data-ca="temp"], .hv-clim [data-ca="fan"]');
       if (!el || !this._climCanWrite()) return;
       const kind = el.getAttribute('data-ca');
-      // Temp needs power on; fan at 0 is how power turns off, so fan stays reachable while on.
-      if (kind === 'temp' && !view().power) return;
-      if (kind === 'fan' && !view().power) return;
+      // Fan and temp both turn power ON when touched while off — do not gate them.
       const zone = el.getAttribute('data-zone');
       drag = { el, kind, zone, x: e.clientX, y: e.clientY, moved: false, last: 0,
         start: kind === 'temp' ? view()[zone] : (view().fan || 0), target: e.target, id: e.pointerId,
@@ -40905,6 +40925,7 @@ class Component extends DCLogic {
             this._climPend.fan = { v: 0, at: Date.now(), staged: true };
             this._climPaint(true);
           } else {
+            this._climPowerOn({ skipFan: true });
             this._climStage('fan', lvl, true);
           }
         }
@@ -40928,7 +40949,10 @@ class Component extends DCLogic {
       this._climWheelFrame(drag.el, drag.frac);
       if (n === drag.last) return;
       drag.last = n;
-      if (drag.kind === 'temp') this._climStage(drag.zone, clampT(drag.start + n * 0.5), true);
+      if (drag.kind === 'temp') {
+        this._climPowerOn();
+        this._climStage(drag.zone, clampT(drag.start + n * 0.5), true);
+      }
     }, { passive: false, capture: true });
     const end = (e) => {
       if (!drag || (e && e.pointerId !== drag.id)) return;
@@ -40975,11 +40999,15 @@ class Component extends DCLogic {
       if (act === 'wide') { this._toggleClimatePopupWide(e); return; }
       if (!this._climCanWrite()) return;
       const v = view();
-      if (act === 'power') { this._climWrite('power', !v.power); return; }
+      if (act === 'power') {
+        if (v.power) this._climWrite('power', false);
+        else this._climPowerOn();
+        return;
+      }
       // A/C while off turns the climate on (and ensures A/C is requested).
       if (act === 'toggle' && el.getAttribute('data-ct') === 'ac') {
         if (!v.power) {
-          this._climWrite('power', true);
+          this._climPowerOn();
           if (!v.ac) this._climWrite('ac', true);
         } else {
           this._climWrite('ac', !v.ac);
@@ -40987,10 +41015,14 @@ class Component extends DCLogic {
         return;
       }
       if (act === 'pref') { const f = el.getAttribute('data-ct'); this._climWrite(f, !v[f]); return; }
-      if (!v.power) return;
+      // Temp and fan also bring the climate up from off.
       if (act === 'temp') {
         const step = t.closest('[data-step]');
-        if (step) { const zone = el.getAttribute('data-zone'); this._climStage(zone, clampT(v[zone] + Number(step.getAttribute('data-step')) * 0.5)); }
+        if (step) {
+          this._climPowerOn();
+          const zone = el.getAttribute('data-zone');
+          this._climStage(zone, clampT(v[zone] + Number(step.getAttribute('data-step')) * 0.5));
+        }
         return;
       }
       if (act === 'fan') {
@@ -41000,6 +41032,7 @@ class Component extends DCLogic {
         else if (seg) this._climSetFan(Array.prototype.indexOf.call(seg.parentNode.children, seg) + 1);
         return;
       }
+      if (!v.power) return;
       if (act === 'toggle' || act === 'pref') { const f = el.getAttribute('data-ct'); this._climWrite(f, !v[f]); return; }
       if (act === 'air') { this._climWrite('blower', Number(el.getAttribute('data-cair'))); return; }
       if (act === 'comfort') { this._climWrite('comfort', Number(el.getAttribute('data-ccomfort'))); return; }
@@ -46397,7 +46430,8 @@ class Component extends DCLogic {
         this._openNavigationApp();
         break;
       case 'toggleClimatePower':
-        this._climWrite('power', !this._climView().power);
+        if (this._climView().power) this._climWrite('power', false);
+        else this._climPowerOn();
         break;
       case 'cycleDriveMode':
         this._cycleDriveRoadMode();
