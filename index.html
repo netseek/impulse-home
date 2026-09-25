@@ -8290,14 +8290,14 @@ window.HavalSplash = (function () {
               <button type="button" class="{{ studioFillMixedClass }}" onClick="{{ studioFillMixed }}">Ambos</button>
             </div>
             <div class="hv-studio-note">{{ studioFillNote }}</div>
-            <sc-if value="{{ studioShowXray }}" hint-placeholder-val="{{ false }}">
-              <div class="hv-studio-label">MODO 3D</div>
-              <div class="hv-studio-chip-row">
-                <button type="button" class="{{ studioXrayOffClass }}" onClick="{{ studioXrayOff }}">Normal</button>
-                <button type="button" class="{{ studioXrayOnClass }}" onClick="{{ studioXrayOn }}">Raio-X</button>
-              </div>
-              <div class="hv-studio-note">Salvo nesta área de trabalho.</div>
-            </sc-if>
+            <div class="hv-studio-label">MODO 3D · DIA/NOITE</div>
+            <div class="hv-studio-chip-row">
+              <sc-if value="{{ studioShowXray }}" hint-placeholder-val="{{ false }}">
+                <button type="button" class="{{ studioXrayClass }}" onClick="{{ studioXrayCycle }}" title="Toque para alternar">{{ studioXrayLabel }}</button>
+              </sc-if>
+              <button type="button" class="{{ studioTimeClass }}" onClick="{{ studioTimeCycle }}" title="Toque para alternar: Dia, Noite, Auto">{{ studioTimeLabel }}</button>
+            </div>
+            <div class="hv-studio-note">{{ studioTimeNote }}</div>
             <div class="hv-studio-label">PAPEL DE PAREDE</div>
             <button type="button" class="hv-studio-wall {{ studioWallClass }}" onClick="{{ studioOpenWallpaper }}" aria-label="{{ studioWallLabel }}" title="{{ studioWallLabel }}">
               <span class="hv-studio-wall-img" style="{{ studioWallStyle }}"></span>
@@ -40385,10 +40385,17 @@ class Component extends DCLogic {
           ? 'O papel de parede preenche a tela; o carro 3D fica oculto.'
           : 'O cenário 3D do carro preenche a tela; nenhum papel de parede é carregado.'),
       studioShowXray: fill === 'car' || fill === 'mixed',
-      studioXrayOffClass: !s.powertrainOn ? 'on' : '',
-      studioXrayOnClass: s.powertrainOn ? 'on' : '',
-      studioXrayOff: () => this._setDesktopPowertrain(false),
-      studioXrayOn: () => this._setDesktopPowertrain(true),
+      // One button per setting, each cycling on tap (3D mode was two chips).
+      studioXrayClass: s.powertrainOn ? 'on' : '',
+      studioXrayLabel: s.powertrainOn ? '3D · Raio-X' : '3D · Normal',
+      studioXrayCycle: () => this._setDesktopPowertrain(!this.state.powertrainOn),
+      studioTimeClass: (s.timeMode || 'auto') === 'auto' ? '' : 'on',
+      studioTimeLabel: s.timeMode === 'day' ? '☀ Dia' : (s.timeMode === 'night' ? '☾ Noite' : 'Auto · faróis'),
+      studioTimeNote: s.timeMode === 'day' ? 'Sempre dia. Raio-X salvo nesta área de trabalho.'
+        : (s.timeMode === 'night' ? 'Sempre noite. Raio-X salvo nesta área de trabalho.'
+          : 'Noite quando os faróis acendem. Raio-X salvo nesta área de trabalho.'),
+      // setState is async: save on the next tick, or it stores the old mode.
+      studioTimeCycle: () => { this.cycleTimeMode(); setTimeout(() => this.saveSettings({ keepCamera: true }), 0); },
       // 3D mode has no wallpaper: the thumb shows greyed out and empty, and a
       // tap still opens the editor (which switches the background to it).
       studioWallClass: fill === 'car' ? 'off' : '',
