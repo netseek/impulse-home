@@ -21647,6 +21647,9 @@ class Component extends DCLogic {
         depthWrite: false, toneMapped: false,
       }));
       layer.plane.renderOrder = renderOrder;
+      // Also on the overlay layer: at night the render loop draws these in its
+      // 1c pass, AFTER the additive headlight pools, or the pools wash them out.
+      layer.plane.layers.enable(SHADOW_OVERLAY_LAYER);
       layer.plane.visible = false;       // until the first bake lands
       group.add(layer.plane);
       return layer;
@@ -30471,6 +30474,12 @@ class Component extends DCLogic {
         const sc = this.shadowCatcher;
         const dir = this.dirLight;
         if (nightPools && sc) sc.layers.disable(0);
+        // Same for the baked ground shadow: with the headlights on, pools drawn
+        // over it in 1b lifted it to almost nothing (dark with lights off, weak
+        // with them on). Its planes carry SHADOW_OVERLAY_LAYER for 1c.
+        const gl = this.contactShadow && this.contactShadow.userData.layers;
+        const groundPlanes = gl ? [gl.sun.plane, gl.ao.plane] : [];
+        if (nightPools) groundPlanes.forEach((p) => p.layers.disable(0));
         renderer.autoClear = true;
         // info.autoReset wipes the counters on EVERY render() call, so the
         // capture below has to happen while this pass is still the last one.
@@ -30492,17 +30501,18 @@ class Component extends DCLogic {
           renderer.render(scene, camera);
           // 1c) Shadow on top (+1 draw call). dirLight briefly shares
           //     SHADOW_OVERLAY_LAYER so the map applies; nothing else does.
-          if (sc && sc.visible && dir) {
-            dir.layers.enable(SHADOW_OVERLAY_LAYER);
+          if ((sc && sc.visible && dir) || groundPlanes.length) {
+            if (dir) dir.layers.enable(SHADOW_OVERLAY_LAYER);
             camera.layers.set(SHADOW_OVERLAY_LAYER);
             renderer.autoClear = false;
             renderer.render(scene, camera);
-            dir.layers.disable(SHADOW_OVERLAY_LAYER);
+            if (dir) dir.layers.disable(SHADOW_OVERLAY_LAYER);
           }
           camera.layers.mask = prevMask;
           scene.background = savedBg;
           renderer.autoClear = true;
           if (sc) sc.layers.enable(0);
+          groundPlanes.forEach((p) => p.layers.enable(0));
         }
         // Total across every scene pass (main + night pools + shadow overlay),
         // captured before the overlay quads add themselves. autoReset goes back
