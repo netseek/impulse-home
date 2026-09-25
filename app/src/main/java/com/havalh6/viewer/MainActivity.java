@@ -2678,7 +2678,7 @@ public final class MainActivity extends Activity {
         }
 
         /**
-         * CLIMATIZAÇÃO card: the sky on the left with the car's own outside
+         * AR CONDICIONADO card: the sky on the left with the car's own outside
          * temperature, the next days on the right, and the cabin temperature
          * under it. Weather is a service (Open-Meteo); the temperatures are the
          * car's, which is why the big number is not the forecast's.
@@ -2746,14 +2746,32 @@ public final class MainActivity extends Activity {
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTextSize(Math.max(8f, h * .13f));
             fill(muted);
+            // hint may be one line or "line1|line2" (\\n is stripped by the cleaner).
             String hint = descriptor.hintText == null ? "" : descriptor.hintText;
-            if (!hint.isEmpty()) c.drawText(ellipsizeStatusText(hint, w * .58f), pad, h * .88f, paint);
+            float hintMax = w * .58f;
+            float hintBottom = h * .92f;
+            float hintLine = Math.max(9f, h * .12f);
+            if (!hint.isEmpty()) {
+                int bar = hint.indexOf('|');
+                if (bar >= 0) {
+                    String line1 = hint.substring(0, bar).trim();
+                    String line2 = hint.substring(bar + 1).trim();
+                    if (!line1.isEmpty()) {
+                        c.drawText(ellipsizeStatusText(line1, hintMax), pad, hintBottom - hintLine, paint);
+                    }
+                    if (!line2.isEmpty()) {
+                        c.drawText(ellipsizeStatusText(line2, hintMax), pad, hintBottom, paint);
+                    }
+                } else {
+                    c.drawText(ellipsizeStatusText(hint, hintMax), pad, hintBottom, paint);
+                }
+            }
             String inside = descriptor.insideText == null || descriptor.insideText.isEmpty()
-                    ? "" : "DENTRO " + descriptor.insideText;
+                    ? "" : "INTERNA " + descriptor.insideText;
             if (!inside.isEmpty()) {
                 paint.setTextAlign(android.graphics.Paint.Align.RIGHT);
                 fill(unknown ? muted : strong);
-                c.drawText(inside, w - pad, h * .88f, paint);
+                c.drawText(inside, w - pad, hintBottom, paint);
             }
         }
 
@@ -11415,7 +11433,8 @@ public final class MainActivity extends Activity {
             descriptor.weatherIcon = cleanBottomCardText(raw.optString("weatherIcon", ""), 20);
             descriptor.forecast = cleanBottomCardText(raw.optString("forecast", ""), 96);
             descriptor.insideText = cleanBottomCardText(raw.optString("inside", ""), 10);
-            descriptor.hintText = cleanBottomCardText(raw.optString("hint", ""), 64);
+            // Climate hint is two short lines joined by '|'; keep room for both.
+            descriptor.hintText = cleanBottomCardText(raw.optString("hint", ""), 80);
             descriptor.navIdleCity = cleanBottomCardText(raw.optString("navIdleCity", ""), 32);
             descriptor.navIdleAction = cleanBottomCardText(raw.optString("navIdleAction", ""), 48);
             if ("consumption".equals(id)) descriptor.energyBars = parseEnergyBars(raw.optString("energyBars", ""));

@@ -1551,8 +1551,9 @@ was no way to tell whether it was right. `RangeLedger` (native, fed by
 `TripRecorder`) now keeps one cycle per charge in `trips.db` (`range_cycles` /
 `range_samples`, DB v5): the forecast at the start (the car's EV range off the
 bus, and the page's history estimate), then a sample per SOC point. The range
-popup's maximised view (`_rangeBurnView`) plots EV km driven + range still quoted
-against the starting forecast: flat means the forecast was right.
+popup's maximised view (`_rangeBurnView`) plots absolute SOC % vs distance, with
+two diagonals from `(0, soc0)` to each starting forecast's empty point (history
+and the car). Above a diagonal = lasting longer than that forecast.
 
 Things that are easy to break:
 

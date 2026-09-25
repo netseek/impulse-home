@@ -36,13 +36,13 @@ function includesAll(text, values, label) {
 // regress to the generic widget-picker route.
 includesAll(html, [
   "{ id: 'navigation', title: 'Navegação', action: 'openNavigation' }",
-  "{ id: 'climate', title: 'Climate', action: 'openClimate' }",
+  "{ id: 'climate', title: 'Ar Condicionado', action: 'openClimate' }",
   // The card id stays `consumption` (saved layouts, native allow-list); the
   // workspace it opens was renamed ENERGY (docs/energy-workspace-plan.md).
   "{ id: 'consumption', title: 'Consumo', action: 'openConsumption' }",
-  "{ id: 'range', title: 'Range', action: 'openRange' }",
-  "{ id: 'status', title: 'Vehicle status', action: 'openVehicleStatus' }",
-  "{ id: 'clock', title: 'Clock', action: 'openClockSettings' }",
+  "{ id: 'range', title: 'Autonomia', action: 'openRange' }",
+  "{ id: 'status', title: 'Status do veículo', action: 'openVehicleStatus' }",
+  "{ id: 'clock', title: 'Relógio', action: 'openClockSettings' }",
   // The three driving tiles share one destination: the card body opens the
   // DRIVING popup, the icon keeps the per-mode quick change.
   "{ id: 'driveMode', title: 'Modo de condução', action: 'openDriving', iconAction: 'cycleDriveMode' }",
@@ -184,6 +184,25 @@ includesAll(method('_createFocusedCardDesktop'), [
 includesAll(html, ['top:var(--hv-popup-top', 'bottom:var(--hv-popup-bottom-inset'], 'popup geometry');
 includesAll(method('_switchDesktop'), ['focusedCardType: null'], 'desktop popup cleanup');
 includesAll(method('_openDesktopStudio'), ['focusedCardType: null'], 'studio popup cleanup');
+// Desktop swipe on the card popup / its backdrop (same handlers as the board).
+includesAll(html, [
+  'class="hv-card-focus {{ focusedCardPopupClass }}"',
+  'onTouchStart="{{ desktopSwipeStart }}"',
+  'class="hv-card-focus-backdrop {{ focusedCardBackdropClass }}"',
+], 'popup desktop swipe handlers');
+includesAll(method('_pointInDesktopSwipeZone'), [
+  "cls.contains('hv-card-focus')",
+  "cls.contains('hv-card-focus-backdrop')",
+], 'popup swipe zone');
+includesAll(method('_onDesktopGestureStart'), ["cls.contains('hv-card-focus')", 'fromPopup:'], 'popup swipe gesture');
+includesAll(method('_isDesktopSwipeBlockedTarget'), [
+  "t.closest('.hv-clim-wheel')",
+  "t.closest('.hv-card-focus button')",
+], 'popup swipe keeps controls');
+includesAll(html, [
+  'body.hv-desk-sliding #hv-root > .hv-card-focus',
+  'body.hv-desk-sliding #hv-root > .hv-card-focus-backdrop',
+], 'popup fades during desk slide');
 
 // Android Auto TBT on the Navigation card / widget. Impulse publishes
 // app.androidauto.session and app.navigation.directions; this viewer must

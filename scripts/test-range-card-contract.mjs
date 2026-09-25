@@ -40,7 +40,8 @@ assert.ok(/\.setRangeForecast\(/.test(method('_startRangeForecastReporter')), 'h
 assert.ok(html.slice(html.indexOf('async componentDidMount()'), html.indexOf('async componentDidMount()') + 4000).includes('this._startRangeForecastReporter()'), 'the reporter must start at mount, not only when a range widget renders');
 assert.ok(/\.getRangeCycles\(/.test(method('_rangeCycles')), 'the expanded popup reads TripBridge.getRangeCycles');
 assert.ok(/this\._rangeBurnView\(/.test(method('_rangeWidgetView')), 'the range popup view carries the forecast check');
-assert.ok(html.includes('{{ focusedRangeBurnHistPath }}') && html.includes('{{ focusedRangeWideToggle }}'), 'expanded range popup markup is missing');
+assert.ok(html.includes('{{ focusedRangeBurnSocPath }}') && html.includes('{{ focusedRangeBurnOem0Path }}') && html.includes('{{ focusedRangeWideToggle }}'), 'expanded range popup markup is missing');
+assert.ok(method('_rangeBurnView').includes("rangeBurnYMax: '100%'") && method('_rangeBurnView').includes('rangeBurnSocPath'), 'burn chart plots absolute SOC vs distance with forecast diagonals');
 assert.ok(/histEvKmNum: !demo && hasHistEv/.test(method('_rangeTelemetry')), 'only a real history estimate may be reported, never demo or the OEM fallback');
 assert.ok(!method('_rangeTelemetry').includes('this._powerSource()'), 'range freshness cannot inherit generic power flow');
 console.log('range-card contracts: ok');
