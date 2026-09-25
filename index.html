@@ -9779,6 +9779,8 @@ const WHEEL_RAD_PER_S_PER_KMH = 15.2 / 40;
 const PT_POSTFX_HZ = 5;
 // Power card DOM refresh ceiling from the widget loop, ms. See _drawGraphs.
 const POWER_CARD_PAINT_MS = 100;
+// _powerFallbackPacked result lifetime, ms. Bus values do not move faster.
+const POWER_FALLBACK_MEMO_MS = 250;
 const CAR_SPEED_KMH_PER_UNIT = 40;
 
 // Event / cycle / orbit camera behaviour (CAMERA → OPTIONS).
@@ -11796,7 +11798,20 @@ class Component extends DCLogic {
     return this._powerFallbackPacked();
   }
 
+  // Memoised for POWER_FALLBACK_MEMO_MS. Each call reads up to four keys through
+  // window.carTelemetry.get, a SYNCHRONOUS JS->Java bridge call, and one dock sync
+  // reaches this several times (status, kW, model). Measured on the car
+  // 2026-09-25 while charging: 90% of a 17 ms _syncDockIndicators was here.
   _powerFallbackPacked() {
+    const now = Date.now();
+    const memo = this._powerFallbackMemo;
+    if (memo && now - memo.at < POWER_FALLBACK_MEMO_MS) return memo.value;
+    const value = this._powerFallbackPackedRead();
+    this._powerFallbackMemo = { at: now, value };
+    return value;
+  }
+
+  _powerFallbackPackedRead() {
     const getVal = (k) => {
       try {
         if (window.carTelemetry && typeof window.carTelemetry.get === 'function') {
@@ -17611,10 +17626,14 @@ class Component extends DCLogic {
   // Same contract as _setMotionSpeed: streams at CAN rate without committing.
   // _applyWheelTransforms reads _currentWheelAngle(), and the OVERRIDE panel's
   // readout is painted directly, so a live bus never re-renders the tree.
+  // requestRender is required: transforms alone leave the on-demand loop idle
+  // (measured on the car 2026-09-25 — steer updated live, rendersPerSec stayed 0
+  // until headlights forced a frame).
   _setWheelAngle(deg, commitNow) {
     const v = Math.round((isFinite(deg) ? deg : 0) * 10) / 10;
     this._liveSet('wheelAngle', v, { commit: !!commitNow });
     this._applyWheelTransforms();
+    if (this.requestRender) this.requestRender(2, true);
   }
 
   // Apply steer + roll in WORLD space about each wheel's shared axle centre.
@@ -18188,6 +18207,9 @@ class Component extends DCLogic {
     }
     this._liveSet('motionSpeed', v, { commit: !!commitNow });
     this._syncEventCamera();
+    // Same hole as _setWheelAngle: live write alone does not wake on-demand
+    // drawing. keepPostFx — continuous roll reuses the cached bloom overlay.
+    if (this.requestRender) this.requestRender(2, true);
   }
 
   // Raises/lowers the car body (glass, interior, lights, shared floor) while
