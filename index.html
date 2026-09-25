@@ -10353,6 +10353,9 @@ class Component extends DCLogic {
       // (_blurSpriteGain, measured 1.46 on the car) to match bloom at speed; the
       // shutter sprite stands in for a sharp rim and read ~46% too bright with it.
       mbGain: 1.0,
+      // 0 = baked sprite follows the alias window as before.
+      spriteFromKmh: 0,
+      spriteFadeKmh: 12,
       // A low-opacity smear laid over the STILL-SHARP rim, easing in from
       // preBlendFromKmh up to the fade, meant to low-pass the angular detail
       // that judders in the 12-27 km/h band the handover cannot reach.
@@ -18363,6 +18366,15 @@ class Component extends DCLogic {
     // rAF tick, parked included, and a fresh literal there is avoidable garbage
     // on a memory-constrained head unit.
     const out = this._blurWinScratch || (this._blurWinScratch = { start: 0, full: 0 });
+    // With the shutter motion blur on, the sharp rim is gone from mbFromKmh, so
+    // the alias floor no longer has to pull the baked sprite in early. Holding it
+    // back (spriteFromKmh) and widening its fade (spriteFadeKmh) lets the light
+    // live smear carry further and the strong baked look arrive gradually.
+    if (t.motionBlur && t.spriteFromKmh > 0) {
+      out.start = t.spriteFromKmh;
+      out.full = t.spriteFromKmh + Math.max(0.1, t.spriteFadeKmh || fade);
+      return out;
+    }
     out.start = start;
     out.full = start + fade;
     return out;
