@@ -4930,6 +4930,10 @@ window.HavalSplash = (function () {
     .hv-studio-body { min-height: 0; flex: 1; max-height: none; overflow: auto; padding: 20px 22px 24px; }
     .hv-studio-note { font-size: 12px; opacity: .58; }
     .hv-studio-actions,.hv-studio-chip-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 20px; }
+    /* Two cycling toggles, each a fixed half of the row whatever its label. */
+    .hv-studio-chip-row.hv-studio-half-row { display: grid; grid-template-columns: 1fr 1fr; }
+    .hv-studio-half-row sc-if { display: contents; }
+    .hv-studio-half-row button { width: 100%; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .hv-studio-accents { display: grid; grid-template-columns: repeat(6, 44px); gap: 8px; margin: 10px 0 20px; }
     .hv-studio-actions button,.hv-studio-chip-row button,.hv-studio-wide {
       min-height: 44px; padding: 0 17px; border: 1px solid var(--hv-frost-edge); border-radius: 13px;
@@ -8291,7 +8295,7 @@ window.HavalSplash = (function () {
             </div>
             <div class="hv-studio-note">{{ studioFillNote }}</div>
             <div class="hv-studio-label">MODO 3D · DIA/NOITE</div>
-            <div class="hv-studio-chip-row">
+            <div class="hv-studio-chip-row hv-studio-half-row">
               <sc-if value="{{ studioShowXray }}" hint-placeholder-val="{{ false }}">
                 <button type="button" class="{{ studioXrayClass }}" onClick="{{ studioXrayCycle }}" title="Toque para alternar">{{ studioXrayLabel }}</button>
               </sc-if>
@@ -40359,10 +40363,10 @@ class Component extends DCLogic {
       studioShowXray: fill === 'car' || fill === 'mixed',
       // One button per setting, each cycling on tap (3D mode was two chips).
       studioXrayClass: s.powertrainOn ? 'on' : '',
-      studioXrayLabel: s.powertrainOn ? '3D · Raio-X' : '3D · Normal',
+      studioXrayLabel: s.powertrainOn ? 'Raio-X' : 'Normal',
       studioXrayCycle: () => this._setDesktopPowertrain(!this.state.powertrainOn),
       studioTimeClass: (s.timeMode || 'auto') === 'auto' ? '' : 'on',
-      studioTimeLabel: s.timeMode === 'day' ? '☀ Dia' : (s.timeMode === 'night' ? '☾ Noite' : 'Auto · faróis'),
+      studioTimeLabel: s.timeMode === 'day' ? '☀ Dia' : (s.timeMode === 'night' ? '☾ Noite' : 'Auto'),
       studioTimeNote: s.timeMode === 'day' ? 'Sempre dia. Raio-X salvo nesta área de trabalho.'
         : (s.timeMode === 'night' ? 'Sempre noite. Raio-X salvo nesta área de trabalho.'
           : 'Noite quando os faróis acendem. Raio-X salvo nesta área de trabalho.'),
