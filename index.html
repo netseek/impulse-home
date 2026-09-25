@@ -20351,6 +20351,12 @@ class Component extends DCLogic {
     this._tireWheels = this._allWheels.filter(isTire);
     this._xrayTireBandSizeCache = null;
     this._rimWheels = this._allWheels.filter(m => !isTire(m));
+    // Catalog rim GLBs carry `tyre` and may skip the body material pass —
+    // retune here so every installed rubber shares the same look.
+    this._tireWheels.forEach((mesh) => {
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m) => { if (m) this._tuneTireMaterial(m); });
+    });
 
     // Get vertex count helper
     const getVertexCount = (mesh) => {
@@ -41056,38 +41062,50 @@ class Component extends DCLogic {
   }
 
   /**
-   * Rail card. The big number is the CABIN temperature — what you feel, and
-   * the reason you would reach for the card — with outside and the set point
-   * under it. Tapping the icon alone toggles the climate (iconAction);
-   * tapping the card opens the popup, like every other rail card.
+   * Rail card. Left: driver setpoint + fan segments. Right: HOJE (car outside
+   * + current sky) then the next two forecast days. INTERNA stays bottom-right.
    */
   _climRail() {
     const v = this._climView();
     const src = this._climSource();
     const wx = this._weatherModel();
     const t = (x) => (x == null || !isFinite(x) ? '—' : String(Math.round(x * 2) / 2).replace('.', ',')) + '°';
-    const forecast = !wx || !wx.days ? ''
-      : wx.days.map((d) => d.d + '|' + this._weatherIconFor(d.code) + '|' + d.max + '°').join(';');
+    // Driver setpoint always shows one decimal (22,0° / 22,5°).
+    const driverT = (x) => {
+      if (x == null || !isFinite(x)) return '—';
+      return (Math.round(Number(x) * 2) / 2).toFixed(1).replace('.', ',') + '°';
+    };
+    const cols = [];
+    // Today lives in the forecast strip: car outside + current sky, flagged |1.
+    cols.push('HOJE|' + (wx ? this._weatherIconFor(wx.code) : '') + '|'
+      + (src === 'nosignal' ? '—' : t(v.outside)) + '|1');
+    if (wx && wx.days) {
+      for (let i = 0; i < 2 && i < wx.days.length; i++) {
+        const d = wx.days[i];
+        cols.push(d.d + '|' + this._weatherIconFor(d.code) + '|' + d.max + '°');
+      }
+    }
+    const forecast = cols.join(';');
+    const fanMax = v.fanMax || 7;
     const base = {
-      weatherIcon: wx ? this._weatherIconFor(wx.code) : '',
+      weatherIcon: '',
       forecast: forecast,
       inside: src === 'nosignal' ? '' : t(v.inside),
-      // Pipe = line break on the native rail card (cleanBottomCardText strips \n).
-      hint: 'Clique para abrir|os controles do AC',
+      hint: '',
     };
     if (src === 'nosignal') {
-      return Object.assign(base, { summary: 'Sem sinal do carro', primary: '—°', secondary: 'SEM SINAL DO CARRO',
+      return Object.assign(base, { summary: 'Sem sinal do carro', primary: '—', secondary: 'SEM SINAL DO CARRO',
         metricA: '', metricB: '', progress: 0, state: 'unavailable' });
     }
     return Object.assign(base, {
-      // The rail summary is one line of text for shells that show no graphic.
-      summary: 'Fora ' + t(v.outside) + ' · interna ' + t(v.inside)
-        + (v.power ? ' · ajuste ' + t(v.driver) : ' · desligado'),
-      primary: t(v.outside),
+      summary: 'Ajuste ' + driverT(v.driver) + ' · fora ' + t(v.outside)
+        + (v.power ? ' · vent ' + (v.fan || 0) : ' · desligado'),
+      primary: driverT(v.driver),
       secondary: v.power ? (v.auto ? 'AUTOMÁTICO' : 'MANUAL') : 'DESLIGADO',
       metricA: 'INTERNA ' + t(v.inside),
-      metricB: v.power ? 'AJUSTE ' + t(v.driver) : '',
-      progress: v.power ? Math.round(((v.fan || 0) / (v.fanMax || 7)) * 100) : 0,
+      metricB: String(fanMax),
+      // Off → progress 0 → empty fan bar (no lit segments).
+      progress: v.power ? Math.round(((v.fan || 0) / fanMax) * 100) : 0,
       state: v.power ? 'on' : 'off',
     });
   }

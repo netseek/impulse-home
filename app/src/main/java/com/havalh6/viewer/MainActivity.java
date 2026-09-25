@@ -2678,10 +2678,9 @@ public final class MainActivity extends Activity {
         }
 
         /**
-         * AR CONDICIONADO card: the sky on the left with the car's own outside
-         * temperature, the next days on the right, and the cabin temperature
-         * under it. Weather is a service (Open-Meteo); the temperatures are the
-         * car's, which is why the big number is not the forecast's.
+         * AR CONDICIONADO card: driver setpoint + fan segments on the left;
+         * HOJE (car outside + current sky, accent) and the next two forecast
+         * days on the right; cabin INTERNA bottom-right. Hint is unused.
          */
         private void drawClimate(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
@@ -2689,93 +2688,95 @@ public final class MainActivity extends Activity {
             String[] days = descriptor.forecast == null || descriptor.forecast.isEmpty()
                     ? new String[0] : descriptor.forecast.split(";");
             float pad = w * .045f;
-            float iconSize = Math.min(h * .50f, w * .21f);
-            float cy = h * .28f;
+            float bottomY = h * .94f;
 
-            Bitmap sky = getWeatherBitmap(descriptor.weatherIcon);
-            float textLeft = pad;
-            if (sky != null) {
-                oval.set(pad, cy - iconSize / 2f, pad + iconSize, cy + iconSize / 2f);
-                paint.setColorFilter(new android.graphics.PorterDuffColorFilter(
-                        unknown ? muted : accent, android.graphics.PorterDuff.Mode.SRC_IN));
-                paint.setAlpha(255);
-                c.drawBitmap(sky, null, oval, paint);
-                paint.setColorFilter(null);
-                textLeft = pad + iconSize + w * .03f;
-            }
+            // Left column: bottom-aligned with INTERNA (temp → fan → label).
+            float leftW = Math.min(w * .38f, h * 1.15f);
+            String driver = descriptor.primary == null ? "" : descriptor.primary;
+
+            int fanMax = 7;
+            try {
+                if (descriptor.metricB != null && !descriptor.metricB.isEmpty()) {
+                    fanMax = Math.max(1, Math.min(10, Integer.parseInt(descriptor.metricB.trim())));
+                }
+            } catch (NumberFormatException ignored) {}
+            int lit = unknown ? 0
+                    : Math.max(0, Math.min(fanMax, Math.round(descriptor.progress / 100f * fanMax)));
+            float barLeft = pad;
+            float barRight = leftW - pad * .4f;
+            float barW = Math.max(8f, barRight - barLeft);
+            float gap = Math.max(2f, barW * .06f);
+            float segW = Math.max(2f, (barW - gap * (fanMax - 1)) / fanMax);
+            float segH = Math.max(4f, h * .085f);
+            // Label on INTERNA's baseline; fan strip and temp sit above it.
+            float labelY = bottomY;
+            float barTop = labelY - h * .22f - segH;
+            float tempY = barTop - h * .12f;
 
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL));
-            paint.setTextSize(Math.max(24f, h * .40f));
-            fill(strong);
-            c.drawText(descriptor.primary == null ? "" : descriptor.primary,
-                    textLeft, cy + h * .14f, paint);
+            paint.setTextSize(Math.max(28f, h * .48f));
+            fill(unknown ? muted : strong);
+            if (!driver.isEmpty()) {
+                c.drawText(driver, pad, tempY, paint);
+            }
 
-            // Next days, at most three, right to left so a narrow card drops the
-            // far ones. The stop is the temperature's MEASURED width: a fixed
-            // w*.18 let "20,5°" run under the first day on the car.
-            float tempRight = textLeft + paint.measureText(descriptor.primary == null ? "" : descriptor.primary) + w * .04f;
-            android.graphics.Typeface dayFace = android.graphics.Typeface.create("sans-serif-light",
-                    android.graphics.Typeface.NORMAL);
-            paint.setTypeface(dayFace);
-            float colW = Math.min(w * .13f, h * .46f);
+            float radius = Math.max(2f, segH * .45f);
+            for (int i = 0; i < fanMax; i++) {
+                float x = barLeft + i * (segW + gap);
+                // Off / empty: faint track only, no accent fill (progress == 0).
+                fill(i < lit ? accent : withAlpha(strong, 0x24));
+                oval.set(x, barTop, x + segW, barTop + segH);
+                c.drawRoundRect(oval, radius, radius, paint);
+            }
+
+            boolean off = unknown || !"on".equals(descriptor.state);
+            String fanLabel = off ? "Desligado" : String.valueOf(lit);
+            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            paint.setTypeface(android.graphics.Typeface.create(
+                    android.graphics.Typeface.SANS_SERIF, 200, false));
+            paint.setTextSize(Math.max(8f, h * .13f));
+            fill(muted);
+            c.drawText(fanLabel, (barLeft + barRight) * .5f, labelY, paint);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+
+            // Right: up to three forecast columns (HOJE first when flagged).
+            android.graphics.Typeface dayFace = android.graphics.Typeface.create(
+                    android.graphics.Typeface.SANS_SERIF, 200, false);
+            android.graphics.Typeface dayStrong = android.graphics.Typeface.create(
+                    "sans-serif-medium", android.graphics.Typeface.NORMAL);
+            float colW = Math.min(w * .15f, h * .50f);
             float right = w - pad;
-            for (int i = Math.min(days.length, 3) - 1; i >= 0 && right - colW >= tempRight; i--) {
+            float forecastLeft = leftW + pad * .5f;
+            for (int i = Math.min(days.length, 3) - 1; i >= 0 && right - colW >= forecastLeft; i--) {
                 String[] parts = days[i].split("[|]");
                 if (parts.length < 3) continue;
+                boolean today = parts.length >= 4 && "1".equals(parts[3].trim());
                 float cx = right - colW / 2f;
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER);
-                paint.setTypeface(dayFace);
+                paint.setTypeface(today ? dayStrong : dayFace);
                 paint.setTextSize(Math.max(8f, h * .13f));
-                fill(muted);
+                fill(today ? accent : muted);
                 c.drawText(parts[0], cx, h * .17f, paint);
                 Bitmap ic = getWeatherBitmap(parts[1]);
                 if (ic != null) {
-                    float s2 = colW * .72f;
+                    float s2 = colW * (today ? .78f : .72f);
                     float iconTop = h * .20f;
                     oval.set(cx - s2 / 2f, iconTop, cx + s2 / 2f, iconTop + s2);
                     paint.setColorFilter(new android.graphics.PorterDuffColorFilter(
-                            strong, android.graphics.PorterDuff.Mode.SRC_IN));
-                    paint.setAlpha(210);
+                            today ? accent : strong, android.graphics.PorterDuff.Mode.SRC_IN));
+                    paint.setAlpha(today ? 255 : 210);
                     c.drawBitmap(ic, null, oval, paint);
                     paint.setColorFilter(null);
                 }
-                paint.setTypeface(android.graphics.Typeface.DEFAULT);
-                paint.setTextSize(Math.max(9f, h * .15f));
-                fill(strong);
+                paint.setTypeface(today ? dayStrong : android.graphics.Typeface.DEFAULT);
+                paint.setTextSize(Math.max(today ? 11f : 9f, h * (today ? .18f : .15f)));
+                fill(unknown ? muted : strong);
                 c.drawText(parts[2], cx, h * .62f, paint);
                 right -= colW;
             }
 
-            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            // API 28 weight axis — "sans-serif-light" on this MMI still reads medium.
-            paint.setTypeface(android.graphics.Typeface.create(
-                    android.graphics.Typeface.SANS_SERIF, 200, false));
-            paint.setTextSize(Math.max(9f, h * .14f));
-            fill(muted);
-            // hint may be one line or "line1|line2|…" (\\n is stripped by the cleaner).
-            String hint = descriptor.hintText == null ? "" : descriptor.hintText;
-            float hintMax = w * .58f;
-            float hintBottom = h * .94f;
-            float hintStep = Math.max(11f, h * .14f);
-            if (!hint.isEmpty()) {
-                String[] lines = hint.split("\\|");
-                int n = 0;
-                for (String rawLine : lines) {
-                    if (rawLine != null && !rawLine.trim().isEmpty()) n++;
-                }
-                if (n == 0) n = 1;
-                int drawn = 0;
-                for (String rawLine : lines) {
-                    if (rawLine == null) continue;
-                    String line = rawLine.trim();
-                    if (line.isEmpty()) continue;
-                    float y = hintBottom - (n - 1 - drawn) * hintStep;
-                    c.drawText(ellipsizeStatusText(line, hintMax), pad, y, paint);
-                    drawn++;
-                }
-            }
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
             String inside = descriptor.insideText == null || descriptor.insideText.isEmpty()
                     ? "" : "INTERNA " + descriptor.insideText;
@@ -2783,7 +2784,7 @@ public final class MainActivity extends Activity {
                 paint.setTextAlign(android.graphics.Paint.Align.RIGHT);
                 paint.setTextSize(Math.max(8f, h * .13f));
                 fill(unknown ? muted : strong);
-                c.drawText(inside, w - pad, hintBottom, paint);
+                c.drawText(inside, w - pad, bottomY, paint);
             }
         }
 
