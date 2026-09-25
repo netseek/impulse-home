@@ -9674,7 +9674,8 @@ const GROUND_SMOOTH = 1.5;         // final blur, texels: hides the tap pattern
 // it -- 85% off #111 is #030303, i.e. invisible. A soft additive pool of light
 // under the car gives the shadow something to darken, the way a showroom spot
 // does. Car centerFill only: over a wallpaper it would just wash the photo.
-const GROUND_NIGHT_GLOW = 0.22;    // additive strength, 0 = off
+const GROUND_NIGHT_GLOW = 0.5;     // additive strength, 0 = off. 0.22 left the shadow barely visible;
+                                   // 0.8 reads like the day shadow but the ground stops looking like night
 const GROUND_NIGHT_GLOW_SIZE = 2.6; // diameter, x the car's longest side
 
 // Night mode used to zero hemi+dir so the car sat in IBL-only darkness. Prefer
@@ -10286,6 +10287,10 @@ class Component extends DCLogic {
       // spin freezes or runs backwards — the wagon-wheel effect, and the
       // reason a rim can look motionless at 20 km/h on a 14-22 fps panel.
       stepFrac: 0.45,
+      // Multiplier on the spin rate (WHEEL_RAD_PER_S_PER_KMH). The base rate was
+      // never tuned against the real car; the owner reported the wheel reading
+      // faster than the car itself (2026-09-25). Also scales the alias window.
+      spinScale: 1,
       // Roll by the smoothed frame interval, not the raw one — see the loop.
       stepSmooth: true,
       // Where the sprite takes over. The sharp rim is GONE by blurFullKmh and
@@ -18346,7 +18351,7 @@ class Component extends DCLogic {
     // Smoothed inter-frame interval while moving (see the render loop); falls
     // back to a pessimistic 18 fps, the measured median on the MMI.
     const dt = this._motionDt || (1 / 18);
-    const aliasKmh = (t.stepFrac * period) / (dt * WHEEL_RAD_PER_S_PER_KMH);
+    const aliasKmh = (t.stepFrac * period) / (dt * WHEEL_RAD_PER_S_PER_KMH * (t.spinScale || 1));
     // The fps-derived alias speed is a FLOOR, not the answer. The top of the
     // window is pinned to blurFullKmh so the handover cannot wander with the
     // frame rate — measured travelling 25.1 -> 30 km/h inside a single 5 s
@@ -30104,14 +30109,15 @@ class Component extends DCLogic {
           // which reads as the wheel hitching. An even step per drawn frame is
           // what film does; a long frame then costs one late frame, not a jump.
           const rollDt = this._wheelSpinTune.stepSmooth ? this._motionDt : delta;
-          const idealDelta = rollDt * speed * 15.2;
+          const spinScale = this._wheelSpinTune.spinScale || 1;
+          const idealDelta = rollDt * speed * 15.2 * spinScale;
           const maxStep = (this._rimRepeatRad || (Math.PI * 2 / 5)) * this._wheelSpinTune.stepFrac;
           const rollDelta = Math.max(-maxStep, Math.min(maxStep, idealDelta));
           this._rollClamped = Math.abs(idealDelta) > maxStep + 1e-9;
           // Shutter arc for the motion-blur sprite: how far the wheel REALLY turned
           // over the frame the eye just waited through (raw delta, not smoothed),
           // so a late frame smears further rather than looking stopped.
-          this._shutterRad = Math.abs(delta * speed * 15.2) * (this._wheelSpinTune.shutter || 0);
+          this._shutterRad = Math.abs(delta * speed * 15.2 * spinScale) * (this._wheelSpinTune.shutter || 0);
           if (this._allWheels || this._tireWheels) {
             // Deduped union — see the matching note in _applyWheelTransforms:
             // tires can be excluded from _allWheels (custom/catalog wheels)
