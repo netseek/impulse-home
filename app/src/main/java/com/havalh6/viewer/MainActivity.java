@@ -2689,8 +2689,8 @@ public final class MainActivity extends Activity {
             String[] days = descriptor.forecast == null || descriptor.forecast.isEmpty()
                     ? new String[0] : descriptor.forecast.split(";");
             float pad = w * .045f;
-            float iconSize = Math.min(h * .40f, w * .17f);
-            float cy = h * .34f;
+            float iconSize = Math.min(h * .50f, w * .21f);
+            float cy = h * .28f;
 
             Bitmap sky = getWeatherBitmap(descriptor.weatherIcon);
             float textLeft = pad;
@@ -2707,16 +2707,18 @@ public final class MainActivity extends Activity {
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL));
-            paint.setTextSize(Math.max(20f, h * .34f));
+            paint.setTextSize(Math.max(24f, h * .40f));
             fill(strong);
             c.drawText(descriptor.primary == null ? "" : descriptor.primary,
-                    textLeft, cy + h * .12f, paint);
+                    textLeft, cy + h * .14f, paint);
 
             // Next days, at most three, right to left so a narrow card drops the
             // far ones. The stop is the temperature's MEASURED width: a fixed
             // w*.18 let "20,5°" run under the first day on the car.
             float tempRight = textLeft + paint.measureText(descriptor.primary == null ? "" : descriptor.primary) + w * .04f;
-            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+            android.graphics.Typeface dayFace = android.graphics.Typeface.create("sans-serif-light",
+                    android.graphics.Typeface.NORMAL);
+            paint.setTypeface(dayFace);
             float colW = Math.min(w * .13f, h * .46f);
             float right = w - pad;
             for (int i = Math.min(days.length, 3) - 1; i >= 0 && right - colW >= tempRight; i--) {
@@ -2724,19 +2726,22 @@ public final class MainActivity extends Activity {
                 if (parts.length < 3) continue;
                 float cx = right - colW / 2f;
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+                paint.setTypeface(dayFace);
                 paint.setTextSize(Math.max(8f, h * .13f));
                 fill(muted);
                 c.drawText(parts[0], cx, h * .17f, paint);
                 Bitmap ic = getWeatherBitmap(parts[1]);
                 if (ic != null) {
-                    float s2 = colW * .58f;
-                    oval.set(cx - s2 / 2f, h * .22f, cx + s2 / 2f, h * .22f + s2);
+                    float s2 = colW * .72f;
+                    float iconTop = h * .20f;
+                    oval.set(cx - s2 / 2f, iconTop, cx + s2 / 2f, iconTop + s2);
                     paint.setColorFilter(new android.graphics.PorterDuffColorFilter(
                             strong, android.graphics.PorterDuff.Mode.SRC_IN));
                     paint.setAlpha(210);
                     c.drawBitmap(ic, null, oval, paint);
                     paint.setColorFilter(null);
                 }
+                paint.setTypeface(android.graphics.Typeface.DEFAULT);
                 paint.setTextSize(Math.max(9f, h * .15f));
                 fill(strong);
                 c.drawText(parts[2], cx, h * .62f, paint);
@@ -2744,32 +2749,39 @@ public final class MainActivity extends Activity {
             }
 
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setTextSize(Math.max(8f, h * .13f));
+            // API 28 weight axis — "sans-serif-light" on this MMI still reads medium.
+            paint.setTypeface(android.graphics.Typeface.create(
+                    android.graphics.Typeface.SANS_SERIF, 200, false));
+            paint.setTextSize(Math.max(9f, h * .14f));
             fill(muted);
-            // hint may be one line or "line1|line2" (\\n is stripped by the cleaner).
+            // hint may be one line or "line1|line2|…" (\\n is stripped by the cleaner).
             String hint = descriptor.hintText == null ? "" : descriptor.hintText;
             float hintMax = w * .58f;
-            float hintBottom = h * .92f;
-            float hintLine = Math.max(9f, h * .12f);
+            float hintBottom = h * .94f;
+            float hintStep = Math.max(11f, h * .14f);
             if (!hint.isEmpty()) {
-                int bar = hint.indexOf('|');
-                if (bar >= 0) {
-                    String line1 = hint.substring(0, bar).trim();
-                    String line2 = hint.substring(bar + 1).trim();
-                    if (!line1.isEmpty()) {
-                        c.drawText(ellipsizeStatusText(line1, hintMax), pad, hintBottom - hintLine, paint);
-                    }
-                    if (!line2.isEmpty()) {
-                        c.drawText(ellipsizeStatusText(line2, hintMax), pad, hintBottom, paint);
-                    }
-                } else {
-                    c.drawText(ellipsizeStatusText(hint, hintMax), pad, hintBottom, paint);
+                String[] lines = hint.split("\\|");
+                int n = 0;
+                for (String rawLine : lines) {
+                    if (rawLine != null && !rawLine.trim().isEmpty()) n++;
+                }
+                if (n == 0) n = 1;
+                int drawn = 0;
+                for (String rawLine : lines) {
+                    if (rawLine == null) continue;
+                    String line = rawLine.trim();
+                    if (line.isEmpty()) continue;
+                    float y = hintBottom - (n - 1 - drawn) * hintStep;
+                    c.drawText(ellipsizeStatusText(line, hintMax), pad, y, paint);
+                    drawn++;
                 }
             }
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
             String inside = descriptor.insideText == null || descriptor.insideText.isEmpty()
                     ? "" : "INTERNA " + descriptor.insideText;
             if (!inside.isEmpty()) {
                 paint.setTextAlign(android.graphics.Paint.Align.RIGHT);
+                paint.setTextSize(Math.max(8f, h * .13f));
                 fill(unknown ? muted : strong);
                 c.drawText(inside, w - pad, hintBottom, paint);
             }

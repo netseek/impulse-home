@@ -40562,6 +40562,13 @@ class Component extends DCLogic {
    * shrinks as it leaves. Sliding the block as one piece - which is what this did
    * first - moves the right distance and still looks wrong.
    *
+   * Scale from each slot's distance to the viewport centre, not from the sign of
+   * [f]. The drag steps with Math.round, so past the halfway point [f] flips sign
+   * while the finger keeps moving the same way; an "incoming vs outgoing" split
+   * then briefly grows the number that just left centre before shrinking it.
+   * Slots sit at -1 / 0 / +1 in pitch units; after translateY(f*pitch) their
+   * distances are |f-1|, |f|, |f+1|.
+   *
    * We interpolate with a transform rather than the font size: changing text size
    * on every frame relayouts the popup, and this panel cannot afford that.
    */
@@ -40572,21 +40579,26 @@ class Component extends DCLogic {
     const nears = wheel.querySelectorAll('.near');
     const pitch = this._climStackPitch(wheel);
     const k = this._climWheelRatio(wheel);
-    const a = Math.min(1, Math.abs(f));
+    // How close a slot is to centre in 0..1 (1 = fully selected size).
+    const focus = (dist) => Math.max(0, 1 - Math.min(1, Math.abs(dist)));
     stack.style.transform = 'translateY(' + (f * pitch).toFixed(1) + 'px)';
     if (cur) {
-      cur.style.transform = 'scale(' + (1 - a * (1 - 1 / k)).toFixed(3) + ')';
-      cur.style.opacity = (1 - a * 0.7).toFixed(3);
+      const a = focus(f);
+      // .cur's resting size is the selected size, so scale down toward 1/k.
+      cur.style.transform = 'scale(' + (1 / k + a * (1 - 1 / k)).toFixed(3) + ')';
+      cur.style.opacity = (0.3 + a * 0.7).toFixed(3);
     }
-    // Only the one moving INTO the middle grows; the other is on its way out and
-    // already reads as a neighbour.
-    const incoming = nears[f > 0 ? 0 : 1];
-    const outgoing = nears[f > 0 ? 1 : 0];
-    if (incoming) {
-      incoming.style.transform = 'scale(' + (1 + a * (k - 1)).toFixed(3) + ')';
-      incoming.style.opacity = (0.3 + a * 0.7).toFixed(3);
+    // nears[0] is the warmer value above, nears[1] the cooler below.
+    if (nears[0]) {
+      const a = focus(f - 1);
+      nears[0].style.transform = 'scale(' + (1 + a * (k - 1)).toFixed(3) + ')';
+      nears[0].style.opacity = (0.3 + a * 0.7).toFixed(3);
     }
-    if (outgoing) { outgoing.style.transform = ''; outgoing.style.opacity = ''; }
+    if (nears[1]) {
+      const a = focus(f + 1);
+      nears[1].style.transform = 'scale(' + (1 + a * (k - 1)).toFixed(3) + ')';
+      nears[1].style.opacity = (0.3 + a * 0.7).toFixed(3);
+    }
   }
 
   /** Ratio between the current value's type size and a neighbour's, from the live
@@ -41056,7 +41068,7 @@ class Component extends DCLogic {
       forecast: forecast,
       inside: src === 'nosignal' ? '' : t(v.inside),
       // Pipe = line break on the native rail card (cleanBottomCardText strips \n).
-      hint: 'Temperatura externa. Clique|para abrir controles do AC',
+      hint: 'Clique para abrir|os controles do AC',
     };
     if (src === 'nosignal') {
       return Object.assign(base, { summary: 'Sem sinal do carro', primary: '—°', secondary: 'SEM SINAL DO CARRO',
