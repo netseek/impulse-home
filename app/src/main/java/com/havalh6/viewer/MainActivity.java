@@ -2708,9 +2708,9 @@ public final class MainActivity extends Activity {
             float gap = Math.max(2f, barW * .06f);
             float segW = Math.max(2f, (barW - gap * (fanMax - 1)) / fanMax);
             float segH = Math.max(4f, h * .085f);
-            // Label on INTERNA's baseline; fan strip and temp sit above it.
-            float labelY = bottomY;
-            float barTop = labelY - h * .22f - segH;
+            // No fan label — drop the stack by ~half the old label band so it
+            // sits nearer INTERNA without overlapping it.
+            float barTop = bottomY - h * .11f - segH;
             float tempY = barTop - h * .12f;
 
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
@@ -2733,17 +2733,6 @@ public final class MainActivity extends Activity {
                 oval.set(x, barTop, x + segW, barTop + segH);
                 c.drawRoundRect(oval, radius, radius, paint);
             }
-
-            // Powered includes ions — that state is "on + anion", not off.
-            boolean off = unknown || !("on".equals(descriptor.state) || ions);
-            String fanLabel = off ? "Desligado" : String.valueOf(lit);
-            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
-            paint.setTypeface(android.graphics.Typeface.create(
-                    android.graphics.Typeface.SANS_SERIF, 200, false));
-            paint.setTextSize(Math.max(8f, h * .13f));
-            fill(muted);
-            c.drawText(fanLabel, (barLeft + barRight) * .5f, labelY, paint);
-            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
 
             // Right: up to three forecast columns (HOJE first when flagged).
             android.graphics.Typeface dayFace = android.graphics.Typeface.create(
