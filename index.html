@@ -9609,9 +9609,6 @@ const SHADOW_OVERLAY_LAYER = 4;
 // The floor is redrawn on this layer into stencil only, so the tone grade can
 // leave it alone -- see _applyGrade.
 const GRADE_MASK_LAYER = 5;
-// Tires only — camera + hemi see this so rubber still renders/fills when we
-// pull them off layer 0 to hide them from dirLight (see window.__tireSun).
-const TIRE_FILL_LAYER = 6;
 const GRADE_STENCIL_FLOOR = 1;
 // Contact shadow under the car — dirLight PCFSoft penumbra + catcher opacity.
 // NOTE: three r137 ignores shadow.radius under PCFSoftShadowMap (only PCF and
@@ -29479,73 +29476,6 @@ class Component extends DCLogic {
         };
       };
 
-      // Tire sun A/B. Off = tires leave layer 0 so dirLight misses them; camera
-      // + hemi keep TIRE_FILL_LAYER so rubber still draws with fill light. IBL
-      // is separate — pass { env: false } to also zero tire envMapIntensity.
-      // Call with no args (or {}) to read. Does not touch castShadow.
-      window.__tireSun = (patch) => {
-        const tires = this._tireWheels || [];
-        const cam = this.camera;
-        const hemi = this.hemiLight;
-        const L = 6; // TIRE_FILL_LAYER — camera+hemi only; dirLight stays on 0
-        const want = (patch && typeof patch === 'object' && 'on' in patch)
-          ? !!patch.on
-          : (this._tireSunOn !== false);
-        const touchEnv = patch && typeof patch === 'object' && 'env' in patch;
-        const envOn = touchEnv ? !!patch.env : (this._tireEnvOn !== false);
-
-        const applyLayers = (sunOn) => {
-          tires.forEach((m) => {
-            if (!m || !m.layers) return;
-            if (sunOn) {
-              m.layers.enable(0);
-              m.layers.disable(L);
-            } else {
-              m.layers.disable(0);
-              m.layers.enable(L);
-            }
-          });
-          if (cam) {
-            if (sunOn) cam.layers.disable(L);
-            else cam.layers.enable(L);
-          }
-          if (hemi) {
-            if (sunOn) hemi.layers.disable(L);
-            else hemi.layers.enable(L);
-          }
-        };
-        const applyEnv = (on) => {
-          tires.forEach((m) => {
-            const mats = [].concat(m && m.material);
-            mats.forEach((mat) => {
-              if (!mat || !/tire|tyre/i.test(mat.name || '')) return;
-              if (mat._tireSunEnv === undefined) mat._tireSunEnv = mat.envMapIntensity;
-              mat.envMapIntensity = on ? mat._tireSunEnv : 0;
-              mat.needsUpdate = true;
-            });
-          });
-        };
-
-        if (patch && typeof patch === 'object') {
-          if ('on' in patch) {
-            this._tireSunOn = want;
-            applyLayers(want);
-          }
-          if (touchEnv) {
-            this._tireEnvOn = envOn;
-            applyEnv(envOn);
-          }
-          if (this.requestRender) this.requestRender(4);
-        }
-
-        return {
-          on: this._tireSunOn !== false,
-          env: this._tireEnvOn !== false,
-          tires: tires.length,
-          layer: L,
-          dirLayer0: this.dirLight ? this.dirLight.layers.isEnabled(0) : null,
-        };
-      };
 
       if (this._debugMode) {
         window.__debugCamera = (reason) => this._logDebugCamera(reason || 'manual');
