@@ -903,8 +903,9 @@ window.HavalSplash = (function () {
     }
     .hv-config-head {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-start;
       align-items: center;
+      gap: 8px;
       margin-bottom: 8px;
       flex-shrink: 0;
     }
@@ -917,6 +918,8 @@ window.HavalSplash = (function () {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-width: 0;
+      flex: 1;
     }
     .hv-config-close {
       background: none;
@@ -1811,7 +1814,7 @@ window.HavalSplash = (function () {
     .hv-wallpaper-pop-head {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 10px;
       margin-bottom: 10px;
       flex-shrink: 0;
@@ -2951,7 +2954,7 @@ window.HavalSplash = (function () {
     .hv-widget-picker-head {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 8px;
       padding: 2px 2px 10px;
       flex-shrink: 0;
@@ -4321,7 +4324,7 @@ window.HavalSplash = (function () {
     .hv-hs-roof-head {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 16px;
       margin: 0 0 8px;
     }
@@ -5205,7 +5208,7 @@ window.HavalSplash = (function () {
     }
     #hv-root .hv-card-focus.fit { transform: translate(0,18px) scale(.985); }
     #hv-root .hv-card-focus.fit.on { transform: translate(0,0) scale(1); }
-    /* ENERGIA maximised (the expand button beside ×): the board's full width, same height. */
+    /* ENERGIA maximised (expand control beside the popup): full board width. */
     #hv-root .hv-card-focus.wide { width: var(--hv-pop-wide-width, calc(100vw - 52px)); }
     #hv-root .hv-desktop-studio .hv-clock-config-gallery { grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); }
     .hv-studio-title { font-size: 16px; font-weight: 650; white-space: nowrap; }
@@ -5356,7 +5359,6 @@ window.HavalSplash = (function () {
     .hv-clim-headx { margin-left: auto; display: flex; align-items: center; gap: 16px; }
     .hv-clim-headx .meta { font-size: 13.5px; letter-spacing: .1em; opacity: .75; }
     .hv-clim-headx .meta b { font-size: 15px; font-weight: 500; opacity: 1; }
-    .hv-card-focus-head .hv-clim-headx ~ button { margin-left: 8px; }
 
     /* popup */
     .hv-clim-pop { height: calc(100% - 48px); display: grid; grid-template-columns: minmax(0,1fr) 0; }
@@ -5429,6 +5431,21 @@ window.HavalSplash = (function () {
     .hv-clim-fanbar i::after { content: ''; position: absolute; top: -14px; bottom: -14px; left: -3.5px; right: -3.5px; }
     .hv-clim-fanbar i.on { background: var(--hv-accent); opacity: 1; }
     .hv-clim-fan.scrub .hv-clim-fanbar i.on { height: 14px; }
+    /* ÍONS: green halo (eco-style radial) + green fan / ion toggle. */
+    .hv-clim.hv-clim-w.ions { position: relative; isolation: isolate; }
+    .hv-card-focus.ions { isolation: isolate; }
+    .hv-clim.hv-clim-w.ions::before,
+    .hv-card-focus.ions::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+      background: radial-gradient(ellipse 58% 72% at 22% 34%, rgba(60,207,145,.40), rgba(60,207,145,.12) 48%, transparent 74%);
+    }
+    #hv-root.hv-widgets-light .hv-clim.hv-clim-w.ions::before,
+    #hv-root.hv-widgets-light .hv-card-focus.ions::before {
+      background: radial-gradient(ellipse 58% 72% at 22% 34%, rgba(31,157,106,.32), rgba(31,157,106,.10) 48%, transparent 74%);
+    }
+    .hv-clim.ions .hv-clim-fanbar i.on { background: var(--clim-good); }
+    .hv-clim.ions .hv-clim-ib[data-ct="anion"].on { color: var(--clim-good); }
+    .hv-clim.ions .hv-clim-ib[data-ct="anion"].on::after { background: var(--clim-good); }
 
     .hv-clim-togs { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 6px; }
     .hv-clim-togs .hv-clim-ib { flex: 1; }
@@ -5597,7 +5614,6 @@ window.HavalSplash = (function () {
     .hv-energy-period { margin-left:auto; }
     .hv-card-focus-head .hv-card-focus-action { width:auto; margin-left:auto; padding:0 14px; font:600 12px/1 'Space Mono',monospace; letter-spacing:.06em; }
     .hv-card-focus-head .hv-card-focus-action.on { color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(255,255,255,.14); }
-    .hv-card-focus-head.with-action > button:last-child { margin-left:18px; }
     /* The popup frame is a fixed 3x2 size; on the emulator the NOW panel used a
        third of it. Let the panel fill the frame instead of floating at the top. */
     .hv-energy-trips { flex:1; min-height:0; display:grid; grid-template-columns:minmax(170px,.5fr) minmax(0,1.5fr); grid-template-rows:minmax(0,1fr); gap:12px; }
@@ -5781,12 +5797,11 @@ window.HavalSplash = (function () {
     .hv-energy-tripcol { min-height:0; display:flex; flex-direction:column; gap:8px; }
     .hv-energy-tripcol > .hv-energy-list { flex:1; }
     .hv-energy-tripseg { display:grid; grid-template-columns:1fr 1fr; flex-shrink:0; }
-    /* Header: trip title right of the tabs, before ×; a gear after the tabs. */
+    /* Header: ×/VOLTAR left, then title, tabs, gear; trip detail floats right. */
     .hv-card-focus-head .hv-head-spacer { flex:1; min-width:8px; }
     .hv-card-focus-head .hv-energy-headtitle { margin:0 14px 0 0; max-width:40%; font:inherit; letter-spacing:0; }
     .hv-card-focus-head .hv-energy-headtitle > strong { font:600 15px/1.2 'Space Grotesk',sans-serif; }
     .hv-card-focus-head .hv-energy-headtitle > small { font:400 11px/1.3 'Space Grotesk',sans-serif; }
-    .hv-card-focus-head .hv-energy-headtitle ~ button,.hv-card-focus-head .hv-head-spacer ~ button { margin-left:0; }
     .hv-card-focus-head .hv-energy-gear { margin-left:10px; width:40px; height:40px; display:grid; place-items:center; padding:0; background:transparent; }
     .hv-card-focus-head .hv-energy-gear > svg { width:20px; height:20px; fill:currentColor; opacity:.8; }
     .hv-card-focus-head .hv-energy-gear.on { color:var(--hv-readable-accent,var(--hv-accent)); background:rgba(255,255,255,.14); }
@@ -6388,7 +6403,7 @@ window.HavalSplash = (function () {
     .hv-range-burn-row > b { font-size:11px; text-align:right; }
     .hv-range-burn-row.head > span:nth-child(n+4) { text-align:right; }
     .hv-range-burn-row > span:nth-child(4) { text-align:right; }
-    .hv-card-focus-head .hv-range-toggle-group { width:auto !important; max-width:none !important; height:38px !important; display:inline-flex; align-items:center; gap:10px; padding:0 4px !important; margin-left:auto; margin-right:8px; background:transparent !important; border:none !important; border-radius:0 !important; box-shadow:none !important; cursor:pointer; color:var(--hv-widget-fg,#edf5fa); transition:all .2s ease; -webkit-tap-highlight-color:transparent; flex-shrink:0; box-sizing:border-box; }
+    .hv-card-focus-head .hv-range-toggle-group { width:auto !important; max-width:none !important; height:38px !important; display:inline-flex; align-items:center; gap:10px; padding:0 4px !important; margin-left:auto; margin-right:0; background:transparent !important; border:none !important; border-radius:0 !important; box-shadow:none !important; cursor:pointer; color:var(--hv-widget-fg,#edf5fa); transition:all .2s ease; -webkit-tap-highlight-color:transparent; flex-shrink:0; box-sizing:border-box; }
     .hv-card-focus-head .hv-range-toggle-group:hover, .hv-card-focus-head .hv-range-toggle-group:active { background:transparent !important; border:none !important; }
     .hv-card-focus-head .hv-range-toggle-group.on { background:transparent !important; border:none !important; box-shadow:none !important; }
     .hv-range-toggle-label { font:700 12px/1 'Space Mono',monospace; letter-spacing:.03em; opacity:.92; white-space:nowrap; }
@@ -6454,9 +6469,9 @@ window.HavalSplash = (function () {
        buttons — so the shared 760px frame left a third of the dialog empty. */
     .hv-card-focus.narrow { width:min(560px,calc(100vw - 52px)); }
     .hv-card-focus-head { height:42px; display:flex; align-items:center; gap:10px; font:9px/1 'Space Mono',monospace; letter-spacing:.15em; }
-    /* The close button holds the right edge whatever sits beside the title, so
-       the cards without a header badge look exactly as they did. */
-    .hv-card-focus-head button { margin-left:auto; }
+    /* Close / VOLTAR lead the header (top-left). Right-edge chrome uses its
+       own margin-left:auto (climate meta, range toggle, energy spacer). */
+    .hv-card-focus-head > button { flex-shrink:0; margin-left:0; }
     .hv-card-focus-badge { display:none; }
     .hv-card-focus-badge.on { display:inline-flex; align-items:center; min-height:24px; padding:0 9px; border:1px solid currentColor; border-radius:999px; font:7px/1 'Space Mono',monospace; letter-spacing:.08em; }
     .hv-card-focus-badge.demo { color:#f0bd65; }
@@ -7477,8 +7492,8 @@ window.HavalSplash = (function () {
 
   <div class="hv-widget-picker {{ widgetPickerListClass }}" style="display: {{ widgetPickerDisplay }}; {{ widgetPickerStyle }}">
     <div class="hv-widget-picker-head">
-      <div class="hv-widget-picker-title">{{ widgetPickerTitle }}</div>
       <button type="button" class="hv-widget-picker-close" onClick="{{ closeWidgetPicker }}" title="Fechar">×</button>
+      <div class="hv-widget-picker-title">{{ widgetPickerTitle }}</div>
     </div>
     <sc-if value="{{ widgetPickerIsThumbs }}" hint-placeholder-val="{{ false }}">
     <div class="hv-widget-picker-grid">
@@ -7559,8 +7574,8 @@ window.HavalSplash = (function () {
   <div class="hv-wallpaper-backdrop {{ wallpaperBackdropClass }}" onClick="{{ closeWallpaperPopup }}"></div>
   <div class="hv-wallpaper-pop {{ wallpaperPopupClass }}">
     <div class="hv-wallpaper-pop-head">
-      <div class="hv-wallpaper-pop-title">PAPEL DE PAREDE</div>
       <button type="button" class="hv-wallpaper-pop-close" onClick="{{ closeWallpaperPopup }}" title="Fechar">×</button>
+      <div class="hv-wallpaper-pop-title">PAPEL DE PAREDE</div>
     </div>
     <div class="hv-wallpaper-src-row">
       <sc-for list="{{ wallpaperSourceTabs }}" as="wst" hint-placeholder-count="4">
@@ -7624,7 +7639,7 @@ window.HavalSplash = (function () {
   <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedClimateGrowClass }}" onClick="{{ focusedClimateWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedClimateShrinkClass }}" onClick="{{ focusedClimateWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
   <sc-if value="{{ focusedCardIsRange }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedRangeGrowClass }}" onClick="{{ focusedRangeWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedRangeShrinkClass }}" onClick="{{ focusedRangeWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
   <section class="hv-card-focus {{ focusedCardPopupClass }}" role="dialog" aria-label="{{ focusedCardTitle }}" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}" onMouseDown="{{ desktopSwipeStart }}" onMouseMove="{{ desktopSwipeMove }}" onMouseUp="{{ desktopSwipeEnd }}">
-    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><span>{{ focusedCardTitle }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-tabs hv-energy-headtabs" role="tablist" aria-label="Visões de consumo"><button type="button" role="tab" class="{{ focusedConsumptionTabNowClass }}" aria-selected="{{ focusedConsumptionTabNowOn }}" onClick="{{ focusedConsumptionTabNow }}">AGORA</button><button type="button" role="tab" class="{{ focusedConsumptionTabTripsClass }}" aria-selected="{{ focusedConsumptionTabTripsOn }}" onClick="{{ focusedConsumptionTabTrips }}">VIAGENS</button><button type="button" role="tab" class="{{ focusedConsumptionTabHistoryClass }}" aria-selected="{{ focusedConsumptionTabHistoryOn }}" onClick="{{ focusedConsumptionTabHistory }}">HISTÓRICO</button></div><button type="button" class="hv-energy-gear {{ focusedConsumptionSettingsClass }}" onClick="{{ focusedConsumptionSettingsToggle }}" aria-label="Configurações de consumo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></button></sc-if><sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><div class="hv-clim hv-clim-headx"><span class="cap meta">DENTRO <b data-cv="inside">—</b> · FORA <b data-cv="outside">—</b> · <span data-cv="mode"></span></span></div></sc-if><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><span class="hv-head-spacer"></span><sc-if value="{{ focusedConsumptionHeadDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle hv-energy-headtitle"><strong>{{ focusedConsumptionDetailTitle }}</strong><small data-en-live="{{ focusedConsumptionDetailLiveMeta }}">{{ focusedConsumptionDetailMeta }}</small></div></sc-if></sc-if><sc-if value="{{ focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-back" onClick="{{ focusedConsumptionSettingsToggle }}" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg><span>VOLTAR</span></button></sc-if><sc-if value="{{ !focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Fechar">×</button></sc-if></header>
+    <header class="hv-card-focus-head {{ focusedCardHeadClass }}"><sc-if value="{{ focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-back" onClick="{{ focusedConsumptionSettingsToggle }}" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg><span>VOLTAR</span></button></sc-if><sc-if value="{{ !focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ closeFocusedCard }}" aria-label="Fechar">×</button></sc-if><span>{{ focusedCardTitle }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-tabs hv-energy-headtabs" role="tablist" aria-label="Visões de consumo"><button type="button" role="tab" class="{{ focusedConsumptionTabNowClass }}" aria-selected="{{ focusedConsumptionTabNowOn }}" onClick="{{ focusedConsumptionTabNow }}">AGORA</button><button type="button" role="tab" class="{{ focusedConsumptionTabTripsClass }}" aria-selected="{{ focusedConsumptionTabTripsOn }}" onClick="{{ focusedConsumptionTabTrips }}">VIAGENS</button><button type="button" role="tab" class="{{ focusedConsumptionTabHistoryClass }}" aria-selected="{{ focusedConsumptionTabHistoryOn }}" onClick="{{ focusedConsumptionTabHistory }}">HISTÓRICO</button></div><button type="button" class="hv-energy-gear {{ focusedConsumptionSettingsClass }}" onClick="{{ focusedConsumptionSettingsToggle }}" aria-label="Configurações de consumo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></button></sc-if><sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><div class="hv-clim hv-clim-headx"><span class="cap meta">DENTRO <b data-cv="inside">—</b> · FORA <b data-cv="outside">—</b> · <span data-cv="mode"></span></span></div></sc-if><span class="hv-card-focus-badge {{ focusedCardBadgeClass }}">{{ focusedCardBadge }}</span><sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><span class="hv-head-spacer"></span><sc-if value="{{ focusedConsumptionHeadDetail }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-bartitle hv-energy-headtitle"><strong>{{ focusedConsumptionDetailTitle }}</strong><small data-en-live="{{ focusedConsumptionDetailLiveMeta }}">{{ focusedConsumptionDetailMeta }}</small></div></sc-if></sc-if></header>
         <sc-if value="{{ focusedConsumptionSettingsOpen }}" hint-placeholder-val="{{ false }}">
           <div class="hv-energy-settings slim-scrollbar" role="dialog" aria-label="Configurações de consumo">
             <section>
@@ -8116,12 +8131,12 @@ window.HavalSplash = (function () {
   <div class="hv-desktop-studio-backdrop {{ desktopStudioBackdropClass }}" onClick="{{ closeDesktopStudio }}"></div>
   <section class="hv-desktop-studio {{ desktopStudioClass }}" role="dialog" aria-label="Gerenciador de layout">
     <header class="hv-studio-head">
+      <button type="button" class="hv-studio-close" onClick="{{ closeDesktopStudio }}" aria-label="Fechar gerenciador de layout">×</button>
       <sc-if value="{{ studioIsClock }}" hint-placeholder-val="{{ false }}">
         <div class="hv-studio-crumb"><button type="button" onClick="{{ setStudioCards }}" aria-label="Voltar aos cards">‹</button><strong>Relógio</strong></div>
       </sc-if>
       <strong class="hv-studio-title" style="display:{{ studioTitleDisplay }};">{{ studioTitle }}</strong>
       <span class="hv-studio-scope">{{ desktopName }}</span>
-      <button type="button" class="hv-studio-close" onClick="{{ closeDesktopStudio }}" aria-label="Fechar gerenciador de layout">×</button>
     </header>
     <div class="hv-studio-body slim-scrollbar">
       <sc-if value="{{ studioIsClock }}" hint-placeholder-val="{{ false }}">
@@ -8376,10 +8391,10 @@ window.HavalSplash = (function () {
   <div class="hv-config-panel slim-scrollbar">
     <!-- Header -->
     <div class="hv-config-head">
+      <button class="hv-config-close" onClick="{{ closeConfigPanel }}" title="Fechar painel">×</button>
       <div class="hv-config-title">{{ configHeaderTitle }}</div>
       <div class="hv-config-head-actions">
         <button type="button" class="hv-config-save {{ saveBtnClass }}" onClick="{{ onSaveSettings }}" title="{{ configSaveTitle }}" style="display: {{ configSaveDisplay }};">SALVAR</button>
-        <button class="hv-config-close" onClick="{{ closeConfigPanel }}" title="Fechar painel">×</button>
       </div>
     </div>
 
@@ -20937,7 +20952,8 @@ class Component extends DCLogic {
     if (this.scene) {
       // \.\d+ matches Blender-suffixed duplicates (e.g. GT's own "Break.001" rear
       // caliper material, distinct from HEV's shared "Break" used on the front).
-      const WHEEL_RE = /^(Wheel|Break|Tire Top|Tire Side)(\.\d+)?$/;
+      // Include catalog `tyre` — visible rubber after a stock/catalog rim swap.
+      const WHEEL_RE = /^(Wheel|Break|Tire Top|Tire Side|tyre)(\.\d+)?$/;
       const dimWheels = next && !keepDay;
       this.scene.traverse(c => {
         if (!c.isMesh) return;
@@ -21384,6 +21400,27 @@ class Component extends DCLogic {
   // instead of reading as deep/black. Restore metalness toward the original
   // 0.9 for dark colours only, so blacks/dark reds stay punchy while
   // lighter/mid-tone swatches keep the satin finish.
+  // Tire rubber look. Stock Tire Top/Side used to inherit the generic body
+  // envMapIntensity=1.3 and read as a harsh sun streak; catalog `tyre` sat at
+  // authored ~1. Tuned live: keep dirLight, soften IBL to 0.8, floor stock
+  // roughness at 0.72, catalog tyre at 0.92, clearcoat off on Tire Top.
+  _tuneTireMaterial(m) {
+    if (!m) return;
+    const name = m.name || '';
+    if (!/^(tire top|tire side|tyre)(\.\d+)?$/i.test(name)) return;
+    m.envMapIntensity = 0.8;
+    if (/^tyre(\.\d+)?$/i.test(name)) {
+      m.roughness = Math.min(m.roughness == null ? 1 : m.roughness, 0.92);
+    } else {
+      m.roughness = 0.72;
+    }
+    if ('clearcoat' in m) {
+      m.clearcoat = 0;
+      m.clearcoatRoughness = 1;
+    }
+    m.needsUpdate = true;
+  }
+
   // `roughness` here is the BASE coat (under the clearcoat) — real automotive
   // paint keeps this moderate so the metallic flake/diffuse still reads;
   // pushing it to near-zero flattens the base layer into the same mirror-
@@ -23558,8 +23595,8 @@ class Component extends DCLogic {
     roofPop.className = 'hv-hs-roof-pop';
     roofPop.innerHTML =
       '<div class="hv-hs-roof-head">' +
-        '<div><h4>STATUS DO VEÍCULO</h4><button type="button" class="hv-energy-gear hv-hs-roof-gear" aria-label="Configurações de status" data-hs-status-cfg><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></button><span class="hv-hs-roof-mode" data-hs-vehicle-source>INDISPONÍVEL</span></div>' +
         '<button type="button" class="hv-hs-roof-close" aria-label="Fechar controles do veículo" data-hs-roof-close>×</button>' +
+        '<div><h4>STATUS DO VEÍCULO</h4><button type="button" class="hv-energy-gear hv-hs-roof-gear" aria-label="Configurações de status" data-hs-status-cfg><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></button><span class="hv-hs-roof-mode" data-hs-vehicle-source>INDISPONÍVEL</span></div>' +
       '</div>' +
       '<div class="hv-energy-settings hv-hs-status-cfg slim-scrollbar" role="dialog" aria-label="Configurações de status" data-hs-status-cfg-panel>' +
         '<section><p class="hv-energy-zlabel">UNIDADES DOS PNEUS</p>' +
@@ -34328,6 +34365,15 @@ class Component extends DCLogic {
         m.envMapIntensity = 1.3;   // let the HDRI reflections read on paint/chrome
         const nm = (m.name || '').toLowerCase();
 
+        // Tire rubber — the generic 1.3 HDRI read as a harsh sun streak on
+        // near-black rubber (stock Tire Top/Side; catalog `tyre`). Tuned on
+        // desktop against sun-off (too dead) and stock 1.3 (too shiny): keep
+        // dirLight, soften IBL, kill clearcoat on MeshPhysical Tire Top.
+        if (/^(tire top|tire side|tyre)(\.\d+)?$/i.test(m.name || '')) {
+          this._tuneTireMaterial(m);
+          return;
+        }
+
         // Body paint — capture the painted panels so the swatches can recolor them
         // (Body + Panel + Roof are the visible painted shell; exclude glass/chrome/
         // lights/tires/trim).
@@ -40771,6 +40817,10 @@ class Component extends DCLogic {
       root._climSig = sig;
       root.classList.toggle('off', src !== 'nosignal' && !v.power);
       root.classList.toggle('nosig', src === 'nosignal');
+      const ionsOn = on && !!v.anion;
+      root.classList.toggle('ions', ionsOn);
+      const focus = root.closest('.hv-card-focus');
+      if (focus) focus.classList.toggle('ions', ionsOn);
       const air = CLIM_AIR_MODES.find((m) => m.v === v.blower);
       root.setAttribute('data-air', on ? (air ? air.id : 'face') : 'none');
       const fmt = (x) => (src === 'nosignal' ? '—' : this._climFmtTemp(x));
@@ -40835,6 +40885,18 @@ class Component extends DCLogic {
       const cabin = this._climCabinSrc(on ? (air ? air.id : 'face') : 'off');
       root.querySelectorAll('.hv-clim-car img').forEach((n) => { if (n.getAttribute('src') !== cabin) n.setAttribute('src', cabin); });
     });
+    // Flip the rail wash as soon as ÍONS / power changes — the settle timer is too slow for a halo.
+    const railState = src === 'nosignal' ? 'unavailable' : (!v.power ? 'off' : (v.anion ? 'ions' : 'on'));
+    if (this._climLastRailState !== railState) {
+      this._climLastRailState = railState;
+      if (!this._unmounted && this._androidApp) {
+        if (this._climRailTimer) clearTimeout(this._climRailTimer);
+        this._climRailTimer = setTimeout(() => {
+          this._climRailTimer = 0;
+          if (!this._unmounted) this._syncDockIndicators();
+        }, 50);
+      }
+    }
   }
 
   /**
@@ -41179,7 +41241,8 @@ class Component extends DCLogic {
       metricB: String(fanMax),
       // Off → progress 0 → empty fan bar (no lit segments).
       progress: v.power ? Math.round(((v.fan || 0) / fanMax) * 100) : 0,
-      state: v.power ? 'on' : 'off',
+      // ions = powered + anion — native wash + green fan segments.
+      state: v.power ? (v.anion ? 'ions' : 'on') : 'off',
     });
   }
 
@@ -42641,7 +42704,7 @@ class Component extends DCLogic {
       // Tabs sit in the popup header; the bar below only carries the per-tab controls.
       // Only HISTÓRICO keeps a bar: VIAGENS moved its toggle under the list and its title to the header.
       consumptionShowBar: tab === 'history' || (tab === 'now' && m.sourceClass !== 'live' && !m.demo && !!wide),
-      // Maximise / restore beside the popup's × (owner, 2026-09-14).
+      // Maximise / restore control outside the popup header (owner, 2026-09-14).
       consumptionWideToggle: (ev) => this._toggleEnergyPopupWide(ev),
       consumptionWideOn: this._energyPopupWideOn(),
       consumptionWideOff: !this._energyPopupWideOn(),
@@ -43827,7 +43890,7 @@ class Component extends DCLogic {
     return this._energyPopupWide;
   }
 
-  /** Maximise / restore beside the popup's ×: the 3x2 frame or the board's full width, remembered. */
+  /** Maximise / restore outside the popup header: the 3x2 frame or the board's full width, remembered. */
   _toggleEnergyPopupWide(ev) {
     this._cardControlEvent(ev);
     this._energyPopupWide = !this._energyPopupWideOn();
