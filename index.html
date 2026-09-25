@@ -9649,6 +9649,12 @@ const GROUND_AO_K = 0.4;
 const GROUND_AO_FALLOFF = 1.5;     // how much less a HIGH blocker occludes
 const GROUND_AO_H = 0.6;           // blockers above this height add no AO
 const GROUND_SMOOTH = 1.5;         // final blur, texels: hides the tap pattern
+// Night: the background is ~#111, and a shadow can only darken what is behind
+// it -- 85% off #111 is #030303, i.e. invisible. A soft additive pool of light
+// under the car gives the shadow something to darken, the way a showroom spot
+// does. Car centerFill only: over a wallpaper it would just wash the photo.
+const GROUND_NIGHT_GLOW = 0.22;    // additive strength, 0 = off
+const GROUND_NIGHT_GLOW_SIZE = 2.6; // diameter, x the car's longest side
 
 // Night mode used to zero hemi+dir so the car sat in IBL-only darkness. Prefer
 // keeping day car lighting and only swapping the background + ground pools.
@@ -21594,6 +21600,31 @@ class Component extends DCLogic {
       group.add(layer.plane);
       return layer;
     };
+    // Night glow: drawn BEFORE both shadow layers (renderOrder 1) so they
+    // darken it. Additive but alpha-preserving (setAdditiveKeepAlpha), so it
+    // can never paint the canvas opaque.
+    const glowTex = (() => {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 256;
+      const ctx = cv.getContext('2d');
+      const gr = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+      gr.addColorStop(0, 'rgba(255,255,255,1)');
+      gr.addColorStop(0.45, 'rgba(255,255,255,0.55)');
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gr;
+      ctx.fillRect(0, 0, 256, 256);
+      return new THREE.CanvasTexture(cv);
+    })();
+    const glowMat = new THREE.MeshBasicMaterial({
+      map: glowTex, color: 0xb8c4d6, transparent: true, opacity: GROUND_NIGHT_GLOW,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+    });
+    setAdditiveKeepAlpha(THREE, glowMat);
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), glowMat);
+    glow.renderOrder = 1;
+    glow.visible = false;
+    group.add(glow);
+
     const sun = mkLayer(1024, 2);
     const ao = mkLayer(512, 3);
     group.userData.layers = { sun, ao };   // diagnostics: read back a layer's out target
@@ -21702,6 +21733,7 @@ class Component extends DCLogic {
       aoOn: 1, aoStrength: GROUND_AO_STRENGTH, aoMinR: GROUND_AO_MIN_R, aoK: GROUND_AO_K,
       aoFalloff: GROUND_AO_FALLOFF, aoH: GROUND_AO_H,
       smooth: GROUND_SMOOTH,
+      nightGlow: GROUND_NIGHT_GLOW, nightGlowSize: GROUND_NIGHT_GLOW_SIZE,
       lastMs: 0, bakes: 0,
     };
     this._contactShadowTune = tune;
@@ -21831,6 +21863,14 @@ class Component extends DCLogic {
       // double it. material.visible, not .visible: several paths rewrite the
       // mesh's visibility with the rest of the scene.
       if (this.shadowCatcher) this.shadowCatcher.material.visible = !sun.plane.visible;
+      glow.visible = !!(this.state.nightMode && !this._isMixedCenterFill()
+        && tune.nightGlow > 0 && !box.isEmpty());
+      if (glow.visible) {
+        const d = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * tune.nightGlowSize;
+        glow.position.set((box.min.x + box.max.x) / 2, -0.001, (box.min.z + box.max.z) / 2);
+        glow.scale.set(d, 1, d);
+        glowMat.opacity = tune.nightGlow;
+      }
       tune.lastMs = +(performance.now() - t0).toFixed(1);
       tune.bakes++;
     };
