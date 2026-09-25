@@ -9677,6 +9677,9 @@ const GROUND_SMOOTH = 1.5;         // final blur, texels: hides the tap pattern
 const GROUND_NIGHT_GLOW = 0.5;     // additive strength, 0 = off. 0.22 left the shadow barely visible;
                                    // 0.8 reads like the day shadow but the ground stops looking like night
 const GROUND_NIGHT_GLOW_SIZE = 2.6; // diameter, x the car's longest side
+// Night multiplies both shadow layers' strength: over a dim pool the same
+// occlusion reads far lighter than on the day floor.
+const GROUND_NIGHT_SHADOW_GAIN = 1.8;
 
 // Night mode used to zero hemi+dir so the car sat in IBL-only darkness. Prefer
 // keeping day car lighting and only swapping the background + ground pools.
@@ -21782,6 +21785,7 @@ class Component extends DCLogic {
       aoFalloff: GROUND_AO_FALLOFF, aoH: GROUND_AO_H,
       smooth: GROUND_SMOOTH,
       nightGlow: GROUND_NIGHT_GLOW, nightGlowSize: GROUND_NIGHT_GLOW_SIZE,
+      nightShadowGain: GROUND_NIGHT_SHADOW_GAIN,
       lastMs: 0, bakes: 0,
     };
     this._contactShadowTune = tune;
@@ -21869,6 +21873,7 @@ class Component extends DCLogic {
       if (this.floorMesh) y0 = this.floorMesh.getWorldPosition(new THREE.Vector3()).y;
       group.position.y = Math.max(baseY + 0.004, y0 + 0.003);
 
+      const nightGain = this.state.nightMode ? (tune.nightShadowGain || 1) : 1;
       const dl = this.dirLight;
       const sunLive = !!(tune.sunOn && dl && dl.visible && dl.intensity > 0 && dl.castShadow);
       if (!box.isEmpty()) {
@@ -21881,7 +21886,7 @@ class Component extends DCLogic {
           Ldir.set(0, 1, 0);
           bakeLayer(ao, Ldir, y0, 0.02, {
             tMax: tune.aoH, minR: tune.aoMinR, k: tune.aoK,
-            falloff: tune.aoFalloff, strength: tune.aoStrength,
+            falloff: tune.aoFalloff, strength: tune.aoStrength * nightGain,
           });
         }
         if (sunLive) {
@@ -21891,7 +21896,7 @@ class Component extends DCLogic {
           if (Ldir.y < 0.05) Ldir.y = 0.05;    // a grazing sun would smear to infinity
           bakeLayer(sun, Ldir, y0, 0.02, {
             tMax: 0, minR: tune.sunMinR, k: tune.sunK,
-            falloff: tune.sunFalloff, strength: tune.sunStrength,
+            falloff: tune.sunFalloff, strength: tune.sunStrength * nightGain,
           });
         }
         scene.overrideMaterial = null;
