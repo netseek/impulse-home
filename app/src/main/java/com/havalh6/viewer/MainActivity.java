@@ -209,7 +209,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v60-clima-live";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v61-clima-ions";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -2722,16 +2722,20 @@ public final class MainActivity extends Activity {
                 c.drawText(driver, pad, tempY, paint);
             }
 
+            // ÍONS borrows the climate green accent (same as --clim-good).
+            boolean ions = "ions".equals(descriptor.state);
+            int fanAccent = ions ? 0xFF3CCF91 : accent;
             float radius = Math.max(2f, segH * .45f);
             for (int i = 0; i < fanMax; i++) {
                 float x = barLeft + i * (segW + gap);
                 // Off / empty: faint track only, no accent fill (progress == 0).
-                fill(i < lit ? accent : withAlpha(strong, 0x24));
+                fill(i < lit ? fanAccent : withAlpha(strong, 0x24));
                 oval.set(x, barTop, x + segW, barTop + segH);
                 c.drawRoundRect(oval, radius, radius, paint);
             }
 
-            boolean off = unknown || !"on".equals(descriptor.state);
+            // Powered includes ions — that state is "on + anion", not off.
+            boolean off = unknown || !("on".equals(descriptor.state) || ions);
             String fanLabel = off ? "Desligado" : String.valueOf(lit);
             paint.setTextAlign(android.graphics.Paint.Align.CENTER);
             paint.setTypeface(android.graphics.Typeface.create(
@@ -8985,6 +8989,8 @@ public final class MainActivity extends Activity {
         if (state == null) return 0;
         switch (state) {
             case "eco": return 0xFF4FBF6A;
+            // Climate ÍONS: same radial wash treatment as eco, climate green accent.
+            case "ions": return 0xFF3CCF91;
             case "normal": return 0xFF4A7FB5;
             case "sport": return 0xFFE0392C;
             case "snow": return 0xFF6FB6E8;
@@ -11399,7 +11405,8 @@ public final class MainActivity extends Activity {
             if ("power".equals(id)) glyphText = sanitizePowerDirections(raw.optString("glyphText", ""));
             String state = "climate".equals(id)
                     ? sanitizeClockOption(raw.optString("state", "unavailable"),
-                            new String[] {"on", "off", "unavailable"}, "unavailable")
+                            // ions = powered + anion (green wash / fan); must not fall to unavailable.
+                            new String[] {"on", "off", "ions", "unavailable"}, "unavailable")
                     : ("wallpaper".equals(id) || "desktops".equals(id))
                     ? raw.optString("state", "car")
                     : ("range".equals(id)
