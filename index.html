@@ -40663,7 +40663,12 @@ class Component extends DCLogic {
     const now = Date.now();
     if (wheel._climRollAt && now - wheel._climRollAt < 220) return;
     wheel._climRollAt = now;
-    this._climTweenWheel(wheel, to > from ? -1 : 1);
+    // Paint already wrote the new value at rest. Apply the start offset in this
+    // same turn so the browser never shows the resting sizes then a pop to ±1
+    // (which reads as the number that left centre briefly growing).
+    const f0 = to > from ? -1 : 1;
+    this._climWheelFrame(wheel, f0);
+    this._climTweenWheel(wheel, f0);
   }
   _climSchedulePaint() {
     if (this._climPaintQueued) return;
