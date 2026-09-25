@@ -9670,16 +9670,6 @@ const GROUND_AO_K = 0.4;
 const GROUND_AO_FALLOFF = 1.5;     // how much less a HIGH blocker occludes
 const GROUND_AO_H = 0.6;           // blockers above this height add no AO
 const GROUND_SMOOTH = 1.5;         // final blur, texels: hides the tap pattern
-// Night: the background is ~#111, and a shadow can only darken what is behind
-// it -- 85% off #111 is #030303, i.e. invisible. A soft additive pool of light
-// under the car gives the shadow something to darken, the way a showroom spot
-// does. Car centerFill only: over a wallpaper it would just wash the photo.
-const GROUND_NIGHT_GLOW = 0.5;     // additive strength, 0 = off. 0.22 left the shadow barely visible;
-                                   // 0.8 reads like the day shadow but the ground stops looking like night
-const GROUND_NIGHT_GLOW_SIZE = 2.6; // diameter, x the car's longest side
-// Night multiplies both shadow layers' strength: over a dim pool the same
-// occlusion reads far lighter than on the day floor.
-const GROUND_NIGHT_SHADOW_GAIN = 1.8;
 
 // Night mode used to zero hemi+dir so the car sat in IBL-only darkness. Prefer
 // keeping day car lighting and only swapping the background + ground pools.
@@ -21036,14 +21026,17 @@ class Component extends DCLogic {
     // _ensureNightRig is often spent before that recompile finishes — the
     // ShadowMaterial catcher then stays blank until something else dirties it.
     // Keep the map dirty across the settle window (and on every day/night flip).
-    this._kickShadowRefresh(builtRig ? 16 : 6);
+    // The ground bake is identical in day and night while the sun is kept
+    // (keepDay), so skip re-baking it: the switch should change nothing but the
+    // background. With keepDay off the sun layer really does change.
+    this._kickShadowRefresh(builtRig ? 16 : 6, keepDay);
     if (this.state.widgetThemeMode === 'auto') this._refreshAutoWidgetThemeSample(false);
   }
 
-  _kickShadowRefresh(frames = 6) {
+  _kickShadowRefresh(frames = 6, keepGroundBake) {
     this._shadowRefreshLeft = Math.max(this._shadowRefreshLeft || 0, frames);
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
-    this._requestContactShadow();
+    if (!keepGroundBake) this._requestContactShadow();
     if (this.requestRender) this.requestRender(frames);
   }
 
@@ -21654,31 +21647,6 @@ class Component extends DCLogic {
       group.add(layer.plane);
       return layer;
     };
-    // Night glow: drawn BEFORE both shadow layers (renderOrder 1) so they
-    // darken it. Additive but alpha-preserving (setAdditiveKeepAlpha), so it
-    // can never paint the canvas opaque.
-    const glowTex = (() => {
-      const cv = document.createElement('canvas');
-      cv.width = cv.height = 256;
-      const ctx = cv.getContext('2d');
-      const gr = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-      gr.addColorStop(0, 'rgba(255,255,255,1)');
-      gr.addColorStop(0.45, 'rgba(255,255,255,0.55)');
-      gr.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = gr;
-      ctx.fillRect(0, 0, 256, 256);
-      return new THREE.CanvasTexture(cv);
-    })();
-    const glowMat = new THREE.MeshBasicMaterial({
-      map: glowTex, color: 0xb8c4d6, transparent: true, opacity: GROUND_NIGHT_GLOW,
-      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
-    });
-    setAdditiveKeepAlpha(THREE, glowMat);
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), glowMat);
-    glow.renderOrder = 1;
-    glow.visible = false;
-    group.add(glow);
-
     const sun = mkLayer(1024, 2);
     const ao = mkLayer(512, 3);
     group.userData.layers = { sun, ao };   // diagnostics: read back a layer's out target
@@ -21787,8 +21755,6 @@ class Component extends DCLogic {
       aoOn: 1, aoStrength: GROUND_AO_STRENGTH, aoMinR: GROUND_AO_MIN_R, aoK: GROUND_AO_K,
       aoFalloff: GROUND_AO_FALLOFF, aoH: GROUND_AO_H,
       smooth: GROUND_SMOOTH,
-      nightGlow: GROUND_NIGHT_GLOW, nightGlowSize: GROUND_NIGHT_GLOW_SIZE,
-      nightShadowGain: GROUND_NIGHT_SHADOW_GAIN,
       lastMs: 0, bakes: 0,
     };
     this._contactShadowTune = tune;
@@ -21876,7 +21842,6 @@ class Component extends DCLogic {
       if (this.floorMesh) y0 = this.floorMesh.getWorldPosition(new THREE.Vector3()).y;
       group.position.y = Math.max(baseY + 0.004, y0 + 0.003);
 
-      const nightGain = this.state.nightMode ? (tune.nightShadowGain || 1) : 1;
       const dl = this.dirLight;
       const sunLive = !!(tune.sunOn && dl && dl.visible && dl.intensity > 0 && dl.castShadow);
       if (!box.isEmpty()) {
@@ -21889,7 +21854,7 @@ class Component extends DCLogic {
           Ldir.set(0, 1, 0);
           bakeLayer(ao, Ldir, y0, 0.02, {
             tMax: tune.aoH, minR: tune.aoMinR, k: tune.aoK,
-            falloff: tune.aoFalloff, strength: tune.aoStrength * nightGain,
+            falloff: tune.aoFalloff, strength: tune.aoStrength,
           });
         }
         if (sunLive) {
@@ -21899,7 +21864,7 @@ class Component extends DCLogic {
           if (Ldir.y < 0.05) Ldir.y = 0.05;    // a grazing sun would smear to infinity
           bakeLayer(sun, Ldir, y0, 0.02, {
             tMax: 0, minR: tune.sunMinR, k: tune.sunK,
-            falloff: tune.sunFalloff, strength: tune.sunStrength * nightGain,
+            falloff: tune.sunFalloff, strength: tune.sunStrength,
           });
         }
         scene.overrideMaterial = null;
@@ -21919,14 +21884,6 @@ class Component extends DCLogic {
       // double it. material.visible, not .visible: several paths rewrite the
       // mesh's visibility with the rest of the scene.
       if (this.shadowCatcher) this.shadowCatcher.material.visible = !sun.plane.visible;
-      glow.visible = !!(this.state.nightMode && !this._isMixedCenterFill()
-        && tune.nightGlow > 0 && !box.isEmpty());
-      if (glow.visible) {
-        const d = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * tune.nightGlowSize;
-        glow.position.set((box.min.x + box.max.x) / 2, -0.001, (box.min.z + box.max.z) / 2);
-        glow.scale.set(d, 1, d);
-        glowMat.opacity = tune.nightGlow;
-      }
       tune.lastMs = +(performance.now() - t0).toFixed(1);
       tune.bakes++;
     };
