@@ -31,7 +31,14 @@ const sharp = require('sharp');
 const DEBUG = process.argv.includes('--debug');
 const srcDir = path.join(root, 'assets/_source/power');
 const outDir = path.join(root, 'assets/power/graphics');
-const OUT_W = 350, OUT_H = 770, MARGIN = 6;
+// MARGIN must clear the soft AO blur (sigma 5 ≈ 15–20 px). At 6 the left/right
+// tire shadows hit the canvas edge and read as a hard vertical cut.
+const OUT_W = 350, OUT_H = 770, MARGIN = 20;
+// Source pad around the solid silhouette. Cast shadow from the studio light is
+// stronger on one side; if the extract cuts through it, that side shows a knife
+// edge even when MARGIN is large enough for the synthetic AO.
+const CROP_PAD = 48;
+const CROP_EDGE_FEATHER = 14;
 
 // Everything in source pixels (x along the car, front = small x).
 const VARIANTS = {
@@ -266,7 +273,7 @@ async function build(key, cfg) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (rgba[(y * W + x) * 4 + 3] > 160 && !ground[y * W + x]) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
   }
-  const pad = 14; // keep some shadow beyond the silhouette
+  const pad = CROP_PAD;
   minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad); maxX = Math.min(W - 1, maxX + pad); maxY = Math.min(H - 1, maxY + pad);
   const cw = maxX - minX + 1, ch = maxY - minY + 1;          // source crop
   const rw = ch, rh = cw;                                      // rotated
@@ -288,6 +295,20 @@ async function build(key, cfg) {
     .resize(dw, dh, { kernel: 'lanczos3', fit: 'fill' }).raw().toBuffer();
   const layer = await sharp({ create: { width: OUT_W, height: OUT_H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
     .composite([{ input: cropped, raw: { width: dw, height: dh, channels: 4 }, left: offX, top: offY }]).raw().toBuffer();
+
+  // Soften any cast-shadow fringe that still reaches the extract rectangle.
+  // Solid car (a > 150) is left alone; the synthetic AO below rebuilds the
+  // soft ground contact. Without this, a pad that is still a few pixels short
+  // of the studio cast leaves a vertical seam at offX / offX+dw.
+  for (let y = offY; y < offY + dh; y++) for (let x = offX; x < offX + dw; x++) {
+    const o = (y * OUT_W + x) * 4;
+    const a = layer[o + 3];
+    if (a < 8 || a > 150) continue;
+    const d = Math.min(x - offX, offX + dw - 1 - x, y - offY, offY + dh - 1 - y);
+    if (d >= CROP_EDGE_FEATHER) continue;
+    const t = d / CROP_EDGE_FEATHER;
+    layer[o + 3] = Math.round(a * t * t);
+  }
 
   // Edge choke: the outermost ring of the silhouette still carries some of the
   // white studio backdrop after resampling and reads as a light outline on a

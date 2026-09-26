@@ -3063,35 +3063,35 @@ public final class MainActivity extends Activity {
             // renders have no body): a schematic port on the right rear quarter.
             float[] battery,engine,frontMotor,rearMotor=null;float[][] frontPath,fl,fr,rearPath=null,rl=null,rr=null,hubs,iceL,iceR,iceBatt,chargePath=null,chargeExt=null;float[] inlet=null;
             if(awd){
-                battery=new float[]{77.8f,259.1f,179.7f,285.1f};engine=new float[]{170.5f,96.5f,72.7f,76.1f};
-                frontMotor=new float[]{103f,97.5f,59.4f,87.9f};rearMotor=new float[]{133.9f,608.4f,76f,76f};
-                frontPath=new float[][]{{136.3f,259.1f},{136.3f,221.1f},{132.9f,185.4f}};
-                fl=new float[][]{{162.4f,137.9f},{271.7f,138.8f}};fr=new float[][]{{103f,137.9f},{69.7f,138.8f}};
-                rearPath=new float[][]{{171.9f,544.2f},{171.9f,577.5f},{171.9f,608.4f}};
-                rl=new float[][]{{209.9f,633.1f},{273.2f,632.2f}};rr=new float[][]{{133.9f,633.1f},{69.7f,632.2f}};
-                hubs=new float[][]{{302.6f,138.8f},{38.8f,138.8f},{302.6f,632.2f},{38.8f,632.2f}};
-                iceL=new float[][]{{243.2f,148.8f},{273.2f,148.8f}};iceR=new float[][]{{170.5f,148.8f},{69.7f,148.8f}};
-                iceBatt=new float[][]{{202.8f,172.6f},{202.8f,221.1f},{202.8f,259.1f}};
-                inlet=new float[]{322f,572f};chargePath=new float[][]{{322f,572f},{290f,572f},{290f,530f},{257.5f,530f}};
-                chargeExt=new float[][]{{342f,730f},{342f,598f},{322f,572f}};
+                battery=new float[]{93.6f,279.1f,150.4f,238.9f};engine=new float[]{171.2f,143f,60.9f,63.7f};
+                frontMotor=new float[]{114.7f,143.8f,49.8f,73.6f};rearMotor=new float[]{140.6f,571.7f,63.6f,63.7f};
+                frontPath=new float[][]{{142.6f,279.1f},{142.6f,247.3f},{139.8f,217.4f}};
+                fl=new float[][]{{164.5f,177.6f},{256f,178.4f}};fr=new float[][]{{114.7f,177.6f},{86.9f,178.4f}};
+                rearPath=new float[][]{{172.4f,518f},{172.4f,545.8f},{172.4f,571.7f}};
+                rl=new float[][]{{204.2f,592.4f},{257.2f,591.6f}};rr=new float[][]{{140.6f,592.4f},{86.9f,591.6f}};
+                hubs=new float[][]{{281.8f,178.4f},{61f,178.4f},{281.8f,591.6f},{61f,591.6f}};
+                iceL=new float[][]{{232.1f,186.8f},{257.2f,186.8f}};iceR=new float[][]{{171.2f,186.8f},{86.9f,186.8f}};
+                iceBatt=new float[][]{{198.3f,206.7f},{198.3f,247.3f},{198.3f,279.1f}};
+                inlet=new float[]{300f,548f};chargePath=new float[][]{{300f,548f},{274f,548f},{274f,506f},{244f,506f}};
+                chargeExt=new float[][]{{318f,690f},{318f,570f},{300f,548f}};
             }else if(hev){
-                battery=new float[]{146.2f,468.2f,72.5f,77.6f};engine=new float[]{187.2f,99.8f,65.3f,83.5f};
-                frontMotor=new float[]{126.3f,106.6f,56.4f,67.6f};
-                frontPath=new float[][]{{157.9f,468.2f},{123.6f,451.6f},{122.7f,318.5f},{144.4f,212.6f},{151.1f,174.2f}};
-                fl=new float[][]{{182.7f,141.8f},{270.5f,143.6f}};fr=new float[][]{{126.3f,141.8f},{85.8f,143.6f}};
-                hubs=new float[][]{{304.3f,144.9f},{49.7f,145.8f},{304.3f,620.7f},{47.5f,620.7f}};
-                iceL=new float[][]{{252.5f,153.9f},{270.5f,153.9f}};iceR=new float[][]{{187.2f,153.9f},{85.8f,153.9f}};
-                iceBatt=new float[][]{{207.4f,183.3f},{238.1f,214.8f},{238.1f,451.6f},{198.4f,468.2f}};
+                battery=new float[]{150.7f,454.5f,61.1f,65.2f};engine=new float[]{185.2f,144.9f,55f,70.1f};
+                frontMotor=new float[]{134.1f,150.6f,47.3f,56.8f};
+                frontPath=new float[][]{{160.6f,454.5f},{131.8f,440.5f},{131f,328.7f},{149.2f,239.6f},{154.9f,207.4f}};
+                fl=new float[][]{{181.4f,180.1f},{255.3f,181.7f}};fr=new float[][]{{134.1f,180.1f},{100f,181.7f}};
+                hubs=new float[][]{{283.8f,182.8f},{69.6f,183.6f},{283.8f,582.7f},{67.8f,582.7f}};
+                iceL=new float[][]{{240.2f,190.4f},{255.3f,190.4f}};iceR=new float[][]{{185.2f,190.4f},{100f,190.4f}};
+                iceBatt=new float[][]{{202.3f,215f},{228.1f,241.5f},{228.1f,440.5f},{194.7f,454.5f}};
             }else{
-                battery=new float[]{100.5f,287.1f,152.7f,193.5f};engine=new float[]{186.1f,101.5f,64.8f,87.9f};
-                frontMotor=new float[]{114.3f,103.8f,67.2f,74.1f};
-                frontPath=new float[][]{{151.4f,287.1f},{151.4f,235.7f},{149.1f,177.9f}};
-                fl=new float[][]{{181.5f,143.2f},{274.1f,144.1f}};fr=new float[][]{{114.3f,143.2f},{81.9f,144.1f}};
-                hubs=new float[][]{{304.2f,145.5f},{47.2f,145.5f},{304.2f,626.8f},{47.2f,626.8f}};
-                iceL=new float[][]{{250.9f,154.7f},{274.1f,154.7f}};iceR=new float[][]{{186.1f,154.7f},{81.9f,154.7f}};
-                iceBatt=new float[][]{{218.5f,189.4f},{218.5f,240.4f},{218.5f,287.1f}};
-                inlet=new float[]{324f,566f};chargePath=new float[][]{{324f,566f},{288f,566f},{288f,460f},{253.2f,460f}};
-                chargeExt=new float[][]{{342f,730f},{342f,592f},{324f,566f}};
+                battery=new float[]{112.5f,303.4f,128.2f,162.3f};engine=new float[]{184.3f,147.7f,54.4f,73.8f};
+                frontMotor=new float[]{124.1f,149.6f,56.3f,62.2f};
+                frontPath=new float[][]{{155.2f,303.4f},{155.2f,260.3f},{153.2f,211.8f}};
+                fl=new float[][]{{180.4f,182.6f},{258.1f,183.4f}};fr=new float[][]{{124.1f,182.6f},{96.9f,183.4f}};
+                hubs=new float[][]{{283.4f,184.6f},{67.8f,184.6f},{283.4f,588.4f},{67.8f,588.4f}};
+                iceL=new float[][]{{238.7f,192.3f},{258.1f,192.3f}};iceR=new float[][]{{184.3f,192.3f},{96.9f,192.3f}};
+                iceBatt=new float[][]{{211.5f,221.5f},{211.5f,264.2f},{211.5f,303.4f}};
+                inlet=new float[]{304f,540f};chargePath=new float[][]{{304f,540f},{274f,540f},{274f,460f},{241f,460f}};
+                chargeExt=new float[][]{{320f,700f},{320f,565f},{304f,540f}};
             }
             boolean incoming=front<0||rear<0,outgoing=front>0||rear>0;
             // Engine running with the car standing is the generator filling the pack.
