@@ -22034,6 +22034,12 @@ class Component extends DCLogic {
     if (!t) return;
     const p = this._groundShadowPrefs();
     t.gain = p.gain; t.sunK = p.soft; t.aoStrength = p.contact;
+    // SUAVIDADE softens the contact layer too, by the same factor, or the
+    // crisp tyre line never changes: its radius is aoMinR + aoK * height, and
+    // at the contact patch (height ~0) that is aoMinR alone.
+    const f = p.soft / GROUND_SUN_K;
+    t.aoK = GROUND_AO_K * f;
+    t.aoMinR = GROUND_AO_MIN_R * f;
   }
 
   _nudgeGroundShadow(key, dir) {
