@@ -9674,6 +9674,12 @@ const GROUND_AO_K = 0.4;
 const GROUND_AO_FALLOFF = 1.5;     // how much less a HIGH blocker occludes
 const GROUND_AO_H = 0.6;           // blockers above this height add no AO
 const GROUND_SMOOTH = 1.5;         // final blur, texels: hides the tap pattern
+// The sun layer's filter reads 2 x 64 taps per texel, spread over a disc that
+// is METRES wide at sunK 2 -- cache-hostile. At 1024^2 it measured ~300 ms of
+// GPU per bake on the car, i.e. 300-570 ms frames every door-tween bake (door
+// cycle: 72 frames in 9 s vs 259 with the layer off). A penumbra that soft has
+// no detail to lose at low resolution; the crisp tyre contact is the AO layer's.
+const GROUND_SUN_RES = 256;
 
 // Night mode used to zero hemi+dir so the car sat in IBL-only darkness. Prefer
 // keeping day car lighting and only swapping the background + ground pools.
@@ -20928,7 +20934,8 @@ class Component extends DCLogic {
         m.metalness = metalness;
         m.roughness = roughness;
         m.envMapIntensity = envMapIntensity;
-        m.needsUpdate = true;
+        // No needsUpdate: these are uniforms, refreshed every frame. needsUpdate
+        // only makes three re-validate every body program on the next frame.
       });
     }
     // Scene background is handled by _applyBackground below
@@ -20964,7 +20971,6 @@ class Component extends DCLogic {
         fm.color.set(0xdedfe1);
         fm.roughness = 0.96;
         fm.envMapIntensity = 0.25;
-        fm.needsUpdate = true;
       }
     }
     if (this.shadowCatcher) {
@@ -21005,7 +21011,6 @@ class Component extends DCLogic {
             if (m._dayEnvMap !== undefined) m.envMapIntensity = m._dayEnvMap;
             if (m._dayRoughness !== undefined) m.roughness = m._dayRoughness;
           }
-          m.needsUpdate = true;
         });
       });
     }
@@ -21044,7 +21049,15 @@ class Component extends DCLogic {
     }
     // UI background
     this._applyBackground(next, this.state.dayBg, this.state.nightBg, this.state.vignette, this.state.grainEnabled);
-    this._generateBlurredWheelTexture();
+    // The rim capture measured 115-149 ms on the car, synchronously, on every
+    // day/night flip -- and a headlight-driven flip happens while driving, i.e.
+    // mid wheel-spin. With the sun kept (keepDay) the wheels are lit exactly as
+    // before, so the capture would be identical: skip it. Otherwise the wheels
+    // really are dimmed; take the debounced path, off the switch frame.
+    if (!keepDay) {
+      if (typeof this._requestBlurCapture === 'function') this._requestBlurCapture();
+      else this._generateBlurredWheelTexture();
+    }
     // Blur capture temporarily hides nightFloor — re-assert after it returns.
     if (this.nightFloor) {
       this.nightFloor.visible = !!next && this._carSceneVisible === true;
@@ -21067,7 +21080,14 @@ class Component extends DCLogic {
     // The ground bake is identical in day and night while the sun is kept
     // (keepDay), so skip re-baking it: the switch should change nothing but the
     // background. With keepDay off the sun layer really does change.
-    this._kickShadowRefresh(builtRig ? 16 : 6, keepDay);
+    //
+    // Only the first entry (builtRig) needs that window. A later flip with the
+    // sun kept changes nothing in the shadow map either, so it gets no updates
+    // at all -- measured on the car, a headlight-driven night switch was
+    // forcing 18 shadow-map re-renders (each a VSM blur at 2048^2).
+    if (builtRig) this._kickShadowRefresh(16, keepDay);
+    else if (!keepDay) this._kickShadowRefresh(6);
+    else if (this.requestRender) this.requestRender(4);
     if (this.state.widgetThemeMode === 'auto') this._refreshAutoWidgetThemeSample(false);
   }
 
@@ -21685,7 +21705,7 @@ class Component extends DCLogic {
       group.add(layer.plane);
       return layer;
     };
-    const sun = mkLayer(1024, 2);
+    const sun = mkLayer(GROUND_SUN_RES, 2);
     const ao = mkLayer(512, 3);
     group.userData.layers = { sun, ao };   // diagnostics: read back a layer's out target
 
@@ -21792,7 +21812,7 @@ class Component extends DCLogic {
       sunFalloff: GROUND_SUN_FALLOFF,
       aoOn: 1, aoStrength: GROUND_AO_STRENGTH, aoMinR: GROUND_AO_MIN_R, aoK: GROUND_AO_K,
       aoFalloff: GROUND_AO_FALLOFF, aoH: GROUND_AO_H,
-      smooth: GROUND_SMOOTH,
+      smooth: GROUND_SMOOTH, sunRes: GROUND_SUN_RES,
       lastMs: 0, bakes: 0,
     };
     this._contactShadowTune = tune;
@@ -21934,6 +21954,11 @@ class Component extends DCLogic {
           if (k in tune && typeof patch[k] === 'number') tune[k] = patch[k];
         });
         if ('on' in patch) group.userData.disabled = !patch.on;
+        if (typeof patch.sunRes === 'number' && patch.sunRes !== sun.res) {
+          const n = Math.max(64, Math.min(2048, patch.sunRes | 0));
+          sun.bake.setSize(n, n); sun.out.setSize(n, n); sun.tmp.setSize(n, n);
+          sun.res = n; tune.sunRes = n;
+        }
         if (group.userData.disabled && this.shadowCatcher) this.shadowCatcher.material.visible = true;
         this._requestContactShadow(0);
       }
