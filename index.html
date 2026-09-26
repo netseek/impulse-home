@@ -35846,6 +35846,7 @@ class Component extends DCLogic {
       if (this._unmounted) return;
       prefetch();
     }, 6000);
+    this._scheduleNightWarm();
     if (this._camIconWarmupArmed) return;
     this._camIconWarmupArmed = true;
     const kick = () => {
@@ -35861,6 +35862,81 @@ class Component extends DCLogic {
       this._ensureCamIcons(0, { background: true });
     };
     setTimeout(kick, CAM_ICON_WARMUP_MS);
+  }
+
+  // First night entry after boot measured a 650 ms + 167 ms frame on the car:
+  // _ensureNightRig adds 13 SpotLights (POOL_LAYER only) and the night passes
+  // (1b pools, 1c shadow overlay) then compile programs the day never needed.
+  // Do that here instead, well after the reveal and never while moving: build
+  // the rig at intensity 0 (the main pass does not see POOL_LAYER lights, so
+  // day rendering is unchanged) and draw both night passes once through a 1x1
+  // scissor on the REAL framebuffer -- a scratch target keys a different
+  // encoding and would compile the wrong programs (see _prewarmCarReveal).
+  // A/B: localStorage.h6_nightWarm = '0'.
+  _scheduleNightWarm() {
+    if (this._nightWarmArmed) return;
+    this._nightWarmArmed = true;
+    try { if (localStorage.getItem('h6_nightWarm') === '0') return; } catch (e) {}
+    const tryWarm = () => {
+      if (this._unmounted || this._nightRigBuilt || this.state.nightMode) return;
+      if (!this.renderer || !this.camera || !this.nightFloor || !this._revealSettled()) {
+        setTimeout(tryWarm, 1000);
+        return;
+      }
+      // Not while moving (a compile stall would land mid wheel-spin), loading
+      // or hidden. Re-checked on every step, not only when the chain starts.
+      if (this._currentMotionSpeed() !== 0 || !this._carSceneVisible || this.state.loading
+          || document.visibilityState !== 'visible') {
+        setTimeout(tryWarm, 3000);
+        return;
+      }
+      const THREE = this.THREE;
+      const r = this.renderer, scene = this.scene, cam = this.camera;
+      const t0 = performance.now();
+      const p0 = r.info.programs ? r.info.programs.length : 0;
+      const prevAutoClear = r.autoClear;
+      const prevScissorTest = r.getScissorTest();
+      const prevViewport = r.getViewport(new THREE.Vector4());
+      const prevScissor = r.getScissor(new THREE.Vector4());
+      const prevRt = r.getRenderTarget();
+      const prevMask = cam.layers.mask;
+      const prevBg = scene.background;
+      const nf = this.nightFloor, nfVis = nf.visible;
+      const dir = this.dirLight;
+      try {
+        this._ensureNightRig();
+        nf.visible = true;
+        scene.background = null;
+        r.setRenderTarget(null);
+        r.autoClear = false;
+        r.setScissorTest(true);
+        r.setViewport(0, 0, 1, 1);
+        r.setScissor(0, 0, 1, 1);
+        cam.layers.set(POOL_LAYER);                       // 1b
+        r.render(scene, cam);
+        if (dir) dir.layers.enable(SHADOW_OVERLAY_LAYER); // 1c
+        cam.layers.set(SHADOW_OVERLAY_LAYER);
+        r.render(scene, cam);
+        if (dir) dir.layers.disable(SHADOW_OVERLAY_LAYER);
+      } catch (e) {
+        console.warn('[Night] warm failed', e);
+      } finally {
+        cam.layers.mask = prevMask;
+        nf.visible = nfVis;
+        scene.background = prevBg;
+        r.setViewport(prevViewport);
+        r.setScissor(prevScissor);
+        r.setScissorTest(prevScissorTest);
+        r.autoClear = prevAutoClear;
+        r.setRenderTarget(prevRt);
+      }
+      this._nightWarm = {
+        ms: +(performance.now() - t0).toFixed(1),
+        programs: (r.info.programs ? r.info.programs.length : 0) - p0,
+      };
+      if (this.requestRender) this.requestRender(2, true);
+    };
+    setTimeout(tryWarm, 4000);
   }
 
   // True once the boot reveal is over AND has had REVEAL_SETTLE_MS to land.
