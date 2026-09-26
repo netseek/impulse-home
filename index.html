@@ -8455,6 +8455,13 @@ window.HavalSplash = (function () {
         <button type="button" onClick="{{ resetPaintFinish }}" title="Voltar ao acabamento original desta cor" style="width: 100%; padding: 8px 10px; margin-bottom: 12px; border-radius: 8px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); color: inherit;">REDEFINIR ACABAMENTO</button>
       </sc-if>
 
+      <div class="hv-config-section-label">INSULFILM</div>
+      <div class="hv-config-row-head">
+        <span>ESCURECIMENTO</span>
+        <span class="hv-config-val">{{ windowTintLabel }}</span>
+      </div>
+      <input type="range" min="0" max="1" step="0.01" value="{{ windowTint }}" onChange="{{ onWindowTint }}" onInput="{{ onWindowTint }}" style="width: 100%; accent-color: #4fd6e8; margin-bottom: 12px;" />
+
       <div class="hv-config-section-label">ACABAMENTO DO ARO</div>
       <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 12px; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .1em; opacity: .85; min-height: 36px;">
         <input type="checkbox" checked="{{ wheelTintOverride }}" onChange="{{ onWheelTintOverride }}" style="accent-color: #4fd6e8; width: 18px; height: 18px; cursor: pointer;" />
@@ -8648,6 +8655,16 @@ window.HavalSplash = (function () {
           </button>
         </sc-for>
       </div>
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin: 16px 0 9px;">SOMBRA NO CHÃO</div>
+      <sc-for list="{{ shadowRows }}" as="sr" hint-placeholder-count="3">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <span style="flex: 1; min-width: 0; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .1em; opacity: .7;">{{ sr.label }}</span>
+          <button type="button" class="hv-range-nudge" onClick="{{ sr.onLess }}">−</button>
+          <span style="min-width: 34px; text-align: center; font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ sr.value }}</span>
+          <button type="button" class="hv-range-nudge" onClick="{{ sr.onMore }}">+</button>
+        </div>
+      </sc-for>
+      <button type="button" onClick="{{ onShadowReset }}" style="width: 100%; padding: 7px; border-radius: 7px; border: 1px solid rgba(79,214,232,.3); background: rgba(79,214,232,.08); color: #4fd6e8; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em;">SOMBRA PADRÃO</button>
       </sc-if>
 
       <sc-if value="{{ overrideIsMotion }}" hint-placeholder-val="{{ true }}">
@@ -10083,7 +10100,7 @@ function persistBootShellLayout(mode, splitRatio, opts) {
 }
 
 class Component extends DCLogic {
-  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'dyad', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, powertrainOn: false, nightMode: false, timeMode: 'auto', widgetThemeMode: 'dark', nightKeepDayLighting: NIGHT_KEEP_DAY_LIGHTING_DEFAULT, showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
+  state = { loading: true, progress: 0, error: null, splashActive: !!(window.HavalSplash && window.HavalSplash.active), carColor: null, lightIntensity: 1.1, exposure: 1, hdriKey: 'dyad', origHex: null, customHdriName: null, panelOpen: false, configExpanded: false, powertrainOn: false, nightMode: false, timeMode: 'auto', groundShadow: null, widgetThemeMode: 'dark', nightKeepDayLighting: NIGHT_KEEP_DAY_LIGHTING_DEFAULT, showFps: false, resScaleMode: 'off', saveFlash: false, perfToastOn: false, perfToastTitle: '', perfToastMsg: '',
     lights: { position: false, headlight: false, highbeam: false, fogFront: false, fogRear: false, turnL: false, turnR: false, hazard: false, brake: false, reverse: false }, assignMode: null,
     configSection: 'paint', // 'paint' | 'wheels' | 'override' | 'env' | 'camera'
     tuningSubTab: 'paint', // 'paint' | 'wheels'
@@ -10118,6 +10135,9 @@ class Component extends DCLogic {
     // Per-tint body finish overrides, keyed by _paintFinishKey:
     // { '#8B0000': { metalness, roughness }, stock: {...} }. Absent = built-in.
     paintFinish: {},
+    // Window film darkness, 0 (clear) .. 1 (limo). 0.5 reproduces the stock
+    // smoked look (opacity 0.62) that the material pass used to hardcode.
+    windowTint: 0.5,
     grainEnabled: false,
     showGlassTweaks: false,
     glassTweaks: { opacity: 0.1, iridescence: 0, iridIOR: 1.8, thickMin: 100, thickMax: 400, clearcoat: 1.0, envMap: 1.0, color: '#ffffff', fresnel: 0 },
@@ -10885,6 +10905,7 @@ class Component extends DCLogic {
     this._savedSettings = saved;
     const s = this.state;
     if (saved.timeMode === 'day' || saved.timeMode === 'night' || saved.timeMode === 'auto') s.timeMode = saved.timeMode;
+    if (saved.groundShadow && typeof saved.groundShadow === 'object') s.groundShadow = this._cleanGroundShadow(saved.groundShadow);
     if (typeof saved.nightMode === 'boolean' && saved.timeMode !== 'auto') s.nightMode = saved.nightMode;
     if (saved.widgetThemeMode === 'light' || saved.widgetThemeMode === 'dark' || saved.widgetThemeMode === 'auto') {
       s.widgetThemeMode = saved.widgetThemeMode;
@@ -10904,6 +10925,7 @@ class Component extends DCLogic {
     if (saved.setupCompleted) this._setupCompleted = true;
     if (typeof saved.carColor === 'string' || saved.carColor === null) s.carColor = saved.carColor;
     if (saved.paintFinish && typeof saved.paintFinish === 'object') s.paintFinish = { ...saved.paintFinish };
+    if (typeof saved.windowTint === 'number') s.windowTint = Math.min(1, Math.max(0, saved.windowTint));
     if (typeof saved.lightIntensity === 'number') s.lightIntensity = saved.lightIntensity;
     if (typeof saved.exposure === 'number') s.exposure = saved.exposure;
     if (typeof saved.hdriKey === 'string') s.hdriKey = saved.hdriKey;
@@ -15445,12 +15467,14 @@ class Component extends DCLogic {
     const payload = {
       setupCompleted: !!this._setupCompleted,
       timeMode: s.timeMode,
+      groundShadow: s.groundShadow || null,
       nightMode: s.nightMode,
       widgetThemeMode: (s.widgetThemeMode === 'light' || s.widgetThemeMode === 'auto') ? s.widgetThemeMode : 'dark',
       modelVariant: s.modelVariant,
       modelTrim: s.modelTrim || 'phev34',
       carColor: s.carColor,
       paintFinish: { ...s.paintFinish },
+      windowTint: s.windowTint,
       lightIntensity: s.lightIntensity,
       exposure: s.exposure,
       hdriKey: s.hdriKey,
@@ -15537,6 +15561,7 @@ class Component extends DCLogic {
     if (saved.carColor !== undefined && typeof this.setColor === 'function') {
       this.setColor(saved.carColor);
     }
+    if (typeof saved.windowTint === 'number') this._applyWindowTint(saved.windowTint);
     if (typeof saved.exposure === 'number' && this.renderer) {
       this.renderer.toneMappingExposure = saved.exposure;
     }
@@ -15973,6 +15998,16 @@ class Component extends DCLogic {
       overrideIsMotion: s.overrideSubTab === 'motion',
       overrideIsDoors:  s.overrideSubTab === 'doors',
       overrideIsLights: s.overrideSubTab === 'lights',
+      shadowRows: (() => {
+        const p = this._groundShadowPrefs();
+        return [['gain', 'INTENSIDADE', 1], ['soft', 'SUAVIDADE', 2], ['contact', 'CONTATO', 1]]
+          .map(([k, label, dp]) => ({
+            label, value: p[k].toFixed(dp),
+            onLess: () => this._nudgeGroundShadow(k, -1),
+            onMore: () => this._nudgeGroundShadow(k, 1),
+          }));
+      })(),
+      onShadowReset: () => this._resetGroundShadow(),
       setOverrideMotion: () => this._openConfigTab('advanced', { advanced: 'motion' }),
       setOverrideDoors:  () => this._openConfigTab('advanced', { advanced: 'doors' }),
       setOverrideLights: () => this._openConfigTab('advanced', { advanced: 'lights' }),
@@ -16036,6 +16071,9 @@ class Component extends DCLogic {
           onPaintMetalness: (e) => this._setPaintFinish('metalness', e.target.value),
           onPaintRoughness: (e) => this._setPaintFinish('roughness', e.target.value),
           resetPaintFinish: () => this._resetPaintFinish(),
+          windowTint: s.windowTint,
+          windowTintLabel: Math.round(s.windowTint * 100) + '%',
+          onWindowTint: (e) => this._setWindowTint(e.target.value),
         };
       })(),
       onCustomCarColor: (e) => {
@@ -21812,7 +21850,7 @@ class Component extends DCLogic {
       sunFalloff: GROUND_SUN_FALLOFF,
       aoOn: 1, aoStrength: GROUND_AO_STRENGTH, aoMinR: GROUND_AO_MIN_R, aoK: GROUND_AO_K,
       aoFalloff: GROUND_AO_FALLOFF, aoH: GROUND_AO_H,
-      smooth: GROUND_SMOOTH, sunRes: GROUND_SUN_RES,
+      smooth: GROUND_SMOOTH, sunRes: GROUND_SUN_RES, gain: 1,
       lastMs: 0, bakes: 0,
     };
     this._contactShadowTune = tune;
@@ -21912,7 +21950,7 @@ class Component extends DCLogic {
           Ldir.set(0, 1, 0);
           bakeLayer(ao, Ldir, y0, 0.02, {
             tMax: tune.aoH, minR: tune.aoMinR, k: tune.aoK,
-            falloff: tune.aoFalloff, strength: tune.aoStrength,
+            falloff: tune.aoFalloff, strength: tune.aoStrength * (tune.gain || 1),
           });
         }
         if (sunLive) {
@@ -21922,7 +21960,7 @@ class Component extends DCLogic {
           if (Ldir.y < 0.05) Ldir.y = 0.05;    // a grazing sun would smear to infinity
           bakeLayer(sun, Ldir, y0, 0.02, {
             tMax: 0, minR: tune.sunMinR, k: tune.sunK,
-            falloff: tune.sunFalloff, strength: tune.sunStrength,
+            falloff: tune.sunFalloff, strength: tune.sunStrength * (tune.gain || 1),
           });
         }
         scene.overrideMaterial = null;
@@ -21946,6 +21984,7 @@ class Component extends DCLogic {
       tune.bakes++;
     };
     this.contactShadow = group;
+    this._applyGroundShadowPrefs();
     this._requestContactShadow(0);
 
     window.__contactShadow = (patch) => {
@@ -21964,6 +22003,58 @@ class Component extends DCLogic {
       }
       return { ...tune, on: !group.userData.disabled, visible: group.visible };
     };
+  }
+
+  // Avançado -> Luzes shadow steppers. Saved as state.groundShadow; null means
+  // the built-in defaults. gain scales both layers (darker / lighter), soft is
+  // the sun penumbra (sunK), contact the AO under the car (aoStrength).
+  _groundShadowSpec() {
+    return {
+      gain:    { def: 1,                  min: 0.4, max: 2.0, step: 0.1 },
+      soft:    { def: GROUND_SUN_K,       min: 0.25, max: 4.0, step: 0.25 },
+      contact: { def: GROUND_AO_STRENGTH, min: 0,   max: 1.5, step: 0.1 },
+    };
+  }
+
+  _cleanGroundShadow(v) {
+    const spec = this._groundShadowSpec(), out = {};
+    Object.keys(spec).forEach((k) => {
+      const n = Number(v && v[k]);
+      out[k] = isFinite(n) ? Math.min(spec[k].max, Math.max(spec[k].min, n)) : spec[k].def;
+    });
+    return out;
+  }
+
+  _groundShadowPrefs() {
+    return this._cleanGroundShadow(this.state.groundShadow || {});
+  }
+
+  _applyGroundShadowPrefs() {
+    const t = this._contactShadowTune;
+    if (!t) return;
+    const p = this._groundShadowPrefs();
+    t.gain = p.gain; t.sunK = p.soft; t.aoStrength = p.contact;
+  }
+
+  _nudgeGroundShadow(key, dir) {
+    const spec = this._groundShadowSpec()[key];
+    if (!spec) return;
+    const p = this._groundShadowPrefs();
+    const next = Math.round((p[key] + dir * spec.step) / spec.step) * spec.step;
+    p[key] = +Math.min(spec.max, Math.max(spec.min, next)).toFixed(2);
+    this.setState({ groundShadow: p }, () => {
+      this._applyGroundShadowPrefs();
+      this._requestContactShadow(60);
+      this.saveSettings({ keepCamera: true });
+    });
+  }
+
+  _resetGroundShadow() {
+    this.setState({ groundShadow: null }, () => {
+      this._applyGroundShadowPrefs();
+      this._requestContactShadow(60);
+      this.saveSettings({ keepCamera: true });
+    });
   }
 
   // Trailing debounce for the contact-shadow bake: several settle paths fire
@@ -22850,6 +22941,31 @@ class Component extends DCLogic {
         if (this.renderer) this.renderer.properties.remove(m);
       });
     });
+  }
+
+  // Window film: darkness 0..1 -> glass opacity. 0.5 lands on the stock 0.62.
+  _windowTintOpacity(t) {
+    const v = Number.isFinite(+t) ? Math.min(1, Math.max(0, +t)) : 0.5;
+    return 0.2 + 0.84 * v;
+  }
+
+  _setWindowTint(val) {
+    const t = Math.min(1, Math.max(0, parseFloat(val) || 0));
+    this.setState({ windowTint: t });
+    this._applyWindowTint(t);
+  }
+
+  // Opacity only: no needsUpdate / program change, so dragging costs nothing
+  // beyond the redraw.
+  _applyWindowTint(t) {
+    if (!this.scene) return;
+    const op = this._windowTintOpacity(t);
+    this.scene.traverse(c => {
+      if (!c.isMesh) return;
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      mats.forEach(m => { if (m && m._isWindowGlass) m.opacity = op; });
+    });
+    if (typeof this.requestRender === 'function') this.requestRender();
   }
 
   _setGlassTweak(key, val) {
@@ -34557,7 +34673,8 @@ class Component extends DCLogic {
           }
           // Regular window / windscreen glass
           m.transparent = true;
-          m.opacity = 0.62;
+          m._isWindowGlass = true;
+          m.opacity = this._windowTintOpacity(this.state.windowTint);
           m.depthWrite = false;
           m.side = THREE.FrontSide;
           m.polygonOffset = true;
