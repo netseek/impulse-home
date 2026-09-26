@@ -10135,8 +10135,7 @@ class Component extends DCLogic {
     // Per-tint body finish overrides, keyed by _paintFinishKey:
     // { '#8B0000': { metalness, roughness }, stock: {...} }. Absent = built-in.
     paintFinish: {},
-    // Window film darkness, 0 (clear) .. 1 (limo). 0.5 reproduces the stock
-    // smoked look (opacity 0.62) that the material pass used to hardcode.
+    // Window film darkness above stock film, 0 .. 1 (limo). Default 0.5.
     windowTint: 0.5,
     grainEnabled: false,
     showGlassTweaks: false,
@@ -22949,10 +22948,11 @@ class Component extends DCLogic {
     });
   }
 
-  // Window film: darkness 0..1 -> glass opacity. 0.5 lands on the stock 0.62.
+  // Window film: darkness 0..1 -> glass opacity. 0 is the stock film
+  // (opacity 0.536); 1 is near-opaque limo glass.
   _windowTintOpacity(t) {
     const v = Number.isFinite(+t) ? Math.min(1, Math.max(0, +t)) : 0.5;
-    return 0.2 + 0.84 * v;
+    return 0.536 + 0.44 * v;
   }
 
   _setWindowTint(val) {
@@ -46567,7 +46567,9 @@ class Component extends DCLogic {
 
   resetPaintColors() {
     this.setColor('stock');
+    this._applyWindowTint(0.5);
     this.setState({
+      windowTint: 0.5,
       wheelColor: '#3a3a3d',
       wheelTintOverride: false,
     }, () => {
