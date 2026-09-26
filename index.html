@@ -8668,6 +8668,19 @@ window.HavalSplash = (function () {
       </sc-if>
 
       <sc-if value="{{ overrideIsMotion }}" hint-placeholder-val="{{ true }}">
+      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">VELOCIDADE</div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">FRENTE →</span>
+        <span data-speed-label="1" style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ motionSpeedLabel }}</span>
+      </div>
+      <div class="hv-range-row">
+        <div class="hv-range" onPointerDown="{{ onMotionRangeDown }}" onTouchStart="{{ onMotionRangeDown }}" onMouseDown="{{ onMotionRangeDown }}">
+          <div class="hv-range-track"><div class="hv-range-fill" style="width: {{ motionSpeedPct }};"></div></div>
+          <div class="hv-range-thumb" style="left: {{ motionSpeedPct }};"></div>
+        </div>
+      </div>
+      <button onClick="{{ onMotionStop }}" style="width: 100%; padding: 7px; border-radius: 7px; border: 1px solid rgba(79,214,232,.3); background: rgba(79,214,232,.08); color: #4fd6e8; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em;">PARAR</button>
+      <div style="height: 18px;"></div>
       <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">ÂNGULO DA RODA</div>
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
         <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">ESQ. ←  → DIR.</span>
@@ -8675,20 +8688,6 @@ window.HavalSplash = (function () {
       </div>
       <input data-steer-range="1" type="range" min="-35" max="35" step="0.1" value="{{ wheelAngle }}" onChange="{{ onWheelAngle }}" onInput="{{ onWheelAngle }}" style="width: 100%; accent-color: #4fd6e8; margin: 0 0 18px;" />
 
-      <div style="font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 9px;">VELOCIDADE</div>
-      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-        <span style="font-family: 'Space Mono', monospace; font-size: 8px; opacity: .5;">RÉ ←  → FRENTE</span>
-        <span data-speed-label="1" style="font-family: 'Space Mono', monospace; font-size: 10px; color: #4fd6e8;">{{ motionSpeedLabel }}</span>
-      </div>
-      <div class="hv-range-row">
-        <button type="button" class="hv-range-nudge" onClick="{{ onMotionSlower }}">−</button>
-        <div class="hv-range" onPointerDown="{{ onMotionRangeDown }}" onTouchStart="{{ onMotionRangeDown }}" onMouseDown="{{ onMotionRangeDown }}">
-          <div class="hv-range-track"><div class="hv-range-fill" style="width: {{ motionSpeedPct }};"></div></div>
-          <div class="hv-range-thumb" style="left: {{ motionSpeedPct }};"></div>
-        </div>
-        <button type="button" class="hv-range-nudge" onClick="{{ onMotionFaster }}">+</button>
-      </div>
-      <button onClick="{{ onMotionStop }}" style="width: 100%; padding: 7px; border-radius: 7px; border: 1px solid rgba(79,214,232,.3); background: rgba(79,214,232,.08); color: #4fd6e8; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: .12em;">PARAR</button>
       </sc-if>
 
       <sc-if value="{{ overrideIsDoors }}" hint-placeholder-val="{{ false }}">
@@ -9679,15 +9678,16 @@ const CAR_SHADOW_OPACITY = 0.90;   // was 0.80
 // above the floor), in metres. Live-tunable: window.__contactShadow({...}).
 const GROUND_SUN_STRENGTH = 1;  // replaces the catcher's CAR_SHADOW_OPACITY on the floor
 const GROUND_SUN_MIN_R = 0.01;
-// Tuned by eye on the car/emulator: a very wide, soft sun penumbra (2 m per
-// metre of blocker height) reads like an overcast studio, not a crisp sun.
-const GROUND_SUN_K = 2;
+// Tuned by eye on the car (Avançado -> Luzes, 2026-09-26: 1.2 / 4.00 / 0.7):
+// a very wide, soft penumbra reads like an overcast studio, not a crisp sun.
+const GROUND_SUN_K = 4;
+const GROUND_SHADOW_GAIN = 1.2;
 // Fade with blocker distance: sky light fills in under a HIGH blocker, so the
 // roof and mirrors cast lighter shadows than the sills. Weight (1 - t)^this.
 const GROUND_SUN_FALLOFF = 0.2;
-const GROUND_AO_STRENGTH = 0.4;
-const GROUND_AO_MIN_R = 0.02;
-const GROUND_AO_K = 0.4;
+const GROUND_AO_STRENGTH = 0.7;
+const GROUND_AO_MIN_R = 0.04;
+const GROUND_AO_K = 0.8;
 const GROUND_AO_FALLOFF = 1.5;     // how much less a HIGH blocker occludes
 const GROUND_AO_H = 0.6;           // blockers above this height add no AO
 const GROUND_SMOOTH = 1.5;         // final blur, texels: hides the tap pattern
@@ -16189,10 +16189,8 @@ class Component extends DCLogic {
       onWheelAngle:  (e) => { this._holdMotionFromUi('steer'); this._setWheelAngle(parseFloat(e.target.value)); },
       motionSpeed:      liveSpeed,
       motionSpeedLabel: Math.round(Math.abs(liveSpeed) * 40) + ' km/h' + (liveSpeed < 0 ? ' ↩' : ''),
-      motionSpeedPct:   (Math.max(0, Math.min(1, (liveSpeed + 5) / 10)) * 100).toFixed(2) + '%',
+      motionSpeedPct:   (Math.max(0, Math.min(1, liveSpeed / 5)) * 100).toFixed(2) + '%',
       onMotionRangeDown: (e) => this._startMotionRange(e),
-      onMotionSlower: () => this._nudgeMotionSpeed(-0.25),
-      onMotionFaster: () => this._nudgeMotionSpeed(0.25),
       onMotionStop:  () => { this._holdMotionFromUi('speed'); this._setMotionSpeed(0, true); },
       carHeightVal:   s.carHeightOffset * 100,
       carHeightLabel: (s.carHeightOffset * 100 > 0 ? '+' : '') + (s.carHeightOffset * 100).toFixed(1) + ' cm',
@@ -18053,7 +18051,8 @@ class Component extends DCLogic {
         }
         const range = document.querySelector('.hv-range');
         if (!range) return;
-        const pct = (Math.max(0, Math.min(1, (v + 5) / 10)) * 100).toFixed(2) + '%';
+        // Forward only (0-200 km/h); a real reverse reading pins the thumb at 0.
+        const pct = (Math.max(0, Math.min(1, v / 5)) * 100).toFixed(2) + '%';
         const fill = range.querySelector('.hv-range-fill');
         const thumb = range.querySelector('.hv-range-thumb');
         if (fill) fill.style.width = pct;
@@ -18168,11 +18167,6 @@ class Component extends DCLogic {
     return typeof v === 'number' ? v : 0;
   }
 
-  _nudgeMotionSpeed(delta) {
-    this._holdMotionFromUi('speed');
-    const v = Math.max(-5, Math.min(5, this._currentMotionSpeed() + delta));
-    this._setMotionSpeed(v, true);
-  }
 
   _startMotionRange(e) {
     if (e && e.preventDefault) e.preventDefault();
@@ -18201,7 +18195,7 @@ class Component extends DCLogic {
     const rect = el.getBoundingClientRect();
     let u = (pt.clientX - rect.left) / Math.max(rect.width, 1);
     u = Math.max(0, Math.min(1, u));
-    const v = Math.round((-5 + u * 10) / 0.05) * 0.05;
+    const v = Math.round((u * 5) / 0.05) * 0.05;   // forward only: 0-200 km/h
     this._liveSet('motionSpeed', v);
     this.requestRender(2);
   }
@@ -21849,7 +21843,7 @@ class Component extends DCLogic {
       sunFalloff: GROUND_SUN_FALLOFF,
       aoOn: 1, aoStrength: GROUND_AO_STRENGTH, aoMinR: GROUND_AO_MIN_R, aoK: GROUND_AO_K,
       aoFalloff: GROUND_AO_FALLOFF, aoH: GROUND_AO_H,
-      smooth: GROUND_SMOOTH, sunRes: GROUND_SUN_RES, gain: 1,
+      smooth: GROUND_SMOOTH, sunRes: GROUND_SUN_RES, gain: GROUND_SHADOW_GAIN,
       lastMs: 0, bakes: 0,
     };
     this._contactShadowTune = tune;
@@ -22009,7 +22003,7 @@ class Component extends DCLogic {
   // the sun penumbra (sunK), contact the AO under the car (aoStrength).
   _groundShadowSpec() {
     return {
-      gain:    { def: 1,                  min: 0.4, max: 2.0, step: 0.1 },
+      gain:    { def: GROUND_SHADOW_GAIN, min: 0.4, max: 2.0, step: 0.1 },
       soft:    { def: GROUND_SUN_K,       min: 0.25, max: 4.0, step: 0.25 },
       contact: { def: GROUND_AO_STRENGTH, min: 0,   max: 1.5, step: 0.1 },
     };
