@@ -5726,6 +5726,23 @@ window.HavalSplash = (function () {
     .hv-energy-legend > li > i.b0 { background:#2fbf71; } .hv-energy-legend > li > i.b1 { background:#9ccc3d; }
     .hv-energy-legend > li > i.b2 { background:#e8b93a; } .hv-energy-legend > li > i.b3 { background:#f2994a; }
     .hv-energy-legend > li > i.b4 { background:#e5484d; }
+    /* MAPA | GRÁFICO (owner, 2026-09-27): the graph covers the map; the metric buttons stay on top of it. */
+    .hv-energy-viewbtn { min-height:40px; padding:0 14px; border:0; border-radius:11px; background:#1a1f24; color:#fff; font:600 11px/1 var(--hv-font); letter-spacing:.06em; white-space:nowrap; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.28); }
+    .hv-energy-legend:empty { display:none; }
+    .hv-energy-graph { position:absolute; inset:0; z-index:4; display:flex; flex-direction:column; padding:14px 18px 62px 14px; background:#2f3337; color:#e8eaec; }
+    .hv-energy-graph-title { margin:0 0 8px 44px; display:flex; align-items:baseline; gap:8px; }
+    .hv-energy-mapmax > .hv-energy-graph > .hv-energy-graph-title { margin-left:62px; min-height:44px; align-items:center; }
+    .hv-energy-graph-title > strong { font:700 17px/1.2 var(--hv-font); }
+    .hv-energy-graph-title > small { font:500 13px/1 var(--hv-font); opacity:.7; }
+    .hv-energy-graph-plot { position:relative; flex:1; min-height:0; margin:6px 0 22px 44px; }
+    .hv-energy-graph-plot > svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+    .hv-energy-graph-plot .grid { stroke:rgba(255,255,255,.22); stroke-width:1; vector-effect:non-scaling-stroke; }
+    .hv-energy-graph-plot .line { fill:none; stroke:var(--gc,#2fd49a); stroke-width:2; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+    .hv-energy-graph-plot .area { fill:var(--gc,#2fd49a); fill-opacity:.35; stroke:none; }
+    .hv-energy-graph.m-ev { --gc:#4aa8ff; } .hv-energy-graph.m-fuel { --gc:#f2994a; } .hv-energy-graph.m-alt { --gc:#c9a36b; }
+    .hv-energy-graph-plot > .yt { position:absolute; left:-8px; transform:translate(-100%,-50%); font:500 11px/1 var(--hv-font); opacity:.7; white-space:nowrap; }
+    .hv-energy-graph-plot > .xt { position:absolute; bottom:-18px; transform:translateX(-50%); font:500 11px/1 var(--hv-font); opacity:.7; white-space:nowrap; }
+    .hv-energy-graph-plot > .hv-energy-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; margin:0; }
     .hv-energy-stopinfo { position:absolute; left:10px; bottom:10px; z-index:3; max-width:75%; padding:8px 12px; border-radius:12px; background:rgba(20,26,32,.9); color:#fff; }
     .hv-energy-stopinfo > strong { display:block; font-size:14px; font-weight:600; }
     .hv-energy-stopinfo > small { display:block; margin-top:2px; font-size:12px; opacity:.8; }
@@ -5822,7 +5839,7 @@ window.HavalSplash = (function () {
     /* The popup's full map covers the whole popup, header included. */
     .hv-card-focus > .hv-energy-mapmax-pop { inset:0; z-index:30; padding:0; border-radius:22px; overflow:hidden; }
     .hv-energy-mapmax > .hv-energy-livemap { position:absolute; inset:0; border-radius:inherit; }
-    .hv-energy-mapmax > .hv-energy-mapmax-close { position:absolute; left:12px; top:12px; z-index:4; width:44px; height:44px; border:0; border-radius:14px; background:rgba(20,26,32,.82); color:#fff; font:400 24px/1 sans-serif; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .hv-energy-mapmax > .hv-energy-mapmax-close { position:absolute; left:12px; top:12px; z-index:5; width:44px; height:44px; border:0; border-radius:14px; background:rgba(20,26,32,.82); color:#fff; font:400 24px/1 sans-serif; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.3); }
     .hv-energy-livemap.max .hv-energy-livemap-controls { left:12px; right:auto; top:66px; }
     .hv-energy-haltsbtn { min-height:40px; padding:0 12px; border:0; border-radius:11px; background:#fff; color:#1a1f24; font:600 11px/1 var(--hv-font); letter-spacing:.06em; opacity:1; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.28); }
     .hv-energy-haltsbtn.on { color:var(--hv-readable-accent,var(--hv-accent)); }
@@ -7327,9 +7344,9 @@ window.HavalSplash = (function () {
                 <sc-if value="{{ wg.consumptionMapMaxOpen }}" hint-placeholder-val="{{ false }}">
                   <div class="hv-energy-mapmax">
                     <div class="hv-energy-livemap" data-trip="{{ wg.consumptionMapKey }}" data-mode="max"></div><button type="button" class="hv-energy-mapmax-close" onClick="{{ wg.consumptionMapMaxClose }}" aria-label="Compactar o mapa">×</button>
-                    <div class="hv-energy-mapbar">
+                    <sc-if value="{{ wg.consumptionGraphOn }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-graph {{ wg.consumptionGraphCls }}"><p class="hv-energy-graph-title"><strong>{{ wg.consumptionGraphTitle }}</strong><small>{{ wg.consumptionGraphUnit }}</small></p><div class="hv-energy-graph-plot"><svg viewBox="0 0 1000 400" preserveAspectRatio="none" role="img" aria-label="Gráfico da viagem"><sc-for list="{{ wg.consumptionGraphGrid }}" as="gl" hint-placeholder-count="5"><line class="grid" x1="0" x2="1000" y1="{{ gl.y }}" y2="{{ gl.y }}"></line></sc-for><path class="area" d="{{ wg.consumptionGraphArea }}"></path><path class="line" d="{{ wg.consumptionGraphLine }}"></path></svg><sc-for list="{{ wg.consumptionGraphYTicks }}" as="yt" hint-placeholder-count="5"><small class="yt" style="{{ yt.style }}">{{ yt.label }}</small></sc-for><sc-for list="{{ wg.consumptionGraphXTicks }}" as="xt" hint-placeholder-count="6"><small class="xt" style="{{ xt.style }}">{{ xt.label }}</small></sc-for><sc-if value="{{ wg.consumptionGraphEmpty }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">Sem dados para este gráfico.</p></sc-if></div></div></sc-if><div class="hv-energy-mapbar">
                       <div class="hv-energy-mapctl">
-                        <div class="hv-energy-seg" role="group" aria-label="Colorir a rota por"><button type="button" class="{{ wg.consumptionRouteSpeedClass }}" onClick="{{ wg.consumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ wg.consumptionRouteEvClass }}" onClick="{{ wg.consumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ wg.consumptionRouteFuelClass }}" onClick="{{ wg.consumptionRouteFuel }}">COMBUSTÍVEL</button></div>
+                        <button type="button" class="hv-energy-viewbtn" onClick="{{ wg.consumptionRouteGraphToggle }}">{{ wg.consumptionGraphLabel }}</button><div class="hv-energy-seg" role="group" aria-label="Métrica"><button type="button" class="{{ wg.consumptionRouteSpeedClass }}" onClick="{{ wg.consumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ wg.consumptionRouteEvClass }}" onClick="{{ wg.consumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ wg.consumptionRouteFuelClass }}" onClick="{{ wg.consumptionRouteFuel }}">COMBUSTÍVEL</button><button type="button" class="{{ wg.consumptionRouteAltClass }}" onClick="{{ wg.consumptionRouteAlt }}">ALTITUDE</button></div>
                         <button type="button" class="hv-energy-haltsbtn {{ wg.consumptionHaltsClass }}" onClick="{{ wg.consumptionHaltsToggle }}">PARADAS</button>
                       </div>
                       <ul class="hv-energy-legend"><sc-for list="{{ wg.consumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
@@ -7403,9 +7420,9 @@ window.HavalSplash = (function () {
                           <div class="hv-energy-mappane">
                             <sc-if value="{{ wg.consumptionDetailHasMapView }}" hint-placeholder-val="{{ false }}">
                               <div class="hv-energy-mapwrap">
-                                <div class="hv-energy-mapbar">
+                                <sc-if value="{{ wg.consumptionGraphOn }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-graph {{ wg.consumptionGraphCls }}"><p class="hv-energy-graph-title"><strong>{{ wg.consumptionGraphTitle }}</strong><small>{{ wg.consumptionGraphUnit }}</small></p><div class="hv-energy-graph-plot"><svg viewBox="0 0 1000 400" preserveAspectRatio="none" role="img" aria-label="Gráfico da viagem"><sc-for list="{{ wg.consumptionGraphGrid }}" as="gl" hint-placeholder-count="5"><line class="grid" x1="0" x2="1000" y1="{{ gl.y }}" y2="{{ gl.y }}"></line></sc-for><path class="area" d="{{ wg.consumptionGraphArea }}"></path><path class="line" d="{{ wg.consumptionGraphLine }}"></path></svg><sc-for list="{{ wg.consumptionGraphYTicks }}" as="yt" hint-placeholder-count="5"><small class="yt" style="{{ yt.style }}">{{ yt.label }}</small></sc-for><sc-for list="{{ wg.consumptionGraphXTicks }}" as="xt" hint-placeholder-count="6"><small class="xt" style="{{ xt.style }}">{{ xt.label }}</small></sc-for><sc-if value="{{ wg.consumptionGraphEmpty }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">Sem dados para este gráfico.</p></sc-if></div></div></sc-if><div class="hv-energy-mapbar">
                                   <div class="hv-energy-mapctl">
-                                    <div class="hv-energy-seg" role="group" aria-label="Colorir a rota por"><button type="button" class="{{ wg.consumptionRouteSpeedClass }}" onClick="{{ wg.consumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ wg.consumptionRouteEvClass }}" onClick="{{ wg.consumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ wg.consumptionRouteFuelClass }}" onClick="{{ wg.consumptionRouteFuel }}">COMBUSTÍVEL</button></div>
+                                    <button type="button" class="hv-energy-viewbtn" onClick="{{ wg.consumptionRouteGraphToggle }}">{{ wg.consumptionGraphLabel }}</button><div class="hv-energy-seg" role="group" aria-label="Métrica"><button type="button" class="{{ wg.consumptionRouteSpeedClass }}" onClick="{{ wg.consumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ wg.consumptionRouteEvClass }}" onClick="{{ wg.consumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ wg.consumptionRouteFuelClass }}" onClick="{{ wg.consumptionRouteFuel }}">COMBUSTÍVEL</button><button type="button" class="{{ wg.consumptionRouteAltClass }}" onClick="{{ wg.consumptionRouteAlt }}">ALTITUDE</button></div>
                                   </div>
                                   <ul class="hv-energy-legend"><sc-for list="{{ wg.consumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
                                 </div>
@@ -7727,9 +7744,9 @@ window.HavalSplash = (function () {
         <sc-if value="{{ focusedConsumptionMapMaxOpen }}" hint-placeholder-val="{{ false }}">
           <div class="hv-energy-mapmax hv-energy-mapmax-pop">
             <div class="hv-energy-livemap" data-trip="{{ focusedConsumptionMapKey }}" data-mode="max"></div><button type="button" class="hv-energy-mapmax-close" onClick="{{ focusedConsumptionMapMaxClose }}" aria-label="Compactar o mapa">×</button>
-            <div class="hv-energy-mapbar">
+            <sc-if value="{{ focusedConsumptionGraphOn }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-graph {{ focusedConsumptionGraphCls }}"><p class="hv-energy-graph-title"><strong>{{ focusedConsumptionGraphTitle }}</strong><small>{{ focusedConsumptionGraphUnit }}</small></p><div class="hv-energy-graph-plot"><svg viewBox="0 0 1000 400" preserveAspectRatio="none" role="img" aria-label="Gráfico da viagem"><sc-for list="{{ focusedConsumptionGraphGrid }}" as="gl" hint-placeholder-count="5"><line class="grid" x1="0" x2="1000" y1="{{ gl.y }}" y2="{{ gl.y }}"></line></sc-for><path class="area" d="{{ focusedConsumptionGraphArea }}"></path><path class="line" d="{{ focusedConsumptionGraphLine }}"></path></svg><sc-for list="{{ focusedConsumptionGraphYTicks }}" as="yt" hint-placeholder-count="5"><small class="yt" style="{{ yt.style }}">{{ yt.label }}</small></sc-for><sc-for list="{{ focusedConsumptionGraphXTicks }}" as="xt" hint-placeholder-count="6"><small class="xt" style="{{ xt.style }}">{{ xt.label }}</small></sc-for><sc-if value="{{ focusedConsumptionGraphEmpty }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">Sem dados para este gráfico.</p></sc-if></div></div></sc-if><div class="hv-energy-mapbar">
               <div class="hv-energy-mapctl">
-                <div class="hv-energy-seg" role="group" aria-label="Colorir a rota por"><button type="button" class="{{ focusedConsumptionRouteSpeedClass }}" onClick="{{ focusedConsumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ focusedConsumptionRouteEvClass }}" onClick="{{ focusedConsumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ focusedConsumptionRouteFuelClass }}" onClick="{{ focusedConsumptionRouteFuel }}">COMBUSTÍVEL</button></div>
+                <button type="button" class="hv-energy-viewbtn" onClick="{{ focusedConsumptionRouteGraphToggle }}">{{ focusedConsumptionGraphLabel }}</button><div class="hv-energy-seg" role="group" aria-label="Métrica"><button type="button" class="{{ focusedConsumptionRouteSpeedClass }}" onClick="{{ focusedConsumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ focusedConsumptionRouteEvClass }}" onClick="{{ focusedConsumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ focusedConsumptionRouteFuelClass }}" onClick="{{ focusedConsumptionRouteFuel }}">COMBUSTÍVEL</button><button type="button" class="{{ focusedConsumptionRouteAltClass }}" onClick="{{ focusedConsumptionRouteAlt }}">ALTITUDE</button></div>
                 <button type="button" class="hv-energy-haltsbtn {{ focusedConsumptionHaltsClass }}" onClick="{{ focusedConsumptionHaltsToggle }}">PARADAS</button>
               </div>
               <ul class="hv-energy-legend"><sc-for list="{{ focusedConsumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
@@ -7848,9 +7865,9 @@ window.HavalSplash = (function () {
                   <div class="hv-energy-mappane">
                     <sc-if value="{{ focusedConsumptionDetailHasMapView }}" hint-placeholder-val="{{ false }}">
                       <div class="hv-energy-mapwrap">
-                        <div class="hv-energy-mapbar">
+                        <sc-if value="{{ focusedConsumptionGraphOn }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-graph {{ focusedConsumptionGraphCls }}"><p class="hv-energy-graph-title"><strong>{{ focusedConsumptionGraphTitle }}</strong><small>{{ focusedConsumptionGraphUnit }}</small></p><div class="hv-energy-graph-plot"><svg viewBox="0 0 1000 400" preserveAspectRatio="none" role="img" aria-label="Gráfico da viagem"><sc-for list="{{ focusedConsumptionGraphGrid }}" as="gl" hint-placeholder-count="5"><line class="grid" x1="0" x2="1000" y1="{{ gl.y }}" y2="{{ gl.y }}"></line></sc-for><path class="area" d="{{ focusedConsumptionGraphArea }}"></path><path class="line" d="{{ focusedConsumptionGraphLine }}"></path></svg><sc-for list="{{ focusedConsumptionGraphYTicks }}" as="yt" hint-placeholder-count="5"><small class="yt" style="{{ yt.style }}">{{ yt.label }}</small></sc-for><sc-for list="{{ focusedConsumptionGraphXTicks }}" as="xt" hint-placeholder-count="6"><small class="xt" style="{{ xt.style }}">{{ xt.label }}</small></sc-for><sc-if value="{{ focusedConsumptionGraphEmpty }}" hint-placeholder-val="{{ false }}"><p class="hv-energy-empty">Sem dados para este gráfico.</p></sc-if></div></div></sc-if><div class="hv-energy-mapbar">
                           <div class="hv-energy-mapctl">
-                            <div class="hv-energy-seg" role="group" aria-label="Colorir a rota por"><button type="button" class="{{ focusedConsumptionRouteSpeedClass }}" onClick="{{ focusedConsumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ focusedConsumptionRouteEvClass }}" onClick="{{ focusedConsumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ focusedConsumptionRouteFuelClass }}" onClick="{{ focusedConsumptionRouteFuel }}">COMBUSTÍVEL</button></div>
+                            <button type="button" class="hv-energy-viewbtn" onClick="{{ focusedConsumptionRouteGraphToggle }}">{{ focusedConsumptionGraphLabel }}</button><div class="hv-energy-seg" role="group" aria-label="Métrica"><button type="button" class="{{ focusedConsumptionRouteSpeedClass }}" onClick="{{ focusedConsumptionRouteSpeed }}">VELOCIDADE</button><button type="button" class="{{ focusedConsumptionRouteEvClass }}" onClick="{{ focusedConsumptionRouteEv }}">ELÉTRICO</button><button type="button" class="{{ focusedConsumptionRouteFuelClass }}" onClick="{{ focusedConsumptionRouteFuel }}">COMBUSTÍVEL</button><button type="button" class="{{ focusedConsumptionRouteAltClass }}" onClick="{{ focusedConsumptionRouteAlt }}">ALTITUDE</button></div>
                           </div>
                           <ul class="hv-energy-legend"><sc-for list="{{ focusedConsumptionDetailLegend }}" as="lg" hint-placeholder-count="5"><li><i class="{{ lg.cls }}"></i><small>{{ lg.label }}</small></li></sc-for></ul>
                         </div>
@@ -10284,6 +10301,7 @@ class Component extends DCLogic {
     energyTripStart: '',
     energyRange: '7d',
     energyRouteMetric: 'speed',
+    energyTripGraph: false,
     energyStopSel: -1,
     energyFinishConfirm: false,
     energyMapMax: false,
@@ -43210,6 +43228,8 @@ class Component extends DCLogic {
       consumptionRouteSpeed: (ev) => this._setEnergyRouteMetric('speed', ev),
       consumptionRouteEv: (ev) => this._setEnergyRouteMetric('ev', ev),
       consumptionRouteFuel: (ev) => this._setEnergyRouteMetric('fuel', ev),
+      consumptionRouteAlt: (ev) => this._setEnergyRouteMetric('alt', ev),
+      consumptionRouteGraphToggle: (ev) => this._toggleEnergyTripGraph(ev),
       consumptionDetailHasProfile: false,
       consumptionDetailProfile: '',
       consumptionDetailNote: '',
@@ -43329,7 +43349,9 @@ class Component extends DCLogic {
     // Online, the pane IS the interactive OSM map (owner decision: online map
     // first), so it fills whatever width the pane has. Offline, the tiles-only
     // snapshot with the route drawn over it letterboxes in the same place.
-    const metric = this.state.energyRouteMetric === 'ev' || this.state.energyRouteMetric === 'fuel' ? this.state.energyRouteMetric : 'speed';
+    const metric = ['ev', 'fuel', 'alt'].indexOf(this.state.energyRouteMetric) >= 0 ? this.state.energyRouteMetric : 'speed';
+    const graphOn = !!this.state.energyTripGraph;
+    const graph = graphOn && detail ? this._energyGraph(detail.series, metric, units) : null;
     const frame = detail ? detail.frame : null;
     const hasView = !!(frame && detail.fixes && detail.fixes.length >= 2);
     const online = typeof navigator === 'undefined' || navigator.onLine !== false;
@@ -43407,13 +43429,25 @@ class Component extends DCLogic {
       consumptionDetailEndX: +last[0].toFixed(1),
       consumptionDetailEndY: +last[1].toFixed(1),
       consumptionDetailPins: pins,
-      consumptionDetailLegend: legend,
+      consumptionDetailLegend: graph ? [] : legend,
       consumptionDetailHasStopInfo: !!stopText,
       consumptionDetailStopTitle: stopText ? stopText.title : '',
       consumptionDetailStopDetail: stopText ? stopText.detail : '',
       consumptionRouteSpeedClass: on(metric === 'speed'),
       consumptionRouteEvClass: on(metric === 'ev'),
       consumptionRouteFuelClass: on(metric === 'fuel'),
+      consumptionRouteAltClass: on(metric === 'alt'),
+      consumptionGraphOn: !!graph,
+      consumptionGraphLabel: graphOn ? 'MAPA' : 'GRÁFICO',
+      consumptionGraphCls: 'm-' + metric,
+      consumptionGraphTitle: graph ? graph.title : '',
+      consumptionGraphUnit: graph ? graph.unit : '',
+      consumptionGraphLine: graph ? graph.line : '',
+      consumptionGraphArea: graph ? graph.area : '',
+      consumptionGraphGrid: graph ? graph.grid : [],
+      consumptionGraphYTicks: graph ? graph.yTicks : [],
+      consumptionGraphXTicks: graph ? graph.xTicks : [],
+      consumptionGraphEmpty: !!graph && graph.empty,
       consumptionDetailHasProfile: !!(detail && detail.profile),
       consumptionDetailProfile: detail ? detail.profile : '',
       consumptionDetailNote: note,
@@ -43677,8 +43711,9 @@ class Component extends DCLogic {
     tr.points = points;
     tr.stops = stops;
     const detail = this._energyShapes(points);
-    detail.route = points.filter((p) => p[1] != null && p[2] != null).map((p) => [p[1], p[2], p[4], p[5], p[6], p[7]]);
+    detail.route = points.filter((p) => p[1] != null && p[2] != null).map((p) => [p[1], p[2], p[4], p[5], p[6], p[7], p[3], p[0]]);
     detail.fixes = detail.route.map((p) => [p[0], p[1]]);
+    detail.series = this._energySeries(points, detail.route);
     detail.stops = stops;
     detail.frame = this._energyOverlayFrame(detail.fixes, '');
     detail.live = true;
@@ -44232,12 +44267,13 @@ class Component extends DCLogic {
     }
     // The compact route (kept forever) when stored; the per-second samples otherwise.
     if (!route || route.length < 2) {
-      route = points.filter((p) => p[1] != null && p[2] != null).map((p) => [p[1], p[2], p[4], p[5], p[6], p[7]]);
+      route = points.filter((p) => p[1] != null && p[2] != null).map((p) => [p[1], p[2], p[4], p[5], p[6], p[7], p[3], p[0]]);
     }
     const detail = this._energyShapes(points);
     detail.halts = this._energyHalts(points, route);
     detail.route = route;
     detail.fixes = route.map((p) => [p[0], p[1]]);
+    detail.series = this._energySeries(points, route);
     detail.stops = stops;
     detail.frame = this._energyOverlayFrame(detail.fixes, view);
     if (!demo && trip.snapshotPath) {
@@ -44335,8 +44371,128 @@ class Component extends DCLogic {
 
   _setEnergyRouteMetric(metric, ev) {
     this._cardControlEvent(ev);
-    if (metric !== 'speed' && metric !== 'ev' && metric !== 'fuel') return;
+    if (metric !== 'speed' && metric !== 'ev' && metric !== 'fuel' && metric !== 'alt') return;
     this._uiOnlySetState({ energyRouteMetric: metric });
+  }
+
+  /** MAPA | GRÁFICO over the route pane: the same metric coloured along the route, or plotted against time. */
+  _toggleEnergyTripGraph(ev) {
+    this._cardControlEvent(ev);
+    this._uiOnlySetState((s) => ({ energyTripGraph: !s.energyTripGraph }));
+  }
+
+  /**
+   * One row per sample for the trip graph: [t, kmh, kw, fuelMode, fuelRate, alt].
+   * The per-second samples while the trip still has them (they include the
+   * stretches with no GPS fix), otherwise the compact route. A route saved
+   * before alt/t were kept has no t, so its x axis is the sample index.
+   */
+  _energySeries(points, route) {
+    if (points && points.length >= 2) return points.map((p) => [p[0], p[4], p[5], p[6], p[7], p[3]]);
+    return (route || []).map((r) => [r[7] == null ? null : r[7], r[2], r[3], r[4], r[5], r[6] == null ? null : r[6]]);
+  }
+
+  /**
+   * The trip graph for one metric: SVG paths in a 1000 x 400 box plus
+   * positioned tick labels. Pure (scripts/test-energy-map.mjs).
+   */
+  _energyGraph(series, metric, units) {
+    const W = 1000, H = 400, BUCKETS = 400;
+    const kml = !units || units.fuel !== 'l100';
+    const meta = {
+      speed: ['Velocidade', '[km/h]', (r) => r[1]],
+      ev: ['Potência elétrica', '[kW]', (r) => r[2]],
+      fuel: ['Combustível', kml ? '[km/L]' : '[L/100 km]', (r) => {
+        const mode = Number(r[3]);
+        const rate = r[4] == null ? NaN : Number(r[4]);
+        // Engine off reads as zero consumption, not as a gap.
+        if (mode !== 1 || !(rate > 0)) return 0;
+        return Math.min(40, kml ? 100 / rate : rate);
+      }],
+      alt: ['Altitude', '[m]', (r) => r[5]],
+    }[metric] || null;
+    const out = { title: meta ? meta[0] : '', unit: meta ? meta[1] : '', line: '', area: '', grid: [], yTicks: [], xTicks: [], empty: true };
+    const rows = (series || []).filter((r) => r);
+    if (!meta || rows.length < 2) return out;
+    const val = (r) => {
+      const v = meta[2](r);
+      const n = v == null ? NaN : Number(v);
+      return isFinite(n) ? n : NaN;
+    };
+    const hasT = rows.every((r) => r[0] != null && isFinite(Number(r[0])));
+    const x0 = hasT ? Number(rows[0][0]) : 0;
+    const x1 = hasT ? Number(rows[rows.length - 1][0]) : rows.length - 1;
+    const span = Math.max(1, x1 - x0);
+    // Averaged into fixed buckets, so a 3000-sample trip is a 400-point path.
+    const sum = new Array(BUCKETS).fill(0);
+    const cnt = new Array(BUCKETS).fill(0);
+    rows.forEach((r, i) => {
+      const v = val(r);
+      if (!isFinite(v)) return;
+      const x = hasT ? Number(r[0]) : i;
+      const k = Math.max(0, Math.min(BUCKETS - 1, Math.floor((x - x0) / span * BUCKETS)));
+      sum[k] += v;
+      cnt[k]++;
+    });
+    const pts = sum.map((sm, k) => (cnt[k] ? [(k + 0.5) / BUCKETS * W, sm / cnt[k]] : null));
+    const vals = pts.filter((p) => p).map((p) => p[1]);
+    if (vals.length < 2) return out;
+    let lo = Math.min.apply(null, vals);
+    let hi = Math.max.apply(null, vals);
+    // Speed, fuel and power read from zero; altitude reads over its own range.
+    if (metric !== 'alt') lo = Math.min(0, lo);
+    // A flat road would otherwise fill the plot with GPS noise: show at least 20 m of altitude.
+    if (metric === 'alt' && hi - lo < 20) {
+      const mid = (hi + lo) / 2;
+      lo = mid - 10;
+      hi = mid + 10;
+    }
+    if (hi - lo < 1e-6) hi = lo + 1;
+    const raw = (hi - lo) / 5;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((st) => st >= raw - 1e-9) || 10 * mag;
+    lo = Math.floor(lo / step + 1e-9) * step;
+    hi = Math.ceil(hi / step - 1e-9) * step;
+    const y = (v) => H - (v - lo) / (hi - lo) * H;
+    const base = y(metric === 'alt' ? lo : Math.max(lo, 0));
+    const xy = (p) => p[0].toFixed(1) + ',' + y(p[1]).toFixed(1);
+    let line = '';
+    let area = '';
+    let run = [];
+    const flush = () => {
+      if (run.length) {
+        line += 'M' + run.map(xy).join('L');
+        area += 'M' + run[0][0].toFixed(1) + ',' + base.toFixed(1) + 'L' + run.map(xy).join('L')
+          + 'L' + run[run.length - 1][0].toFixed(1) + ',' + base.toFixed(1) + 'Z';
+      }
+      run = [];
+    };
+    // A gap of more than a few buckets breaks the line; shorter ones are bridged.
+    let miss = 0;
+    pts.forEach((p) => {
+      if (p) {
+        miss = 0;
+        run.push(p);
+      } else if (++miss > 3) flush();
+    });
+    flush();
+    out.line = line;
+    out.area = area;
+    out.empty = false;
+    const dec = step < 1 ? 1 : 0;
+    for (let i = 0; lo + i * step <= hi + step / 2; i++) {
+      const v = lo + i * step;
+      out.grid.push({ y: y(v).toFixed(1) });
+      out.yTicks.push({ label: v.toFixed(dec), style: 'top:' + (y(v) / H * 100).toFixed(2) + '%' });
+    }
+    if (hasT) {
+      const hm = (ms) => {
+        const d = new Date(ms);
+        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      };
+      for (let i = 0; i <= 5; i++) out.xTicks.push({ label: hm(x0 + span * i / 5), style: 'left:' + (i * 20) + '%' });
+    }
+    return out;
   }
 
   _selectEnergyStop(index, ev) {
@@ -44356,7 +44512,7 @@ class Component extends DCLogic {
 
   /**
    * Colour bands along a route. Pure (scripts/test-energy-map.mjs).
-   * route: [[lat, lon, kmh, kw, fuelMode, fuelRate], ...] as TripStore.saveRoute writes it.
+   * route: [[lat, lon, kmh, kw, fuelMode, fuelRate, alt, t], ...] as TripStore.saveRoute writes it (no alt/t on older routes).
    * Returns { segments: [{ cls, pts }], legend: [{ cls, label }] }. Consecutive points
    * in the same band share one segment, so a steady drive is one polyline, not hundreds.
    */
@@ -44389,6 +44545,29 @@ class Component extends DCLogic {
         // Engine off (or no reading): no fuel colour at all; the route's white casing shows through.
         if (mode !== 1 || !(rate > 0)) return '';
         return rate < 5 ? 'b1' : (rate < 8 ? 'b2' : (rate < 12 ? 'b3' : 'b4'));
+      };
+    } else if (metric === 'alt') {
+      // Relative to this trip's own range: five equal bands, low (green) to high (red).
+      let lo = Infinity;
+      let hi = -Infinity;
+      (route || []).forEach((p) => {
+        const a = p && p[6] != null ? Number(p[6]) : NaN;
+        if (isFinite(a)) {
+          lo = Math.min(lo, a);
+          hi = Math.max(hi, a);
+        }
+      });
+      const has = isFinite(lo);
+      const flat = has && hi - lo < 5;
+      const cut = (k) => Math.round(lo + (hi - lo) * k / 5);
+      legend = !has ? [['none', 'sem altitude']]
+        : (flat ? [['b2', Math.round((lo + hi) / 2) + ' m']]
+          : [['b0', '< ' + cut(1) + ' m'], ['b1', cut(1) + '–' + cut(2)], ['b2', cut(2) + '–' + cut(3)], ['b3', cut(3) + '–' + cut(4)], ['b4', '> ' + cut(4) + ' m']]);
+      band = (p) => {
+        const a = p[6] == null ? NaN : Number(p[6]);
+        if (!has || !isFinite(a)) return 'none';
+        if (flat) return 'b2';
+        return 'b' + Math.min(4, Math.floor((a - lo) / (hi - lo) * 5));
       };
     } else {
       legend = [['b0', '< 30 km/h'], ['b1', '30–60'], ['b2', '60–90'], ['b3', '90–110'], ['b4', '> 110 km/h']];

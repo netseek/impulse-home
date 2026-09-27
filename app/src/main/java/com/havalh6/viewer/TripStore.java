@@ -373,14 +373,14 @@ final class TripStore extends SQLiteOpenHelper implements RangeLedger.Store {
     /**
      * The route kept FOREVER, unlike the per-second samples (last
      * {@link #DETAIL_TRIPS} trips): up to {@code max} GPS points, each
-     * [lat, lon, kmh, kw, fuelMode, fuelRate], enough to draw and colour the
-     * route by speed, electric or fuel. "[]" for a trip with no fix, so the
+     * [lat, lon, kmh, kw, fuelMode, fuelRate, alt, t], enough to draw and colour the
+     * route by speed, electric, fuel or altitude, and to plot it against time. "[]" for a trip with no fix, so the
      * sweep does not retry it.
      */
     void saveRoute(long startMs, int max) {
         JSONArray route = new JSONArray();
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT lat, lon, kmh, kw, fuel_mode, fuel_rate FROM trip_points"
+                "SELECT lat, lon, kmh, kw, fuel_mode, fuel_rate, alt, t FROM trip_points"
                         + " WHERE start_ms = ? AND lat IS NOT NULL AND lon IS NOT NULL ORDER BY t",
                 new String[]{String.valueOf(startMs)})) {
             int stride = Math.max(1, (int) Math.ceil(c.getCount() / (double) Math.max(1, max)));
@@ -394,6 +394,8 @@ final class TripStore extends SQLiteOpenHelper implements RangeLedger.Store {
                 p.put(c.isNull(3) ? JSONObject.NULL : (Object) round(c.getDouble(3), 1));
                 p.put(c.getInt(4));
                 p.put(c.isNull(5) ? JSONObject.NULL : (Object) round(c.getDouble(5), 1));
+                p.put(c.isNull(6) ? JSONObject.NULL : (Object) Math.round(c.getDouble(6)));
+                p.put(c.getLong(7));
                 route.put(p);
             }
         } catch (JSONException e) {
