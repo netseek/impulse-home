@@ -40818,6 +40818,24 @@ class Component extends DCLogic {
     if (field === 'tempRange') { c.tMin = v[0]; c.tMax = v[1]; }
     else if (field === 'fanRange') { if (v > 0) c.fanMax = v; }
     else c[field] = v;
+    // SYNC is one setpoint for both zones, and the car only reports the driver's
+    // when a wheel button or its own panel moves it: the passenger number then
+    // sat on whatever it was last told, sometimes for hours, while the car had
+    // long since moved both. _climStage already mirrors our OWN writes this way;
+    // this is the same rule applied to what the car says. Driver to passenger
+    // only -- that is the direction the car itself copies in, and a stale
+    // passenger reading arriving after a driver one must not drag the driver
+    // back with it.
+    if ((field === 'driver' && c.sync === true) || (field === 'sync' && v === true)) {
+      const synced = c.driver;
+      if (synced !== undefined && c.pass !== synced) {
+        c.pass = synced;
+        const pendPass = this._climPend.pass;
+        if (pendPass && !pendPass.staged && this._climSame('pass', pendPass.v, synced)) {
+          delete this._climPend.pass;
+        }
+      }
+    }
     const held = this._climHold || {};
     // Finger still owns this field: keep conf updated for when they release, but do not
     // clear the staged value or repaint over the gesture.
