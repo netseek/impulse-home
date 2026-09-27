@@ -3154,11 +3154,11 @@ public final class MainActivity extends Activity {
             float breathe=motion?(float)(.775+.225*Math.cos(seconds*Math.PI*2/2.2)):1f;
             float chargeBreathe=motion?(float)(.7+.3*Math.cos(seconds*Math.PI*2/1.8)):1f;
 
-            // The car is drawn rotated (front to the right); the battery % sits
-            // upright UNDER it, so keep a strip free at the bottom for it.
+            // The car is drawn rotated (front to the right). Fit uses the
+            // original label strip so SOC type size cannot shrink the chassis;
+            // the % itself is bottom-anchored and grows up under the car.
             float dp=getResources().getDisplayMetrics().density;
-            // Bottom-anchored SOC grows up into this strip toward the chassis.
-            float labelH=30*dp;
+            float labelH=17*dp;
             float fit=Math.min(w/770f,(h-labelH)/350f)*.96f;
             float ox=w*.5f,oy=(h-labelH)*.5f;
             int saved=c.save();
