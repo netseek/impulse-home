@@ -2681,10 +2681,17 @@ public final class MainActivity extends Activity {
          * AR CONDICIONADO card: driver setpoint + fan segments on the left;
          * HOJE (car outside + current sky, accent) and the next two forecast
          * days on the right; cabin INTERNA bottom-right. Hint is unused.
+         *
+         * Type scale (keep INTERNA in sync with sibling rail cards):
+         *   setpoint   h·0.48  (frac ",0" at 50%; ° stays full size)
+         *               off → driver setpoint, muted
+         *   forecast   day h·0.17 / icon fits label→temp band / temp h·0.22
+         *   INTERNA    h·0.18
          */
         private void drawClimate(android.graphics.Canvas c, float w, float h,
                 int accent, int muted, int strong) {
             boolean unknown = "unavailable".equals(descriptor.state);
+            boolean off = "off".equals(descriptor.state);
             String[] days = descriptor.forecast == null || descriptor.forecast.isEmpty()
                     ? new String[0] : descriptor.forecast.split(";");
             float pad = w * .045f;
@@ -2700,7 +2707,7 @@ public final class MainActivity extends Activity {
                     fanMax = Math.max(1, Math.min(10, Integer.parseInt(descriptor.metricB.trim())));
                 }
             } catch (NumberFormatException ignored) {}
-            int lit = unknown ? 0
+            int lit = unknown || off ? 0
                     : Math.max(0, Math.min(fanMax, Math.round(descriptor.progress / 100f * fanMax)));
             float barLeft = pad;
             float barRight = leftW - pad * .4f;
@@ -2716,10 +2723,10 @@ public final class MainActivity extends Activity {
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL));
-            paint.setTextSize(Math.max(28f, h * .48f));
-            fill(unknown ? muted : strong);
+            // Off keeps the driver setpoint but muted so it reads as inactive.
+            int tempColor = unknown || off ? muted : strong;
             if (!driver.isEmpty()) {
-                c.drawText(driver, pad, tempY, paint);
+                drawClimateSetpoint(c, driver, pad, tempY, Math.max(28f, h * .48f), tempColor);
             }
 
             // ÍONS borrows the climate green accent (same as --clim-good).
@@ -2739,7 +2746,15 @@ public final class MainActivity extends Activity {
                     android.graphics.Typeface.SANS_SERIF, 200, false);
             android.graphics.Typeface dayStrong = android.graphics.Typeface.create(
                     "sans-serif-medium", android.graphics.Typeface.NORMAL);
-            float colW = Math.min(w * .15f, h * .50f);
+            float colW = Math.min(w * .16f, h * .54f);
+            float dayBaseline = h * .16f;
+            float fcTempBaseline = h * .66f;
+            // Icon lives in the gap between day label and forecast temp so a
+            // larger colW cannot push the glyph into either line (that read as
+            // a horizontal misalignment when the icon overlapped the °).
+            float iconBandTop = dayBaseline + h * .04f;
+            float iconBandBot = fcTempBaseline - h * .14f;
+            float iconMax = Math.max(8f, Math.min(colW * .78f, iconBandBot - iconBandTop));
             float right = w - pad;
             float forecastLeft = leftW + pad * .5f;
             for (int i = Math.min(days.length, 3) - 1; i >= 0 && right - colW >= forecastLeft; i--) {
@@ -2749,24 +2764,25 @@ public final class MainActivity extends Activity {
                 float cx = right - colW / 2f;
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                 paint.setTypeface(today ? dayStrong : dayFace);
-                paint.setTextSize(Math.max(8f, h * .13f));
+                paint.setTextSize(Math.max(10f, h * .17f));
                 fill(today ? accent : muted);
-                c.drawText(parts[0], cx, h * .17f, paint);
+                c.drawText(parts[0], cx, dayBaseline, paint);
                 Bitmap ic = getWeatherBitmap(parts[1]);
                 if (ic != null) {
-                    float s2 = colW * (today ? .78f : .72f);
-                    float iconTop = h * .20f;
+                    float s2 = iconMax;
+                    float iconTop = iconBandTop + (iconBandBot - iconBandTop - s2) * .5f;
                     oval.set(cx - s2 / 2f, iconTop, cx + s2 / 2f, iconTop + s2);
                     paint.setColorFilter(new android.graphics.PorterDuffColorFilter(
                             today ? accent : strong, android.graphics.PorterDuff.Mode.SRC_IN));
                     paint.setAlpha(today ? 255 : 210);
                     c.drawBitmap(ic, null, oval, paint);
                     paint.setColorFilter(null);
+                    paint.setAlpha(255);
                 }
                 paint.setTypeface(today ? dayStrong : android.graphics.Typeface.DEFAULT);
-                paint.setTextSize(Math.max(today ? 11f : 9f, h * (today ? .18f : .15f)));
+                paint.setTextSize(Math.max(today ? 13f : 11f, h * (today ? .22f : .19f)));
                 fill(unknown ? muted : strong);
-                c.drawText(parts[2], cx, h * .62f, paint);
+                c.drawText(parts[2], cx, fcTempBaseline, paint);
                 right -= colW;
             }
 
@@ -2775,9 +2791,41 @@ public final class MainActivity extends Activity {
                     ? "" : "INTERNA " + descriptor.insideText;
             if (!inside.isEmpty()) {
                 paint.setTextAlign(android.graphics.Paint.Align.RIGHT);
-                paint.setTextSize(Math.max(8f, h * .13f));
+                // Shared rail meta size — reuse for sibling cards that label a cabin reading.
+                paint.setTextSize(Math.max(11f, h * .18f));
                 fill(unknown ? muted : strong);
                 c.drawText(inside, w - pad, bottomY, paint);
+            }
+        }
+
+        /** Big climate setpoint: integer full size, ",0" at half, ° full; OFF/— unchanged. */
+        private void drawClimateSetpoint(android.graphics.Canvas c, String driver,
+                float x, float y, float fullSize, int color) {
+            fill(color);
+            int comma = driver.indexOf(',');
+            if (comma <= 0 || "OFF".equalsIgnoreCase(driver) || "—".equals(driver)) {
+                paint.setTextSize(fullSize);
+                c.drawText(driver, x, y, paint);
+                return;
+            }
+            String main = driver.substring(0, comma);
+            String rest = driver.substring(comma);
+            String frac = rest;
+            String unit = "";
+            int deg = rest.indexOf('°');
+            if (deg >= 0) {
+                frac = rest.substring(0, deg);
+                unit = rest.substring(deg);
+            }
+            paint.setTextSize(fullSize);
+            c.drawText(main, x, y, paint);
+            float cursor = x + paint.measureText(main);
+            paint.setTextSize(fullSize * .5f);
+            c.drawText(frac, cursor, y, paint);
+            cursor += paint.measureText(frac);
+            if (!unit.isEmpty()) {
+                paint.setTextSize(fullSize);
+                c.drawText(unit, cursor, y, paint);
             }
         }
 
@@ -3109,7 +3157,8 @@ public final class MainActivity extends Activity {
             // The car is drawn rotated (front to the right); the battery % sits
             // upright UNDER it, so keep a strip free at the bottom for it.
             float dp=getResources().getDisplayMetrics().density;
-            float labelH=17*dp;
+            // Bottom-anchored SOC grows up into this strip toward the chassis.
+            float labelH=30*dp;
             float fit=Math.min(w/770f,(h-labelH)/350f)*.96f;
             float ox=w*.5f,oy=(h-labelH)*.5f;
             int saved=c.save();
@@ -3191,15 +3240,17 @@ public final class MainActivity extends Activity {
             if(packCharging&&pulse&&motion)drawPowerChargeSweep(c,battery,seconds);
             c.restoreToCount(saved);
 
-            // Battery % upright, under the car, centred beneath the pack.
-            // Rotation maps image (x, y) to screen (ox - fit*(y-385), oy + fit*(x-175)).
+            // Battery % upright under the car, bottom-anchored so a larger size
+            // fills the gap upward toward the chassis (not downward off the card).
             float packCenterY=battery[1]+battery[3]/2;
-            float lx=ox-fit*(packCenterY-385f),ly=oy+fit*175f+12.5f*dp;
+            float lx=ox-fit*(packCenterY-385f);
             String socText=descriptor.socKnown?Math.round(descriptor.powerSoc)+"%":"—";
-            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(12.5f*dp);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(22f*dp);
             paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            android.graphics.Paint.FontMetrics socFm=paint.getFontMetrics();
+            float ly=h-2.5f*dp-socFm.descent;
             boolean bolt=plug||iceCharging;
-            float tw=paint.measureText(socText),bs=11f*dp;
+            float tw=paint.measureText(socText),bs=18f*dp;
             float textX=bolt?lx+bs*.45f:lx;
             fill(strong);c.drawText(socText,textX,ly,paint);
             if(bolt){
@@ -9349,30 +9400,52 @@ public final class MainActivity extends Activity {
         }
         content.addView(graphic);
 
+        boolean railFigure = "power".equals(descriptor.id) || "consumption".equals(descriptor.id);
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
         copy.setOrientation(android.widget.LinearLayout.VERTICAL);
-        copy.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        // Power / CONSUMO: pack figure + detail at the bottom so the big number
+        // sits right above its labels (no weighted spacer — that left a void).
+        copy.setGravity(railFigure ? android.view.Gravity.BOTTOM : android.view.Gravity.CENTER_VERTICAL);
         copy.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
         android.widget.TextView primary = new android.widget.TextView(this);
         primary.setTag("quickValue");
         primary.setText(quickVisualPrimaryText(descriptor));
-        primary.setTextSize("power".equals(descriptor.id) ? 25f
-                : "clock".equals(descriptor.id) || "consumption".equals(descriptor.id) ? 24f : ("wallpaper".equals(descriptor.id) ? 18.5f : 21f));
+        // Power / CONSUMO share the climate setpoint scale (decimal at 50%).
+        primary.setTextSize(railFigure ? 40f
+                : "clock".equals(descriptor.id) ? 24f : ("wallpaper".equals(descriptor.id) ? 18.5f : 21f));
         primary.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         primary.setTextColor(dockLabelColor());
         primary.setMaxLines(1);
         primary.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        float railFigurePullUp = 0f;
+        if (railFigure) {
+            primary.setIncludeFontPadding(false);
+            primary.setPadding(0, 0, 0, 0);
+            primary.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            // Digits have no descenders, but the TextView still reserves the font
+            // descent under the baseline. Pull labels partway into that band so
+            // the gap sits between "too open" (full descent) and "flush" (2dp).
+            android.graphics.Paint.FontMetrics fm = primary.getPaint().getFontMetrics();
+            railFigurePullUp = Math.max(0f, fm.descent - 7f * density);
+        }
         copy.addView(primary);
 
         android.widget.TextView detail = new android.widget.TextView(this);
         detail.setTag("frostSecondary");
         detail.setText(quickVisualDetail(descriptor));
-        detail.setTextSize("power".equals(descriptor.id) ? 11f : ("consumption".equals(descriptor.id) ? 11f : 9.5f));
+        // Rail meta = climate INTERNA (h·0.18 ≈ 14sp on the 124dp card).
+        detail.setTextSize(railFigure ? 14f : 9.5f);
         detail.setLetterSpacing(0.025f);
         detail.setLineSpacing(0f, 1.02f);
+        if (railFigure) {
+            detail.setIncludeFontPadding(false);
+            detail.setPadding(0, 0, 0, 0);
+        }
         // The source badge is long and must never ellipsise into something that
         // reads like a different claim ("DEMO · SIMULATED · NOT VEHICLE..." is
         // not the same statement).
@@ -9381,7 +9454,9 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        detailLp.topMargin = Math.round(3 * density);
+        detailLp.topMargin = railFigure
+                ? -Math.round(railFigurePullUp)
+                : Math.round(3 * density);
         detail.setLayoutParams(detailLp);
         copy.addView(detail);
         content.addView(copy);
@@ -9414,23 +9489,52 @@ public final class MainActivity extends Activity {
         return descriptor.secondary + (metrics.isEmpty() ? "" : "\n" + metrics);
     }
 
-    /** {@link #quickVisualPrimary} with CONSUMO's unit set small after the number. */
+    /** {@link #quickVisualPrimary} with unit small and decimal digits at half size. */
     private CharSequence quickVisualPrimaryText(BottomCardDescriptor descriptor) {
         String primary = quickVisualPrimary(descriptor);
+        int unitColor = dockUiLight ? 0xFF6B7480 : 0xFF7D8793;
         if ("power".equals(descriptor.id)) {
-            android.text.SpannableString text = new android.text.SpannableString(primary + " kW");
-            text.setSpan(new android.text.style.RelativeSizeSpan(0.45f), primary.length(), text.length(),
-                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            text.setSpan(new android.text.style.ForegroundColorSpan(dockUiLight ? 0xFF6B7480 : 0xFF7D8793), primary.length(),
-                    text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            return text;
+            return styleRailFigure(primary, " kW", 0.45f, unitColor);
         }
-        if (!"consumption".equals(descriptor.id) || descriptor.metricA.isEmpty()) return primary;
-        android.text.SpannableString text = new android.text.SpannableString(primary + " " + descriptor.metricA);
-        text.setSpan(new android.text.style.RelativeSizeSpan(0.4f), primary.length(), text.length(),
-                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        text.setSpan(new android.text.style.ForegroundColorSpan(dockUiLight ? 0xFF6B7480 : 0xFF7D8793), primary.length(),
-                text.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if ("consumption".equals(descriptor.id) && !descriptor.metricA.isEmpty()) {
+            return styleRailFigure(primary, " " + descriptor.metricA, 0.4f, unitColor);
+        }
+        if ("consumption".equals(descriptor.id)) {
+            return styleRailFigure(primary, "", 1f, unitColor);
+        }
+        return primary;
+    }
+
+    /**
+     * Rail big figure in the climate-setpoint style: integer full size, decimal
+     * digits (and separator) at 50%, then an optional unit at {@code unitRel}.
+     */
+    private static CharSequence styleRailFigure(String number, String unit, float unitRel, int unitColor) {
+        if (number == null) number = "";
+        if (unit == null) unit = "";
+        android.text.SpannableString text = new android.text.SpannableString(number + unit);
+        int sep = -1;
+        for (int i = 0; i < number.length(); i++) {
+            char ch = number.charAt(i);
+            if (ch == '.' || ch == ',') {
+                sep = i;
+                break;
+            }
+        }
+        if (sep >= 0) {
+            int end = sep + 1;
+            while (end < number.length() && Character.isDigit(number.charAt(end))) end++;
+            if (end > sep) {
+                text.setSpan(new android.text.style.RelativeSizeSpan(0.5f), sep, end,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        if (!unit.isEmpty()) {
+            text.setSpan(new android.text.style.RelativeSizeSpan(unitRel), number.length(), text.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new android.text.style.ForegroundColorSpan(unitColor), number.length(), text.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
         return text;
     }
 
