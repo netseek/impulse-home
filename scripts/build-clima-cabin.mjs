@@ -22,12 +22,18 @@ import path from 'node:path';
 
 const SRC = 'assets/_source/clima';
 const OUT = 'assets/ui/clima';
+// Purpose-made dark renders. A mode with one here uses it for night instead of
+// the remapped light render; the rest fall back to remap().
+const NIGHT_SRC = 'assets/_source/clima/night';
 const MODES = ['off', 'face', 'facefeet', 'feet', 'feetglass'];
 const height = Number((process.argv.find((a) => a.startsWith('--height=')) || '--height=480').split('=')[1]);
 // The popup surfaces these sit on (--hv-frost-fill-strong, flattened).
 const NIGHT_BG = [14, 20, 27];
 const SOURCE_BG = 236;
 const FEATHER = 26;
+// The render's backdrop is a soft vignette (lum 228-240), not a flat SOURCE_BG.
+// Night ink below this floor is backdrop and keys out to transparent.
+const NIGHT_INK_FLOOR = 10;
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -49,7 +55,7 @@ function remap(data, info, theme) {
           neutral = Math.min(255, Math.round(data[i + c] * 1.045));
         } else {
           // Ink: how far this pixel is below the render's background.
-          const ink = Math.max(0, SOURCE_BG - lum);
+          const ink = Math.max(0, SOURCE_BG - NIGHT_INK_FLOOR - lum);
           neutral = Math.max(0, Math.min(235, Math.round(NIGHT_BG[c] + ink * 0.8)));
         }
         const tinted = theme === 'day'
@@ -58,7 +64,22 @@ function remap(data, info, theme) {
         out[o + c] = Math.round(neutral * (1 - chroma) + tinted * chroma);
       }
       const d = Math.min(edge, x, info.width - 1 - x);
-      out[o + 3] = d >= FEATHER ? 255 : Math.round((d / FEATHER) * 255);
+      let alpha = d >= FEATHER ? 1 : d / FEATHER;
+      if (theme === 'night') {
+        // The dark popup is a translucent gradient, not a flat NIGHT_BG, so a
+        // baked background shows as a box. Colour-to-alpha against NIGHT_BG:
+        // every night pixel sits at or above it, so this inverts exactly and
+        // over NIGHT_BG it composites back to the same picture.
+        let a = 0;
+        for (let c = 0; c < 3; c++) a = Math.max(a, (out[o + c] - NIGHT_BG[c]) / (255 - NIGHT_BG[c]));
+        for (let c = 0; c < 3; c++) {
+          out[o + c] = a > 1 / 255 ? Math.min(255, Math.round(NIGHT_BG[c] + (out[o + c] - NIGHT_BG[c]) / a)) : 0;
+        }
+        // The backdrop is faintly blue, so chroma tints it; matte it out by luminance.
+        const matte = Math.min(1, Math.max(0, (SOURCE_BG - NIGHT_INK_FLOOR - lum) / 12));
+        alpha *= a > 1 / 255 ? a * matte : 0;
+      }
+      out[o + 3] = Math.round(alpha * 255);
     }
   }
   return out;
@@ -84,6 +105,38 @@ for (const mode of MODES) {
     await sharp(rgba, { raw: { width: info.width, height: info.height, channels: 4 } })
       .webp({ quality: 82, alphaQuality: 90 }).toFile(path.join(OUT, `${mode}-${theme}.webp`));
   }
+  const nightSrc = path.join(NIGHT_SRC, `${mode}.webp`);
+  if (fs.existsSync(nightSrc)) await buildNightRender(nightSrc, path.join(OUT, `${mode}-night.webp`));
   const kb = (f) => Math.round(fs.statSync(path.join(OUT, f)).size / 1024);
   console.log(`${mode}: ${info.width}x${info.height}  day ${kb(`${mode}-day.webp`)} kB  night ${kb(`${mode}-night.webp`)} kB`);
+}
+
+// A dark render sits on its own opaque backdrop, which reads as a box on the
+// translucent popup. Measure that backdrop from the border (it differs per
+// render) and colour-to-alpha against it, so the popup's surface shows through.
+async function buildNightRender(src, out) {
+  const { data, info } = await sharp(src).resize({ height, fit: 'inside' })
+    .removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = info;
+  const border = [[], [], []];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (x > 2 && y > 2 && x < w - 3 && y < h - 3) continue;
+    for (let c = 0; c < 3; c++) border[c].push(data[(y * w + x) * 3 + c]);
+  }
+  const bg = border.map((v) => v.sort((a, b) => a - b)[v.length >> 1]);
+  const rgba = Buffer.alloc(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 3, o = (y * w + x) * 4;
+    let a = 0;
+    // Backdrop noise (a few levels either side) keys out rather than hazing.
+    for (let c = 0; c < 3; c++) a = Math.max(a, Math.max(0, data[i + c] - bg[c] - 4) / (255 - bg[c]));
+    for (let c = 0; c < 3; c++) {
+      rgba[o + c] = a > 1 / 255 ? Math.max(0, Math.min(255, Math.round(bg[c] + (data[i + c] - bg[c]) / a))) : 0;
+    }
+    const d = Math.min(y, h - 1 - y, x, w - 1 - x);
+    rgba[o + 3] = Math.round(a * (d >= FEATHER ? 1 : d / FEATHER) * 255);
+  }
+  await sharp(rgba, { raw: { width: w, height: h, channels: 4 } })
+    .webp({ quality: 82, alphaQuality: 90 }).toFile(out);
+  console.log(`  night render ${path.basename(src)} bg ${bg.join(',')}`);
 }

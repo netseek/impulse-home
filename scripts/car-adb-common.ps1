@@ -10,6 +10,12 @@ $CarHintFile = Join-Path $CarRoot '.car-adb-serial'
 # Head-unit AVD for local deploy — not a phone/tablet profile (e.g. Medium_Phone).
 $HavalAvdName = 'Haval'
 
+$platformTools = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools'
+$emulatorDir = Join-Path $env:LOCALAPPDATA 'Android\Sdk\emulator'
+if ((Test-Path $platformTools) -and ($env:PATH -notmatch [regex]::Escape($platformTools))) {
+  $env:PATH = "$platformTools;$emulatorDir;$env:PATH"
+}
+
 function Get-Adb {
   $sdk = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
   if (Test-Path $sdk) { return $sdk }
@@ -172,7 +178,7 @@ function Scan-AdbHosts([string[]]$Prefixes) {
 }
 
 function Test-IsEmulator([string]$Serial) {
-  return $Serial -match '^(emulator-|127\.0\.0\.1:|localhost:)'
+  return $Serial -match '^(\[::1\]:|emulator-|127\.0\.0\.1:|localhost:)'
 }
 
 function Get-WifiSsid {
@@ -338,7 +344,7 @@ function Start-HavalEmulator([string]$Adb) {
   }
   Write-Host "Starting $HavalAvdName emulator ..."
   Start-Process -FilePath (Get-EmulatorExe) -ArgumentList @('-avd', $HavalAvdName, '-no-skin', '-no-snapshot-load')
-  $deadline = (Get-Date).AddSeconds(120)
+  $deadline = (Get-Date).AddSeconds(180)
   do {
     Start-Sleep -Seconds 3
     $rows = @(Get-AdbRows $Adb | Where-Object { (Test-IsEmulator $_.Serial) })

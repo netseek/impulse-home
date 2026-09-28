@@ -67,10 +67,13 @@ snapshot() {
   if [ -n "$aa" ]; then
     for t in /proc/"$aa"/task/*; do
       c=$(cat "$t"/comm 2>/dev/null)
+      # comm is cut to 15 chars (DecodeInputThread -> DecodeInputThre). Not
+      # every AA host build has the Decode* threads at all: the 2024 PHEV's
+      # runs ReaderThread x2 + MediaCodec_loop + CodecLooper only.
       case "$c" in
         ReaderThread)       k=aa_reader ;;
-        DecodeInputThread)  k=aa_dec_in ;;
-        DecodeOutputThread) k=aa_dec_out ;;
+        DecodeInput*)       k=aa_dec_in ;;
+        DecodeOutput*)      k=aa_dec_out ;;
         MediaCodec_loop)    k=aa_mc_loop ;;
         CodecLooper)        k=aa_codec_looper ;;
         *) continue ;;
@@ -91,20 +94,21 @@ while [ "$w" -le "$WINDOWS" ]; do
   snapshot > "$TMP.1"
   # queued-frames of the AA video layer on the cluster, and whether each
   # display's layers went to GPU (Client) or HWC (Device) composition.
-  dumpsys SurfaceFlinger 2>/dev/null | awk '
-    /^\+ .*\(SurfaceView - com\.ts\.androidauto/ { aa = 1 }
-    aa && /queued-frames=/ {
-      match($0, /queued-frames=[0-9]+/); q = substr($0, RSTART + 14, RLENGTH - 14); aa = 0
-    }
+  # The queue is pulled with grep, not awk's match(): that crashed on the car
+  # the first time the AA layer was actually present.
+  dumpsys SurfaceFlinger > "$TMP.dump" 2>/dev/null
+  q=$(grep -A12 '^+ .*(SurfaceView - com.ts.androidauto' "$TMP.dump" \
+    | grep -m1 -o 'queued-frames=[0-9]*' | sed 's/.*=//')
+  echo "queued ${q:-na}" > "$TMP.sf"
+  awk '
     /^Display [0-9]+ HWC layers:/ { d = $2 }
     /\| *Client *\|/ { c[d]++ }
     /\| *Device *\|/ { v[d]++ }
     END {
-      if (q == "") q = "na"
-      print "queued", q
       print "comp_main", "c" c[0] + 0 "d" v[0] + 0
       print "comp_cluster", "c" c[4] + 0 "d" v[4] + 0
-    }' > "$TMP.sf"
+    }' "$TMP.dump" >> "$TMP.sf"
+  rm -f "$TMP.dump"
 
   ts=$(date +%H:%M:%S)
   # This ROM's awk is fragile, all of these crash or mis-parse on the car:

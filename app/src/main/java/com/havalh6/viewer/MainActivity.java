@@ -2685,7 +2685,7 @@ public final class MainActivity extends Activity {
          * Type scale (keep INTERNA in sync with sibling rail cards):
          *   setpoint   h·0.48  (frac ",0" at 50%; ° stays full size)
          *               off → driver setpoint, muted
-         *   forecast   day h·0.17 / icon fits label→temp band / temp h·0.22
+         *   forecast   day h·0.135 / icon fits label→temp band / temp h·0.185 (today) / h·0.16
          *   INTERNA    h·0.18
          */
         private void drawClimate(android.graphics.Canvas c, float w, float h,
@@ -2746,7 +2746,7 @@ public final class MainActivity extends Activity {
                     android.graphics.Typeface.SANS_SERIF, 200, false);
             android.graphics.Typeface dayStrong = android.graphics.Typeface.create(
                     "sans-serif-medium", android.graphics.Typeface.NORMAL);
-            float colW = Math.min(w * .16f, h * .54f);
+            float colW = Math.min(w * .15f, h * .50f);
             float dayBaseline = h * .16f;
             float fcTempBaseline = h * .66f;
             // Icon lives in the gap between day label and forecast temp so a
@@ -2754,7 +2754,7 @@ public final class MainActivity extends Activity {
             // a horizontal misalignment when the icon overlapped the °).
             float iconBandTop = dayBaseline + h * .04f;
             float iconBandBot = fcTempBaseline - h * .14f;
-            float iconMax = Math.max(8f, Math.min(colW * .78f, iconBandBot - iconBandTop));
+            float iconMax = Math.max(8f, Math.min(colW * .66f, (iconBandBot - iconBandTop) * .80f));
             float right = w - pad;
             float forecastLeft = leftW + pad * .5f;
             for (int i = Math.min(days.length, 3) - 1; i >= 0 && right - colW >= forecastLeft; i--) {
@@ -2764,7 +2764,7 @@ public final class MainActivity extends Activity {
                 float cx = right - colW / 2f;
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                 paint.setTypeface(today ? dayStrong : dayFace);
-                paint.setTextSize(Math.max(10f, h * .17f));
+                paint.setTextSize(Math.max(9f, h * .135f));
                 fill(today ? accent : muted);
                 c.drawText(parts[0], cx, dayBaseline, paint);
                 Bitmap ic = getWeatherBitmap(parts[1]);
@@ -2780,7 +2780,7 @@ public final class MainActivity extends Activity {
                     paint.setAlpha(255);
                 }
                 paint.setTypeface(today ? dayStrong : android.graphics.Typeface.DEFAULT);
-                paint.setTextSize(Math.max(today ? 13f : 11f, h * (today ? .22f : .19f)));
+                paint.setTextSize(Math.max(today ? 12f : 10f, h * (today ? .185f : .16f)));
                 fill(unknown ? muted : strong);
                 c.drawText(parts[2], cx, fcTempBaseline, paint);
                 right -= colW;
@@ -3154,12 +3154,12 @@ public final class MainActivity extends Activity {
             float breathe=motion?(float)(.775+.225*Math.cos(seconds*Math.PI*2/2.2)):1f;
             float chargeBreathe=motion?(float)(.7+.3*Math.cos(seconds*Math.PI*2/1.8)):1f;
 
-            // The car is drawn rotated (front to the right). Fit uses the
-            // original label strip so SOC type size cannot shrink the chassis;
-            // the % itself is bottom-anchored and grows up under the car.
+            // The car is drawn rotated (front to the right). Fit keeps most of
+            // the column for the chassis; SOC is bottom-anchored underneath and
+            // must not steal height from the graphic.
             float dp=getResources().getDisplayMetrics().density;
-            float labelH=17*dp;
-            float fit=Math.min(w/770f,(h-labelH)/350f)*.96f;
+            float labelH=14*dp;
+            float fit=Math.min(w/770f,(h-labelH)/350f)*1.0f;
             float ox=w*.5f,oy=(h-labelH)*.5f;
             int saved=c.save();
             c.translate(ox,oy);c.scale(fit,fit);c.rotate(90f);c.translate(-175f,-385f);
@@ -3240,17 +3240,17 @@ public final class MainActivity extends Activity {
             if(packCharging&&pulse&&motion)drawPowerChargeSweep(c,battery,seconds);
             c.restoreToCount(saved);
 
-            // Battery % upright under the car, bottom-anchored so a larger size
-            // fills the gap upward toward the chassis (not downward off the card).
+            // Battery % upright under the car, bottom-anchored. Sized below the
+            // chassis so the graphic stays the focus of the column.
             float packCenterY=battery[1]+battery[3]/2;
             float lx=ox-fit*(packCenterY-385f);
             String socText=descriptor.socKnown?Math.round(descriptor.powerSoc)+"%":"—";
-            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(22f*dp);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(15f*dp);
             paint.setTextAlign(android.graphics.Paint.Align.CENTER);
             android.graphics.Paint.FontMetrics socFm=paint.getFontMetrics();
             float ly=h-2.5f*dp-socFm.descent;
             boolean bolt=plug||iceCharging;
-            float tw=paint.measureText(socText),bs=18f*dp;
+            float tw=paint.measureText(socText),bs=12.5f*dp;
             float textX=bolt?lx+bs*.45f:lx;
             fill(strong);c.drawText(socText,textX,ly,paint);
             if(bolt){
