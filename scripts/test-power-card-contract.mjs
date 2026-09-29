@@ -53,7 +53,7 @@ assert.ok(!/<filter|filter=|<marker|marker-end/.test(overlayMarkup),
   'Power overlay must not use SVG filters or markers');
 // Motion is paused by default and runs only on .is-running (flow active AND on
 // screen), so a hidden or idle card never animates.
-for (const cls of ['hv-power-flow-track', 'hv-power-flow-head', 'hv-power-hub', 'hv-power-cell-wave', 'hv-power-cell-pulse', 'hv-power-bolt', 'hv-power-charge-sweep']) {
+for (const cls of ['hv-power-flow-track', 'hv-power-flow-head', 'hv-power-hub', 'hv-power-wheel-halo', 'hv-power-cell-wave', 'hv-power-cell-pulse', 'hv-power-bolt', 'hv-power-charge-sweep']) {
   const rule = html.match(new RegExp(`\\n\\s*(?:\\.hv-power-route )?\\.${cls} \\{[^}]*\\}`));
   assert.ok(rule && rule[0].includes('animation-play-state:paused'), `${cls} must start paused`);
   assert.ok(new RegExp(`\\.hv-power-canvas\\.is-running [^{]*\\.${cls}`).test(html), `${cls} must run only under .is-running`);
@@ -93,6 +93,7 @@ assert.ok(java.includes('sanitizePowerState'));
 assert.ok(java.includes('sanitizePowerVariant'));
 assert.ok(java.includes('drawPowerBatteryCells'));
 assert.ok(java.includes('drawPowerTopRoute'));
+assert.ok(java.includes('drawPowerWheelTraction'));
 assert.ok(java.includes('www/assets/power/graphics/'));
 assert.ok(java.includes('Abre os detalhes do fluxo de energia.'));
 

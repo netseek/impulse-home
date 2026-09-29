@@ -2499,6 +2499,14 @@ window.HavalSplash = (function () {
     .hv-power-canvas.is-running .hv-power-hub { animation-play-state:running; }
     @keyframes hv-power-hub-out { 0% { transform:scale(.45); opacity:.9; } 100% { transform:scale(1.45); opacity:0; } }
     @keyframes hv-power-hub-in { 0% { transform:scale(1.45); opacity:0; } 100% { transform:scale(.45); opacity:.9; } }
+    .hv-power-wheel-group { opacity:1; }
+    .hv-power-wheel-halo { fill:none; stroke-linecap:round; stroke-linejoin:round; animation:hv-power-breathe 2.2s ease-in-out infinite; animation-play-state:paused; }
+    .hv-power-wheel-halo.outer { stroke-width:3; stroke-opacity:.14; }
+    .hv-power-wheel-halo.inner { stroke-width:1.2; stroke-opacity:.38; }
+    .hv-power-wheel-halo.drive { stroke:#22c9ff; }
+    .hv-power-wheel-halo.regen { stroke:#53ed91; }
+    .hv-power-wheel-halo.engine { stroke:#ffb65c; }
+    .hv-power-canvas.is-running .hv-power-wheel-halo { animation-play-state:running; }
     .hv-power-soc-plate { fill:rgba(8,15,20,.86); stroke:rgba(180,189,197,.45); stroke-width:1; }
     .hv-power-soc-label { fill:#f3f8fb; font:700 27px/1 var(--hv-font); text-anchor:middle; dominant-baseline:middle; paint-order:stroke; stroke:rgba(4,9,12,.55); stroke-width:3px; }
     /* Cards: one state word, two big numbers. The graphic carries the rest. */
@@ -2594,9 +2602,9 @@ window.HavalSplash = (function () {
        cut bare rAF from ~57/s to 35-39/s (p90 61-69 ms); stepped it is 56-57/s,
        p90 ~19.5 ms -- the same as idle. Keep new overlay animations stepped. */
     .hv-power-flow-track,.hv-power-route .hv-power-flow-head,.hv-power-hub { animation-timing-function:steps(12); }
-    .hv-power-highlight.active,.hv-power-pack-edge,.hv-power-pack-glow,.hv-power-bolt { animation-timing-function:steps(14); }
+    .hv-power-highlight.active,.hv-power-pack-edge,.hv-power-pack-glow,.hv-power-bolt,.hv-power-wheel-halo { animation-timing-function:steps(14); }
     .hv-power-cell-pulse,.hv-power-cell-wave,.hv-power-charge-sweep { animation-timing-function:steps(16); }
-    @media (prefers-reduced-motion:reduce) { .hv-power-flow-track,.hv-power-flow-head,.hv-power-cell-pulse,.hv-power-cell-wave,.hv-power-hub,.hv-power-highlight,.hv-power-pack-edge,.hv-power-bolt,.hv-power-charge-sweep,.hv-power-pack-glow,.hv-power-art::before { animation:none !important; } .hv-power-flow-track { stroke-dashoffset:0; } .hv-power-cell-wave,.hv-power-hub,.hv-power-charge-sweep { display:none; } .hv-power-cell-fill,.hv-power-route,.hv-power-highlight { transition:none !important; } }
+    @media (prefers-reduced-motion:reduce) { .hv-power-flow-track,.hv-power-flow-head,.hv-power-cell-pulse,.hv-power-cell-wave,.hv-power-hub,.hv-power-wheel-halo,.hv-power-highlight,.hv-power-pack-edge,.hv-power-bolt,.hv-power-charge-sweep,.hv-power-pack-glow,.hv-power-art::before { animation:none !important; } .hv-power-flow-track { stroke-dashoffset:0; } .hv-power-cell-wave,.hv-power-hub,.hv-power-charge-sweep { display:none; } .hv-power-cell-fill,.hv-power-route,.hv-power-highlight { transition:none !important; } }
     .hv-graphs {
       position: absolute;
       top: 0; right: 0; bottom: 0; left: 0;
@@ -9297,19 +9305,22 @@ const CAR_POWER_GRAPHICS = {
     front:[[155.2,303.4],[155.2,260.3],[153.2,211.8]], fl:[[180.4,182.6],[258.1,183.4]], fr:[[124.1,182.6],[96.9,183.4]],
     iceL:[[238.7,192.3],[258.1,192.3]], iceR:[[184.3,192.3],[96.9,192.3]], iceBatt:[[211.5,221.5],[211.5,264.2],[211.5,303.4]],
     inlet:[304,540], charge:[[304,540],[274,540],[274,460],[241,460]], chargeExt:[[320,700],[320,565],[304,540]],
-    hubs:[[283.4,184.6],[67.8,184.6],[283.4,588.4],[67.8,588.4]] },
+    hubs:[[283.4,184.6],[67.8,184.6],[283.4,588.4],[67.8,588.4]],
+    wheels:[[262,129,41,109],[46,129,41,109],[262,533,41,109],[46,533,41,109]] },
   phev34: { label:'PHEV34 / GT', asset:'assets/power/graphics/approved-phev34-chassis.png', awd:true,
     battery:[93.6,279.1,150.4,238.9], engine:[171.2,143,60.9,63.7], frontMotor:[114.7,143.8,49.8,73.6], rearMotor:[140.6,571.7,63.6,63.7],
     front:[[142.6,279.1],[142.6,247.3],[139.8,217.4]], fl:[[164.5,177.6],[256,178.4]], fr:[[114.7,177.6],[86.9,178.4]],
     rear:[[172.4,518],[172.4,545.8],[172.4,571.7]], rl:[[204.2,592.4],[257.2,591.6]], rr:[[140.6,592.4],[86.9,591.6]],
     iceL:[[232.1,186.8],[257.2,186.8]], iceR:[[171.2,186.8],[86.9,186.8]], iceBatt:[[198.3,206.7],[198.3,247.3],[198.3,279.1]],
     inlet:[300,548], charge:[[300,548],[274,548],[274,506],[244,506]], chargeExt:[[318,690],[318,570],[300,548]],
-    hubs:[[281.8,178.4],[61,178.4],[281.8,591.6],[61,591.6]] },
+    hubs:[[281.8,178.4],[61,178.4],[281.8,591.6],[61,591.6]],
+    wheels:[[261,128,41,109],[45,128,41,109],[261,534,41,109],[45,534,41,109]] },
   hev2: { label:'HEV2', asset:'assets/power/graphics/approved-hev2-chassis.png', awd:false,
     battery:[150.7,454.5,61.1,65.2], engine:[185.2,144.9,55,70.1], frontMotor:[134.1,150.6,47.3,56.8],
     front:[[160.6,454.5],[131.8,440.5],[131,328.7],[149.2,239.6],[154.9,207.4]], fl:[[181.4,180.1],[255.3,181.7]], fr:[[134.1,180.1],[100,181.7]],
     iceL:[[240.2,190.4],[255.3,190.4]], iceR:[[185.2,190.4],[100,190.4]], iceBatt:[[202.3,215],[228.1,241.5],[228.1,440.5],[194.7,454.5]],
-    hubs:[[283.8,182.8],[69.6,183.6],[283.8,582.7],[67.8,582.7]] },
+    hubs:[[283.8,182.8],[69.6,183.6],[283.8,582.7],[67.8,582.7]],
+    wheels:[[262,128,41,109],[46,128,41,109],[262,528,41,109],[46,528,41,109]] },
 };
 const CAR_POWER_STATE_LABEL = {
   idle: 'Parado',
@@ -12265,6 +12276,42 @@ class Component extends DCLogic {
     else if (iceOn) out += iceRoute('engine-battery', g.iceBatt);
     out += route('front', g.front, model.frontDir) + route('front-left', g.fl, model.frontDir) + route('front-right', g.fr, model.frontDir);
     if (g.awd) out += route('rear', g.rear, model.rearDir) + route('rear-left', g.rl, model.rearDir) + route('rear-right', g.rr, model.rearDir);
+    out += '</g>';
+
+    // Driven wheels traction & energy: soft glowing halos and vertical gradient fill (3D X-ray mode simulation)
+    out += '<g data-layer="wheel-traction">';
+    const wheelTraction = (b, direction, name, toneOverride) => {
+      if (!direction || !b) return '';
+      const tone = toneOverride || (direction < 0 ? 'regen' : 'drive');
+      const bx = n(b[0]), by = n(b[1]), bw = n(b[2]), bh = n(b[3]);
+      const fillId = prefix + '-wheel-fill-' + name;
+      const color = tone === 'regen' ? '#53ed91' : (tone === 'engine' ? '#ffb65c' : '#22c9ff');
+      return '<g class="hv-power-wheel-group ' + tone + tier + '" data-wheel="' + name + '">'
+        + '<defs>'
+        + '<linearGradient id="' + fillId + '" x1="0" y1="' + by + '" x2="0" y2="' + n(by + bh) + '" gradientUnits="userSpaceOnUse">'
+        + '<stop offset="0%" stop-color="' + color + '" stop-opacity="0"/>'
+        + '<stop offset="25%" stop-color="' + color + '" stop-opacity="0.08"/>'
+        + '<stop offset="50%" stop-color="' + color + '" stop-opacity="0.22"/>'
+        + '<stop offset="75%" stop-color="' + color + '" stop-opacity="0.08"/>'
+        + '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>'
+        + '</linearGradient>'
+        + '</defs>'
+        + '<rect x="' + n(b[0] - 1.5) + '" y="' + n(b[1] - 1.5) + '" width="' + n(b[2] + 3) + '" height="' + n(b[3] + 3) + '" rx="11" class="hv-power-wheel-halo outer ' + tone + '"></rect>'
+        + '<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + bh + '" rx="10" fill="url(#' + fillId + ')" class="hv-power-wheel-halo inner ' + tone + '"></rect>'
+        + '</g>';
+    };
+    const wheelBoxes = g.wheels || (g.hubs ? g.hubs.map((h) => [h[0] - 20.5, h[1] - 54.5, 41, 109]) : null);
+    if (wheelBoxes) {
+      const frontDir = model.frontDir || (iceWheels ? 1 : 0);
+      const frontTone = !model.frontDir && iceWheels ? 'engine' : (frontDir < 0 ? 'regen' : 'drive');
+      out += wheelTraction(wheelBoxes[0], frontDir, 'front-right', frontTone)
+        + wheelTraction(wheelBoxes[1], frontDir, 'front-left', frontTone);
+      if (g.awd && model.rearDir) {
+        const rearTone = model.rearDir < 0 ? 'regen' : 'drive';
+        out += wheelTraction(wheelBoxes[2], model.rearDir, 'rear-right', rearTone)
+          + wheelTraction(wheelBoxes[3], model.rearDir, 'rear-left', rearTone);
+      }
+    }
     out += '</g>';
 
     // Driven wheels: a ring that radiates out (drive) or gathers in (regen).

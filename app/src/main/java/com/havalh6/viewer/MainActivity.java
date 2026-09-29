@@ -3109,7 +3109,7 @@ public final class MainActivity extends Activity {
             // scripts/build-approved-chassis-assets.mjs; regenerate, do not nudge.
             // inlet / chargePath / chargeExt are the one hand-placed exception (the
             // renders have no body): a schematic port on the right rear quarter.
-            float[] battery,engine,frontMotor,rearMotor=null;float[][] frontPath,fl,fr,rearPath=null,rl=null,rr=null,hubs,iceL,iceR,iceBatt,chargePath=null,chargeExt=null;float[] inlet=null;
+            float[] battery,engine,frontMotor,rearMotor=null;float[][] frontPath,fl,fr,rearPath=null,rl=null,rr=null,hubs,wheels,iceL,iceR,iceBatt,chargePath=null,chargeExt=null;float[] inlet=null;
             if(awd){
                 battery=new float[]{93.6f,279.1f,150.4f,238.9f};engine=new float[]{171.2f,143f,60.9f,63.7f};
                 frontMotor=new float[]{114.7f,143.8f,49.8f,73.6f};rearMotor=new float[]{140.6f,571.7f,63.6f,63.7f};
@@ -3118,6 +3118,7 @@ public final class MainActivity extends Activity {
                 rearPath=new float[][]{{172.4f,518f},{172.4f,545.8f},{172.4f,571.7f}};
                 rl=new float[][]{{204.2f,592.4f},{257.2f,591.6f}};rr=new float[][]{{140.6f,592.4f},{86.9f,591.6f}};
                 hubs=new float[][]{{281.8f,178.4f},{61f,178.4f},{281.8f,591.6f},{61f,591.6f}};
+                wheels=new float[][]{{261f,128f,41f,109f},{45f,128f,41f,109f},{261f,534f,41f,109f},{45f,534f,41f,109f}};
                 iceL=new float[][]{{232.1f,186.8f},{257.2f,186.8f}};iceR=new float[][]{{171.2f,186.8f},{86.9f,186.8f}};
                 iceBatt=new float[][]{{198.3f,206.7f},{198.3f,247.3f},{198.3f,279.1f}};
                 inlet=new float[]{300f,548f};chargePath=new float[][]{{300f,548f},{274f,548f},{274f,506f},{244f,506f}};
@@ -3128,6 +3129,7 @@ public final class MainActivity extends Activity {
                 frontPath=new float[][]{{160.6f,454.5f},{131.8f,440.5f},{131f,328.7f},{149.2f,239.6f},{154.9f,207.4f}};
                 fl=new float[][]{{181.4f,180.1f},{255.3f,181.7f}};fr=new float[][]{{134.1f,180.1f},{100f,181.7f}};
                 hubs=new float[][]{{283.8f,182.8f},{69.6f,183.6f},{283.8f,582.7f},{67.8f,582.7f}};
+                wheels=new float[][]{{262f,128f,41f,109f},{46f,128f,41f,109f},{262f,528f,41f,109f},{46f,528f,41f,109f}};
                 iceL=new float[][]{{240.2f,190.4f},{255.3f,190.4f}};iceR=new float[][]{{185.2f,190.4f},{100f,190.4f}};
                 iceBatt=new float[][]{{202.3f,215f},{228.1f,241.5f},{228.1f,440.5f},{194.7f,454.5f}};
             }else{
@@ -3136,6 +3138,7 @@ public final class MainActivity extends Activity {
                 frontPath=new float[][]{{155.2f,303.4f},{155.2f,260.3f},{153.2f,211.8f}};
                 fl=new float[][]{{180.4f,182.6f},{258.1f,183.4f}};fr=new float[][]{{124.1f,182.6f},{96.9f,183.4f}};
                 hubs=new float[][]{{283.4f,184.6f},{67.8f,184.6f},{283.4f,588.4f},{67.8f,588.4f}};
+                wheels=new float[][]{{262f,129f,41f,109f},{46f,129f,41f,109f},{262f,533f,41f,109f},{46f,533f,41f,109f}};
                 iceL=new float[][]{{238.7f,192.3f},{258.1f,192.3f}};iceR=new float[][]{{184.3f,192.3f},{96.9f,192.3f}};
                 iceBatt=new float[][]{{211.5f,221.5f},{211.5f,264.2f},{211.5f,303.4f}};
                 inlet=new float[]{304f,540f};chargePath=new float[][]{{304f,540f},{274f,540f},{274f,460f},{241f,460f}};
@@ -3202,8 +3205,12 @@ public final class MainActivity extends Activity {
                 drawPowerTopRoute(c,rr,rear,seconds,motion);
             }
             int hubDir=front!=0?front:(iceWheels?1:0),hubColor=front==0&&iceWheels?0xFFFFB65C:0;
+            drawPowerWheelTraction(c,wheels[0],hubDir,seconds,motion,hubColor);drawPowerWheelTraction(c,wheels[1],hubDir,seconds,motion,hubColor);
             drawPowerHub(c,hubs[0],hubDir,seconds,motion,hubColor);drawPowerHub(c,hubs[1],hubDir,seconds,motion,hubColor);
-            if(awd){drawPowerHub(c,hubs[2],rear,seconds,motion);drawPowerHub(c,hubs[3],rear,seconds,motion);}
+            if(awd){
+                drawPowerWheelTraction(c,wheels[2],rear,seconds,motion,0);drawPowerWheelTraction(c,wheels[3],rear,seconds,motion,0);
+                drawPowerHub(c,hubs[2],rear,seconds,motion);drawPowerHub(c,hubs[3],rear,seconds,motion);
+            }
             if(plug){
                 // Charger post outside the car, and the port with a plug glyph.
                 float px=chargeExt[0][0],py=chargeExt[0][1];
@@ -3391,6 +3398,40 @@ public final class MainActivity extends Activity {
             int color=colorOverride!=0?colorOverride:direction>0?0xFF22C9FF:0xFF53ED91;
             stroke(withAlpha(color,Math.round(.9f*(1-eased)*255)),4f);
             c.drawCircle(hub[0],hub[1],r,paint);
+        }
+
+        /** Driven wheel traction & energy: soft glowing halos and vertical gradient fill. */
+        private void drawPowerWheelTraction(android.graphics.Canvas c,float[] box,int direction,
+                double seconds,boolean motion,int colorOverride){
+            if(direction==0||box==null)return;
+            float bx=box[0],by=box[1],bw=box[2],bh=box[3];
+            int color=colorOverride!=0?colorOverride:(direction>0?0xFF22C9FF:0xFF53ED91);
+            float breathe=motion?(float)(.775+.225*Math.cos(seconds*Math.PI*2/2.2)):1f;
+
+            // Very soft outer glow halo
+            oval.set(bx-1.5f,by-1.5f,bx+bw+1.5f,by+bh+1.5f);
+            stroke(withAlpha(color,Math.round(.14f*255*breathe)),3f);
+            c.drawRoundRect(oval,11f,11f,paint);
+
+            // Soft inner border with soft vertical gradient fill
+            oval.set(bx,by,bx+bw,by+bh);
+            fill(0xFFFFFFFF);
+            paint.setShader(new android.graphics.LinearGradient(0,by,0,by+bh,
+                new int[]{
+                    withAlpha(color,0),
+                    withAlpha(color,Math.round(.08f*255)),
+                    withAlpha(color,Math.round(.22f*255)),
+                    withAlpha(color,Math.round(.08f*255)),
+                    withAlpha(color,0)
+                },
+                new float[]{0f,0.25f,0.5f,0.75f,1f},
+                android.graphics.Shader.TileMode.CLAMP));
+            c.drawRoundRect(oval,10f,10f,paint);
+            paint.setShader(null);
+
+            // Soft inner border stroke
+            stroke(withAlpha(color,Math.round(.38f*255*breathe)),1.2f);
+            c.drawRoundRect(oval,10f,10f,paint);
         }
 
         /** Cache successful and failed top-down chassis loads once per variant. */
