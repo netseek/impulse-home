@@ -3436,6 +3436,30 @@ window.HavalSplash = (function () {
     }
     .hv-media-1x2 { --hv-media-pad: 10px; --hv-media-btn: 34px; --hv-media-title: 13px; }
     .hv-media-2x1 { --hv-media-pad: 11px; --hv-media-btn: 34px; --hv-media-title: 14px; }
+    /* 1 row 2 cols: place playback controls below the progress bar for better space utilization */
+    .hv-media-2x1.split > .hv-media-body,
+    .hv-media-1x2.split > .hv-media-body {
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      gap: 4px;
+    }
+    .hv-media-2x1.split .hv-media-chrome,
+    .hv-media-1x2.split .hv-media-chrome {
+      flex: 0 0 auto;
+      justify-content: center;
+      gap: 2px;
+    }
+    .hv-media-2x1.split .hv-media-source,
+    .hv-media-1x2.split .hv-media-source {
+      padding-right: 68px;
+    }
+    .hv-media-2x1.split > .hv-media-body > .hv-media-transport,
+    .hv-media-1x2.split > .hv-media-body > .hv-media-transport {
+      margin-top: 6px;
+      justify-content: center;
+      gap: 12px;
+    }
     .hv-media-3x1 { --hv-media-pad: 12px; --hv-media-btn: 40px; --hv-media-title: 17px; }
     .hv-media-2x2 { --hv-media-btn: 44px; --hv-media-title: 17px; }
     .hv-media-3x2 { --hv-media-btn: 48px; --hv-media-title: 20px; }
@@ -45231,6 +45255,28 @@ class Component extends DCLogic {
     return url;
   }
 
+  _mediaAppIcon(pkg, label) {
+    if (!pkg && !label) return '';
+    const key = (pkg || '') + '|' + (label || '');
+    if (Object.prototype.hasOwnProperty.call(this._mediaAppIconByKey || {}, key)) {
+      return this._mediaAppIconByKey[key];
+    }
+    let url = '';
+    const isAA = (label && label.toUpperCase().indexOf('ANDROID AUTO') >= 0)
+      || (pkg && (pkg.toLowerCase().indexOf('androidauto') >= 0 || pkg.toLowerCase().indexOf('projection.gearhead') >= 0));
+    const isCP = (label && (label.toUpperCase() === 'CARPLAY' || label.toUpperCase().indexOf('CARPLAY') >= 0))
+      || (pkg && pkg.toLowerCase().indexOf('carplay') >= 0);
+    const lookupPkg = isAA ? CAR_AA_PACKAGE : (isCP ? 'com.ts.carplay' : (pkg || ''));
+    try {
+      if (lookupPkg && window.AppLauncherBridge && typeof window.AppLauncherBridge.getAppIcon === 'function') {
+        url = window.AppLauncherBridge.getAppIcon(lookupPkg) || '';
+      }
+    } catch (e) {}
+    if (!this._mediaAppIconByKey) this._mediaAppIconByKey = {};
+    this._mediaAppIconByKey[key] = url;
+    return url;
+  }
+
   _ensureDemoNavTicker() {
     if (this._demoNavTicker || !this._demoPreview || typeof setInterval !== 'function') return;
     this._demoNavTicker = setInterval(() => {
@@ -45806,6 +45852,8 @@ class Component extends DCLogic {
     // assuming. Without it the tap would be a silent no-op.
     const canLaunch = !!(hasTrack && s.mediaPackageName && s.mediaCanLaunch);
     const openApp = (ev) => this._openMediaApp(ev);
+    const appIcon = s.mediaAppIcon || (hasTrack && (s.mediaPackageName || s.mediaAppLabel)
+      ? this._mediaAppIcon(s.mediaPackageName, s.mediaAppLabel) : '');
     return {
       mediaSizeClass: 'hv-media-' + w + 'x' + h,
       mediaLayoutClass: wide ? 'split' : 'cover',
@@ -45821,9 +45869,9 @@ class Component extends DCLogic {
       // The source app names itself in the corner: its own icon and label,
       // both published by MediaNowPlaying rather than guessed from the
       // package name.
-      mediaAppIcon: s.mediaAppIcon || '',
-      mediaHasAppIcon: !!(hasTrack && s.mediaAppIcon),
-      mediaShowApp: hasTrack && !!(s.mediaAppLabel || s.mediaAppIcon),
+      mediaAppIcon: appIcon,
+      mediaHasAppIcon: !!(hasTrack && appIcon),
+      mediaShowApp: hasTrack && !!(s.mediaAppLabel || appIcon),
       // At 1x1 the pill is the icon alone: the name would eat most of the
       // slot width and the icon already identifies the player.
       mediaShowAppName: !compact && !!s.mediaAppLabel,

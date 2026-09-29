@@ -205,7 +205,12 @@ final class ProjectionPresence {
         // icon (generic Android). Use the bundled AA / CarPlay marks instead.
         int res = kind == Kind.ANDROID_AUTO ? R.drawable.ic_android_auto : R.drawable.ic_carplay;
         try {
-            return app.getDrawable(res);
+            Drawable d = app.getDrawable(res);
+            if (d != null) return d;
+        } catch (Throwable ignored) {}
+        int defRes = kind == Kind.ANDROID_AUTO ? R.drawable.ic_android_auto_default : R.drawable.ic_carplay_default;
+        try {
+            return app.getDrawable(defRes);
         } catch (Throwable ignored) {
             return null;
         }

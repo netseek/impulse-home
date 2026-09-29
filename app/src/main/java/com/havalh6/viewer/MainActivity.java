@@ -10675,14 +10675,14 @@ public final class MainActivity extends Activity {
     }
 
     /** MediaCenter owns both AA and USB — only the AA label is projection. */
-    private static boolean isAndroidAutoMediaSource(String pkg, String label) {
+    static boolean isAndroidAutoMediaSource(String pkg, String label) {
         if (label != null && label.equalsIgnoreCase("ANDROID AUTO")) return true;
         if (pkg == null || pkg.isEmpty()) return false;
         String p = pkg.toLowerCase(java.util.Locale.US);
         return p.contains("androidauto") || p.contains("projection.gearhead");
     }
 
-    private static boolean isCarPlayMediaSource(String pkg, String label) {
+    static boolean isCarPlayMediaSource(String pkg, String label) {
         if (label != null) {
             String l = label.trim();
             if (l.equalsIgnoreCase("CARPLAY") || l.equalsIgnoreCase("CarPlay")) return true;

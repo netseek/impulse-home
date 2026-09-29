@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.Drawable;
 import android.media.MediaDescription;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
@@ -400,19 +401,53 @@ final class MediaNowPlaying {
     }
 
     /**
-     * The source app's launcher icon, as a data URL.
-     *
-     * Cached per package: a cover changes per track, an app icon does not, and
-     * re-encoding a PNG on every metadata update would put it on the emit path.
+     * Resolves the app icon drawable, preferring our branded marks for projection
+     * sources (Android Auto and CarPlay) before querying PackageManager.
      */
+    private Drawable resolveAppIconDrawable(String pkg, String label, int source) {
+        if (source == MediaTrack.SRC_CARPLAY || MainActivity.isCarPlayMediaSource(pkg, label)) {
+            try {
+                Drawable d = appContext.getDrawable(R.drawable.ic_carplay);
+                if (d != null) return d;
+            } catch (Throwable ignored) {}
+            try {
+                return appContext.getDrawable(R.drawable.ic_carplay_default);
+            } catch (Throwable ignored) {}
+        }
+        if ((source == MediaTrack.SRC_MEDIA_CENTER && "ANDROID AUTO".equalsIgnoreCase(label))
+                || MainActivity.isAndroidAutoMediaSource(pkg, label)) {
+            try {
+                Drawable d = appContext.getDrawable(R.drawable.ic_android_auto);
+                if (d != null) return d;
+            } catch (Throwable ignored) {}
+            try {
+                return appContext.getDrawable(R.drawable.ic_android_auto_default);
+            } catch (Throwable ignored) {}
+        }
+        if (pkg != null && !pkg.isEmpty()) {
+            try {
+                return appContext.getPackageManager().getApplicationIcon(pkg);
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
     private String appIconDataUrl(String pkg) {
-        if (appContext == null || pkg == null || pkg.isEmpty()) return "";
-        String cached = appIconCache.get(pkg);
+        return appIconDataUrl(pkg, null, 0);
+    }
+
+    private String appIconDataUrl(String pkg, String label, int source) {
+        if (appContext == null) return "";
+        if ((pkg == null || pkg.isEmpty()) && (label == null || label.isEmpty()) && source == 0) return "";
+        String cacheKey = (pkg != null ? pkg : "") + "|" + (label != null ? label : "") + "|" + source;
+        String cached = appIconCache.get(cacheKey);
         if (cached != null) return cached;
+        if (pkg != null && !pkg.isEmpty() && appIconCache.containsKey(pkg) && (label == null || label.isEmpty()) && source == 0) {
+            return appIconCache.get(pkg);
+        }
         String encoded = "";
         try {
-            android.graphics.drawable.Drawable icon =
-                    appContext.getPackageManager().getApplicationIcon(pkg);
+            Drawable icon = resolveAppIconDrawable(pkg, label, source);
             if (icon != null) {
                 int size = APP_ICON_PX;
                 Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
@@ -427,7 +462,8 @@ final class MediaNowPlaying {
             }
         } catch (Exception ignored) {}
         if (appIconCache.size() >= 8) appIconCache.clear();
-        appIconCache.put(pkg, encoded);
+        if (pkg != null && !pkg.isEmpty()) appIconCache.put(pkg, encoded);
+        appIconCache.put(cacheKey, encoded);
         return encoded;
     }
 
@@ -517,7 +553,7 @@ final class MediaNowPlaying {
                 + winner.artist + "|" + winner.album + "|" + winner.durationMs + "|"
                 + winner.playing + "|" + winner.appLabel + "|" + lastArtKey + "|" + art.length()
                 + "|" + canLaunch(winner.packageName)
-                + "|" + appIconDataUrl(winner.packageName).length();
+                + "|" + appIconDataUrl(winner.packageName, winner.appLabel, winner.source).length();
         if (!changed(signature)) return;
 
         JSONObject o = emptyPayload(false);
@@ -532,7 +568,7 @@ final class MediaNowPlaying {
             o.put("packageName", winner.packageName);
             o.put("hasTrack", !winner.title.isEmpty() || !winner.artist.isEmpty());
             o.put("artDataUrl", art);
-            o.put("appIcon", appIconDataUrl(winner.packageName));
+            o.put("appIcon", appIconDataUrl(winner.packageName, winner.appLabel, winner.source));
             o.put("canLaunch", canLaunch(winner.packageName));
             o.put("needsListener", false);
         } catch (Exception e) {
