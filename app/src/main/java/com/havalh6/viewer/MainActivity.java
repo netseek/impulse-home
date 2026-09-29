@@ -3912,9 +3912,18 @@ public final class MainActivity extends Activity {
     private boolean workspaceLayoutMode;
     /** Layout manager screen open on the page: "desktops", "layout", "appearance" or "". */
     private String studioScreen = "";
+    private static final int WORKSPACE_CARD_WIDTH_DP = 198;
+    private static final int WORKSPACE_CARD_EXPANDED_WIDTH_DP = 700;
+    private View workspaceCard;
     private View workspaceActionsFace;
+    private View workspaceAppsExpandedFace;
     private View workspaceLayoutFace;
+    private View workspaceProjectionAction;
+    private boolean workspaceExpandedAppsMode;
+    private android.widget.LinearLayout launcherIconsLayout;
+    private WorkspaceAppsScrollView workspaceAppsScroll;
     private android.widget.TextView workspaceHeading;
+    private android.animation.ValueAnimator workspaceWidthAnimator;
     private final java.util.List<android.widget.TextView> workspaceLayoutCells = new ArrayList<>();
     private final java.util.Map<View, android.animation.Animator> railJiggles = new java.util.HashMap<>();
     /** Which pinned destinations are installed (or emulator-stubbed). */
@@ -4573,8 +4582,18 @@ public final class MainActivity extends Activity {
                 + ",b:" + (r.bottom / density) + "}";
     }
 
+    private void onAppLaunched() {
+        if (workspaceExpandedAppsMode) {
+            setWorkspaceExpandedAppsMode(false, true);
+        }
+        if (DOCK_SURFACE_LAUNCHER.equals(dockSurfaceMode)) {
+            chooseDockSurface(DOCK_SURFACE_CARDS, true);
+        }
+    }
+
     private void launchAppForPackage(String packageName, String label) {
         if (packageName == null || packageName.isEmpty()) return;
+        onAppLaunched();
         // AA / CarPlay audio is published by MediaCenter, but starting
         // MediaCenter MAIN skips the track. Raise the projection task instead.
         if (ProjectionPresence.isProjectionPackage(packageName)) {
@@ -6946,6 +6965,7 @@ public final class MainActivity extends Activity {
      * freeform slot. Same windowing path as {@link #maximizePopupApp}.
      */
     private void launchAppFullscreen(String packageName) {
+        onAppLaunched();
         try {
             if (packageName == null || packageName.isEmpty()) return;
             PackageManager pm = getPackageManager();
@@ -6994,6 +7014,7 @@ public final class MainActivity extends Activity {
      * then fall back to any exported launcher entry the stack happens to ship.
      */
     private void launchProjection(ProjectionPresence.Kind kind) {
+        onAppLaunched();
         if (kind == null || kind == ProjectionPresence.Kind.NONE) return;
         if (projectionPresence == null) return;
         if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
@@ -7019,6 +7040,7 @@ public final class MainActivity extends Activity {
      * this ROM. Open the stock Settings root activity instead, fullscreen.
      */
     private void launchAndroidSettingsRoot() {
+        onAppLaunched();
         try {
             if (pinBoundsRunnable != null) mainHandler.removeCallbacks(pinBoundsRunnable);
             if (pinMediaBoundsRunnable != null) mainHandler.removeCallbacks(pinMediaBoundsRunnable);
@@ -7452,6 +7474,39 @@ public final class MainActivity extends Activity {
                     return true;
                 }
                 pulling = false;
+            }
+            return super.onTouchEvent(ev);
+        }
+    }
+
+    private static class WorkspaceAppsScrollView extends android.widget.HorizontalScrollView {
+        WorkspaceAppsScrollView(Context context) {
+            super(context);
+            setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+            setHorizontalScrollBarEnabled(false);
+            setClipChildren(true);
+            setClipToPadding(false);
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(android.view.MotionEvent ev) {
+            if (ev.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+                android.view.ViewParent parent = getParent();
+                if (parent != null) {
+                    parent.requestDisallowInterceptTouchEvent(true);
+                }
+            }
+            return super.onInterceptTouchEvent(ev);
+        }
+
+        @Override
+        public boolean onTouchEvent(android.view.MotionEvent ev) {
+            if (ev.getActionMasked() == android.view.MotionEvent.ACTION_DOWN
+                    || ev.getActionMasked() == android.view.MotionEvent.ACTION_MOVE) {
+                android.view.ViewParent parent = getParent();
+                if (parent != null) {
+                    parent.requestDisallowInterceptTouchEvent(true);
+                }
             }
             return super.onTouchEvent(ev);
         }
@@ -8024,35 +8079,28 @@ public final class MainActivity extends Activity {
         bindRecentSlots(pm, apps);
 
         projectionPresence = new ProjectionPresence(this, mainHandler, mediaNowPlaying);
-        projectionPresence.start(kind -> bindProjectionSlot(kind));
+        projectionPresence.start(kind -> {
+            bindProjectionSlot(kind);
+            updateWorkspaceProjectionSlot(kind);
+        });
         bindProjectionSlot(projectionPresence.current());
 
-        scrollView.addView(iconsLayout, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
-
-        // When icons fit on screen, keep the row centered; when they overflow, allow scroll + edge fade.
-        scrollView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            int avail = scrollView.getWidth();
-            if (avail <= 0) return;
-            iconsLayout.setMinimumWidth(avail);
-            iconsLayout.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
-        });
+        launcherIconsLayout = iconsLayout;
 
         host.addView(scrollView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
+        scrollView.setVisibility(View.GONE);
+        scrollView.setAlpha(0f);
 
         cardsScrollView = buildQuickCardsRow(density, iconSizePx);
-        cardsScrollView.setVisibility(DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
-                ? View.VISIBLE : View.GONE);
-        cardsScrollView.setAlpha(DOCK_SURFACE_CARDS.equals(dockSurfaceMode) ? 1f : 0f);
+        cardsScrollView.setVisibility(View.VISIBLE);
+        cardsScrollView.setAlpha(1f);
         host.addView(cardsScrollView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
-        scrollView.setVisibility(DOCK_SURFACE_LAUNCHER.equals(dockSurfaceMode)
-                ? View.VISIBLE : View.GONE);
-        scrollView.setAlpha(DOCK_SURFACE_LAUNCHER.equals(dockSurfaceMode) ? 1f : 0f);
+
+        updateWorkspaceProjectionSlot(projectionPresence.current());
 
         layoutContentRow = buildLayoutContentRow(density, itemWidthPx, iconSizePx);
         layoutContentRow.setVisibility(View.GONE);
@@ -8834,6 +8882,108 @@ public final class MainActivity extends Activity {
         return new BitmapDrawable(getResources(), bmp);
     }
 
+    private Drawable dockGlyphProjection(int sizePx, int color) {
+        ProjectionPresence.Kind kind = projectionPresence != null
+                ? projectionPresence.current() : ProjectionPresence.Kind.NONE;
+        if (kind == ProjectionPresence.Kind.CARPLAY) {
+            return dockGlyphCarPlay(sizePx, color);
+        } else if (kind == ProjectionPresence.Kind.ANDROID_AUTO) {
+            return dockGlyphAndroidAuto(sizePx, color);
+        } else {
+            return dockGlyphConnectivity(sizePx, color);
+        }
+    }
+
+    private Drawable dockGlyphCarPlay(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 1.7f / 24f);
+        float s = sizePx;
+        float u = s / 24f;
+        float rx = 2.4f * u;
+        c.drawRoundRect(3f * u, 5.5f * u, 21f * u, 18.5f * u, rx, rx, p);
+        float pillRx = 1.1f * u;
+        android.graphics.Paint pFill = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        pFill.setColor(color);
+        pFill.setStyle(android.graphics.Paint.Style.FILL);
+        c.drawRoundRect(4.8f * u, 9.5f * u, 6.6f * u, 14.5f * u, pillRx, pillRx, pFill);
+        return new BitmapDrawable(getResources(), bmp);
+    }
+
+    private Drawable dockGlyphAndroidAuto(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 1.7f / 24f);
+        float s = sizePx;
+        float u = s / 24f;
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(12f * u, 4.2f * u);
+        path.lineTo(4f * u, 19.5f * u);
+        path.lineTo(12f * u, 15.8f * u);
+        path.lineTo(20f * u, 19.5f * u);
+        path.close();
+        c.drawPath(path, p);
+        return new BitmapDrawable(getResources(), bmp);
+    }
+
+    private Drawable dockGlyphConnectivity(int sizePx, int color) {
+        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        bmp.setDensity(getResources().getDisplayMetrics().densityDpi);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = dockGlyphStroke(color, sizePx, 1.7f / 24f);
+        float s = sizePx;
+        float u = s / 24f;
+
+        // Smartphone body in stroke
+        float phoneL = 4.2f * u;
+        float phoneT = 2.4f * u;
+        float phoneR = 15.2f * u;
+        float phoneB = 21.6f * u;
+        float phoneRx = 1.8f * u;
+        c.drawRoundRect(phoneL, phoneT, phoneR, phoneB, phoneRx, phoneRx, p);
+
+        // Speaker notch at top
+        c.drawLine(8f * u, 4.6f * u, 11.4f * u, 4.6f * u, p);
+
+        // Settings / sync badge disc at bottom right (matches Image 2)
+        float cx = 16.2f * u;
+        float cy = 16.2f * u;
+        float badgeR = 4.6f * u;
+
+        // Cutout mask behind badge so it cleanly separates from the phone corner
+        android.graphics.Paint pClear = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        pClear.setStyle(android.graphics.Paint.Style.FILL);
+        pClear.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
+        c.drawCircle(cx, cy, badgeR + 1.2f * u, pClear);
+
+        // Badge disc border
+        c.drawCircle(cx, cy, badgeR, p);
+
+        // Sync arrows inside the badge disc
+        android.graphics.Paint pSync = dockGlyphStroke(color, sizePx, 1.35f / 24f);
+        float arcR = 2.4f * u;
+        android.graphics.RectF arcRect = new android.graphics.RectF(
+                cx - arcR, cy - arcR, cx + arcR, cy + arcR);
+        c.drawArc(arcRect, 25f, 130f, false, pSync);
+        c.drawArc(arcRect, 205f, 130f, false, pSync);
+
+        // Arrowheads for the sync arcs
+        float head = 1.2f * u;
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(cx - arcR - head * 0.4f, cy - head * 0.8f);
+        path.lineTo(cx - arcR, cy);
+        path.lineTo(cx - arcR + head * 0.9f, cy - head * 0.2f);
+
+        path.moveTo(cx + arcR + head * 0.4f, cy + head * 0.8f);
+        path.lineTo(cx + arcR, cy);
+        path.lineTo(cx + arcR - head * 0.9f, cy + head * 0.2f);
+        c.drawPath(path, pSync);
+
+        return new BitmapDrawable(getResources(), bmp);
+    }
+
     private Drawable dockGlyphLayout(int sizePx, int color) {
         Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         android.graphics.Canvas c = new android.graphics.Canvas(bmp);
@@ -8995,7 +9145,7 @@ public final class MainActivity extends Activity {
         View layout = layoutContentRow;
         View config = configContentScroll;
         // Editing the cards needs them on screen, whichever surface is chosen.
-        View show = (railEditMode || DOCK_SURFACE_CARDS.equals(dockSurfaceMode)) ? cards : apps;
+        View show = cards;
         if (STRIP_LAYOUT.equals(mode)) show = layout;
         else if (STRIP_CONFIG.equals(mode)) show = config;
         View[] all = { apps, cards, layout, config };
@@ -9050,7 +9200,7 @@ public final class MainActivity extends Activity {
                 setModeCellLabelVisible(modeSurfaceBtn, true);
             }
         }
-        if (STRIP_APPS.equals(stripMode) && appsScrollView != null && cardsScrollView != null) {
+        if (STRIP_APPS.equals(stripMode) && cardsScrollView != null) {
             showStripContent(STRIP_APPS, animate);
         }
         if (!drawerExpanded) applyDrawerCollapsedUi(false);
@@ -9656,14 +9806,17 @@ public final class MainActivity extends Activity {
     }
 
     private View makeQuickWorkspaceCard(float density) {
-        // Split card: two full-height hit targets, no inner chips. Heading sits
-        // behind the actions so it does not steal taps from the Apps half.
+        // Workspace rail card: collapsed with 3 actions (APPS, LAYOUT, CARPLAY/AA),
+        // expanding inline ~3x to the right when APPS is tapped to reveal horizontal
+        // scrollable app launcher row preceded by CARDS collapse button.
         FrameLayout card = new FrameLayout(this);
+        workspaceCard = card;
+        int initialWidthDp = workspaceExpandedAppsMode ? WORKSPACE_CARD_EXPANDED_WIDTH_DP : WORKSPACE_CARD_WIDTH_DP;
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                Math.round(242 * density), Math.round(124 * density));
+                Math.round(initialWidthDp * density), Math.round(124 * density));
         lp.rightMargin = Math.round(10 * density);
         card.setLayoutParams(lp);
-        card.setContentDescription("Workspace: app launcher and layout manager");
+        card.setContentDescription("Workspace: app launcher, layout manager and phone projection");
         card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
         quickCardViews.add(card);
@@ -9682,7 +9835,7 @@ public final class MainActivity extends Activity {
         headingLp.leftMargin = Math.round(14 * density);
         headingLp.topMargin = Math.round(10 * density);
         heading.setLayoutParams(headingLp);
-        heading.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
+        heading.setVisibility((workspaceLayoutMode || workspaceExpandedAppsMode) ? View.GONE : View.VISIBLE);
         card.addView(heading);
         workspaceHeading = heading;
 
@@ -9690,37 +9843,246 @@ public final class MainActivity extends Activity {
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         actions.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        // Title band is ~10dp inset + 10.5sp caption. Pad the stacks (not the
-        // row) so APPS / LAYOUT centre in the leftover height and the halves
-        // still receive taps on the title.
-        int titleBand = Math.round(28 * density);
-        actions.addView(makeWorkspaceAction(density, true, "APPS", "Show app launcher",
-                v -> chooseDockSurface(DOCK_SURFACE_LAUNCHER, true)));
 
+        actions.addView(makeWorkspaceAction(density, "workspaceApps", "APPS", "Show app launcher",
+                v -> setWorkspaceExpandedAppsMode(true, true)));
+
+        actions.addView(makeWorkspaceAction(density, "workspaceLayout", "LAYOUT", "Show desktop selector",
+                v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops")));
+
+        View projAction = makeWorkspaceAction(density, "workspaceProjection", getProjectionLabel(),
+                "CarPlay or Android Auto", v -> launchProjectionOrConfig());
+        projAction.setOnLongClickListener(v -> {
+            launchProjectionConfig();
+            return true;
+        });
+        workspaceProjectionAction = projAction;
+        actions.addView(projAction);
+
+        card.addView(actions);
+        workspaceActionsFace = actions;
+
+        View expandedFace = makeWorkspaceAppsExpandedFace(density);
+        card.addView(expandedFace);
+        workspaceAppsExpandedFace = expandedFace;
+
+        View layoutFace = makeWorkspaceLayoutFace(density);
+        card.addView(layoutFace);
+        workspaceLayoutFace = layoutFace;
+
+        if (workspaceExpandedAppsMode) {
+            actions.setVisibility(View.GONE);
+            layoutFace.setVisibility(View.GONE);
+            expandedFace.setVisibility(View.VISIBLE);
+        } else if (workspaceLayoutMode) {
+            actions.setVisibility(View.GONE);
+            layoutFace.setVisibility(View.VISIBLE);
+            expandedFace.setVisibility(View.GONE);
+        } else {
+            actions.setVisibility(View.VISIBLE);
+            layoutFace.setVisibility(View.GONE);
+            expandedFace.setVisibility(View.GONE);
+        }
+        return card;
+    }
+
+    private View makeWorkspaceAppsExpandedFace(float density) {
+        android.widget.LinearLayout face = new android.widget.LinearLayout(this);
+        face.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        face.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        // CARDS icon button on left - same style and size as Apps/Layout icons
+        View cardsAction = makeWorkspaceAction(density, "workspaceCards", "CARDS", "Show workspace cards",
+                v -> setWorkspaceExpandedAppsMode(false, true));
+        int cardsActionWidth = Math.round((WORKSPACE_CARD_WIDTH_DP / 3f) * density);
+        cardsAction.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                cardsActionWidth, android.widget.LinearLayout.LayoutParams.MATCH_PARENT));
+        face.addView(cardsAction);
+
+        // Separator divider
         View divider = new View(this);
-        divider.setTag("workspaceSplit");
+        divider.setTag("workspaceAppsDivider");
         android.widget.LinearLayout.LayoutParams dividerLp =
                 new android.widget.LinearLayout.LayoutParams(
                         Math.max(1, Math.round(density)),
                         android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
-        dividerLp.topMargin = titleBand;
-        dividerLp.bottomMargin = Math.round(14 * density);
+        dividerLp.topMargin = Math.round(16 * density);
+        dividerLp.bottomMargin = Math.round(16 * density);
         divider.setLayoutParams(dividerLp);
         divider.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
-        actions.addView(divider);
+        face.addView(divider);
 
-        actions.addView(makeWorkspaceAction(density, false, "LAYOUT", "Show desktop selector",
-                v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops")));
-        card.addView(actions);
-        workspaceActionsFace = actions;
-        View layoutFace = makeWorkspaceLayoutFace(density);
-        card.addView(layoutFace);
-        workspaceLayoutFace = layoutFace;
-        // A rebuild keeps whichever face was up.
-        actions.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
-        layoutFace.setVisibility(workspaceLayoutMode ? View.VISIBLE : View.GONE);
-        return card;
+        // Scrollable apps container
+        WorkspaceAppsScrollView scroll = new WorkspaceAppsScrollView(this);
+        workspaceAppsScroll = scroll;
+        scroll.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        scroll.setHorizontalFadingEdgeEnabled(true);
+        scroll.setFadingEdgeLength(Math.round(16 * density));
+
+        if (launcherIconsLayout != null) {
+            if (launcherIconsLayout.getParent() instanceof android.view.ViewGroup) {
+                ((android.view.ViewGroup) launcherIconsLayout.getParent()).removeView(launcherIconsLayout);
+            }
+            int padTop = Math.max(0, Math.round(10 * density));
+            launcherIconsLayout.setPadding(Math.round(8 * density), padTop, Math.round(16 * density), 0);
+            scroll.addView(launcherIconsLayout, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        }
+
+        face.addView(scroll);
+        return face;
     }
+
+    private String getProjectionLabel() {
+        if (projectionPresence != null) {
+            ProjectionPresence.Kind kind = projectionPresence.current();
+            if (kind == ProjectionPresence.Kind.CARPLAY) return "CarPlay";
+            if (kind == ProjectionPresence.Kind.ANDROID_AUTO) return "Android Auto";
+        }
+        return "Conectividade";
+    }
+
+    private void launchProjectionOrConfig() {
+        if (projectionPresence != null && projectionPresence.current() != ProjectionPresence.Kind.NONE) {
+            launchProjection(projectionPresence.current());
+        } else {
+            launchProjectionConfig();
+        }
+    }
+
+    private void launchProjectionConfig() {
+        onAppLaunched();
+        if (getPackageManager().getLaunchIntentForPackage(PHONE_CONNECT_PACKAGE) != null) {
+            launchAppFullscreen(PHONE_CONNECT_PACKAGE);
+        } else {
+            launchAndroidSettingsRoot();
+        }
+    }
+
+    private void updateWorkspaceProjectionSlot(ProjectionPresence.Kind kind) {
+        if (workspaceProjectionAction != null) {
+            applyWorkspaceActionGlyph(workspaceProjectionAction);
+        }
+    }
+
+    private void setWorkspaceExpandedAppsMode(boolean expanded, boolean animate) {
+        if (workspaceExpandedAppsMode == expanded && workspaceCard != null) return;
+        workspaceExpandedAppsMode = expanded;
+        if (expanded && workspaceLayoutMode) {
+            workspaceLayoutMode = false;
+        }
+
+        if (expanded && cardsScrollView instanceof android.widget.HorizontalScrollView) {
+            ((android.widget.HorizontalScrollView) cardsScrollView).smoothScrollTo(0, 0);
+        }
+
+        if (workspaceHeading != null) {
+            if (expanded) {
+                workspaceHeading.setVisibility(View.GONE);
+            } else {
+                workspaceHeading.setText(workspaceLayoutMode ? "LAYOUT" : "WORKSPACE");
+                workspaceHeading.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
+            }
+        }
+
+        if (workspaceCard != null) {
+            float density = getResources().getDisplayMetrics().density;
+            int targetWidthPx = Math.round((expanded ? WORKSPACE_CARD_EXPANDED_WIDTH_DP : WORKSPACE_CARD_WIDTH_DP) * density);
+            if (workspaceWidthAnimator != null) {
+                workspaceWidthAnimator.cancel();
+                workspaceWidthAnimator = null;
+            }
+            if (animate && workspaceCard.getWidth() > 0) {
+                int startWidth = workspaceCard.getWidth();
+                workspaceWidthAnimator = android.animation.ValueAnimator.ofInt(startWidth, targetWidthPx);
+                workspaceWidthAnimator.setDuration(220);
+                workspaceWidthAnimator.setInterpolator(new android.view.animation.DecelerateInterpolator());
+                workspaceWidthAnimator.addUpdateListener(a -> {
+                    int val = (Integer) a.getAnimatedValue();
+                    android.view.ViewGroup.LayoutParams lp = workspaceCard.getLayoutParams();
+                    if (lp != null) {
+                        lp.width = val;
+                        workspaceCard.setLayoutParams(lp);
+                    }
+                });
+                workspaceWidthAnimator.start();
+            } else {
+                android.view.ViewGroup.LayoutParams lp = workspaceCard.getLayoutParams();
+                if (lp != null) {
+                    lp.width = targetWidthPx;
+                    workspaceCard.setLayoutParams(lp);
+                }
+            }
+        }
+
+        if (expanded) {
+            if (workspaceActionsFace != null) {
+                workspaceActionsFace.animate().cancel();
+                if (animate) {
+                    workspaceActionsFace.animate().alpha(0f).setDuration(120).withEndAction(() -> {
+                        workspaceActionsFace.setVisibility(View.GONE);
+                    }).start();
+                } else {
+                    workspaceActionsFace.setAlpha(0f);
+                    workspaceActionsFace.setVisibility(View.GONE);
+                }
+            }
+            if (workspaceLayoutFace != null) {
+                workspaceLayoutFace.animate().cancel();
+                workspaceLayoutFace.setVisibility(View.GONE);
+            }
+            if (workspaceAppsExpandedFace != null) {
+                workspaceAppsExpandedFace.animate().cancel();
+                workspaceAppsExpandedFace.setVisibility(View.VISIBLE);
+                if (animate) {
+                    workspaceAppsExpandedFace.setAlpha(0f);
+                    workspaceAppsExpandedFace.animate().alpha(1f).setDuration(160).start();
+                } else {
+                    workspaceAppsExpandedFace.setAlpha(1f);
+                }
+            }
+        } else {
+            if (workspaceAppsExpandedFace != null) {
+                workspaceAppsExpandedFace.animate().cancel();
+                if (animate) {
+                    workspaceAppsExpandedFace.animate().alpha(0f).setDuration(120).withEndAction(() -> {
+                        workspaceAppsExpandedFace.setVisibility(View.GONE);
+                    }).start();
+                } else {
+                    workspaceAppsExpandedFace.setAlpha(0f);
+                    workspaceAppsExpandedFace.setVisibility(View.GONE);
+                }
+            }
+            View targetIn = workspaceLayoutMode ? workspaceLayoutFace : workspaceActionsFace;
+            View otherFace = workspaceLayoutMode ? workspaceActionsFace : workspaceLayoutFace;
+            if (otherFace != null) {
+                otherFace.animate().cancel();
+                otherFace.setVisibility(View.GONE);
+            }
+            if (targetIn != null) {
+                targetIn.animate().cancel();
+                targetIn.setVisibility(View.VISIBLE);
+                if (animate) {
+                    targetIn.setAlpha(0f);
+                    targetIn.animate().alpha(1f).setDuration(160).start();
+                } else {
+                    targetIn.setAlpha(1f);
+                }
+            }
+        }
+
+        if (expanded) {
+            if (workspaceAppsScroll != null) workspaceAppsScroll.scrollTo(0, 0);
+            if (cardsScrollView instanceof android.widget.HorizontalScrollView) {
+                ((android.widget.HorizontalScrollView) cardsScrollView).smoothScrollTo(0, 0);
+            }
+        }
+    }
+
 
     /**
      * The Workspace card's Layout face: the three Layout manager screens and the
@@ -9840,6 +10202,9 @@ public final class MainActivity extends Activity {
 
     private void setWorkspaceLayoutMode(boolean on) {
         if (workspaceLayoutMode == on) return;
+        if (on && workspaceExpandedAppsMode) {
+            setWorkspaceExpandedAppsMode(false, false);
+        }
         workspaceLayoutMode = on;
         if (workspaceHeading != null) {
             workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
@@ -9873,7 +10238,7 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private View makeWorkspaceAction(float density, boolean apps, String label,
+    private View makeWorkspaceAction(float density, String tag, String label,
             String description, View.OnClickListener click) {
         // Icon + caption centred as one stack. A TextView compound-drawable
         // centres the label and parks the glyph above it, which is why
@@ -9881,7 +10246,7 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout cell = new android.widget.LinearLayout(this);
         cell.setOrientation(android.widget.LinearLayout.VERTICAL);
         cell.setGravity(android.view.Gravity.CENTER);
-        cell.setTag(apps ? "workspaceApps" : "workspaceLayout");
+        cell.setTag(tag);
         cell.setContentDescription(description);
         cell.setClickable(true);
         cell.setFocusable(true);
@@ -9889,7 +10254,8 @@ public final class MainActivity extends Activity {
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
         cell.setLayoutParams(lp);
-        cell.setPadding(0, Math.round(28 * density), 0, 0);
+        boolean isCards = "workspaceCards".equals(tag);
+        cell.setPadding(0, isCards ? 0 : Math.round(28 * density), 0, 0);
 
         android.widget.ImageView glyph = new android.widget.ImageView(this);
         glyph.setTag("workspaceGlyph");
@@ -9904,11 +10270,13 @@ public final class MainActivity extends Activity {
         caption.setText(label);
         caption.setTag("workspaceLabel");
         caption.setGravity(android.view.Gravity.CENTER);
-        caption.setTextSize(10.5f);
+        boolean isLong = label != null && label.length() > 8;
+        caption.setTextSize(isLong ? 8.4f : 10.5f);
         caption.setMaxLines(1);
+        caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
         caption.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
-        caption.setLetterSpacing(0.11f);
+        caption.setLetterSpacing(isLong ? 0.0f : 0.11f);
         android.widget.LinearLayout.LayoutParams captionLp =
                 new android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -9925,17 +10293,36 @@ public final class MainActivity extends Activity {
         if (cell == null) return;
         float density = getResources().getDisplayMetrics().density;
         int size = Math.round(32 * density);
-        boolean layoutOn = "workspaceLayout".equals(cell.getTag()) && desktopStudioOpen;
-        int color = layoutOn ? dockAccentColor : dockLabelColor();
+        Object tagObj = cell.getTag();
+        String tag = tagObj != null ? tagObj.toString() : "";
+        boolean layoutOn = "workspaceLayout".equals(tag) && desktopStudioOpen;
+        boolean projActive = "workspaceProjection".equals(tag) && projectionPresence != null
+                && projectionPresence.current() != ProjectionPresence.Kind.NONE;
+        int color = (layoutOn || projActive) ? dockAccentColor : dockLabelColor();
         android.widget.ImageView glyph = cell.findViewWithTag("workspaceGlyph");
         if (glyph != null) {
-            glyph.setImageDrawable("workspaceApps".equals(cell.getTag())
-                    ? dockGlyphAppTiles(size, color)
-                    : dockGlyphMosaic(size, color));
+            if ("workspaceApps".equals(tag)) {
+                glyph.setImageDrawable(dockGlyphAppTiles(size, color));
+            } else if ("workspaceLayout".equals(tag)) {
+                glyph.setImageDrawable(dockGlyphMosaic(size, color));
+            } else if ("workspaceProjection".equals(tag)) {
+                glyph.setImageDrawable(dockGlyphProjection(size, color));
+            } else if ("workspaceCards".equals(tag)) {
+                glyph.setImageDrawable(dockGlyphCards(size, color));
+            }
         }
         android.widget.TextView caption = cell.findViewWithTag("workspaceLabel");
-        if (caption != null) caption.setTextColor(color);
-        if (layoutOn) {
+        if (caption != null) {
+            caption.setTextColor(color);
+            if ("workspaceProjection".equals(tag)) {
+                String projLabel = getProjectionLabel();
+                caption.setText(projLabel);
+                boolean isLong = projLabel != null && projLabel.length() > 8;
+                caption.setTextSize(isLong ? 8.4f : 10.5f);
+                caption.setLetterSpacing(isLong ? 0.0f : 0.11f);
+            }
+        }
+        if (layoutOn || projActive) {
             android.graphics.drawable.GradientDrawable bg =
                     new android.graphics.drawable.GradientDrawable();
             bg.setCornerRadius(9 * density);
@@ -10584,7 +10971,8 @@ public final class MainActivity extends Activity {
 
     private void tintFrostText(View view) {
         Object tag = view.getTag();
-        if ("workspaceApps".equals(tag) || "workspaceLayout".equals(tag)) {
+        if ("workspaceApps".equals(tag) || "workspaceLayout".equals(tag)
+                || "workspaceProjection".equals(tag) || "workspaceCards".equals(tag)) {
             applyWorkspaceActionGlyph(view);
         } else if (tag instanceof String && ((String) tag).startsWith("workspaceLayoutCell:")) {
             styleWorkspaceLayoutCells();
@@ -10601,7 +10989,7 @@ public final class MainActivity extends Activity {
             }
         } else if ("quickAccentRail".equals(tag)) {
             view.setBackgroundColor(withAlpha(dockAccentColor, 0xD8));
-        } else if ("workspaceSplit".equals(tag)) {
+        } else if ("workspaceSplit".equals(tag) || "workspaceAppsDivider".equals(tag)) {
             view.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
         }
         if (view instanceof android.view.ViewGroup) {
