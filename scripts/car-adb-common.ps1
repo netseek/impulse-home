@@ -69,10 +69,25 @@ function Install-CarApk([string]$Adb, [string]$Serial, [string]$Apk) {
   }
 
   Write-Host 'Pushing APK and pm install -i com.autolink.installer ...'
-  & $Adb -s $Serial push $Apk /data/local/tmp/havalh6-viewer.apk
-  if ($LASTEXITCODE -ne 0) { throw "adb push failed ($LASTEXITCODE)" }
+  $ErrorActionPreference = 'Continue'
+  $pushOut = & $Adb -s $Serial push $Apk /data/local/tmp/havalh6-viewer.apk 2>&1 | Out-String
+  $ErrorActionPreference = $callerEap
+  Write-Host $pushOut.Trim()
+  $localSize = (Get-Item $Apk).Length
+  $remoteLs = & $Adb -s $Serial shell ls -l /data/local/tmp/havalh6-viewer.apk 2>&1 | Out-String
+  if ($remoteLs -notmatch [string]$localSize) {
+    & $Adb connect $Serial | Out-Null
+    $remoteLs = & $Adb -s $Serial shell ls -l /data/local/tmp/havalh6-viewer.apk 2>&1 | Out-String
+    if ($remoteLs -notmatch [string]$localSize -and $pushOut -notmatch [string]$localSize) {
+      throw "adb push failed: $($pushOut.Trim())"
+    }
+  }
   $ErrorActionPreference = 'Continue'
   $pm = & $Adb -s $Serial shell "pm install -r -g -i $installer /data/local/tmp/havalh6-viewer.apk" 2>&1 | Out-String
+  if ($pm -match 'device offline|cannot connect') {
+    & $Adb connect $Serial | Out-Null
+    $pm = & $Adb -s $Serial shell "pm install -r -g -i $installer /data/local/tmp/havalh6-viewer.apk" 2>&1 | Out-String
+  }
   $ErrorActionPreference = $callerEap
   Write-Host $pm.Trim()
   if ($pm -notmatch '(?m)^Success' -and $LASTEXITCODE -ne 0) {

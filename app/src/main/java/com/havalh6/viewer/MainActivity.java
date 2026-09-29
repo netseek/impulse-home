@@ -3912,7 +3912,8 @@ public final class MainActivity extends Activity {
     private boolean workspaceLayoutMode;
     /** Layout manager screen open on the page: "desktops", "layout", "appearance" or "". */
     private String studioScreen = "";
-    private static final int WORKSPACE_CARD_WIDTH_DP = 198;
+    private static final int WORKSPACE_CARD_WIDTH_DP = 208;
+    private static final int WORKSPACE_CARD_SIDE_GAP_DP = 10;
     private static final int WORKSPACE_CARD_EXPANDED_WIDTH_DP = 700;
     private View workspaceCard;
     private View workspaceActionsFace;
@@ -7887,10 +7888,9 @@ public final class MainActivity extends Activity {
         dockSurfaceMode = normalizeDockSurfaceMode(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
                 .getString(PREF_DOCK_SURFACE, DOCK_SURFACE_CARDS));
         float density = getResources().getDisplayMetrics().density;
-        // Bigger than the old 52/78: dropping the captions freed vertical room in
-        // the dock band. One GWM hub (ic_gwm on black) opens the four OEM shortcuts.
-        int iconSizePx = Math.round(60 * density);
-        int itemWidthPx = Math.round(84 * density);
+        // Sized for compact bottom rail workspace card (48dp plates centered in 124dp card).
+        int iconSizePx = Math.round(38 * density);
+        int itemWidthPx = Math.round(66 * density);
         dockCellPx = itemWidthPx;
         dockIconPx = iconSizePx;
         int marginBottomPx = compensatedBottomMarginPx(launcherBottomGapPx());
@@ -8562,7 +8562,7 @@ public final class MainActivity extends Activity {
     private android.graphics.drawable.Drawable makeLauncherIconPlateDrawable(
             float density, boolean dark) {
         int stroke = Math.max(1, Math.round(density));
-        float radius = 14f * density;
+        float radius = 12f * density;
         android.graphics.drawable.GradientDrawable border = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
                 dark ? new int[] { 0x7AFFFFFF, 0x1FFFFFFF }
@@ -8586,7 +8586,7 @@ public final class MainActivity extends Activity {
     private android.graphics.drawable.Drawable makeLauncherIconPlateDrawable(
             float density, int fillColor) {
         int stroke = Math.max(1, Math.round(density));
-        float radius = 14f * density;
+        float radius = 12f * density;
         android.graphics.drawable.GradientDrawable fill =
                 new android.graphics.drawable.GradientDrawable();
         fill.setCornerRadius(radius);
@@ -8735,7 +8735,7 @@ public final class MainActivity extends Activity {
         frameLp.gravity = android.view.Gravity.CENTER_HORIZONTAL | android.view.Gravity.TOP;
         iconFrame.setLayoutParams(frameLp);
         iconFrame.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
-        iconFrame.setElevation(7f * density);
+        iconFrame.setElevation(4f * density);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             iconFrame.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
             // Crop the icon itself to the plate's rounded-square outline instead of
@@ -8886,8 +8886,16 @@ public final class MainActivity extends Activity {
         ProjectionPresence.Kind kind = projectionPresence != null
                 ? projectionPresence.current() : ProjectionPresence.Kind.NONE;
         if (kind == ProjectionPresence.Kind.CARPLAY) {
+            try {
+                Drawable d = getDrawable(R.drawable.ic_carplay_default);
+                if (d != null) return d;
+            } catch (Throwable ignored) {}
             return dockGlyphCarPlay(sizePx, color);
         } else if (kind == ProjectionPresence.Kind.ANDROID_AUTO) {
+            try {
+                Drawable d = getDrawable(R.drawable.ic_android_auto_default);
+                if (d != null) return d;
+            } catch (Throwable ignored) {}
             return dockGlyphAndroidAuto(sizePx, color);
         } else {
             return dockGlyphConnectivity(sizePx, color);
@@ -9843,12 +9851,11 @@ public final class MainActivity extends Activity {
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         actions.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        int sideGapPx = Math.round(WORKSPACE_CARD_SIDE_GAP_DP * density);
+        actions.setPadding(sideGapPx, 0, sideGapPx, 0);
 
         actions.addView(makeWorkspaceAction(density, "workspaceApps", "APPS", "Show app launcher",
                 v -> setWorkspaceExpandedAppsMode(true, true)));
-
-        actions.addView(makeWorkspaceAction(density, "workspaceLayout", "LAYOUT", "Show desktop selector",
-                v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops")));
 
         View projAction = makeWorkspaceAction(density, "workspaceProjection", getProjectionLabel(),
                 "CarPlay or Android Auto", v -> launchProjectionOrConfig());
@@ -9858,6 +9865,9 @@ public final class MainActivity extends Activity {
         });
         workspaceProjectionAction = projAction;
         actions.addView(projAction);
+
+        actions.addView(makeWorkspaceAction(density, "workspaceLayout", "LAYOUT", "Show desktop selector",
+                v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops")));
 
         card.addView(actions);
         workspaceActionsFace = actions;
@@ -9892,12 +9902,15 @@ public final class MainActivity extends Activity {
         face.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
+        int sideGapPx = Math.round(WORKSPACE_CARD_SIDE_GAP_DP * density);
         // CARDS icon button on left - same style and size as Apps/Layout icons
         View cardsAction = makeWorkspaceAction(density, "workspaceCards", "CARDS", "Show workspace cards",
                 v -> setWorkspaceExpandedAppsMode(false, true));
-        int cardsActionWidth = Math.round((WORKSPACE_CARD_WIDTH_DP / 3f) * density);
-        cardsAction.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                cardsActionWidth, android.widget.LinearLayout.LayoutParams.MATCH_PARENT));
+        int cardsActionWidth = Math.round(((WORKSPACE_CARD_WIDTH_DP - 2 * WORKSPACE_CARD_SIDE_GAP_DP) / 3f) * density);
+        android.widget.LinearLayout.LayoutParams cardsLp = new android.widget.LinearLayout.LayoutParams(
+                cardsActionWidth, android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+        cardsLp.leftMargin = sideGapPx;
+        cardsAction.setLayoutParams(cardsLp);
         face.addView(cardsAction);
 
         // Separator divider
@@ -9927,7 +9940,8 @@ public final class MainActivity extends Activity {
             if (launcherIconsLayout.getParent() instanceof android.view.ViewGroup) {
                 ((android.view.ViewGroup) launcherIconsLayout.getParent()).removeView(launcherIconsLayout);
             }
-            int padTop = Math.max(0, Math.round(10 * density));
+            int platePx = dockPlatePx(dockIconPx, density);
+            int padTop = Math.max(0, Math.round((124 * density - platePx) / 2f));
             launcherIconsLayout.setPadding(Math.round(8 * density), padTop, Math.round(16 * density), 0);
             scroll.addView(launcherIconsLayout, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT));
@@ -9943,7 +9957,7 @@ public final class MainActivity extends Activity {
             if (kind == ProjectionPresence.Kind.CARPLAY) return "CarPlay";
             if (kind == ProjectionPresence.Kind.ANDROID_AUTO) return "Android Auto";
         }
-        return "Conectividade";
+        return "PHONE";
     }
 
     private void launchProjectionOrConfig() {
@@ -10255,11 +10269,18 @@ public final class MainActivity extends Activity {
                 0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
         cell.setLayoutParams(lp);
         boolean isCards = "workspaceCards".equals(tag);
-        cell.setPadding(0, isCards ? 0 : Math.round(28 * density), 0, 0);
+        int size = Math.round(32 * density);
+        if (isCards) {
+            cell.setGravity(android.view.Gravity.CENTER_HORIZONTAL | android.view.Gravity.TOP);
+            int glyphTop = Math.max(0, Math.round((124 * density - size) / 2f));
+            cell.setPadding(0, glyphTop, 0, 0);
+        } else {
+            cell.setGravity(android.view.Gravity.CENTER);
+            cell.setPadding(0, Math.round(28 * density), 0, 0);
+        }
 
         android.widget.ImageView glyph = new android.widget.ImageView(this);
         glyph.setTag("workspaceGlyph");
-        int size = Math.round(32 * density);
         android.widget.LinearLayout.LayoutParams glyphLp =
                 new android.widget.LinearLayout.LayoutParams(size, size);
         glyph.setLayoutParams(glyphLp);
@@ -10322,23 +10343,13 @@ public final class MainActivity extends Activity {
                 caption.setLetterSpacing(isLong ? 0.0f : 0.11f);
             }
         }
-        if (layoutOn || projActive) {
-            android.graphics.drawable.GradientDrawable bg =
-                    new android.graphics.drawable.GradientDrawable();
-            bg.setCornerRadius(9 * density);
-            bg.setColor(withAlpha(dockAccentColor, 0x2E));
-            bg.setStroke(Math.max(1, Math.round(density)), withAlpha(dockAccentColor, 0xA0));
-            cell.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(withAlpha(color, 0x33)), bg, null));
-        } else {
-            android.graphics.drawable.GradientDrawable mask =
-                    new android.graphics.drawable.GradientDrawable();
-            mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-            mask.setColor(0xFFFFFFFF);
-            cell.setBackground(new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(withAlpha(color, 0x33)),
-                    null, mask));
-        }
+        android.graphics.drawable.GradientDrawable mask =
+                new android.graphics.drawable.GradientDrawable();
+        mask.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        mask.setColor(0xFFFFFFFF);
+        cell.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(withAlpha(color, 0x33)),
+                null, mask));
     }
 
     private View makeQuickTextCard(float density, int widthDp, String title, String value,
@@ -13046,19 +13057,19 @@ public final class MainActivity extends Activity {
         webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
-    /** Two-line caption band — every dock tile reserves the same height. */
+    /** Caption band under dock icon. */
     private void styleDockCaption(android.widget.TextView labelView, float density) {
-        labelView.setTextSize(11f);
+        labelView.setTextSize(10f);
         labelView.setTextColor(0xE6FFFFFF);
         labelView.setGravity(android.view.Gravity.TOP | android.view.Gravity.CENTER_HORIZONTAL);
         labelView.setMaxLines(2);
-        labelView.setMinLines(2);
+        labelView.setMinLines(1);
         labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        labelView.setLineSpacing(0f, 0.92f);
+        labelView.setLineSpacing(0f, 0.95f);
         labelView.setIncludeFontPadding(false);
         labelView.setShadowLayer(3f, 0f, 1f, 0xCC000000);
-        labelView.setPadding(Math.round(2 * density), Math.round(4 * density),
-                Math.round(2 * density), 0);
+        labelView.setPadding(Math.round(1 * density), Math.round(3 * density),
+                Math.round(1 * density), 0);
     }
 
     private MotionTrailLayout makeDockItem(int itemWidthPx, int iconSizePx, float density) {
@@ -13070,7 +13081,7 @@ public final class MainActivity extends Activity {
         item.setAlpha(1f);
         android.widget.LinearLayout.LayoutParams itemParams = new android.widget.LinearLayout.LayoutParams(
                 itemWidthPx, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        itemParams.rightMargin = Math.round(12 * density);
+        itemParams.rightMargin = Math.round(8 * density);
         item.setLayoutParams(itemParams);
         item.setBackgroundColor(0x00000000);
         item.setClickable(true);
@@ -13641,10 +13652,11 @@ public final class MainActivity extends Activity {
         android.widget.ImageView iv = (android.widget.ImageView) item.findViewWithTag("icon");
         android.widget.TextView tv = (android.widget.TextView) item.findViewWithTag("label");
         float density = getResources().getDisplayMetrics().density;
-        int iconPx = dockIconPx > 0 ? dockIconPx : Math.round(60 * density);
+        int iconPx = dockIconPx > 0 ? dockIconPx : Math.round(38 * density);
+        int platePx = dockPlatePx(iconPx, density);
         Drawable drawn = editPackage != null ? resolveDockIcon(editPackage, icon) : icon;
         String caption = editPackage != null ? resolveDockLabel(editPackage, label) : (label != null ? label : "");
-        if (iv != null) iv.setImageDrawable(normalizeAdaptiveIcon(drawn, iconPx));
+        if (iv != null) iv.setImageDrawable(normalizeAdaptiveIcon(drawn, platePx));
         View plate = item.findViewWithTag("iconPlate");
         if (plate != null) {
             Integer plateColor = editPackage != null ? dockOverridePlateColor(editPackage) : null;
@@ -13656,7 +13668,6 @@ public final class MainActivity extends Activity {
                 item.setTag(Boolean.valueOf(darkPlate));
                 plate.setBackground(makeLauncherIconPlateDrawable(density, darkPlate));
             }
-            int platePx = dockPlatePx(iconPx, density);
             int inset = Math.round(platePx * launcherIconInsetFrac());
             plate.setPadding(inset, inset, inset, inset);
         }
