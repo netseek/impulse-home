@@ -217,8 +217,8 @@ final class ProjectionPresence {
     }
 
     String labelFor(Kind kind) {
-        if (kind == Kind.ANDROID_AUTO) return "Android Auto";
-        if (kind == Kind.CARPLAY) return "CarPlay";
+        if (kind == Kind.ANDROID_AUTO) return "A.AUTO";
+        if (kind == Kind.CARPLAY) return "CARPLAY";
         return "";
     }
 

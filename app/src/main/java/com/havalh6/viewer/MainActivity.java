@@ -3912,8 +3912,9 @@ public final class MainActivity extends Activity {
     private boolean workspaceLayoutMode;
     /** Layout manager screen open on the page: "desktops", "layout", "appearance" or "". */
     private String studioScreen = "";
-    private static final int WORKSPACE_CARD_WIDTH_DP = 208;
-    private static final int WORKSPACE_CARD_SIDE_GAP_DP = 10;
+    private static final int WORKSPACE_CARD_WIDTH_DP = 236;
+    private static final int WORKSPACE_CARD_SIDE_GAP_DP = 14;
+    private static final int WORKSPACE_CARD_INNER_GAP_DP = 8;
     private static final int WORKSPACE_CARD_EXPANDED_WIDTH_DP = 700;
     private View workspaceCard;
     private View workspaceActionsFace;
@@ -8887,14 +8888,14 @@ public final class MainActivity extends Activity {
                 ? projectionPresence.current() : ProjectionPresence.Kind.NONE;
         if (kind == ProjectionPresence.Kind.CARPLAY) {
             try {
-                Drawable d = getDrawable(R.drawable.ic_carplay_default);
-                if (d != null) return d;
+                Drawable d = getDrawable(R.drawable.ic_carplay);
+                if (d != null) return d.mutate();
             } catch (Throwable ignored) {}
             return dockGlyphCarPlay(sizePx, color);
         } else if (kind == ProjectionPresence.Kind.ANDROID_AUTO) {
             try {
-                Drawable d = getDrawable(R.drawable.ic_android_auto_default);
-                if (d != null) return d;
+                Drawable d = getDrawable(R.drawable.ic_android_auto);
+                if (d != null) return d.mutate();
             } catch (Throwable ignored) {}
             return dockGlyphAndroidAuto(sizePx, color);
         } else {
@@ -9852,10 +9853,16 @@ public final class MainActivity extends Activity {
         actions.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         int sideGapPx = Math.round(WORKSPACE_CARD_SIDE_GAP_DP * density);
+        int innerGapPx = Math.round(WORKSPACE_CARD_INNER_GAP_DP * density);
         actions.setPadding(sideGapPx, 0, sideGapPx, 0);
 
-        actions.addView(makeWorkspaceAction(density, "workspaceApps", "APPS", "Show app launcher",
-                v -> setWorkspaceExpandedAppsMode(true, true)));
+        View appsAction = makeWorkspaceAction(density, "workspaceApps", "APPS", "Show app launcher",
+                v -> setWorkspaceExpandedAppsMode(true, true));
+        android.widget.LinearLayout.LayoutParams appsLp =
+                (android.widget.LinearLayout.LayoutParams) appsAction.getLayoutParams();
+        appsLp.rightMargin = innerGapPx;
+        appsAction.setLayoutParams(appsLp);
+        actions.addView(appsAction);
 
         View projAction = makeWorkspaceAction(density, "workspaceProjection", getProjectionLabel(),
                 "CarPlay or Android Auto", v -> launchProjectionOrConfig());
@@ -9864,10 +9871,15 @@ public final class MainActivity extends Activity {
             return true;
         });
         workspaceProjectionAction = projAction;
+        android.widget.LinearLayout.LayoutParams projLp =
+                (android.widget.LinearLayout.LayoutParams) projAction.getLayoutParams();
+        projLp.rightMargin = innerGapPx;
+        projAction.setLayoutParams(projLp);
         actions.addView(projAction);
 
-        actions.addView(makeWorkspaceAction(density, "workspaceLayout", "LAYOUT", "Show desktop selector",
-                v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops")));
+        View layoutAction = makeWorkspaceAction(density, "workspaceLayout", "LAYOUT", "Show desktop selector",
+                v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops"));
+        actions.addView(layoutAction);
 
         card.addView(actions);
         workspaceActionsFace = actions;
@@ -9903,10 +9915,11 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         int sideGapPx = Math.round(WORKSPACE_CARD_SIDE_GAP_DP * density);
+        int innerGapPx = Math.round(WORKSPACE_CARD_INNER_GAP_DP * density);
         // CARDS icon button on left - same style and size as Apps/Layout icons
         View cardsAction = makeWorkspaceAction(density, "workspaceCards", "CARDS", "Show workspace cards",
                 v -> setWorkspaceExpandedAppsMode(false, true));
-        int cardsActionWidth = Math.round(((WORKSPACE_CARD_WIDTH_DP - 2 * WORKSPACE_CARD_SIDE_GAP_DP) / 3f) * density);
+        int cardsActionWidth = Math.round(((WORKSPACE_CARD_WIDTH_DP - 2 * WORKSPACE_CARD_SIDE_GAP_DP - 2 * WORKSPACE_CARD_INNER_GAP_DP) / 3f) * density);
         android.widget.LinearLayout.LayoutParams cardsLp = new android.widget.LinearLayout.LayoutParams(
                 cardsActionWidth, android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         cardsLp.leftMargin = sideGapPx;
@@ -9922,6 +9935,8 @@ public final class MainActivity extends Activity {
                         android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
         dividerLp.topMargin = Math.round(16 * density);
         dividerLp.bottomMargin = Math.round(16 * density);
+        dividerLp.leftMargin = Math.round(innerGapPx / 2f);
+        dividerLp.rightMargin = Math.round(innerGapPx / 2f);
         divider.setLayoutParams(dividerLp);
         divider.setBackgroundColor(dockUiLight ? 0x30808080 : 0x32FFFFFF);
         face.addView(divider);
@@ -9954,8 +9969,8 @@ public final class MainActivity extends Activity {
     private String getProjectionLabel() {
         if (projectionPresence != null) {
             ProjectionPresence.Kind kind = projectionPresence.current();
-            if (kind == ProjectionPresence.Kind.CARPLAY) return "CarPlay";
-            if (kind == ProjectionPresence.Kind.ANDROID_AUTO) return "Android Auto";
+            if (kind == ProjectionPresence.Kind.CARPLAY) return "CARPLAY";
+            if (kind == ProjectionPresence.Kind.ANDROID_AUTO) return "A.AUTO";
         }
         return "PHONE";
     }
@@ -10291,13 +10306,12 @@ public final class MainActivity extends Activity {
         caption.setText(label);
         caption.setTag("workspaceLabel");
         caption.setGravity(android.view.Gravity.CENTER);
-        boolean isLong = label != null && label.length() > 8;
-        caption.setTextSize(isLong ? 8.4f : 10.5f);
+        caption.setTextSize(10.5f);
         caption.setMaxLines(1);
         caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
         caption.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
-        caption.setLetterSpacing(isLong ? 0.0f : 0.11f);
+        caption.setLetterSpacing(0.11f);
         android.widget.LinearLayout.LayoutParams captionLp =
                 new android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -10336,11 +10350,9 @@ public final class MainActivity extends Activity {
         if (caption != null) {
             caption.setTextColor(color);
             if ("workspaceProjection".equals(tag)) {
-                String projLabel = getProjectionLabel();
-                caption.setText(projLabel);
-                boolean isLong = projLabel != null && projLabel.length() > 8;
-                caption.setTextSize(isLong ? 8.4f : 10.5f);
-                caption.setLetterSpacing(isLong ? 0.0f : 0.11f);
+                caption.setText(getProjectionLabel());
+                caption.setTextSize(10.5f);
+                caption.setLetterSpacing(0.11f);
             }
         }
         android.graphics.drawable.GradientDrawable mask =
