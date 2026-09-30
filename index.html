@@ -6495,31 +6495,62 @@ window.HavalSplash = (function () {
     .hv-range-burn-sum { opacity:.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .hv-range-burn-demo { margin-left:auto; padding:3px 7px; border-radius:6px; background:rgba(242,153,74,.18); color:#f2994a; }
     .hv-range-burn-stats { display:flex; gap:10px; }
-    .hv-range-burn-stat { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:4px; padding:8px 10px; border:1px solid var(--hv-widget-border); border-radius:12px; font:700 11px/1.1 var(--hv-font); letter-spacing:.06em; }
+    .hv-range-burn-stat { flex:1 1 0; min-width:0; display:flex; flex-direction:column; justify-content:space-between; gap:4px; padding:10px 12px; border:1px solid var(--hv-widget-border); border-radius:14px; background:rgba(255,255,255,.03); font:700 11px/1.1 var(--hv-font); letter-spacing:.05em; }
     .hv-range-burn-stat.driven { flex:0 0 auto; }
+    .hv-range-burn-stat.proj { border-color:rgba(45,212,191,.35); background:rgba(45,212,191,.04); }
+    .hv-range-burn-stat.proj .proj-val { color:#2dd4bf; }
+    .hv-range-burn-stat .stat-hdr { display:flex; justify-content:space-between; align-items:center; opacity:.75; font-size:10.5px; }
+    .hv-range-burn-stat .stat-range { font-size:10px; opacity:.7; }
+    .hv-range-burn-stat .stat-row { display:flex; justify-content:space-between; align-items:flex-end; gap:6px; margin-top:2px; }
+    .hv-range-burn-stat .stat-main { display:flex; align-items:baseline; gap:4px; white-space:nowrap; }
+    .hv-range-burn-stat .stat-main strong { font-size:25px; font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1; }
+    .hv-range-burn-stat .stat-main small { opacity:.65; font-size:11px; }
+    .hv-range-burn-stat .stat-side { display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-size:10px; opacity:.75; white-space:nowrap; }
+    .hv-range-burn-stat .stat-side .rate { font-variant-numeric:tabular-nums; color:var(--hv-readable-accent,var(--hv-accent,#00b4d8)); font-weight:700; }
+    .hv-range-burn-stat .diff-badge { padding:2.5px 7px; border-radius:6px; font-size:11px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:0; }
+    .hv-range-burn-stat .diff-badge.better { background:rgba(34,197,94,.22); color:#4ade80; border:1px solid rgba(74,222,128,.35); }
+    .hv-range-burn-stat .diff-badge.under { background:rgba(245,158,11,.22); color:#fde047; border:1px solid rgba(253,224,71,.35); }
+    .hv-range-burn-stat .diff-badge.alert { background:rgba(239,68,68,.24); color:#ffa3a3; border:1px solid rgba(255,140,140,.45); }
+    .hv-range-burn-stat .diff-badge.neutral { background:rgba(255,255,255,.08); color:rgba(255,255,255,.85); border:1px solid rgba(255,255,255,.15); }
     .hv-range-burn-stat > span { opacity:.7; }
     .hv-range-burn-stat.hist > span { color:var(--rb-hist); opacity:1; }
     .hv-range-burn-stat > div { display:flex; align-items:baseline; gap:5px; white-space:nowrap; }
-    .hv-range-burn-stat strong { font-size:22px; font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
-    .hv-range-burn-stat small { opacity:.65; font-size:10.5px; }
+    .hv-range-burn-stat strong { font-size:25px; font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1; }
+    .hv-range-burn-stat small { opacity:.65; font-size:11px; }
     .hv-range-burn-stat > b, .hv-range-burn-row > b { font-size:13px; font-variant-numeric:tabular-nums; }
     .hv-range-burn b.ok { color:#3ec77a; } .hv-range-burn b.under { color:#f2994a; } .hv-range-burn b.over { color:var(--rb-hist); }
-    .hv-range-burn-chart { position:relative; flex:1 1 auto; min-height:120px; display:grid; grid-template-columns:40px minmax(0,1fr); grid-template-rows:minmax(0,1fr) auto; column-gap:6px; }
+    .hv-range-burn-chart { position:relative; flex:1 1 auto; min-height:140px; display:grid; grid-template-columns:40px minmax(0,1fr); grid-template-rows:minmax(0,1fr) auto; column-gap:6px; }
     .hv-range-burn-chart > svg { grid-column:2; grid-row:1; width:100%; height:100%; overflow:visible; }
+    .hv-range-burn-tags { grid-column:2; grid-row:1; position:relative; pointer-events:none; }
+    .hv-range-burn-tag { position:absolute; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; padding:4px 9px; border-radius:7px; border:1px solid; white-space:nowrap; backdrop-filter:blur(6px); z-index:2; }
+    .hv-range-burn-tag .tag-title { font:800 9.5px/1 var(--hv-font); letter-spacing:.06em; margin-bottom:3px; opacity:.85; }
+    .hv-range-burn-tag .tag-val { font:800 13px/1 var(--hv-font); font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+    .hv-range-burn-tag.proj { background:#082f2c; border-color:#2dd4bf; color:#2dd4bf; }
+    .hv-range-burn-tag.hist { background:#082538; border-color:var(--rb-hist); color:var(--rb-hist); }
+    .hv-range-burn-tag.oem { background:#162230; border-color:rgba(255,255,255,.35); color:#edf5fa; }
+    .hv-range-burn-tag.charge { background:#052914; border-color:#22c55e; color:#4ade80; }
     .hv-range-burn-y { grid-column:1; grid-row:1; display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end; font:700 10.5px/1 var(--hv-font); opacity:.6; font-variant-numeric:tabular-nums; }
     .hv-range-burn-x { grid-column:2; grid-row:2; display:flex; justify-content:space-between; padding-top:4px; font:700 10.5px/1 var(--hv-font); opacity:.6; }
     .hv-range-burn-chart path { fill:none; vector-effect:non-scaling-stroke; stroke-linecap:round; stroke-linejoin:round; }
     .hv-rb-grid { stroke:var(--hv-widget-border); stroke-width:1; }
     .hv-rb-area { fill:var(--rb-hist) !important; opacity:.12; stroke:none; }
-    .hv-rb-soc { stroke:var(--rb-hist); stroke-width:2.5; }
+    .hv-rb-soc { stroke:var(--rb-hist); stroke-width:2.8; }
+    .hv-rb-extrap { stroke:#2dd4bf; stroke-width:2.2; stroke-dasharray:6 5; opacity:.9; }
     .hv-rb-f0 { stroke-width:1.5; stroke-dasharray:6 5; opacity:.85; }
     .hv-rb-f0.hist { stroke:var(--rb-hist); }
-    .hv-rb-f0.oem { stroke:var(--rb-oem); }
+    .hv-rb-f0.oem { stroke:var(--rb-oem); opacity:.5; }
+    .hv-rb-vline { stroke-width:1.5; stroke-dasharray:4 3; opacity:.75; }
+    .hv-rb-vline.proj { stroke:#2dd4bf; }
+    .hv-rb-vline.hist { stroke:var(--rb-hist); }
+    .hv-rb-vline.oem { stroke:var(--rb-oem); opacity:.4; }
+    .hv-rb-vline.charge { stroke:#22c55e; stroke-width:2; stroke-dasharray:3 3; opacity:.95; }
     .hv-range-burn-legend { display:flex; flex-wrap:wrap; gap:4px 14px; font:700 10.5px/1.2 var(--hv-font); opacity:.75; }
     .hv-range-burn-legend i { display:inline-block; width:16px; vertical-align:middle; margin-right:5px; border-top:2.5px solid var(--rb-hist); }
-    .hv-range-burn-legend .oem i { border-top:1.5px dashed var(--rb-oem); }
+    .hv-range-burn-legend .oem i { border-top:1.5px dashed var(--rb-oem); opacity:.6; }
     .hv-range-burn-legend .hist i { border-top:1.5px dashed var(--rb-hist); }
     .hv-range-burn-legend .soc i { border-top:2.5px solid var(--rb-hist); }
+    .hv-range-burn-legend .extrap i { border-top:2px dashed #2dd4bf; }
+    .hv-range-burn-legend .charge i { border-top:1.5px dashed #22c55e; }
     .hv-range-burn-empty { flex:1 1 auto; display:flex; align-items:center; justify-content:center; text-align:center; padding:0 24px; font:700 12px/1.5 var(--hv-font); opacity:.65; border:1px dashed var(--hv-widget-border); border-radius:12px; }
     .hv-range-burn-past { display:flex; flex-direction:column; gap:3px; font:700 11px/1.3 var(--hv-font); }
     .hv-range-burn-row { display:grid; grid-template-columns:52px 76px minmax(0,1fr) 58px 58px 58px; gap:6px; align-items:baseline; font-variant-numeric:tabular-nums; }
@@ -8113,9 +8144,27 @@ window.HavalSplash = (function () {
               <sc-if value="{{ focusedRangeBurnDemo }}" hint-placeholder-val="{{ false }}"><span class="hv-range-burn-demo">DEMO</span></sc-if>
             </div>
             <div class="hv-range-burn-stats">
-              <div class="hv-range-burn-stat hist"><span>HISTÓRICO</span><div><small>previsto</small><strong>{{ focusedRangeBurnHist0 }}</strong><small>→ agora</small><strong>{{ focusedRangeBurnHistNow }}</strong><small>{{ focusedRangeBurnUnit }}</small></div><b class="{{ focusedRangeBurnHistErrClass }}">{{ focusedRangeBurnHistErr }}</b></div>
-              <div class="hv-range-burn-stat oem"><span>VEÍCULO</span><div><small>previsto</small><strong>{{ focusedRangeBurnOem0 }}</strong><small>→ agora</small><strong>{{ focusedRangeBurnOemNow }}</strong><small>{{ focusedRangeBurnUnit }}</small></div><b class="{{ focusedRangeBurnOemErrClass }}">{{ focusedRangeBurnOemErr }}</b></div>
-              <div class="hv-range-burn-stat driven"><span>RODADO EV</span><div><strong>{{ focusedRangeBurnDriven }}</strong><small>{{ focusedRangeBurnUnit }}</small></div></div>
+              <div class="hv-range-burn-stat real">
+                <div class="stat-hdr"><span>CONSUMO REAL</span><span class="stat-range">{{ focusedRangeBurnSocRange }}</span></div>
+                <div class="stat-row">
+                  <div class="stat-main"><strong>{{ focusedRangeBurnDriven }}</strong><small>{{ focusedRangeBurnUnit }} EV</small></div>
+                  <div class="stat-side"><span>{{ focusedRangeBurnSocUsed }}</span><span class="rate">{{ focusedRangeBurnRate }}</span></div>
+                </div>
+              </div>
+              <div class="hv-range-burn-stat proj">
+                <div class="stat-hdr"><span>PROJEÇÃO 100%</span><b class="diff-badge {{ focusedRangeBurnDiff170Class }}">{{ focusedRangeBurnDiff170 }}</b></div>
+                <div class="stat-row">
+                  <div class="stat-main"><strong class="proj-val">{{ focusedRangeBurnFull100 }}</strong><small>{{ focusedRangeBurnUnit }}</small></div>
+                  <div class="stat-side"><span>vs {{ focusedRangeBurnSpecKm }} padrão</span><span>ciclo: {{ focusedRangeBurnCycleProj }}</span></div>
+                </div>
+              </div>
+              <div class="hv-range-burn-stat bench">
+                <div class="stat-hdr"><span>MÉDIA / RECARGA</span><span class="stat-range">{{ focusedRangeBurnHistSocRange }}</span></div>
+                <div class="stat-row">
+                  <div class="stat-main"><strong>{{ focusedRangeBurnHistRealKm }}</strong><small>{{ focusedRangeBurnUnit }} REAL</small></div>
+                  <div class="stat-side"><span>Δ {{ focusedRangeBurnHistSocUsed }} uso</span><span>100% eq: {{ focusedRangeBurnHistAvg }} {{ focusedRangeBurnUnit }}</span></div>
+                </div>
+              </div>
             </div>
             <sc-if value="{{ focusedRangeBurnHasChart }}" hint-placeholder-val="{{ false }}">
               <div class="hv-range-burn-chart">
@@ -8125,11 +8174,32 @@ window.HavalSplash = (function () {
                   <path class="hv-rb-area" d="{{ focusedRangeBurnSocArea }}"></path>
                   <path class="hv-rb-f0 oem" d="{{ focusedRangeBurnOem0Path }}"></path>
                   <path class="hv-rb-f0 hist" d="{{ focusedRangeBurnHist0Path }}"></path>
+                  <path class="hv-rb-extrap" d="{{ focusedRangeBurnExtrapPath }}"></path>
                   <path class="hv-rb-soc" d="{{ focusedRangeBurnSocPath }}"></path>
+                  <path class="hv-rb-vline oem" d="{{ focusedRangeBurnVLineOemPath }}"></path>
+                  <path class="hv-rb-vline hist" d="{{ focusedRangeBurnVLineHistPath }}"></path>
+                  <path class="hv-rb-vline proj" d="{{ focusedRangeBurnVLineProjPath }}"></path>
+                  <path class="hv-rb-vline charge" d="{{ focusedRangeBurnVLineChargePath }}"></path>
                 </svg>
+                <div class="hv-range-burn-tags">
+                  <sc-for list="{{ focusedRangeBurnMarkers }}" as="mk" hint-placeholder-count="0">
+                    <div class="hv-range-burn-tag {{ mk.cls }}" style="left:{{ mk.leftPct }}%; top:{{ mk.topPx }}px;">
+                      <span class="tag-title">{{ mk.label }}</span>
+                      <strong class="tag-val">{{ mk.val }}</strong>
+                    </div>
+                  </sc-for>
+                </div>
                 <div class="hv-range-burn-x"><span>0</span><span>distância no ciclo</span><span>{{ focusedRangeBurnXMax }}</span></div>
               </div>
-              <div class="hv-range-burn-legend"><span class="soc"><i></i>bateria real</span><span class="hist"><i></i>previsão · histórico</span><span class="oem"><i></i>previsão · veículo</span></div>
+              <div class="hv-range-burn-legend">
+                <span class="soc"><i></i>bateria real</span>
+                <span class="extrap"><i></i>tendência</span>
+                <span class="hist"><i></i>previsão · histórico</span>
+                <span class="oem"><i></i>previsão · veículo</span>
+                <sc-if value="{{ focusedRangeBurnIsCharging }}" hint-placeholder-val="{{ false }}">
+                  <span class="charge"><i></i>recarga</span>
+                </sc-if>
+              </div>
             </sc-if>
             <sc-if value="{{ focusedRangeBurnEmpty }}" hint-placeholder-val="{{ true }}"><div class="hv-range-burn-empty">{{ focusedRangeBurnEmptyText }}</div></sc-if>
             <sc-if value="{{ focusedRangeBurnHasPast }}" hint-placeholder-val="{{ false }}">
@@ -46652,18 +46722,83 @@ class Component extends DCLogic {
     const pts = cur && Array.isArray(cur.points) ? cur.points : [];
     const fin = (v) => v != null && isFinite(v);
     const soc0 = cur && fin(cur.soc0) ? cur.soc0 : NaN;
+    const lastSoc = cur && fin(cur.lastSoc) ? cur.lastSoc : NaN;
+    const evKm = cur && fin(cur.evKm) ? cur.evKm : 0;
+    const totalKm = cur && fin(cur.km) ? cur.km : evKm;
     const hasSoc = pts.length >= 2;
     const hasDiag = fin(soc0) && ((cur && fin(cur.oem0) && cur.oem0 > 0) || (cur && fin(cur.hist0) && cur.hist0 > 0));
     const has = hasSoc || hasDiag;
+
+    // Check charging state
+    let isCharging = false;
+    try {
+      if (window.carTelemetry && typeof window.carTelemetry.get === 'function') {
+        isCharging = window.carTelemetry.get(CAR_SIGNALS.chargingState, '').trim() === '1';
+      }
+    } catch (e) {}
+    if (!isCharging && this._powerLive && (this._powerLive.isCharging || this._powerLive.charging)) isCharging = true;
+    if (demo && cur && !cur.end) isCharging = true;
+
+    // 1. Real Burn and Extrapolations (Option 1 metrics)
+    const socUsed = fin(soc0) && fin(lastSoc) ? Math.max(0, soc0 - lastSoc) : 0;
+    const socRange = (fin(soc0) ? Math.round(soc0) : '—') + '% → ' + (fin(lastSoc) ? Math.round(lastSoc) : '—') + '%';
+    const socUsedText = (socUsed > 0 ? Math.round(socUsed) : 0) + '% usado';
+    const burnRate = socUsed > 0 && evKm > 0 ? (evKm / socUsed) : NaN;
+    const rateText = isFinite(burnRate) ? (burnRate.toFixed(2) + ' ' + unitKey + '/%') : '—';
+    const cycleProjKm = isFinite(burnRate) && fin(soc0) && soc0 > 0 ? Math.round(soc0 * burnRate) : NaN;
+    const full100EqKm = isFinite(burnRate) ? Math.round(100 * burnRate) : NaN;
+
+    // Spec default (170 km default for Haval H6 PHEV)
+    const spec = (typeof this._energySpec === 'function' ? this._energySpec() : null) || { evRangeKm: 170 };
+    const specEvKm = (spec && spec.evRangeKm) ? spec.evRangeKm : 170;
+    const diff170 = isFinite(full100EqKm) && specEvKm > 0 ? (full100EqKm / specEvKm - 1) : NaN;
+    const diff170Text = isFinite(diff170) ? pct(diff170) : '—';
+    const diff170Class = !isFinite(diff170) ? 'neutral' : (diff170 >= 0 ? 'better' : (diff170 >= -0.1 ? 'under' : 'alert'));
+
+    // Historical statistics: real habit per charge and 100% normalized equivalent
+    let totalHistEvKm = 0;
+    let totalHistSocUsed = 0;
+    let histValidCycles = 0;
+    let sumHistSoc0 = 0;
+    let sumHistLastSoc = 0;
+    list.slice(1).forEach((c) => {
+      if (fin(c.soc0) && fin(c.lastSoc) && fin(c.evKm) && c.soc0 - c.lastSoc >= 5 && c.evKm > 2) {
+        histValidCycles++;
+        totalHistEvKm += c.evKm;
+        totalHistSocUsed += (c.soc0 - c.lastSoc);
+        sumHistSoc0 += c.soc0;
+        sumHistLastSoc += c.lastSoc;
+      }
+    });
+    const hasHistData = histValidCycles > 0;
+    const avgRealCycleKm = hasHistData ? Math.round(totalHistEvKm / histValidCycles) : NaN;
+    const avgHistSoc0 = hasHistData ? Math.round(sumHistSoc0 / histValidCycles) : NaN;
+    const avgHistLastSoc = hasHistData ? Math.round(sumHistLastSoc / histValidCycles) : NaN;
+    const avgHistSocUsed = hasHistData ? Math.round(totalHistSocUsed / histValidCycles) : NaN;
+    const avgRealRangeText = hasHistData ? (avgHistSoc0 + '% → ' + avgHistLastSoc + '%') : '—';
+    const allTimeAvg100 = totalHistSocUsed > 0
+      ? Math.round(totalHistEvKm / totalHistSocUsed * 100)
+      : (cur && fin(cur.hist0) && fin(soc0) && soc0 > 0 ? Math.round(cur.hist0 / (soc0 / 100)) : 148);
+    const diffAvg = isFinite(full100EqKm) && isFinite(allTimeAvg100) && allTimeAvg100 > 0 ? (full100EqKm / allTimeAvg100 - 1) : NaN;
+    const diffAvgText = isFinite(diffAvg) ? (pct(diffAvg) + ' vs média') : '—';
+    const diffAvgClass = !isFinite(diffAvg) ? 'neutral' : (diffAvg >= 0 ? 'better' : (diffAvg >= -0.1 ? 'under' : 'alert'));
+
+    const lastCycle = list[1];
+    const lastCycleKmText = lastCycle && fin(lastCycle.soc0) && fin(lastCycle.lastSoc) && (lastCycle.soc0 - lastCycle.lastSoc >= 5) && fin(lastCycle.evKm)
+      ? ('Última carga fez: ' + fmt(Math.round(lastCycle.evKm / (lastCycle.soc0 - lastCycle.lastSoc) * 100)) + ' ' + unit)
+      : 'Média de todos os ciclos';
+
+    // 2. Chart geometry and scales
     const W = 600;
     const H = 240;
     const yMax = 100;
-    let kmMax = 10;
+    let kmMax = Math.max(10, totalKm, evKm);
     pts.forEach((p) => { if (fin(p[3])) kmMax = Math.max(kmMax, p[3]); });
-    if (cur) [cur.hist0, cur.oem0, cur.km].forEach((v) => { if (fin(v)) kmMax = Math.max(kmMax, v); });
-    kmMax = Math.max(10, Math.ceil(kmMax * 1.05 / 10) * 10);
+    if (cur) [cur.hist0, cur.oem0, cycleProjKm].forEach((v) => { if (fin(v)) kmMax = Math.max(kmMax, v); });
+    kmMax = Math.max(10, Math.ceil(kmMax * 1.08 / 10) * 10);
     const X = (km) => (km / kmMax * W).toFixed(1);
     const Y = (v) => (H - Math.max(0, Math.min(yMax, v)) / yMax * H).toFixed(1);
+
     const socPath = (() => {
       let d = '';
       let pen = false;
@@ -46681,6 +46816,50 @@ class Component extends DCLogic {
     const diag = (f0) => (fin(soc0) && fin(f0) && f0 > 0
       ? 'M ' + X(0) + ' ' + Y(soc0) + ' L ' + X(f0) + ' ' + Y(0)
       : '');
+
+    // Extrapolation diagonal from last measured point to 0% SOC at cycleProjKm
+    const extrapPath = hasSoc && fin(cycleProjKm) && cycleProjKm > totalKm && fin(lastSoc)
+      ? 'M ' + X(totalKm) + ' ' + Y(lastSoc) + ' L ' + X(cycleProjKm) + ' ' + Y(0)
+      : '';
+
+    // Markers and vertical lines with collision-aware stagger
+    const markers = [];
+    if (fin(cycleProjKm) && cycleProjKm > 0) {
+      markers.push({ id: 'proj', km: cycleProjKm, label: 'TENDÊNCIA', val: fmt(cycleProjKm) + ' ' + unit, cls: 'proj' });
+    }
+    if (cur && fin(cur.hist0) && cur.hist0 > 0) {
+      markers.push({ id: 'hist', km: cur.hist0, label: 'HISTÓRICO', val: fmt(cur.hist0) + ' ' + unit, cls: 'hist' });
+    }
+    if (cur && fin(cur.oem0) && cur.oem0 > 0) {
+      markers.push({ id: 'oem', km: cur.oem0, label: 'VEÍCULO', val: fmt(cur.oem0) + ' ' + unit, cls: 'oem' });
+    }
+    if (isCharging && fin(evKm) && evKm > 0) {
+      markers.push({ id: 'charge', km: evKm, label: 'RECARGA', val: fmt(evKm) + ' ' + unit, cls: 'charge' });
+    }
+    markers.sort((a, b) => a.km - b.km);
+    const tagLevels = [];
+    markers.forEach((m, idx) => {
+      const left = (m.km / kmMax * 100);
+      let level = 0;
+      for (let p = 0; p < idx; p++) {
+        const pLeft = (markers[p].km / kmMax * 100);
+        if (Math.abs(left - pLeft) < 15 && tagLevels[p] === level) {
+          level = (level + 1) % 3;
+        }
+      }
+      tagLevels.push(level);
+    });
+    markers.forEach((m, idx) => {
+      m.leftPct = Math.max(6, Math.min(94, (m.km / kmMax * 100))).toFixed(1);
+      m.topPx = 3 + tagLevels[idx] * 28;
+    });
+
+    const vLine = (m) => m ? ('M ' + X(m.km) + ' ' + (m.topPx + 28) + ' V ' + H) : '';
+    const mProj = markers.find((m) => m.id === 'proj');
+    const mHist = markers.find((m) => m.id === 'hist');
+    const mOem = markers.find((m) => m.id === 'oem');
+    const mCharge = markers.find((m) => m.id === 'charge');
+
     // Actual vs forecast: what the cycle delivers (EV km driven, plus what is
     // still quoted if it has not run empty) over what was forecast at its start.
     const proj = (c, rem) => (fin(c.evKm) ? c.evKm + (c.end === 'depleted' ? 0 : (fin(rem) ? rem : NaN)) : NaN);
@@ -46701,7 +46880,6 @@ class Component extends DCLogic {
         when: day(c.id),
         socs: (fin(c.soc0) ? Math.round(c.soc0) : '—') + '→' + (fin(c.lastSoc) ? Math.round(c.lastSoc) : '—') + '%',
         end: endText(c),
-        // Recharged or cut short: the result still leans on the last quote.
         approx: c.end === 'depleted' ? '' : '≈',
         driven: fmt(c.evKm),
         histErr: pct(he),
@@ -46710,12 +46888,10 @@ class Component extends DCLogic {
         oemErrClass: errClass(oe),
       };
     });
-    // Every cycle starts at a charge (RangeLedger): with none open, the next one waits for one.
+    // Summary line
     const summary = !cur ? 'SEM CICLO AINDA · COMEÇA APÓS A PRÓXIMA RECARGA'
       : (cur.end ? 'ÚLTIMO CICLO · ' + endText(cur) + ' · ' + day(cur.id) + ' · AGUARDANDO RECARGA'
-        : 'DESDE A CARGA DE ' + day(cur.id) + ' · '
-          + (fin(cur.soc0) ? Math.round(cur.soc0) : '—') + '% → ' + (fin(cur.lastSoc) ? Math.round(cur.lastSoc) : '—') + '% · '
-          + fmt(cur.km) + ' ' + unit + ' RODADOS');
+        : 'DESDE A CARGA DE ' + day(cur.id) + ' · ' + socRange + ' · ' + fmt(cur.km) + ' ' + unit + ' RODADOS');
     return {
       rangeBurnDemo: demo,
       rangeBurnSummary: summary,
@@ -46723,6 +46899,22 @@ class Component extends DCLogic {
       rangeBurnEmpty: !has,
       rangeBurnEmptyText: cur ? 'Gravando · o gráfico aparece a partir do segundo ponto de SOC.'
         : 'Nada gravado ainda. O primeiro ciclo começa na primeira condução após uma recarga.',
+      rangeBurnIsCharging: isCharging,
+      rangeBurnSocRange: socRange,
+      rangeBurnSocUsed: socUsedText,
+      rangeBurnRate: rateText,
+      rangeBurnFull100: fmt(full100EqKm),
+      rangeBurnCycleProj: fmt(cycleProjKm) + ' ' + unit,
+      rangeBurnSpecKm: fmt(specEvKm) + ' ' + unit,
+      rangeBurnDiff170: diff170Text,
+      rangeBurnDiff170Class: diff170Class,
+      rangeBurnHistAvg: fmt(allTimeAvg100),
+      rangeBurnHistRealKm: isFinite(avgRealCycleKm) ? fmt(avgRealCycleKm) : '—',
+      rangeBurnHistSocRange: avgRealRangeText,
+      rangeBurnHistSocUsed: isFinite(avgHistSocUsed) ? (avgHistSocUsed + '%') : '—',
+      rangeBurnDiffAvg: diffAvgText,
+      rangeBurnDiffAvgClass: diffAvgClass,
+      rangeBurnLastCycleText: lastCycleKmText,
       rangeBurnHist0: cur ? fmt(cur.hist0) : '—',
       rangeBurnOem0: cur ? fmt(cur.oem0) : '—',
       rangeBurnDriven: cur ? fmt(cur.evKm) : '—',
@@ -46738,8 +46930,14 @@ class Component extends DCLogic {
       rangeBurnXMax: fmt(kmMax) + ' ' + unit,
       rangeBurnHist0Path: cur ? diag(cur.hist0) : '',
       rangeBurnOem0Path: cur ? diag(cur.oem0) : '',
+      rangeBurnExtrapPath: extrapPath,
       rangeBurnSocPath: socPath,
       rangeBurnSocArea: socArea,
+      rangeBurnVLineProjPath: vLine(mProj),
+      rangeBurnVLineHistPath: vLine(mHist),
+      rangeBurnVLineOemPath: vLine(mOem),
+      rangeBurnVLineChargePath: vLine(mCharge),
+      rangeBurnMarkers: markers,
       rangeBurnPast: past,
       rangeBurnHasPast: past.length > 0,
     };
