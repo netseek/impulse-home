@@ -6993,13 +6993,17 @@ public final class MainActivity extends Activity {
             intent.setComponent(resolve.getComponent());
             intent.setPackage(packageName);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
                     | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 
-            Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
-            Log.w(TAG, "Fullscreen launch " + resolve.getComponent());
-            startActivity(intent, opts);
-            requestTaskBounds(packageName, FULLSCREEN_BOUNDS);
+            if (isGwmApp(packageName)) {
+                Log.w(TAG, "Native GWM launch " + resolve.getComponent());
+                startActivity(intent);
+            } else {
+                Bundle opts = buildWindowOptions(WINDOWING_MODE_FULLSCREEN, FULLSCREEN_BOUNDS);
+                Log.w(TAG, "Fullscreen launch " + resolve.getComponent());
+                startActivity(intent, opts);
+                requestTaskBounds(packageName, FULLSCREEN_BOUNDS);
+            }
             notifyViewerShellLayout();
         } catch (Exception e) {
             Log.e(TAG, "Error launching fullscreen " + packageName, e);
@@ -9986,9 +9990,23 @@ public final class MainActivity extends Activity {
     private void launchProjectionConfig() {
         onAppLaunched();
         if (getPackageManager().getLaunchIntentForPackage(PHONE_CONNECT_PACKAGE) != null) {
-            launchAppFullscreen(PHONE_CONNECT_PACKAGE);
+            launchPhoneConnectSettings();
         } else {
             launchAndroidSettingsRoot();
+        }
+    }
+
+    private void launchPhoneConnectSettings() {
+        try {
+            Intent intent = new Intent();
+            intent.setComponent(new ComponentName(PHONE_CONNECT_PACKAGE,
+                    "com.beantechs.settings.ui.activity.MainActivity"));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            intent.putExtra("position", 0);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to launch phone connect settings directly", e);
+            launchAppFullscreen(PHONE_CONNECT_PACKAGE);
         }
     }
 
@@ -13708,14 +13726,7 @@ public final class MainActivity extends Activity {
     private void bindProjectionSlot(ProjectionPresence.Kind kind) {
         if (projectionItem == null) return;
         if (kind == null || kind == ProjectionPresence.Kind.NONE) {
-            // Same as the OEM rail: nothing projected -> offer the connect screen.
-            if (getPackageManager().getLaunchIntentForPackage(PHONE_CONNECT_PACKAGE) == null) {
-                projectionItem.setVisibility(View.GONE);
-                return;
-            }
-            bindDockItem(projectionItem,
-                    getDrawable(R.drawable.ic_phone_link), "Configurar Navegação",
-                    v -> launchAppFullscreen(PHONE_CONNECT_PACKAGE));
+            projectionItem.setVisibility(View.GONE);
             return;
         }
         Drawable icon = projectionPresence != null ? projectionPresence.iconFor(kind) : null;
