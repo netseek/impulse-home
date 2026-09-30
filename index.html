@@ -43205,10 +43205,9 @@ class Component extends DCLogic {
   }
 
   _energyRailCard(m) {
-    // Rail card (owner, 2026-09-18): the trip's ELECTRIC consumption is the big
-    // number, the bars are daily kWh/100 km to match, and the detail reads
-    // "13.4 km · 24 min" then "64% EV · 15.7 km/L". A trip being driven needs
-    // no prefix; a finished one says ÚLTIMA.
+    // Rail card: the trip's ELECTRIC consumption is the big number,
+    // the bars are daily kWh/100 km to match, and the detail reads
+    // "13.4 km · 24 min" then "64% EV · 15.7 km/L".
     const units = m.units;
     const ev = (row) => (Number(row.km) > 0.5 ? (Number(row.kwhOut) || 0) * 100 / Number(row.km) : 0);
     const bars = this._energyBarsFrom(this._energyDaySeries(m.hist, 7, Date.now()), () => '', ev)
@@ -43219,9 +43218,8 @@ class Component extends DCLogic {
     const tripFuel = has ? this._energyFuelText(this._energyTripKmPerL(t), units) : '—';
     const primary = has ? tripEv : (m.nowEv || '—');
     const unit = this._energyEvUnitLabel(units);
-    const live = has && m.tripLabel.indexOf('VIAGEM ATUAL') === 0;
     const secondary = has
-      ? (live ? '' : 'ÚLTIMA · ') + m.tripKm + ' · ' + m.tripTime
+      ? m.tripKm + ' · ' + m.tripTime
       : (m.bridge ? 'NENHUMA VIAGEM' : m.source);
     const mix = [
       has && m.tripEvShare !== '—' ? m.tripEvShare + ' EV' : '',

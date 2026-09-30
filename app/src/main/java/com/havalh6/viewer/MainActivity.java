@@ -9701,7 +9701,7 @@ public final class MainActivity extends Activity {
             return styleRailFigure(primary, " kW", 0.45f, unitColor);
         }
         if ("consumption".equals(descriptor.id) && !descriptor.metricA.isEmpty()) {
-            return styleRailFigure(primary, " " + descriptor.metricA, 0.4f, unitColor);
+            return styleRailFigure(primary, " " + descriptor.metricA, 0.38f, unitColor);
         }
         if ("consumption".equals(descriptor.id)) {
             return styleRailFigure(primary, "", 1f, unitColor);
@@ -9773,8 +9773,8 @@ public final class MainActivity extends Activity {
         if ("power".equals(id)) return 318;
         if ("navigation".equals(id)) return 286;
         if ("roof".equals(id)) return 286;
-        if ("status".equals(id) || "tires".equals(id)) return 270;
-        if ("range".equals(id) || "consumption".equals(id)) return 258;
+        if ("status".equals(id) || "tires".equals(id) || "consumption".equals(id)) return 270;
+        if ("range".equals(id)) return 258;
         if ("wallpaper".equals(id)) return 248;
         if ("clock".equals(id)) return 224;
         return 238;
