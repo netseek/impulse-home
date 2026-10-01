@@ -6014,9 +6014,10 @@ window.HavalSplash = (function () {
        on it reads at ~1.8:1. Near-black clears 6.8:1 on the night teal and 10.7:1 on
        the day blue, so one colour serves both. */
     .hv-energy-pad > .k-ok { grid-column:4; grid-row:3 / span 2; background:var(--hv-accent,#2aa7b7); color:#08131a; font:600 18px/1 var(--hv-font); letter-spacing:.06em; }
-    .hv-energy-pad > .k-zero { grid-column:1 / span 3; }
-    .hv-energy-confirm-actions > .hv-energy-askdef { font-size:13px; letter-spacing:.04em; }
-    .hv-energy-pad > button { min-height:54px; border:0; border-radius:14px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:500 22px/1 var(--hv-font); font-variant-numeric:tabular-nums; cursor:pointer; }
+    .hv-energy-confirm-actions { display:flex; gap:10px; }
+    .hv-energy-confirm-actions > .hv-energy-askdef { flex:1; min-height:46px; border:0; border-radius:12px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:600 13px/1 var(--hv-font); letter-spacing:.04em; cursor:pointer; }
+    .hv-energy-confirm-actions > .hv-energy-askdef:active { background:rgba(255,255,255,.2); }
+    .hv-energy-confirm-actions > .hv-energy-askskip { flex:0 0 auto; min-width:90px; opacity:.75; }
     .hv-energy-pad > button:active { background:rgba(255,255,255,.2); }
     .hv-energy-pad > button.act { font:600 14px/1 var(--hv-font); letter-spacing:.06em; opacity:.8; }
     .hv-energy-ask-box .primary { color:#fff; background:var(--hv-accent,#2aa7b7); }
@@ -7820,7 +7821,10 @@ window.HavalSplash = (function () {
         <div class="hv-energy-pad">
           <sc-for list="{{ energyAskKeys }}" as="k" hint-placeholder-count="12"><button type="button" class="{{ k.cls }}" aria-label="{{ k.label }}" onClick="{{ k.onClick }}">{{ k.text }}</button></sc-for>
         </div>
-        <div class="hv-energy-confirm-actions"><button type="button" class="hv-energy-askdef" onClick="{{ energyAskAlt }}">{{ energyAskAltText }}</button></div>
+        <div class="hv-energy-confirm-actions">
+          <button type="button" class="hv-energy-askdef" onClick="{{ energyAskAlt }}">{{ energyAskAltText }}</button>
+          <sc-if value="{{ energyAskHasDefault }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-askdef hv-energy-askskip" onClick="{{ energyAskSkip }}">PULAR</button></sc-if>
+        </div>
       </div>
     </div>
   </sc-if>
@@ -10885,6 +10889,8 @@ class Component extends DCLogic {
     this._widgetHold = null;
     this._widgetTouchActive = false;
     this._widgetSuppressClick = false;
+    this._widgetSuppressClickUntil = 0;
+    this._widgetSuppressTimer = 0;
     this._camSlotHoldTimer = 0;
     this._camSlotHoldFired = false;
     this._camSlotHoldKey = null;
@@ -13061,15 +13067,35 @@ class Component extends DCLogic {
       || t.closest('input[type="range"]'));
   }
 
+  _widgetClickSuppressed() {
+    if (this._widgetSuppressClick) return true;
+    if (this._widgetSuppressClickUntil && Date.now() < this._widgetSuppressClickUntil) return true;
+    if (this._desktopClickSuppressed && this._desktopClickSuppressed()) return true;
+    if (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx)) return true;
+    if (this._desktopGesture && this._desktopGesture.moved) return true;
+    if (typeof document !== 'undefined' && document.body && (
+      document.body.classList.contains('hv-desk-sliding') ||
+      document.body.classList.contains('hv-desk-animating')
+    )) return true;
+    return false;
+  }
+
   _onWidgetSuppressClick(e) {
-    if (this._widgetSuppressClick) {
+    if (this._widgetClickSuppressed()) {
       const t = e && e.target;
-      if (t && t.closest && t.closest('.hv-widget-remove, .hv-widget-exit, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-widget-picker-backdrop, .hv-widget-slot-banner, .hv-graph-editor')) {
+      const isDeskSwitching = (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx))
+        || (this._desktopClickSuppressed && this._desktopClickSuppressed())
+        || (typeof document !== 'undefined' && document.body && (
+          document.body.classList.contains('hv-desk-sliding') ||
+          document.body.classList.contains('hv-desk-animating')
+        ));
+      if (!isDeskSwitching && t && t.closest && t.closest('.hv-widget-remove, .hv-widget-exit, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-widget-picker-backdrop, .hv-widget-slot-banner, .hv-graph-editor')) {
         this._widgetSuppressClick = false;
         return;
       }
       if (e && e.preventDefault) e.preventDefault();
       if (e && e.stopPropagation) e.stopPropagation();
+      if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
       this._widgetSuppressClick = false;
       return;
     }
@@ -13087,10 +13113,16 @@ class Component extends DCLogic {
     this._dismissWidgetMenu();
   }
 
-  _suppressNextWidgetClick() {
+  _suppressNextWidgetClick(ms) {
+    const duration = typeof ms === 'number' ? ms : 500;
     this._widgetSuppressClick = true;
-    const self = this;
-    setTimeout(() => { self._widgetSuppressClick = false; }, 400);
+    this._widgetSuppressClickUntil = Math.max(this._widgetSuppressClickUntil || 0, Date.now() + duration);
+    clearTimeout(this._widgetSuppressTimer);
+    this._widgetSuppressTimer = setTimeout(() => {
+      if (Date.now() >= (this._widgetSuppressClickUntil || 0)) {
+        this._widgetSuppressClick = false;
+      }
+    }, duration + 20);
   }
 
   _onWidgetHoldStart(side, item, ev) {
@@ -38551,6 +38583,8 @@ class Component extends DCLogic {
 
   _switchDesktop(index, skipCapture, force, opts) {
     if (!this._desktopReady || !this._desktops || !this._desktops.length) return;
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+    this._suppressNextWidgetClick(500);
     const count = this._desktops.length;
     const nextIndex = ((parseInt(index, 10) || 0) % count + count) % count;
     if (nextIndex === this._desktopIndex && !force) return;
@@ -38790,6 +38824,8 @@ class Component extends DCLogic {
     const backward = (cur - nextIndex + count) % count;
     // −1 = stage moves left (next), +1 = stage moves right (previous).
     const slideDir = forward <= backward ? -1 : 1;
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+    this._suppressNextWidgetClick(500);
     this._deskSlideAnimateTo(nextIndex, slideDir);
   }
 
@@ -39162,6 +39198,8 @@ class Component extends DCLogic {
     }
     this._deskSlide = null;
     this._deskSlideClearDots();
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+    this._suppressNextWidgetClick(500);
     if (this.controls && !this._desktopGesture && !this.state.desktopStudioOpen && !this.state.firstRunSetupOpen
       && this._shouldShowCar() && !this._camAnim) {
       this.controls.enabled = true;
@@ -39270,6 +39308,8 @@ class Component extends DCLogic {
 
   /** Programmatic switch (arrows / dots / keyboard): short slide then commit. */
   _deskSlideAnimateTo(toIndex, dir) {
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+    this._suppressNextWidgetClick(500);
     if (!this._deskSlideArm(dir, toIndex)) {
       this._switchDesktop(toIndex);
       return;
@@ -39860,6 +39900,13 @@ class Component extends DCLogic {
   }
 
   _openFocusedCard(type) {
+    if (this._widgetClickSuppressed && this._widgetClickSuppressed()) return;
+    if (this._desktopClickSuppressed && this._desktopClickSuppressed()) return;
+    if (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx)) return;
+    if (typeof document !== 'undefined' && document.body && (
+      document.body.classList.contains('hv-desk-sliding') ||
+      document.body.classList.contains('hv-desk-animating')
+    )) return;
     if (type === 'media') {
       this._openMediaApp(null);
       return;
@@ -40394,7 +40441,8 @@ class Component extends DCLogic {
       const count = this._desktops.length;
       const toIndex = ((this._desktopIndex || 0) + (dir < 0 ? 1 : -1) + count) % count;
       if (!this._deskSlideArm(dir, toIndex)) return;
-      if (g.fromBoard) this._suppressNextWidgetClick();
+      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+      this._suppressNextWidgetClick(500);
     } else if (!this._deskSlide.busy) {
       // Re-aim if the user reverses past centre.
       const dir = dx < 0 ? -1 : 1;
@@ -40411,8 +40459,8 @@ class Component extends DCLogic {
       // Commit as soon as travel hits the threshold — no need to wait for lift.
       const travel = Math.abs(this._deskSlide.dx || dx);
       if (travel >= this._deskCommitPx() && Math.abs(dx) >= Math.abs(dy)) {
-        this._suppressDesktopClickUntil = Date.now() + 450;
-        if (g.fromBoard) this._suppressNextWidgetClick();
+        this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+        this._suppressNextWidgetClick(500);
         g.slideCommitted = true;
         this._deskSlideCommit(this._deskSlide.toIndex, this._deskSlide.dir, this._deskSlide.dx || dx);
       }
@@ -40430,7 +40478,11 @@ class Component extends DCLogic {
       this.controls.enabled = g.controlsEnabled;
     }
     if (!g) return;
-    if (g.slideCommitted) return;
+    if (g.slideCommitted) {
+      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+      this._suppressNextWidgetClick(500);
+      return;
+    }
     const p = this._eventClientPoint(ev);
     if (!p) return;
     const dx = p.x - g.x;
@@ -40443,8 +40495,8 @@ class Component extends DCLogic {
       const dir = this._deskSlide.dir;
       const flicked = (dir < 0 && vx < -0.35) || (dir > 0 && vx > 0.35);
       const farEnough = travel >= this._deskCommitPx() && Math.abs(dx) >= Math.abs(dy) * 0.85;
-      this._suppressDesktopClickUntil = Date.now() + 450;
-      if (g.fromBoard) this._suppressNextWidgetClick();
+      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+      this._suppressNextWidgetClick(500);
       if (farEnough || flicked) {
         this._deskSlideCommit(this._deskSlide.toIndex, dir, this._deskSlide.dx || dx);
       } else {
@@ -40457,8 +40509,8 @@ class Component extends DCLogic {
       && travel >= H6_DESK_SLIDE_COMMIT_PX
       && Math.abs(dx) >= Math.abs(dy) * 1.1);
     if (isSwipe) {
-      this._suppressDesktopClickUntil = Date.now() + 450;
-      if (g.fromBoard) this._suppressNextWidgetClick();
+      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+      this._suppressNextWidgetClick(500);
       this._requestDesktopSwitch((this._desktopIndex || 0) + (dx < 0 ? 1 : -1));
       return;
     }
@@ -40467,6 +40519,8 @@ class Component extends DCLogic {
   _onDesktopGestureCancel() {
     const g = this._desktopGesture;
     this._desktopGesture = null;
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
+    this._suppressNextWidgetClick(500);
     // Defer controls restore to _deskSlideTeardown when a slide is in flight.
     const slideFlying = g && (g.slideCommitted || (this._deskSlide && this._deskSlide.busy));
     if (g && this.controls && g.controlsEnabled != null && !slideFlying) {
@@ -40635,6 +40689,8 @@ class Component extends DCLogic {
       energyAskKeys: this._energyAskKeys(),
       energyAskAltText: this._energyAskAltLabel(),
       energyAskAlt: (ev) => this._answerEnergyAskAlt(ev),
+      energyAskHasDefault: isFinite(this._energyAskDefaultPrice()),
+      energyAskSkip: (ev) => this._answerEnergyAsk(false, ev),
     };
     if (!type) return base;
     const entry = this._focusedCardEntry(type);
@@ -41804,7 +41860,7 @@ class Component extends DCLogic {
         if (isControl) {
           this._suppressAutoClimateOpen(2500);
         } else {
-          if (this._widgetSuppressClick || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return;
+          if (this._widgetClickSuppressed() || this._desktopClickSuppressed() || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return;
           if (this._climSuppressClick && Date.now() - this._climSuppressClick < 400) return;
           e.stopPropagation();
           if (this.state.focusedCardType !== 'climate') {
@@ -41819,8 +41875,10 @@ class Component extends DCLogic {
       e.stopPropagation();
       this._bumpClimatePanelHold();
       if (this._climSuppressClick && Date.now() - this._climSuppressClick < 400) return;
+      if (this._widgetClickSuppressed() || this._desktopClickSuppressed()) return;
       const act = el.getAttribute('data-ca');
       if (act === 'open') {
+        if (this._widgetClickSuppressed() || this._desktopClickSuppressed() || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return;
         if (this.state.focusedCardType !== 'climate') {
           this._openFocusedCard('climate');
         }
@@ -42822,7 +42880,8 @@ class Component extends DCLogic {
     const ask = this.state.energyAsk;
     if (!ask) return;
     const pr = this._energyPrices();
-    pr.paid[ask.key] = v;
+    const keys = ask.keys || [ask.key];
+    keys.forEach((k) => { pr.paid[k] = v; });
     this._saveEnergyPrices();
     this.setState({ energyAsk: null }, () => this._energyCheckPriceAsk());
   }
@@ -42847,10 +42906,44 @@ class Component extends DCLogic {
     this._uiOnlySetState((st) => ({ energyRev: (st.energyRev || 0) + 1, energyAsk: on ? st.energyAsk : null }));
   }
 
-  /** Every refuel and charge the recorder knows (demo: a priced pair). */
+  /** Every refuel and charge the recorder knows (demo: a priced pair). Merges duplicates from same session. */
   _energyStopList() {
     const h = this._energyCache;
-    if (h && h.stopList) return h.stopList;
+    if (h && h.stopList) {
+      if (h._dedupedStopList) return h._dedupedStopList;
+      const raw = h.stopList;
+      const out = [];
+      for (let i = 0; i < raw.length; i++) {
+        const cur = raw[i];
+        if (!cur) continue;
+        const curT = Number(cur.t) || 0;
+        const prev = out.length ? out[out.length - 1] : null;
+        const prevT = prev ? Number(prev.t) || 0 : 0;
+        // Merge with previous if same kind and within 2 hours or same startMs/t
+        const isSame = prev && prev.kind === cur.kind && (
+          curT === prevT ||
+          (cur.startMs && prev.startMs && cur.startMs === prev.startMs) ||
+          (Math.abs(curT - prevT) < 2 * 3600000)
+        );
+        if (isSame) {
+          prev.after = Math.max(Number(prev.after) || 0, Number(cur.after) || 0);
+          prev.before = Math.min(Number(prev.before) || 0, Number(cur.before) || 0);
+          if (cur.kind === 'charge') {
+            prev.amount = Math.max(0, prev.after - prev.before);
+          } else {
+            prev.amount = Math.max(Number(prev.amount) || 0, Number(cur.amount) || 0);
+          }
+          if (!prev.keys) prev.keys = [(prev.kind === 'charge' ? 'charge:' : 'refuel:') + prev.t];
+          prev.keys.push((cur.kind === 'charge' ? 'charge:' : 'refuel:') + cur.t);
+        } else {
+          const clone = Object.assign({}, cur);
+          clone.keys = [(clone.kind === 'charge' ? 'charge:' : 'refuel:') + clone.t];
+          out.push(clone);
+        }
+      }
+      h._dedupedStopList = out;
+      return out;
+    }
     return [];
   }
 
@@ -42876,7 +42969,11 @@ class Component extends DCLogic {
       const added = charge
         ? (isFinite(after) && isFinite(before) ? Math.max(0, after - before) * cap / 100 : 0)
         : (Number(sp.amount) > 0 ? Number(sp.amount) : (isFinite(after) && isFinite(before) ? Math.max(0, after - before) * cap / 100 : 0));
-      const paid = Number(pr.paid[(charge ? 'charge:' : 'refuel:') + t]);
+      const keys = sp.keys || [(charge ? 'charge:' : 'refuel:') + t];
+      let paid = NaN;
+      for (let i = 0; i < keys.length; i++) {
+        if (Number(pr.paid[keys[i]]) > 0) { paid = Number(pr.paid[keys[i]]); break; }
+      }
       const price = paid > 0 ? paid : (charge ? pr.kwh : pr.fuel);
       const prev = charge ? kwhAvg : fuelAvg;
       let next = prev;
@@ -42948,16 +43045,19 @@ class Component extends DCLogic {
     if (isFinite(kmh) && kmh > 5) return;
     const spec = this._energySpec();
     const next = this._energyStopList().find((sp) => {
-      const key = (sp.kind === 'charge' ? 'charge:' : 'refuel:') + sp.t;
-      return Number(sp.t) > pr.since && !pr.paid[key] && !pr.skipped[key];
+      const keys = sp.keys || [(sp.kind === 'charge' ? 'charge:' : 'refuel:') + sp.t];
+      const isHandled = keys.some((k) => pr.paid[k] || pr.skipped[k]);
+      return Number(sp.t) > pr.since && !isHandled;
     });
     if (!next) return;
     const charge = next.kind === 'charge';
     const qty = charge ? Math.max(0, (Number(next.after) || 0) - (Number(next.before) || 0)) * spec.batteryKwh / 100 : Number(next.amount) || 0;
+    const allKeys = next.keys || [(charge ? 'charge:' : 'refuel:') + next.t];
     this._energyAskDraft = '';
     this._liveSet('energyAskCents', 0);
     this.setState({ energyAsk: {
-      key: (charge ? 'charge:' : 'refuel:') + next.t,
+      key: allKeys[0],
+      keys: allKeys,
       charge: charge,
       title: charge ? 'Recarga detectada' : 'Abastecimento detectado',
       text: (qty > 0 ? (charge ? '≈ ' + qty.toFixed(1) + ' kWh' : qty.toFixed(1) + ' L') + ' · ' : '') + this._energyWhen(Number(next.t)),
@@ -42972,12 +43072,13 @@ class Component extends DCLogic {
     const pr = this._energyPrices();
     const cents = this._energyAskCents();
     const v = cents > 0 && cents < 100000 ? cents / 100 : NaN;
+    const keys = ask.keys || [ask.key];
     if (save && isFinite(v)) {
-      pr.paid[ask.key] = v;
+      keys.forEach((k) => { pr.paid[k] = v; });
       // The last price paid is the best guess for the next one.
       if (ask.charge) pr.kwh = v; else pr.fuel = v;
     } else if (!save) {
-      pr.skipped[ask.key] = 1;
+      keys.forEach((k) => { pr.skipped[k] = 1; });
     } else {
       return;
     }
@@ -49978,6 +50079,7 @@ class Component extends DCLogic {
     clearTimeout(this._desktopGestureHoldTimer);
     clearTimeout(this._desktopIndicatorTimer);
     clearTimeout(this._desktopDotHoldTimer);
+    clearTimeout(this._widgetSuppressTimer);
     clearTimeout(this._camSlotHoldTimer);
     clearInterval(this._energyTimer);
     clearInterval(this._rangeReportTimer);
