@@ -234,6 +234,19 @@ public final class MainActivity extends Activity {
     private final ConcurrentHashMap<String, String> telemetryCache = new ConcurrentHashMap<>();
     private View launchAnchor;
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    /** Bing wallpaper JSON. One thread, so a refresh cannot pile onto the WebView. */
+    private java.util.concurrent.ExecutorService netFetchExec;
+
+    private java.util.concurrent.ExecutorService netFetchExec() {
+        if (netFetchExec == null) {
+            netFetchExec = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "h6-net-fetch");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        return netFetchExec;
+    }
     private Runnable pinBoundsRunnable;
 
     private final BroadcastReceiver taskResolvedReceiver = new BroadcastReceiver() {
@@ -941,9 +954,36 @@ public final class MainActivity extends Activity {
          * Fetch Bing daily-wallpaper JSON from native code. WebView fetch() to
          * bing.com is blocked on some builds; this uses the same HTTPS endpoint
          * as Windows Spotlight (HPImageArchive).
+         *
+         * Blocking. A desktop switch measured 2.8s frozen on this call. New
+         * callers use {@link #fetchJsonAsync}.
          */
         @JavascriptInterface
         public String fetchJson(String url) {
+            return fetchJsonBody(url);
+        }
+
+        /**
+         * Same fetch as {@link #fetchJson}, off the WebView thread. The page
+         * gets the body via {@code window.__h6FetchJson(token, body)}.
+         */
+        @JavascriptInterface
+        public void fetchJsonAsync(String url, String token) {
+            final String id = token == null ? "" : token;
+            final String u = url;
+            netFetchExec().execute(() -> {
+                final String body = fetchJsonBody(u);
+                if (webView == null) return;
+                final String js = "window.__h6FetchJson&&window.__h6FetchJson("
+                        + org.json.JSONObject.quote(id) + ","
+                        + org.json.JSONObject.quote(body) + ")";
+                webView.post(() -> {
+                    if (webView != null) webView.evaluateJavascript(js, null);
+                });
+            });
+        }
+
+        private String fetchJsonBody(String url) {
             if (url == null) return "";
             String u = url.trim();
             if (!u.startsWith("https://www.bing.com/") && !u.startsWith("https://bing.com/")) {
