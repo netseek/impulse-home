@@ -9604,12 +9604,15 @@ public final class MainActivity extends Activity {
         }
         content.addView(graphic);
 
-        boolean railFigure = "power".equals(descriptor.id) || "consumption".equals(descriptor.id);
+        boolean isConsumption = "consumption".equals(descriptor.id);
+        boolean isPower = "power".equals(descriptor.id);
+        boolean railFigure = isPower || isConsumption;
         android.widget.LinearLayout copy = new android.widget.LinearLayout(this);
         copy.setOrientation(android.widget.LinearLayout.VERTICAL);
-        // Power / CONSUMO: pack figure + detail at the bottom so the big number
-        // sits right above its labels (no weighted spacer — that left a void).
-        copy.setGravity(railFigure ? android.view.Gravity.BOTTOM : android.view.Gravity.CENTER_VERTICAL);
+        // Power: pack figure + detail at the bottom so the big number sits right above its labels.
+        // Consumption: big figure slightly up in its original position, 2nd line aligned in remaining space.
+        copy.setGravity(isPower ? android.view.Gravity.BOTTOM
+                : (isConsumption ? android.view.Gravity.TOP : android.view.Gravity.CENTER_VERTICAL));
         copy.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
@@ -9628,9 +9631,13 @@ public final class MainActivity extends Activity {
         if (railFigure) {
             primary.setIncludeFontPadding(false);
             primary.setPadding(0, 0, 0, 0);
-            primary.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams primaryLp = new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            if (isConsumption) {
+                primaryLp.topMargin = Math.round(5 * density);
+            }
+            primary.setLayoutParams(primaryLp);
             // Digits have no descenders, but the TextView still reserves the font
             // descent under the baseline. Pull labels partway into that band so
             // the gap sits between "too open" (full descent) and "flush" (2dp).
@@ -9642,8 +9649,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView detail = new android.widget.TextView(this);
         detail.setTag("frostSecondary");
         detail.setText(quickVisualDetail(descriptor));
-        // Rail meta = climate INTERNA (h·0.18 ≈ 14sp on the 124dp card).
-        detail.setTextSize(railFigure ? 14f : 9.5f);
+        detail.setTextSize(isConsumption ? 12f : (railFigure ? 14f : 9.5f));
         detail.setLetterSpacing(0.025f);
         detail.setLineSpacing(0f, 1.02f);
         if (railFigure) {
@@ -9655,13 +9661,21 @@ public final class MainActivity extends Activity {
         // not the same statement).
         detail.setMaxLines("power".equals(descriptor.id) || DRIVING_CARD_IDS.contains(descriptor.id) || "wallpaper".equals(descriptor.id) ? 4 : 3);
         detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        detailLp.topMargin = railFigure
-                ? -Math.round(railFigurePullUp)
-                : Math.round(3 * density);
-        detail.setLayoutParams(detailLp);
+        if (isConsumption) {
+            detail.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
+            android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    0, 1f);
+            detail.setLayoutParams(detailLp);
+        } else {
+            android.widget.LinearLayout.LayoutParams detailLp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            detailLp.topMargin = railFigure
+                    ? -Math.round(railFigurePullUp)
+                    : Math.round(3 * density);
+            detail.setLayoutParams(detailLp);
+        }
         copy.addView(detail);
         content.addView(copy);
         card.addView(content);
@@ -9683,9 +9697,10 @@ public final class MainActivity extends Activity {
             if (descriptor.secondary.isEmpty()) return rear;
             return rear + (rear.isEmpty() ? "" : "\n") + descriptor.secondary;
         }
-        // CONSUMO carries its unit beside the big number, so the detail is the
-        // trip line and the EV share only.
-        String metrics = "consumption".equals(descriptor.id) ? "" : descriptor.metricA;
+        if ("consumption".equals(descriptor.id)) {
+            return !descriptor.secondary.isEmpty() ? descriptor.secondary : descriptor.metricB;
+        }
+        String metrics = descriptor.metricA;
         if (!descriptor.metricB.isEmpty()) {
             metrics += (metrics.isEmpty() ? "" : "  ·  ") + descriptor.metricB;
         }
@@ -10464,18 +10479,22 @@ public final class MainActivity extends Activity {
         // letting it fall through to the 3D canvas underneath.
         card.setClickable(true);
         card.setFocusable(true);
-        final String bodyCommand = descriptor != null ? descriptor.action : "";
         card.setOnClickListener(v -> {
-            if (quickMediaCanLaunch && quickMediaPackage != null && !quickMediaPackage.isEmpty()) {
-                launchAppForPackage(quickMediaPackage,
+            String pkg = quickMediaPackage;
+            if (pkg == null || pkg.isEmpty()) {
+                if (mediaNowPlaying != null) {
+                    MediaTrack w = mediaNowPlaying.winner();
+                    if (w != null && w.packageName != null && !w.packageName.isEmpty()) {
+                        pkg = w.packageName;
+                    }
+                }
+            }
+            if (pkg != null && !pkg.isEmpty()) {
+                launchAppForPackage(pkg,
                         quickMediaTitle != null ? quickMediaTitle.getText().toString() : "Media");
-            } else if (!bodyCommand.isEmpty()) {
-                // Nothing to open: fall back to the card's own command so the
-                // tap answers rather than doing nothing.
-                callViewerDock(bodyCommand);
             }
         });
-        if (descriptor != null && !descriptor.longAction.isEmpty()) {
+        if (descriptor != null && !descriptor.longAction.isEmpty() && !"openMedia".equals(descriptor.longAction)) {
             final String longCommand = descriptor.longAction;
             card.setLongClickable(true);
             card.setOnLongClickListener(v -> {
@@ -14841,6 +14860,7 @@ public final class MainActivity extends Activity {
         // Back in front: take the popup over again (no-op until the page has revealed).
         if (climateHandoff != null) climateHandoff.setForeground(true);
         mediaNowPlaying.start();
+        mediaNowPlaying.pushNow();
         // Permission may have been granted via adb while we were paused; retry.
         mainHandler.removeCallbacks(mediaVizPoll);
         mainHandler.post(mediaVizPoll);

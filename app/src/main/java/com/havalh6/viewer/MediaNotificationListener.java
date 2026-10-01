@@ -82,6 +82,12 @@ public final class MediaNotificationListener extends NotificationListenerService
     }
 
     void requestPush() {
+        if (manager != null && selfComponent != null) {
+            try {
+                pickController(manager.getActiveSessions(selfComponent));
+                return;
+            } catch (Throwable ignored) {}
+        }
         emitCurrent();
     }
 

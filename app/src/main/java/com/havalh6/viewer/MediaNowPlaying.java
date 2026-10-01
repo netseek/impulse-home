@@ -510,7 +510,7 @@ final class MediaNowPlaying {
     // ------------------------------------------------------------ arbitration
 
     /** Playing beats paused; between equals, projection beats a plain session. */
-    private MediaTrack winner() {
+    MediaTrack winner() {
         MediaTrack best = null;
         int bestScore = Integer.MIN_VALUE;
         // Both projection sources publish null when they go quiet, so a track
@@ -985,10 +985,71 @@ final class MediaNowPlaying {
     }
 
     private String encodeArt(Bitmap bmp) {
-        Bitmap scaled = scaleArt(bmp);
+        Bitmap unboxed = removeLetterbox(bmp);
+        Bitmap scaled = scaleArt(unboxed);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         scaled.compress(Bitmap.CompressFormat.JPEG, ART_JPEG_QUALITY, baos);
         return "data:image/jpeg;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+    }
+
+    /**
+     * Trims black letterbox bars baked into video thumbnails (such as 16:9 videos
+     * returned by YouTube in a 4:3 320x240 frame with ~30px black bars on top and bottom).
+     */
+    private static Bitmap removeLetterbox(Bitmap src) {
+        if (src == null || src.isRecycled()) return src;
+        int w = src.getWidth();
+        int h = src.getHeight();
+        if (w < 16 || h < 16) return src;
+
+        Bitmap soft = src;
+        if (Build.VERSION.SDK_INT >= 26 && src.getConfig() == Bitmap.Config.HARDWARE) {
+            Bitmap copy = src.copy(Bitmap.Config.ARGB_8888, false);
+            if (copy != null) soft = copy;
+            else return src;
+        }
+
+        int top = 0;
+        int maxScan = h / 4;
+        for (int y = 0; y < maxScan; y++) {
+            boolean allBlack = true;
+            for (int x = 0; x < w; x += 4) {
+                int p = soft.getPixel(x, y);
+                int r = (p >> 16) & 0xff;
+                int g = (p >> 8) & 0xff;
+                int b = p & 0xff;
+                if (r > 25 || g > 25 || b > 25) {
+                    allBlack = false;
+                    break;
+                }
+            }
+            if (!allBlack) break;
+            top = y + 1;
+        }
+
+        int bottom = 0;
+        for (int y = h - 1; y >= h - maxScan; y--) {
+            boolean allBlack = true;
+            for (int x = 0; x < w; x += 4) {
+                int p = soft.getPixel(x, y);
+                int r = (p >> 16) & 0xff;
+                int g = (p >> 8) & 0xff;
+                int b = p & 0xff;
+                if (r > 25 || g > 25 || b > 25) {
+                    allBlack = false;
+                    break;
+                }
+            }
+            if (!allBlack) break;
+            bottom = (h - 1) - y + 1;
+        }
+
+        if (top >= h * 0.05 && bottom >= h * 0.05 && (h - top - bottom) > h / 2) {
+            try {
+                return Bitmap.createBitmap(soft, 0, top, w, h - top - bottom);
+            } catch (Throwable ignored) {}
+        }
+        return soft;
     }
 
     /** Load content/file URIs locally. http(s) is handled by {@link #scheduleArtworkDownload}. */
