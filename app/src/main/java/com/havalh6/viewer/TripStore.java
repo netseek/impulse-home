@@ -6,6 +6,8 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import android.util.Log;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -25,6 +27,7 @@ import java.util.Map;
  * BY over {@code days}, not a table of their own.
  */
 final class TripStore extends SQLiteOpenHelper implements RangeLedger.Store {
+    private static final String TAG = "TripStore";
     static final int DETAIL_TRIPS = 30;
     private static final String DB_NAME = "trips.db";
     static final int ROUTE_POINTS = 300;
@@ -352,12 +355,53 @@ final class TripStore extends SQLiteOpenHelper implements RangeLedger.Store {
         try (Cursor c = getReadableDatabase().rawQuery(
                 "SELECT fuel_pct_end, soc_end, end_lat, end_lon, end_ms FROM trips ORDER BY start_ms DESC LIMIT 1", null)) {
             if (!c.moveToFirst()) return null;
-            return new Parked(c.isNull(0) ? Double.NaN : c.getDouble(0), c.isNull(1) ? Double.NaN : c.getDouble(1),
-                    c.isNull(2) ? Double.NaN : c.getDouble(2), c.isNull(3) ? Double.NaN : c.getDouble(3), c.getLong(4));
+            double fuel = c.isNull(0) ? Double.NaN : c.getDouble(0);
+            double soc = c.isNull(1) ? Double.NaN : c.getDouble(1);
+            double lat = c.isNull(2) ? Double.NaN : c.getDouble(2);
+            double lon = c.isNull(3) ? Double.NaN : c.getDouble(3);
+            long endMs = c.getLong(4);
+
+            // If a recharge or refuel occurred after the trip ended, the battery/fuel level was raised by the stop
+            try (Cursor sc = getReadableDatabase().rawQuery(
+                    "SELECT kind, level_after FROM trip_stops WHERE t >= ? ORDER BY id ASC",
+                    new String[]{String.valueOf(endMs)})) {
+                while (sc.moveToNext()) {
+                    String kind = sc.getString(0);
+                    if (TripStop.CHARGE.equals(kind) && !sc.isNull(1)) soc = sc.getDouble(1);
+                    if (TripStop.REFUEL.equals(kind) && !sc.isNull(1)) fuel = sc.getDouble(1);
+                }
+            } catch (Exception ignored) {}
+
+            return new Parked(fuel, soc, lat, lon, endMs);
         }
     }
 
     void insertStop(long startMs, TripStop stop) {
+        SQLiteDatabase db = getWritableDatabase();
+        try (Cursor c = db.rawQuery(
+                "SELECT id, level_before, level_after, amount FROM trip_stops WHERE (start_ms = ? OR t = ?) AND kind = ? LIMIT 1",
+                new String[]{String.valueOf(startMs), String.valueOf(stop.t), stop.kind})) {
+            if (c.moveToFirst()) {
+                long existingId = c.getLong(0);
+                double before = c.isNull(1) ? stop.before : Math.min(c.getDouble(1), stop.before);
+                double after = c.isNull(2) ? stop.after : Math.max(c.getDouble(2), stop.after);
+                double amount = stop.amount;
+                if (TripStop.CHARGE.equals(stop.kind)) {
+                    amount = Math.max(0, after - before);
+                } else if (TripStop.REFUEL.equals(stop.kind)) {
+                    amount = Math.max(0, (after - before) * 55.0 / 100.0);
+                }
+                ContentValues v = new ContentValues();
+                putReal(v, "level_before", before);
+                putReal(v, "level_after", after);
+                putReal(v, "amount", amount);
+                db.update("trip_stops", v, "id = ?", new String[]{String.valueOf(existingId)});
+                return;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "stop check failed", e);
+        }
+
         ContentValues v = new ContentValues();
         v.put("start_ms", startMs);
         v.put("t", stop.t);
@@ -367,7 +411,7 @@ final class TripStore extends SQLiteOpenHelper implements RangeLedger.Store {
         putReal(v, "level_before", stop.before);
         putReal(v, "level_after", stop.after);
         putReal(v, "amount", stop.amount);
-        getWritableDatabase().insert("trip_stops", null, v);
+        db.insert("trip_stops", null, v);
     }
 
     /**

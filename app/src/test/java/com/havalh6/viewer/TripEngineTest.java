@@ -725,6 +725,52 @@ public class TripEngineTest {
     }
 
     @Test
+    public void multipleLevelsAcrossLongStopDoNotDuplicateCharge() {
+        signal(TripEngine.KEY_SOC, "15", T0 - 1000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        for (long t = T0; t <= T0 + 60_000; t += 1000) engine.tick(t);
+        signal(TripEngine.KEY_READY, "0", T0 + 62_000);
+        long parkTime = T0 + 62_000;
+        for (long t = parkTime; t <= parkTime + TripEngine.MERGE_GAP_MS + 2000; t += 1000) engine.tick(t);
+        signal(TripEngine.KEY_SOC, "69", parkTime + TripEngine.MERGE_GAP_MS + 5000);
+        for (long t = parkTime + TripEngine.MERGE_GAP_MS + 5000; t <= parkTime + TripEngine.MERGE_GAP_MS + 60_000; t += 1000) engine.tick(t);
+        signal(TripEngine.KEY_SOC, "62", parkTime + TripEngine.MERGE_GAP_MS + 70_000);
+        long resume = parkTime + TripEngine.MERGE_GAP_MS + 80_000;
+        signal(TripEngine.KEY_READY, "1", resume);
+        signal(TripEngine.KEY_SPEED, "30", resume);
+        for (long t = resume; t <= resume + TripEngine.LEVEL_SETTLE_MS + 2000; t += 1000) {
+            signal(TripEngine.KEY_SOC, "62", t);
+            engine.tick(t);
+        }
+
+        assertEquals(1, stops.size());
+    }
+
+    @Test
+    public void standingChargeDoesNotDuplicateAfterSettle() {
+        signal(TripEngine.KEY_SOC, "20", T0 - 1000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "0", T0);
+        // Arm standing baseline (60s)
+        for (long t = T0; t <= T0 + TripEngine.STAND_ARM_MS + 2000; t += 1000) engine.tick(t);
+        // Charge starts to 90%
+        long chargeTime = T0 + TripEngine.STAND_ARM_MS + 5000;
+        signal(TripEngine.KEY_SOC, "90", chargeTime);
+        // Let it settle (STAND_SETTLE_MS = 45s)
+        for (long t = chargeTime; t <= chargeTime + TripEngine.STAND_SETTLE_MS + 2000; t += 1000) engine.tick(t);
+        assertEquals(1, stops.size());
+
+        // Car remains standing still with READY on for another 5 minutes, receiving periodic SOC telemetry
+        for (long t = chargeTime + TripEngine.STAND_SETTLE_MS + 5000; t <= chargeTime + TripEngine.STAND_SETTLE_MS + 300_000; t += 10_000) {
+            signal(TripEngine.KEY_SOC, "90", t);
+            engine.tick(t);
+        }
+        // Must still be only 1 stop, not 6+ stops!
+        assertEquals(1, stops.size());
+    }
+
+    @Test
     public void noTripWithoutReady() {
         signal(TripEngine.KEY_SPEED, "60", T0);
         engine.tick(T0 + 1000);

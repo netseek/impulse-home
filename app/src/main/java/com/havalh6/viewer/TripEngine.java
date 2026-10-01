@@ -371,7 +371,9 @@ final class TripEngine {
             return;
         }
         double parked = fuel ? parkedFuelPct : parkedSoc;
-        boolean duringStop = !Boolean.TRUE.equals(ready) || (resumedAt > 0 && t - resumedAt <= LEVEL_SETTLE_MS);
+        // Electric battery charging never occurs while driving (ready == true).
+        // Only fuel float gauges require settle time after setting off.
+        boolean duringStop = !Boolean.TRUE.equals(ready) || (fuel && resumedAt > 0 && t - resumedAt <= LEVEL_SETTLE_MS);
         // Only return when the parked arm really owns the reading: the settle window after
         // setting off is also duringStop, and with no READY-off baseline there is nothing
         // for it to compare against -- a fill that early must still reach the in-trip arm.
@@ -433,8 +435,16 @@ final class TripEngine {
     }
 
     private void flushCandidates() {
-        if (refuelCandidate != null) emitStop(refuelCandidate);
-        if (chargeCandidate != null) emitStop(chargeCandidate);
+        if (refuelCandidate != null) {
+            emitStop(refuelCandidate);
+            if (!Double.isNaN(parkedFuelPct)) parkedFuelPct = refuelCandidate.after;
+            if (!Double.isNaN(standFuelPct)) standFuelPct = refuelCandidate.after;
+        }
+        if (chargeCandidate != null) {
+            emitStop(chargeCandidate);
+            if (!Double.isNaN(parkedSoc)) parkedSoc = chargeCandidate.after;
+            if (!Double.isNaN(standSoc)) standSoc = chargeCandidate.after;
+        }
         refuelCandidate = null;
         chargeCandidate = null;
         candGrewAt = 0;
@@ -442,7 +452,22 @@ final class TripEngine {
 
     /** To the open trip, or held for the next one when the car is parked between trips. */
     private void emitStop(TripStop stop) {
-        if (st.open) listener.onStop(st.startMs, stop); else pendingStops.add(stop);
+        if (st.open) {
+            listener.onStop(st.startMs, stop);
+        } else {
+            boolean merged = false;
+            for (TripStop p : pendingStops) {
+                if (stop.kind.equals(p.kind)) {
+                    if (stop.after > p.after) {
+                        p.after = stop.after;
+                        p.amount = amountOf(TripStop.REFUEL.equals(stop.kind), p.before, stop.after);
+                    }
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) pendingStops.add(stop);
+        }
     }
 
     /** Called by the recorder about once a second. */
@@ -589,7 +614,11 @@ final class TripEngine {
         st.wasMoving = !Double.isNaN(kmh) && kmh > STOP_ARMED_ABOVE_KMH;
         listener.onTripOpened(t);
         // Stops noticed while no trip was open (parked between trips) belong to this one.
-        for (TripStop stop : pendingStops) listener.onStop(t, stop);
+        for (TripStop stop : pendingStops) {
+            listener.onStop(t, stop);
+            if (TripStop.CHARGE.equals(stop.kind)) parkedSoc = Double.NaN;
+            if (TripStop.REFUEL.equals(stop.kind)) parkedFuelPct = Double.NaN;
+        }
         pendingStops.clear();
     }
 
