@@ -22,8 +22,9 @@ import path from 'node:path';
 
 const SRC = 'assets/_source/clima';
 const OUT = 'assets/ui/clima';
-// Purpose-made dark renders. A mode with one here uses it for night instead of
-// the remapped light render; the rest fall back to remap().
+// Dark renders, one per mode. Each replaces the remapped light image for night.
+// The backdrop is removed by a flood fill from the border: the cabin floor is
+// almost as dark as that backdrop, so a brightness key punches the floor out.
 const NIGHT_SRC = 'assets/_source/clima/night';
 const MODES = ['off', 'face', 'facefeet', 'feet', 'feetglass'];
 const height = Number((process.argv.find((a) => a.startsWith('--height=')) || '--height=480').split('=')[1]);
@@ -112,8 +113,8 @@ for (const mode of MODES) {
 }
 
 // A dark render sits on its own opaque backdrop, which reads as a box on the
-// translucent popup. Measure that backdrop from the border (it differs per
-// render) and colour-to-alpha against it, so the popup's surface shows through.
+// translucent popup. Flood-fill that backdrop in from the border and drop it,
+// leaving the cabin — including the dark floor — opaque.
 async function buildNightRender(src, out) {
   const { data, info } = await sharp(src).resize({ height, fit: 'inside' })
     .removeAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -124,19 +125,52 @@ async function buildNightRender(src, out) {
     for (let c = 0; c < 3; c++) border[c].push(data[(y * w + x) * 3 + c]);
   }
   const bg = border.map((v) => v.sort((a, b) => a - b)[v.length >> 1]);
+  const nearBg = (i) => {
+    for (let c = 0; c < 3; c++) if (Math.abs(data[i + c] - bg[c]) > 18) return false;
+    return true;
+  };
+  const drop = new Uint8Array(w * h);
+  const queue = [];
+  const push = (x, y) => {
+    const p = y * w + x;
+    if (drop[p] || !nearBg(p * 3)) return;
+    drop[p] = 1;
+    queue.push(p);
+  };
+  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+  for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+  for (let q = 0; q < queue.length; q++) {
+    const p = queue[q], x = p % w, y = (p - x) / w;
+    if (x > 0) push(x - 1, y);
+    if (x + 1 < w) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y + 1 < h) push(x, y + 1);
+  }
   const rgba = Buffer.alloc(w * h * 4);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = (y * w + x) * 3, o = (y * w + x) * 4;
-    let a = 0;
-    // Backdrop noise (a few levels either side) keys out rather than hazing.
-    for (let c = 0; c < 3; c++) a = Math.max(a, Math.max(0, data[i + c] - bg[c] - 4) / (255 - bg[c]));
-    for (let c = 0; c < 3; c++) {
-      rgba[o + c] = a > 1 / 255 ? Math.max(0, Math.min(255, Math.round(bg[c] + (data[i + c] - bg[c]) / a))) : 0;
-    }
+    const p = y * w + x, i = p * 3, o = p * 4;
     const d = Math.min(y, h - 1 - y, x, w - 1 - x);
-    rgba[o + 3] = Math.round(a * (d >= FEATHER ? 1 : d / FEATHER) * 255);
+    const edge = d >= FEATHER ? 1 : d / FEATHER;
+    const a = drop[p] ? 0 : edge;
+    rgba[o] = Math.round(data[i] * a);
+    rgba[o + 1] = Math.round(data[i + 1] * a);
+    rgba[o + 2] = Math.round(data[i + 2] * a);
+    rgba[o + 3] = Math.round(a * 255);
   }
-  await sharp(rgba, { raw: { width: w, height: h, channels: 4 } })
+  const blurred = await sharp(rgba, { raw: { width: w, height: h, channels: 4 } })
+    .blur(0.6).ensureAlpha().raw().toBuffer();
+  const straight = Buffer.alloc(w * h * 4);
+  for (let p = 0; p < w * h; p++) {
+    const o = p * 4;
+    const a = blurred[o + 3] / 255;
+    straight[o + 3] = blurred[o + 3];
+    if (a > 1 / 255) {
+      straight[o] = Math.max(0, Math.min(255, Math.round(blurred[o] / a)));
+      straight[o + 1] = Math.max(0, Math.min(255, Math.round(blurred[o + 1] / a)));
+      straight[o + 2] = Math.max(0, Math.min(255, Math.round(blurred[o + 2] / a)));
+    }
+  }
+  await sharp(straight, { raw: { width: w, height: h, channels: 4 } })
     .webp({ quality: 82, alphaQuality: 90 }).toFile(out);
   console.log(`  night render ${path.basename(src)} bg ${bg.join(',')}`);
 }
