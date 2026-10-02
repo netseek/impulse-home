@@ -1,0 +1,110 @@
+name: Release
+
+# Push a tag to cut a release:   git tag v1.2.0 && git push origin v1.2.0
+# A tag containing a hyphen (v1.2.0-preview.1) is published as a pre-release.
+# See docs/RELEASING.md for the one-time setup (signing key and secrets).
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Only release commits that are on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Work out the version
+        id: v
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          BASE="${VER%%-*}"
+          IFS=. read -r MA MI PA <<< "$BASE"
+          # Strict on purpose: later steps interpolate this value into shell commands.
+          if [[ ! "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::tag must look like v1.2.3 or v1.2.3-preview.1"; exit 1
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "code=$((MA * 10000 + MI * 100 + PA))" >> "$GITHUB_OUTPUT"
+          if [[ "$VER" == *-* ]]; then echo "channel=preview" >> "$GITHUB_OUTPUT"; else echo "channel=stable" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Fetch the pinned asset bundle
+        env:
+          GH_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+        run: node scripts/fetch-assets.mjs
+
+      - name: Decode the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Build and sign
+        env:
+          SIGNING_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --console=plain \
+            -PappVersionName="${{ steps.v.outputs.version }}" \
+            -PappVersionCode="${{ steps.v.outputs.code }}"
+          cp app/build/outputs/apk/release/app-release.apk impulse-home.apk
+
+      - name: Verify the signature
+        id: sig
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose impulse-home.apk
+          SIGNER=$("$APKSIGNER" verify --print-certs impulse-home.apk \
+            | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')
+          echo "signer=$SIGNER" >> "$GITHUB_OUTPUT"
+          echo "Signed by $SIGNER"
+          if [ -n "${{ vars.RELEASE_SIGNER_SHA256 }}" ] && [ "$SIGNER" != "${{ vars.RELEASE_SIGNER_SHA256 }}" ]; then
+            echo "::error::signed with an unexpected key"; exit 1
+          fi
+
+      - name: Release notes and manifest
+        run: |
+          PREV=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          RANGE="${PREV:+$PREV..}$GITHUB_REF_NAME"
+          git log --no-merges --format='- %s' "$RANGE" > NOTES.md
+          node scripts/make-latest-json.mjs \
+            --apk impulse-home.apk \
+            --version "${{ steps.v.outputs.version }}" \
+            --code "${{ steps.v.outputs.code }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer "${{ steps.sig.outputs.signer }}" \
+            --channel "${{ steps.v.outputs.channel }}" \
+            --notes-file NOTES.md \
+            --out latest.json
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FLAGS=""
+          if [ "${{ steps.v.outputs.channel }}" = "preview" ]; then FLAGS="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" impulse-home.apk latest.json \
+            --title "Impulse Home ${{ steps.v.outputs.version }}" \
+            --notes-file NOTES.md $FLAGS

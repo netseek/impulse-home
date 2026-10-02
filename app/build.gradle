@@ -2,6 +2,11 @@ plugins {
     id "com.android.application"
 }
 
+// Version comes from the release pipeline (-PappVersionName / -PappVersionCode).
+// The defaults only apply to local builds.
+def appVersionName = (findProperty("appVersionName") ?: "1.0.0").toString()
+def appVersionCode = (findProperty("appVersionCode") ?: "1").toString().toInteger()
+
 android {
     namespace "com.havalh6.viewer"
     compileSdk 36
@@ -10,28 +15,40 @@ android {
         applicationId "com.havalh6.viewer"
         minSdk 23
         targetSdk 28
-        versionCode 1
-        versionName "1.0.0"
+        versionCode appVersionCode
+        versionName appVersionName
     }
 
+    // Debug builds use the default ~/.android/debug.keystore that AGP generates.
+    // No keystore of any kind lives in this repository: the release key exists only
+    // as a CI secret, and release builds are signed through these variables.
     signingConfigs {
-        debug {
-            storeFile file("debug.keystore")
-            storePassword "android"
-            keyAlias "androiddebugkey"
-            keyPassword "android"
+        release {
+            def keystorePath = System.getenv("SIGNING_KEYSTORE_FILE")
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+            }
         }
     }
 
     buildTypes {
-        debug {
-            signingConfig signingConfigs.debug
-        }
         release {
+            // Without SIGNING_KEYSTORE_FILE this yields an UNSIGNED apk, on purpose.
+            signingConfig signingConfigs.release.storeFile != null ? signingConfigs.release : null
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
+    }
+
+    lint {
+        // targetSdk 28 is deliberate: the app runs on an Android 9 head unit and
+        // relies on pre-29 behaviour. This rule is a Google Play policy and the
+        // app is never published there, so it would only block release builds.
+        disable "ExpiredTargetSdkVersion"
     }
 
     sourceSets.main.assets.srcDir("$buildDir/generated/viewerAssets")

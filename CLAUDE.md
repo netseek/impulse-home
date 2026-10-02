@@ -6,6 +6,20 @@ Adreno 640**, WebView 91, driving a 1920x720 panel. Everything below was
 exists because several rounds of plausible-sounding optimisation were undone by
 a single measurement.
 
+## Repository layout note: assets are fetched, not tracked
+
+This repository holds code only. The 3D models, textures and images under
+`assets/` come from a pinned bundle (`assets.lock.json`, fetched by
+`node scripts/fetch-assets.mjs`) and are gitignored. The exception is the
+JavaScript that lives there (`assets/clock-*.js`), which is source and is tracked.
+
+Everything below that says "move a retired asset to `assets/_archive/`" describes
+the maintainer's full working tree, where the originals and `_archive`/`_backup`/
+`_source`/`_blender` live. They never enter the bundle (path segments starting
+with `_` are excluded), so they never reach the APK or this repository. A build
+without the bundle compiles and passes its tests but starts without the car.
+Release flow: `docs/RELEASING.md`.
+
 ## The one rule
 
 **Measure on the car before and after. Never optimise from reasoning alone.**
