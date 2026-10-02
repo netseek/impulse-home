@@ -58,8 +58,11 @@ updates in place and keeps its data (settings, trip history) instead of having t
 
 It was made once with `apksigner rotate` (old signer: the debug keystore; new signer: the release
 keystore) and holds certificates and signatures only: nothing secret, so it is committed. The release
-workflow applies it to every build (`apksigner sign --lineage`, without the v1 signature, which cannot
-carry a rotation) and refuses to publish an APK whose lineage has fewer than two signers.
+workflow applies it to every build with `apksigner sign --lineage` and refuses to publish an APK whose
+lineage has fewer than two signers. Only the v3 signature scheme can carry a rotation (v1 and v2 would
+demand the old private key), so the APK is **v3-only and needs Android 9 or newer**, which is every
+head unit this app targets. Verify such an APK with `apksigner verify --min-sdk-version 28`; the default
+check assumes the manifest's minSdk 23 and rejects an APK without v1.
 
 Never delete or regenerate it. A device that has accepted a lineage-signed build only takes updates
 signed by the last key in the chain. To rotate again, extend the chain with

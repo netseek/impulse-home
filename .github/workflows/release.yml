@@ -78,10 +78,10 @@ jobs:
       - name: Sign with the release key and the rotation lineage
         # The first builds of this app were signed with a debug key. release/signing-lineage.bin
         # proves to Android that the release key is that key's successor, so a device that still
-        # has the old build can update in place and keep its data. The v1 (JAR) signature cannot
-        # carry a rotation and would demand the old private key, so it is turned off explicitly
-        # (--min-sdk-version alone does not: apksigner still insists on the oldest signer);
-        # every head unit this app targets is Android 9 or newer.
+        # has the old build can update in place and keep its data. Only the v3 signature scheme
+        # can carry a rotation: v1 and v2 would demand the old private key, so both are turned
+        # off and the APK is v3-only, which Android 9 and newer read (every head unit this app
+        # targets). Found by trying each option on throwaway keys, not by reading the docs.
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -92,15 +92,16 @@ jobs:
           "${BT}apksigner" sign \
             --ks "$RUNNER_TEMP/release.jks" --ks-key-alias "$SIGNING_KEY_ALIAS" \
             --ks-pass env:SIGNING_STORE_PASSWORD --key-pass env:SIGNING_KEY_PASSWORD \
-            --lineage release/signing-lineage.bin --min-sdk-version 24 --v1-signing-enabled false \
+            --lineage release/signing-lineage.bin --rotation-min-sdk-version 28 \
+            --min-sdk-version 28 --v1-signing-enabled false --v2-signing-enabled false \
             --out impulse-home.apk aligned.apk
 
       - name: Verify the signature
         id: sig
         run: |
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --verbose impulse-home.apk
-          SIGNER=$("$APKSIGNER" verify --print-certs impulse-home.apk \
+          "$APKSIGNER" verify --verbose --min-sdk-version 28 impulse-home.apk
+          SIGNER=$("$APKSIGNER" verify --print-certs --min-sdk-version 28 impulse-home.apk \
             | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')
           echo "signer=$SIGNER" >> "$GITHUB_OUTPUT"
           echo "Signed by $SIGNER"
