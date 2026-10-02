@@ -18155,59 +18155,6 @@ class Component extends DCLogic {
     if (this.requestRender) this.requestRender(2, true);
   }
 
-  // The directional shadow map is baked once (autoUpdate is off). Entering
-  // x-ray is one of the bakes: the ghost becomes the caster and needsUpdate
-  // fires a single frame. The wheels both cast into that map and receive it,
-  // so the bake freezes the rim at the angle it had during the desktop switch.
-  // The wheel then rolls on under a shadow that does not — a dark disc on the
-  // face. Measured on the car, Drive desktop, 18 km/h, x-ray just opened.
-  //
-  // While x-ray is up and the car is actually moving, the wheel meshes stop
-  // receiving that map. The floor shadow is the contact bake, not this map, so
-  // the ground is unchanged. Stopping (or leaving x-ray) gives receiving back;
-  // a stop under x-ray rebakes once so the parked face matches the rim. A bake
-  // while still rolling would freeze the current angle, which is the bug.
-  _eachWheelShadowMesh(fn) {
-    const seen = this._wheelShadowSeen || (this._wheelShadowSeen = new Set());
-    seen.clear();
-    const touch = (m) => {
-      if (!m || !m.isMesh || seen.has(m)) return;
-      seen.add(m);
-      fn(m);
-    };
-    [this._allWheels, this._tireWheels, this._rimWheels, this._spokesWheels,
-     this._otherRimWheels, this._customClonedWheels].forEach((list) => {
-      (list || []).forEach((w) => {
-        touch((w && w.mesh) ? w.mesh : ((w && w.c) ? w.c : w));
-      });
-    });
-    const brakes = this._steerOnlyMeshes;
-    if (brakes) ['fl', 'fr', 'rl', 'rr'].forEach((k) => (brakes[k] || []).forEach(touch));
-  }
-
-  _syncWheelReceivedShadow(xrayNow) {
-    // 0.005 units is the speed deadband (0.2 km/h). A real stop is always 0.
-    // xrayNow: the toggle runs inside the setState updater, before
-    // state.powertrainOn has committed. Pass the value that is about to land.
-    const moving = Math.abs(this._currentMotionSpeed()) > 0.005;
-    const xray = xrayNow !== undefined ? !!xrayNow : !!(this.state && this.state.powertrainOn);
-    const drop = xray && moving;
-    if (drop === this._wheelRecvDropped && !drop) return;
-    this._eachWheelShadowMesh((m) => {
-      if (drop) {
-        if (m._recvShadowWas === undefined) m._recvShadowWas = !!m.receiveShadow;
-        if (m.receiveShadow) m.receiveShadow = false;
-      } else if (m._recvShadowWas !== undefined) {
-        m.receiveShadow = m._recvShadowWas;
-        delete m._recvShadowWas;
-      }
-    });
-    if (this._wheelRecvDropped && !drop && xray && this.renderer) {
-      this.renderer.shadowMap.needsUpdate = true;
-    }
-    this._wheelRecvDropped = drop;
-  }
-
   // Apply steer + roll in WORLD space about each wheel's shared axle centre.
   //   newWorld = T(P) × R_steer × R_roll × T(-P) × _initWorld
   // P = wheel-cluster centre (so all 7 sub-meshes pivot on the same axle — no
@@ -18255,7 +18202,6 @@ class Component extends DCLogic {
     const _p = scratch.position, _q = scratch.quaternion, _s = scratch.scale;
 
     const speed = this._currentMotionSpeed();
-    this._syncWheelReceivedShadow();
     const speedKmh = Math.abs(speed) * 40;
     // The handover speed is no longer a fixed 30 -> 60 km/h. It now tracks the
     // speed at which THIS rim, at the frame rate we are actually getting,
@@ -32009,9 +31955,6 @@ class Component extends DCLogic {
     // off, so without this the map keeps the solid car's silhouette until some
     // unrelated event rebakes it -- and when one does, mid-x-ray, the floor
     // shadow vanishes outright. Rebake now, against what is actually on screen.
-    // Drop wheel receiving first when the car is already rolling, so this bake
-    // cannot stamp the current rim angle onto the wheel face.
-    this._syncWheelReceivedShadow(true);
     if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
     return true;
   }
@@ -32113,9 +32056,7 @@ class Component extends DCLogic {
       // Casters are back (or their materials are). Pairs with the needsUpdate
       // in _useGhostBodyModel: requestRender alone reuses the baked map, so
       // leaving x-ray would otherwise keep whatever was baked while the shell
-      // was hidden -- i.e. no shadow under the car. Restore wheel receiving
-      // before that bake so the solid rim is in the map it is about to sample.
-      this._syncWheelReceivedShadow(false);
+      // was hidden -- i.e. no shadow under the car.
       if (this.renderer) this.renderer.shadowMap.needsUpdate = true;
       if (!this._ghostMats) return;
       this._ghostMats.forEach((e) => {
