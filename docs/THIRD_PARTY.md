@@ -1,6 +1,6 @@
 # Third-party material
 
-Impulse Home bundles the components below. Each stays under its own license.
+Impulse Launcher bundles the components below. Each stays under its own license.
 
 ## Code, vendored in `vendor/`
 
@@ -26,6 +26,8 @@ Impulse Home bundles the components below. Each stays under its own license.
 | Blower and recirculation icons | the [Impulse](https://github.com/bobaoapae/haval-app-tool-multimidia) project | same project (AGPL-3.0) |
 | Seat glyph (`assets/ui/icons/clima/seat.svg`) | "heated seat" by **Thuy Nguyen**, from the [Noun Project](https://thenounproject.com/) | Noun Project license; the author must be credited wherever the icon is shown publicly |
 | Weather forecast and air quality | [Open-Meteo](https://open-meteo.com/) | CC BY 4.0; the free API is for non-commercial use. The viewer sends only a position rounded to two decimals (about 1 km) and no API key. |
+| Map tiles, with the "© OpenStreetMap contributors" credit drawn on every map | [OpenStreetMap](https://www.openstreetmap.org/copyright) | ODbL 1.0; the tile usage policy applies (identifying `User-Agent`, caching, no bulk prefetch) |
+| Place names (reverse geocoding) | [Nominatim](https://nominatim.org/) on OpenStreetMap data | ODbL 1.0; the usage policy applies (identifying `User-Agent`, at most one request a second) |
 
 The OEM head-unit APKs used while studying the vehicle are a visual reference
 only; nothing extracted from them is shipped.

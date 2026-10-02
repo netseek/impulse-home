@@ -1,6 +1,6 @@
-# Impulse Home
+# Impulse Launcher
 
-![Impulse Home on the Haval H6 head unit](docs/images/hero.webp)
+![Impulse Launcher on the Haval H6 head unit](docs/images/hero.webp)
 
 A live 3D home screen for the **Haval H6** head unit (Snapdragon SA8155, 1920x720
 panel, Android 9 WebView). It draws your car, its doors, lights and wheels, and puts
@@ -8,7 +8,7 @@ climate, energy, trips and driving controls next to it, all fed in real time fro
 the vehicle bus.
 
 It is part of the [Impulse](https://github.com/bobaoapae/haval-app-tool-multimidia)
-ecosystem: Impulse reads and writes the vehicle bus, Impulse Home draws it.
+ecosystem: Impulse reads and writes the vehicle bus, Impulse Launcher draws it.
 
 > Not affiliated with or endorsed by GWM / Haval. Credits and trademarks:
 > [THIRD_PARTY.md](docs/THIRD_PARTY.md). The screenshots below come from an emulator with
@@ -40,7 +40,7 @@ Tap a widget to open it as a larger **popup**.
 
 Dual-zone temperature, fan speed, seat heating and ventilation, AUTO, A/C, SYNC and
 defrost, plus cabin air quality, a four-day weather forecast and comfort intensity. With
-Impulse installed, Impulse Home can show its own panel when you press the car's climate
+Impulse installed, Impulse Launcher can show its own panel when you press the car's climate
 controls, instead of the stock one.
 
 ![Climate popup](docs/images/clima.webp)
@@ -70,9 +70,9 @@ assumptions wrong.
 
 ## Install
 
-**Prerequisite:** [Impulse](https://github.com/bobaoapae/haval-app-tool-multimidia) must be installed on the head unit. Impulse Home gets its vehicle data from it, so install Impulse first.
+**Prerequisite:** [Impulse](https://github.com/bobaoapae/haval-app-tool-multimidia) must be installed on the head unit. Impulse Launcher gets its vehicle data from it, so install Impulse first.
 
-**From Impulse (recommended).** Open Impulse -> *Instalar Apps* -> **Impulse Home**. Impulse
+**From Impulse (recommended).** Open Impulse -> *Instalar Apps* -> **Impulse Launcher**. Impulse
 downloads the latest signed release and offers to set it up.
 
 **By hand.** Download `impulse-home.apk` from the [Releases](../../releases) page, then:
@@ -86,6 +86,19 @@ adb shell pm install -r -i com.autolink.installer /data/local/tmp/viewer.apk
 required: the head unit refuses a plain install of this package.
 
 Releases are signed with one key; see [SECURITY.md](docs/SECURITY.md) to verify it.
+
+## Permissions and privacy
+
+On first launch Android asks for **location**. It is optional and everything else works without it.
+Granting it enables:
+
+- the weather forecast: the position is rounded to about 1 km before it goes to Open-Meteo;
+- place names for trips and the navigation card: the precise position goes to OpenStreetMap's
+  Nominatim service;
+- recording the route and altitude of each trip, which stays on the head unit.
+
+Trip maps also download OpenStreetMap tiles. The details are in
+[signals-and-limits](docs/vehicle-data/signals-and-limits.md#what-leaves-the-head-unit).
 
 ## Repository layout
 

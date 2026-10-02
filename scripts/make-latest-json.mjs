@@ -37,7 +37,7 @@ const manifest = {
   signerSha256: signer,
   bytes: statSync(apk).size,
   channel: opt('channel', 'stable'),
-  // Version of the Impulse <-> Impulse Home contract (<meta-data impulse.api>).
+  // Version of the Impulse <-> Impulse Launcher contract (<meta-data impulse.api>).
   impulseApi: 2,
   notes: opt('notes-file') ? readFileSync(opt('notes-file'), 'utf8').trim() : '',
   publishedAt: new Date().toISOString(),

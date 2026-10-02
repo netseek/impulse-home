@@ -36,6 +36,20 @@ an outdoor PM2.5 figure are the external dependency: they come from
 (about 1 km) and no key, and the manifest requests `INTERNET` and the location permissions for it.
 Nothing else about the car or the driver is part of that request.
 
+## What leaves the head unit
+
+Three kinds of request go out, all to open services without an account or an API key. Each one needs the
+location permission except the map tiles, which only need the network. If the permission is denied the
+weather and place-name requests are not made, and no route is recorded.
+
+| Request | To | What it carries |
+|---|---|---|
+| Weather forecast and outdoor PM2.5 | `api.open-meteo.com`, `air-quality-api.open-meteo.com` | The position **rounded to two decimals** (about 1 km). Refreshed on a time limit, and again when the position moves by more than about 5 km. |
+| Place names for trips and the navigation card | `nominatim.openstreetmap.org` (OpenStreetMap) | The **precise position** (six decimals) of the trip ends and of the idle card, with an identifying `User-Agent`. At most one request a second for the whole process; for the idle card, only after the car has moved at least about 120 m. |
+| Trip map snapshots and the interactive map | `tile.openstreetmap.org` | The coordinates of the map tiles that cover the route, which reveal the area. Tiles are cached for 30 days; no bulk prefetch. |
+
+The route, the altitude and every trip are stored only in the head unit's own database.
+
 ## Energy limitations
 
 The car supplies no history or named periods. History exists because the viewer records it

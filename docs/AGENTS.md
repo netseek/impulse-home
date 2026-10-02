@@ -6,7 +6,7 @@ knowledge lives under [`docs/`](README.md), organised by topic; open only what t
 
 ## What this is
 
-Impulse Home is a 3D home screen for the Haval H6 head unit (Snapdragon SA8155 / Adreno 640, a
+Impulse Launcher is a 3D home screen for the Haval H6 head unit (Snapdragon SA8155 / Adreno 640, a
 WebView 91 on Android 9, a 1920x720 panel). A single `index.html` (React and three.js, no bundler)
 runs inside a thin Android shell (`app/`), and the vehicle bus reaches it through the
 [Impulse](https://github.com/bobaoapae/haval-app-tool-multimidia) app. The code is AGPL-3.0; the 3D
