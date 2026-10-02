@@ -98,9 +98,13 @@ jobs:
 
       - name: Release notes and manifest
         run: |
-          PREV=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)
-          RANGE="${PREV:+$PREV..}$GITHUB_REF_NAME"
-          git log --no-merges --format='- %s' "$RANGE" > NOTES.md
+          # Only version tags count as the previous release: the channel-* tags are moving pointers.
+          PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          if [ -z "$PREV" ]; then
+            echo "First public release." > NOTES.md
+          else
+            git log --no-merges --format='- %s' "$PREV..$GITHUB_REF_NAME" > NOTES.md
+          fi
           node scripts/make-latest-json.mjs \
             --apk impulse-home.apk \
             --version "${{ steps.v.outputs.version }}" \
