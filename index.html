@@ -6104,7 +6104,9 @@ window.HavalSplash = (function () {
     .hv-energy-ltrack > i.mark { width:2px; margin-left:-1px; background:#fff; } .hv-energy-ltrack > i.mark.off { display:none; }
     /* HISTÓRICO (owner, 2026-09-14): three topics, a comparison strip, electric / fuel bars. */
     .hv-energy-chartpane > .hv-energy-zlabel { opacity:1; }
-    .hv-energy-stack { flex:1; width:100%; max-width:34px; display:flex; flex-direction:column; justify-content:flex-end; }
+    .hv-energy-stack { position:relative; flex:1; width:100%; max-width:34px; display:flex; flex-direction:column; justify-content:flex-end; }
+    .hv-energy-stack > em { position:absolute; left:50%; transform:translate(-50%,-3px); font:600 9px/1 var(--hv-font); font-style:normal; letter-spacing:.02em; opacity:.62; pointer-events:none; white-space:nowrap; }
+    .hv-energy-col.today .hv-energy-stack > em { opacity:.9; }
     .hv-energy-stack > i { display:block; width:100%; }
     .hv-energy-stack > i.fuel { border-radius:4px 4px 0 0; background:#f2994a; }
     .hv-energy-stack > i.ev { border-radius:0 0 1px 1px; background:#2fbf71; }
@@ -7682,7 +7684,7 @@ window.HavalSplash = (function () {
                     <sc-if value="{{ wg.consumptionHistShowChart }}" hint-placeholder-val="{{ true }}">
                       <div class="hv-energy-chartpane">
                         <p class="hv-energy-zlabel"><span>{{ wg.consumptionHistorySummary }}</span><span class="hv-energy-tlegend"><i class="fuel"></i>combustão<i class="ev"></i>elétrico</span></p>
-                        <div class="hv-energy-chart" role="img" aria-label="Distância por período"><sc-for list="{{ wg.consumptionHistoryBars }}" as="hb" hint-placeholder-count="7"><div class="hv-energy-col {{ hb.cls }}"><div class="hv-energy-stack"><i class="fuel" style="{{ hb.fuelStyle }}"></i><i class="ev" style="{{ hb.evStyle }}"></i></div><small>{{ hb.label }}</small></div></sc-for></div>
+                        <div class="hv-energy-chart" role="img" aria-label="Distância por período"><sc-for list="{{ wg.consumptionHistoryBars }}" as="hb" hint-placeholder-count="7"><div class="hv-energy-col {{ hb.cls }}"><div class="hv-energy-stack"><i class="fuel" style="{{ hb.fuelStyle }}"></i><i class="ev" style="{{ hb.evStyle }}"></i><em style="{{ hb.valStyle }}">{{ hb.val }}</em></div><small>{{ hb.label }}</small></div></sc-for></div>
                       </div>
                     </sc-if>
                     <sc-if value="{{ wg.consumptionHistShowData }}" hint-placeholder-val="{{ false }}">
@@ -8137,7 +8139,7 @@ window.HavalSplash = (function () {
             <sc-if value="{{ focusedConsumptionHistShowChart }}" hint-placeholder-val="{{ true }}">
               <div class="hv-energy-chartpane">
                 <p class="hv-energy-zlabel"><span>{{ focusedConsumptionHistorySummary }}</span><span class="hv-energy-tlegend"><i class="fuel"></i>combustão<i class="ev"></i>elétrico</span></p>
-                <div class="hv-energy-chart" role="img" aria-label="Distância por período"><sc-for list="{{ focusedConsumptionHistoryBars }}" as="hb" hint-placeholder-count="7"><div class="hv-energy-col {{ hb.cls }}"><div class="hv-energy-stack"><i class="fuel" style="{{ hb.fuelStyle }}"></i><i class="ev" style="{{ hb.evStyle }}"></i></div><small>{{ hb.label }}</small></div></sc-for></div>
+                <div class="hv-energy-chart" role="img" aria-label="Distância por período"><sc-for list="{{ focusedConsumptionHistoryBars }}" as="hb" hint-placeholder-count="7"><div class="hv-energy-col {{ hb.cls }}"><div class="hv-energy-stack"><i class="fuel" style="{{ hb.fuelStyle }}"></i><i class="ev" style="{{ hb.evStyle }}"></i><em style="{{ hb.valStyle }}">{{ hb.val }}</em></div><small>{{ hb.label }}</small></div></sc-for></div>
               </div>
             </sc-if>
             <sc-if value="{{ focusedConsumptionHistShowData }}" hint-placeholder-val="{{ false }}">
@@ -43647,8 +43649,12 @@ class Component extends DCLogic {
       const ev = e.row ? Math.max(0, Math.min(km, Number(e.row.evKm) || 0)) : 0;
       const total = max > 0 && km > 0 ? Math.max(3, km * 100 / max) : 0;
       const evPart = km > 0 ? total * ev / km : 0;
+      // Value over the bar: every bar on a short axis, only the peak and today on a dense one.
+      const showVal = km >= 0.5 && (series.length <= 14 || km === max || i === series.length - 1);
       return {
         cls: i === series.length - 1 ? 'today' : '',
+        val: showVal ? Math.round(km) + ' km' : '',
+        valStyle: 'bottom:' + total.toFixed(1) + '%',
         evStyle: 'height:' + evPart.toFixed(1) + '%',
         fuelStyle: 'height:' + (total - evPart).toFixed(1) + '%',
         label: labelFor(e, i),
@@ -45340,7 +45346,7 @@ class Component extends DCLogic {
       ? this.state.energyRange : '7d';
     const units = m.units;
     const spec = this._energySpec();
-    const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'DEFINIR', 'OUT', 'NOV', 'DEZ'];
+    const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
     let rows;
     let bars;
     if (range === '12m' || range === 'all') {
@@ -45427,18 +45433,20 @@ class Component extends DCLogic {
     const capacity = row(est.capacityMeasured ? 'CAPAC. MEDIDA' : 'CAPAC. NOMINAL',
       isFinite(est.capacityKwh) ? est.capacityKwh.toFixed(1) : '—', 'kWh', true);
     // A plug-in's electric range per charge, against the range GWM declares (WLTP).
+    // First slot is the period's average net consumption, mirroring the fuel block's CONSUMO MÉDIO.
+    const evAvg = row('CONSUMO MÉDIO', this._energyEvText(kwh100, units), this._energyEvUnitLabel(units, true));
     const electric = spec.evRangeKm > 0 ? [
+      evAvg,
       row('DA BATERIA', kwhOut >= 0.05 ? kwhOut.toFixed(1) : '—', 'kWh'),
       row('RECUPERADO', kwhIn >= 0.05 ? kwhIn.toFixed(1) : '—', 'kWh' + recovered),
       row('RECARREGADO', charges > 0 && chargeKwh > 0 ? '≈' + Math.round(chargeKwh) : '—', 'kWh' + times(charges)),
       row('POR CARGA', isFinite(est.perChargeYours) ? '~' + Math.round(est.perChargeYours) : '—', 'km'),
       // Your range per charge as a share of the declared WLTP range for this version.
       row('VS WLTP ' + spec.evRangeKm + ' KM', isFinite(est.declaredShare) ? String(Math.round(est.declaredShare * 100)) : '—', '%'),
-      capacity,
     ] : [
+      evAvg,
       row('DA BATERIA', kwhOut >= 0.05 ? kwhOut.toFixed(1) : '—', 'kWh'),
       row('RECUPERADO', kwhIn >= 0.05 ? kwhIn.toFixed(1) : '—', 'kWh' + recovered),
-      row('LÍQUIDO', this._energyEvText(kwh100, units), this._energyEvUnitLabel(units, true)),
       capacity,
     ];
 
