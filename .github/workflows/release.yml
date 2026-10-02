@@ -19,11 +19,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Only release commits that are on main
+      - name: Only release commits from the right branch
+        # A stable tag (v1.2.0) must be on main. A preview tag (v1.2.0-preview.1)
+        # may come from the preview branch or from main.
         run: |
           git fetch origin main
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
-            || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
+          git fetch origin preview || true
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main 2>/dev/null \
+              || git merge-base --is-ancestor "$GITHUB_SHA" origin/preview 2>/dev/null \
+              || { echo "::error::a preview tag must be on main or preview"; exit 1; }
+          else
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+              || { echo "::error::a stable tag must be on main"; exit 1; }
+          fi
 
       - uses: actions/setup-java@v4
         with:
@@ -111,3 +120,20 @@ jobs:
           gh release create "$GITHUB_REF_NAME" impulse-home.apk latest.json \
             --title "Impulse Home ${{ steps.v.outputs.version }}" \
             --notes-file NOTES.md $FLAGS
+
+      - name: Point the channel at this release
+        # Impulse follows a channel through a URL that never changes:
+        #   .../releases/download/channel-stable/latest.json
+        #   .../releases/download/channel-preview/latest.json
+        # Each channel is a release that holds only latest.json, overwritten here.
+        # It is a pre-release so it never takes the "Latest" badge from a real one.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CH="channel-${{ steps.v.outputs.channel }}"
+          if ! gh release view "$CH" >/dev/null 2>&1; then
+            gh release create "$CH" --prerelease --target "$GITHUB_SHA" \
+              --title "Channel: ${{ steps.v.outputs.channel }}" \
+              --notes "Moving pointer. It holds only latest.json for the ${{ steps.v.outputs.channel }} channel; installable builds are the versioned releases."
+          fi
+          gh release upload "$CH" latest.json --clobber

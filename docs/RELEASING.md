@@ -70,15 +70,26 @@ git tag v1.2.0 && git push origin v1.2.0
 ```
 
 * `v1.2.0` is a stable release; `v1.2.0-preview.1` is a pre-release.
-* `versionCode` is `major*10000 + minor*100 + patch` (1.2.0 -> 10200).
-* The workflow refuses a tag that is not on `main`.
-* It publishes `impulse-home.apk` and `latest.json`. The stable manifest is always at
+* `versionCode` is `major*10000 + minor*100 + patch` (1.2.0 -> 10200). A preview
+  and its stable release share a `versionCode`, so promoting `1.2.0-preview.3` to
+  `1.2.0` is not an upgrade for Android: bump the patch number instead.
+* It publishes `impulse-home.apk` and `latest.json`.
 
-  ```
-  https://github.com/netseek/impulse-home/releases/latest/download/latest.json
-  ```
+## Channels
 
-  GitHub's `latest` skips pre-releases, so a preview channel needs its own URL.
+| Channel | Branch | Tags | Manifest URL (never changes) |
+|---|---|---|---|
+| stable | `main` | `v1.2.0` | `https://github.com/netseek/impulse-home/releases/download/channel-stable/latest.json` |
+| preview | `preview` | `v1.2.0-preview.1` | `https://github.com/netseek/impulse-home/releases/download/channel-preview/latest.json` |
+
+* A stable tag must be on `main`. A preview tag may be on `preview` or `main`.
+* New work lands on `preview`; when it has proven itself, merge `preview` into
+  `main` and tag a stable release.
+* The workflow overwrites `latest.json` on the `channel-<name>` release after every
+  release, so Impulse follows a channel through one fixed URL.
+* The asset bundle needs no channel: every commit pins its own bundle in
+  `assets.lock.json`. A preview commit pins a newer bundle; `main` adopts it when
+  `preview` is merged.
 
 ## Updating on the car
 
