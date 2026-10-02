@@ -10284,16 +10284,16 @@ const DESKTOP_CAM_FLY_SEC = 0.85;
 const CAR_FADE_MS = 320;
 // Desktop swipe: commit once the finger has travelled this share of the
 // panel (even while still touching); one desktop per gesture.
-const DESK_SWIPE_COMMIT_FRAC = 0.3;
-const DESK_SWIPE_SLIDE_MS = 260;
-const DESK_SWIPE_FADE_MS = 220;
+const DESK_SWIPE_COMMIT_FRAC = 0.25;
+const DESK_SWIPE_SLIDE_MS = 180;
+const DESK_SWIPE_FADE_MS = 160;
 // Background swipe: the incoming image's soft leading edge (share of the
 // panel width). The outgoing one stays still underneath -- letting it drift
 // uncovered a strip of the page's own background, which only the new image's
 // translucent feather covered: a light band with a hard edge on Drive -> Lounge.
 const DESK_BG_FEATHER = 0.3;
 // .hv-wallpaper fades its opacity over 0.7 s; hold the incoming pane past it.
-const DESK_WALL_SETTLE_MS = 760;
+const DESK_WALL_SETTLE_MS = 480;
 // How far toward the next view the camera follows the finger before commit.
 const DESK_SWIPE_CAM_LEAD = 0.25;
 // Screen-space dissolve used when x-ray switches on or off.
@@ -13201,9 +13201,9 @@ class Component extends DCLogic {
       || t.closest('.hv-energy-mapmax')
       || t.closest('.hv-media-transport button')
       || t.closest('.hv-driving-chip')
-      || t.closest('.hv-clim [data-ca]')
-      || t.closest('.hv-clim-wheel')
-      || t.closest('.hv-clim-fan')
+      || t.closest('.hv-card-focus .hv-clim [data-ca]:not([data-ca="open"])')
+      || t.closest('.hv-card-focus .hv-clim-wheel')
+      || t.closest('.hv-card-focus .hv-clim-fan')
       || t.closest('.hv-energy button')
       || t.closest('.hv-card-focus-head button')
       || t.closest('.hv-card-focus-head [role="tab"]')
@@ -13218,28 +13218,31 @@ class Component extends DCLogic {
       || t.closest('input[type="range"]'));
   }
 
-  _widgetClickSuppressed() {
-    if (this._widgetSuppressClick) return true;
-    if (this._widgetSuppressClickUntil && Date.now() < this._widgetSuppressClickUntil) return true;
-    if (this._desktopClickSuppressed && this._desktopClickSuppressed()) return true;
+  _isDeskSwitchingOrRecent() {
+    const now = Date.now();
     if (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx)) return true;
     if (this._desktopGesture && this._desktopGesture.moved) return true;
+    if (this._lastDesktopSwitchAt && (now - this._lastDesktopSwitchAt) < 1200) return true;
+    if (this._lastDesktopGestureEndAt && (now - this._lastDesktopGestureEndAt) < 800) return true;
+    if (this._suppressDesktopClickUntil && now < this._suppressDesktopClickUntil) return true;
+    if (this._widgetSuppressClickUntil && now < this._widgetSuppressClickUntil) return true;
+    if (this._widgetSuppressClick) return true;
     if (typeof document !== 'undefined' && document.body && (
       document.body.classList.contains('hv-desk-sliding') ||
-      document.body.classList.contains('hv-desk-animating')
+      document.body.classList.contains('hv-desk-animating') ||
+      document.body.classList.contains('hv-desk-bg-up')
     )) return true;
     return false;
   }
 
+  _widgetClickSuppressed() {
+    return this._isDeskSwitchingOrRecent();
+  }
+
   _onWidgetSuppressClick(e) {
-    if (this._widgetClickSuppressed()) {
+    if (this._isDeskSwitchingOrRecent()) {
       const t = e && e.target;
-      const isDeskSwitching = (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx))
-        || (this._desktopClickSuppressed && this._desktopClickSuppressed())
-        || (typeof document !== 'undefined' && document.body && (
-          document.body.classList.contains('hv-desk-sliding') ||
-          document.body.classList.contains('hv-desk-animating')
-        ));
+      const isDeskSwitching = true;
       if (!isDeskSwitching && t && t.closest && t.closest('.hv-widget-remove, .hv-widget-exit, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-widget-picker-backdrop, .hv-widget-slot-banner, .hv-graph-editor')) {
         this._widgetSuppressClick = false;
         return;
@@ -13247,7 +13250,6 @@ class Component extends DCLogic {
       if (e && e.preventDefault) e.preventDefault();
       if (e && e.stopPropagation) e.stopPropagation();
       if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
-      this._widgetSuppressClick = false;
       return;
     }
     if (!this.state.widgetMenuId) return;
@@ -38785,8 +38787,9 @@ class Component extends DCLogic {
 
   _switchDesktop(index, skipCapture, force, opts) {
     if (!this._desktopReady || !this._desktops || !this._desktops.length) return;
-    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-    this._suppressNextWidgetClick(500);
+    this._lastDesktopSwitchAt = Date.now();
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+    this._suppressNextWidgetClick(1200);
     const count = this._desktops.length;
     const nextIndex = ((parseInt(index, 10) || 0) % count + count) % count;
     if (nextIndex === this._desktopIndex && !force) return;
@@ -38830,7 +38833,6 @@ class Component extends DCLogic {
     this._refreshBoardBounds(d.shellMode);
     this._desktopCameras = this._cloneDesktopCameras(d.cameras);
     persistBootShellLayout(d.shellMode, this._splitRatio);
-    this._saveDesktopStore();
     const left = this._board('left', d.shellMode);
     const right = this._board('right', d.shellMode);
     this.setState({
@@ -38868,7 +38870,6 @@ class Component extends DCLogic {
       widgetMenuSide: null,
       appsFabOpen: false,
     }, () => {
-      this._persistWidgets();
       if (carFadeIn) {
         if (this.requestRender) this.requestRender(4);
         requestAnimationFrame(() => requestAnimationFrame(() => this._carFade(true)));
@@ -38885,11 +38886,6 @@ class Component extends DCLogic {
       this._applyFitCamera();
       this._syncCarSceneForShell();
       this._syncWallpaperLayer();
-      // Bing only. A curated or favorites desktop has its picture already;
-      // refreshing the Bing feed here blocked the switch on the download.
-      if ((d.wallpaperSource || 'bing') === 'bing' && this._centerFillUsesWallpaper(d)) {
-        this._ensureWallpapers(false);
-      }
       // centerFill can differ between desktops, and only _applyBackground makes
       // the canvas transparent for 'mixed'. Without it, switching into a Both
       // desktop kept the previous desktop's opaque background over the wallpaper.
@@ -38900,14 +38896,21 @@ class Component extends DCLogic {
       // then switch it on; turning it OFF stays immediate.
       if (d.powertrainOn && this._shouldShowCar()) this._xrayAfterCamFlight();
       else this._applyPowertrainVisibility(!!d.powertrainOn);
-      this._refreshAutoWidgetThemeSample(false);
-      this._prefetchDesktopWallBright();
       this._syncCenterFillIndicator();
       this._syncSlotUseToNative();
-      this._syncDockIndicators();
       if (opts && opts.afterPaint) {
         try { opts.afterPaint(); } catch (e) {}
       }
+      // Defer disk I/O, IPC sync and wallpaper fetching so the switch animation finishes with zero stutter
+      setTimeout(() => {
+        this._persistWidgets();
+        this._syncDockIndicators();
+        this._refreshAutoWidgetThemeSample(false);
+        this._prefetchDesktopWallBright();
+        if ((d.wallpaperSource || 'bing') === 'bing' && this._centerFillUsesWallpaper(d)) {
+          this._ensureWallpapers(false);
+        }
+      }, 100);
     });
     try {
       const bridge = window.AppLauncherBridge;
@@ -39005,7 +39008,7 @@ class Component extends DCLogic {
   }
 
   _desktopClickSuppressed() {
-    return !!(this._suppressDesktopClickUntil && Date.now() < this._suppressDesktopClickUntil);
+    return this._isDeskSwitchingOrRecent();
   }
 
   /**
@@ -39020,6 +39023,9 @@ class Component extends DCLogic {
     const cur = this._desktopIndex || 0;
     const nextIndex = ((parseInt(index, 10) || 0) % count + count) % count;
     if (nextIndex === cur) return;
+    this._lastDesktopSwitchAt = Date.now();
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+    this._suppressNextWidgetClick(1200);
     if (this.state.desktopStudioOpen && this.state.desktopStudioTab === 'desktops') {
       this._switchDesktop(nextIndex, false, false, { keepDesks: true });
       return;
@@ -39028,8 +39034,6 @@ class Component extends DCLogic {
     const backward = (cur - nextIndex + count) % count;
     // −1 = stage moves left (next), +1 = stage moves right (previous).
     const slideDir = forward <= backward ? -1 : 1;
-    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-    this._suppressNextWidgetClick(500);
     this._deskSlideAnimateTo(nextIndex, slideDir);
   }
 
@@ -39103,9 +39107,17 @@ class Component extends DCLogic {
     dom.back.style.transform = 'translate3d(' + this._deskBackX(clamped, clamped < 0 ? -1 : 1) + 'px,0,0)';
     this._deskSlidePaintDots(clamped);
     if (!slide.busy) {
-      this._deskSlideCamAt(u * DESK_SWIPE_CAM_LEAD);
-      // The card rail is native: follow the finger in 5% steps, not per event.
-      const railA = Math.round((1 - u) * 20) / 20;
+      this._deskSlidePendingCamU = u * DESK_SWIPE_CAM_LEAD;
+      if (!this._deskSlideCamRaf) {
+        this._deskSlideCamRaf = requestAnimationFrame(() => {
+          this._deskSlideCamRaf = null;
+          if (this._deskSlide && !this._deskSlide.busy) {
+            this._deskSlideCamAt(this._deskSlidePendingCamU);
+          }
+        });
+      }
+      // The card rail is native: follow the finger in 10% steps, not per event.
+      const railA = Math.round((1 - u) * 10) / 10;
       if (railA !== slide.railA) {
         slide.railA = railA;
         this._deskRailFade(railA, 0);
@@ -39214,9 +39226,14 @@ class Component extends DCLogic {
 
   /** Morph page dots toward the destination as the swipe nears commit. */
   _deskSlidePaintDots(dx) {
-    const bar = document.querySelector('.hv-desktop-dots-bar .hv-desktop-dots');
-    if (!bar) return;
-    const dots = bar.querySelectorAll('.hv-desktop-dot');
+    let dots = this._cachedDots;
+    if (!dots || !dots.length || !dots[0].isConnected) {
+      const bar = document.querySelector('.hv-desktop-dots-bar .hv-desktop-dots');
+      if (!bar) return;
+      dots = bar.querySelectorAll('.hv-desktop-dot');
+      this._cachedDots = dots;
+    }
+    if (!dots || !dots.length) return;
     const cur = this._desktopIndex || 0;
     const slide = this._deskSlide;
     const to = slide ? slide.toIndex : cur;
@@ -39240,15 +39257,19 @@ class Component extends DCLogic {
   }
 
   _deskSlideClearDots() {
-    const bar = document.querySelector('.hv-desktop-dots-bar .hv-desktop-dots');
-    if (!bar) return;
-    const dots = bar.querySelectorAll('.hv-desktop-dot');
+    let dots = this._cachedDots;
+    if (!dots || !dots.length || !dots[0].isConnected) {
+      const bar = document.querySelector('.hv-desktop-dots-bar .hv-desktop-dots');
+      if (!bar) return;
+      dots = bar.querySelectorAll('.hv-desktop-dot');
+    }
     const cur = this._desktopIndex || 0;
     for (let i = 0; i < dots.length; i++) {
       dots[i].classList.remove('slide-from', 'slide-to');
       dots[i].style.removeProperty('--p');
       dots[i].classList.toggle('on', i === cur);
     }
+    this._cachedDots = null;
   }
 
   /** Prepare a swipe toward `toIndex` (dir: -1 = next, +1 = previous). */
@@ -39266,6 +39287,8 @@ class Component extends DCLogic {
     this._deskSlideClearCanvasBg();
     document.body.classList.remove('hv-desk-animating');
     document.body.classList.add('hv-desk-sliding');
+    const bar = document.querySelector('.hv-desktop-dots-bar .hv-desktop-dots');
+    this._cachedDots = bar ? bar.querySelectorAll('.hv-desktop-dot') : null;
     this._deskSlide = {
       busy: false,
       dir: dir < 0 ? -1 : 1,
@@ -39395,6 +39418,11 @@ class Component extends DCLogic {
     const dom = this._deskSlideDom;
     clearTimeout(this._deskSlideAnimTimer);
     clearTimeout(this._deskSlideSafety);
+    if (this._deskSlideCamRaf) {
+      cancelAnimationFrame(this._deskSlideCamRaf);
+      this._deskSlideCamRaf = null;
+    }
+    this._cachedDots = null;
     if (document.body) {
       document.body.classList.remove('hv-desk-sliding', 'hv-desk-animating');
       document.body.style.removeProperty('--hv-desk-wall-x');
@@ -39402,8 +39430,9 @@ class Component extends DCLogic {
     }
     this._deskSlide = null;
     this._deskSlideClearDots();
-    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-    this._suppressNextWidgetClick(500);
+    this._lastDesktopGestureEndAt = Date.now();
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+    this._suppressNextWidgetClick(1200);
     if (this.controls && !this._desktopGesture && !this.state.desktopStudioOpen && !this.state.firstRunSetupOpen
       && this._shouldShowCar() && !this._camAnim) {
       this.controls.enabled = true;
@@ -39431,7 +39460,6 @@ class Component extends DCLogic {
     slide.toIndex = toIndex;
     const startDx = typeof fromDx === 'number' ? fromDx : (slide.dx || 0);
     this._deskSlideApplyOffset(startDx);
-    void document.body.offsetWidth;
     const ms = DESK_SWIPE_SLIDE_MS;
     const carFaded = this._desktopShowsCar(this._desktops[this._desktopIndex || 0])
       && !this._desktopShowsCar(this._desktops[toIndex]);
@@ -39485,7 +39513,6 @@ class Component extends DCLogic {
     const startDx = typeof fromDx === 'number' ? fromDx : (slide.dx || 0);
     const dir = slide.dir || -1;
     this._deskSlideApplyOffset(startDx);
-    void (document.body && document.body.offsetWidth);
     const ms = DESK_SWIPE_FADE_MS;
     if (document.body) document.body.classList.add('hv-desk-animating');
     this._deskSlideSetVars(0, 1);
@@ -40104,12 +40131,14 @@ class Component extends DCLogic {
   }
 
   _openFocusedCard(type) {
+    if (this._isDeskSwitchingOrRecent && this._isDeskSwitchingOrRecent()) return;
     if (this._widgetClickSuppressed && this._widgetClickSuppressed()) return;
     if (this._desktopClickSuppressed && this._desktopClickSuppressed()) return;
     if (this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx)) return;
     if (typeof document !== 'undefined' && document.body && (
       document.body.classList.contains('hv-desk-sliding') ||
-      document.body.classList.contains('hv-desk-animating')
+      document.body.classList.contains('hv-desk-animating') ||
+      document.body.classList.contains('hv-desk-bg-up')
     )) return;
     if (type === 'media') {
       this._openMediaApp(null);
@@ -40168,6 +40197,7 @@ class Component extends DCLogic {
   }
 
   _onCarClimatePanelRequest(value) {
+    if (this._isDeskSwitchingOrRecent && this._isDeskSwitchingOrRecent()) return;
     // Only the rising edge. The trailing 0 is the car closing a panel we never opened.
     const wants = String(value != null ? value : '').trim();
     if (!wants || wants === '0') return;
@@ -40645,8 +40675,9 @@ class Component extends DCLogic {
       const count = this._desktops.length;
       const toIndex = ((this._desktopIndex || 0) + (dir < 0 ? 1 : -1) + count) % count;
       if (!this._deskSlideArm(dir, toIndex)) return;
-      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-      this._suppressNextWidgetClick(500);
+      this._lastDesktopGestureEndAt = Date.now();
+      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+      this._suppressNextWidgetClick(1200);
     } else if (!this._deskSlide.busy) {
       // Re-aim if the user reverses past centre.
       const dir = dx < 0 ? -1 : 1;
@@ -40663,8 +40694,9 @@ class Component extends DCLogic {
       // Commit as soon as travel hits the threshold — no need to wait for lift.
       const travel = Math.abs(this._deskSlide.dx || dx);
       if (travel >= this._deskCommitPx() && Math.abs(dx) >= Math.abs(dy)) {
-        this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-        this._suppressNextWidgetClick(500);
+        this._lastDesktopGestureEndAt = Date.now();
+        this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+        this._suppressNextWidgetClick(1200);
         g.slideCommitted = true;
         this._deskSlideCommit(this._deskSlide.toIndex, this._deskSlide.dir, this._deskSlide.dx || dx);
       }
@@ -40674,6 +40706,9 @@ class Component extends DCLogic {
   _onDesktopGestureEnd(ev) {
     const g = this._desktopGesture;
     this._desktopGesture = null;
+    this._lastDesktopGestureEndAt = Date.now();
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+    this._suppressNextWidgetClick(1200);
     // Only restore controls immediately when no slide animation is flying.
     // If a slide was committed or is busy, _deskSlideTeardown restores controls
     // once the animation finishes, avoiding a camera jump mid-slide.
@@ -40683,8 +40718,6 @@ class Component extends DCLogic {
     }
     if (!g) return;
     if (g.slideCommitted) {
-      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-      this._suppressNextWidgetClick(500);
       return;
     }
     const p = this._eventClientPoint(ev);
@@ -40699,8 +40732,6 @@ class Component extends DCLogic {
       const dir = this._deskSlide.dir;
       const flicked = (dir < 0 && vx < -0.35) || (dir > 0 && vx > 0.35);
       const farEnough = travel >= this._deskCommitPx() && Math.abs(dx) >= Math.abs(dy) * 0.85;
-      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-      this._suppressNextWidgetClick(500);
       if (farEnough || flicked) {
         this._deskSlideCommit(this._deskSlide.toIndex, dir, this._deskSlide.dx || dx);
       } else {
@@ -40713,8 +40744,6 @@ class Component extends DCLogic {
       && travel >= H6_DESK_SLIDE_COMMIT_PX
       && Math.abs(dx) >= Math.abs(dy) * 1.1);
     if (isSwipe) {
-      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-      this._suppressNextWidgetClick(500);
       this._requestDesktopSwitch((this._desktopIndex || 0) + (dx < 0 ? 1 : -1));
       return;
     }
@@ -40723,8 +40752,9 @@ class Component extends DCLogic {
   _onDesktopGestureCancel() {
     const g = this._desktopGesture;
     this._desktopGesture = null;
-    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 500);
-    this._suppressNextWidgetClick(500);
+    this._lastDesktopGestureEndAt = Date.now();
+    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+    this._suppressNextWidgetClick(1200);
     // Defer controls restore to _deskSlideTeardown when a slide is in flight.
     const slideFlying = g && (g.slideCommitted || (this._deskSlide && this._deskSlide.busy));
     if (g && this.controls && g.controlsEnabled != null && !slideFlying) {
@@ -41968,10 +41998,28 @@ class Component extends DCLogic {
         isWidget: isWidget };
       if (kind === 'temp') holdTemp(zone);
       if (el._climTween) { cancelAnimationFrame(el._climTween); el._climTween = 0; }
-      e.stopPropagation();
+      if (!isWidget) {
+        e.stopPropagation();
+      }
     }, true);
     document.addEventListener('pointermove', (e) => {
       if (!drag || e.pointerId !== drag.id) return;
+      if (drag.isWidget && !drag.moved) {
+        const hx = Math.abs(e.clientX - drag.x);
+        const hy = Math.abs(e.clientY - drag.y);
+        if (hx > 10 && hx > hy) {
+          if (this._climHold) {
+            if (drag.kind === 'temp') {
+              delete this._climHold[drag.zone];
+              if (drag.zone === 'driver') delete this._climHold.pass;
+            } else if (drag.kind === 'fan') {
+              delete this._climHold.fan;
+            }
+          }
+          drag = null;
+          return;
+        }
+      }
       if (drag.isWidget) this._suppressAutoClimateOpen(2500);
       if (drag.kind === 'fan') {
         const bar = drag.el.querySelector('[data-cfan]');
@@ -42064,7 +42112,7 @@ class Component extends DCLogic {
         if (isControl) {
           this._suppressAutoClimateOpen(2500);
         } else {
-          if (this._widgetClickSuppressed() || this._desktopClickSuppressed() || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return;
+          if (this._isDeskSwitchingOrRecent() || this._widgetClickSuppressed() || this._desktopClickSuppressed() || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return;
           if (this._climSuppressClick && Date.now() - this._climSuppressClick < 400) return;
           e.stopPropagation();
           if (this.state.focusedCardType !== 'climate') {
@@ -42079,10 +42127,10 @@ class Component extends DCLogic {
       e.stopPropagation();
       this._bumpClimatePanelHold();
       if (this._climSuppressClick && Date.now() - this._climSuppressClick < 400) return;
-      if (this._widgetClickSuppressed() || this._desktopClickSuppressed()) return;
+      if (this._isDeskSwitchingOrRecent() || this._widgetClickSuppressed() || this._desktopClickSuppressed()) return;
       const act = el.getAttribute('data-ca');
       if (act === 'open') {
-        if (this._widgetClickSuppressed() || this._desktopClickSuppressed() || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return;
+        if (this._isDeskSwitchingOrRecent() || this._widgetClickSuppressed() || this._desktopClickSuppressed() || this.state.widgetMenuId || this.state.widgetPlaceType || this.state.widgetPlaceMode || this.state.widgetPickerStep || this.state.desktopStudioOpen) return;
         if (this.state.focusedCardType !== 'climate') {
           this._openFocusedCard('climate');
         }
@@ -47862,6 +47910,7 @@ class Component extends DCLogic {
         break;
       case 'ac': // Legacy native clients: retain the former Climate entrypoint.
       case 'openClimate':
+        if (this._isDeskSwitchingOrRecent && this._isDeskSwitchingOrRecent()) return;
         this._openFocusedCard('climate');
         break;
       case 'openConsumption':

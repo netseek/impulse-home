@@ -786,8 +786,19 @@ public final class MainActivity extends Activity {
             final int ms = Math.max(0, Math.min(2000, durationMs));
             runOnUiThread(() -> {
                 if (stripContainer == null) return;
+                lastRailFadeAt = android.os.SystemClock.uptimeMillis();
                 stripContainer.animate().cancel();
-                stripContainer.animate().alpha(a).setDuration(ms).withLayer().start();
+                if (a <= 0.05f) {
+                    stripContainer.animate().alpha(0f).setDuration(ms).withLayer()
+                            .withEndAction(() -> {
+                                if (stripContainer != null && stripContainer.getAlpha() <= 0.05f) {
+                                    stripContainer.setEnabled(false);
+                                }
+                            }).start();
+                } else {
+                    stripContainer.setEnabled(true);
+                    stripContainer.animate().alpha(a).setDuration(ms).withLayer().start();
+                }
             });
         }
 
@@ -1072,6 +1083,7 @@ public final class MainActivity extends Activity {
     };
     private View mediaLaunchAnchor;
     private View stripContainer;
+    private long lastRailFadeAt = 0L;
     /** Visual preview of the 60dp area reserved for Impulse's persistent bar. */
     private View impulseReserveBand;
     private View stripRow;
@@ -9446,6 +9458,7 @@ public final class MainActivity extends Activity {
                 }
                 final BottomCardDescriptor cardDescriptor = descriptor;
                 View card = makeQuickVisualCard(density, descriptor, v -> {
+                    if (android.os.SystemClock.uptimeMillis() - lastRailFadeAt < 1200) return;
                     callViewerDock(cardDescriptor.action);
                 });
                 card.setTag("bottomCard:" + descriptor.id);
@@ -9461,7 +9474,10 @@ public final class MainActivity extends Activity {
         View climate = makeQuickTextCard(density, 218, "CLIMATE",
                 "— °C  ·  Fan —  ·  AUTO —",
                 "Climate summary. Opens the climate page when available",
-                v -> callViewerDock("openClimate"));
+                v -> {
+                    if (android.os.SystemClock.uptimeMillis() - lastRailFadeAt < 1200) return;
+                    callViewerDock("openClimate");
+                });
         quickClimateValue = (android.widget.TextView) climate.findViewWithTag("quickValue");
         row.addView(climate);
 
@@ -13140,6 +13156,10 @@ public final class MainActivity extends Activity {
 
     private void callViewerDock(String cmd) {
         if (webView == null || cmd == null) return;
+        if (("openClimate".equals(cmd) || "ac".equals(cmd))
+                && android.os.SystemClock.uptimeMillis() - lastRailFadeAt < 1200) {
+            return;
+        }
         final String safe = cmd.replace("'", "").replace("\\", "").replace("\"", "");
         final String js = "try{if(window.__app&&typeof window.__app.dockCommand==='function'){"
                 + "window.__app.dockCommand('" + safe + "');}}catch(e){}";
