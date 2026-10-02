@@ -18,6 +18,18 @@ Impulse Home bundles the components below. Each stays under its own license.
 |---|---|---|
 | DM Sans (latin, latin-ext, weights 400 and 600) | SIL Open Font License 1.1 | `vendor/fonts/` |
 
+## Icons and data
+
+| Item | Source | License |
+|---|---|---|
+| Climate and weather icons (`assets/ui/icons/clima/icons.json`, `assets/ui/icons/weather/*.png`) | [Material Design Icons](https://pictogrammers.com/library/mdi/) (`@mdi/svg`) | Apache-2.0 |
+| Blower and recirculation icons | the [Impulse](https://github.com/bobaoapae/haval-app-tool-multimidia) project | same project (AGPL-3.0) |
+| Seat glyph (`assets/ui/icons/clima/seat.svg`) | "heated seat" by **Thuy Nguyen**, from the [Noun Project](https://thenounproject.com/) | Noun Project license; the author must be credited wherever the icon is shown publicly |
+| Weather forecast and air quality | [Open-Meteo](https://open-meteo.com/) | CC BY 4.0; the free API is for non-commercial use. The viewer sends only a position rounded to two decimals (about 1 km) and no API key. |
+
+The OEM head-unit APKs used while studying the vehicle are a visual reference
+only; nothing extracted from them is shipped.
+
 ## 3D models and images in the asset bundle
 
 These items are in the bundle (see `LICENSE-ASSETS`), not in this repository.
