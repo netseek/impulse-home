@@ -29,6 +29,7 @@ They are credited here because their licenses require it.
 | Vorsteiner V-FF109 wheel (`vorsteiner_v-ff109.glb`) | jonver87 | CC BY 4.0 | https://sketchfab.com/3d-models/vorsteiner-v-ff109-b1a49af59a7047d79644d33ace1fe6d3 |
 
 | Jeep rim (`jeep_rim_.glb`) | Steven B | **CC BY-NC-SA 4.0** | https://sketchfab.com/3d-models/jeep-rim-tutorial-by-chris-plush-results-5f847af27614452b8e2a10c808cb6996 |
+| Environment HDRI `st_peters_square_night_1k.hdr` | Poly Haven | CC0 1.0 (public domain) | https://polyhaven.com/a/st_peters_square_night |
 
 The three models were adapted: re-centred and re-scaled to fit the car.
 
