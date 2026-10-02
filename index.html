@@ -31635,8 +31635,10 @@ class Component extends DCLogic {
     const rear = rig.getObjectByName('Powerplant_Rear');
     if (rear) rear.visible = (pack.hidesGroups || []).indexOf('Powerplant_Rear') === -1;
     // The car draws its own wheels. Ours would z-fight with them and cost
-    // ~28k of the model's 44k triangles for nothing.
-    const wheels = rig.getObjectByName('Rodas');
+    // ~28k of the model's 44k triangles for nothing. 'Wheels' is a node name
+    // in the GLB, not UI text: the pt-BR sweep turned it into 'Rodas', the
+    // lookup missed, and a second wheel set drew 12 cm low inside the real one.
+    const wheels = rig.getObjectByName('Wheels');
     if (wheels) wheels.visible = false;
     // Trim the modules to the lid's window before anything measures them --
     // the glow planes are sized from these boxes in _rebuildPowertrainCellGlows.
