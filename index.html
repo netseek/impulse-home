@@ -1635,9 +1635,9 @@ window.HavalSplash = (function () {
     .hv-widget-remove,
     .hv-widget-exit {
       position: absolute;
-      top: 8px;
+      top: 6px;
       z-index: 8;
-      width: 26px; height: 26px;
+      width: 44px; height: 44px;
       border-radius: 50%;
       border: 1px solid var(--hv-widget-border);
       background: var(--hv-widget-menu-bg);
@@ -1648,8 +1648,10 @@ window.HavalSplash = (function () {
       align-items: center;
       justify-content: center;
     }
-    .hv-widget-exit { left: 8px; }
-    .hv-widget-remove { right: 8px; }
+    .hv-widget-exit { left: 6px; }
+    .hv-widget-remove { right: 6px; }
+    .hv-widget-exit svg, .hv-widget-remove svg { width: 22px; height: 22px; }
+    .hv-widget-remove { color: #ff6b6b; }
     .hv-widget-stub {
       height: 100%;
       display: flex;
@@ -13242,8 +13244,11 @@ class Component extends DCLogic {
   _onWidgetSuppressClick(e) {
     if (this._isDeskSwitchingOrRecent()) {
       const t = e && e.target;
-      const isDeskSwitching = true;
-      if (!isDeskSwitching && t && t.closest && t.closest('.hv-widget-remove, .hv-widget-exit, .hv-widget-card-menu button, .hv-widget-cell, .hv-widget-picker, .hv-widget-picker-backdrop, .hv-widget-slot-banner, .hv-graph-editor')) {
+      // Edit-menu buttons are explicit taps; let them through unless a desktop
+      // slide is genuinely in flight.
+      const sliding = !!(this._deskSlide && (this._deskSlide.busy || this._deskSlide.dx))
+        || (this._desktopGesture && this._desktopGesture.moved);
+      if (!sliding && t && t.closest && t.closest('.hv-widget-remove, .hv-widget-exit, .hv-widget-card-menu button')) {
         this._widgetSuppressClick = false;
         return;
       }
@@ -40706,9 +40711,12 @@ class Component extends DCLogic {
   _onDesktopGestureEnd(ev) {
     const g = this._desktopGesture;
     this._desktopGesture = null;
-    this._lastDesktopGestureEndAt = Date.now();
-    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
-    this._suppressNextWidgetClick(1200);
+    // A plain tap must still reach its click; only a drag/slide suppresses it.
+    if (g && (g.moved || g.slideCommitted || (this._deskSlide && this._deskSlide.dx))) {
+      this._lastDesktopGestureEndAt = Date.now();
+      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+      this._suppressNextWidgetClick(1200);
+    }
     // Only restore controls immediately when no slide animation is flying.
     // If a slide was committed or is busy, _deskSlideTeardown restores controls
     // once the animation finishes, avoiding a camera jump mid-slide.
@@ -40752,9 +40760,11 @@ class Component extends DCLogic {
   _onDesktopGestureCancel() {
     const g = this._desktopGesture;
     this._desktopGesture = null;
-    this._lastDesktopGestureEndAt = Date.now();
-    this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
-    this._suppressNextWidgetClick(1200);
+    if (g && (g.moved || g.slideCommitted || (this._deskSlide && this._deskSlide.dx))) {
+      this._lastDesktopGestureEndAt = Date.now();
+      this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
+      this._suppressNextWidgetClick(1200);
+    }
     // Defer controls restore to _deskSlideTeardown when a slide is in flight.
     const slideFlying = g && (g.slideCommitted || (this._deskSlide && this._deskSlide.busy));
     if (g && this.controls && g.controlsEnabled != null && !slideFlying) {
