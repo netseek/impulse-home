@@ -16,6 +16,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Fetch the asset bundle (skipped where the token is unavailable)
+        # Fork pull requests cannot read secrets, so they run without the bundle
+        # and the tests that need it are skipped, not failed.
+        env:
+          GH_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+        run: |
+          if [ -n "$GH_TOKEN" ]; then node scripts/fetch-assets.mjs || echo "::warning::asset bundle not available"; fi
       - name: Node contract tests
         run: node scripts/run-tests.mjs
 
