@@ -50,6 +50,21 @@ Settings -> Secrets and variables -> Actions:
 Require a pull request, require the `tests` and `android` checks, block force
 pushes. `CODEOWNERS` then makes you the required reviewer.
 
+## The key-rotation lineage
+
+The first builds of this app were signed with a debug key. `release/signing-lineage.bin` proves to
+Android that the release key is that key's successor, so a device that still has the old build
+updates in place and keeps its data (settings, trip history) instead of having to uninstall.
+
+It was made once with `apksigner rotate` (old signer: the debug keystore; new signer: the release
+keystore) and holds certificates and signatures only: nothing secret, so it is committed. The release
+workflow applies it to every build (`apksigner sign --lineage`, without the v1 signature, which cannot
+carry a rotation) and refuses to publish an APK whose lineage has fewer than two signers.
+
+Never delete or regenerate it. A device that has accepted a lineage-signed build only takes updates
+signed by the last key in the chain. To rotate again, extend the chain with
+`apksigner rotate --in release/signing-lineage.bin --old-signer ... --new-signer ...`.
+
 ## Publishing new art
 
 ```bash
