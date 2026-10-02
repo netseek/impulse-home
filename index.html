@@ -5338,6 +5338,7 @@ window.HavalSplash = (function () {
     body.hv-desk-sliding #hv-root > .hv-pop-grow,
     body.hv-desk-sliding #hv-root > .hv-pop-shrink {
       opacity: var(--hv-desk-fade, 1) !important;
+      transition: opacity 160ms ease;
     }
     body.hv-desk-animating #hv-root > .hv-widget-board,
     body.hv-desk-animating #hv-root > .hv-car-stage-action,
@@ -31142,6 +31143,16 @@ class Component extends DCLogic {
         }
         const carMoving = Math.abs(this._currentMotionSpeed()) > 0;
         const allowReduce = this._resReductionAllowed(cameraBusy, carMoving);
+        // While a finger is dragging a desktop slide the car does not move and the
+        // slide itself is compositor-only, but x-ray (and anything else asking for
+        // frames) kept the scene rendering at ~20 fps on the main thread: measured
+        // on the car, the drag ran at 6-11 fps with the renderer ~40% of it. Let a
+        // few frames through (the transparent-canvas swap needs them), then hold
+        // the last one until the slide commits.
+        if (needRender && this._deskSlide && !this._deskSlide.busy) {
+          if (this._deskSlideRenderBudget > 0) this._deskSlideRenderBudget--;
+          else needRender = false;
+        }
         if (needRender) {
           this._lastActiveMs = _nowRes;
           // The refinement's own frames must not read as motion, or the tier
@@ -39152,7 +39163,14 @@ class Component extends DCLogic {
     // Widgets are fully gone by the commit point, so the switch under them is
     // never seen.
     const u = Math.min(1, Math.abs(clamped) / this._deskCommitPx());
-    this._deskSlideSetVars(clamped, 1 - u);
+    // The widgets fade out ONCE, as a CSS transition, when the drag starts. They
+    // used to follow the finger: every touchmove rewrote an inherited custom
+    // property on <body>, and the trace showed 50 style recalcs (up to 65 ms) in
+    // one swipe. They are gone by the commit point either way.
+    if (!slide.faded) {
+      slide.faded = true;
+      this._deskSlideSetVars(clamped, 0);
+    }
     this._deskSlideShapeBack(clamped < 0 ? -1 : 1);
     dom.back.style.transition = 'none';
     dom.back.style.transform = 'translate3d(' + this._deskBackX(clamped, clamped < 0 ? -1 : 1) + 'px,0,0)';
@@ -39164,7 +39182,7 @@ class Component extends DCLogic {
       // made the drag run at the render's pace; the lead is a quarter of a
       // flight, so ~15 Hz reads the same and leaves the thread to the touch.
       this._deskSlidePendingCamU = u * DESK_SWIPE_CAM_LEAD;
-      if (!this._deskSlideCamRaf && !this._deskSlideCamTimer) {
+      if (DESK_SWIPE_CAM_LEAD > 0 && !this._deskSlideCamRaf && !this._deskSlideCamTimer) {
         const fire = () => {
           this._deskSlideCamRaf = null;
           if (this._deskSlide && !this._deskSlide.busy) {
@@ -39355,6 +39373,7 @@ class Component extends DCLogic {
     document.body.classList.add('hv-desk-sliding');
     const bar = document.querySelector('.hv-desktop-dots-bar .hv-desktop-dots');
     this._cachedDots = bar ? bar.querySelectorAll('.hv-desktop-dot') : null;
+    this._deskSlideRenderBudget = 1;
     this._deskSlide = {
       busy: false,
       dir: dir < 0 ? -1 : 1,
