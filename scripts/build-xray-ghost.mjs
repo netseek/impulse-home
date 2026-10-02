@@ -20,7 +20,7 @@
 //   node scripts/build-xray-ghost.mjs
 //
 // NOT boot-critical (x-ray fetches on demand), so unlike the -lite bodies this
-// MAY use Draco. See CLAUDE.md "Editing GLB assets".
+// MAY use Draco. See docs/engineering "Editing GLB assets".
 
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, KHRDracoMeshCompression } from '@gltf-transform/extensions';

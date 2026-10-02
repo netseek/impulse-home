@@ -1,5 +1,5 @@
 // Render the production Power markup/CSS at each supported size, then exercise
-// the full app's popup. CODEX_NODE_MODULES may point to a bundled Playwright.
+// the full app's popup. PLAYWRIGHT_NODE_MODULES may point to a bundled Playwright.
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -10,8 +10,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch {
-  if (!process.env.CODEX_NODE_MODULES) throw Error('Install Playwright or set CODEX_NODE_MODULES to the directory containing it.');
-  ({ chromium } = require(path.join(process.env.CODEX_NODE_MODULES, 'playwright')));
+  if (!process.env.PLAYWRIGHT_NODE_MODULES) throw Error('Install Playwright or set PLAYWRIGHT_NODE_MODULES to the directory containing it.');
+  ({ chromium } = require(path.join(process.env.PLAYWRIGHT_NODE_MODULES, 'playwright')));
 }
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const script = html.match(/<script type="text\/x-dc" data-dc-script>([\s\S]*?)<\/script>/)[1];

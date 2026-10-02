@@ -12,8 +12,10 @@ $ErrorActionPreference = 'Stop'
 $ViewerApk = Join-Path $CarRoot 'app\build\outputs\apk\debug\app-debug.apk'
 if (-not (Test-Path $ViewerApk)) { throw "Viewer APK missing: $ViewerApk" }
 
-$ImpulseScript = "C:\Users\<user>\StudioProjects\haval-app-tool-multimidia\scripts\Deploy-To-Car.ps1"
-$ImpulseApk = "C:\Users\<user>\StudioProjects\haval-app-tool-multimidia\app\build\outputs\apk\debug\app-debug.apk"
+# Checkout of the sibling Impulse repository (set IMPULSE_DIR to override).
+$ImpulseRoot = if ($env:IMPULSE_DIR) { $env:IMPULSE_DIR } else { Join-Path $CarRoot '..\haval-app-tool-multimidia' }
+$ImpulseScript = Join-Path $ImpulseRoot 'scripts\Deploy-To-Car.ps1'
+$ImpulseApk = Join-Path $ImpulseRoot 'app\build\outputs\apk\debug\app-debug.apk'
 if (-not (Test-Path $ImpulseApk)) { throw "Impulse APK missing: $ImpulseApk" }
 
 $Adb = Get-Adb

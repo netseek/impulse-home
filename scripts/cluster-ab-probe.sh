@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # Cluster-lag A/B probe. Runs ON the head unit (adb shell or root telnet).
-# Plan and arm definitions: docs/cluster-ab-plan.md.
+# Plan and arm definitions: docs/engineering/cluster-ab-plan.md.
 #
 #   adb push scripts/cluster-ab-probe.sh /data/local/tmp/
 #   sh /data/local/tmp/cluster-ab-probe.sh <arm> [windows=3] [secs=20]

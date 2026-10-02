@@ -8,8 +8,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch {
-  if (!process.env.CODEX_NODE_MODULES) throw Error('Install Playwright or set CODEX_NODE_MODULES to the directory containing it.');
-  ({ chromium } = require(path.join(process.env.CODEX_NODE_MODULES, 'playwright')));
+  if (!process.env.PLAYWRIGHT_NODE_MODULES) throw Error('Install Playwright or set PLAYWRIGHT_NODE_MODULES to the directory containing it.');
+  ({ chromium } = require(path.join(process.env.PLAYWRIGHT_NODE_MODULES, 'playwright')));
 }
 // Strip texture references in an in-memory copy: ghost materials need no textures/KTX decoder.
 const source = fs.readFileSync(path.join(root, 'assets/haval-h6-hev-lite.glb'));

@@ -25,7 +25,7 @@
 // --capture a,b  record the arguments of these app methods.
 //
 // Arms are interleaved (A,B,C,A,B,C...) because this unit drifts ~2x over
-// minutes -- see CLAUDE.md. h6_settings_v1 is backed up and restored so a
+// minutes -- see docs/engineering. h6_settings_v1 is backed up and restored so a
 // ?model= arm cannot leave the car on a different body.
 
 import { execFileSync } from 'node:child_process';

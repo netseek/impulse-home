@@ -4,7 +4,7 @@
  *
  * Every check is a function of the source text, and each one is also run
  * against a deliberately broken copy: a check that still passes on the broken
- * copy is decoration, not a gate (CLAUDE.md, "negative-control every assertion
+ * copy is decoration, not a gate (docs/engineering, "negative-control every assertion
  * you add").
  */
 import assert from 'node:assert/strict';
@@ -58,13 +58,13 @@ const CHECKS = {
     const selector = rule.slice(0, rule.indexOf('{'));
     return !/\.hv-energy[\w-]*\s+span/.test(selector);
   }),
-  // A card id with no `case` falls through to a generic ring (docs/ui-surfaces.md).
+  // A card id with no `case` falls through to a generic ring (docs/architecture/ui-surfaces.md).
   'rail card has its own native painter': ({ java }) =>
     /case "consumption": drawEnergy\(/.test(java) && /private void drawEnergy\(/.test(java),
   'native parses the seven-day bars': ({ java }) =>
     /descriptor\.energyBars = parseEnergyBars\(raw\.optString\("energyBars"/.test(java),
   // A data URL always contains ";", and the template splits an interpolated
-  // style on it (docs/ui-surfaces.md): the map must be an <image href> (in the
+  // style on it (docs/architecture/ui-surfaces.md): the map must be an <image href> (in the
   // route svg, so tiles and route letterbox together), never a style.
   'trip map is an image href, not a style': ({ html }) =>
     html.includes('<image class="hv-energy-map" href="{{ focusedConsumptionDetailMap }}"')

@@ -84,7 +84,7 @@ final class TripEngine {
     static final double ARRIVAL_M = 150;
     /** Guidance that has sent nothing for this long is a lost session and no longer holds a trip open. */
     static final long GUIDANCE_HOLD_MAX_MS = 60 * 60_000L;
-    /** Impulse DASHBOARD_FUEL_TANK_CAPACITY_LITERS: one tank size across both apps (CLAUDE.md). */
+    /** Impulse DASHBOARD_FUEL_TANK_CAPACITY_LITERS: one tank size across both apps (docs/engineering). */
     static final double TANK_LITRES = 55.0;
     /** A fuel level this much higher after a stop is a refuel, not gauge noise. */
     static final double REFUEL_MIN_PCT = 4.0;

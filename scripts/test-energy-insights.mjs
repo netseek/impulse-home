@@ -5,7 +5,7 @@
  * Those methods are pure (no `this`), so they are lifted out of index.html and
  * run against fixtures. Every scenario is then re-run against a deliberately
  * broken copy of the source: a mutant that no scenario catches means the suite
- * is decoration (CLAUDE.md, "negative-control every assertion you add").
+ * is decoration (docs/engineering, "negative-control every assertion you add").
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

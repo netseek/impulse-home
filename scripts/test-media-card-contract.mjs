@@ -8,7 +8,7 @@
  * out of ONE builder, that a transport command cannot leave without both an
  * active track and a working MediaBridge, that no metadata or control is
  * invented beyond what MediaNowPlaying publishes and MediaBridge exposes, and
- * that the idle vocabulary in docs/widget-data-audit.md is never softened into
+ * that the idle vocabulary in docs/vehicle-data/signals-and-limits.md is never softened into
  * something that reads like a live claim.
  *
  * Run: node scripts/test-media-card-contract.mjs
@@ -204,7 +204,7 @@ assert.match(mediaView, /this\._openMediaApp\(ev\);/,
 // 5. Source vocabulary.
 //
 //    Media is never simulated, so it has no DEMO form at all — and the two idle
-//    strings are the ones docs/widget-data-audit.md fixes for this card.
+//    strings are the ones docs/vehicle-data/signals-and-limits.md fixes for this card.
 // ---------------------------------------------------------------------------
 includesAll(mediaView, [
   "'MÍDIA · SEM FAIXA'",
@@ -341,13 +341,13 @@ assert.ok(!positionDom.includes('setState'), 'the position tick must not call se
 // crosses it on every tick (measured on the car: 23 commits in 15 s, React back
 // to 65.9% of wall). It was removed, and this assertion then failed on a
 // deliberate, documented change -- exactly the "pins literals, so it lies twice"
-// failure CLAUDE.md warns about. Assert the SHAPE: the position path writes the
+// failure docs/engineering warns about. Assert the SHAPE: the position path writes the
 // live mirror and paints the DOM, and never reaches setState.
 const applyPosition = blockFrom(html, '  applyMediaPosition(ms) {', 'position apply');
 // Strip line comments before looking for the call. The block EXPLAINS at length
 // why it does not call setState, so a bare includes('setState') matches the
 // prose and fails on correct code -- the mirror image of the vacuous match
-// CLAUDE.md warns about. Negative-controlled against a reintroduced call.
+// docs/engineering warns about. Negative-controlled against a reintroduced call.
 const applyPositionCode = applyPosition.replace(/^\s*\/\/.*$/gm, '');
 assert.ok(!/this\.setState\(/.test(applyPositionCode),
   'applyMediaPosition must not call setState -- a playing player crosses any threshold every tick');

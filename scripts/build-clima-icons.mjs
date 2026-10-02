@@ -16,7 +16,8 @@ import path from 'node:path';
 
 const VERSION = '7.4.47';
 const OUT = 'assets/ui/icons/clima';
-const IMPULSE_DRAWABLE = 'C:/Users/<user>/StudioProjects/haval-app-tool-multimidia/app/src/main/res/drawable';
+// Checkout of the sibling Impulse repository (set IMPULSE_DIR to override).
+const IMPULSE_DRAWABLE = `${process.env.IMPULSE_DIR || '../haval-app-tool-multimidia'}/app/src/main/res/drawable`;
 
 // popup name -> MDI icon
 const ICONS = {

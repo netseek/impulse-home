@@ -19,7 +19,7 @@ import java.util.Locale;
 /**
  * Saves the OpenStreetMap tiles under a trip as a small JPEG.
  *
- * <p>Owner decision (docs/energy-workspace-plan.md): the online map is primary,
+ * <p>Owner decision (docs/features/energy-workspace.md): the online map is primary,
  * a plain background the fallback, and a low-res snapshot is taken when a trip
  * finishes so the trip never needs the network again. One image per trip, a few
  * tiles per trip, tiles cached on disk: well inside the OSM tile usage policy,

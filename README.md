@@ -64,8 +64,9 @@ a clock; wallpaper presets.
 ## Built for a slow main thread
 
 The head unit's WebView is the constraint, not the GPU, so the viewer renders on demand and
-keeps vehicle-bus signals away from React. [`CLAUDE.md`](CLAUDE.md) records every number it
-is built on, measured on the car, including the ones that proved earlier assumptions wrong.
+keeps vehicle-bus signals away from React. The [engineering notes](docs/engineering/measuring-and-performance.md)
+record every number it is built on, measured on the car, including the ones that proved earlier
+assumptions wrong.
 
 ## Install
 
@@ -95,8 +96,8 @@ Releases are signed with one key; see [SECURITY.md](SECURITY.md) to verify it.
 | `vendor/` | vendored runtime libraries |
 | `scripts/` | build tooling for models and textures, device harnesses, tests |
 | `assets/` | fetched, not tracked (see `assets.lock.json`) |
-| `docs/` | how the surfaces fit together ([ui-surfaces.md](docs/ui-surfaces.md)) and design notes |
-| `CLAUDE.md` | engineering notes, measured on the car |
+| `docs/` | engineering notes measured on the car, architecture, feature contracts, vehicle data ([index](docs/README.md)) |
+| `AGENTS.md` | guide and ground rules for AI agents working in the repository |
 
 ## Licenses and credits
 

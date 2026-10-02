@@ -226,7 +226,7 @@ function Get-CarLan {
   $ssid = Get-WifiSsid
   $local = @(Get-LocalIpv4Prefixes)
   $onCarAp = ($ssid -match '(?i)HAVAL[_ ]?SEEK') -or ($local -contains '192.168.33')
-  $onHome = ($ssid -match '(?i)<home-ssid>') -or ($local -contains '192.168.1')
+  $onHome = ($env:H6_HOME_SSID -and $ssid -match [regex]::Escape($env:H6_HOME_SSID)) -or ($local -contains '192.168.1')
 
   $order = New-Object System.Collections.Generic.List[string]
   if ($onCarAp) { [void]$order.Add('192.168.33') }

@@ -4032,7 +4032,7 @@ window.HavalSplash = (function () {
        that never gets painted. Toggled by a plain classList add/remove.
        Unlike the button icon, this ring sits OUTSIDE the button's opaque
        backing, directly over the 3D scene — a plain white arc would repeat
-       the day-mode invisibility mistake CLAUDE.md documents for the old
+       the day-mode invisibility mistake docs/engineering documents for the old
        boot-center ring. The dim full track keeps it readable in day mode;
        the drop-shadow keeps the bright arc readable in night mode. */
     .hv-fab-ring {
@@ -9756,7 +9756,7 @@ CAR_MODE_STATE_BY_KEY[CAR_MODE_ONE_PEDAL.key] = CAR_MODE_ONE_PEDAL.stateKey;
 
 // DRIVING card. Coffee OS / Vehicle Center present drive mode, power mode and
 // energy recovery as one surface rather than three tiles, and the OEM audit in
-// docs/oem-apk-can-reference.md recommends the same composition with steering
+// docs/vehicle-data/oem-reference/README.md recommends the same composition with steering
 // and ESP progressively disclosed. These are the four CAR_MODE_GROUPS above,
 // addressed by name so a reordering of that array cannot silently repoint a
 // control at the wrong CAN key.
@@ -10177,7 +10177,7 @@ const CAM_ICON_WARMUP_MS = 900;
 // frame froze the main thread 1.1-2.7 s, right as the widget boards fade in.
 const REVEAL_SETTLE_MS = 2500; // after boot + intro, before background prefetch
 // A tile costs one full scene pass plus a readback stall, and that is hardware
-// the numbers in CLAUDE.md say not to guess at: measured 15ms + 37ms on a
+// the numbers in docs/engineering say not to guess at: measured 15ms + 37ms on a
 // desktop, unknown on the Adreno. So the gap between tiles is derived from how
 // long the last one actually took (CAM_ICON_DUTY) rather than fixed, which
 // leaves the UI the same share of the frame budget on any unit.
@@ -10751,7 +10751,7 @@ class Component extends DCLogic {
       // real work, not a tunable. Do not just raise this value.
       preBlend: 0,
       preBlendFromKmh: 12,
-      // Blur arc as a fraction of the repeat period. CLAUDE.md: the arc has
+      // Blur arc as a fraction of the repeat period. docs/engineering: the arc has
       // to stay UNDER the spoke pitch or the smear is axisymmetric and the
       // sprite reads as standing still. Capped at the 60 degrees that suits a
       // 5-spoke rim, floored so a 30-spoke mesh rim still smears to a disc.
@@ -10963,7 +10963,7 @@ class Component extends DCLogic {
     this._graphVizHueDeg = 186;
     this._graphVizTrackKey = '';
     this._graphRaf = 0;
-    // TEMPORARY A/B switch for the cluster-lag test (docs/cluster-ab-plan.md):
+    // TEMPORARY A/B switch for the cluster-lag test (docs/engineering/cluster-ab-plan.md):
     // false restores the pre-2026-09-23 widget loop -- power card refreshed
     // and rewritten every tick, visibility read with getBoundingClientRect.
     // Live via window.__powerLean(bool); persisted so a WebView reload cannot
@@ -14795,7 +14795,7 @@ class Component extends DCLogic {
    * `outline_lamps_state` tracks the stalk *selection*, so it reads 0 whenever
    * the switch is on AUTO even though the lamps are lit. No live position-lamp
    * signal exists — a full-stalk capture moved only that key and low beam (see
-   * ANDROID.md) — so the state is derived from three things:
+   * docs/architecture/android-shell.md) — so the state is derived from three things:
    *
    *   1. stalk selected to position
    *   2. any beam on (position lamps are physically lit with a beam)
@@ -18568,7 +18568,7 @@ class Component extends DCLogic {
    * Boot / model-load progress, painted instead of committed.
    *
    * XHR fires a progress event per chunk, and each one used to call setState -
-   * a full React commit (197 ms p50 on this car, see CLAUDE.md) per chunk of a
+   * a full React commit (197 ms p50 on this car, see docs/engineering) per chunk of a
    * 13.5 MB body. That does not merely cost its own time: each commit hands the
    * main thread back mid-transfer, so the DOWNLOAD stretches with it. Measured
    * on the car, same file, three interleaved pairs:
@@ -19468,7 +19468,7 @@ class Component extends DCLogic {
     // to 0 measured 0.0 px, restoring it brought -7.5 px straight back. dx was
     // 0.00 in every arm: VERTICAL ONLY is the tell that this is the ride-height
     // frame, not a centring, runout or normalisation problem. Same bug family
-    // as the swapped-rim note in CLAUDE.md, one frame further along.
+    // as the swapped-rim note in docs/engineering, one frame further along.
     //
     // Frame on where the rim ACTUALLY IS, not on the pivot cached at init.
     //
@@ -19481,7 +19481,7 @@ class Component extends DCLogic {
     // disc spins about its OWN centre, an off-centre rim image ORBITS. It reads
     // as "the wheel turns about a point that is not the centre of the circle",
     // which is a texture bug and looks nothing like one. Same family as the
-    // swapped-rim note in CLAUDE.md, one frame further along.
+    // swapped-rim note in docs/engineering, one frame further along.
     //
     // Two things NOT to do, both tried and measured:
     //   - shifting the camera by heightShiftY. The counter-shift is correct for
@@ -19666,7 +19666,7 @@ class Component extends DCLogic {
     }
 
     // The smear must stay under the spoke pitch or the sprite comes out
-    // axisymmetric and reads as standing still (CLAUDE.md). 60 deg only ever
+    // axisymmetric and reads as standing still (docs/engineering). 60 deg only ever
     // suited a 5-8 spoke rim; a 30-spoke rim needs 12 deg by that rule, which
     // is no blur at all, so floor it and accept that a rim that fine honestly
     // does smear to a plain disc.
@@ -29195,7 +29195,7 @@ class Component extends DCLogic {
   _maybeAdaptDPR() {
     // MAX pins the ladder. 'off' only stops the MOTION tier from reducing;
     // this walk still moves _dprIdx on its own, and every step calls
-    // _onResize(), which reallocates every render target — CLAUDE.md measures
+    // _onResize(), which reallocates every render target — docs/engineering measures
     // frames straddling that at 200-300 ms. MAX is for when the picture must
     // stop changing under you, full stop.
     if (this.state && this.state.resScaleMode === 'max') return;
@@ -30033,7 +30033,7 @@ class Component extends DCLogic {
       });
 
       // Wheel-spin state + live tuning, for A/B-ing the spin ON THE CAR over
-      // CDP (see CLAUDE.md). Call with no argument to read; pass a partial
+      // CDP (see docs/engineering). Call with no argument to read; pass a partial
       // object to patch the tunables, e.g. __wheelSpin({ stepFrac: 0.35 }).
       // Anything that changes the blur ARC needs a re-capture, which
       // _generateBlurredWheelTexture does; the rest takes effect next frame.
@@ -32406,7 +32406,7 @@ class Component extends DCLogic {
         tireBandUvFlip: 1,
         // Route the emissive x-ray parts through the app's bloom composer, so
         // the light actually BLEEDS instead of stopping at the surface. This is
-        // the only thing here that costs real frame time: CLAUDE.md measures
+        // the only thing here that costs real frame time: docs/engineering measures
         // the post-FX passes at 2.0 ms/frame on the head unit, and this forces
         // the bloom half of that on whenever x-ray is up, regardless of whether
         // any car light is lit. Set to 0 to get the emission without the bleed.
@@ -40128,7 +40128,7 @@ class Component extends DCLogic {
    * This is a USER ACTION (a button or knob press), not a per-tick signal, so a React commit
    * here is the same cost as tapping the card. What must not happen is one commit per bus
    * frame: a single press arrives as 0 -> 2 -> 0 and a knob turn produces a burst, hence the
-   * coalescing window. See the `_live` seam notes in CLAUDE.md for why that matters.
+   * coalescing window. See the `_live` seam notes in docs/engineering for why that matters.
    */
   /**
    * Whether Impulse is really holding the OEM A/C app back for us.
@@ -42287,7 +42287,7 @@ class Component extends DCLogic {
   // ── ENERGY workspace ──────────────────────────────────────────────────────
   //
   // Rail card, widget and popup all come from _energyModel
-  // (docs/energy-workspace-plan.md). The stored card / widget type stays
+  // (docs/features/energy-workspace.md). The stored card / widget type stays
   // `consumption`, so saved layouts, the native allow-list and openConsumption
   // keep working; only the label reads ENERGY.
   //
@@ -42979,7 +42979,7 @@ class Component extends DCLogic {
    * IME asks in a locale it may not share with the page.
    *
    * Nothing here goes through setState. A React commit costs 197 ms p50 on this car
-   * (CLAUDE.md), which on a keypad is one lost keypress in every press, so the
+   * (docs/engineering), which on a keypad is one lost keypress in every press, so the
    * readout is painted straight into the DOM through the _live seam and React sees
    * the value once, when SALVAR is pressed.
    */
@@ -46296,7 +46296,7 @@ class Component extends DCLogic {
    *
    * There is also no DEMO state. Media is never synthesised, so the badge never
    * has a demo form to abbreviate — the idle strings from
-   * docs/widget-data-audit.md are the contract and are used verbatim.
+   * docs/vehicle-data/signals-and-limits.md are the contract and are used verbatim.
    */
   _mediaWidgetView(item) {
     const s = this.state;
@@ -49821,7 +49821,7 @@ class Component extends DCLogic {
     // Measured on the car while driving, it fired 23x in a 15 s window and put
     // React back to 65.9% of wall clock at 105 ms p50 / 957 ms p90 per commit
     // -- after motionSpeed had already been moved off React for exactly this.
-    // See "A hot CAN signal must never reach setState at all" in CLAUDE.md.
+    // See "A hot CAN signal must never reach setState at all" in docs/engineering.
     this._syncMediaPositionDom(pos, this.state.mediaDurationMs || 0);
   }
 

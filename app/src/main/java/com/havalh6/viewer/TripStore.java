@@ -21,7 +21,7 @@ import java.util.Map;
 /**
  * Trip persistence.
  *
- * <p>Retention (docs/energy-workspace-plan.md, decision 2): per-sample detail
+ * <p>Retention (docs/features/energy-workspace.md, decision 2): per-sample detail
  * ({@code trip_points}) is kept for the last {@link #DETAIL_TRIPS} trips only;
  * trip summaries and daily totals are kept forever. Monthly totals are a GROUP
  * BY over {@code days}, not a table of their own.

@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 import {overlaySVG} from '../assets/power/graphics/graphics.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const require=createRequire(import.meta.url);
-let chromium;try{({chromium}=require('playwright'));}catch{({chromium}=require(path.join(process.env.CODEX_NODE_MODULES||'', 'playwright')));}
+let chromium;try{({chromium}=require('playwright'));}catch{({chromium}=require(path.join(process.env.PLAYWRIGHT_NODE_MODULES||'', 'playwright')));}
 const out=path.join(root,'assets/power/graphics');fs.mkdirSync(out,{recursive:true});
 const server=http.createServer((req,res)=>{
   const p=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));

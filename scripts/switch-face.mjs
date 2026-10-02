@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 
 function ensureForward() {
-  const adb = (process.env.LOCALAPPDATA || 'C:\\Users\\<user>\\AppData\\Local') + '\\Android\\Sdk\\platform-tools\\adb.exe';
+  const adb = (process.env.LOCALAPPDATA || '') + '\\Android\\Sdk\\platform-tools\\adb.exe';
   try {
     const unixNet = execSync(`"${adb}" -s emulator-5554 shell "grep -a webview_devtools_remote /proc/net/unix"`, { stdio: ['pipe', 'pipe', 'ignore'] }).toString();
     const match = unixNet.match(/@webview_devtools_remote_(\d+)/);

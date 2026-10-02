@@ -38,7 +38,7 @@ includesAll(html, [
   "{ id: 'navigation', title: 'Navegação', action: 'openNavigation' }",
   "{ id: 'climate', title: 'Ar Condicionado', action: 'openClimate' }",
   // The card id stays `consumption` (saved layouts, native allow-list); the
-  // workspace it opens was renamed ENERGY (docs/energy-workspace-plan.md).
+  // workspace it opens was renamed ENERGY (docs/features/energy-workspace.md).
   "{ id: 'consumption', title: 'Consumo', action: 'openConsumption' }",
   "{ id: 'range', title: 'Autonomia', action: 'openRange' }",
   "{ id: 'status', title: 'Status do veículo', action: 'openVehicleStatus' }",

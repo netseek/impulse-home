@@ -183,7 +183,7 @@ A desktop's snapshot always records `appCar`.
 descendant rule like `.hv-driving-name span { font: 7px … }` also matches the
 interpolated text inside a sibling `<strong>` and silently shrinks it. Use a
 child combinator (`> span`); `small`, `em` and `i` are safe. See
-`docs/driving-card.md` for the full write-up, the way to diagnose it in one
+`docs/features/driving-card.md` for the full write-up, the way to diagnose it in one
 call, and the three shared card rules that still have it.
 
 ## The template engine splits an interpolated `style` on `;`

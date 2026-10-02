@@ -6,7 +6,7 @@ package com.havalh6.viewer;
  * <p>Pure Java so the recorder's arithmetic can be unit-tested off the car.
  * The formats follow what Impulse's cluster theme already parses
  * ({@code InstrumentProjector2}), which is the trusted reference for these keys
- * (docs/energy-workspace-plan.md, "Data sources").
+ * (docs/features/energy-workspace.md, "Data sources").
  */
 final class TripSignals {
     static final int FUEL_UNKNOWN = 0;

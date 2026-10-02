@@ -72,7 +72,7 @@ esac
 echo "--- current state ---"; status
 echo "--- building ---"
 JAVA_HOME="${JAVA_HOME:-C:/Program Files/Android/Android Studio/jbr}" ./gradlew assembleDebug --console=plain -q
-ADB="${ADB:-C:/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb.exe}"
+ADB="${ADB:-adb}"
 DEV=$("$ADB" devices | awk '$2=="device" && $1 ~ /:5555$/ {print $1; exit}')
 if [ -z "$DEV" ]; then
   echo "no device on 5555 - APK is at app/build/outputs/apk/debug/app-debug.apk"

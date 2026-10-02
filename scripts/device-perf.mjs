@@ -49,7 +49,7 @@ const AS_JSON = has('--json');
 const WATCH = has('--watch');
 // --assert turns this from a report into a GATE.
 //
-// Prose has already failed at stopping this bug class. CLAUDE.md said "if you
+// Prose has already failed at stopping this bug class. docs/engineering said "if you
 // add a signal handler that calls setState, throttle it the same way", and an
 // agent then wrote the POWER card's "update DOM and React no more than four
 // times a second" -- faithfully implementing the thing the file was warning
@@ -247,7 +247,7 @@ async function once() {
       console.log('  PERF GATE FAILED');
       for (const f of fails) console.log(`    - ${f}`);
       console.log('');
-      console.log('  See CLAUDE.md, "A hot CAN signal must never reach setState at all".');
+      console.log('  See docs/engineering, "A hot CAN signal must never reach setState at all".');
       console.log('  Throttling is not the fix -- three handlers have tried it. Paint the DOM');
       console.log('  directly and commit only at settle points.');
       console.log('');

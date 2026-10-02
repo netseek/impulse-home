@@ -28,7 +28,7 @@ import java.util.Set;
  * Records trips natively, off the WebView.
  *
  * <p>The page cannot do this: when another app takes focus the WebView goes
- * hidden, Chromium stops servicing rAF and clamps timers to 1 Hz (CLAUDE.md), so
+ * hidden, Chromium stops servicing rAF and clamps timers to 1 Hz (docs/engineering), so
  * a trip recorded there would have holes exactly when the driver is using
  * navigation.
  *

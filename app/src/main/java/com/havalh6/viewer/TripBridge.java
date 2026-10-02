@@ -62,7 +62,7 @@ final class TripBridge {
      * The trip's map snapshot as a {@code data:image/jpeg} URL, or "" while it
      * has not been drawn (offline) or cannot be (no GPS fix). Bind it to an
      * {@code <img src>}, never a style: the template engine splits a style on
-     * ";" and a data URL always contains one (docs/ui-surfaces.md).
+     * ";" and a data URL always contains one (docs/architecture/ui-surfaces.md).
      */
     @JavascriptInterface
     public String getTripMap(String startMs) {

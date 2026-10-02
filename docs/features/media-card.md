@@ -2,7 +2,7 @@
 
 Replaces a rail tile whose body opened the widget picker, a widget with no
 builder of its own, and a popup that did not exist. The three surfaces now come
-out of one builder, the way `docs/ui-surfaces.md` recommends and `DRIVING` does
+out of one builder, the way `docs/architecture/ui-surfaces.md` recommends and `DRIVING` does
 it: `_focusedCardRenderFields` re-exports every key of `_mediaWidgetView` whose
 name starts with the card type, so `mediaTitle` reaches the popup markup as
 `{{ focusedMediaTitle }}` with no second code path, and `_syncDockIndicators`
@@ -40,7 +40,7 @@ contract test fails if one is added.
 Media is the one card with **no DEMO state**, because nothing about it is ever
 synthesised: there is no media equivalent of `_graphDemoValue()`. The builder
 contains no `DEMO` string at all and the contract test asserts it stays that
-way, so the "full badge or nothing" rule in `docs/widget-data-audit.md` cannot
+way, so the "full badge or nothing" rule in `docs/vehicle-data/signals-and-limits.md` cannot
 be violated by abbreviation here.
 
 | State | Badge | When |
@@ -93,7 +93,7 @@ the scene and orbited the camera.
 and it stays that way deliberately: it is the only card whose useful action is a
 command rather than a reading, and folding it into the generic card would cost
 the three transport buttons to gain a shape it does not want. MediaCenter, the
-OEM reference in `docs/oem-apk-can-reference.md`, puts transport on its rail
+OEM reference in `docs/vehicle-data/oem-reference/README.md`, puts transport on its rail
 surface too.
 
 What it borrowed back from the generic card is the part that was missing: a body

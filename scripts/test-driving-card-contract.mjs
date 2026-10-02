@@ -7,7 +7,7 @@
  * than booting a browser, Gradle or a device: what it guards is the small,
  * durable part of the card — which CAN keys it addresses, that a write can only
  * leave through the allow-listed bridge, and that the source vocabulary in
- * docs/widget-data-audit.md is never abbreviated into something that reads like
+ * docs/vehicle-data/signals-and-limits.md is never abbreviated into something that reads like
  * a vehicle value when it is not.
  *
  * Run: node scripts/test-driving-card-contract.mjs

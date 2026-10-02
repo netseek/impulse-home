@@ -7,7 +7,7 @@
  *
  * IMPORTANT: patches JSON only and copies the BIN chunk through unchanged.
  * Do NOT round-trip through gltf-transform read/write — that rewrites vertex
- * layout and can disturb KTX2/Draco payloads. See CLAUDE.md "Editing GLB assets".
+ * layout and can disturb KTX2/Draco payloads. See docs/engineering "Editing GLB assets".
  */
 import fs from 'node:fs';
 import path from 'node:path';

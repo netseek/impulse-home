@@ -149,7 +149,7 @@ public final class MainActivity extends Activity {
                     "close_sunroof",
                     "open_curtain",
                     "close_curtain"
-                    // Software mirror fold is a no-op on this MMI (see CLAUDE.md).
+                    // Software mirror fold is a no-op on this MMI (see docs/engineering).
                     // Keep the names for when OEM virtual-SW fold actually actuates:
                     // "fold_mirrors", "unfold_mirrors", "toggle_mirrors"
             ));

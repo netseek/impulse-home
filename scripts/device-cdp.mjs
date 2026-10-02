@@ -1,5 +1,5 @@
 // Drive the viewer's WebView on a real device (emulator OR the car) over the
-// Chrome DevTools Protocol — the harness CLAUDE.md describes, packaged.
+// Chrome DevTools Protocol — the harness docs/engineering describes, packaged.
 //
 // The app enables setWebContentsDebuggingEnabled(true), so its WebView always
 // publishes @webview_devtools_remote_<pid>. This forwards that socket, attaches

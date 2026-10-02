@@ -8,13 +8,15 @@
 //  * the seat glyph: a Noun Project icon supplied by the owner
 //    (noun_heatedseat_2695898, "Created by Thuy Nguyen from the Noun Project").
 //    The two attribution <text> nodes are stripped from the shipped copy —
-//    the credit lives in docs/credits.md instead, where it can be read.
+//    the credit lives in THIRD_PARTY.md instead, where it can be read.
 import fs from 'node:fs';
 import path from 'node:path';
 
 const OUT = 'assets/ui/icons/clima';
-const BOTTOM_BAR = 'C:/Users/<user>/StudioProjects/haval-app-tool-multimidia/app/src/main/java/br/com/redesurftank/havalshisuku/ui/components/BottomBarUI.kt';
-const SEAT_SVG = 'C:/Users/<user>/Downloads/noun_heatedseat_2695898.svg';
+// Checkout of the sibling Impulse repository, and the Noun Project glyph supplied by the owner.
+const IMPULSE_DIR = process.env.IMPULSE_DIR || '../haval-app-tool-multimidia';
+const BOTTOM_BAR = `${IMPULSE_DIR}/app/src/main/java/br/com/redesurftank/havalshisuku/ui/components/BottomBarUI.kt`;
+const SEAT_SVG = process.env.SEAT_SVG || 'noun_heatedseat_2695898.svg';
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -34,7 +36,7 @@ if (fs.existsSync(SEAT_SVG)) {
   fs.writeFileSync(path.join(OUT, 'seat.svg'), svg);
   const d = [...svg.matchAll(/<path d="([^"]+)"/g)].map((x) => x[1]);
   fs.writeFileSync(path.join(OUT, 'seat-paths.json'), JSON.stringify(d, null, 1) + '\n');
-  console.log(`seat.svg    <- noun_heatedseat_2695898 (${d.length} paths, attribution in docs/credits.md)`);
+  console.log(`seat.svg    <- noun_heatedseat_2695898 (${d.length} paths, attribution in THIRD_PARTY.md)`);
 } else {
   console.warn('seat source not found:', SEAT_SVG);
 }

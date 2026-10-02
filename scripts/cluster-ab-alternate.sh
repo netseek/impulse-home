@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Unattended viewer-vs-static A/B for the cluster-lag test (docs/cluster-ab-plan.md,
+# Unattended viewer-vs-static A/B for the cluster-lag test (docs/engineering/cluster-ab-plan.md,
 # arms C and D). Runs ON the head unit, so it survives adb dropping when the car
 # leaves home Wi-Fi, and nobody has to touch the screen while driving.
 #

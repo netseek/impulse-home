@@ -2,7 +2,7 @@
 
 Replaces the three separate quick cards (`driveMode`, `powerMode`, `regen`) and
 sits alongside the older `modes` widget rather than deleting it. Composition
-follows the recommendation in `docs/oem-apk-can-reference.md`: Vehicle Center
+follows the recommendation in `docs/vehicle-data/oem-reference/README.md`: Vehicle Center
 groups driving-related settings onto one surface, so the glance card anchors on
 the selected drive mode and everything else is progressively disclosed in the
 popup.
@@ -39,7 +39,7 @@ call sites read `CAR_MODE_GROUPS[3]` for regeneration with nothing to catch it.
 ## Source vocabulary
 
 The badge is computed over the three *primary* groups (drive, power,
-recovery) and follows `docs/widget-data-audit.md` rule 5:
+recovery) and follows `docs/vehicle-data/signals-and-limits.md` rule 5:
 
 | State | Badge | When |
 | --- | --- | --- |
