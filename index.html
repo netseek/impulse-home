@@ -5653,7 +5653,7 @@ window.HavalSplash = (function () {
     .hv-energy-glance .hv-energy-tkv-sub { margin-top:4px; padding-top:6px; }
     .hv-energy-glance .hv-energy-tkv-sub li > b { font-size:14px; }
     .hv-energy-glance .hv-energy-tkv li > small { font-size:9px; }
-    .hv-energy-glance .hv-energy-g-chart .hv-energy-tenmin { padding:0 46px 2px 46px; }
+    .hv-energy-glance .hv-energy-g-chart .hv-energy-tenmin { padding:0 var(--ch-x) 2px var(--ch-x); }
     .hv-energy-glance .hv-energy-g-levels { display:grid; grid-template-columns:1fr 1fr; align-content:center; gap:4px 14px; }
     .hv-energy-glance .hv-energy-lrow > b { font-size:16px; }
     /* which pieces each size shows (owner, 2026-09-21)
@@ -5873,7 +5873,7 @@ window.HavalSplash = (function () {
     .hv-energy-tlegend > i { width:12px; height:4px; margin-left:8px; border-radius:2px; }
     .hv-energy-tlegend > i.avg { background:linear-gradient(90deg,#f2994a 0 45%,transparent 45% 55%,#63d9e7 55% 100%); }
     .hv-energy-tlegend > i.drive { background:#63d9e7; } .hv-energy-tlegend > i.regen { background:#3ee08a; } .hv-energy-tlegend > i.fuel { background:#f2994a; } .hv-energy-tlegend > i.ev { background:#2fbf71; }
-    .hv-energy-tenmin { --ch-pad:16px; position:relative; flex:1; min-height:0; padding:0 46px 16px 46px; }
+    .hv-energy-tenmin { --ch-pad:16px; --ch-x:8px; position:relative; flex:1; min-height:0; padding:0 var(--ch-x) 16px var(--ch-x); }
     .hv-energy-tenmin > svg { display:block; width:100%; height:100%; overflow:visible; }
     .hv-energy-tenmin path { vector-effect:non-scaling-stroke; }
     .hv-energy-tenmin path.grid { fill:none; stroke:rgba(255,255,255,.1); stroke-width:1; }
@@ -5887,18 +5887,14 @@ window.HavalSplash = (function () {
     /* Glanceable while driving: big, bright, few (owner, 2026-10-02). */
     .hv-energy-tenmin > span { position:absolute; font:700 16px/1 var(--hv-font); opacity:.95; }
     .hv-energy-tenmin > .xl { font-size:12px; font-weight:400; opacity:.7; }
-    /* Gas on the left, electric on the right (owner, 2026-09-19): fuel scale left, kW right. */
-    .hv-energy-tenmin > .yl { right:0; width:44px; text-align:left; }
-    .hv-energy-tenmin > .ytop,.hv-energy-tenmin > .rtop { top:0; } .hv-energy-tenmin > .ybot,.hv-energy-tenmin > .rbot { bottom:14px; }
-    .hv-energy-tenmin > .ymid { transform:translateY(-50%); }
-    .hv-energy-tenmin > .yr { left:0; width:44px; text-align:right; color:#f2994a; }
-    .hv-energy-tenmin > .rbot { bottom:auto; transform:translateY(-50%); }
-    .hv-energy-tenmin > .xl { bottom:0; } .hv-energy-tenmin > .x0 { left:46px; } .hv-energy-tenmin > .x5 { left:50%; transform:translateX(-50%); } .hv-energy-tenmin > .x10 { right:46px; }
-    /* NOW rides the line's end on the right; the window average sits on its dashed line on the left. */
-    .hv-energy-tenmin > .lnow { right:0; width:44px; font-size:20px; transform:translateY(-50%); color:#63d9e7; }
-    .hv-energy-tenmin > .lnow.up { color:#ff8a8a; } .hv-energy-tenmin > .lnow.dn { color:#7dffb0; }
-    .hv-energy-tenmin > .lavg { left:50px; font-size:13px; opacity:.85; transform:translateY(-120%); }
-    .hv-energy-tenmin > .lnow:empty, .hv-energy-tenmin > .lavg:empty { display:none; }
+    /* No side rulers (owner, 2026-10-02): the chart's own peak and trough carry their value,
+       right on the curve. Electric peak above its crest, regen trough below its dip, fuel peak in orange. */
+    .hv-energy-tenmin > .xl { bottom:0; } .hv-energy-tenmin > .x0 { left:var(--ch-x); } .hv-energy-tenmin > .x5 { left:50%; transform:translateX(-50%); } .hv-energy-tenmin > .x10 { right:var(--ch-x); }
+    .hv-energy-tenmin > .lpk, .hv-energy-tenmin > .ltr, .hv-energy-tenmin > .lfk { font-size:20px; white-space:nowrap; text-shadow:0 0 4px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.85); }
+    .hv-energy-tenmin > .lpk { color:#63d9e7; transform:translate(-50%,-110%); }
+    .hv-energy-tenmin > .ltr { color:#3ee08a; transform:translate(-50%,10%); }
+    .hv-energy-tenmin > .lfk { color:#f2994a; transform:translate(-50%,-110%); }
+    .hv-energy-tenmin > .lpk:empty, .hv-energy-tenmin > .ltr:empty, .hv-energy-tenmin > .lfk:empty { display:none; }
     .hv-energy-glance .hv-energy-g-chart .hv-energy-tenmin { --ch-pad:2px; }
     .hv-energy-tkv { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px 12px; }
     .hv-energy-wide .hv-energy-tkv { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px 14px; }
@@ -7580,7 +7576,7 @@ window.HavalSplash = (function () {
                   </section>
                   <section class="hv-energy-zone hv-energy-g-chart">
                     <p class="hv-energy-zlabel"><span>ÚLTIMOS 10 MIN</span></p>
-                    <div class="hv-energy-tenmin" data-fixed="10m" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg><span class="yl ytop"></span><span class="yl ybot"></span><span class="yr rtop"></span><span class="lnow"></span><span class="lavg"></span></div>
+                    <div class="hv-energy-tenmin" data-fixed="10m" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg><span class="lpk"></span><span class="ltr"></span><span class="lfk"></span></div>
                   </section>
                   <section class="hv-energy-zone hv-energy-z-levels hv-energy-g-levels">
                     <div class="hv-energy-level">
@@ -7651,7 +7647,7 @@ window.HavalSplash = (function () {
                     </section>
                     <section class="hv-energy-zone hv-energy-z-tenmin">
                       <p class="hv-energy-zlabel"><span class="hv-energy-charttitle" data-en="chartTitle">{{ wg.consumptionChartTitle }}</span><span class="hv-energy-tlegend"><i class="fuel"></i>L/100 km<i class="drive"></i>kW tração<i class="regen"></i>kW regen.<i class="avg"></i>médias</span></p>
-                      <div class="hv-energy-tenmin" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg><span class="yl ytop">40</span><span class="yl ymid">0</span><span class="yl ybot">-20</span><span class="yr rtop">20</span><span class="yr rbot">0</span><span class="xl x0">−10 min</span><span class="xl x5">−5</span><span class="xl x10">agora</span><span class="lnow"></span><span class="lavg"></span></div>
+                      <div class="hv-energy-tenmin" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg><span class="lpk"></span><span class="ltr"></span><span class="lfk"></span><span class="xl x0">−10 min</span><span class="xl x5">−5</span><span class="xl x10">agora</span></div>
                       <small class="hv-energy-zsub" data-en="tenMinAvg">{{ wg.consumptionTenMinAvg }}</small>
                     </section>
                     <section class="hv-energy-zone">
@@ -8103,7 +8099,7 @@ window.HavalSplash = (function () {
             <section class="hv-energy-zone hv-energy-z-tenmin">
               <p class="hv-energy-zlabel"><span class="hv-energy-charttitle" data-en="chartTitle">{{ focusedConsumptionChartTitle }}</span><span class="hv-energy-tlegend"><i class="fuel"></i>L/100 km<i class="drive"></i>kW tração<i class="regen"></i>kW regen.<i class="avg"></i>médias</span></p>
               <sc-if value="{{ focusedConsumptionChartControls }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-chartctl"><div class="hv-energy-seg" role="group" aria-label="Intervalo"><sc-for list="{{ focusedConsumptionChartSpans }}" as="cs" hint-placeholder-count="6"><button type="button" class="{{ cs.cls }}" onClick="{{ cs.onClick }}">{{ cs.label }}</button></sc-for></div><div class="hv-energy-seg" role="group" aria-label="Detalhe"><sc-for list="{{ focusedConsumptionChartDensities }}" as="cd" hint-placeholder-count="3"><button type="button" class="{{ cd.cls }}" onClick="{{ cd.onClick }}">{{ cd.label }}</button></sc-for></div></div></sc-if>
-              <div class="hv-energy-tenmin" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg><span class="yl ytop">40</span><span class="yl ymid">0</span><span class="yl ybot">-20</span><span class="yr rtop">20</span><span class="yr rbot">0</span><span class="xl x0">−10 min</span><span class="xl x5">−5</span><span class="xl x10">agora</span><span class="lnow"></span><span class="lavg"></span></div>
+              <div class="hv-energy-tenmin" aria-hidden="true"><svg viewBox="0 0 600 160" preserveAspectRatio="none"><path class="grid" d="M0 0"></path><path class="zero" d="M0 0"></path><path class="drive" d="M0 0"></path><path class="regen" d="M0 0"></path><path class="fuel" d="M0 0"></path><path class="avgdrive" d="M0 0"></path><path class="avgfuel" d="M0 0"></path></svg><span class="lpk"></span><span class="ltr"></span><span class="lfk"></span><span class="xl x0">−10 min</span><span class="xl x5">−5</span><span class="xl x10">agora</span></div>
               <small class="hv-energy-zsub" data-en="tenMinAvg">{{ focusedConsumptionTenMinAvg }}</small>
             </section>
             <section class="hv-energy-zone">
@@ -43644,17 +43640,27 @@ class Component extends DCLogic {
       if (b.ice === false) evKm += dkm;
       if (b.ice === true || b.ice === false) knownKm += dkm;
     }
-    // NOW and the average as plain numbers, placed at their own height on the scale.
-    const lastS = list.length ? list[list.length - 1] : null;
-    const nowKw = lastS && isFinite(lastS.kw) && now - lastS.t <= GAP * 2 ? lastS.kw : null;
-    const pctY = (k) => Math.max(0.06, Math.min(0.94, (hi - k) / (hi - lo))).toFixed(3);
+    // Peak / trough / fuel peak, labelled where they happen on the curve.
+    let pk = null;
+    let tr = null;
+    let fk = null;
+    pts.forEach((q) => {
+      if (isFinite(q.kw)) {
+        if (!pk || q.kw > pk.kw) pk = q;
+        if (!tr || q.kw < tr.kw) tr = q;
+      }
+      if (isFinite(q.fuel) && (!fk || q.fuel > fk.fuel)) fk = q;
+    });
+    const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+    const mark = (q, val, yOf, minY, maxY) => 'left:calc(var(--ch-x) + (100% - 2 * var(--ch-x)) * ' + cl(q.p / W, 0.04, 0.96).toFixed(3)
+      + ');top:calc((100% - var(--ch-pad)) * ' + cl(Number(yOf(val)) / H, minY, maxY).toFixed(3) + ')';
     return {
-      nowText: nowKw == null ? '' : String(Math.round(nowKw)),
-      nowTop: nowKw == null ? '' : 'calc((100% - var(--ch-pad)) * ' + pctY(nowKw) + ')',
-      nowClass: nowKw == null || avgKw == null || Math.abs(nowKw - avgKw) < Math.max(1, (hi - lo) * 0.08) ? '' : (nowKw > avgKw ? 'up' : 'dn'),
-      nowFrac: nowKw == null ? -1 : Number(pctY(nowKw)),
-      avgText: avgKw == null ? '' : 'ø ' + Math.round(avgKw),
-      avgTop: avgKw == null ? '' : 'calc((100% - var(--ch-pad)) * ' + pctY(avgKw) + ')',
+      pkText: pk && pk.kw > 0.5 ? String(Math.round(pk.kw)) : '',
+      pkPos: pk && pk.kw > 0.5 ? mark(pk, pk.kw, y, 0.16, 0.98) : '',
+      trText: tr && tr.kw < -0.5 ? String(Math.round(tr.kw)) : '',
+      trPos: tr && tr.kw < -0.5 ? mark(tr, tr.kw, y, 0.02, 0.84) : '',
+      fkText: fk && fk.fuel > 0.05 ? fk.fuel.toFixed(fk.fuel >= 10 ? 0 : 1) : '',
+      fkPos: fk && fk.fuel > 0.05 ? mark(fk, fk.fuel, yf, 0.16, 0.98) : '',
       grid: 'M0 ' + y(hi) + ' H600 M0 ' + y(lo) + ' H600',
       zero: 'M0 ' + y(0) + ' H600',
       drive: withPaths ? area((k) => Math.max(0, k)) : '',
@@ -43739,34 +43745,18 @@ class Component extends DCLogic {
         const s = h.querySelector('.' + cls);
         if (s && s.textContent !== t) s.textContent = t;
       };
-      text('ytop', v.top);
-      text('ybot', v.bottom);
-      if (v.fuelTop) text('rtop', v.fuelTop);
       if (v.x0) text('x0', v.x0);
       if (v.x5) text('x5', v.x5);
-      const place = (cls, t, top, extra) => {
+      // Value labels sit on the curve itself: text and CSS position, written only on change.
+      const mark = (cls, t, pos) => {
         const s = h.querySelector('.' + cls);
         if (!s) return;
         if (s.textContent !== t) s.textContent = t;
-        if (s.style.top !== top) s.style.top = top;
-        if (extra != null) {
-          const c = cls + (extra ? ' ' + extra : '');
-          if (s.className !== c) s.className = c;
-        }
+        if (s.getAttribute('style') !== pos) s.setAttribute('style', pos);
       };
-      place('lnow', v.nowText || '', v.nowTop || '', v.nowClass || '');
-      place('lavg', v.avgText || '', v.avgTop || '');
-      // The NOW value replaces an axis label it would sit on top of.
-      const hide = (cls, on) => {
-        const s = h.querySelector('.' + cls);
-        if (s && (s.style.visibility === 'hidden') !== on) s.style.visibility = on ? 'hidden' : '';
-      };
-      hide('ytop', v.nowFrac >= 0 && v.nowFrac < 0.14);
-      hide('ybot', v.nowFrac > 0.86);
-      const mid = h.querySelector('.ymid');
-      if (mid && mid.style.top !== v.zeroPct) mid.style.top = v.zeroPct;
-      const rbot = h.querySelector('.rbot');
-      if (rbot && rbot.style.top !== v.zeroPct) rbot.style.top = v.zeroPct;
+      mark('lpk', v.pkText || '', v.pkPos || '');
+      mark('ltr', v.trText || '', v.trPos || '');
+      mark('lfk', v.fkText || '', v.fkPos || '');
     }
   }
 
