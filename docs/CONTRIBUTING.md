@@ -6,7 +6,7 @@ rules below are about not making it slower.
 ## Read first
 
 [`AGENTS.md`](AGENTS.md) holds the ground rules (written for AI agents, and just as good for people),
-and the [engineering notes](docs/engineering/measuring-and-performance.md) hold the hard-won facts.
+and the [engineering notes](engineering/measuring-and-performance.md) hold the hard-won facts.
 Their one rule applies to every performance change: **measure on the car (or say that you could not) before
 and after.** Several plausible optimisations in it were undone by a single
 measurement.
@@ -39,7 +39,7 @@ models under `assets/` with the same file names.
   have the right to relicense.
 * A signal that arrives from the vehicle bus must never reach React `setState`;
   route it through the `_live*` seam (explained in the
-  [engineering notes](docs/engineering/measuring-and-performance.md)).
+  [engineering notes](engineering/measuring-and-performance.md)).
 * Contract tests live in `scripts/test-*.mjs`. A test listed in
   `scripts/tests-known-failing.txt` is known debt; fixing one is a welcome PR.
 * Do not add 3D models, textures or images to a PR. Open an issue first: assets

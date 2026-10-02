@@ -3,8 +3,8 @@
 //   1. every relative Markdown link and image resolves to a tracked file;
 //   2. every Markdown file under docs/ is listed in docs/README.md;
 //   3. no personal data, local path or private network name is tracked;
-//   4. no AI-agent memory file or folder is tracked (AGENTS.md and the CLAUDE.md pointer are the
-//      only agent-facing files, and CLAUDE.md must stay a pointer, not a second copy of the guide).
+//   4. no AI-agent memory file or folder is tracked;
+//   5. the repository root holds a single Markdown file, README.md: the rest lives under docs/.
 //
 // Run it with `node scripts/test-docs.mjs`; scripts/run-tests.mjs runs it with the rest.
 
@@ -70,8 +70,7 @@ const BANNED = [
   [new RegExp('192\\.168\\.33\\.1' + '55'), 'a private LAN address'],
   [new RegExp('[A-Za-z0-9._%+-]+@(gmail|hotmail|outlook|yahoo)\\.com', 'i'), 'a personal e-mail address'],
 ];
-// PUBLISH-CHECKLIST.md is an internal file that is deleted before the repository goes public.
-const SKIP_CONTENT = new Set(['scripts/test-docs.mjs', 'PUBLISH-CHECKLIST.md']);
+const SKIP_CONTENT = new Set(['scripts/test-docs.mjs']);
 for (const f of tracked) {
   if (isVendor(f) || binary.test(f) || SKIP_CONTENT.has(f)) continue;
   let text;
@@ -102,10 +101,13 @@ const AGENT_PATHS = [
 for (const f of tracked) {
   if (AGENT_PATHS.some((re) => re.test(f))) fail(`${f}: AI-agent memory or config must not be committed`);
 }
-assert.ok(trackedSet.has('AGENTS.md'), 'AGENTS.md (the master guide) must exist');
-const claude = read('CLAUDE.md');
-if (claude.split('\n').length > 15 || !claude.includes('@AGENTS.md')) {
-  fail('CLAUDE.md must stay a short pointer that imports @AGENTS.md (no second copy of the guide)');
+assert.ok(trackedSet.has('docs/AGENTS.md'), 'docs/AGENTS.md (the master guide) must exist');
+
+// ---- 5. one Markdown entry point in the root -------------------------------------------------------
+for (const f of tracked) {
+  if (/^[^/]+\.md$/.test(f) && f !== 'README.md') {
+    fail(`${f}: Markdown belongs under docs/ (README.md is the only one in the root)`);
+  }
 }
 
 if (problems.length) {

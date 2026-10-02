@@ -8,7 +8,7 @@ The test base of this repository and how to run it.
 |---|---|---|
 | Node contract tests | `node scripts/run-tests.mjs` | Every `scripts/test-*.mjs`: card, widget and popup contracts read from the source text, plus pure logic (energy insights and map maths, power behaviour, clock labels and sweep, the climate SYNC mirror). |
 | JVM unit tests | `./gradlew :app:testDebugUnitTest` | The pure-Java logic of the native side: `TripEngineTest`, `TripSignalsTest`, `TripMapMathTest`, `RangeLedgerTest`. Nothing in them may touch an Android stub. |
-| Docs guard | `node scripts/test-docs.mjs` (also run by `run-tests.mjs`) | Every relative link in the Markdown resolves; every file under `docs/` is listed in `docs/README.md`; no personal data, local paths or AI-agent memory files are tracked; `CLAUDE.md` stays a pointer. |
+| Docs guard | `node scripts/test-docs.mjs` (also run by `run-tests.mjs`) | Every relative link in the Markdown resolves; every file under `docs/` is listed in `docs/README.md`; no personal data, local paths or AI-agent memory files are tracked; the repository root holds a single Markdown file, `README.md`. |
 | Device harness | `npm run car:perf`, `scripts/device-cdp.mjs` | Frame rate, main-thread blocking and commit cost, on the car or the emulator. Read the signals in pairs; see [measuring-and-performance](measuring-and-performance.md). |
 
 `scripts/run-tests.mjs` reads two lists next to it:
@@ -57,9 +57,9 @@ confirm it then fails. Two checks written that session did not bite, and the
 first control run was itself mis-scoped and reported a false failure. It costs
 one `node -e`, and it is the only thing separating a gate from decoration.
 
-These tests read source text, and `MainActivity.java` and `CLAUDE.md` both have
-**mixed line endings** -- a patch keyed to one will silently fail to match a
-region written with the other. Try LF and CRLF before concluding the text moved.
+These tests read source text, `MainActivity.java` has **mixed line endings** and git can flip
+`index.html` between LF and CRLF -- a patch keyed to one will silently fail to match a region
+written with the other. Try LF and CRLF before concluding the text moved.
 
 And two ways to invalidate your own experiment:
 

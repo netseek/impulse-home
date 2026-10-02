@@ -1,7 +1,7 @@
 # Modularising the viewer
 
-> Companion to `CLAUDE.md`. That file says what the car does under load; this
-> one says where code goes. Read both before a structural change.
+> Companion to the [engineering notes](../engineering/measuring-and-performance.md). Those say what the
+> car does under load; this one says where code goes. Read both before a structural change.
 
 > **STATUS 2026-09-04 — none of §8 has been done, and the file has grown 45%
 > since this was written.** §1's measurements are stale: `index.html` is now
@@ -11,7 +11,7 @@
 > One thing did land, and it is worth knowing about because it is the pattern
 > for hot-signal work: the **`_live*` seam** (`_liveDefine` / `_liveSet` /
 > `_liveGet`, beside `_currentMotionSpeed`). CAN signals that drive the scene no
-> longer travel through `setState` — see CLAUDE.md, "A hot CAN signal must never
+> longer travel through `setState` — see the engineering notes, "A hot CAN signal must never
 > reach `setState` at all". It is not part of this plan and does not depend on
 > it; it is a seam inside the monolith, not a step toward splitting it.
 >
@@ -70,7 +70,7 @@ worse. So:
 > there, and esbuild is already a devDependency.
 
 This keeps the boot path equivalent in kind, so the split itself carries
-**zero runtime delta by construction**. That matters: CLAUDE.md's one rule is
+**zero runtime delta by construction**. That matters: the engineering notes' one rule is
 measure-before-and-after, and a refactor that cannot change the frame is a
 refactor that does not need a car to approve it.
 
@@ -250,7 +250,7 @@ export default {
 };
 ```
 
-This is worth building **even setting the preview aside**. CLAUDE.md records
+This is worth building **even setting the preview aside**. the engineering notes record
 that the CAN bus is nearly silent parked (0.3 signals/sec) — so today a
 driveway test cannot exercise any driving state at all. `?mock=drive-cycle`
 works on the car, on the emulator, and in the browser, and it drives the real
@@ -341,13 +341,13 @@ boots at every step.
    then.
 7. **Extract `wheels`** (~2,100 lines) last. It is the most physics-entangled
    code in the repo (rim repeat measurement, first-harmonic axis correction,
-   blur sprite capture) and CLAUDE.md documents two separate agents breaking
+   blur sprite capture) and the engineering notes document two separate agents breaking
    the blur shader. Move it only once the pattern is boring.
 8. **`scene/`** — renderer, camera, `_setResTier`, post-FX. Do this last and
    **measure on the car**: it is the only step that touches the frame.
 
 Steps 1–7 are prototype-shape-preserving and should not move a single number in
-CLAUDE.md's table. If one moves, something else changed — find it.
+the engineering notes' table. If one moves, something else changed — find it.
 
 ## 9. Rules for agents after this lands
 
@@ -359,5 +359,5 @@ CLAUDE.md's table. If one moves, something else changed — find it.
   states is not reviewable and should not merge.
 - New CAN signal → `core/signals.js`, plus the feature's `signals` array, plus
   a value in every mock scenario.
-- Before a scene/ or render-loop change, re-read CLAUDE.md §"The one rule" and
+- Before a scene/ or render-loop change, re-read the engineering notes, "The one rule", and
   measure on the car. Feature-level changes do not need that; scene ones do.

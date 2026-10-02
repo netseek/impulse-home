@@ -11,7 +11,7 @@ It is part of the [Impulse](https://github.com/bobaoapae/haval-app-tool-multimid
 ecosystem: Impulse reads and writes the vehicle bus, Impulse Home draws it.
 
 > Not affiliated with or endorsed by GWM / Haval. Credits and trademarks:
-> [THIRD_PARTY.md](THIRD_PARTY.md). The screenshots below come from an emulator with
+> [THIRD_PARTY.md](docs/THIRD_PARTY.md). The screenshots below come from an emulator with
 > simulated data (the app marks it **DEMO**).
 
 ## What it does
@@ -85,7 +85,7 @@ adb shell pm install -r -i com.autolink.installer /data/local/tmp/viewer.apk
 `adb install` stalls on this unit, and the `-i com.autolink.installer` identity is
 required: the head unit refuses a plain install of this package.
 
-Releases are signed with one key; see [SECURITY.md](SECURITY.md) to verify it.
+Releases are signed with one key; see [SECURITY.md](docs/SECURITY.md) to verify it.
 
 ## Repository layout
 
@@ -97,13 +97,13 @@ Releases are signed with one key; see [SECURITY.md](SECURITY.md) to verify it.
 | `scripts/` | build tooling for models and textures, device harnesses, tests |
 | `assets/` | fetched, not tracked (see `assets.lock.json`) |
 | `docs/` | engineering notes measured on the car, architecture, feature contracts, vehicle data ([index](docs/README.md)) |
-| `AGENTS.md` | guide and ground rules for AI agents working in the repository |
+| `docs/AGENTS.md` | guide and ground rules for AI agents working in the repository |
 
 ## Licenses and credits
 
 * **Code:** [AGPL-3.0](LICENSE).
 * **Assets** (3D models, images, video): [LICENSE-ASSETS](LICENSE-ASSETS). They are not open
   source; official builds may be used, the files may not be reused.
-* **Third-party:** [THIRD_PARTY.md](THIRD_PARTY.md).
+* **Third-party:** [THIRD_PARTY.md](docs/THIRD_PARTY.md).
 * Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). Seat icon: "heated
   seat" by Thuy Nguyen from the Noun Project. Icons: Material Design Icons (Apache-2.0).

@@ -8,7 +8,7 @@
 //  * the seat glyph: a Noun Project icon supplied by the owner
 //    (noun_heatedseat_2695898, "Created by Thuy Nguyen from the Noun Project").
 //    The two attribution <text> nodes are stripped from the shipped copy —
-//    the credit lives in THIRD_PARTY.md instead, where it can be read.
+//    the credit lives in docs/THIRD_PARTY.md instead, where it can be read.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -36,7 +36,7 @@ if (fs.existsSync(SEAT_SVG)) {
   fs.writeFileSync(path.join(OUT, 'seat.svg'), svg);
   const d = [...svg.matchAll(/<path d="([^"]+)"/g)].map((x) => x[1]);
   fs.writeFileSync(path.join(OUT, 'seat-paths.json'), JSON.stringify(d, null, 1) + '\n');
-  console.log(`seat.svg    <- noun_heatedseat_2695898 (${d.length} paths, attribution in THIRD_PARTY.md)`);
+  console.log(`seat.svg    <- noun_heatedseat_2695898 (${d.length} paths, attribution in docs/THIRD_PARTY.md)`);
 } else {
   console.warn('seat source not found:', SEAT_SVG);
 }

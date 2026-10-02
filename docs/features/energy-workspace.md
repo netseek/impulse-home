@@ -91,7 +91,7 @@ first real drives validate the integration.
 ### Native `TripRecorder` (Java)
 
 The WebView cannot record: once another app takes focus, rAF stops and timers
-drop to 1 Hz (`CLAUDE.md`, hidden WebView). The recorder is **process-scoped**
+drop to 1 Hz ([hidden WebView](../engineering/measuring-and-performance.md)). The recorder is **process-scoped**
 (`TripRecorder.get`) and registers its own receiver for
 `ACTION_VEHICLE_EVENT_CHANGED` on the application context, delivered on its
 worker thread, plus a `LocationManager` GPS listener.

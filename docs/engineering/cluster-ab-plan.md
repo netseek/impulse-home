@@ -17,7 +17,7 @@ question is what the viewer takes away from it.
 One main thread composes both displays, and both flip into GPU (Client)
 composition on their own. If so, the viewer costs the cluster roughly in
 proportion to **how many frames it posts per second**, not to how much CPU each
-frame costs. The GPU itself is idle here (`gl.finish` 0.1 ms, see CLAUDE.md).
+frame costs. The GPU itself is idle here (`gl.finish` 0.1 ms, see [measuring-and-performance](measuring-and-performance.md)).
 
 ## What each arm answers
 
@@ -77,7 +77,7 @@ That is 3 windows of 20 s each, about 70 s with overhead, so a block is ~2.5 min
 
 Run the arms **A B C D D C B A**, then repeat that once: 16 blocks, ~40 min of
 driving. The mirrored order cancels a linear drift. This unit drifts ~2x over
-minutes (see CLAUDE.md), so blocks taken far apart cannot be compared directly.
+minutes (see [measuring-and-performance](measuring-and-performance.md)), so blocks taken far apart cannot be compared directly.
 
 The arms are compared on **rates**, not on the accumulated backlog, so there is
 no need to reset the projection between arms. The backlog carries over;

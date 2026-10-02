@@ -1,8 +1,17 @@
 # Documentation
 
-How the documentation is organised. Agents: start from [AGENTS.md](../AGENTS.md), which holds the rules
+How the documentation is organised. Agents: start from [AGENTS.md](AGENTS.md), which holds the rules
 for working in this repository. Every document under `docs/` is listed here, and a test
 (`scripts/test-docs.mjs`) fails if one is missing or a link is broken.
+
+## Project
+
+| Document | What it covers |
+|---|---|
+| [AGENTS](AGENTS.md) | The guide for AI agents: where to look and eight ground rules |
+| [CONTRIBUTING](CONTRIBUTING.md) | Building, testing and sending a change |
+| [SECURITY](SECURITY.md) | Reporting a vulnerability and verifying a release |
+| [THIRD_PARTY](THIRD_PARTY.md) | Credits and licenses of everything that is not ours |
 
 ## Engineering notes
 
@@ -52,6 +61,6 @@ Hard-won facts about this hardware. Everything here was measured on the car, not
 
 ## Adding or changing a document
 
-Follow [AGENTS.md](../AGENTS.md): add only what is relevant, put each fact in one place, keep personal
+Follow [AGENTS.md](AGENTS.md): add only what is relevant, put each fact in one place, keep personal
 data and agent memory out, and add the file to the table above. Screenshots in `docs/images/` come
 from an emulator with simulated data.
