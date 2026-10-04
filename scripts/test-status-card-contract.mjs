@@ -82,7 +82,9 @@ assert.match(demoTicker, /if\s*\(\s*at\[CAR_SIGNALS\.doors\]\s*\)\s*return/,
 assert.ok(!demoTicker.includes('_carDoorSlots'),
   'presentation ticker must neither read nor mutate canonical parsed door slots');
 
-const unmount = block(html, '  componentWillUnmount(');
+// Anchored to a line start: nested components (DesktopStage) have their own,
+// deeper-indented componentWillUnmount that a bare substring match would hit first.
+const unmount = block(html, '\n  componentWillUnmount(');
 assert.match(unmount, /clearInterval\s*\(\s*this\._demoDoorTicker\s*\)/,
   'unmount must clear the demo door timer');
 assert.match(unmount, /this\._demoDoorTicker\s*=\s*0/,
