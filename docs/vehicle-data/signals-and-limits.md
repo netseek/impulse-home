@@ -85,3 +85,30 @@ action, order or limit), which preserves the rail's scroll position during telem
 2. Confirm that each mode control returns a state acknowledgement, then label its pending and
    unavailable states accordingly.
 3. Verify the Power and Graphs source badges both in a parked, no-bus session and in a moving one.
+
+### Rapid window commands
+
+The receiver calculates an individual toggle from the physical state and ignores
+it during movement (`0`). Home keeps one pending command per window, blocks
+repeated toggles and overlapping all-window commands, and releases them when
+`window_status` confirms the destination or the existing timeout expires. A
+movement reading does not extend the lock after timeout, so stale telemetry
+cannot prevent the user from retrying.
+The animation may anticipate the destination, but the request does not replace
+the confirmed state; the 3D menu shows `MOVENDO…` while waiting. If the bridge is
+unavailable or the command times out, geometry returns to the last received
+reading. Other windows remain usable. `node scripts/test-window-command-race.mjs`
+covers delayed telemetry, repeated taps, overlap with collective commands,
+timeouts and an unavailable bridge.
+
+The status widget's collective window and tailgate buttons show `MOVENDO…` and
+are disabled while a command is pending. The tailgate does not allow a reversal
+on its first nonzero signal: that signal may arrive before travel ends, so it
+uses the existing bounded wait (6 s plus a margin). An unavailable bridge cancels
+the wait and restores the last reading.
+
+The sunroof's special tilt/slide signal is converted to a percentage before
+passing through the same echo buffer as the curtain. Open, close and slider
+commands retain the requested destination while waiting; on expiry, the last
+received signal reconciles the position. Ventilation still maps to 25%.
+Regression coverage: `node scripts/test-roof-command-echo.mjs`.

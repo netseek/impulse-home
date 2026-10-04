@@ -1592,8 +1592,8 @@ window.HavalSplash = (function () {
       --hv-widget-bg: rgba(248, 250, 252, 0.78);
       --hv-widget-border: rgba(20, 28, 40, 0.16);
       --hv-widget-shadow: 0 14px 36px rgba(20, 28, 40, 0.14);
-      --hv-widget-fg: #1c2430;
-      --hv-widget-muted: rgba(28,36,48,.58);
+      --hv-widget-fg: #111b27;
+      --hv-widget-muted: #485565;
       --hv-widget-menu-bg: rgba(255,255,255,.88);
       --hv-config-chip-border: rgba(20, 28, 40, 0.16);
       --hv-config-chip-bg: rgba(20, 28, 40, 0.05);
@@ -4831,9 +4831,9 @@ window.HavalSplash = (function () {
       --hv-frost-noise: linear-gradient(112deg, rgba(255,255,255,.065), rgba(255,255,255,0) 36%), radial-gradient(circle at 18% 0%, rgba(255,255,255,.07), transparent 44%);
     }
     #hv-root.hv-widgets-light {
-      --hv-frost-fill: rgba(247, 250, 252, .68);
+      --hv-frost-fill: rgba(247, 250, 252, .92);
       --hv-frost-fill-strong: rgba(247, 250, 252, .92);
-      --hv-frost-edge: rgba(255, 255, 255, .76);
+      --hv-frost-edge: rgba(35, 49, 64, .22);
       --hv-frost-inner: rgba(255, 255, 255, .58);
       --hv-frost-shadow: 0 15px 38px rgba(38, 51, 62, .16);
       --hv-frost-noise: linear-gradient(112deg, rgba(255,255,255,.82), rgba(255,255,255,0) 40%), radial-gradient(circle at 18% 0%, rgba(255,255,255,.65), transparent 46%);
@@ -7041,6 +7041,17 @@ window.HavalSplash = (function () {
     .hv-status-3x2 .hv-status-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .hv-status-actions button { min-width:0; min-height:46px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:4px; border:1px solid var(--hv-frost-edge); border-radius:9px; background:var(--hv-control-fill); color:inherit; font:600 11px/1 var(--hv-font); letter-spacing:.03em; cursor:pointer; overflow:hidden; }
     .hv-status-actions button small { font:600 8px/1 var(--hv-font); letter-spacing:.08em; opacity:.62; }
+    /* Readable dashboard labels and controls over a bright scenic wallpaper. */
+    #hv-root.hv-widgets-light .hv-widget-card small,
+    #hv-root.hv-widgets-light .hv-status-subtitle,
+    #hv-root.hv-widgets-light .hv-range-total-lbl,
+    #hv-root.hv-widgets-light .hv-range-total > span:first-child,
+    #hv-root.hv-widgets-light .hv-range-legend .leg-sub { opacity:.9; }
+    #hv-root.hv-widgets-light .hv-status-actions button { background:#e2e9ef; border-color:#9baaba; color:#152435; }
+    #hv-root.hv-widgets-light .hv-status-actions button:disabled { background:#e8edf2; color:#435366; border-style:dashed; cursor:wait; }
+    #hv-root.hv-widgets-light .hv-status-summary.attention { color:#b42335; }
+    #hv-root.hv-widgets-light .hv-range-legend .fuel .leg-head { color:#91480b; }
+
     .hv-status-sliders { display:flex; flex-direction:column; justify-content:space-evenly; gap:8px; min-width:0; }
     .hv-status-sliders .hv-hs-roof-slide { display:grid; grid-template-columns:1fr auto; gap:5px; align-items:center; }
     .hv-status-sliders .hv-hs-roof-slide-name { font:600 9px/1 var(--hv-font); letter-spacing:.06em; }
@@ -7336,7 +7347,7 @@ window.HavalSplash = (function () {
               <sc-if value="{{ !wg.statusIsConsole }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-status-stage" onClick="{{ wg.onStatusOpen }}" aria-label="{{ wg.statusAriaLabel }}"><sc-if value="{{ wg.statusShowSummary }}" hint-placeholder-val="{{ false }}"><span class="hv-status-meta"><strong class="hv-status-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><small class="hv-status-subtitle">{{ wg.statusSubtitle }}</small></span></sc-if><div class="hv-status-visual" aria-hidden="true"><div class="hv-status-envelope" style="{{ wg.statusVehicleStyle }}"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-tire-mark {{ st.markCls }}" aria-hidden="true"></i></sc-for></div><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-card-tire {{ st.cls }}"><span><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em></span><small>{{ st.temperature }}{{ st.temperatureUnit }}</small></i></sc-for></div></button></sc-if>
               <sc-if value="{{ wg.statusIsConsole }}" hint-placeholder-val="{{ false }}"><div class="hv-hs-roof-stack hv-status-console-stack"><section class="hv-vehicle-window-panel" aria-label="Status e controles dos vidros" onClick="{{ wg.statusControlClick }}"><div class="hv-vehicle-window-head"><strong>VIDROS</strong></div><div class="hv-vehicle-window-grid"><sc-for list="{{ wg.statusWindowControls }}" as="sw" hint-placeholder-count="4"><button type="button" class="hv-vehicle-window-button {{ sw.cls }}" onClick="{{ sw.onClick }}" aria-label="{{ sw.ariaLabel }}" disabled="{{ sw.disabled }}" aria-disabled="{{ sw.disabled }}" aria-pressed="{{ sw.pressed }}"><strong aria-hidden="true">{{ sw.short }}</strong><span>{{ sw.stateLabel }}</span></button></sc-for></div><div class="hv-vehicle-window-all"><button type="button" onClick="{{ wg.statusWindowCloseAll }}">FECHAR TODAS</button><button type="button" onClick="{{ wg.statusWindowOpenAll }}">ABRIR TODAS</button></div></section><section class="hv-hs-roof-card hv-hs-roof-card-fat" data-hs-roof-card="sunroof" onClick="{{ wg.statusControlClick }}"><div class="hv-hs-roof-row"><div class="hv-hs-roof-slide" style="{{ wg.statusSunroofLevelStyle }}"><span class="hv-hs-roof-slide-name">TETO SOLAR</span><span class="hv-hs-roof-slide-pct">{{ wg.statusSunroofPct }}%</span><div class="hv-hs-roof-track"><i class="hv-hs-roof-track-well"></i><i class="hv-hs-roof-track-fill"></i><i class="hv-hs-roof-knob"></i><i class="hv-hs-roof-vent-mark"></i><input class="hv-hs-roof-quick-range" type="range" min="0" max="100" step="1" value="{{ wg.statusSunroofPct }}" onInput="{{ wg.statusSunroofInput }}" onChange="{{ wg.statusSunroofInput }}" aria-label="Abertura: teto solar"></div></div></div><span class="hv-hs-roof-state">{{ wg.statusSunroofStateLabel }}</span><div class="hv-hs-roof-presets"><button type="button" onClick="{{ wg.statusSunroofPrimary }}">{{ wg.statusSunroofPrimaryLabel }}</button><button type="button" onClick="{{ wg.statusSunroofSecondary }}">{{ wg.statusSunroofSecondaryLabel }}</button></div></section><section class="hv-hs-roof-card hv-hs-roof-card-fat" data-hs-roof-card="curtain" onClick="{{ wg.statusControlClick }}"><div class="hv-hs-roof-row"><div class="hv-hs-roof-slide" style="{{ wg.statusCurtainLevelStyle }}"><span class="hv-hs-roof-slide-name">CORTINA</span><span class="hv-hs-roof-slide-pct">{{ wg.statusCurtainPct }}%</span><div class="hv-hs-roof-track"><i class="hv-hs-roof-track-well"></i><i class="hv-hs-roof-track-fill"></i><i class="hv-hs-roof-knob"></i><input class="hv-hs-roof-quick-range" type="range" min="0" max="100" step="1" value="{{ wg.statusCurtainPct }}" onInput="{{ wg.statusCurtainInput }}" onChange="{{ wg.statusCurtainInput }}" aria-label="Abertura: cortina"></div></div></div><span class="hv-hs-roof-state">{{ wg.statusCurtainStateLabel }}</span><div class="hv-hs-roof-presets"><button type="button" onClick="{{ wg.statusCurtainPrimary }}">{{ wg.statusCurtainPrimaryLabel }}</button><button type="button" onClick="{{ wg.statusCurtainSecondary }}">{{ wg.statusCurtainSecondaryLabel }}</button></div></section><div class="hv-hs-vehicle-stage"><div class="hv-hs-vehicle-meta"><strong class="hv-hs-vehicle-summary {{ wg.statusSummaryClass }}">{{ wg.statusSummary }}</strong><small class="hv-hs-vehicle-subtitle">{{ wg.statusSubtitle }}</small></div><div class="hv-hs-vehicle-art" style="{{ wg.statusVehicleStyle }}" aria-hidden="true"><img class="hv-status-car" src="./assets/ui/vehicle-status/base.png" alt=""><div class="hv-vehicle-roof"><i class="hv-vehicle-roof-cavity"></i><i class="hv-vehicle-roof-curtain"></i><img class="hv-vehicle-roof-fixed" src="./assets/ui/vehicle-status/roof-glass-fixed-v3.png" alt=""><img class="hv-vehicle-roof-glass" src="./assets/ui/vehicle-status/roof-glass-front-v3.png" alt=""><i class="hv-vehicle-roof-frame"></i></div><sc-for list="{{ wg.statusImageLayers }}" as="sl" hint-placeholder-count="9"><img class="hv-status-layer {{ sl.cls }}" src="{{ sl.src }}" alt=""></sc-for><sc-for list="{{ wg.statusSeatBelts }}" as="sb" hint-placeholder-count="5"><i class="hv-envelope-seatbelt {{ sb.cls }}"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-status-tire-mark {{ st.markCls }}" aria-hidden="true"></i></sc-for><sc-for list="{{ wg.statusTires }}" as="st" hint-placeholder-count="4"><i class="hv-hs-vehicle-tire {{ st.cls }}"><strong>{{ st.pressure }}</strong><em>{{ st.pressureUnit }}</em><small>{{ st.temperature }} {{ st.temperatureUnit }}</small></i></sc-for></div><div class="hv-hs-roof-footer" onClick="{{ wg.statusControlClick }}"><button type="button" onClick="{{ wg.statusRoofToggleAll }}">{{ wg.statusRoofToggleAllLabel }}</button><button type="button" onClick="{{ wg.statusTrunkToggle }}">{{ wg.statusTrunkToggleLabel }}</button></div></div></div></sc-if>
               <sc-if value="{{ wg.statusShowSliders }}" hint-placeholder-val="{{ false }}"><div class="hv-status-sliders" onClick="{{ wg.statusControlClick }}"><div class="hv-hs-roof-slide" style="{{ wg.statusSunroofLevelStyle }}"><span class="hv-hs-roof-slide-name">TETO SOLAR</span><span class="hv-hs-roof-slide-pct">{{ wg.statusSunroofPct }}%</span><div class="hv-hs-roof-track"><i class="hv-hs-roof-track-well"></i><i class="hv-hs-roof-track-fill"></i><i class="hv-hs-roof-knob"></i><i class="hv-hs-roof-vent-mark"></i><input class="hv-hs-roof-quick-range" type="range" min="0" max="100" step="1" value="{{ wg.statusSunroofPct }}" onInput="{{ wg.statusSunroofInput }}" onChange="{{ wg.statusSunroofInput }}" aria-label="Abertura: teto solar"></div></div><div class="hv-status-full-presets"><button type="button" onClick="{{ wg.statusSunroofPrimary }}">{{ wg.statusSunroofPrimaryLabel }}</button><button type="button" onClick="{{ wg.statusSunroofSecondary }}">{{ wg.statusSunroofSecondaryLabel }}</button></div><div class="hv-hs-roof-slide" style="{{ wg.statusCurtainLevelStyle }}"><span class="hv-hs-roof-slide-name">CORTINA</span><span class="hv-hs-roof-slide-pct">{{ wg.statusCurtainPct }}%</span><div class="hv-hs-roof-track"><i class="hv-hs-roof-track-well"></i><i class="hv-hs-roof-track-fill"></i><i class="hv-hs-roof-knob"></i><input class="hv-hs-roof-quick-range" type="range" min="0" max="100" step="1" value="{{ wg.statusCurtainPct }}" onInput="{{ wg.statusCurtainInput }}" onChange="{{ wg.statusCurtainInput }}" aria-label="Abertura: cortina"></div></div><div class="hv-status-full-presets"><button type="button" onClick="{{ wg.statusCurtainPrimary }}">{{ wg.statusCurtainPrimaryLabel }}</button><button type="button" onClick="{{ wg.statusCurtainSecondary }}">{{ wg.statusCurtainSecondaryLabel }}</button></div></div></sc-if>
-              <sc-if value="{{ wg.statusShowActions }}" hint-placeholder-val="{{ false }}"><div class="hv-status-actions" onClick="{{ wg.statusControlClick }}"><sc-if value="{{ wg.statusShowWindowAction }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ wg.statusWindowsToggleAll }}"><small>{{ wg.statusWindowsAction }}</small>VIDROS</button></sc-if><button type="button" onClick="{{ wg.statusRoofToggleAll }}"><small>{{ wg.statusRoofAction }}</small>TETO</button><button type="button" onClick="{{ wg.statusTrunkToggle }}"><small>{{ wg.statusTrunkAction }}</small>PORTA-MALAS</button></div></sc-if>
+              <sc-if value="{{ wg.statusShowActions }}" hint-placeholder-val="{{ false }}"><div class="hv-status-actions" onClick="{{ wg.statusControlClick }}"><sc-if value="{{ wg.statusShowWindowAction }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ wg.statusWindowsToggleAll }}" disabled="{{ wg.statusWindowsPending }}" aria-busy="{{ wg.statusWindowsPending }}"><small>{{ wg.statusWindowsAction }}</small>VIDROS</button></sc-if><button type="button" onClick="{{ wg.statusRoofToggleAll }}"><small>{{ wg.statusRoofAction }}</small>TETO</button><button type="button" onClick="{{ wg.statusTrunkToggle }}" disabled="{{ wg.statusTrunkPending }}" aria-busy="{{ wg.statusTrunkPending }}"><small>{{ wg.statusTrunkAction }}</small>PORTA-MALAS</button></div></sc-if>
             </div>
           </sc-if>
           <sc-if value="{{ wg.isRange }}" hint-placeholder-val="{{ false }}">
@@ -8637,6 +8648,9 @@ window.HavalSplash = (function () {
               <button type="button" class="{{ studioTimeClass }}" onClick="{{ studioTimeCycle }}" title="Toque para alternar: Dia, Noite, Auto">{{ studioTimeLabel }}</button>
             </div>
             <div class="hv-studio-note">{{ studioTimeNote }}</div>
+            <div class="hv-studio-label">TELA INICIAL</div>
+            <button type="button" class="hv-studio-custom-btn" onClick="{{ openHomeSettings }}" disabled="{{ !homeSettingsAvailable }}">Definir como tela inicial</button>
+            <div class="hv-studio-note">Escolha o Impulse Home na tela do Android. Disponível se a central permitir.</div>
             <div class="hv-studio-label">IMAGEM</div>
             <button type="button" class="hv-studio-wall {{ studioWallClass }}" onClick="{{ studioOpenWallpaper }}" aria-label="{{ studioWallLabel }}" title="{{ studioWallLabel }}">
               <span class="hv-studio-wall-img" style="{{ studioWallStyle }}"></span>
@@ -8830,6 +8844,7 @@ window.HavalSplash = (function () {
 
     <!-- ── LAYOUT (background + widget hint) ── -->
     <sc-if value="{{ sectionIsLayout }}" hint-placeholder-val="{{ false }}">
+      <button type="button" class="hv-config-reset" onClick="{{ openHomeSettings }}" disabled="{{ !homeSettingsAvailable }}">DEFINIR COMO TELA INICIAL</button>
       <sc-if value="{{ layoutSectionVisible }}" hint-placeholder-val="{{ false }}">
       <div style="font-family: var(--hv-font); font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 8px;">PREENCHIMENTO CENTRAL</div>
       <div class="hv-layout-fill-row">
@@ -9634,12 +9649,6 @@ const H6_DESKTOP_ACCENTS = [
 ];
 const H6_CUSTOM_ACCENTS_KEY = 'h6_custom_accents_v1';
 const H6_CUSTOM_ACCENT_SLOTS = 4;
-const H6_GRAPH_PERIODS = [
-  { key: 'trip', label: 'Viagem' }, { key: '1km', label: '1 km' },
-  { key: '5min', label: '5 min' }, { key: '30min', label: '30 min' },
-  { key: 'hour', label: 'Hora' }, { key: 'day', label: 'Dia' },
-  { key: 'month', label: 'Mês' }, { key: 'year', label: 'Ano' },
-];
 const H6_STUDIO_TABS = ['desktops', 'cards', 'widgets', 'appearance', 'clock'];
 // Layout manager → Cards & widgets explains each half in the driver's language.
 const H6_STUDIO_EXPLAIN_CARDS = 'Estes são os cards que ainda não estão na barra inferior. Toque em um para adicioná-lo no fim da barra. Na barra, arraste e solte para mudar a ordem e toque em × para remover.';
@@ -9923,7 +9932,6 @@ const DEMO_NAV_INTERVAL_MS = 2800;
 // opening/closing cycle observed as -1 → 3 → 1 → 5 → 4 → -1 → 0.
 // Treat any positive value as "not shut", 0 as shut, and negative as unknown
 // (leave the mesh where it is rather than guessing).
-const CAR_OPENING_UNKNOWN = -1;
 
 // car.basic.steering_wheel_angle is the STEERING WHEEL angle (roughly +/-500 deg,
 // lock to lock); the viewer's wheelAngle is the ROAD WHEEL angle, capped at +/-35.
@@ -10291,7 +10299,6 @@ const FIRST_RUN_VIEW_SHIFT = 0.24;
 const SHELL_MODES = ['appCar', 'appsOnly'];
 const SHELL_RATIOS = ['1:1', '2:1', '1:2'];
 const SHELL_BOOT_KEY = 'hv_shell_boot_v1';
-const BING_WALLPAPER_API = 'https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=pt-BR';
 const BING_WALLPAPER_PAGE = 8;
 const BING_WALLPAPER_PAGES = 2; // 16 recent images — scroll for more
 // Microsoft Bing daily wallpaper — Brazilian feed (pt-BR).
@@ -11083,15 +11090,6 @@ class Component extends DCLogic {
     if (i < 0 || !this._customCamViews) return null;
     const p = this._customCamViews[i];
     return (p && typeof p.f === 'number' && typeof p.r === 'number' && typeof p.y === 'number') ? p : null;
-  }
-
-  _hasFilledCamSlots() {
-    if (!this._customCamViews) return false;
-    for (let i = 0; i < CUSTOM_CAM_SLOTS; i++) {
-      const p = this._customCamViews[i];
-      if (p && typeof p.f === 'number') return true;
-    }
-    return false;
   }
 
   _emptyCustomCamViews() {
@@ -12780,11 +12778,6 @@ class Component extends DCLogic {
     } catch (e) {}
   }
 
-  _setPowerElClass(el, base, extra) {
-    if (!el) return;
-    el.className = base + (extra ? (' ' + extra) : '');
-  }
-
   _updatePowerCards(now) {
     if (!this._powerCardCacheAt || now - this._powerCardCacheAt > 500) {
       this._powerCardCache = document.querySelectorAll('.hv-power');
@@ -12874,10 +12867,6 @@ class Component extends DCLogic {
     samples.push({ t: now, v: value });
     const cutoff = now - Math.max(CAR_GRAPH_AVG_MS, CAR_GRAPH_KPI_SPAN_MS) - 500;
     while (samples.length && samples[0].t < cutoff) samples.shift();
-  }
-
-  _graphDefaultPane() {
-    return { kind: 'series', vars: ['evPowerKw'], y1Rulers: false, y2Rulers: false, vizStyle: 'spectrum', graphStyle: 'line' };
   }
 
   _graphNormalizePane(pane) {
@@ -14906,13 +14895,15 @@ class Component extends DCLogic {
     // While a UI toggle is travelling, swallow mid-travel 0/3 echoes so the
     // optimistic car-paced tween is not yanked to PARTIAL mid-glass.
     let anyIgnored = false;
-    corners.forEach((corner) => {
+    let pendingSettled = false;
+    corners.forEach((corner, i) => {
       if (!this._isWindowBusIgnored(corner)) return;
       anyIgnored = true;
       const entry = this._windowBusIgnore[corner];
       const st = states[corner];
       entry.pending = st;
-      if (entry.goal && st === entry.goal) {
+      if ((slots[i] === 1 || slots[i] === 2) && entry.goal && st === entry.goal) {
+        pendingSettled = true;
         // Arrived — clear ignore early and adopt.
         if (entry.timer) {
           clearTimeout(entry.timer);
@@ -14923,8 +14914,7 @@ class Component extends DCLogic {
         entry.pending = null;
         return;
       }
-      // Keep showing the optimistic goal for this corner.
-      states[corner] = entry.goal || prev[corner] || states[corner];
+      // Keep confirmed telemetry separate from the animated target.
     });
     const changed = corners.some((c) => (prev[c] || null) !== states[c]);
     this._carWindowStates = states;
@@ -14933,17 +14923,20 @@ class Component extends DCLogic {
     this._hsWindowMenuStates = menu;
     const byCorner = {};
     corners.forEach((c) => {
-      byCorner[c] = states[c] === 'open' ? 100
-        : states[c] === 'partial' ? PARTIAL_PCT
+      const entry = this._windowBusIgnore && this._windowBusIgnore[c];
+      const visual = this._isWindowBusIgnored(c) ? entry.goal : states[c];
+      byCorner[c] = visual === 'open' ? 100
+        : visual === 'partial' ? PARTIAL_PCT
         : 0;
     });
     this._setWindowCornerTargets(byCorner);
     this._syncWindowsOpenFromCorners();
     this._syncHotspotWindowsMenu();
+    if (pendingSettled) this._refreshUnifiedStatus();
     // The roof popup and the Status card paint imperatively and were only
     // synced when the popup opened, so a window moving while either was on
     // screen left a stale label. Repaint on change only.
-    if (changed && !anyIgnored) {
+    if (changed || anyIgnored) {
       try { this._syncRoofVehicleStatus(this._statusEnvelopeSnapshot()); } catch (e) {}
     }
     if (this.requestRender) this.requestRender(4);
@@ -15030,16 +15023,8 @@ class Component extends DCLogic {
         if (trunkN !== undefined && isFinite(trunkN) && trunkN >= 0) {
           const pct = trunkN > 0 ? 100 : 0;
           entry.pending = pct;
-          if (entry.goal != null && pct === entry.goal) {
-            if (entry.timer) {
-              clearTimeout(entry.timer);
-              entry.timer = null;
-            }
-            entry.until = 0;
-            entry.goal = null;
-            entry.pending = null;
-            this._setTrunkOpen(pct);
-          }
+          // The tailgate reports nonzero before travel ends. Keep the bounded
+          // pending window instead of treating that early echo as completion.
         }
       } else {
         applySlot(trunkN, (pct) => this._setTrunkOpen(pct));
@@ -15074,9 +15059,8 @@ class Component extends DCLogic {
       const slide = Math.min(1, n / CAR_SUNROOF_SLIDE_MAX);
       pct = SUNROOF_TILT_PCT + slide * (100 - SUNROOF_TILT_PCT);
     }
-    this._sunroofStep = CAR_OPENING_STEP;
-    this._setSunroofOpen(pct);
-    this._syncEventCamera();
+    // Reuse the roof echo buffer after converting the special tilt/slide signal.
+    this._applyCarOpening('_setSunroofOpen', pct, 100);
   }
 
   /**
@@ -15216,7 +15200,7 @@ class Component extends DCLogic {
     const entry = this._windowBusIgnore[corner] || (this._windowBusIgnore[corner] = {});
     entry.until = performance.now() + wait;
     entry.goal = toPct > 50 ? 'open' : 'closed';
-    entry.pending = null;
+    entry.pending = (this._carWindowStates || {})[corner] || 'closed';
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = setTimeout(() => this._flushWindowBusIgnore(corner), wait);
   }
@@ -15238,12 +15222,14 @@ class Component extends DCLogic {
     entry.pending = null;
     entry.goal = null;
     if (!pending) return;
+    this._ensureHsWindowMenuStates()[corner] = pending === 'closed' ? 'closed' : 'open';
     const byCorner = {};
     byCorner[corner] = pending === 'open' ? 100 : (pending === 'partial' ? 45 : 0);
     this._setWindowCornerTargets(byCorner);
     this._syncWindowsOpenFromCorners();
     this._syncHotspotWindowsMenu();
     try { this._syncRoofVehicleStatus(this._statusEnvelopeSnapshot()); } catch (e) {}
+    this._refreshUnifiedStatus();
   }
 
   _armTrunkBusIgnore(toPct) {
@@ -15253,7 +15239,8 @@ class Component extends DCLogic {
     const entry = this._trunkBusIgnore;
     entry.until = performance.now() + wait;
     entry.goal = toPct > 0 ? 100 : 0;
-    entry.pending = null;
+    const slot = this._carDoorSlots && this._carDoorSlots[CAR_DOOR_SLOTS.trunk];
+    entry.pending = slot == null ? ((this.state && this.state.trunkOpen) || 0) : (slot > 0 ? 100 : 0);
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = setTimeout(() => this._flushTrunkBusIgnore(), wait);
   }
@@ -15276,6 +15263,7 @@ class Component extends DCLogic {
     entry.goal = null;
     if (pending == null || !isFinite(pending)) return;
     this._setTrunkOpen(pending);
+    this._refreshUnifiedStatus();
   }
 
   /** Steering-wheel degrees → road-wheel degrees, clamped to the model's range. */
@@ -15620,32 +15608,6 @@ class Component extends DCLogic {
     const effectiveColor = eff === 'light' ? accent.light : accent.dark;
     this.setState({ accentColor: effectiveColor });
     this._syncDockIndicators();
-  }
-
-  openConfigSection(section) {
-    // Legacy 'tuning' maps to paint panel + tuning submenu.
-    if (section === 'tuning') section = 'paint';
-    if (section === 'time') {
-      this.setState((st) => ({
-        configExpanded: true,
-        activeGroup: st.activeGroup === 'time' ? null : 'time',
-      }));
-      return;
-    }
-    const patch = { configExpanded: true, panelOpen: true, configSection: section };
-    if (section === 'paint' || section === 'wheels') {
-      patch.activeGroup = 'tuning';
-      patch.tuningSubTab = section;
-    } else if (section === 'env') {
-      patch.activeGroup = 'env';
-    } else if (section === 'camera') {
-      this.toggleCameraRail(true);
-      return;
-    } else if (section === 'override') {
-      patch.activeGroup = 'override';
-    }
-    this.setState(patch);
-    if (section === 'wheels') this._generateCatalogThumbnails();
   }
 
   toggleConfigRail() {
@@ -16403,6 +16365,8 @@ class Component extends DCLogic {
         });
       })(),
       onSaveSettings: () => this.saveSettings(),
+      homeSettingsAvailable: !!(window.AppLauncherBridge && typeof window.AppLauncherBridge.openHomeSettings === 'function'),
+      openHomeSettings: () => window.AppLauncherBridge.openHomeSettings(),
       // The camera section has its own save-to-desktop row; a second SAVE
       // up here only made it unclear which one stores the view.
       configSaveDisplay: s.configSection === 'camera' ? 'none' : '',
@@ -17444,14 +17408,14 @@ class Component extends DCLogic {
     if (this.requestRender) this.requestRender(2);
   }
 
-  _setCenterFill(mode, after) {
+  _setCenterFill(mode, after, showPicker = false) {
     const next = this._normalizeCenterFill(mode);
-    if (this.state.centerFill === next) {
+    if (this.state.centerFill === next && !showPicker) {
       if (typeof after === 'function') after();
       return;
     }
     const patch = { centerFill: next };
-    if (next === 'car') patch.wallpaperPopupOpen = false;
+    if (next === 'car' || showPicker) patch.wallpaperPopupOpen = next !== 'car';
     if (next === 'wallpaper') {
       if (this._hotspotsVisible || this._hsRoofPopOpen) this._hideHotspots();
       patch.hotspotsChrome = false;
@@ -17485,20 +17449,18 @@ class Component extends DCLogic {
     const order = ['car', 'wallpaper', 'mixed'];
     const cur = this._normalizeCenterFill(this.state.centerFill);
     const next = order[(order.indexOf(cur) + 1) % order.length];
-    this._setCenterFill(next);
+    // One commit keeps the mode, its picker and the native card in step.
+    this._wallpaperReturnTab = null;
+    this._setCenterFill(next, null, true);
   }
 
   openWallpaperPopup() {
-    if (!this._centerFillUsesWallpaper()) {
-      this._setCenterFill('wallpaper', () => {
-        this._wallpaperReturnTab = null;
-        this.setState({ wallpaperPopupOpen: true });
-        this._ensureWallpapers(false);
-      });
-      return;
-    }
     // Opened from anywhere but Appearance: nothing to go back to.
     this._wallpaperReturnTab = null;
+    if (!this._centerFillUsesWallpaper()) {
+      this._setCenterFill('wallpaper', null, true);
+      return;
+    }
     this.setState({ wallpaperPopupOpen: true });
     this._ensureWallpapers(false);
   }
@@ -17549,10 +17511,6 @@ class Component extends DCLogic {
         }, 100);
       }
     }
-  }
-
-  openFirstRunSetup() {
-    this.setState({ firstRunSetupOpen: true });
   }
 
   _confirmFirstRunSetup() {
@@ -17633,17 +17591,6 @@ class Component extends DCLogic {
     });
   }
 
-  _toggleWallpaperAuto(on) {
-    const next = on == null ? !this.state.wallpaperAuto : !!on;
-    if (this.state.wallpaperAuto === next) return;
-    const patch = { wallpaperAuto: next };
-    if (next) patch.wallpaperIdx = 0;
-    this.setState(patch, () => {
-      if (next) this._ensureWallpapers(true);
-      else this._syncWallpaperLayer();
-    });
-  }
-
   _formatWallpaperDate(raw) {
     if (!raw || String(raw).length < 8) return '';
     const d = String(raw);
@@ -17671,15 +17618,6 @@ class Component extends DCLogic {
       this._ensureWallpapers(true);
       this.saveSettings();
     });
-  }
-
-  _wallpaperStep(delta) {
-    const entries = this._wallpaperEntries || [];
-    if (!entries.length) {
-      this._ensureWallpapers(false);
-      return;
-    }
-    this._selectWallpaperIdx((this.state.wallpaperIdx || 0) + delta);
   }
 
   _wallpaperStarFields(url, entryForFavorite) {
@@ -18134,13 +18072,6 @@ class Component extends DCLogic {
       if (!this._wheelAngleHeldByUi) this._carSteerAtHold = this._lastCarSteerDeg;
       this._wheelAngleHeldByUi = true;
     }
-  }
-
-  _releaseMotionUiHold() {
-    this._motionSpeedHeldByUi = false;
-    this._wheelAngleHeldByUi = false;
-    this._carSpeedAtHold = undefined;
-    this._carSteerAtHold = undefined;
   }
 
   // ── Motion controls ─────────────────────────────────────────────────────
@@ -21417,25 +21348,6 @@ class Component extends DCLogic {
     this._finishHdriSwitch();
   }
 
-  selectTab(tab) {
-    // Legacy helper — route old tab ids into the new section nav.
-    if (tab === 'color') { this.openConfigSection('paint'); return; }
-    if (tab === 'wheels') { this.openConfigSection('wheels'); return; }
-    if (tab === 'env') { this.openConfigSection('env'); return; }
-    if (tab === 'lights' || tab === 'motion' || tab === 'doors') {
-      this.setState({
-        configExpanded: true, panelOpen: true, activeGroup: 'override',
-        configSection: 'override', overrideSubTab: tab,
-      });
-      return;
-    }
-    this.openConfigSection('paint');
-  }
-
-  toggleNightMode() {
-    this.setTimeMode(this.state.nightMode ? 'day' : 'night');
-  }
-
   _applyNightMode(next, force) {
     if (!force && this.state.nightMode === next) return;
     // Build the SpotLight rig on the way in, never on the way out — day mode
@@ -22124,34 +22036,6 @@ class Component extends DCLogic {
     panel(2.0, 4, 9, [5, 5, -11], [0, 2, 0]);
     panel(0.5, 26, 26, [0, -7, 0], [0, 0, 0]);
     return env;
-  }
-
-  // Soft elliptical contact shadow rendered as a textured plane under the car.
-
-  // Procedural metallic-flake normal map. Tiny random sub-pixel normals that,
-  // tiled densely under the clearcoat, read as fine metallic sparkle.
-  makeFlakeNormal() {
-    const THREE = this.THREE;
-    if (this._flakeTex) return this._flakeTex;
-    const S = 256;
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = S;
-    const ctx = cv.getContext('2d');
-    const img = ctx.createImageData(S, S);
-    for (let i = 0; i < S * S; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const r = Math.pow(Math.random(), 1.5) * 0.85; // mostly flat, occasional steep
-      img.data[i * 4]     = 128 + Math.round(Math.cos(a) * r * 127);
-      img.data[i * 4 + 1] = 128 + Math.round(Math.sin(a) * r * 127);
-      img.data[i * 4 + 2] = 255;
-      img.data[i * 4 + 3] = 255;
-    }
-    ctx.putImageData(img, 0, 0);
-    const t = new THREE.CanvasTexture(cv);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(48, 48);
-    this._flakeTex = t;
-    return t;
   }
 
   // ShadowMaterial-based shadow catcher: a thin plane at car base that is
@@ -23171,30 +23055,6 @@ class Component extends DCLogic {
     return true;
   }
 
-  // Trim a mesh in place to keep only triangles whose world-Y centroid is at or
-  // above minWorldY (used to drop the cluster faces below the rear signature bar).
-  _trimMeshAboveY(mesh, minWorldY) {
-    const THREE = this.THREE;
-    const geo = mesh.geometry;
-    const pos = geo.attributes.position;
-    if (!pos) return;
-    const index = geo.index;
-    const triCount = index ? index.count / 3 : pos.count / 3;
-    const keep = [];
-    const v = new THREE.Vector3();
-    mesh.updateMatrixWorld(true);
-    for (let t = 0; t < triCount; t++) {
-      const a = index ? index.getX(t*3)   : t*3;
-      const b = index ? index.getX(t*3+1) : t*3+1;
-      const c = index ? index.getX(t*3+2) : t*3+2;
-      let yc = 0;
-      [a, b, c].forEach(i => { v.fromBufferAttribute(pos, i); mesh.localToWorld(v); yc += v.y; });
-      yc /= 3;
-      if (yc >= minWorldY) keep.push(a, b, c);
-    }
-    if (keep.length) geo.setIndex(keep);
-  }
-
   // Split each mesh into left (worldZ>0) and right (worldZ<0) halves by triangle
   // centroid. Each half gets its own cloned material so they emit independently.
   // Split a single mesh into inner (|worldZ| < threshold) and outer (|worldZ| >= threshold)
@@ -24068,11 +23928,6 @@ class Component extends DCLogic {
 
   _toggleHotspotWindow(key) {
     if (!['fl', 'fr', 'rl', 'rr'].includes(key)) return;
-    const openNow = this._hsWindowCornerState(key) === 'open';
-    const next = openNow ? 0 : 100;
-    this._setWindowCornerOpen(key, next);
-    this._armWindowBusIgnore(key, next);
-    // Local 3D already applied; bridge only needs the per-corner command.
     this._sendCarCommand('toggle_window_' + key, '', { skipLocal: true });
     this._armHotspotHideTimer();
   }
@@ -24085,8 +23940,13 @@ class Component extends DCLogic {
       const open = this._hsWindowCornerState(key) === 'open';
       const btn = menu.querySelector('[data-hs-window-key="' + key + '"]');
       const lbl = menu.querySelector('[data-hs-window-lbl="' + key + '"]');
-      if (btn) btn.classList.toggle('open', open);
-      if (lbl) lbl.textContent = open ? 'OPEN' : 'FECHADO';
+      const pending = this._isWindowBusIgnored(key);
+      if (btn) {
+        btn.classList.toggle('open', open);
+        btn.disabled = pending;
+        btn.setAttribute('aria-busy', String(pending));
+      }
+      if (lbl) lbl.textContent = pending ? 'MOVENDO…' : (open ? 'OPEN' : 'FECHADO');
     });
   }
 
@@ -24099,9 +23959,6 @@ class Component extends DCLogic {
     btn.setAttribute('aria-label', 'Tailgate open or close');
     btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
-      const next = ((this.state && this.state.trunkOpen) || 0) > 0 ? 0 : 100;
-      this._setTrunkOpen(next);
-      this._armTrunkBusIgnore(next);
       this._sendCarCommand('toggle_trunk', '', { skipLocal: true });
       this._armHotspotHideTimer();
     });
@@ -24114,7 +23971,10 @@ class Component extends DCLogic {
     const open = ((this.state && this.state.trunkOpen) || 0) > 0;
     const btn = menu.querySelector('[data-hs-trunk-toggle]');
     if (!btn) return;
-    btn.textContent = open ? 'FECHAR' : 'OPEN';
+    const pending = this._isTrunkBusIgnored();
+    btn.disabled = pending;
+    btn.setAttribute('aria-busy', String(pending));
+    btn.textContent = pending ? 'MOVENDO…' : (open ? 'FECHAR' : 'OPEN');
     btn.classList.toggle('open-action', !open);
   }
 
@@ -24491,27 +24351,6 @@ class Component extends DCLogic {
     canvas.addEventListener('pointercancel', this._onHsPointerUp);
   }
 
-  _initCamFab() {
-    if (!this._hsLayer || this._camFabEl) return;
-    const wrap = document.createElement('div');
-    wrap.className = 'hv-cam-fab';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'hv-cam-fab-btn';
-    btn.title = 'Vistas de câmera';
-    btn.setAttribute('aria-label', 'Vistas de câmera');
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>';
-    btn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      this._hideHotspots();
-      this.toggleCameraRail();
-    });
-    wrap.appendChild(btn);
-    this._hsLayer.appendChild(wrap);
-    this._camFabEl = wrap;
-    this._camFabBtn = btn;
-  }
-
   _initXrayFab() {
     if (!this._hsLayer || this._xrayFabEl) return;
     const wrap = document.createElement('div');
@@ -24615,82 +24454,6 @@ class Component extends DCLogic {
     if (btn) btn.classList.toggle('act', !!act);
   }
 
-  _rebuildCamFabAnchor(root) {
-    const model = root || this.model;
-    if (!this.THREE || !model) {
-      this._camFabAnchor = null;
-      return;
-    }
-    const THREE = this.THREE;
-    model.updateMatrixWorld(true);
-    const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
-    let world = this._rearLeftWheelFabWorld();
-    if (!world) {
-      const skip = new Set([this.floorMesh, this.nightFloor, this.shadowCatcher, this.contactShadow]
-        .filter(Boolean));
-      const box = new THREE.Box3();
-      model.traverse((o) => {
-        if (o.isMesh && o.visible && !skip.has(o)) box.expandByObject(o);
-      });
-      if (box.isEmpty()) {
-        this._camFabAnchor = null;
-        return;
-      }
-      const center = box.getCenter(new THREE.Vector3());
-      const { F, R } = this._carBasis();
-      let fMin = Infinity, fMax = -Infinity, rMin = Infinity, rMax = -Infinity;
-      for (let i = 0; i < 8; i++) {
-        const c = new THREE.Vector3(
-          (i & 1) ? box.max.x : box.min.x,
-          (i & 2) ? box.max.y : box.min.y,
-          (i & 4) ? box.max.z : box.min.z);
-        const rel = c.clone().sub(center);
-        const f = rel.dot(F), r = rel.dot(R);
-        if (f < fMin) fMin = f;
-        if (f > fMax) fMax = f;
-        if (r < rMin) rMin = r;
-        if (r > rMax) rMax = r;
-      }
-      const inset = 0.06;
-      const spanR = rMax - rMin;
-      world = center.clone()
-        .addScaledVector(F, fMin + (fMax - fMin) * inset)
-        .addScaledVector(R, rMin + spanR * inset);
-      world.y = box.min.y + (box.max.y - box.min.y) * 0.22;
-      world.addScaledVector(R, -spanR * 0.14);
-    }
-    this._camFabAnchor = world.applyMatrix4(inv);
-  }
-
-  // Rear-left wheel hub, nudged outboard so the icon sits in the gap beside the
-  // tyre rather than on the body glass.
-  _rearLeftWheelFabWorld() {
-    const wheels = this._rearLeftWheels;
-    if (!wheels || !wheels.length || !this.THREE) return null;
-    const THREE = this.THREE;
-    const box = new THREE.Box3();
-    wheels.forEach((m) => {
-      if (m && m.isMesh && this._isWorldVisible(m)) box.expandByObject(m);
-    });
-    if (box.isEmpty()) return null;
-    const center = box.getCenter(new THREE.Vector3());
-    const ref = wheels.find((m) => m._rollAxis) || wheels[0];
-    const axle = ref && ref._rollAxis ? ref._rollAxis.clone().normalize() : null;
-    let outward;
-    if (axle) outward = axle.clone().negate(); // left side outboard (matches blur discs)
-    else {
-      const { R } = this._carBasis();
-      outward = R.clone().negate();
-    }
-    const size = box.getSize(new THREE.Vector3());
-    const outDist = Math.max(size.x, size.y, size.z) * 0.54 + 0.07;
-    center.addScaledVector(outward, outDist);
-    const { F } = this._carBasis();
-    center.addScaledVector(F, -0.07); // nudge toward rear (screen-right in RL 3/4)
-    center.y = box.min.y + size.y * 0.42;
-    return center;
-  }
-
   _closeCameraPanel() {
     if (this.state.panelOpen && this.state.activeGroup === 'camera') {
       this.setState({ panelOpen: false, activeGroup: null, camSlotPickMode: false, camSlotDeleteKey: null });
@@ -24705,18 +24468,6 @@ class Component extends DCLogic {
       || t.closest('.hv-cam-fab')
     )) return;
     this._closeCameraPanel();
-  }
-
-  _updateCamFab() {
-    const world = this._rearLeftWheelFabWorld();
-    if (world && this.model) {
-      this.model.updateMatrixWorld(true);
-      const inv = new THREE.Matrix4().copy(this.model.matrixWorld).invert();
-      if (!this._camFabAnchor) this._camFabAnchor = new this.THREE.Vector3();
-      this._camFabAnchor.copy(world).applyMatrix4(inv);
-    }
-    const on = this.state.panelOpen && this.state.activeGroup === 'camera';
-    this._projectHsFab(this._camFabEl, this._camFabBtn, this._camFabAnchor, on);
   }
 
   _updateXrayFab() {
@@ -24743,9 +24494,6 @@ class Component extends DCLogic {
     this._hsLayer = null;
     this._disposeXrayWheelGlows();
     this._disposeXrayTireBands();
-    this._camFabEl = null;
-    this._camFabBtn = null;
-    this._camFabAnchor = null;
     this._xrayFabEl = null;
     this._xrayFabBtn = null;
     this._xrayFabAnchor = null;
@@ -24853,16 +24601,6 @@ class Component extends DCLogic {
     else this._queueVehicleOpeningLevel(kind, level);
   }
 
-  _flushVehicleOpeningLevel(kind) {
-    const command = this._vehicleOpeningCommand(kind);
-    if (!command || !command.set || !this._vehicleOpeningTimers || this._vehicleOpeningTimers[kind] == null) return;
-    const timer = this._vehicleOpeningTimers[kind];
-    clearTimeout(timer);
-    delete this._vehicleOpeningTimers[kind];
-    const key = kind === 'windows' ? 'windowsOpen' : (kind === 'sunroof' ? 'sunroofOpen' : 'curtainOpen');
-    this._sendCarCommand(command.set, String(this._vehicleOpeningLevel(this.state[key])), { skipLocal: true });
-  }
-
   _setVehicleOpeningLevel(kind, raw) {
     const command = this._vehicleOpeningCommand(kind);
     if (!command || !command.set) return;
@@ -24880,11 +24618,11 @@ class Component extends DCLogic {
     this._clearVehicleOpeningLevel(kind);
     const level = action === 'open' ? 100 : 0;
     if (kind === 'curtain' || kind === 'sunroof') this._beginCarRoofTravel(kind, level);
-    else this._applyVehicleOpeningLevel(kind, level);
+    else if (kind !== 'windows') this._applyVehicleOpeningLevel(kind, level);
+
     if (kind === 'windows') {
-      ['fl', 'fr', 'rl', 'rr'].forEach((k) => this._armWindowBusIgnore(k, level));
-    }
-    this._sendCarCommand(command[action], '', { skipLocal: true });
+      this._sendCarCommand(command[action], '');
+    } else this._sendCarCommand(command[action], '', { skipLocal: true });
   }
 
   _applyCarCommandLocally(cmd, value) {
@@ -24960,7 +24698,33 @@ class Component extends DCLogic {
 
   _sendCarCommand(cmd, value, opts) {
     if (!cmd) return false;
+    if (cmd === 'toggle_trunk') {
+      if (this._isTrunkBusIgnored()) return false;
+      const slot = this._carDoorSlots && this._carDoorSlots[CAR_DOOR_SLOTS.trunk];
+      const open = slot == null ? ((this.state && this.state.trunkOpen) || 0) > 0 : slot > 0;
+      const next = open ? 0 : 100;
+      this._armTrunkBusIgnore(next);
+      this._setTrunkOpen(next);
+      opts = { skipLocal: true };
+    }
+    const windowMatch = /^toggle_window_(fl|fr|rl|rr)$/.exec(cmd);
+    const corners = windowMatch ? [windowMatch[1]]
+      : /^(open_windows|close_windows|toggle_windows)$/.test(cmd) ? ['fl', 'fr', 'rl', 'rr'] : [];
+    // Toggles use the receiver's current state, so overlapping requests cannot
+    // safely express a reversal. Wait for telemetry (or the bounded timeout).
+    if (corners.some((key) => this._isWindowBusIgnored(key))) return false;
+    if (windowMatch) {
+      const key = windowMatch[1];
+      const next = ((this._carWindowStates || {})[key] || 'closed') === 'closed' ? 100 : 0;
+      this._armWindowBusIgnore(key, next);
+      this._setWindowCornerOpen(key, next);
+      opts = { skipLocal: true };
+    }
     if (!opts || !opts.skipLocal) this._applyCarCommandLocally(cmd, value);
+    corners.forEach((key) => {
+      this._ensureHsWindowMenuStates()[key] = ((this._carWindowStates || {})[key] || 'closed') === 'closed' ? 'closed' : 'open';
+    });
+    if (corners.length) this._syncHotspotWindowsMenu();
     try {
       const bridge = window.TelemetryBridge;
       if (bridge && typeof bridge.invokeVehicleCommand === 'function') {
@@ -24968,6 +24732,8 @@ class Component extends DCLogic {
         return true;
       }
     } catch (e) {}
+    corners.forEach((key) => this._flushWindowBusIgnore(key));
+    if (cmd === 'toggle_trunk') this._flushTrunkBusIgnore();
     console.warn('[vehicle-control] no Impulse bridge for', cmd, value || '');
     return false;
   }
@@ -25201,6 +24967,7 @@ class Component extends DCLogic {
       return;
     }
     this._sendCarCommand('toggle_trunk', '', { skipLocal: true });
+    this._refreshUnifiedStatus();
   }
 
   _setAllStatusWindows(action, ev) {
@@ -25583,7 +25350,6 @@ class Component extends DCLogic {
 
     this._hsAnchors = anchors;
     this._ensureHotspotElements();
-    this._rebuildCamFabAnchor(model);
     this._rebuildXrayFabAnchor(model);
   }
 
@@ -27222,11 +26988,6 @@ class Component extends DCLogic {
     );
   }
 
-  setWheelSubTab(tab) {
-    this.setState({ wheelSubTab: tab });
-    if (tab === 'catalog') this._generateCatalogThumbnails();
-  }
-
   // Which catalog wheel is stock for a sellable trim (see _trims()).
   _stockCatalogKeyFor(trimKey) {
     const trim = trimKey || (this.state && this.state.modelTrim) || 'phev34';
@@ -27251,10 +27012,6 @@ class Component extends DCLogic {
     const saved = this.state.selectedCatalogKey;
     if (!saved || saved === stockKey || this._isStockPlaceholderKey(saved)) return stockKey;
     return saved;
-  }
-
-  _wheelAssetFile(item) {
-    return item.file;
   }
 
   onSelectStockWheel() {
@@ -27353,7 +27110,7 @@ class Component extends DCLogic {
       loader.setMeshoptDecoder(window.MeshoptDecoder);
     }
     loader.load(
-      'assets/wheels/' + this._wheelAssetFile(item),
+      'assets/wheels/' + item.file,
       (gltf) => {
         draco.dispose();
         install(gltf.scene);
@@ -27384,171 +27141,6 @@ class Component extends DCLogic {
     this._pendingWheelSizeInch = inch;
     this.setState({ wheelSizeInch: inch, isCustomUpload: false });
     this._loadCatalogWheelByKey(item.key);
-  }
-
-  // Renders a small offscreen preview of each catalog wheel and caches it as a
-  // data URL. Runs once, lazily, the first time the CATALOG sub-tab is opened —
-  // sequential (not parallel) so 20+ multi-MB GLBs don't all hit the network /
-  // GPU at once.
-  async _generateCatalogThumbnails() {
-    // PNGs are pre-rendered build artifacts. Do not create a second WebGL
-    // context or fetch all catalog GLBs on the resource-limited MMI.
-    if (this._catalogThumbsStarted) return;
-    this._catalogThumbsStarted = true;
-  }
-
-  _disposeThumbRenderer() {
-    if (this._thumbRenderer) {
-      this._thumbRenderer.dispose();
-      if (this._thumbRenderer.forceContextLoss) this._thumbRenderer.forceContextLoss();
-      this._thumbRenderer = null;
-    }
-    this._thumbScene = null;
-    this._thumbCamera = null;
-  }
-
-  _ensureThumbRenderer() {
-    if (this._thumbRenderer) return;
-    const THREE = this.THREE;
-    const size = 160;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(1);
-    renderer.setSize(size, size, false);
-    if (THREE.SRGBColorSpace !== undefined) renderer.outputColorSpace = THREE.SRGBColorSpace;
-    else if (renderer.outputEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(32, 1, 0.01, 100);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(2, 3, 4);
-    scene.add(key);
-    const fill = new THREE.DirectionalLight(0xffffff, 1.1);
-    fill.position.set(-3, 1.2, -2);
-    scene.add(fill);
-
-    this._thumbRenderer = renderer;
-    this._thumbScene = scene;
-    this._thumbCamera = camera;
-  }
-
-  _renderCatalogThumb(item) {
-    const THREE = this.THREE;
-    this._ensureThumbRenderer();
-    return new Promise((resolve, reject) => {
-      const loader = new THREE.GLTFLoader();
-      const draco = new THREE.DRACOLoader();
-      draco.setDecoderPath('vendor/draco/');
-      loader.setDRACOLoader(draco);
-      if (this._ktx2Loader) loader.setKTX2Loader(this._ktx2Loader);
-      if (window.MeshoptDecoder) {
-        loader.setMeshoptDecoder(window.MeshoptDecoder);
-      }
-      loader.load(
-        'assets/wheels/' + this._wheelAssetFile(item),
-        (gltf) => {
-          draco.dispose();
-          const obj = gltf.scene;
-          this._thumbScene.add(obj);
-          obj.updateMatrixWorld(true);
-          const box = new THREE.Box3().setFromObject(obj);
-          const sphere = box.getBoundingSphere(new THREE.Sphere());
-          const size = box.getSize(new THREE.Vector3());
-          const center = box.getCenter(new THREE.Vector3());
-
-          // Detect the wheel's axle axis the same way the custom-wheel pipeline
-          // does: the axle is the axis whose two perpendicular dimensions are
-          // most equal (the disc's diameter). Framing the camera along that
-          // axis gives a straight-on face view instead of a generic 3/4 angle.
-          const diffX = Math.abs(size.y - size.z);
-          const diffY = Math.abs(size.x - size.z);
-          const diffZ = Math.abs(size.x - size.y);
-          let axis = 'z';
-          if (diffX < diffY && diffX < diffZ) axis = 'x';
-          else if (diffY < diffX && diffY < diffZ) axis = 'y';
-
-          // Weighted mean coordinate along the axle (sampled, not exhaustive —
-          // this only needs to pick a side, not be precise) tells us which
-          // side the visually rich face (spokes) sits on. The same sampling
-          // pass also collects each vertex's radial distance from centre
-          // within the FACE plane (the two axes perpendicular to the axle),
-          // used below for framing.
-          let sum = 0, count = 0;
-          const v = new THREE.Vector3();
-          const radialSamples = [];
-          obj.traverse((c) => {
-            if (c.isMesh && c.geometry && c.geometry.attributes.position) {
-              c.updateWorldMatrix(true, false);
-              const pos = c.geometry.attributes.position;
-              const stride = Math.max(1, Math.floor(pos.count / 400));
-              for (let i = 0; i < pos.count; i += stride) {
-                v.fromBufferAttribute(pos, i).applyMatrix4(c.matrixWorld);
-                sum += axis === 'x' ? v.x : axis === 'y' ? v.y : v.z;
-                count++;
-                let rx = 0, ry = 0, rz = 0;
-                if (axis === 'x') { ry = v.y - center.y; rz = v.z - center.z; }
-                else if (axis === 'y') { rx = v.x - center.x; rz = v.z - center.z; }
-                else { rx = v.x - center.x; ry = v.y - center.y; }
-                radialSamples.push(Math.sqrt(rx * rx + ry * ry + rz * rz));
-              }
-            }
-          });
-          const avg = count > 0 ? sum / count : 0;
-          const centerAxisVal = axis === 'x' ? center.x : axis === 'y' ? center.y : center.z;
-          const sign = avg >= centerAxisVal ? 1 : -1;
-          const dir = new THREE.Vector3(
-            axis === 'x' ? sign : 0,
-            axis === 'y' ? sign : 0,
-            axis === 'z' ? sign : 0
-          );
-
-          // Frame using a high percentile of the FACE-PLANE radial samples,
-          // not the raw bounding box — a model with extra depth-wise
-          // geometry (deep barrel, backing plate, brake-disc mockup) would
-          // otherwise get a bigger sphere.radius and be pushed further back
-          // than a shallow wheel, and even a face-plane box can be thrown
-          // off by one outlier vertex (a valve stem, bolt, badge) sticking
-          // out radially. A percentile of many sampled vertices ignores a
-          // few stray outliers the way box/sphere extents can't.
-          radialSamples.sort((a, b) => a - b);
-          const faceRadius = radialSamples.length
-            ? radialSamples[Math.min(radialSamples.length - 1, Math.floor(radialSamples.length * 0.97))]
-            : Math.max(size.x, size.y, size.z) / 2;
-
-          const fovRad = this._thumbCamera.fov * Math.PI / 180;
-          const dist = (faceRadius / Math.sin(fovRad / 2)) * 1.25;
-
-          // Avoid a degenerate lookAt when the axle points straight along the
-          // default world-up (0,1,0) — pick a perpendicular up vector instead.
-          this._thumbCamera.up.set(0, axis === 'y' ? 0 : 1, axis === 'y' ? 1 : 0);
-
-          this._thumbCamera.position.copy(sphere.center).addScaledVector(dir, dist);
-          // Near/far only need to clear the geometry's extent ALONG the
-          // viewing axis (the wheel's own thickness) — using the full 3D
-          // sphere.radius here (as before) over-estimates that for a
-          // deep-dish wheel now that dist itself is based on the smaller
-          // face-plane faceRadius, pushing near toward 0 and far way out,
-          // which starves z-buffer precision across the actual scene depth.
-          const axisExtent = axis === 'x' ? size.x : axis === 'y' ? size.y : size.z;
-          this._thumbCamera.near = Math.max(0.001, dist - axisExtent);
-          this._thumbCamera.far = dist + axisExtent;
-          this._thumbCamera.updateProjectionMatrix();
-          this._thumbCamera.lookAt(sphere.center);
-
-          this._thumbRenderer.render(this._thumbScene, this._thumbCamera);
-          const dataUrl = this._thumbRenderer.domElement.toDataURL('image/png');
-
-          this._thumbScene.remove(obj);
-          this._disposeOwnedObject(obj);
-          resolve(dataUrl);
-        },
-        undefined,
-        (err) => {
-          draco.dispose();
-          reject(err);
-        }
-      );
-    });
   }
 
   _handleUploadedWheelModel(scene, name, fromCatalog = false) {
@@ -30400,7 +29992,7 @@ class Component extends DCLogic {
           this._preloadedStock = {
             key: stockKey,
             promise: new Promise((resolve) => {
-              loader.load('assets/wheels/' + this._wheelAssetFile(stockItem),
+              loader.load('assets/wheels/' + stockItem.file,
                 (gltf) => resolve(gltf.scene),
                 undefined,
                 (err) => { console.warn('Stock wheel preload failed', err); resolve(null); });
@@ -32747,10 +32339,6 @@ class Component extends DCLogic {
     this._powertrainArrowSig = sig;
     this._powertrainBeadGeo = geo;
     this._powertrainBeadGeoRadius = w;
-  }
-
-  _ensurePowertrainBeadGeometry() {
-    this._ensurePowertrainArrowGeometry();
   }
 
   /** Aim a flow arrow along the HV path; flip tip when regen reverses travel. */
@@ -35650,7 +35238,7 @@ class Component extends DCLogic {
       '_frontLeftWheels', '_frontRightWheels', '_rearLeftWheels', '_rearRightWheels', '_allWheels',
       '_tireWheels', '_rimWheels', '_spokesWheels', '_otherRimWheels', '_steerOnlyMeshes',
       '_blurredDiscs', '_backingDiscs', '_carLateralDir', '_carForwardDir', '_carCenter', '_hinges', '_mirrorFolds', '_trunkHinge',
-      '_windows', '_hsAnchors', '_carPickMeshes', '_camFabAnchor', '_xrayFabAnchor'];
+      '_windows', '_hsAnchors', '_carPickMeshes', '_xrayFabAnchor'];
   }
 
   /**
@@ -36564,10 +36152,6 @@ class Component extends DCLogic {
     return !this._introEndedAt || performance.now() - this._introEndedAt >= REVEAL_SETTLE_MS;
   }
 
-  _camIconsBusy() {
-    return !!(this._camIconTimer || (this._camIconQueue && this._camIconQueue.length));
-  }
-
   _stepCamIcons() {
     this._camIconTimer = null;
     const queue = this._camIconQueue;
@@ -36620,10 +36204,8 @@ class Component extends DCLogic {
   _invalidateCamIcons() {
     this._camIcons = null;
     this._camIconBoxCache = null;
-    this._camFabAnchor = null;
     this._xrayFabAnchor = null;
     if (this.model) {
-      this._rebuildCamFabAnchor();
       this._rebuildXrayFabAnchor();
     }
     this._camIconQueue = null;
@@ -38306,17 +37888,6 @@ class Component extends DCLogic {
     try {
       if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setChromeOnTop === 'function') {
         window.AppLauncherBridge.setChromeOnTop(!!onTop);
-      }
-    } catch (e) {}
-  }
-
-  _setSplitRatio(ratio) {
-    this._splitRatio = ratio;
-    persistBootShellLayout(this._shellMode, ratio);
-    this.setState({ splitRatio: ratio });
-    try {
-      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.setSplitRatio === 'function') {
-        window.AppLauncherBridge.setSplitRatio(ratio);
       }
     } catch (e) {}
   }
@@ -40555,10 +40126,6 @@ class Component extends DCLogic {
     }
   }
 
-  _revealDesktopIndicator() {
-    // Frost background stays on; no expand/collapse timer.
-  }
-
   _reportDesktopSwitcherHit() {
     // Top switcher removed — keep the native hit proxy cleared.
     const B = window.AppLauncherBridge;
@@ -40725,53 +40292,6 @@ class Component extends DCLogic {
     }
     if (g && g.slideCommitted) return;
     if (this._deskSlide && !this._deskSlide.busy) this._deskSlideCancel(this._deskSlide.dx || 0);
-  }
-
-  /** Hit-test the switcher after a cancelled click (see _onDesktopGestureEnd). */
-  _activateDesktopSwitcherAt(x, y) {
-    if (this._desktopClickSuppressed()) return;
-    const el = (typeof document !== 'undefined' && document.elementFromPoint)
-      ? document.elementFromPoint(x, y) : null;
-    let btn = el && el.closest ? el.closest('.hv-desktop-switcher button') : null;
-    // Proxy pad can land slightly outside a button — snap to the nearest one.
-    if (!btn) {
-      const switcher = document.querySelector('.hv-desktop-switcher');
-      if (switcher) {
-        const buttons = switcher.querySelectorAll('button');
-        let best = null;
-        let bestDist = 40;
-        for (let i = 0; i < buttons.length; i++) {
-          const r = buttons[i].getBoundingClientRect();
-          const cx = (r.left + r.right) / 2;
-          const cy = (r.top + r.bottom) / 2;
-          const d = Math.hypot(x - cx, y - cy);
-          if (d < bestDist) { bestDist = d; best = buttons[i]; }
-        }
-        btn = best;
-      }
-    }
-    if (!btn) return;
-    try { btn.click(); } catch (e) {}
-    // Eat a late native click that sometimes still arrives after touchmove.
-    this._suppressDesktopClickUntil = Date.now() + 350;
-  }
-
-  _onDesktopDotHoldStart(index, ev) {
-    if (ev && ev.type === 'mousedown' && this._desktopDotTouch) return;
-    if (ev && ev.type === 'touchstart') this._desktopDotTouch = true;
-    clearTimeout(this._desktopDotHoldTimer);
-    this._desktopDotHoldTimer = setTimeout(() => {
-      this._desktopDotHoldTimer = 0;
-      if (index !== this._desktopIndex) this._switchDesktop(index);
-      setTimeout(() => this._openDesktopStudio('desktop'), 0);
-    }, CAR_WIDGET_HOLD_MS);
-  }
-
-  _onDesktopDotHoldEnd(ev) {
-    if (ev && ev.type === 'mouseup' && this._desktopDotTouch) return;
-    if (ev && (ev.type === 'touchend' || ev.type === 'touchcancel')) this._desktopDotTouch = false;
-    clearTimeout(this._desktopDotHoldTimer);
-    this._desktopDotHoldTimer = 0;
   }
 
   _saveTireDisplayPreference(pressure, temperature) {
@@ -46692,7 +46212,7 @@ class Component extends DCLogic {
       // and ignores commands anyway. This used to be `!envelope.demo`, which left
       // the expanded Status card's buttons dead on the car while the popup's
       // worked - two surfaces, one of them missed.
-      disabled:!envelope.demo && (windowState.state === 'unknown' || windowState.state === 'moving'),
+      disabled:!envelope.demo && (windowState.state === 'unknown' || this._isWindowBusIgnored(windowState.key)),
       onClick:(ev) => this._toggleStatusWindow(windowState.key, ev),
     }));
     const roofAction = (kind, action) => (ev) => { this._cardControlEvent(ev); this._runVehicleOpeningAction(kind, action); this._refreshUnifiedStatus(); };
@@ -46712,6 +46232,7 @@ class Component extends DCLogic {
     const sunroofActions = contextualRoofActions('sunroof', envelope.sunroof.pct);
     const curtainActions = contextualRoofActions('curtain', envelope.curtain.pct);
     const windowsOpen = envelope.windows.some((entry) => entry.state === 'open' || entry.state === 'partial');
+    const windowsPending = ['fl', 'fr', 'rl', 'rr'].some((key) => this._isWindowBusIgnored(key));
     const roofOpen = envelope.sunroof.pct > 2 || envelope.curtain.pct > 2;
     const trunkOpen = status.openings.some((entry) => entry.key === 'trunk' && entry.state === 'open');
     return {
@@ -46774,9 +46295,11 @@ class Component extends DCLogic {
       statusCurtainInput: roofInput('curtain'),
       statusRoofCloseAll: (ev) => { this._cardControlEvent(ev); this._runVehicleOpeningAction('sunroof','close'); this._runVehicleOpeningAction('curtain','close'); this._refreshUnifiedStatus(); },
       statusRoofOpenAll: (ev) => { this._cardControlEvent(ev); this._runVehicleOpeningAction('curtain','open'); this._runVehicleOpeningAction('sunroof','open'); this._refreshUnifiedStatus(); },
-      statusWindowsAction: windowsOpen ? 'FECHAR' : 'ABRIR',
+      statusWindowsPending: windowsPending,
+      statusWindowsAction: windowsPending ? 'MOVENDO…' : (windowsOpen ? 'FECHAR' : 'ABRIR'),
       statusRoofAction: roofOpen ? 'FECHAR' : 'ABRIR',
-      statusTrunkAction: trunkOpen ? 'FECHAR' : 'ABRIR',
+      statusTrunkPending: this._isTrunkBusIgnored(),
+      statusTrunkAction: this._isTrunkBusIgnored() ? 'MOVENDO…' : (trunkOpen ? 'FECHAR' : 'ABRIR'),
       statusWindowsToggleAllLabel: (windowsOpen ? 'FECHAR' : 'ABRIR') + ' VIDROS',
       statusRoofToggleAllLabel: (roofOpen ? 'FECHAR' : 'ABRIR') + ' TETO + CORTINA',
       statusTrunkToggleLabel: (trunkOpen ? 'FECHAR' : 'ABRIR') + ' PORTA-MALAS',
@@ -47676,7 +47199,6 @@ class Component extends DCLogic {
       patch.wheelSubTab = 'catalog';
     }
     this.setState(patch);
-    if (section === 'wheels') this._generateCatalogThumbnails();
   }
 
   /**
@@ -47730,7 +47252,6 @@ class Component extends DCLogic {
       }
     }
     this.setState(patch);
-    if (tab === 'wheel') this._generateCatalogThumbnails();
   }
 
   resetPaintColors() {
@@ -48718,10 +48239,6 @@ class Component extends DCLogic {
     return (dx * dx + dy * dy) <= (disc.r * disc.r);
   }
 
-  _pointInDesktopSwitcher(clientX, clientY) {
-    return false;
-  }
-
   _pointInDesktopSwipeZone(clientX, clientY, ev) {
     const cls = ev && ev.currentTarget && ev.currentTarget.classList;
     // Handlers sit on these elements — trust the target, skip geometry.
@@ -49142,32 +48659,6 @@ class Component extends DCLogic {
       graphPaneEditors: paneEditors,
       onGraphEditorClose: close,
       onGraphEditorDragStart: (ev) => this._onGraphEditorDragStart(ev),
-    };
-  }
-
-  _widgetCardRect(side, item) {
-    const fallback = side === 'right'
-      ? { l: 1180, t: 100, r: 1872, b: 530 }
-      : { l: 48, t: 100, r: 740, b: 530 };
-    const b = (side === 'right' ? this._shellRightBounds : this._shellLeftBounds) || fallback;
-    const left = b.l || 0;
-    const top = b.t || 0;
-    const width = Math.max(0, (b.r || 0) - (b.l || 0));
-    const height = Math.max(0, (b.b || 0) - (b.t || 0));
-    const cols = this._gridColsForMode(this.state.shellMode || 'appCar');
-    const rows = this._gridRowsForMode(this.state.shellMode || 'appCar');
-    const gap = 8;
-    const cellW = cols > 0 ? (width - gap * (cols - 1)) / cols : width;
-    const cellH = rows > 0 ? (height - gap * (rows - 1)) / rows : height;
-    const x = item.x || 0;
-    const y = item.y || 0;
-    const w = item.w || 1;
-    const h = item.h || 1;
-    return {
-      left: left + x * (cellW + gap),
-      top: top + y * (cellH + gap),
-      width: w * cellW + Math.max(0, w - 1) * gap,
-      height: h * cellH + Math.max(0, h - 1) * gap,
     };
   }
 
@@ -50296,7 +49787,6 @@ class Component extends DCLogic {
     clearTimeout(this._desktopPersistTimer);
     clearTimeout(this._desktopGestureHoldTimer);
     clearTimeout(this._desktopIndicatorTimer);
-    clearTimeout(this._desktopDotHoldTimer);
     clearTimeout(this._widgetSuppressTimer);
     clearTimeout(this._camSlotHoldTimer);
     clearInterval(this._energyTimer);
@@ -50346,7 +49836,6 @@ class Component extends DCLogic {
     if (this.controls && this.controls.dispose) this.controls.dispose();
     if (this._dracoLoader && this._dracoLoader.dispose) this._dracoLoader.dispose();
     if (this._ktx2Loader && this._ktx2Loader.dispose) this._ktx2Loader.dispose();
-    this._disposeThumbRenderer();
     this._disposeCustomWheelResources();
 
     const disposedPasses = new Set();
