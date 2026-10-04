@@ -342,3 +342,168 @@ the clamp is correct for tweens and physics and wrong for anything periodic.
   cost an estimated 8-15 ms against a ~36 ms budget. The pre-baked wheel blur
   sprite is the cheap equivalent: 8 discs, 256 triangles total, against 374k in
   the main pass.
+
+
+## Desktop switch update scheduling
+
+Native card synchronization is scheduled after a React commit, rather than
+performed inside `renderVals`. Calls in the same task share one pending timer;
+the flush reads the latest state. While a desktop slide is active, the timer
+waits until teardown before constructing card views and crossing the native
+bridge. This does not delay vehicle commands or their pending-state guards.
+
+Widget field builders also reuse each visited desktop's last fields during a
+slide. Teardown invalidates the active board and recomputes current values.
+First visits still build fields, and deleted desktops evict their field cache.
+
+`test-desktop-update-cost.mjs` checks grouped calls, latest-state delivery,
+slide deferral, unmount, render-side effects and field reuse, with negative
+controls. Native cards retain their fade; React still renders the root shell.
+
+A runtime A/B/B/A comparison on the car (same warmed desktop transition,
+three-second windows) measured total card-data preparation at 54/21/16/20 ms,
+respectively: lower in both paired comparisons. Frame p95 was
+150/18/83/50 ms and maximum gaps were 367/483/366/183 ms. Frame pacing did
+not improve consistently; these changes remove redundant work, but do not
+establish that the remaining stalls are fixed. The comparison used temporary
+method wrappers for scheduling and field reuse; it was not a React-removal test.
+
+
+### Hidden panel renders and drag invalidations
+
+Settings, desktop management, wallpaper selection and the focused-card popup
+now use the same memoized-template mechanism as desktop boards. Closed panels
+retain their DOM and last view. Closing updates the visibility class without
+removing their contents, preserving CSS exit transitions; reopening recomputes
+the current fields. Closed Studio thumbnail, accent and clock galleries are
+not rebuilt. Hidden panel clocks and imperative widget painters are excluded
+until the panel opens again.
+
+During a desktop gesture, `_uiOnlySetState` drops only callback-free updates
+whose sole key is `widgetRev`. This key requests a redraw, not a vehicle-state
+change; slide teardown already refreshes the latest live data. Vehicle values,
+commands, acknowledgements and updates with commit callbacks are unchanged.
+`test-hidden-panels.mjs` verifies closing contents, memo identity, reopening and
+visual-only deferral, with negative controls.
+
+A controlled A/B/B/A car test bypassed panel memoization and redraw deferral
+in A, then enabled both in B. Each three-second window included a 500 ms
+desktop drag with simulated widget-redraw requests every 80 ms. Drag renders
+were 6/0/0/3 and total renders 8/2/2/6. Maximum frame intervals were
+400/117/100/234 ms; full-window p95 was 33/33/17/83 ms. Both paired maximum
+gaps improved, but pauses remain and the short drag p95 was mixed. This
+is a controlled invalidation test, not a claim that all real swipes are smooth
+or a comparison with React removed.
+
+
+### Independent desktop widget updates
+
+The desktop pages now live in a child React component using the existing
+memoized board template. Callback-free `widgetRev` invalidations refresh that
+child's widget fields and paint lifecycle without calling root `renderVals`.
+During a slide these redraw requests still wait for teardown. Changes to
+vehicle state, theme, layout and open panels use the root lifecycle. Popup,
+configuration, widget-editing and apps-only modes deliberately use the full
+render so their controls cannot show stale fields.
+
+A new parent view takes precedence over previously computed child fields.
+The child refreshes climate mounts and native-card synchronization after its
+own commits; parent commits keep the original root lifecycle. Widget-only
+updates do not schedule desktop persistence or recompute closed-panel fields.
+`test-desktop-stage.mjs` checks independent refresh, parent invalidation,
+popup/theme/vehicle-state/callback fallback and unmount, with negative controls.
+
+A controlled three-second A/B/B/A car test requested widget redraws every
+250 ms. A forced full-root updates; B used the independent desktop stage.
+Root renders were 11/0/0/11; child-only paints were 0/11/11/0. Long tasks
+above 50 ms were 5/0/0/1. Frame p95 was 34/33/33/33 ms, so this establishes
+less JavaScript work, not elimination of all frame gaps.
+
+The same run separately compared normal widget backdrop blur with a temporary
+CSS override disabling it during the same warmed desktop swipe, in A/B/B/A
+order. The WebView supported blur and the active cards used
+`blur(14px) saturate(1.18)`. Frame p95 was 67/68/52/67 ms and maximum gaps
+183/867/133/183 ms. The benefit did not repeat consistently, so blur remains
+enabled; the temporary stylesheet was removed. The desktop still has one
+root commit at the switch and other remaining native/compositing costs.
+
+
+### Native bottom-card reuse across desktop themes
+
+The Android bottom rail reuses card views by card ID when normal desktop
+configuration changes. Workspace stays attached; matching cards keep their
+views, new cards are constructed once, and removed cards remain in a cache
+bounded to 16 identities (the same maximum as the parsed payload). Reordering
+moves existing views instead of rebuilding all cards. Clock face options and
+live values update the existing custom views through `setDescriptor`.
+
+Title or action changes, duplicate IDs, cache overflow and rail editing fall
+back to the original rebuild path so listeners and edit controls remain correct.
+Color/accent changes retint existing surfaces, text and media controls and
+invalidate custom graphics; they no longer force an entire row rebuild.
+Unchanged theme signatures skip repeated background/drawable creation on
+telemetry updates. Detached card backgrounds are retinted when reattached.
+
+`test-native-card-reuse.mjs` checks source contracts with negative controls;
+JVM tests validate existing native pure logic. Android view identity and actual
+rendering require the device. Debug-only `H6RailPerf` logs expose rebuilds,
+retints and reused/new card counts without vehicle or user data.
+
+An interleaved APK A/B/B/A comparison isolated native rail color updates by
+sending the same card payload ten times, alternating light/dark and accent
+every 350 ms. `dumpsys gfxinfo` was reset before each window. Old/new/new/old
+median native frame times were 57/23/14/101 ms; p95 was 113/46/34/150 ms.
+Slow-UI-frame counts were 14/11/8/13. These short windows (24–28 native frames)
+show improvement in both paired color-update comparisons; they do not measure
+the entire desktop swipe or prove every stall is gone.
+
+
+### Unchanged native card payloads
+
+Native graphics and clock descriptor updates compare normalized scalar and array
+values before invalidating or rebuilding a clock snapshot. New descriptor objects
+with identical contents keep their current drawing. The latest descriptor is
+still assigned, so actions and metadata follow the current payload. Theme retints,
+rendered clock face delivery, attachment and minute/second clock ticks retain
+independent invalidation paths.
+
+`test-native-card-redraw.mjs` compiles the actual pure descriptor class and checks
+all 55 fields independently, equal distinct objects and null descriptors. Negative
+controls remove a field comparison and each view guard; clock tick and refresh
+contracts remain checked. This test needs a JDK; the standard suite discovers it.
+
+An interleaved old/new/new/old APK comparison repeated an unchanged native
+payload 60 times at 100 ms intervals. Native frame p95 was 42/53/38/22 ms;
+frame counts were 390/393/411/61 and slow-UI counts 21/42/12/11. There was
+no repeatable frame-time improvement, and the last arm had substantially less
+frame activity, so these windows cannot establish an FPS benefit. The tested
+benefit is skipping descriptor-triggered invalidation and clock snapshot work
+for equal payloads; real desktop-swipe smoothness still requires evaluation.
+
+
+### Desktop fade without inherited animation state
+
+Desktop fades use the `hv-desk-faded` body class and the existing CSS opacity
+transitions. The former `--hv-desk-fade` custom property was inherited throughout
+the document, including retained desktop widgets. Each endpoint change caused
+broad style recalculation even though only the shell chrome consumed the value.
+The class targets that chrome directly. Slide and cancellation keep their
+160/220 ms transitions; teardown removes the fade state.
+
+A four-switch car trace measured 782 ms total in style recalculation, with a
+69 ms maximum, while individual root React renders took 29–32 ms. An isolated
+runtime A/B/B/A comparison of the old property and new class measured style
+totals of 157/83/82/141 ms per programmatic switch. Maximum frame intervals were
+150/67/67/135 ms. All runs used warmed desktop pages; an earlier run with the
+WebView hidden behind another app was discarded.
+
+A second A/B/B/A comparison included a 500 ms simulated drag in each direction.
+Leftward maximum frame intervals were 167/117/132/150 ms; rightward intervals
+were 133/83/83/133 ms. All four paired maxima improved. Style totals and frame
+p95 did not improve in every drag pair, and these are short controlled runs,
+not a claim of continuous 60 fps. Separate brightness-cache and viewport-read
+experiments did not show consistent frame gains and were not shipped.
+
+`test-desktop-slide.mjs` checks fade endpoints, cancellation/restoration and
+teardown without inherited style writes, plus retained CSS transitions, with
+negative controls. Device verification remains necessary for frame pacing.

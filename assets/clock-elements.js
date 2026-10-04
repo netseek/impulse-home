@@ -141,6 +141,8 @@
     },
     visible: function (element) {
       if (!element || !element.isConnected || document.visibilityState === 'hidden') return false;
+      if (element.closest && element.closest('.hv-desktop-page[data-desktop-active="false"]')) return false;
+      if (element.closest && element.closest('.hv-desktop-studio:not(.on), .hv-desks:not(.on), .hv-wallpaper-pop:not(.on), .hv-card-focus:not(.on)')) return false;
       var rects = element.getClientRects();
       if (!rects || !rects.length) return false;
       var style = root.getComputedStyle ? root.getComputedStyle(element) : null;

@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Line endings are normalised on read. index.html and MainActivity.java are
@@ -76,8 +77,16 @@ assert.doesNotMatch(catalog,
 
 // The payload has to carry the icon's command, and it is allow-listed natively
 // exactly like the card's.
-const dockIndicatorsEarly = blockFrom(html, '  _syncDockIndicators(', 'dock indicator payload');
-includesAll(dockIndicatorsEarly, ["iconAction: card.iconAction || ''"], 'iconAction reaches the rail');
+function drivingPayload(source) {
+  const scheduler = blockFrom(source, '  _syncDockIndicators(', 'dock scheduler');
+  includesAll(scheduler, ['this._flushDockIndicators();'], 'scheduler delivers the payload');
+  const payload = blockFrom(source, '  _flushDockIndicators(', 'dock indicator payload');
+  includesAll(payload, ["iconAction: card.iconAction || ''"], 'iconAction reaches the rail');
+  return payload;
+}
+const dockIndicators = drivingPayload(html);
+assert.throws(() => drivingPayload(html.replace('this._flushDockIndicators();', '')), /scheduler delivers/);
+assert.throws(() => drivingPayload(html.replace("iconAction: card.iconAction || ''", "iconAction: ''")), /iconAction reaches/);
 
 // ---------------------------------------------------------------------------
 // 2. Command wiring: web command, native allow-list, focused workspace.
@@ -390,10 +399,23 @@ assert.ok(effAccent.indexOf('accentColor:') < 0,
   'the sport accent must never be persisted over the user choice');
 includesAll(html, ['accentColor: this._effectiveAccentColor(),', 'accent: this._effectiveAccentColor(),'],
   'both the page and the rail get the effective accent');
-// Accent-tinted icons bake their colour in at build time, so the rail has to be
-// rebuilt when it changes or they keep the old one.
-includesAll(native, ['if (accentChanged) rebuildQuickCardsRow();'],
-  'the rail rebuilds when the accent changes');
+// Reused cards must receive the new accent without rebuilding their views.
+function checkAccentRefresh(source) {
+  includesAll(blockFrom(source, '    private void applyDockIndicators(', 'native payload'),
+    ['dockAccentColor = next;', 'refreshAllDockPlates();'], 'accent reaches theme refresh');
+  includesAll(blockFrom(source, '    private void refreshAllDockPlates(', 'dock theme'),
+    ['refreshQuickCardsTheme();'], 'card theme refresh is reached');
+  const theme = blockFrom(source, '    private void refreshQuickCardsTheme(', 'card theme');
+  includesAll(theme, ['dockAccentColor', 'tintFrostText(card);',
+    'quickCardGraphics.values()', 'graphic.invalidate();'], 'reused cards retint and redraw');
+  includesAll(blockFrom(source, '    private final class QuickCardGraphicView extends View', 'card graphic'),
+    ['int accent = dockAccentColor;'], 'graphics read the current accent');
+}
+checkAccentRefresh(native);
+for (const from of ['dockAccentColor = next;', 'refreshAllDockPlates();',
+  'refreshQuickCardsTheme();', 'tintFrostText(card);', 'graphic.invalidate();', 'int accent = dockAccentColor;']) {
+  assert.throws(() => checkAccentRefresh(native.replaceAll(from, '')), 'accent negative control: ' + from);
+}
 // The accent still owns selection and liveness everywhere on these cards; a
 // card-wide fill in that colour would drown the signal.
 assert.ok(!/case "eco": return dockAccentColor/.test(native),
@@ -557,7 +579,6 @@ for (const cols of ['cols-2', 'cols-3']) {
 // ---------------------------------------------------------------------------
 // 8. Native quick-card payload.
 // ---------------------------------------------------------------------------
-const dockIndicators = blockFrom(html, '  _syncDockIndicators(', 'dock indicator payload');
 includesAll(dockIndicators, [
   "const driving = this._drivingWidgetView({ type: 'driving', w: 2, h: 1 });",
   'driveMode: driveModeVisual,',
@@ -587,8 +608,26 @@ assert.match(html, /const CAR_POWER_MODE_LONG_LABELS = { '0': 'Híbrido', '1': '
 includesAll(dockIndicators, ['CAR_POWER_MODE_LONG_LABELS[drivingGroup(1).value]'],
   'the power tile shows the long label');
 // One-pedal replaces the level rather than extending it, so the tile names it.
-includesAll(dockIndicators, ["onePedalOn ? 'onepedal'", "regenVisual.primary = 'Pedal único'"],
-  'the recovery tile reports one-pedal');
+function checkOnePedal(payload) {
+  const start = payload.indexOf('const regenVisual =');
+  const end = payload.indexOf('const roofSignal =', start);
+  assert.ok(start >= 0 && end > start, 'recovery payload exists');
+  const code = payload.slice(start, end);
+  const render = (on) => vm.runInNewContext('(function(){' + code + ';return regenVisual;}).call(app)', {
+    onePedalOn: on, driving: { drivingControlsDisabled: false },
+    drivingGroup: () => ({ index: 1 }),
+    drivingVisual: (index, state) => ({ primary: 'recovery level', state }),
+    CAR_MODE_ONE_PEDAL: { stateKey: 'onePedal' }, app: { _modeIsPending: () => false },
+  });
+  const off = render(false), on = render(true);
+  assert.equal(off.state, 'level2');
+  assert.equal(off.primary, 'recovery level');
+  assert.equal(on.state, 'onepedal');
+  assert.ok(on.primary.trim() && on.primary !== off.primary, 'one-pedal replaces the level label');
+}
+checkOnePedal(dockIndicators);
+assert.throws(() => checkOnePedal(dockIndicators.replace(/regenVisual\.primary = '[^']+';/, '')), /replaces the level label/);
+assert.throws(() => checkOnePedal(dockIndicators.replace("onePedalOn ? 'onepedal'", "onePedalOn ? 'level2'")));
 assert.ok(!dockIndicators.includes('_modeCardVisual'),
   'the replaced per-mode quick-card builder must be gone');
 

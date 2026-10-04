@@ -1204,6 +1204,8 @@ public final class MainActivity extends Activity {
             new java.util.HashMap<>();
     /** Card root by id, so a mode change can repaint the wash without a rebuild. */
     private final java.util.Map<String, View> quickCardHosts = new java.util.HashMap<>();
+    private final java.util.Map<String, BottomCardDescriptor> quickCardDescriptors = new java.util.HashMap<>();
+    private String quickCardsThemeSig = "";
     private final java.util.Map<String, Integer> lastDrivingWash = new java.util.HashMap<>();
     private android.widget.ImageView quickMediaArt;
     private boolean quickMediaHasArt;
@@ -1367,6 +1369,66 @@ public final class MainActivity extends Activity {
         /** Rows for the ⋯ shown on this card in rail edit mode; empty when it has none. */
         java.util.List<QuickMenuRow> editMenu = java.util.Collections.emptyList();
 
+        // Compare normalized data; new bridge objects alone do not require a repaint.
+        boolean sameVisuals(BottomCardDescriptor other) {
+            return other != null
+                    && java.util.Objects.equals(id, other.id)
+                    && java.util.Objects.equals(title, other.title)
+                    && java.util.Objects.equals(value, other.value)
+                    && java.util.Objects.equals(action, other.action)
+                    && java.util.Objects.equals(primary, other.primary)
+                    && java.util.Objects.equals(secondary, other.secondary)
+                    && java.util.Objects.equals(metricA, other.metricA)
+                    && java.util.Objects.equals(metricB, other.metricB)
+                    && progress == other.progress
+                    && java.util.Objects.equals(powerVariant, other.powerVariant)
+                    && socKnown == other.socKnown
+                    && Double.compare(powerSoc, other.powerSoc) == 0
+                    && java.util.Objects.equals(state, other.state)
+                    && java.util.Arrays.equals(wheelStates, other.wheelStates)
+                    && java.util.Objects.equals(clockFace, other.clockFace)
+                    && java.util.Objects.equals(clockFormat, other.clockFormat)
+                    && java.util.Objects.equals(tirePressures, other.tirePressures)
+                    && java.util.Objects.equals(tireTemperatures, other.tireTemperatures)
+                    && java.util.Objects.equals(tirePressureUnit, other.tirePressureUnit)
+                    && java.util.Arrays.equals(energyBars, other.energyBars)
+                    && java.util.Arrays.equals(openingStates, other.openingStates)
+                    && java.util.Arrays.equals(seatBeltStates, other.seatBeltStates)
+                    && sunroofLevel == other.sunroofLevel
+                    && curtainLevel == other.curtainLevel
+                    && fuelLevel == other.fuelLevel
+                    && java.util.Objects.equals(rangeTotal, other.rangeTotal)
+                    && java.util.Objects.equals(rangeUnit, other.rangeUnit)
+                    && java.util.Objects.equals(rangeEv, other.rangeEv)
+                    && java.util.Objects.equals(rangeFuel, other.rangeFuel)
+                    && java.util.Objects.equals(rangeSoc, other.rangeSoc)
+                    && rangeEvPct == other.rangeEvPct
+                    && rangeFuelPct == other.rangeFuelPct
+                    && java.util.Objects.equals(battery12vVoltage, other.battery12vVoltage)
+                    && battery12vCharging == other.battery12vCharging
+                    && java.util.Objects.equals(battery12vState, other.battery12vState)
+                    && demo == other.demo
+                    && java.util.Objects.equals(iconAction, other.iconAction)
+                    && java.util.Objects.equals(longAction, other.longAction)
+                    && java.util.Objects.equals(glyph, other.glyph)
+                    && java.util.Objects.equals(glyphText, other.glyphText)
+                    && java.util.Objects.equals(appPackage, other.appPackage)
+                    && java.util.Objects.equals(navRemaining, other.navRemaining)
+                    && java.util.Objects.equals(navDuration, other.navDuration)
+                    && java.util.Objects.equals(navEta, other.navEta)
+                    && java.util.Objects.equals(weatherIcon, other.weatherIcon)
+                    && java.util.Objects.equals(forecast, other.forecast)
+                    && java.util.Objects.equals(insideText, other.insideText)
+                    && java.util.Objects.equals(hintText, other.hintText)
+                    && java.util.Objects.equals(navIdleCity, other.navIdleCity)
+                    && java.util.Objects.equals(navIdleAction, other.navIdleAction)
+                    && java.util.Objects.equals(clockHourFormat, other.clockHourFormat)
+                    && java.util.Objects.equals(dialMarks, other.dialMarks)
+                    && java.util.Objects.equals(splitPlates, other.splitPlates)
+                    && java.util.Objects.equals(dateSpineFormat, other.dateSpineFormat)
+                    && java.util.Objects.equals(dateWording, other.dateWording);
+        }
+
         BottomCardDescriptor(String id, String title, String value, String action,
                 String primary, String secondary, String metricA, String metricB, int progress,
                 String state, String powerVariant, boolean socKnown, double powerSoc, String[] wheelStates, String[] openingStates,
@@ -1446,8 +1508,9 @@ public final class MainActivity extends Activity {
         }
 
         void setDescriptor(BottomCardDescriptor next) {
+            boolean changed = !descriptor.sameVisuals(next);
             descriptor = next;
-            refreshNow();
+            if (changed) refreshNow();
         }
 
         void setRenderedFace(Bitmap next) {
@@ -2020,8 +2083,9 @@ public final class MainActivity extends Activity {
         }
 
         void setDescriptor(BottomCardDescriptor next) {
+            boolean changed = !descriptor.sameVisuals(next);
             descriptor = next;
-            invalidate();
+            if (changed) invalidate();
         }
 
         @Override
@@ -9313,6 +9377,8 @@ public final class MainActivity extends Activity {
         row.removeAllViews();
         quickCardViews.clear();
         quickCardHosts.clear();
+        quickCardDescriptors.clear();
+        quickCardsThemeSig = "";
         lastDrivingWash.clear();
         quickClimateValue = null;
         quickConsumptionValue = null;
@@ -9343,6 +9409,7 @@ public final class MainActivity extends Activity {
             int count = Math.min(bottomCards.size(), bottomCardLimit);
             for (int i = 0; i < count; i++) {
                 final BottomCardDescriptor descriptor = bottomCards.get(i);
+                quickCardDescriptors.put(descriptor.id, descriptor);
                 // Media is the one rail card with meaningful immediate controls.
                 // Keep its transport surface when users reorder/select it instead
                 // of reducing it to a generic navigation tile.
@@ -10922,9 +10989,13 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshQuickCardsTheme() {
+        String signature = dockUiLight + "|" + dockAccentColor + "|" + quickCardViews.size();
+        if (signature.equals(quickCardsThemeSig)) return;
+        quickCardsThemeSig = signature;
+        if (isDebuggableBuild()) Log.d("H6RailPerf", "retint cards=" + quickCardHosts.size());
         float density = getResources().getDisplayMetrics().density;
         for (View card : quickCardViews) {
-            if (card == null) continue;
+            if (card == null || card.getParent() != quickCardsRow) continue;
             card.setBackground(makeFrostStateDrawable(card.isSelected(), density,
                     washForCardView(card)));
             tintFrostText(card);
@@ -11716,12 +11787,10 @@ public final class MainActivity extends Activity {
                     refreshWorkspaceLayoutAccent();
                 }
             }
-            boolean accentChanged = false;
             if (o.has("accent")) {
                 String accent = o.optString("accent", "");
                 if (accent != null && accent.trim().startsWith("#")) {
                     int next = parseCssColor(accent.trim(), dockAccentColor);
-                    accentChanged = next != dockAccentColor;
                     dockAccentColor = next;
                 }
             }
@@ -11737,12 +11806,8 @@ public final class MainActivity extends Activity {
                     if (!focus.isEmpty()) scrollRailToCard(focus);
                 }
             }
-            // Icons and graphics bake the accent in when they are built, and
-            // refreshQuickCardsTheme only repaints backgrounds and text -- so an
-            // accent change has to rebuild the rail or tinted children keep the
-            // old colour. Rare enough to be free, and Sport now changes the
-            // accent often enough that a stale tint is visible.
-            if (accentChanged) rebuildQuickCardsRow();
+            // Existing graphic views read dockAccentColor when drawing. Retint
+            // their surfaces below instead of discarding the entire rail.
             applyQuickCardIndicators(o);
             if (o.has("model")) {
                 String v = o.optString("model", dockModelLabel);
@@ -11934,11 +11999,76 @@ public final class MainActivity extends Activity {
             return;
         }
 
+        boolean reused = reconcileQuickCardsRow(next, nextLimit);
         bottomCardsConfigured = true;
         bottomCardLimit = nextLimit;
         bottomCards.clear();
         bottomCards.addAll(next);
-        rebuildQuickCardsRow();
+        if (reused) {
+            updateBottomCardValues(next);
+            bindRailEditLongPress();
+            refreshQuickCardsTheme();
+            replayMediaPayload();
+        } else rebuildQuickCardsRow();
+    }
+
+    private boolean reconcileQuickCardsRow(List<BottomCardDescriptor> next, int limit) {
+        if (!bottomCardsConfigured || quickCardsRow == null || railEditMode
+                || quickCardsRow.getChildCount() == 0) return false;
+        java.util.Set<String> ids = new java.util.HashSet<>(quickCardHosts.keySet());
+        java.util.Set<String> requested = new java.util.HashSet<>();
+        for (BottomCardDescriptor card : next) {
+            if (!requested.add(card.id)) return false;
+            ids.add(card.id);
+        }
+        if (ids.size() > 16) return false; // Same bound as the parsed card list.
+        // A changed action/title needs new listeners and chrome. Clock face and
+        // live values are handled by setDescriptor on the existing view.
+        for (BottomCardDescriptor card : next) {
+            BottomCardDescriptor previous = quickCardDescriptors.get(card.id);
+            if (previous != null && (!previous.title.equals(card.title)
+                    || !previous.action.equals(card.action)
+                    || !previous.iconAction.equals(card.iconAction)
+                    || !previous.longAction.equals(card.longAction))) return false;
+        }
+        dismissQuickMenu();
+        long started = android.os.SystemClock.uptimeMillis();
+        int reused = 0, created = 0;
+        float density = getResources().getDisplayMetrics().density;
+        List<View> desired = new ArrayList<>();
+        desired.add(quickCardsRow.getChildAt(0)); // Workspace keeps its face/menus.
+        for (int i = 0; i < limit; i++) {
+            final BottomCardDescriptor descriptor = next.get(i);
+            View card = quickCardHosts.get(descriptor.id);
+            if (card == null) {
+                if ("media".equals(descriptor.id)) card = makeQuickMediaCard(density, descriptor);
+                else card = makeQuickVisualCard(density, descriptor, v -> {
+                    if (android.os.SystemClock.uptimeMillis() - lastRailFadeAt < 1200) return;
+                    callViewerDock(descriptor.action);
+                });
+                card.setTag("bottomCard:" + descriptor.id);
+                quickCardHosts.put(descriptor.id, card);
+                created++;
+            } else reused++;
+            quickCardDescriptors.put(descriptor.id, descriptor);
+            desired.add(card);
+        }
+        // Keep matching views attached. Only removed/reordered cards move;
+        // detached cache entries are bounded by the fixed card catalog.
+        for (int i = quickCardsRow.getChildCount() - 1; i >= 1; i--) {
+            View card = quickCardsRow.getChildAt(i);
+            if (!desired.contains(card)) quickCardsRow.removeViewAt(i);
+        }
+        for (int i = 1; i < desired.size(); i++) {
+            View card = desired.get(i);
+            if (i < quickCardsRow.getChildCount() && quickCardsRow.getChildAt(i) == card) continue;
+            if (card.getParent() == quickCardsRow) quickCardsRow.removeView(card);
+            quickCardsRow.addView(card, i);
+        }
+        quickCardsThemeSig = "";
+        if (isDebuggableBuild()) Log.d("H6RailPerf", "reuse=" + reused + " create=" + created
+                + " ms=" + (android.os.SystemClock.uptimeMillis() - started));
+        return true;
     }
 
     private String cleanBottomCardText(String value, int maxLength) {
@@ -12160,6 +12290,8 @@ public final class MainActivity extends Activity {
             BottomCardDescriptor right = b.get(i);
             if (!left.id.equals(right.id) || !left.title.equals(right.title)
                     || !left.action.equals(right.action)
+                    || !left.iconAction.equals(right.iconAction)
+                    || !left.longAction.equals(right.longAction)
                     || ("clock".equals(left.id) && (!left.clockFace.equals(right.clockFace)
                     || !left.clockHourFormat.equals(right.clockHourFormat)
                     || !left.dialMarks.equals(right.dialMarks)
@@ -12310,6 +12442,7 @@ public final class MainActivity extends Activity {
 
     private void rebuildQuickCardsRow() {
         if (quickCardsRow == null) return;
+        if (isDebuggableBuild()) Log.d("H6RailPerf", "rebuild");
         // The views an open menu is anchored to are about to be replaced.
         dismissQuickMenu();
         populateQuickCardsRow(quickCardsRow, getResources().getDisplayMetrics().density);
