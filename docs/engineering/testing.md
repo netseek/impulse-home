@@ -25,6 +25,12 @@ CI (`.github/workflows/ci.yml`) runs two jobs: `tests` (the Node suite, with the
 token exists) and `android` (`assembleDebug` and the JVM tests, built without the bundle: that proves
 the code compiles and the logic passes, not that the models load).
 
+The template-event and canvas-visibility tests launch headless Chrome/Chromium
+to exercise actual HTML parsing and DOM behavior. They use the browser CLI,
+without a Node browser-driver dependency. Install Chrome/Chromium on `PATH`, or
+set `CHROME_BIN` to its executable when running `node scripts/run-tests.mjs`.
+An unavailable browser fails these tests; it is not counted as an asset skip.
+
 ### Keeping the base current
 
 - A change that alters behaviour ships with a test for it, or with a stated reason why none is

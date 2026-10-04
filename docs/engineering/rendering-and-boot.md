@@ -383,3 +383,106 @@ right texture object, and the sprite renders **pure black**. Two hours went into
 chasing a "regression" that was one debug line. If a capture looks wrong,
 reload the page before believing any measurement taken after you have poked at
 texture state from devtools.
+
+## Wallpaper-only scene suspension
+
+Once loading finishes, the main 3D loop returns before wheel, aperture, camera,
+shadow and post-processing work when `_shouldShowCar()` is false. Its lightweight
+rAF callback stays scheduled, updates its time origin and keeps the FPS label
+alive, so showing the car again resumes normally. Vehicle telemetry and widget
+timers are independent and remain active. Model/renderer resources remain in
+memory, and initial model loading is unchanged; this is a suspension of ongoing
+scene work, not a removal of 3D RAM or startup cost. The hidden-scene test checks
+suspension, visible resume and loading, with a negative control.
+
+Suspension leaves the renderer's last pixels intact. `_syncCanvasPointerEvents`
+therefore sets only the renderer canvas opacity to `0` whenever `_shouldShowCar()`
+is false, synchronously before another frame, and restores the empty inline
+opacity when the car returns. The host retains its existing pointer policy:
+wallpaper mode still receives canvas gestures, including when the wallpaper is
+missing or fails to load; apps-only does not intercept background input.
+`test-canvas-scene-visibility.mjs` checks these DOM behaviors in Chromium and
+exercises the real frame-request/suspension code with drawing replaced by a
+canvas painter. It does not validate GPU rendering or head-unit performance.
+
+On the car, a four-second idle wallpaper sample before the guard recorded 240
+camera-animation ticks and zero renderer calls. After installation, the same
+observation recorded zero camera ticks and zero renderer calls, including an
+explicit request for 20 render frames. These counts verify suspension only;
+they are not an interleaved FPS benchmark or a measured swipe speedup.
+
+## Desktop gestures and the restored boot
+
+Normal boot loads the model and renderer and runs the splash/intro handoff above.
+The temporary no-3D boot bypass is removed. Desktop fill still controls car
+visibility: the shipped Drive desktop uses `mixed`, Focus uses `car`, and Lounge
+uses `wallpaper`. Saved camera positions and widget layouts are independent of
+that choice. `test-3d-boot.mjs` checks preload reuse, renderer setup and visibility.
+
+The earlier profiling preview reached loading=false on the car with no Three
+global, renderer, model or GLB/HDR/Three/powertrain requests. It provided a
+baseline for UI measurements, not a total-memory reduction percentage. Those
+no-3D measurements do not establish the restored scene's frame rate.
+
+Background touch/mouse gestures bind directly to the renderer canvas through
+native listeners. This keeps touchmove/mousemove delivery independent of template event-name casing.
+The incoming wallpaper pane uses the live viewport's exact size and cover crop;
+the former 30% enlarged feather-mask pane changed crop and jumped at handoff.
+The slide and widget fades remain animated. Unchanged automatic theme samples
+no longer force an extra desktop commit.
+
+Two fingers capture desktop navigation across the WebView, including widgets,
+controls and card popups. The midpoint drives the existing slide; ending uses
+the last midpoint so lifting one finger cannot jump the image. The capture
+prevents controls receiving the two-finger move/end and suppresses its trailing
+click. Existing editing/modal blockers remain. One-finger background navigation
+and interactive controls keep their normal behavior. Touch listeners are removed
+on unmount. Test: `test-desktop-slide.mjs` (crop, native gesture delivery, two-finger
+midpoint and negative controls).
+
+The splash video, held-frame canvas and native skip button use the original
+handoff. `test-splash.mjs` checks clip completion, skip, failure fallback,
+decoder-element cleanup and the explicit `nosplash` diagnostic path, with
+negative controls. Existing music keeps the clip muted.
+
+On-device verification of 1.0.25-preview.1 confirmed decoded splash frames,
+intro completion, video removal and a loaded model with no application error.
+Switching through Drive, Lounge and Focus settled with one active widget page
+and the car visible only in the two car layouts. This was a functional check,
+not a frame-rate comparison against the earlier no-3D build.
+
+A four-run old/new/new/old crop comparison on the no-3D car preview recorded
+a 150 ms maximum rAF gap in both new runs; the comparable old return direction
+recorded 183 ms. The old forward run had a 1.55-second late task, so it cannot
+establish a clean paired speedup. Desktop React commits still produced 53–101 ms
+tasks. This change fixes image geometry and input delivery; it does not establish
+that all main-thread stalls are gone.
+
+
+### Visited desktop widget cache (1.0.17 preview)
+
+The widget board has one template, compiled once into a memoized React child.
+Reading a template's `innerHTML` lowercases its attribute names before the
+runtime compiler sees them. `support.js` maps mouse, touch and pointer events
+(including pointer capture) back to React's canonical prop names. The raw-HTML
+path still preserves camel-case attributes. `test-template-events.mjs` executes
+the real compiler through both paths in Chromium, checking every template event
+binding plus each explicit event mapping for prop name, handler identity and
+invocation; each mapping has a negative control.
+Each visited desktop retains its own keyed page and last view; inactive pages
+remain mounted, invisible, with CSS animations paused. Deleted desktops evict
+their pages. The active view freezes during a slide and refreshes after teardown.
+Pages translate with the wallpaper; the native bottom strip keeps its existing
+fade. First visits still mount widgets. Configuration and telemetry refresh on
+activation. Imperative climate, power, graph, media and energy painters select
+active pages only; the shared clock runtime excludes inactive pages.
+
+Device verification retained the identical clock and page DOM nodes across a
+round trip: zero hidden clock refreshes, refreshes resumed on activation, no
+application error. Local retention tests include a negative control that removes
+the slide freeze.
+
+A five-second trace of a first visit measured a 17 ms median and p95 frame
+interval, but a 329 ms maximum and five intervals above 50 ms. This is not an
+A/B speed claim: root commits, native strip updates and first visits still cause
+long tasks. Retention removes remounts on revisits, not all remaining stalls.
