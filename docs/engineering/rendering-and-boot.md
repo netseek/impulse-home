@@ -395,6 +395,16 @@ memory, and initial model loading is unchanged; this is a suspension of ongoing
 scene work, not a removal of 3D RAM or startup cost. The hidden-scene test checks
 suspension, visible resume and loading, with a negative control.
 
+Suspension leaves the renderer's last pixels intact. `_syncCanvasPointerEvents`
+therefore sets only the renderer canvas opacity to `0` whenever `_shouldShowCar()`
+is false, synchronously before another frame, and restores the empty inline
+opacity when the car returns. The host retains its existing pointer policy:
+wallpaper mode still receives canvas gestures, including when the wallpaper is
+missing or fails to load; apps-only does not intercept background input.
+`test-canvas-scene-visibility.mjs` checks these DOM behaviors in Chromium and
+exercises the real frame-request/suspension code with drawing replaced by a
+canvas painter. It does not validate GPU rendering or head-unit performance.
+
 On the car, a four-second idle wallpaper sample before the guard recorded 240
 camera-animation ticks and zero renderer calls. After installation, the same
 observation recorded zero camera ticks and zero renderer calls, including an
@@ -452,6 +462,13 @@ that all main-thread stalls are gone.
 ### Visited desktop widget cache (1.0.17 preview)
 
 The widget board has one template, compiled once into a memoized React child.
+Reading a template's `innerHTML` lowercases its attribute names before the
+runtime compiler sees them. `support.js` maps mouse, touch and pointer events
+(including pointer capture) back to React's canonical prop names. The raw-HTML
+path still preserves camel-case attributes. `test-template-events.mjs` executes
+the real compiler through both paths in Chromium, checking every template event
+binding plus each explicit event mapping for prop name, handler identity and
+invocation; each mapping has a negative control.
 Each visited desktop retains its own keyed page and last view; inactive pages
 remain mounted, invisible, with CSS animations paused. Deleted desktops evict
 their pages. The active view freezes during a slide and refreshes after teardown.

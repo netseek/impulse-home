@@ -48527,11 +48527,16 @@ class Component extends DCLogic {
 
   _syncCanvasPointerEvents() {
     const el = this.containerRef && this.containerRef.current;
-    if (!el) return;
-    const mode = this._shellMode || (this.state && this.state.shellMode) || 'appCar';
-    // Wallpaper-only still needs the canvas to catch background desktop swipes
-    // and empty-board long-press. appsOnly has no centre stage at all.
-    el.style.pointerEvents = mode === 'appsOnly' ? 'none' : 'auto';
+    if (el) {
+      const mode = this._shellMode || (this.state && this.state.shellMode) || 'appCar';
+      // Wallpaper-only still needs the canvas to catch background desktop swipes
+      // and empty-board long-press. appsOnly has no centre stage at all.
+      el.style.pointerEvents = mode === 'appsOnly' ? 'none' : 'auto';
+    }
+    // A suspended renderer retains its last pixels. Hide them without removing
+    // the canvas from hit testing or waiting for another 3D frame.
+    const canvas = this.renderer && this.renderer.domElement;
+    if (canvas) canvas.style.opacity = this._shouldShowCar() ? '' : '0';
   }
 
   _placeCells(side) {
