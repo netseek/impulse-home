@@ -260,19 +260,6 @@ final class ProjectionPresence {
         }
     }
 
-    private void sendCpTransact(int code) {
-        IBinder binder = ensureCpBinder();
-        if (binder == null || !binder.isBinderAlive()) return;
-        Parcel data = Parcel.obtain();
-        try {
-            data.writeInterfaceToken(CP_DESCRIPTOR);
-            binder.transact(code, data, null, IBinder.FLAG_ONEWAY);
-        } catch (Throwable ignored) {
-        } finally {
-            data.recycle();
-        }
-    }
-
     private Kind detect() {
         boolean carPlay = carPlayLinked() || (media != null && media.hasCarPlayTrack());
         boolean androidAuto = androidAutoLinked() || (media != null && media.hasAndroidAutoTrack());

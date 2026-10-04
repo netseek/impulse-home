@@ -578,6 +578,20 @@ public final class MainActivity extends Activity {
 
     public class AppLauncherBridge {
         @JavascriptInterface
+        public void openHomeSettings() {
+            runOnUiThread(() -> {
+                try {
+                    startActivity(new Intent(android.provider.Settings.ACTION_HOME_SETTINGS));
+                } catch (android.content.ActivityNotFoundException | SecurityException e) {
+                    Log.w(TAG, "Home selection unavailable", e);
+                    android.widget.Toast.makeText(MainActivity.this,
+                            "Esta central não permite escolher a tela inicial pelas configurações do Android.",
+                            android.widget.Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
         public String getClockEnvironment() {
             JSONObject environment = new JSONObject();
             try {
@@ -2415,23 +2429,6 @@ public final class MainActivity extends Activity {
             c.drawText(fuelKm, colLeft + evLblW + evValW + sepW + gasLblW, yRow3, paint);
         }
 
-        private void drawGauge(android.graphics.Canvas c, float w, float h,
-                int accent, int muted, int strong) {
-            float pad = w * .13f;
-            oval.set(pad, h * .25f, w - pad, h * .93f);
-            stroke(muted, Math.max(3f, w * .065f));
-            c.drawArc(oval, 190f, 160f, false, paint);
-            stroke(accent, Math.max(3f, w * .065f));
-            c.drawArc(oval, 190f, 160f * descriptor.progress / 100f, false, paint);
-            float a = (float) Math.toRadians(190f + 160f * descriptor.progress / 100f);
-            float cx = w * .5f, cy = h * .60f, r = w * .24f;
-            stroke(strong, Math.max(2f, w * .035f));
-            c.drawLine(cx, cy, cx + (float) Math.cos(a) * r,
-                    cy + (float) Math.sin(a) * r, paint);
-            fill(accent);
-            c.drawCircle(cx, cy, Math.max(3f, w * .055f), paint);
-        }
-
         /**
          * Status deliberately shares the realistic top-view raster with Tires;
          * opening strokes are placed beside their physical door/tailgate edge,
@@ -2688,18 +2685,6 @@ public final class MainActivity extends Activity {
             }
         }
 
-        private String ellipsizeStatusText(String value, float maxWidth) {
-            if (value == null || value.isEmpty() || paint.measureText(value) <= maxWidth) {
-                return value == null ? "" : value;
-            }
-            String ellipsis = "…";
-            int end = value.length();
-            while (end > 0 && paint.measureText(value.substring(0, end) + ellipsis) > maxWidth) {
-                end--;
-            }
-            return value.substring(0, end) + ellipsis;
-        }
-
         private Bitmap getStatusVehicleBitmap(String filename) {
             if (statusVehicleBitmaps.containsKey(filename)) return statusVehicleBitmaps.get(filename);
             Bitmap bitmap = null;
@@ -2711,11 +2696,6 @@ public final class MainActivity extends Activity {
             }
             statusVehicleBitmaps.put(filename, bitmap);
             return bitmap;
-        }
-
-        private boolean hasOpenStatusOpening(String[] openings) {
-            for (String opening : openings) if ("open".equals(opening)) return true;
-            return false;
         }
 
         private void drawStatusVehicleFallback(android.graphics.Canvas c, float w, float h,
@@ -3926,7 +3906,6 @@ public final class MainActivity extends Activity {
     }
     /** Content shown to the right of the mode drawer: apps | layout | config. */
     private String stripMode = "apps";
-    private boolean drawerExpanded;
     private int dockCellPx;
     private int dockIconPx;
     private int dockIconRowTopPadPx;
@@ -4085,13 +4064,6 @@ public final class MainActivity extends Activity {
     private Bitmap splashHoldFrame;
     private boolean splashFadeStarted;
     private boolean splashOverlayEnded;
-    private boolean splashDropScheduled;
-    private final Runnable forceDropSplash = new Runnable() {
-        @Override
-        public void run() {
-            dropSplashFromShell();
-        }
-    };
 
     /**
      * Left freeform slot over our fullscreen launcher (not split-screen).
@@ -4105,7 +4077,6 @@ public final class MainActivity extends Activity {
     private static final Rect LEFT_POPUP_BOUNDS = new Rect(48, 28, 740, 530);
     /** Right media slot (idle now-playing + music apps share these bounds). */
     private static final Rect RIGHT_APP_BOUNDS = new Rect(1180, 100, 1872, 530);
-    private static final Rect RIGHT_IDLE_BOUNDS = RIGHT_APP_BOUNDS;
     private static final String SHELL_APP_CAR = "appCar";
     private static final String SHELL_APPS = "appsOnly";
     private static final String PREFS_SHELL = "h6_shell";
@@ -5291,11 +5262,6 @@ public final class MainActivity extends Activity {
                 appsFabRoot.requestLayout();
             }
         } catch (Exception ignored) {}
-    }
-
-    private boolean ensureAppsFabOverlay() {
-        ensureAppsFabBuilt();
-        return appsFabRoot != null;
     }
 
     private android.widget.LinearLayout buildAppsFabMenu(float d) {
@@ -8574,12 +8540,6 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void setModeCellIcon(View cell, Drawable glyph) {
-        if (cell == null) return;
-        android.widget.ImageView iv = cell.findViewWithTag("modeIcon");
-        if (iv != null) iv.setImageDrawable(glyph);
-    }
-
     private Drawable glyphForModeCell(View cell, int iconPx, boolean selected) {
         int color = dockGlyphColor(selected);
         if (cell == modeAppsBtn) return dockGlyphApps(iconPx, color);
@@ -9078,24 +9038,7 @@ public final class MainActivity extends Activity {
         return d != null ? d : new android.graphics.drawable.ColorDrawable(color);
     }
 
-    private Drawable glyphForStripMode(String mode) {
-        int size = dockIconPx > 0 ? dockIconPx
-                : Math.round(60 * getResources().getDisplayMetrics().density);
-        int color = dockGlyphColor(true);
-        // Draw at full icon size; makeModeCell insets into the plate.
-        if (STRIP_LAYOUT.equals(mode)) return dockGlyphLayout(size, color);
-        if (STRIP_CONFIG.equals(mode)) return dockGlyphConfig(size, color);
-        return dockGlyphApps(size, color);
-    }
-
-    private void setDrawerExpanded(boolean expanded) {
-        drawerExpanded = expanded;
-        if (expanded) applyDrawerExpandedUi();
-        else applyDrawerCollapsedUi(true);
-    }
-
     private void applyDrawerCollapsedUi(boolean animate) {
-        drawerExpanded = false;
         // In Cards mode Workspace is the single navigation source (Apps +
         // Organize). Do not leave a duplicate Apps icon or an empty drawer cell.
         boolean showLauncherApps = !DOCK_SURFACE_CARDS.equals(dockSurfaceMode);
@@ -9141,52 +9084,6 @@ public final class MainActivity extends Activity {
                     lp.width = target;
                     modeDrawer.setLayoutParams(lp);
                 }
-            }
-        }
-    }
-
-    private void applyDrawerExpandedUi() {
-        drawerExpanded = true;
-        if (modeCollapsedBtn != null) modeCollapsedBtn.setVisibility(View.GONE);
-        if (modeAppsBtn != null) {
-            modeAppsBtn.setVisibility(View.VISIBLE);
-            setModeCellSelected(modeAppsBtn, STRIP_APPS.equals(stripMode));
-            setModeCellLabelVisible(modeAppsBtn, true);
-        }
-        if (modeLayoutBtn != null) {
-            modeLayoutBtn.setVisibility(View.VISIBLE);
-            setModeCellSelected(modeLayoutBtn, STRIP_LAYOUT.equals(stripMode));
-            setModeCellLabelVisible(modeLayoutBtn, true);
-        }
-        if (modeConfigBtn != null) {
-            modeConfigBtn.setVisibility(View.VISIBLE);
-            setModeCellSelected(modeConfigBtn, STRIP_CONFIG.equals(stripMode));
-            setModeCellLabelVisible(modeConfigBtn, true);
-        }
-        if (modeSurfaceBtn != null) {
-            modeSurfaceBtn.setVisibility(View.VISIBLE);
-            setModeCellSelected(modeSurfaceBtn, DOCK_SURFACE_CARDS.equals(dockSurfaceMode));
-            android.widget.TextView label = findModeCellLabel(modeSurfaceBtn);
-            if (label != null) label.setText(DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
-                    ? "Launcher" : "Cards");
-            modeSurfaceBtn.setContentDescription(DOCK_SURFACE_CARDS.equals(dockSurfaceMode)
-                    ? "Show launcher. Long press to customize"
-                    : "Mostrar cards rápidos. Toque longo para personalizar");
-            setModeCellLabelVisible(modeSurfaceBtn, true);
-        }
-        if (modeDrawer != null && dockCellPx > 0) {
-            android.widget.LinearLayout.LayoutParams lp =
-                    (android.widget.LinearLayout.LayoutParams) modeDrawer.getLayoutParams();
-            if (lp != null) {
-                final int target = dockCellPx * 4;
-                android.animation.ValueAnimator anim =
-                        android.animation.ValueAnimator.ofInt(Math.max(dockCellPx, lp.width), target);
-                anim.setDuration(200);
-                anim.addUpdateListener(a -> {
-                    lp.width = (Integer) a.getAnimatedValue();
-                    modeDrawer.setLayoutParams(lp);
-                });
-                anim.start();
             }
         }
     }
@@ -9268,7 +9165,7 @@ public final class MainActivity extends Activity {
         if (STRIP_APPS.equals(stripMode) && cardsScrollView != null) {
             showStripContent(STRIP_APPS, animate);
         }
-        if (!drawerExpanded) applyDrawerCollapsedUi(false);
+        applyDrawerCollapsedUi(false);
         refreshQuickCardsTheme();
         refreshDesktopIndicator();
     }
@@ -11434,35 +11331,6 @@ public final class MainActivity extends Activity {
         setModeCellSelected(layoutCenterFillChip, usesWallpaper);
     }
 
-    private Drawable makeSimpleLayoutGlyph(int sizePx, int kind) {
-        // kind 2 = app+car, kind 3 = app+app (two equal blocks) — centred.
-        Bitmap bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
-        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        p.setColor(dockGlyphColor());
-        float s = sizePx;
-        float padY = s * 0.18f;
-        float h = s - 2f * padY;
-        float gap = s * 0.07f;
-        if (kind == 2) {
-            float wApp = s * 0.28f;
-            float wCar = s * 0.34f;
-            float total = wApp + gap + wCar;
-            float x = (s - total) * 0.5f;
-            c.drawRoundRect(x, padY, x + wApp, padY + h, 3f, 3f, p);
-            x += wApp + gap;
-            p.setAlpha(140);
-            c.drawRoundRect(x, padY + h * 0.12f, x + wCar, padY + h * 0.88f, 4f, 4f, p);
-        } else {
-            float w = (s - gap) * 0.38f;
-            float total = w + gap + w;
-            float x = (s - total) * 0.5f;
-            c.drawRoundRect(x, padY, x + w, padY + h, 3f, 3f, p);
-            c.drawRoundRect(x + w + gap, padY, x + w + gap + w, padY + h, 3f, 3f, p);
-        }
-        return new android.graphics.drawable.BitmapDrawable(getResources(), bmp);
-    }
-
     private View makeWideDockChip(float density, int widthPx, int iconPx, String label,
             View.OnClickListener click) {
         FrameLayout cell = new FrameLayout(this);
@@ -11503,71 +11371,11 @@ public final class MainActivity extends Activity {
         return cell;
     }
 
-    /** Non-interactive hint chip (same plate language as Add Widget). */
-    private View makeDockTipChip(float density, int widthPx, int iconPx, String label) {
-        FrameLayout cell = new FrameLayout(this);
-        android.widget.LinearLayout.LayoutParams lp =
-                new android.widget.LinearLayout.LayoutParams(widthPx,
-                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
-        lp.leftMargin = Math.round(6 * density);
-        cell.setLayoutParams(lp);
-        cell.setClickable(false);
-        cell.setFocusable(false);
-        cell.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-        cell.setContentDescription(label);
-
-        View plate = new View(this);
-        int plateH = Math.round(iconPx + 10 * density);
-        FrameLayout.LayoutParams plateLp = new FrameLayout.LayoutParams(
-                widthPx - Math.round(8 * density), plateH);
-        plateLp.gravity = android.view.Gravity.CENTER;
-        plate.setLayoutParams(plateLp);
-        plate.setTag("modePlate");
-        plate.setBackground(makeDockPlateDrawable(false, density));
-        cell.addView(plate);
-
-        android.widget.TextView tv = new android.widget.TextView(this);
-        FrameLayout.LayoutParams tvLp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        tvLp.gravity = android.view.Gravity.CENTER;
-        tv.setLayoutParams(tvLp);
-        tv.setTag("dockChipLabel");
-        tv.setText(label);
-        tv.setTextColor(dockLabelColorMuted());
-        tv.setTextSize(10.5f);
-        tv.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                android.graphics.Typeface.NORMAL));
-        tv.setLetterSpacing(0.03f);
-        tv.setMaxLines(2);
-        tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        tv.setGravity(android.view.Gravity.CENTER);
-        tv.setPadding(Math.round(10 * density), 0, Math.round(10 * density), 0);
-        cell.addView(tv);
-        return cell;
-    }
-
     private void refreshLayoutChipSelection() {
         refreshCenterFillChip();
         refreshLayoutThemeChip();
         refreshDockSurfaceUi(false);
         refreshDesktopIndicator();
-    }
-
-    private void styleLayoutChipLabel(View chip) {
-        if (chip == null) return;
-        for (int i = 0; i < ((android.view.ViewGroup) chip).getChildCount(); i++) {
-            View child = ((android.view.ViewGroup) chip).getChildAt(i);
-            if (child instanceof android.widget.LinearLayout) {
-                android.widget.LinearLayout inner = (android.widget.LinearLayout) child;
-                for (int j = 0; j < inner.getChildCount(); j++) {
-                    View rowChild = inner.getChildAt(j);
-                    if (rowChild instanceof android.widget.TextView) {
-                        styleDockLabel((android.widget.TextView) rowChild, false);
-                    }
-                }
-            }
-        }
     }
 
     private View buildConfigContentRow(float density, int cellPx, int iconPx) {

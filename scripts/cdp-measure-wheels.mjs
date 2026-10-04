@@ -2,7 +2,6 @@
  * Measure installed Haval catalog wheel radius on a live viewer via CDP.
  * Usage: node scripts/cdp-measure-wheels.mjs [wsUrl]
  */
-import WebSocket from 'ws';
 
 const WS =
   process.argv[2] ||
@@ -15,15 +14,15 @@ function cdp(ws, method, params = {}) {
   ws.send(JSON.stringify({ id, method, params }));
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout ${method}`)), 120000);
-    const onMsg = (raw) => {
-      const msg = JSON.parse(raw);
+    const onMsg = (event) => {
+      const msg = JSON.parse(event.data);
       if (msg.id !== id) return;
       clearTimeout(timer);
-      ws.off('message', onMsg);
+      ws.removeEventListener('message', onMsg);
       if (msg.error) reject(new Error(JSON.stringify(msg.error)));
       else resolve(msg.result);
     };
-    ws.on('message', onMsg);
+    ws.addEventListener('message', onMsg);
   });
 }
 
@@ -71,7 +70,7 @@ const measureExpr = `
 `;
 
 const ws = new WebSocket(WS);
-ws.on('open', async () => {
+ws.addEventListener('open', async () => {
   try {
     await cdp(ws, 'Runtime.enable');
     const rows = [];

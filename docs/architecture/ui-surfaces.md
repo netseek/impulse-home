@@ -40,6 +40,13 @@ desktop (`_desktopBottomCards`, normalised by `_normalizeBottomCards`).
 Both go through the same native allow-list. `iconAction` is optional; without it
 the whole card is one target.
 
+The Wallpaper graphic cycles 3D → Wallpaper → Both in one state update. The
+wallpaper picker opens with Wallpaper or Both and closes with 3D; the car is
+visible in 3D and Both only. Tapping the card body opens the picker without
+changing Wallpaper or Both. Opening it from 3D selects Wallpaper and opens the
+picker in the same update, so delayed callbacks cannot reopen it after a quick
+return to 3D. `test-wallpaper-mode.mjs` covers these transitions and rapid taps.
+
 **A visual card already has a text column.** `makeQuickVisualCard` lays the
 graphic out beside native TextViews that show `primary`, `secondary` and
 `metricA · metricB`. The `QuickCardGraphicView` case should draw a *graphic* —
@@ -196,3 +203,8 @@ wallpaper URLs never hit it, which is why the same pattern looked safe. Put a
 data URL in an attribute instead (`<img src="{{ url }}">`, as the media art and
 the thumbnails do). The tell is `getAttribute('style')` being far shorter than
 the value the builder returned.
+
+In the light theme, widgets use a 92%-opaque background and darker secondary
+text to stay legible over bright wallpapers. Window, roof and tailgate controls
+have stronger borders and fills; pending commands retain readable text and a
+dashed border in addition to their disabled state.

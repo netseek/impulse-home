@@ -534,3 +534,14 @@ The viewer config panel exposes `timeMode`: `day`, `night`, or `auto`.
 Persisted viewer preferences (including `timeMode`) are stored in WebView
 `localStorage` under `h6_settings_v1` when the user taps **Save**. Live car
 signals are applied after saved settings on load, so the car wins over them.
+
+## Default home selection
+
+Appearance settings offer **Set as home screen** in both Desktop Studio and the
+layout panel. The button calls `AppLauncherBridge.openHomeSettings()`, which
+opens `Settings.ACTION_HOME_SETTINGS` on the UI thread. The user makes the
+selection in Android's native settings screen. If the firmware does not provide
+or blocks this activity, a message explains that it is unavailable. The button
+is disabled in a browser or with an older bridge. The Activity already declares
+`MAIN`, `HOME` and `DEFAULT`; this option does not silently change preferences
+or configure startup when the head unit powers on.

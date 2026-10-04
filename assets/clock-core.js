@@ -240,7 +240,6 @@
     resolvedHourFormat: resolvedHourFormat,
     localComponents: localComponents,
     snapshot: snapshot,
-    resolvedHourFormat: resolvedHourFormat,
     nextMinuteDelay: nextMinuteDelay,
     weekStart: weekStart,
     weekDates: weekDates,
