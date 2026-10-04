@@ -15061,22 +15061,19 @@ class Component extends DCLogic {
     for (const door of ['fl', 'fr', 'rl', 'rr']) {
       applySlot(slots[CAR_DOOR_SLOTS[door]], (pct) => this._setDoorOpen(door, pct));
     }
-    if (typeof this._setTrunkOpen === 'function') {
-      const trunkN = slots[CAR_DOOR_SLOTS.trunk];
+    applySlot(slots[CAR_DOOR_SLOTS.trunk], (pct) => {
+      this._trunkBusLevel = pct;
+      if (typeof this._setTrunkOpen !== 'function') return;
       // While a UI toggle is in flight, swallow travel codes (3/1/5/4) so they
       // cannot yank the car-paced tween back open mid-close.
       if (this._isTrunkBusIgnored()) {
-        const entry = this._trunkBusIgnore;
-        if (trunkN !== undefined && isFinite(trunkN) && trunkN >= 0) {
-          const pct = trunkN > 0 ? 100 : 0;
-          entry.pending = pct;
-          // The tailgate reports nonzero before travel ends. Keep the bounded
-          // pending window instead of treating that early echo as completion.
-        }
+        this._trunkBusIgnore.pending = pct;
+        // The tailgate reports nonzero before travel ends. Keep the bounded
+        // pending window instead of treating that early echo as completion.
       } else {
-        applySlot(trunkN, (pct) => this._setTrunkOpen(pct));
+        this._setTrunkOpen(pct);
       }
-    }
+    });
     this._syncEventCamera();
   }
 
@@ -15131,12 +15128,9 @@ class Component extends DCLogic {
       : (setter === '_setSunroofOpen' ? 'sunroof' : null);
     if (kind) {
       if (!this._roofBusLevel) this._roofBusLevel = {};
-      // Always remember the last bus sample — ignore windows measure travel
-      // from this, not from the optimistic local slider.
-      if (!(this._roofBusIgnore && this._roofBusIgnore[kind]
-          && performance.now() < (this._roofBusIgnore[kind].until || 0))) {
-        this._roofBusLevel[kind] = pct;
-      }
+      // Keep telemetry current while protecting the displayed target. A drag
+      // has its own fixed origin in _roofGestureFrom.
+      this._roofBusLevel[kind] = pct;
       if (this._isRoofBusIgnored(kind)) {
         this._bufferRoofBusIgnore(kind, pct);
         this._syncEventCamera();
@@ -15198,22 +15192,24 @@ class Component extends DCLogic {
     if (kind !== 'sunroof' && kind !== 'curtain') return;
     if (!this._roofBusIgnore) this._roofBusIgnore = {};
     if (!this._roofGestureFrom) this._roofGestureFrom = {};
+    const entry = this._roofBusIgnore[kind] || (this._roofBusIgnore[kind] = {});
     // One gesture keeps the bus origin fixed so dragging 20→80 arms ~6.6 s,
     // not a fresh 110 ms window on every 1% tick.
     if (this._roofGestureFrom[kind] == null) {
       this._roofGestureFrom[kind] = fromPct;
+      entry.pending = null;
     }
     const from = this._roofGestureFrom[kind];
     const travel = carRoofTravelMs(kind, from, toPct);
     const wait = Math.max(CAR_ROOF_BUS_IGNORE_MIN_MS,
       Math.round(travel + CAR_ROOF_BUS_IGNORE_PAD_MS));
-    const entry = this._roofBusIgnore[kind] || (this._roofBusIgnore[kind] = {});
     entry.until = performance.now() + wait;
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = setTimeout(() => this._flushRoofBusIgnore(kind), wait);
   }
 
   _flushRoofBusIgnore(kind) {
+    if (this._roofSliderActive) this._roofSliderActive[kind] = false;
     const entry = this._roofBusIgnore && this._roofBusIgnore[kind];
     if (!entry) return;
     if (entry.timer) {
@@ -15279,6 +15275,12 @@ class Component extends DCLogic {
     this._refreshUnifiedStatus();
   }
 
+  _trunkConfirmedPct() {
+    if (this._trunkBusLevel != null) return this._trunkBusLevel;
+    const level = this.state && this.state.trunkOpen;
+    return Number.isFinite(level) && level > 0 ? 100 : 0;
+  }
+
   _armTrunkBusIgnore(toPct) {
     if (!this._trunkBusIgnore) this._trunkBusIgnore = {};
     const wait = Math.max(CAR_ROOF_BUS_IGNORE_MIN_MS,
@@ -15286,8 +15288,7 @@ class Component extends DCLogic {
     const entry = this._trunkBusIgnore;
     entry.until = performance.now() + wait;
     entry.goal = toPct > 0 ? 100 : 0;
-    const slot = this._carDoorSlots && this._carDoorSlots[CAR_DOOR_SLOTS.trunk];
-    entry.pending = slot == null ? ((this.state && this.state.trunkOpen) || 0) : (slot > 0 ? 100 : 0);
+    entry.pending = this._trunkConfirmedPct();
     if (entry.timer) clearTimeout(entry.timer);
     entry.timer = setTimeout(() => this._flushTrunkBusIgnore(), wait);
   }
@@ -24585,8 +24586,14 @@ class Component extends DCLogic {
     return commands[kind] || null;
   }
 
-  _applyVehicleOpeningLevel(kind, raw) {
+  _applyVehicleOpeningLevel(kind, raw, dragging = false) {
     const level = this._vehicleOpeningLevel(raw);
+    if (kind === 'sunroof' || kind === 'curtain') {
+      if (!this._roofSliderActive) this._roofSliderActive = {};
+      if (!this._roofGestureFrom) this._roofGestureFrom = {};
+      if (!dragging || !this._roofSliderActive[kind]) this._roofGestureFrom[kind] = null;
+      this._roofSliderActive[kind] = dragging;
+    }
     if (kind === 'windows') this._setWindowsOpen(level);
     else if (kind === 'sunroof') {
       const from = this._roofBusKindLevel('sunroof');
@@ -24612,6 +24619,8 @@ class Component extends DCLogic {
     // Fresh gesture for open/close — do not inherit a prior slider origin.
     if (!this._roofGestureFrom) this._roofGestureFrom = {};
     this._roofGestureFrom[kind] = null;
+    if (!this._roofSliderActive) this._roofSliderActive = {};
+    this._roofSliderActive[kind] = false;
     if (kind === 'sunroof') {
       this._sunroofStep = CAR_OPENING_STEP;
       this._sunroofTravelGoal = pct;
@@ -24636,7 +24645,7 @@ class Component extends DCLogic {
   _queueVehicleOpeningLevel(kind, raw) {
     const command = this._vehicleOpeningCommand(kind);
     if (!command || !command.set) return;
-    const level = this._applyVehicleOpeningLevel(kind, raw);
+    const level = this._applyVehicleOpeningLevel(kind, raw, true);
     if (!this._vehicleOpeningTimers) this._vehicleOpeningTimers = {};
     this._clearVehicleOpeningLevel(kind);
     this._vehicleOpeningTimers[kind] = setTimeout(() => {
@@ -24660,8 +24669,7 @@ class Component extends DCLogic {
     this._clearVehicleOpeningLevel(kind);
     // Settled value — measure ignore from the last bus sample, not an earlier
     // drag origin, so a reverse (80→40) still covers the hardware turn-around.
-    if (this._roofGestureFrom) this._roofGestureFrom[kind] = null;
-    const level = this._applyVehicleOpeningLevel(kind, raw);
+    const level = this._applyVehicleOpeningLevel(kind, raw, false);
     this._sendCarCommand(command.set, String(level), { skipLocal: true });
   }
 
@@ -24736,9 +24744,9 @@ class Component extends DCLogic {
         this._armWindowBusIgnore('rr', next);
       },
       toggle_trunk: () => {
-        const next = (s.trunkOpen || 0) > 0 ? 0 : 100;
-        this._setTrunkOpen(next);
+        const next = this._trunkConfirmedPct() > 0 ? 0 : 100;
         this._armTrunkBusIgnore(next);
+        this._setTrunkOpen(next);
       },
       toggle_sunroof: () => this._applyVehicleOpeningLevel('sunroof', (s.sunroofOpen || 0) > 0 ? 0 : 100),
       toggle_curtain: () => this._applyVehicleOpeningLevel('curtain', (s.curtainOpen || 0) > 0 ? 0 : 100),
@@ -24753,9 +24761,7 @@ class Component extends DCLogic {
     if (!cmd) return false;
     if (cmd === 'toggle_trunk') {
       if (this._isTrunkBusIgnored()) return false;
-      const slot = this._carDoorSlots && this._carDoorSlots[CAR_DOOR_SLOTS.trunk];
-      const open = slot == null ? ((this.state && this.state.trunkOpen) || 0) > 0 : slot > 0;
-      const next = open ? 0 : 100;
+      const next = this._trunkConfirmedPct() > 0 ? 0 : 100;
       this._armTrunkBusIgnore(next);
       this._setTrunkOpen(next);
       opts = { skipLocal: true };

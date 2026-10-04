@@ -105,10 +105,21 @@ The status widget's collective window and tailgate buttons show `MOVENDO…` and
 are disabled while a command is pending. The tailgate does not allow a reversal
 on its first nonzero signal: that signal may arrive before travel ends, so it
 uses the existing bounded wait (6 s plus a margin). An unavailable bridge cancels
-the wait and restores the last reading.
+the wait and restores the last valid reading. Missing, malformed and negative
+tailgate slots remain unknown in status surfaces without discarding the last
+valid 0/100 control position. Both toggle selection and timeout reconciliation
+use that position, falling back to the normalized pre-command local state only
+when no valid telemetry exists. The wait is armed before the optimistic update.
+Regression coverage: `node scripts/test-trunk-command-echo.mjs`.
 
 The sunroof's special tilt/slide signal is converted to a percentage before
 passing through the same echo buffer as the curtain. Open, close and slider
-commands retain the requested destination while waiting; on expiry, the last
-received signal reconciles the position. Ventilation still maps to 25%.
+commands retain the requested destination while waiting, while the latest valid
+telemetry continues to update separately. Each slider gesture keeps its own
+fixed travel origin, including after a debounced command has been sent. A new
+gesture, a button command or release uses the latest telemetry and discards the
+previous command's buffered echo; timeout reconciles only a new buffered sample.
+For example, reversing from a mapped 40% to closed waits 4.8 s, not just the
+400 ms command margin. Release, buttons and timeout end the per-control drag
+marker. Ventilation still maps to 25%.
 Regression coverage: `node scripts/test-roof-command-echo.mjs`.
