@@ -205,6 +205,16 @@ the most useful OEM reference for a later visual/functional media-card pass.
 Our card must still disable transport when no active track and no working
 `MediaBridge` are present.
 
+### CarPlay UI request
+
+The Impulse projection launcher uses the bound service `com.ts.carplay.CarPlayService`
+and descriptor `com.ts.carplay.common.aidl.ICarPlayService`. `getLinkStatus`
+(transaction `29`) must return `2` (activated) before `requestUi` (transaction
+`20`) is sent synchronously with one integer argument, `0` (normal launch mode).
+Both replies carry an exception header. This is a source-verified interoperability
+contract, not a vehicle-verified launch from this viewer. Transactions `30` and
+`31` are not UI-launch commands and must not be used as a show shortcut.
+
 ## Visual reference learnings
 
 - OEM resources consistently provide paired day/night assets. New card imagery
