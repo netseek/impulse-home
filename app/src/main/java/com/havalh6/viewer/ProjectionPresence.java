@@ -44,8 +44,6 @@ final class ProjectionPresence {
     private static final String CP_HOST = "com.ts.carplay";
     private static final String CP_SERVICE_CLASS = "com.ts.carplay.CarPlayService";
     private static final String CP_DESCRIPTOR = "com.ts.carplay.common.aidl.ICarPlayService";
-    private static final int CP_TX_GET_LINK_STATUS = 29;
-    private static final int CP_LINK_ACTIVATED = 2;
 
     private static final long POLL_MS = 2000;
 
@@ -60,6 +58,8 @@ final class ProjectionPresence {
     private volatile IBinder cpBinder;
     private volatile Kind lastKind = Kind.NONE;
     private boolean started;
+    private volatile CarPlayUiRequest pendingCarPlayShow;
+    private Runnable pendingCarPlayShowTick;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -94,6 +94,7 @@ final class ProjectionPresence {
     }
 
     void stop() {
+        cancelShow();
         started = false;
         if (worker != null) worker.removeCallbacks(tick);
         unbind(aaConnection);
@@ -228,6 +229,7 @@ final class ProjectionPresence {
      * are the hooks visible from package manifests on the MMI.
      */
     void requestShow(Kind kind) {
+        cancelShow();
         if (kind == Kind.ANDROID_AUTO) {
             try {
                 Intent viewState = new Intent("ts.car.androidauto.view_state");
@@ -240,11 +242,62 @@ final class ProjectionPresence {
             // too skipped the track on every AA open.
             sendAaTransact(0x17);
         } else if (kind == Kind.CARPLAY) {
-            // Nothing to send: ICarPlayService 30 is getVideoLastUserMode and 31
-            // setSongElapsedTime (it could rewind the song). The only show-type
-            // call, requestUi (0x14), takes arguments we do not know, so the
-            // task resolve + launch intents in MainActivity do the showing.
+            requestCarPlayShow();
         }
+    }
+
+    /** Cancel only an outstanding UI request, leaving presence polling intact. */
+    void cancelShow() {
+        CarPlayUiRequest request = pendingCarPlayShow;
+        pendingCarPlayShow = null;
+        if (request != null) request.cancel();
+        if (worker != null && pendingCarPlayShowTick != null) {
+            worker.removeCallbacks(pendingCarPlayShowTick);
+        }
+        pendingCarPlayShowTick = null;
+    }
+
+    private void requestCarPlayShow() {
+        final Handler queue = worker;
+        if (!started || queue == null) return;
+        final CarPlayUiRequest request = new CarPlayUiRequest(android.os.SystemClock::uptimeMillis);
+        pendingCarPlayShow = request;
+        pendingCarPlayShowTick = new Runnable() {
+            @Override public void run() {
+                if (pendingCarPlayShow != request) return;
+                final IBinder binder = ensureCpBinder();
+                CarPlayUiRequest.Result result = request.attempt(new CarPlayUiRequest.Service() {
+                    @Override public Integer readInt(int transaction) {
+                        return ProjectionPresence.readInt(binder, CP_DESCRIPTOR, transaction);
+                    }
+
+                    @Override public boolean writeInt(int transaction, int value) {
+                        if (binder == null || !binder.isBinderAlive()) return false;
+                        Parcel data = Parcel.obtain();
+                        Parcel reply = Parcel.obtain();
+                        try {
+                            data.writeInterfaceToken(CP_DESCRIPTOR);
+                            data.writeInt(value);
+                            if (!binder.transact(transaction, data, reply, 0)) return false;
+                            reply.readException();
+                            return true;
+                        } catch (Throwable t) {
+                            Log.w(TAG, "CarPlay requestUi failed", t);
+                            return false;
+                        } finally {
+                            reply.recycle();
+                            data.recycle();
+                        }
+                    }
+                });
+                if (result == CarPlayUiRequest.Result.RETRY && pendingCarPlayShow == request) {
+                    queue.postDelayed(this, CarPlayUiRequest.RETRY_MS);
+                } else {
+                    Log.w(TAG, "CarPlay requestUi " + result);
+                }
+            }
+        };
+        queue.post(pendingCarPlayShowTick);
     }
 
     private void sendAaTransact(int code) {
@@ -286,8 +339,8 @@ final class ProjectionPresence {
 
     private boolean carPlayLinked() {
         IBinder binder = ensureCpBinder();
-        Integer status = readInt(binder, CP_DESCRIPTOR, CP_TX_GET_LINK_STATUS);
-        return status != null && status == CP_LINK_ACTIVATED;
+        Integer status = readInt(binder, CP_DESCRIPTOR, CarPlayUiRequest.GET_LINK_STATUS);
+        return status != null && status == CarPlayUiRequest.LINK_ACTIVATED;
     }
 
     private IBinder ensureAaBinder() {
@@ -361,9 +414,8 @@ final class ProjectionPresence {
         try {
             data.writeInterfaceToken(descriptor);
             if (!binder.transact(code, data, reply, 0)) return null;
-            try {
-                reply.readException();
-            } catch (Throwable ignored) {}
+            reply.readException();
+            if (reply.dataAvail() < 4) return null;
             return reply.readInt();
         } catch (Throwable t) {
             return null;

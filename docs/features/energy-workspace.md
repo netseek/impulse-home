@@ -384,6 +384,16 @@ are detected. DADOS, the list row and the header repaint each second.
 - **Not verified on the car yet**: GPS cadence, bridge cost of the per-second
   read on the MMI, and how the follow view feels at driving speed.
 
+## Default fuel and electricity prices
+
+The settings fields keep the text being edited, including a trailing comma or dot,
+until focus leaves the field; only then do they format to two decimal places. Both
+`6,29` and `6.29` are accepted, and values below one real can start with `0,` or `0.`.
+Valid edits are saved on the device immediately, so closing the popup does not lose
+the price. Clearing a field removes its default. `scripts/test-energy-price-input.mjs`
+exercises typing, deletion, replacement, focus changes and unrelated rerenders in
+Chrome with the actual template compiler and React runtime.
+
 ## Future (optional): refuel log and fuel price
 
 - Detect a refuel as a jump in `remain_fuel_percentage` while parked; litres =

@@ -145,6 +145,22 @@ a paused Android Auto session cannot hide the app you are actually listening to.
 Play/pause routes back to whichever source won (MediaCenter `resume`/`pause` by
 source, CarPlay HID over iAP); skip falls back to media keys.
 
+### Opening projection from a shortcut
+
+Projection shortcuts first raise an existing display task, then ask Impulse to
+resolve one. If no task is available, CarPlay also asks its own service to show
+the linked phone using the [source-verified UI contract](../vehicle-data/oem-reference/README.md#carplay-ui-request).
+The request runs on the existing projection worker, checks live link status,
+and retries an unavailable binder at most six times, 120 ms apart, within one
+second. A disconnected phone or failed reply never sends the show command.
+
+The 1.5-second exported-activity fallback remains: accepting a service request
+does not prove the screen appeared, and a failed task raise must not discard the
+fallback. A newer app launch, activity pause, or destruction cancels pending
+show attempts and fallback work. No media transport command is part of opening
+projection. Direct service access and visible launch still need verification
+on the head unit; the emulator has no OEM projection service.
+
 ### Cover art resolution
 
 Bitmaps sent inside `MediaMetadata` are capped at 320dp by the framework, which

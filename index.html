@@ -1847,8 +1847,8 @@ window.HavalSplash = (function () {
             </section>
             <section>
               <p class="hv-energy-zlabel">PREÇOS</p>
-              <div class="hv-energy-setrow"><small>COMBUSTÍVEL (R$/L)</small><input type="text" inputmode="decimal" class="hv-energy-price" value="{{ focusedConsumptionCfgFuelPrice }}" placeholder="ex. 6,29" onChange="{{ focusedConsumptionCfgFuelPriceChange }}" /></div>
-              <div class="hv-energy-setrow"><small>ENERGIA (R$/kWh)</small><input type="text" inputmode="decimal" class="hv-energy-price" value="{{ focusedConsumptionCfgKwhPrice }}" placeholder="ex. 0,95" onChange="{{ focusedConsumptionCfgKwhPriceChange }}" /></div>
+              <div class="hv-energy-setrow"><small>COMBUSTÍVEL (R$/L)</small><input type="text" inputmode="decimal" class="hv-energy-price" value="{{ focusedConsumptionCfgFuelPrice }}" placeholder="ex. 6,29" onChange="{{ focusedConsumptionCfgFuelPriceChange }}" onBlur="{{ focusedConsumptionCfgFuelPriceBlur }}" /></div>
+              <div class="hv-energy-setrow"><small>ENERGIA (R$/kWh)</small><input type="text" inputmode="decimal" class="hv-energy-price" value="{{ focusedConsumptionCfgKwhPrice }}" placeholder="ex. 0,95" onChange="{{ focusedConsumptionCfgKwhPriceChange }}" onBlur="{{ focusedConsumptionCfgKwhPriceBlur }}" /></div>
               <div class="hv-energy-setrow"><small>PERGUNTAR AO ABASTECER / RECARREGAR</small><div class="hv-energy-seg"><button type="button" class="{{ focusedConsumptionCfgAskOnClass }}" onClick="{{ focusedConsumptionCfgAskOn }}">SIM</button><button type="button" class="{{ focusedConsumptionCfgAskOffClass }}" onClick="{{ focusedConsumptionCfgAskOff }}">NÃO</button></div></div>
               <small class="hv-energy-setnote">Usados quando um abastecimento ou recarga não tem preço. Cada preço informado vale para o volume abastecido e se mistura ao que já havia no tanque ou na bateria.</small>
             </section>
@@ -42719,11 +42719,26 @@ class Component extends DCLogic {
     return isFinite(v) && v > 0 && v < 1000 ? v : NaN;
   }
 
+  _energyDefaultPriceText(kind) {
+    const drafts = this._energyPriceDrafts;
+    return drafts && Object.prototype.hasOwnProperty.call(drafts, kind)
+      ? drafts[kind] : this._energyPriceText(this._energyPrices()[kind]);
+  }
+
   _setEnergyDefaultPrice(kind, text) {
+    // Keep the edit verbatim: formatting 0 to an empty value or 6, to 6,00 on
+    // every React change discards the separator before cents can be typed.
+    if (!this._energyPriceDrafts) this._energyPriceDrafts = {};
+    this._energyPriceDrafts[kind] = String(text);
     const pr = this._energyPrices();
     const v = this._energyParsePrice(text);
     pr[kind] = isFinite(v) ? v : null;
     this._saveEnergyPrices();
+    this._uiOnlySetState((st) => ({ energyRev: (st.energyRev || 0) + 1 }));
+  }
+
+  _finishEnergyDefaultPrice(kind) {
+    if (this._energyPriceDrafts) delete this._energyPriceDrafts[kind];
     this._uiOnlySetState((st) => ({ energyRev: (st.energyRev || 0) + 1 }));
   }
 
@@ -43475,10 +43490,12 @@ class Component extends DCLogic {
       consumptionCfgBasisNote: this._energyFuelBasis() === 'ice'
         ? 'Litros divididos só pelos km rodados com o motor ligado: a eficiência do motor quando ele trabalha.'
         : 'Litros divididos por todos os km da viagem, elétricos inclusive: igual ao painel do carro.',
-      consumptionCfgFuelPrice: this._energyPriceText(this._energyPrices().fuel),
-      consumptionCfgKwhPrice: this._energyPriceText(this._energyPrices().kwh),
+      consumptionCfgFuelPrice: this._energyDefaultPriceText('fuel'),
+      consumptionCfgKwhPrice: this._energyDefaultPriceText('kwh'),
       consumptionCfgFuelPriceChange: (e) => this._setEnergyDefaultPrice('fuel', e && e.target ? e.target.value : ''),
       consumptionCfgKwhPriceChange: (e) => this._setEnergyDefaultPrice('kwh', e && e.target ? e.target.value : ''),
+      consumptionCfgFuelPriceBlur: () => this._finishEnergyDefaultPrice('fuel'),
+      consumptionCfgKwhPriceBlur: () => this._finishEnergyDefaultPrice('kwh'),
       consumptionCfgAskOnClass: on(this._energyPrices().ask !== false),
       consumptionCfgAskOffClass: on(this._energyPrices().ask === false),
       consumptionCfgAskOn: (ev) => this._setEnergyPriceAsk(true, ev),

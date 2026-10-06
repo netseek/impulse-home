@@ -7,7 +7,7 @@ The test base of this repository and how to run it.
 | Layer | Run it with | What it covers |
 |---|---|---|
 | Node contract tests | `node scripts/run-tests.mjs` | Every `scripts/test-*.mjs`: card, widget and popup contracts read from the source text, plus pure logic (energy insights and map maths, power behaviour, clock labels and sweep, the climate SYNC mirror). |
-| JVM unit tests | `./gradlew :app:testDebugUnitTest` | The pure-Java logic of the native side: `TripEngineTest`, `TripSignalsTest`, `TripMapMathTest`, `RangeLedgerTest`. Nothing in them may touch an Android stub. |
+| JVM unit tests | `./gradlew :app:testDebugUnitTest` | The pure-Java logic of the native side: `TripEngineTest`, `TripSignalsTest`, `TripMapMathTest`, `RangeLedgerTest`, `CarPlayUiRequestTest`. Nothing in them may touch an Android stub. |
 | Docs guard | `node scripts/test-docs.mjs` (also run by `run-tests.mjs`) | Every relative link in the Markdown resolves; every file under `docs/` is listed in `docs/README.md`; no personal data, local paths or AI-agent memory files are tracked; the repository root holds a single Markdown file, `README.md`. |
 | Device harness | `npm run car:perf`, `scripts/device-cdp.mjs` | Frame rate, main-thread blocking and commit cost, on the car or the emulator. Read the signals in pairs; see [measuring-and-performance](measuring-and-performance.md). |
 
@@ -25,7 +25,7 @@ CI (`.github/workflows/ci.yml`) runs two jobs: `tests` (the Node suite, with the
 token exists) and `android` (`assembleDebug` and the JVM tests, built without the bundle: that proves
 the code compiles and the logic passes, not that the models load).
 
-The template-event and canvas-visibility tests launch headless Chrome/Chromium
+The template-event, canvas-visibility and energy-price-input tests launch headless Chrome/Chromium
 to exercise actual HTML parsing and DOM behavior. They use the browser CLI,
 without a Node browser-driver dependency. Install Chrome/Chromium on `PATH`, or
 set `CHROME_BIN` to its executable when running `node scripts/run-tests.mjs`.
