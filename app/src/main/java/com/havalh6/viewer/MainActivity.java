@@ -51,6 +51,8 @@ import org.json.JSONObject;
 import org.json.JSONException;
 
 public final class MainActivity extends Activity {
+    // Canvas sizes are pixels; cache the 18sp floor once at activity creation.
+    private float readableTextPx;
     private static final String TAG = "H6Viewer";
     private static final String PERF_TAG = "H6Perf";
     /**
@@ -1242,7 +1244,7 @@ public final class MainActivity extends Activity {
     private boolean quickMediaPlaying;
     private String dockSurfaceMode = DOCK_SURFACE_CARDS;
     private boolean desktopStudioOpen;
-    private String activeDesktopName = "Desktop";
+    private String activeDesktopName = "Tela";
     private int activeDesktopIndex;
     private int desktopCount = 1;
     // Muted cyan keeps the frost surfaces readable without the pale blue cast
@@ -1591,7 +1593,7 @@ public final class MainActivity extends Activity {
             }
             if (snapshot == null || descriptor == null) return;
             int strong = dockLabelColor();
-            int muted = dockUiLight ? 0x99536171 : 0xB8B6C2CE;
+            int muted = dockUiLight ? 0xFF526171 : 0xFFC7D1DB;
             int accent = dockAccentColor;
             if ("meridian".equals(descriptor.clockFace)) drawMeridian(canvas, w, h, strong, muted, accent);
             else if ("split".equals(descriptor.clockFace)) drawSplit(canvas, w, h, strong, muted, accent);
@@ -1602,20 +1604,20 @@ public final class MainActivity extends Activity {
         private void type(int color, float px, android.graphics.Paint.Align align, boolean medium) {
             paint.setStyle(android.graphics.Paint.Style.FILL);
             paint.setColor(color);
-            paint.setTextSize(px);
+            paint.setTextSize(Math.max(readableTextPx, px));
             paint.setTextAlign(align);
             paint.setTypeface(android.graphics.Typeface.create(medium ? "sans-serif-medium" : "sans-serif",
                     android.graphics.Typeface.NORMAL));
         }
 
         private float fit(String value, float intended, float available) {
-            float size = intended;
-            while (size > 10f) {
-                paint.setTextSize(size);
+            float size = Math.max(readableTextPx, intended);
+            while (size > readableTextPx) {
+                paint.setTextSize(Math.max(readableTextPx, size));
                 if (paint.measureText(value) <= available) return size;
                 size -= 1f;
             }
-            return 10f;
+            return readableTextPx;
         }
 
         private void drawPanorama(android.graphics.Canvas c, float w, float h, int strong, int muted, int accent) {
@@ -2096,8 +2098,8 @@ public final class MainActivity extends Activity {
             float h = getHeight();
             if (w <= 0f || h <= 0f) return;
             int accent = dockAccentColor;
-            int muted = dockUiLight ? 0x55323C48 : 0x66FFFFFF;
-            int strong = dockUiLight ? 0xCC25303B : 0xE6FFFFFF;
+            int muted = dockUiLight ? 0xFF526171 : 0xFFC7D1DB;
+            int strong = dockUiLight ? 0xFF111B27 : 0xFFF5F7FA;
             switch (descriptor.id) {
                 case "range": drawRange(canvas, w, h, accent, muted, strong); break;
                 case "status": drawVehicleStatus(canvas, w, h, accent, muted, strong); break;
@@ -2179,14 +2181,14 @@ public final class MainActivity extends Activity {
             if (evKm.isEmpty()) evKm = "—";
 
             String fuelKm = !descriptor.rangeFuel.isEmpty() ? descriptor.rangeFuel : "";
-            if (fuelKm.isEmpty() && (descriptor.metricB.startsWith("FUEL ") || descriptor.metricB.startsWith("GAS "))) {
+            if (fuelKm.isEmpty() && (descriptor.metricB.startsWith("FUEL ") || descriptor.metricB.startsWith("Comb. "))) {
                 String[] p = descriptor.metricB.substring(5).trim().split("\\s+", 2);
                 fuelKm = p[0];
             }
             if (fuelKm.isEmpty()) fuelKm = "—";
 
             String statusText = descriptor.secondary;
-            if (statusText.isEmpty()) statusText = descriptor.demo ? "DEMO · SIMULATED" : "VEHICLE · LIVE";
+            if (statusText.isEmpty()) statusText = descriptor.demo ? "DEMO · SIMULADO · NÃO É DO VEÍCULO" : "VEÍCULO · AO VIVO";
 
             int evSoc = Math.max(0, Math.min(100, descriptor.progress));
 
@@ -2226,13 +2228,13 @@ public final class MainActivity extends Activity {
             paint.setStyle(android.graphics.Paint.Style.FILL);
             paint.setColor(strong);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
-            paint.setTextSize(Math.min(32f * density, h * 0.38f));
+            paint.setTextSize(Math.max(readableTextPx, Math.min(32f * density, h * 0.38f)));
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             c.drawText(totalStr, 0f, yHero, paint);
 
             float totalW = paint.measureText(totalStr);
             paint.setColor(muted);
-            paint.setTextSize(11f * density);
+            paint.setTextSize(Math.max(readableTextPx, 11f * density));
             c.drawText(unitStr, totalW + 4f * density, yHero, paint);
 
             // 1b. Top row right: 12V auxiliary battery indicator (glyph + voltage)
@@ -2245,7 +2247,7 @@ public final class MainActivity extends Activity {
 
                 paint.setTextAlign(android.graphics.Paint.Align.RIGHT);
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
-                paint.setTextSize(11f * density);
+                paint.setTextSize(Math.max(readableTextPx, 11f * density));
                 paint.setColor(v12Color);
                 c.drawText(v12Str, w, yHero, paint);
                 float v12TextW = paint.measureText(v12Str);
@@ -2279,7 +2281,7 @@ public final class MainActivity extends Activity {
 
                 // "12V" micro label to left of battery glyph
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
-                paint.setTextSize(9f * density);
+                paint.setTextSize(Math.max(readableTextPx, 9f * density));
                 paint.setColor(muted);
                 c.drawText("12V", battLeft - 3.5f * density, yHero, paint);
             }
@@ -2338,55 +2340,55 @@ public final class MainActivity extends Activity {
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
             paint.setColor(accent);
-            paint.setTextSize(12f * density);
+            paint.setTextSize(Math.max(readableTextPx, 12f * density));
             c.drawText("EV", 0f, yChips, paint);
             float evLblW = paint.measureText("EV ");
 
-            paint.setTextSize(14.5f * density);
+            paint.setTextSize(Math.max(readableTextPx, 14.5f * density));
             c.drawText(evKm, evLblW, yChips, paint);
             float evValW = paint.measureText(evKm + " ");
 
-            paint.setTextSize(10.5f * density);
+            paint.setTextSize(Math.max(readableTextPx, 10.5f * density));
             c.drawText(unitStr, evLblW + evValW, yChips, paint);
             float evUnitW = paint.measureText(unitStr);
 
             paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
             paint.setColor(muted);
-            paint.setTextSize(12f * density);
+            paint.setTextSize(Math.max(readableTextPx, 12f * density));
             c.drawText(evSoc + "%", evLblW + evValW + evUnitW + gap, yChips, paint);
 
             // GAS Chip on right: GAS  <fuelKm> KM  <fuelLevel>%
             String gasLvlStr = fuelLevel + "%";
             String gasUnitStr = unitStr;
             String gasValStr = fuelKm + " ";
-            String gasLblStr = "GAS ";
+            String gasLblStr = "Comb. ";
 
-            paint.setTextSize(12f * density);
+            paint.setTextSize(Math.max(readableTextPx, 12f * density));
             paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
             float gasLvlW = paint.measureText(gasLvlStr);
 
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
-            paint.setTextSize(10.5f * density);
+            paint.setTextSize(Math.max(readableTextPx, 10.5f * density));
             float gasUnitW = paint.measureText(gasUnitStr);
 
-            paint.setTextSize(14.5f * density);
+            paint.setTextSize(Math.max(readableTextPx, 14.5f * density));
             float gasValW = paint.measureText(gasValStr);
 
-            paint.setTextSize(12f * density);
+            paint.setTextSize(Math.max(readableTextPx, 12f * density));
             float gasLblW = paint.measureText(gasLblStr);
 
             float gasStart = w - (gasLblW + gasValW + gasUnitW + gap + gasLvlW);
 
             paint.setColor(0xFFF2994A);
             c.drawText(gasLblStr, gasStart, yChips, paint);
-            paint.setTextSize(14.5f * density);
+            paint.setTextSize(Math.max(readableTextPx, 14.5f * density));
             c.drawText(gasValStr, gasStart + gasLblW, yChips, paint);
-            paint.setTextSize(10.5f * density);
+            paint.setTextSize(Math.max(readableTextPx, 10.5f * density));
             c.drawText(gasUnitStr, gasStart + gasLblW + gasValW, yChips, paint);
 
             paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
             paint.setColor(muted);
-            paint.setTextSize(12f * density);
+            paint.setTextSize(Math.max(readableTextPx, 12f * density));
             c.drawText(gasLvlStr, gasStart + gasLblW + gasValW + gasUnitW + gap, yChips, paint);
         }
 
@@ -2444,20 +2446,20 @@ public final class MainActivity extends Activity {
             float yRow1 = h * 0.38f;
             paint.setColor(strong);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
-            paint.setTextSize(Math.min(28f * density, h * 0.35f));
+            paint.setTextSize(Math.max(readableTextPx, Math.min(28f * density, h * 0.35f)));
             c.drawText(totalStr, colLeft, yRow1, paint);
 
             float totalW = paint.measureText(totalStr);
             paint.setColor(accent);
-            paint.setTextSize(11f * density);
+            paint.setTextSize(Math.max(readableTextPx, 11f * density));
             c.drawText(unitStr, colLeft + totalW + 4f * density, yRow1, paint);
 
             // Row 2: Status / Source Detail
             float yRow2 = h * 0.63f;
             paint.setColor(muted);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
-            paint.setTextSize(9.5f * density);
-            paint.setLetterSpacing(0.06f);
+            paint.setTextSize(Math.max(readableTextPx, 9.5f * density));
+            paint.setLetterSpacing(0.02f);
             String st = statusText;
             float maxStatusW = w - colLeft;
             if (paint.measureText(st) > maxStatusW) {
@@ -2473,7 +2475,7 @@ public final class MainActivity extends Activity {
             float yRow3 = h * 0.88f;
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
             paint.setColor(accent);
-            paint.setTextSize(11f * density);
+            paint.setTextSize(Math.max(readableTextPx, 11f * density));
             c.drawText("EV ", colLeft, yRow3, paint);
             float evLblW = paint.measureText("EV ");
 
@@ -2487,8 +2489,8 @@ public final class MainActivity extends Activity {
 
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
             paint.setColor(0xFFF2994A);
-            c.drawText("GAS ", colLeft + evLblW + evValW + sepW, yRow3, paint);
-            float gasLblW = paint.measureText("GAS ");
+            c.drawText("Comb. ", colLeft + evLblW + evValW + sepW, yRow3, paint);
+            float gasLblW = paint.measureText("Comb. ");
 
             c.drawText(fuelKm, colLeft + evLblW + evValW + sepW + gasLblW, yRow3, paint);
         }
@@ -2610,10 +2612,10 @@ public final class MainActivity extends Activity {
                 boolean hasValue = !"unavailable".equals(value) && !"—".equals(value);
                 String unitText = hasValue && !unit.isEmpty() ? " " + unit : "";
                 paint.setTypeface(unitFace);
-                paint.setTextSize(smallSize);
+                paint.setTextSize(Math.max(readableTextPx, smallSize));
                 float unitW = paint.measureText(unitText);
                 paint.setTypeface(valueFace);
-                paint.setTextSize(valueSize);
+                paint.setTextSize(Math.max(readableTextPx, valueSize));
                 float valueW = paint.measureText(value);
                 // Left-side readouts end at the car; right-side ones start there.
                 float x = leftSide ? tireXs[i] - valueW - unitW : tireXs[i];
@@ -2624,7 +2626,7 @@ public final class MainActivity extends Activity {
                 c.drawText(value, x, baseline, paint);
                 if (!unitText.isEmpty()) {
                     paint.setTypeface(unitFace);
-                    paint.setTextSize(smallSize);
+                    paint.setTextSize(Math.max(readableTextPx, smallSize));
                     // Match the web popup: PSI/bar rides the same warning tint as the value.
                     fill("warning".equals(wheelState) ? pressureColor : withAlpha(muted, 0xC8));
                     c.drawText(unitText, x + valueW, baseline, paint);
@@ -2632,7 +2634,7 @@ public final class MainActivity extends Activity {
                 String temp = i < temps.length ? temps[i].trim() : "";
                 if (!temp.isEmpty()) {
                     paint.setTypeface(tempFace);
-                    paint.setTextSize(smallSize * 1.1f);
+                    paint.setTextSize(Math.max(readableTextPx, smallSize * 1.1f));
                     paint.setTextAlign(leftSide
                             ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
                     fill(0xFF8F949B);
@@ -2860,7 +2862,7 @@ public final class MainActivity extends Activity {
                 float cx = right - colW / 2f;
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                 paint.setTypeface(today ? dayStrong : dayFace);
-                paint.setTextSize(Math.max(9f, h * .135f));
+                paint.setTextSize(Math.max(readableTextPx, h * .135f));
                 fill(today ? accent : muted);
                 c.drawText(parts[0], cx, dayBaseline, paint);
                 Bitmap ic = getWeatherBitmap(parts[1]);
@@ -2876,7 +2878,7 @@ public final class MainActivity extends Activity {
                     paint.setAlpha(255);
                 }
                 paint.setTypeface(today ? dayStrong : android.graphics.Typeface.DEFAULT);
-                paint.setTextSize(Math.max(today ? 12f : 10f, h * (today ? .185f : .16f)));
+                paint.setTextSize(Math.max(readableTextPx, Math.max(today ? 12f : 10f, h * (today ? .185f : .16f))));
                 fill(unknown ? muted : strong);
                 c.drawText(parts[2], cx, fcTempBaseline, paint);
                 right -= colW;
@@ -2888,7 +2890,7 @@ public final class MainActivity extends Activity {
             if (!inside.isEmpty()) {
                 paint.setTextAlign(android.graphics.Paint.Align.RIGHT);
                 // Shared rail meta size — reuse for sibling cards that label a cabin reading.
-                paint.setTextSize(Math.max(11f, h * .18f));
+                paint.setTextSize(Math.max(readableTextPx, h * .18f));
                 fill(unknown ? muted : strong);
                 c.drawText(inside, w - pad, bottomY, paint);
             }
@@ -2900,7 +2902,7 @@ public final class MainActivity extends Activity {
             fill(color);
             int comma = driver.indexOf(',');
             if (comma <= 0 || "OFF".equalsIgnoreCase(driver) || "—".equals(driver)) {
-                paint.setTextSize(fullSize);
+                paint.setTextSize(Math.max(readableTextPx, fullSize));
                 c.drawText(driver, x, y, paint);
                 return;
             }
@@ -2913,14 +2915,14 @@ public final class MainActivity extends Activity {
                 frac = rest.substring(0, deg);
                 unit = rest.substring(deg);
             }
-            paint.setTextSize(fullSize);
+            paint.setTextSize(Math.max(readableTextPx, fullSize));
             c.drawText(main, x, y, paint);
             float cursor = x + paint.measureText(main);
-            paint.setTextSize(fullSize * .5f);
+            paint.setTextSize(Math.max(readableTextPx, fullSize * .5f));
             c.drawText(frac, cursor, y, paint);
             cursor += paint.measureText(frac);
             if (!unit.isEmpty()) {
-                paint.setTextSize(fullSize);
+                paint.setTextSize(Math.max(readableTextPx, fullSize));
                 c.drawText(unit, cursor, y, paint);
             }
         }
@@ -2999,7 +3001,7 @@ public final class MainActivity extends Activity {
                     paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                     paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                             android.graphics.Typeface.NORMAL));
-                    paint.setTextSize(Math.max(13f, h * .20f));
+                    paint.setTextSize(Math.max(readableTextPx, h * .20f));
                     fill(strong);
                     c.drawText(maneuver, col * .5f, h * .88f, paint);
                 }
@@ -3029,7 +3031,7 @@ public final class MainActivity extends Activity {
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.NORMAL));
                 if (!street.isEmpty()) {
-                    paint.setTextSize(Math.max(16f, h * .26f));
+                    paint.setTextSize(Math.max(readableTextPx, h * .26f));
                     fill(strong);
                     c.drawText(ellipsizeNav(street, textMax), textX, h * .32f, paint);
                 }
@@ -3043,12 +3045,12 @@ public final class MainActivity extends Activity {
                     String idleCity = descriptor.navIdleCity == null ? "" : descriptor.navIdleCity;
                     String idleAction = descriptor.navIdleAction == null ? "" : descriptor.navIdleAction;
                     if (!idleCity.isEmpty()) {
-                        paint.setTextSize(Math.max(12f, h * .17f));
+                        paint.setTextSize(Math.max(readableTextPx, h * .17f));
                         fill(muted);
                         c.drawText(ellipsizeNav(idleCity, textMax), textX, h * .54f, paint);
                     }
                     if (!idleAction.isEmpty()) {
-                        paint.setTextSize(Math.max(10f, h * .13f));
+                        paint.setTextSize(Math.max(readableTextPx, h * .13f));
                         fill(muted);
                         c.drawText(ellipsizeNav(idleAction, textMax), textX, h * .76f, paint);
                     }
@@ -3063,19 +3065,19 @@ public final class MainActivity extends Activity {
                 int accent, int muted, int strong) {
             java.util.List<String[]> items = new java.util.ArrayList<>();
             if (remaining != null && !remaining.isEmpty()) {
-                items.add(new String[] { remaining, "REMAINING" });
+                items.add(new String[] { remaining, "Restante" });
             }
             if (duration != null && !duration.isEmpty()) {
-                items.add(new String[] { duration, "TIME" });
+                items.add(new String[] { duration, "Tempo" });
             }
             if (eta != null && !eta.isEmpty()) {
-                items.add(new String[] { eta, "ETA" });
+                items.add(new String[] { eta, "Chegada" });
             }
             if (items.isEmpty() || maxW <= 0f) return;
             android.graphics.Typeface medium = android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL);
-            float valueSize = Math.max(15f, h * .28f);
-            float labelSize = Math.max(9f, h * .13f);
+            float valueSize = Math.max(readableTextPx, h * .28f);
+            float labelSize = Math.max(readableTextPx, h * .13f);
             float gap = Math.max(10f, h * .08f);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(medium);
@@ -3083,7 +3085,7 @@ public final class MainActivity extends Activity {
             float total = sumNavMetricWidths(widths, gap);
             if (total > maxW) {
                 for (int i = items.size() - 1; i >= 0; i--) {
-                    if ("TIME".equals(items.get(i)[1])) {
+                    if ("Tempo".equals(items.get(i)[1])) {
                         items.remove(i);
                         break;
                     }
@@ -3091,8 +3093,8 @@ public final class MainActivity extends Activity {
                 widths = measureNavMetricWidths(items, valueSize, labelSize);
                 total = sumNavMetricWidths(widths, gap);
             }
-            while (total > maxW && valueSize > 11f) {
-                valueSize -= 1f;
+            while (total > maxW && valueSize > readableTextPx) {
+                valueSize = Math.max(readableTextPx, valueSize - 1f);
                 widths = measureNavMetricWidths(items, valueSize, labelSize);
                 total = sumNavMetricWidths(widths, gap);
             }
@@ -3105,13 +3107,13 @@ public final class MainActivity extends Activity {
             float cx = x;
             for (int i = 0; i < items.size(); i++) {
                 float colW = widths[i];
-                boolean isEta = "ETA".equals(items.get(i)[1]);
+                boolean isEta = "Chegada".equals(items.get(i)[1]);
                 if (isEta && i > 0) cx += etaNudge;
                 paint.setTypeface(medium);
-                paint.setTextSize(valueSize);
+                paint.setTextSize(Math.max(readableTextPx, valueSize));
                 fill(isEta ? accent : strong);
                 c.drawText(ellipsizeNav(items.get(i)[0], colW), cx, valueY, paint);
-                paint.setTextSize(labelSize);
+                paint.setTextSize(Math.max(readableTextPx, labelSize));
                 fill(muted);
                 c.drawText(items.get(i)[1], cx, labelY, paint);
                 cx += colW + gap;
@@ -3122,9 +3124,9 @@ public final class MainActivity extends Activity {
                 float valueSize, float labelSize) {
             float[] widths = new float[items.size()];
             for (int i = 0; i < items.size(); i++) {
-                paint.setTextSize(valueSize);
+                paint.setTextSize(Math.max(readableTextPx, valueSize));
                 float valueW = paint.measureText(items.get(i)[0]);
-                paint.setTextSize(labelSize);
+                paint.setTextSize(Math.max(readableTextPx, labelSize));
                 widths[i] = Math.max(valueW, paint.measureText(items.get(i)[1]));
             }
             return widths;
@@ -3348,7 +3350,7 @@ public final class MainActivity extends Activity {
             float packCenterY=battery[1]+battery[3]/2;
             float lx=ox-fit*(packCenterY-385f);
             String socText=descriptor.socKnown?Math.round(descriptor.powerSoc)+"%":"—";
-            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(15f*dp);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);paint.setTextSize(Math.max(readableTextPx, 15f*dp));
             paint.setTextAlign(android.graphics.Paint.Align.CENTER);
             android.graphics.Paint.FontMetrics socFm=paint.getFontMetrics();
             float ly=h-2.5f*dp-socFm.descent;
@@ -3625,17 +3627,17 @@ public final class MainActivity extends Activity {
                         ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.BOLD));
-                paint.setTextSize(Math.max(15f, Math.min(w, h) * .205f));
+                paint.setTextSize(Math.max(readableTextPx, Math.min(w, h) * .205f));
                 fill(signalColor);
                 c.drawText(readings[i], xs[i], valueYs[i], paint);
             }
             paint.setTextAlign(android.graphics.Paint.Align.CENTER);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL));
-            paint.setTextSize(Math.max(7f, Math.min(w, h) * .085f));
+            paint.setTextSize(Math.max(readableTextPx, Math.min(w, h) * .085f));
             fill(withAlpha(muted, 0xC8));
             String unit = descriptor.metricB.isEmpty() ? "" : " · " + descriptor.metricB;
-            c.drawText(descriptor.state.toUpperCase(java.util.Locale.US) + unit,
+            c.drawText(nativeStateLabel(descriptor.state) + unit,
                     w * .5f, h * .98f, paint);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
@@ -3686,27 +3688,27 @@ public final class MainActivity extends Activity {
                 c.drawLine(cx, cy, cx + (float)Math.cos(ha) * r * .55f, cy + (float)Math.sin(ha) * r * .55f, paint);
                 fill(accent); c.drawCircle(cx, cy, Math.max(3f, w * .035f), paint);
                 paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-                paint.setTextSize(Math.max(18f, h * .22f)); fill(strong); c.drawText(hh, w * .57f, h * .43f, paint);
-                paint.setTextSize(Math.max(18f, h * .22f)); fill(accent); c.drawText(mm, w * .57f, h * .68f, paint);
-                paint.setTextSize(Math.max(7f, h * .08f)); fill(muted); c.drawText(date, w * .57f, h * .90f, paint);
+                paint.setTextSize(Math.max(readableTextPx, h * .22f)); fill(strong); c.drawText(hh, w * .57f, h * .43f, paint);
+                paint.setTextSize(Math.max(readableTextPx, h * .22f)); fill(accent); c.drawText(mm, w * .57f, h * .68f, paint);
+                paint.setTextSize(Math.max(readableTextPx, h * .08f)); fill(muted); c.drawText(date, w * .57f, h * .90f, paint);
             } else if ("split".equals(face)) {
                 float gap = w * .045f, boxW = (w - gap) * .5f;
                 fill(withAlpha(muted, 0x22)); c.drawRoundRect(0, h * .12f, boxW, h * .84f, 10f, 10f, paint);
                 c.drawRoundRect(boxW + gap, h * .12f, w, h * .84f, 10f, 10f, paint);
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER); paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
-                paint.setTextSize(Math.max(28f, h * .48f)); fill(strong); c.drawText(hh, boxW * .5f, h * .62f, paint); c.drawText(mm, boxW + gap + boxW * .5f, h * .62f, paint);
-                paint.setTextSize(Math.max(7f, h * .08f)); fill(muted); c.drawText(date, w * .5f, h * .94f, paint);
+                paint.setTextSize(Math.max(readableTextPx, Math.max(28f, h * .48f))); fill(strong); c.drawText(hh, boxW * .5f, h * .62f, paint); c.drawText(mm, boxW + gap + boxW * .5f, h * .62f, paint);
+                paint.setTextSize(Math.max(readableTextPx, h * .08f)); fill(muted); c.drawText(date, w * .5f, h * .94f, paint);
             } else if ("date-spine".equals(face)) {
                 float spine = w * .24f;
                 fill(withAlpha(accent, 0x28)); c.drawRoundRect(0, 0, spine, h, 9f, 9f, paint);
-                paint.setTextAlign(android.graphics.Paint.Align.CENTER); paint.setTextSize(Math.max(10f, h * .13f)); fill(accent); c.drawText(day, spine * .5f, h * .45f, paint);
-                paint.setTextSize(Math.max(7f, h * .08f)); fill(muted); c.drawText(month, spine * .5f, h * .64f, paint);
-                paint.setTextAlign(android.graphics.Paint.Align.LEFT); paint.setTextSize(Math.max(26f, h * .43f)); fill(strong); c.drawText(hh + ":" + mm, spine + w * .07f, h * .60f, paint);
-                paint.setTextSize(Math.max(7f, h * .08f)); fill(muted); c.drawText(twelve ? (hour24 >= 12 ? "PM" : "AM") : "LOCAL TIME", spine + w * .07f, h * .83f, paint);
+                paint.setTextAlign(android.graphics.Paint.Align.CENTER); paint.setTextSize(Math.max(readableTextPx, h * .13f)); fill(accent); c.drawText(day, spine * .5f, h * .45f, paint);
+                paint.setTextSize(Math.max(readableTextPx, h * .08f)); fill(muted); c.drawText(month, spine * .5f, h * .64f, paint);
+                paint.setTextAlign(android.graphics.Paint.Align.LEFT); paint.setTextSize(Math.max(readableTextPx, Math.max(26f, h * .43f))); fill(strong); c.drawText(hh + ":" + mm, spine + w * .07f, h * .60f, paint);
+                paint.setTextSize(Math.max(readableTextPx, h * .08f)); fill(muted); c.drawText(twelve ? (hour24 >= 12 ? "PM" : "AM") : "Hora local", spine + w * .07f, h * .83f, paint);
             } else {
                 paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-                paint.setTextSize(Math.max(34f, h * .58f)); fill(strong); c.drawText(hh + ":" + mm, w * .02f, h * .62f, paint);
-                paint.setTextSize(Math.max(8f, h * .10f)); fill(accent); c.drawText(date + (twelve ? (hour24 >= 12 ? "  PM" : "  AM") : "  LOCAL"), w * .03f, h * .90f, paint);
+                paint.setTextSize(Math.max(readableTextPx, Math.max(34f, h * .58f))); fill(strong); c.drawText(hh + ":" + mm, w * .02f, h * .62f, paint);
+                paint.setTextSize(Math.max(readableTextPx, h * .10f)); fill(accent); c.drawText(date + (twelve ? (hour24 >= 12 ? "  PM" : "  AM") : "  LOCAL"), w * .03f, h * .90f, paint);
                 stroke(accent, Math.max(2f, w * .012f)); c.drawLine(w * .02f, h * .72f, w * .98f, h * .72f, paint);
             }
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
@@ -3775,10 +3777,10 @@ public final class MainActivity extends Activity {
             paint.setTextAlign(android.graphics.Paint.Align.CENTER);
             paint.setLetterSpacing(.06f);
             float textSize = boxH * .62f;
-            paint.setTextSize(textSize);
+            paint.setTextSize(Math.max(readableTextPx, textSize));
             float maxWidth = boxW * .78f;
             float measured = paint.measureText(code);
-            if (measured > maxWidth) paint.setTextSize(textSize * maxWidth / measured);
+            if (measured > maxWidth) paint.setTextSize(Math.max(readableTextPx, textSize * maxWidth / measured));
             android.graphics.Paint.FontMetrics fm = paint.getFontMetrics();
             c.drawText(code, cx, cy - (fm.ascent + fm.descent) * .5f, paint);
             paint.setLetterSpacing(0f);
@@ -4038,14 +4040,14 @@ public final class MainActivity extends Activity {
     private Boolean emulatorDevice;
     /**
      * Packages that should open as freeform windows outside APP+APP split.
-     * Default off — everything else goes fullscreen. Long-press → "Open as window".
+     * Default off — everything else goes fullscreen. Long-press → "Abrir em janela".
      */
     private final java.util.Set<String> windowPackages = new java.util.HashSet<>();
     /** Main-strip icons keyed by package so recents can hide the duplicate. */
     private final java.util.Map<String, MotionTrailLayout> dockItemsByPackage =
             new java.util.LinkedHashMap<>();
     private android.widget.PopupWindow dockEditMenu;
-    /** Long-press → "Unhide selected…" list. */
+    /** Long-press → "Mostrar ocultos…" list. */
     private android.widget.PopupWindow unhidePicker;
     private final BroadcastReceiver packageRemovedReceiver = new BroadcastReceiver() {
         @Override
@@ -4705,7 +4707,7 @@ public final class MainActivity extends Activity {
             return;
         }
         // Fullscreen by default. Freeform only in APP+APP split, or when the
-        // user opted this package into "Open as window" from the dock menu.
+        // user opted this package into "Abrir em janela" from the dock menu.
         if (!shouldLaunchAsWindow(packageName)) {
             launchAppFullscreen(packageName);
             return;
@@ -5361,7 +5363,7 @@ public final class MainActivity extends Activity {
         ratioRow.addView(makeAppsFabRatioBtn("1:2", d));
         menu.addView(ratioRow);
 
-        menu.addView(makeAppsFabSectionLabel("LAYOUT", d));
+        menu.addView(makeAppsFabSectionLabel("Telas", d));
         android.widget.LinearLayout layoutCol = new android.widget.LinearLayout(this);
         layoutCol.setOrientation(android.widget.LinearLayout.VERTICAL);
         layoutCol.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
@@ -5394,8 +5396,8 @@ public final class MainActivity extends Activity {
         android.widget.TextView t = new android.widget.TextView(this);
         t.setText(text);
         t.setTextColor(0x80EAF2F8);
-        t.setTextSize(12f);
-        t.setLetterSpacing(0.06f);
+        t.setTextSize(18f);
+        t.setLetterSpacing(0.02f);
         t.setGravity(android.view.Gravity.CENTER);
         t.setSingleLine(true);
         t.setPadding(0, Math.round(6 * d), 0, Math.round(6 * d));
@@ -5462,7 +5464,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView t = new android.widget.TextView(this);
         t.setText(label);
         t.setTextColor(0xFFEAF2F8);
-        t.setTextSize(13f);
+        t.setTextSize(18f);
         t.setGravity(android.view.Gravity.CENTER);
         t.setPadding(Math.round(12 * d), Math.round(12 * d), Math.round(12 * d), Math.round(12 * d));
         t.setSingleLine(true);
@@ -5487,7 +5489,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView t = new android.widget.TextView(this);
         t.setText(label);
         t.setTextColor(0xFFEAF2F8);
-        t.setTextSize(14f);
+        t.setTextSize(18f);
         t.setGravity(android.view.Gravity.CENTER);
         t.setPadding(Math.round(18 * d), Math.round(14 * d), Math.round(18 * d), Math.round(14 * d));
         android.widget.LinearLayout.LayoutParams lp =
@@ -7155,6 +7157,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        readableTextPx = 18f * getResources().getDisplayMetrics().scaledDensity;
         // LAYOUT_NO_LIMITS / LAYOUT_IN_SCREEN are applied only while a freeform
         // slot is open — see applyLauncherFocusPolicy. With focus they would hide
         // the MMI rail and header, which is why they stay off here.
@@ -7936,7 +7939,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView skip = new android.widget.TextView(this);
         skip.setText("PULAR");
         skip.setTextColor(0xE8FFFFFF);
-        skip.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        skip.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18);
         skip.setLetterSpacing(0.16f);
         skip.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         int padH = Math.round(16 * d);
@@ -8282,7 +8285,7 @@ public final class MainActivity extends Activity {
         // card, not a second hidden menu.
         modeCollapsedBtn = makeModeCell(density, cellPx, iconPx, iconRowTopPad,
                 dockGlyphCards(cardsDockGlyphPx(iconPx, density), dockGlyphColor(false)),
-                "Cards", v -> {
+                "Barra", v -> {
                     toggleDockSurface();
                     selectStripMode(STRIP_APPS);
                 });
@@ -8521,7 +8524,7 @@ public final class MainActivity extends Activity {
     }
 
     private int dockLabelColorMuted() {
-        return dockUiLight ? 0xFF9AA3AE : 0xCCFFFFFF;
+        return dockUiLight ? 0xFF526171 : 0xFFC7D1DB;
     }
 
     private android.widget.TextView findDockChipLabel(View cell) {
@@ -9217,9 +9220,9 @@ public final class MainActivity extends Activity {
         if (layoutCardsSurfaceChip != null) layoutCardsSurfaceChip.setSelected(cards);
         if (modeSurfaceBtn != null) {
             android.widget.TextView label = findModeCellLabel(modeSurfaceBtn);
-            if (label != null) label.setText(cards ? "Launcher" : "Cards");
+            if (label != null) label.setText(cards ? "Launcher" : "Barra");
             modeSurfaceBtn.setContentDescription(cards
-                    ? "Show launcher. Long press to customize"
+                    ? "Mostrar tela inicial. Segure para personalizar"
                     : "Mostrar cards rápidos. Toque longo para personalizar");
             if (modeSurfaceBtn.getVisibility() == View.VISIBLE) {
                 setModeCellSelected(modeSurfaceBtn, cards);
@@ -9435,7 +9438,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        View climate = makeQuickTextCard(density, 218, "CLIMATE",
+        View climate = makeQuickTextCard(density, 218, "Clima",
                 "— °C  ·  Fan —  ·  AUTO —",
                 "Climate summary. Opens the climate page when available",
                 v -> {
@@ -9529,10 +9532,10 @@ public final class MainActivity extends Activity {
         android.widget.TextView demoBadge = new android.widget.TextView(this);
         demoBadge.setTag("frostAccent");
         demoBadge.setText("DEMO");
-        demoBadge.setTextSize(8f);
+        demoBadge.setTextSize(18f);
         demoBadge.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.BOLD));
-        demoBadge.setLetterSpacing(0.10f);
+        demoBadge.setLetterSpacing(0.02f);
         demoBadge.setVisibility(descriptor.demo ? View.VISIBLE : View.GONE);
         android.widget.LinearLayout.LayoutParams demoBadgeLp =
                 new android.widget.LinearLayout.LayoutParams(
@@ -9544,11 +9547,11 @@ public final class MainActivity extends Activity {
 
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setTag("frostSecondary");
-        heading.setText(descriptor.title.toUpperCase(java.util.Locale.US));
-        heading.setTextSize(9.5f);
+        heading.setText(descriptor.title);
+        heading.setTextSize(18f);
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
-        heading.setLetterSpacing(0.10f);
+        heading.setLetterSpacing(0.02f);
         heading.setMaxLines(1);
         heading.setEllipsize(android.text.TextUtils.TruncateAt.END);
         heading.setTextColor(dockLabelColorMuted());
@@ -9669,8 +9672,8 @@ public final class MainActivity extends Activity {
         android.widget.TextView detail = new android.widget.TextView(this);
         detail.setTag("frostSecondary");
         detail.setText(quickVisualDetail(descriptor));
-        detail.setTextSize(isConsumption ? 12f : (railFigure ? 14f : 9.5f));
-        detail.setLetterSpacing(0.025f);
+        detail.setTextSize(18f);
+        detail.setLetterSpacing(0.02f);
         detail.setLineSpacing(0f, 1.02f);
         if (railFigure) {
             detail.setIncludeFontPadding(false);
@@ -9864,18 +9867,18 @@ public final class MainActivity extends Activity {
                 Math.round(initialWidthDp * density), Math.round(124 * density));
         lp.rightMargin = Math.round(10 * density);
         card.setLayoutParams(lp);
-        card.setContentDescription("Workspace: app launcher, layout manager and phone projection");
+        card.setContentDescription("Apps, telas e projeção do celular");
         card.setBackground(makeFrostStateDrawable(false, density));
         card.setElevation(3f * density);
         quickCardViews.add(card);
 
         android.widget.TextView heading = new android.widget.TextView(this);
-        heading.setText(workspaceLayoutMode ? "LAYOUT" : "WORKSPACE");
+        heading.setText(workspaceLayoutMode ? "Telas" : "Área de trabalho");
         heading.setTag("frostSecondary");
-        heading.setTextSize(10.5f);
+        heading.setTextSize(18f);
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
-        heading.setLetterSpacing(0.11f);
+        heading.setLetterSpacing(0.02f);
         heading.setTextColor(dockLabelColorMuted());
         heading.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         FrameLayout.LayoutParams headingLp = new FrameLayout.LayoutParams(
@@ -9895,7 +9898,7 @@ public final class MainActivity extends Activity {
         int innerGapPx = Math.round(WORKSPACE_CARD_INNER_GAP_DP * density);
         actions.setPadding(sideGapPx, 0, sideGapPx, 0);
 
-        View appsAction = makeWorkspaceAction(density, "workspaceApps", "APPS", "Show app launcher",
+        View appsAction = makeWorkspaceAction(density, "workspaceApps", "APPS", "Abrir apps",
                 v -> setWorkspaceExpandedAppsMode(true, true));
         android.widget.LinearLayout.LayoutParams appsLp =
                 (android.widget.LinearLayout.LayoutParams) appsAction.getLayoutParams();
@@ -9916,7 +9919,7 @@ public final class MainActivity extends Activity {
         projAction.setLayoutParams(projLp);
         actions.addView(projAction);
 
-        View layoutAction = makeWorkspaceAction(density, "workspaceLayout", "LAYOUT", "Show desktop selector",
+        View layoutAction = makeWorkspaceAction(density, "workspaceLayout", "Telas", "Escolher tela",
                 v -> callViewerDock(desktopStudioOpen ? "closeDesktopStudio" : "openLayoutDesktops"));
         actions.addView(layoutAction);
 
@@ -9956,7 +9959,7 @@ public final class MainActivity extends Activity {
         int sideGapPx = Math.round(WORKSPACE_CARD_SIDE_GAP_DP * density);
         int innerGapPx = Math.round(WORKSPACE_CARD_INNER_GAP_DP * density);
         // CARDS icon button on left - same style and size as Apps/Layout icons
-        View cardsAction = makeWorkspaceAction(density, "workspaceCards", "CARDS", "Show workspace cards",
+        View cardsAction = makeWorkspaceAction(density, "workspaceCards", "Barra", "Mostrar barra",
                 v -> setWorkspaceExpandedAppsMode(false, true));
         int cardsActionWidth = Math.round(((WORKSPACE_CARD_WIDTH_DP - 2 * WORKSPACE_CARD_SIDE_GAP_DP - 2 * WORKSPACE_CARD_INNER_GAP_DP) / 3f) * density);
         android.widget.LinearLayout.LayoutParams cardsLp = new android.widget.LinearLayout.LayoutParams(
@@ -10066,7 +10069,7 @@ public final class MainActivity extends Activity {
             if (expanded) {
                 workspaceHeading.setVisibility(View.GONE);
             } else {
-                workspaceHeading.setText(workspaceLayoutMode ? "LAYOUT" : "WORKSPACE");
+                workspaceHeading.setText(workspaceLayoutMode ? "Telas" : "Área de trabalho");
                 workspaceHeading.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
             }
         }
@@ -10182,10 +10185,10 @@ public final class MainActivity extends Activity {
         // cells take the whole card.
         grid.setPadding(pad, pad, pad, pad);
         final String[][] cells = {
-                {"desktops", "Desktops", "openLayoutDesktops"},
-                {"layout", "Cards & widgets", "openLayoutCards"},
-                {"appearance", "Appearance", "openLayoutAppearance"},
-                {"return", "Return", ""},
+                {"desktops", "Telas", "openLayoutDesktops"},
+                {"layout", "Barra e widgets", "openLayoutCards"},
+                {"appearance", "Aparência", "openLayoutAppearance"},
+                {"return", "Voltar", ""},
         };
         for (int r = 0; r < 2; r++) {
             android.widget.LinearLayout row = new android.widget.LinearLayout(this);
@@ -10198,12 +10201,12 @@ public final class MainActivity extends Activity {
                 cell.setText(def[1]);
                 cell.setTag("workspaceLayoutCell:" + def[0]);
                 cell.setGravity(android.view.Gravity.CENTER);
-                cell.setTextSize(13f);
+                cell.setTextSize(18f);
                 cell.setMaxLines(1);
                 cell.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 cell.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                         android.graphics.Typeface.NORMAL));
-                cell.setContentDescription("return".equals(def[0]) ? "Return to workspace" : "Open " + def[1]);
+                cell.setContentDescription("return".equals(def[0]) ? "Voltar à área de trabalho" : "Abrir " + def[1]);
                 android.widget.LinearLayout.LayoutParams cellLp = new android.widget.LinearLayout.LayoutParams(
                         0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
                 int m = Math.round(2 * density);
@@ -10289,7 +10292,7 @@ public final class MainActivity extends Activity {
         }
         workspaceLayoutMode = on;
         if (workspaceHeading != null) {
-            workspaceHeading.setText(on ? "LAYOUT" : "WORKSPACE");
+            workspaceHeading.setText(on ? "Telas" : "Área de trabalho");
             workspaceHeading.setVisibility(on ? View.GONE : View.VISIBLE);
         }
         crossfadeFaces(on ? workspaceActionsFace : workspaceLayoutFace,
@@ -10359,12 +10362,12 @@ public final class MainActivity extends Activity {
         caption.setText(label);
         caption.setTag("workspaceLabel");
         caption.setGravity(android.view.Gravity.CENTER);
-        caption.setTextSize(10.5f);
+        caption.setTextSize(18f);
         caption.setMaxLines(1);
         caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
         caption.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
-        caption.setLetterSpacing(0.11f);
+        caption.setLetterSpacing(0.02f);
         android.widget.LinearLayout.LayoutParams captionLp =
                 new android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -10404,8 +10407,8 @@ public final class MainActivity extends Activity {
             caption.setTextColor(color);
             if ("workspaceProjection".equals(tag)) {
                 caption.setText(getProjectionLabel());
-                caption.setTextSize(10.5f);
-                caption.setLetterSpacing(0.11f);
+                caption.setTextSize(18f);
+                caption.setLetterSpacing(0.02f);
             }
         }
         android.graphics.drawable.GradientDrawable mask =
@@ -10440,10 +10443,10 @@ public final class MainActivity extends Activity {
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setTag("frostSecondary");
         heading.setText(title);
-        heading.setTextSize(10.5f);
+        heading.setTextSize(18f);
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
-        heading.setLetterSpacing(0.11f);
+        heading.setLetterSpacing(0.02f);
         card.addView(heading);
 
         android.widget.TextView body = new android.widget.TextView(this);
@@ -10492,7 +10495,7 @@ public final class MainActivity extends Activity {
         card.setElevation(3f * density);
         card.setContentDescription(descriptor != null
                 ? bottomCardAccessibilityDescription(descriptor)
-                : "Media quick controls");
+                : "Controles de mídia");
         // The body opens the PLAYER — that is what a now-playing card is for,
         // projection sources included. It is clickable unconditionally, so a
         // card with nothing to open still consumes its own touch instead of
@@ -10511,7 +10514,7 @@ public final class MainActivity extends Activity {
             }
             if (pkg != null && !pkg.isEmpty()) {
                 launchAppForPackage(pkg,
-                        quickMediaTitle != null ? quickMediaTitle.getText().toString() : "Media");
+                        quickMediaTitle != null ? quickMediaTitle.getText().toString() : "Mídia");
             }
         });
         if (descriptor != null && !descriptor.longAction.isEmpty() && !"openMedia".equals(descriptor.longAction)) {
@@ -10577,8 +10580,8 @@ public final class MainActivity extends Activity {
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setTag("frostSecondary");
         heading.setText("MÍDIA");
-        heading.setTextSize(10.5f);
-        heading.setLetterSpacing(0.11f);
+        heading.setTextSize(18f);
+        heading.setLetterSpacing(0.02f);
         heading.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                 0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         headRow.addView(heading);
@@ -10589,7 +10592,7 @@ public final class MainActivity extends Activity {
         quickMediaTitle = new android.widget.TextView(this);
         quickMediaTitle.setTag("quickValue");
         quickMediaTitle.setText("Nada tocando");
-        quickMediaTitle.setTextSize(15f);
+        quickMediaTitle.setTextSize(18f);
         quickMediaTitle.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         quickMediaTitle.setMaxLines(1);
@@ -10598,7 +10601,7 @@ public final class MainActivity extends Activity {
         quickMediaArtist = new android.widget.TextView(this);
         quickMediaArtist.setTag("frostSecondary");
         quickMediaArtist.setText("Escolha um app de mídia");
-        quickMediaArtist.setTextSize(9.5f);
+        quickMediaArtist.setTextSize(18f);
         quickMediaArtist.setMaxLines(1);
         quickMediaArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
         copy.addView(quickMediaArtist);
@@ -10614,12 +10617,12 @@ public final class MainActivity extends Activity {
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
         controlsLp.topMargin = 0;
         controls.setLayoutParams(controlsLp);
-        controls.addView(makeQuickMediaButton(density, false, "prev", "Previous track",
+        controls.addView(makeQuickMediaButton(density, false, "prev", "Faixa anterior",
                 v -> mediaNowPlaying.prev()));
-        quickMediaPlayPause = makeQuickMediaButton(density, true, "play", "Play",
+        quickMediaPlayPause = makeQuickMediaButton(density, true, "play", "Tocar",
                 v -> mediaNowPlaying.playPause());
         controls.addView(quickMediaPlayPause);
-        controls.addView(makeQuickMediaButton(density, false, "next", "Next track",
+        controls.addView(makeQuickMediaButton(density, false, "next", "Próxima faixa",
                 v -> mediaNowPlaying.next()));
         copy.addView(controls);
         // The right half stacks: ambient bars behind, copy in front. A
@@ -10967,7 +10970,7 @@ public final class MainActivity extends Activity {
             float d = getResources().getDisplayMetrics().density;
             quickMediaPlayPause.setImageDrawable(
                     mediaGlyph(d, true, quickMediaPlaying ? "pause" : "play"));
-            quickMediaPlayPause.setContentDescription(quickMediaPlaying ? "Pause" : "Play");
+            quickMediaPlayPause.setContentDescription(quickMediaPlaying ? "Pausar" : "Tocar");
         }
         applyQuickMediaAppChip(payload.optString("appIcon", ""), app);
     }
@@ -11010,7 +11013,7 @@ public final class MainActivity extends Activity {
             button.setBackground(makeMediaButtonBackground(density, primary, size));
             if (!primary) {
                 button.setImageDrawable(mediaGlyph(density, false,
-                        "Previous track".contentEquals(
+                        "Faixa anterior".contentEquals(
                                 button.getContentDescription() == null ? "" : button.getContentDescription())
                                 ? "prev" : "next"));
             }
@@ -11086,17 +11089,17 @@ public final class MainActivity extends Activity {
         int count = Math.max(1, desktopCount);
         int index = Math.max(0, Math.min(activeDesktopIndex, count - 1));
         String name = activeDesktopName == null || activeDesktopName.trim().isEmpty()
-                ? "Desktop" : activeDesktopName.trim();
+                ? "Tela" : activeDesktopName.trim();
         if (activeDesktopTitle != null) activeDesktopTitle.setText(name);
-        if (activeDesktopMeta != null) activeDesktopMeta.setText((index + 1) + " of " + count);
+        if (activeDesktopMeta != null) activeDesktopMeta.setText((index + 1) + " de " + count);
         if (activeDesktopTitle != null && activeDesktopTitle.getParent() instanceof View) {
             View card = (View) activeDesktopTitle.getParent();
             card.setBackground(makeFrostStateDrawable(true,
                     getResources().getDisplayMetrics().density));
             activeDesktopTitle.setTextColor(dockLabelColor());
             if (activeDesktopMeta != null) activeDesktopMeta.setTextColor(dockLabelColorMuted());
-            card.setContentDescription(name + ", desktop " + (index + 1) + " of " + count
-                    + ". Tap or long press to customize");
+            card.setContentDescription(name + ", tela " + (index + 1) + " de " + count
+                    + ". Toque ou segure para personalizar");
         }
     }
 
@@ -11135,10 +11138,10 @@ public final class MainActivity extends Activity {
         next.setContentDescription("Próxima área de trabalho");
         desktopControls.addView(next);
         View customize = makeWideDockChip(density, Math.round(118 * density), iconPx,
-                "Customize", v -> callViewerDock("openDesktopStudio"));
+                "Personalizar", v -> callViewerDock("openDesktopStudio"));
         customize.setContentDescription("Personalizar área de trabalho");
         desktopControls.addView(customize);
-        row.addView(makeLayoutGroup(density, "DESKTOP", desktopControls));
+        row.addView(makeLayoutGroup(density, "TELA", desktopControls));
         row.addView(makeLayoutDivider(density));
 
         android.widget.LinearLayout bottomControls = new android.widget.LinearLayout(this);
@@ -11152,7 +11155,7 @@ public final class MainActivity extends Activity {
             return true;
         });
         layoutCardsSurfaceChip = makeWideDockChip(density, Math.round(102 * density), iconPx,
-                "Cards", v -> chooseDockSurface(DOCK_SURFACE_CARDS, true));
+                "Barra", v -> chooseDockSurface(DOCK_SURFACE_CARDS, true));
         layoutCardsSurfaceChip.setContentDescription("Mostrar cards rápidos. Toque longo para personalizar");
         layoutCardsSurfaceChip.setOnLongClickListener(v -> {
             callViewerDock("openDesktopStudio");
@@ -11176,7 +11179,7 @@ public final class MainActivity extends Activity {
         otherControls.addView(layoutAddWidgetChip);
 
         layoutThemeChip = makeWideDockChip(density, Math.round(142 * density), iconPx,
-                "Appearance", v -> callViewerDock("cycleWidgetTheme"));
+                "Aparência", v -> callViewerDock("cycleWidgetTheme"));
         layoutThemeLabel = findDockChipLabel(layoutThemeChip);
         layoutThemeChip.setContentDescription("Alternar tema de aparência");
         otherControls.addView(layoutThemeChip);
@@ -11198,9 +11201,9 @@ public final class MainActivity extends Activity {
         group.setLayoutParams(groupLp);
         android.widget.TextView heading = new android.widget.TextView(this);
         heading.setText(label);
-        heading.setTextSize(9f);
+        heading.setTextSize(18f);
         heading.setTextColor(dockLabelColorMuted());
-        heading.setLetterSpacing(0.12f);
+        heading.setLetterSpacing(0.02f);
         heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         android.widget.LinearLayout.LayoutParams headingLp = new android.widget.LinearLayout.LayoutParams(
@@ -11240,7 +11243,7 @@ public final class MainActivity extends Activity {
         activeDesktopTitle = new android.widget.TextView(this);
         activeDesktopTitle.setText(activeDesktopName);
         activeDesktopTitle.setTextColor(dockLabelColor());
-        activeDesktopTitle.setTextSize(13f);
+        activeDesktopTitle.setTextSize(18f);
         activeDesktopTitle.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         activeDesktopTitle.setMaxLines(1);
@@ -11248,10 +11251,10 @@ public final class MainActivity extends Activity {
         activeDesktopTitle.setGravity(android.view.Gravity.CENTER);
         card.addView(activeDesktopTitle);
         activeDesktopMeta = new android.widget.TextView(this);
-        activeDesktopMeta.setText("1 of 1");
+        activeDesktopMeta.setText("1 de 1");
         activeDesktopMeta.setTextColor(dockLabelColorMuted());
-        activeDesktopMeta.setTextSize(10f);
-        activeDesktopMeta.setLetterSpacing(0.08f);
+        activeDesktopMeta.setTextSize(18f);
+        activeDesktopMeta.setLetterSpacing(0.02f);
         activeDesktopMeta.setGravity(android.view.Gravity.CENTER);
         card.addView(activeDesktopMeta);
         refreshDesktopIndicator();
@@ -11325,10 +11328,10 @@ public final class MainActivity extends Activity {
 
         layoutCenterFillLabel = new android.widget.TextView(this);
         layoutCenterFillLabel.setTextColor(dockLabelColor());
-        layoutCenterFillLabel.setTextSize(11f);
+        layoutCenterFillLabel.setTextSize(18f);
         layoutCenterFillLabel.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
-        layoutCenterFillLabel.setLetterSpacing(0.04f);
+        layoutCenterFillLabel.setLetterSpacing(0.02f);
         layoutCenterFillLabel.setMaxLines(1);
         layoutCenterFillLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
         toggle.addView(layoutCenterFillLabel);
@@ -11392,8 +11395,8 @@ public final class MainActivity extends Activity {
                             : android.R.drawable.ic_menu_directions));
         }
         if (layoutCenterFillLabel != null) {
-            layoutCenterFillLabel.setText(mixed ? "Wallpaper + 3D"
-                    : (wall ? "Wallpaper" : "3D Car"));
+            layoutCenterFillLabel.setText(mixed ? "Imagem + 3D"
+                    : (wall ? "Imagem" : "Carro 3D"));
             styleDockLabel(layoutCenterFillLabel, false);
         }
         if (layoutCenterFillGear != null) {
@@ -11434,10 +11437,10 @@ public final class MainActivity extends Activity {
         tv.setLayoutParams(tvLp);
         tv.setText(label);
         tv.setTextColor(dockLabelColor());
-        tv.setTextSize(12f);
+        tv.setTextSize(18f);
         tv.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
-        tv.setLetterSpacing(0.04f);
+        tv.setLetterSpacing(0.02f);
         cell.addView(tv);
         return cell;
     }
@@ -11683,7 +11686,7 @@ public final class MainActivity extends Activity {
         p.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         float textSize = sizePx * (label != null && label.length() > 4 ? 0.28f : 0.34f);
-        p.setTextSize(textSize);
+        p.setTextSize(Math.max(readableTextPx, textSize));
         p.setStrokeWidth(0f);
         android.graphics.Paint.FontMetrics fm = p.getFontMetrics();
         float baseline = sizePx * 0.5f - (fm.ascent + fm.descent) * 0.5f;
@@ -11736,9 +11739,9 @@ public final class MainActivity extends Activity {
         caption.setTag("dockToolCaption");
         caption.setText(label.toUpperCase());
         caption.setTextColor(dockLabelColorMuted());
-        caption.setTextSize(10f);
+        caption.setTextSize(18f);
         caption.setGravity(android.view.Gravity.CENTER);
-        caption.setLetterSpacing(0.06f);
+        caption.setLetterSpacing(0.02f);
         if (dockUiLight) caption.setShadowLayer(0f, 0f, 0f, 0);
         else caption.setShadowLayer(3f, 0f, 1f, 0x99000000);
         caption.setMaxLines(2);
@@ -12350,57 +12353,76 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private String nativeStateLabel(String state) {
+        if (state == null) return "Indisponível";
+        switch (state) {
+            case "live": return "Ao vivo";
+            case "partial": return "Parcial";
+            case "stale": return "Desatualizado";
+            case "demo": return "DEMO";
+            case "open": return "Aberto";
+            case "closed": return "Fechado";
+            case "fastened": return "Afivelado";
+            case "unfastened": return "Desafivelado";
+            case "warning": return "Alerta";
+            case "normal": return "Normal";
+            case "unknown": return "Sem sinal";
+            case "unavailable": return "Indisponível";
+            default: return state;
+        }
+    }
+
     private String bottomCardAccessibilityDescription(BottomCardDescriptor descriptor) {
         if ("wallpaper".equals(descriptor.id) || "desktops".equals(descriptor.id)) {
-            return "Wallpaper and display fill. " + descriptor.primary + ". " + descriptor.secondary;
+            return "Imagem e fundo. " + descriptor.primary + ". " + descriptor.secondary;
         }
         if ("power".equals(descriptor.id)) {
             StringBuilder description = new StringBuilder("Fluxo de energia. ");
             description.append(descriptor.primary.isEmpty() ? "Fluxo de energia indisponível" : descriptor.primary + " kW");
             if (!descriptor.metricA.isEmpty()) description.append(". ").append(descriptor.metricA);
             if (!descriptor.metricB.isEmpty()) description.append(". ").append(descriptor.metricB);
-            if (!descriptor.secondary.isEmpty()) description.append(". Source ").append(descriptor.secondary);
+            if (!descriptor.secondary.isEmpty()) description.append(". Origem ").append(descriptor.secondary);
             description.append(". Abre os detalhes do fluxo de energia.");
             return description.toString();
         }
         if ("status".equals(descriptor.id)) {
-            StringBuilder description = new StringBuilder("Vehicle status. ");
-            description.append(descriptor.primary.isEmpty() ? "Status unavailable" : descriptor.primary);
-            if (!descriptor.secondary.isEmpty()) description.append(". Source ").append(descriptor.secondary);
-            String[] labels = {"driver door", "front passenger door", "rear left door",
-                    "rear right door", "tailgate"};
+            StringBuilder description = new StringBuilder("Status do veículo. ");
+            description.append(descriptor.primary.isEmpty() ? "Status indisponível" : descriptor.primary);
+            if (!descriptor.secondary.isEmpty()) description.append(". Origem ").append(descriptor.secondary);
+            String[] labels = {"porta do motorista", "porta do passageiro", "porta traseira esquerda",
+                    "porta traseira direita", "porta-malas"};
             for (int i = 0; i < labels.length; i++) {
                 String state = descriptor.openingStates != null && i < descriptor.openingStates.length
                         ? descriptor.openingStates[i] : "unknown";
-                description.append(". ").append(labels[i]).append(" ").append(state);
+                description.append(". ").append(labels[i]).append(" ").append(nativeStateLabel(state));
             }
-            description.append(". Opens vehicle status details.");
+            description.append(". Abre o status do veículo.");
             return description.toString();
         }
         if ("navigation".equals(descriptor.id)) {
-            StringBuilder description = new StringBuilder("Navigation. ");
-            description.append(descriptor.primary.isEmpty() ? "No route data" : descriptor.primary);
+            StringBuilder description = new StringBuilder("Navegação. ");
+            description.append(descriptor.primary.isEmpty() ? "Sem dados de rota" : descriptor.primary);
             if (!descriptor.navIdleCity.isEmpty()) description.append(". ").append(descriptor.navIdleCity);
             if (!descriptor.secondary.isEmpty()) description.append(". ").append(descriptor.secondary);
             if (!descriptor.metricA.isEmpty()) description.append(". ").append(descriptor.metricA);
             if (!descriptor.navIdleAction.isEmpty()) description.append(". ").append(descriptor.navIdleAction);
-            description.append(". Opens navigation.");
+            description.append(". Abre a navegação.");
             return description.toString();
         }
         if (!"tires".equals(descriptor.id)) {
             return descriptor.title + (descriptor.value.isEmpty() ? "" : ": " + descriptor.value);
         }
         String[] readings = tireReadings(descriptor);
-        StringBuilder description = new StringBuilder("Tires. ");
-        description.append("Data state ").append(descriptor.state);
+        StringBuilder description = new StringBuilder("Pneus. ");
+        description.append("Estado dos dados ").append(nativeStateLabel(descriptor.state));
         if (!descriptor.secondary.isEmpty()) {
-            description.append(". Source ").append(descriptor.secondary);
+            description.append(". Origem ").append(descriptor.secondary);
         }
-        String[] positions = {"front left", "front right", "rear left", "rear right"};
+        String[] positions = {"dianteiro esquerdo", "dianteiro direito", "traseiro esquerdo", "traseiro direito"};
         for (int i = 0; i < positions.length; i++) {
-            description.append(". ").append(positions[i]).append(" ").append(readings[i]);
+            description.append(". ").append(positions[i]).append(" ").append(nativeStateLabel(readings[i]));
             if (descriptor.wheelStates != null && i < descriptor.wheelStates.length) {
-                description.append(", ").append(descriptor.wheelStates[i]);
+                description.append(", ").append(nativeStateLabel(descriptor.wheelStates[i]));
             }
         }
         return description.toString();
@@ -12946,7 +12968,7 @@ public final class MainActivity extends Activity {
             boolean last = lastIsExit && row == rows.get(rows.size() - 1);
             android.widget.TextView item = new android.widget.TextView(this);
             item.setText(row.label);
-            item.setTextSize(last ? 13f : 15f);
+            item.setTextSize(18f);
             item.setTypeface(android.graphics.Typeface.create(
                     row.selected ? "sans-serif-medium" : "sans-serif", android.graphics.Typeface.NORMAL));
             item.setTextColor(row.selected ? dockAccentColor
@@ -13052,8 +13074,8 @@ public final class MainActivity extends Activity {
         android.widget.TextView t = new android.widget.TextView(this);
         t.setText(text);
         t.setTextColor(dockLabelColorMuted());
-        t.setTextSize(11f);
-        t.setLetterSpacing(0.08f);
+        t.setTextSize(18f);
+        t.setLetterSpacing(0.02f);
         t.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
                 android.graphics.Typeface.NORMAL));
         t.setPadding(0, 0, 0, Math.round(6 * density));
@@ -13064,7 +13086,7 @@ public final class MainActivity extends Activity {
             float density, Runnable action) {
         android.widget.TextView t = new android.widget.TextView(this);
         t.setText(label);
-        t.setTextSize(14f);
+        t.setTextSize(18f);
         t.setGravity(android.view.Gravity.CENTER);
         t.setPadding(Math.round(16 * density), Math.round(12 * density),
                 Math.round(16 * density), Math.round(12 * density));
@@ -13109,7 +13131,7 @@ public final class MainActivity extends Activity {
 
     /** Caption band under dock icon. */
     private void styleDockCaption(android.widget.TextView labelView, float density) {
-        labelView.setTextSize(10f);
+        labelView.setTextSize(18f);
         labelView.setTextColor(0xE6FFFFFF);
         labelView.setGravity(android.view.Gravity.TOP | android.view.Gravity.CENTER_HORIZONTAL);
         labelView.setMaxLines(2);
@@ -13625,7 +13647,7 @@ public final class MainActivity extends Activity {
             android.widget.TextView tv = new android.widget.TextView(this);
             tv.setText(label);
             tv.setTextColor(0xFFFFFFFF);
-            tv.setTextSize(17f);
+            tv.setTextSize(18f);
             row.addView(tv);
 
             final String targetPkg = pkg;
@@ -13641,7 +13663,7 @@ public final class MainActivity extends Activity {
             android.widget.TextView empty = new android.widget.TextView(this);
             empty.setText("Nenhum app GWM");
             empty.setTextColor(0x99FFFFFF);
-            empty.setTextSize(15f);
+            empty.setTextSize(18f);
             empty.setPadding(Math.round(8 * d), Math.round(10 * d), Math.round(8 * d), Math.round(10 * d));
             box.addView(empty);
         }
@@ -13879,11 +13901,11 @@ public final class MainActivity extends Activity {
         box.setMinimumWidth(Math.round(220 * d));
 
         final boolean isHub = DockAppOverrides.GWM_HUB_PKG.equals(pkg);
-        box.addView(makeDockMenuRow("Customize…", () -> {
+        box.addView(makeDockMenuRow("Personalizar…", () -> {
             dismissDockEditMenu();
             showDockCustomizeSheet(anchor, pkg);
         }));
-        box.addView(makeDockMenuRow("Hide", () -> {
+        box.addView(makeDockMenuRow("Ocultar", () -> {
             dismissDockEditMenu();
             if (isHub) {
                 hideGwmHub();
@@ -13893,13 +13915,13 @@ public final class MainActivity extends Activity {
         }));
         if (!isHub && canToggleOpenAsWindow(pkg)) {
             boolean on = prefersWindow(pkg);
-            box.addView(makeDockMenuRow(on ? "✓ Open as window" : "Open as window", () -> {
+            box.addView(makeDockMenuRow(on ? "✓ Abrir em janela" : "Abrir em janela", () -> {
                 dismissDockEditMenu();
                 toggleOpenAsWindow(pkg);
             }));
         }
         if (!hiddenPackages.isEmpty()) {
-            box.addView(makeDockMenuRow("Unhide selected…", () -> {
+            box.addView(makeDockMenuRow("Mostrar ocultos…", () -> {
                 dismissDockEditMenu();
                 showUnhidePicker();
             }));
@@ -14059,7 +14081,7 @@ public final class MainActivity extends Activity {
         nameField.setText(curName != null ? curName : "");
         nameField.setHintTextColor(dockLabelColorMuted());
         nameField.setTextColor(dockLabelColor());
-        nameField.setTextSize(16f);
+        nameField.setTextSize(18f);
         nameField.setSingleLine(true);
         nameField.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
@@ -14123,7 +14145,7 @@ public final class MainActivity extends Activity {
             android.widget.TextView t = new android.widget.TextView(this);
             t.setText("Padrão");
             t.setTextColor(dockLabelColor());
-            t.setTextSize(8f);
+            t.setTextSize(18f);
             t.setGravity(android.view.Gravity.CENTER);
             cell.addView(t, new android.widget.FrameLayout.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -14388,7 +14410,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView title = new android.widget.TextView(this);
         title.setText("Apps ocultos");
         title.setTextColor(0x99FFFFFF);
-        title.setTextSize(14f);
+        title.setTextSize(18f);
         title.setPadding(Math.round(6 * d), 0, Math.round(6 * d), Math.round(6 * d));
         box.addView(title);
 
@@ -14426,7 +14448,7 @@ public final class MainActivity extends Activity {
             android.widget.TextView tv = new android.widget.TextView(this);
             tv.setText(label);
             tv.setTextColor(0xFFFFFFFF);
-            tv.setTextSize(16f);
+            tv.setTextSize(18f);
             tv.setSingleLine(true);
             tv.setEllipsize(android.text.TextUtils.TruncateAt.END);
             tv.setMaxWidth(Math.round(240 * d));
@@ -14512,7 +14534,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView row = new android.widget.TextView(this);
         row.setText(title);
         row.setTextColor(0xFFFFFFFF);
-        row.setTextSize(16f);
+        row.setTextSize(18f);
         row.setMinHeight(Math.round(48 * d));
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
         row.setPadding(Math.round(10 * d), Math.round(12 * d), Math.round(10 * d), Math.round(12 * d));

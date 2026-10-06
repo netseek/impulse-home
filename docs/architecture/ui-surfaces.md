@@ -11,6 +11,18 @@ and agent briefs.
 | **widget** | the one full-size widget board, beside the car | the WebView | grid cells (1x1 … 3x2) |
 | **popup** | floating over everything, dismissed by a backdrop tap | the WebView | one shared frame |
 
+## Readability
+
+Authored labels use short PT-BR; keep DEMO, unavailable, partial and stale provenance explicit.
+Web surfaces use opaque `--hv-text-*` colors and footprint `--hv-fp-*` sizes, at least 18px;
+labels outside 1x1 use at least 20px. Primary values use 32px in 1x1, 40px in 1x2/2x1,
+and at least 48px in larger footprints. Primary text targets 7:1 contrast and secondary text
+4.5:1 over a readable local panel. Interactive targets have at least 44×44px; compact
+Condução widgets keep drive modes, with the full controls available in the popup. Range
+bar text sits on a solid local panel, independent of the moving fill edge.
+Native labels use at least 18sp; Canvas converts that floor with cached `scaledDensity`.
+Light muted text uses `#526171`. Do not add per-frame typography work or hide state through opacity.
+
 ## card — the bottom rail
 
 A small native tile in the launcher rail. **It is not HTML.** It is built in

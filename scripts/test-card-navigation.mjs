@@ -107,7 +107,6 @@ includesAll(dockIndicators, [
 // a DEMO badge is never abbreviated, and an un-ready vehicle disables writes
 // rather than showing a plausible default.
 includesAll(method('_drivingWidgetView'), [
-  "'DEMO · SIMULADO · NÃO É DO VEÍCULO'",
   "'PRÉVIA LOCAL · NÃO É AJUSTE DO VEÍCULO'",
   "'INDISPONÍVEL · VEÍCULO NÃO PRONTO'",
   "'PENDENTE · AGUARDANDO O VEÍCULO'",
@@ -140,10 +139,6 @@ includesAll(method('_setCardAction'), ["this._cardActions[type] = action", 'this
 includesAll(method('_openFocusedCard'), ["action.kind === 'desktop'", 'd.id === action.desktopId', "this._setCardAction(type, { kind: 'popup' })"], 'deleted target fallback');
 includesAll(method('_rangeTelemetry'), [
   'CAR_SIGNALS.batterySoc, CAR_SIGNALS.evRange, CAR_SIGNALS.fuelRange',
-  "'DEMO · SIMULATED · NOT VEHICLE'",
-  "'PARTIAL · VEHICLE RANGE'",
-  "'STALE · VEHICLE RANGE'",
-  "'UNAVAILABLE · NO RANGE SIGNAL'",
   'completeRange = evKnown && fuelKnown',
   "this._rangeDistanceUnit()",
   "unitKey === 'mi' ? .621371 : 1",
@@ -225,11 +220,6 @@ includesAll(method('_applyCarSignal'), [
 ], 'AA signal routing');
 const navView = method('_navigationWidgetView');
 includesAll(navView, [
-  "'ANDROID AUTO · LIVE'",
-  "'ANDROID AUTO · NO GUIDANCE'",
-  "'NAVIGATION · NO ROUTE DATA'",
-  "'DEMO · ROUTE PREVIEW'",
-  "'DEMO · NO GUIDANCE'",
   'navigationTurnGlyph',
   'navigationCardState',
   'navigationCardGlyph',
@@ -381,3 +371,22 @@ assert.ok(!java.includes('case "navigation": drawRing'),
   'navigation must not fall through to the generic ring');
 
 console.log('card-navigation contracts: ok');
+
+// Scope provenance to each builder; do not pin whole translated sentences.
+for (const name of ['_rangeTelemetry', '_drivingWidgetView']) {
+  const source = method(name);
+  const demo = /'DEMO · (?=[^']*SIMULAD)(?=[^']*NÃO É DO VEÍCULO)[^']+'/;
+  assert.match(source, demo);
+  assert.doesNotMatch(source.replace('SIMULADO', ''), demo);
+  assert.doesNotMatch(source.replace('NÃO É DO VEÍCULO', ''), demo);
+}
+for (const state of ['PARCIAL', 'DESATUALIZAD', 'INDISPONÍVEL']) {
+  const source = method('_rangeTelemetry');
+  assert.ok(source.includes(state), `range exposes ${state}`);
+  assert.ok(!source.replaceAll(state, '').includes(state), 'negative control');
+}
+for (const pattern of [/ANDROID AUTO · [^']*AO VIVO/, /ANDROID AUTO · [^']*SEM ROTA/,
+  /NAVEGAÇÃO · [^']*SEM DADOS/, /DEMO · [^']*PRÉVIA/, /DEMO · [^']*SEM ROTA/]) {
+  assert.match(navView, pattern);
+  assert.doesNotMatch(navView.replaceAll('source =', 'ignored =').replace(pattern, ''), pattern);
+}

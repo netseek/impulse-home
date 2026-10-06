@@ -41,8 +41,15 @@ assert.ok(!html.includes("{ id: 'status', title: 'Status do veículo', action: '
 const snapshot = block(html, '  _statusDoorSnapshot(');
 all(snapshot, ['CAR_DOOR_SLOTS[definition.key]', "state === 'open'", "state === 'closed'", "state === 'unknown'", "'partial'", "'stale'", "'demo'", "'unavailable'"], 'physical opening and provenance mapping');
 assert.match(snapshot, /const demo = !!this\._demoPreview && !observed/, 'demo must only exist without observed door telemetry');
-assert.match(snapshot, /DEMO · SIMULATED · NOT VEHICLE/, 'demo provenance must be explicit');
-assert.match(snapshot, /UNAVAILABLE · NO DOOR SIGNAL/, 'missing telemetry must not receive fallback values');
+// Provenance is asserted by property (demo says simulated and not the vehicle; a missing
+// signal says unavailable and names the signal), not by exact wording.
+const STATUS_DEMO_LABEL = /DEMO · (?=[^'\n]*SIMULAD)(?=[^'\n]*NÃO É DO VEÍCULO)[^'\n]+/;
+const STATUS_UNAVAILABLE_LABEL = /INDISPONÍVEL · SEM SINAL[^'\n]*/;
+assert.match(snapshot, STATUS_DEMO_LABEL, 'demo provenance must be explicit');
+assert.match(snapshot, STATUS_UNAVAILABLE_LABEL, 'missing telemetry must not receive fallback values');
+assert.doesNotMatch(snapshot.replace('NÃO É DO VEÍCULO', ''), STATUS_DEMO_LABEL, 'negative control: demo');
+assert.doesNotMatch(snapshot.replace('SEM SINAL', ''), STATUS_UNAVAILABLE_LABEL, 'negative control: unavailable');
+assert.ok(!/NOT VEHICLE|NO DOOR SIGNAL/.test(snapshot), 'visible provenance is Portuguese');
 
 const demoSequenceStart = html.indexOf('const DEMO_DOOR_SEQUENCE = [');
 assert.ok(demoSequenceStart >= 0, 'missing alternating demo door sequence');
@@ -304,3 +311,5 @@ assert.ok(assetRevision >= 18,
   `bundle revision must be at or past the unified vehicle console (got v${assetRevision})`);
 
 console.log('status-card contracts: ok');
+
+assert.doesNotMatch(snapshot.replace('SIMULADO', ''), STATUS_DEMO_LABEL, 'negative control: simulation must be explicit');

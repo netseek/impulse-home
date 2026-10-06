@@ -27,8 +27,14 @@ function method(name) {
 for (const token of [
   "{ id: 'range', title: 'Autonomia', action: 'openRange' }", "case 'openRange':",
   'focusedCardIsRange', 'h6_range_unit',
-  'CAR_SIGNALS.evRange', 'CAR_SIGNALS.fuelRange', 'DEMO · SIMULATED · NOT VEHICLE',
+  'CAR_SIGNALS.evRange', 'CAR_SIGNALS.fuelRange',
 ]) assert.ok(html.includes(token), `missing ${token}`);
+// Demo range data must say it is simulated and not the vehicle (by property, not by exact wording).
+const RANGE_DEMO_LABEL = /'DEMO · (?=[^']*SIMULAD)(?=[^']*NÃO É DO VEÍCULO)[^']+'/;
+const rangeTelemetry = method('_rangeTelemetry');
+assert.match(rangeTelemetry, RANGE_DEMO_LABEL, 'demo range data must be labelled simulated and not the vehicle');
+assert.doesNotMatch(rangeTelemetry.replace('NÃO É DO VEÍCULO', ''), RANGE_DEMO_LABEL, 'negative control');
+assert.ok(!/NOT VEHICLE/.test(rangeTelemetry), 'visible provenance is Portuguese');
 for (const name of ['_rangeTelemetry', '_rangeDistanceUnit', '_openRangeCard']) {
   assert.ok(method(name).includes(name), `range method contract ${name}`);
 }
@@ -45,3 +51,5 @@ assert.ok(method('_rangeBurnView').includes("rangeBurnYMax: '100%'") && method('
 assert.ok(/histEvKmNum: !demo && hasHistEv/.test(method('_rangeTelemetry')), 'only a real history estimate may be reported, never demo or the OEM fallback');
 assert.ok(!method('_rangeTelemetry').includes('this._powerSource()'), 'range freshness cannot inherit generic power flow');
 console.log('range-card contracts: ok');
+
+assert.doesNotMatch(rangeTelemetry.replace('SIMULADO', ''), RANGE_DEMO_LABEL, 'negative control: simulation must be explicit');

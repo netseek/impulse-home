@@ -150,7 +150,7 @@ T.restore = function () {
 const GROUPS = [
   { types: ['profile', 'navigation', 'driving', 'status', 'range'],
     // The demo route cycles through an idle leg; wait for active guidance.
-    ready: `/REMAINING/.test((document.querySelector('[data-thumb-cap=navigation]')||{}).innerText||'')` },
+    ready: `/Restante/.test((document.querySelector('[data-thumb-cap=navigation]')||{}).innerText||'')` },
   { types: ['graphs', 'climate', 'consumption'],
     ready: `!/desligado/i.test((document.querySelector('[data-thumb-cap=consumption]')||{}).innerText||'')` },
   { types: ['power', 'media'], inject: true },
