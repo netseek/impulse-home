@@ -40685,10 +40685,14 @@ class Component extends DCLogic {
       currentTarget: this._desktopGestureEl, _desktopTwoFinger: true,
       touches: ending ? [] : [point], changedTouches: [point] };
     if (starting) {
-      this._clearWidgetHold();
-      this._cancelCenterHold();
+      // Probe first — if the midpoint is on the car disc, leave the touches
+      // alone so OrbitControls can pan/dolly.
       this._onDesktopGestureStart(gestureEvent);
       this._twoFingerDesktopActive = !!this._desktopGesture;
+      if (this._twoFingerDesktopActive) {
+        this._clearWidgetHold();
+        this._cancelCenterHold();
+      }
     } else if (ev.type === 'touchmove') {
       this._onDesktopGestureMove(gestureEvent);
     } else if (ending) {
@@ -40710,7 +40714,11 @@ class Component extends DCLogic {
     // Background, outer edges, the widget board, and card popups (plus their
     // dimmed backdrop). Map pans / chrome controls keep ownership; the car
     // orbit disc is excluded so a drag on the model still rotates it.
-    if (!p || (!ev._desktopTwoFinger && !this._pointInDesktopSwipeZone(p.x, p.y, ev)) || mode === 'appsOnly'
+    //
+    // Two-finger must use the same zone test: OrbitControls maps TWO →
+    // DOLLY_PAN, and the document capture handler below would otherwise steal
+    // every two-finger press (including on the car) for desktop switching.
+    if (!p || !this._pointInDesktopSwipeZone(p.x, p.y, ev) || mode === 'appsOnly'
       || this.state.desktopStudioOpen || this._widgetAddingOn() || this.state.graphEditId
       || this.state.widgetMenuId || this.state.widgetPickerStep
       || this.state.widgetPlaceMode === 'move'
