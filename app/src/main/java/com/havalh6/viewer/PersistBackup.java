@@ -31,7 +31,8 @@ import java.nio.charset.StandardCharsets;
  * empty trips.db before storage permission is granted, and a later backup used
  * to copy that empty file over the shared one. Restore and backup now union-merge
  * by primary key, and a backup refuses to replace a shared file that has more
- * trips than the local database.
+ * trips than the local database or that cannot be read. Day totals are rebuilt
+ * from the merged trips, so one day's row cannot hide a richer copy.
  */
 final class PersistBackup {
     private static final String TAG = "H6Persist";
@@ -84,6 +85,10 @@ final class PersistBackup {
         try {
             int sharedN = tripCount(shared);
             int bakN = tripCount(bak);
+            if (sharedN < 0 || bakN < 0) {
+                Log.w(TAG, "trips restore unreadable; will retry");
+                return;
+            }
             if (tripCount(local) == 0) {
                 File seed = bakN > sharedN ? bak : shared;
                 if (tripCount(seed) > 0) {
@@ -169,6 +174,10 @@ final class PersistBackup {
         if (!local.isFile() || local.length() == 0) return;
         int localN = queryTrips(db);
         int sharedN = tripCount(shared);
+        if (sharedN < 0) {
+            Log.w(TAG, "refusing to replace unreadable trips backup");
+            return;
+        }
         if (sharedN > localN) {
             Log.w(TAG, "refusing to shrink trips backup " + sharedN + " -> " + localN);
             return;
@@ -176,8 +185,11 @@ final class PersistBackup {
         try {
             // Rotate only from a file that is already as full as .bak. The copy
             // lands beside .bak and replaces it only after it is complete, so a
-            // crash cannot leave .bak truncated.
-            if (shared.isFile() && shared.length() > 0 && sharedN >= tripCount(bak) && sharedN > 0) {
+            // crash cannot leave .bak truncated. An unreadable .bak stays put.
+            int bakN = tripCount(bak);
+            if (bakN < 0) {
+                Log.w(TAG, "leaving unreadable trips.db.bak in place");
+            } else if (shared.isFile() && shared.length() > 0 && sharedN >= bakN && sharedN > 0) {
                 File bakTmp = new File(bak.getPath() + ".tmp");
                 copy(shared, bakTmp);
                 if (bak.exists() && !bak.delete()) {
@@ -210,9 +222,11 @@ final class PersistBackup {
                 db.execSQL("INSERT INTO trip_points (start_ms, t, lat, lon, alt, kmh, kw, fuel_mode, fuel_rate, ice, km) "
                         + "SELECT start_ms, t, lat, lon, alt, kmh, kw, fuel_mode, fuel_rate, ice, km FROM src.trip_points p "
                         + "WHERE NOT EXISTS (SELECT 1 FROM trip_points d WHERE d.start_ms = p.start_ms AND d.t = p.t)");
-                if (hasTable(db, "src", "days") && columns(db, "main", "days") == columns(db, "src", "days")) {
-                    db.execSQL("INSERT OR IGNORE INTO days SELECT * FROM src.days");
-                }
+                // days is a rollup of trips, keyed by day. INSERT OR IGNORE kept the
+                // local day and dropped a richer shared total for that same day, then
+                // the backup wrote the smaller rollup back. Rebuild from the merged
+                // trips so a day that exists on both sides keeps every trip's totals.
+                rebuildDays(db);
                 if (hasTable(db, "src", "trip_stops")
                         && columns(db, "main", "trip_stops") == columns(db, "src", "trip_stops")) {
                     db.execSQL("INSERT INTO trip_stops (start_ms, t, kind, lat, lon, level_before, level_after, amount) "
@@ -287,7 +301,13 @@ final class PersistBackup {
         }
     }
 
-    /** Trips in a closed file. Missing, empty, or unreadable files count as 0. */
+    /**
+     * Trips in a closed file. Missing or empty files count as 0.
+     *
+     * @return -1 when the file exists but cannot be read. Callers must not treat
+     *         that as an empty database: a failed open used to pass the shrink
+     *         check and replace the only copy.
+     */
     private static int tripCount(File f) {
         if (f == null || !f.isFile() || f.length() == 0) return 0;
         SQLiteDatabase db = null;
@@ -296,10 +316,24 @@ final class PersistBackup {
             return queryTrips(db);
         } catch (RuntimeException e) {
             Log.w(TAG, "trip count failed for " + f, e);
-            return 0;
+            return -1;
         } finally {
             if (db != null) db.close();
         }
+    }
+
+    /** Replace {@code days} with a rollup of the merged {@code trips} table. */
+    private static void rebuildDays(SQLiteDatabase db) {
+        if (!hasTable(db, "main", "days") || columns(db, "main", "days") != 8) {
+            Log.w(TAG, "skip day rebuild, days schema differs");
+            return;
+        }
+        db.execSQL("DELETE FROM days");
+        db.execSQL("INSERT INTO days (day, trips, km, drive_ms, fuel_l, kwh_out, kwh_in, ev_km) "
+                + "SELECT day, COUNT(*), "
+                + "COALESCE(SUM(km), 0), COALESCE(SUM(drive_ms), 0), COALESCE(SUM(fuel_l), 0), "
+                + "COALESCE(SUM(kwh_out), 0), COALESCE(SUM(kwh_in), 0), COALESCE(SUM(ev_km), 0) "
+                + "FROM trips WHERE day IS NOT NULL AND day != '' GROUP BY day");
     }
 
     /** @return false when the WAL could not be folded into the main file. */

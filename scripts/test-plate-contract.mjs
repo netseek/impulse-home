@@ -88,4 +88,37 @@ assert.equal(plate.parent.visible, true);
 app._setPlateOn(true);
 assert.equal(app.state.plateOn, true, 'turning it on twice does not toggle back off');
 
+// An upgrade that never chose a plate keeps the bumper slab. First run does not.
+function applySaved(saved, extra) {
+  delete store.h6_setup_completed;
+  delete store.h6_first_run_completed;
+  if (extra) Object.assign(store, extra);
+  store.h6_settings_v1 = JSON.stringify(saved);
+  app.state = { plateText: 'HAV4L06', plateOn: true };
+  app._loadSavedSettingsIntoState();
+  return app.state;
+}
+assert.equal(applySaved({ setupCompleted: true }).plateOn, false, 'upgrade without a plate choice keeps the slab');
+const chosen = applySaved({ setupCompleted: true, plateOn: true, plateText: 'raf1e23' });
+assert.equal(chosen.plateOn, true);
+assert.equal(chosen.plateText, 'RAF1E23');
+assert.equal(applySaved({ modelTrim: 'hev' }).plateOn, true, 'first run keeps the default plate');
+assert.equal(applySaved({ modelTrim: 'hev' }, { h6_setup_completed: '1' }).plateOn, false, 'completed setup with no plateOn key keeps the slab');
+
+assert.throws(() => {
+  const broken = html.replace(
+    'else if (saved.plateOn === false || setupDone) s.plateOn = false;',
+    'else if (saved.plateOn === false) s.plateOn = false;',
+  );
+  const ctx = vm.createContext({ DCLogic: class {}, window: {}, performance, console, setTimeout, clearTimeout });
+  vm.runInContext(broken.match(/<script type="text\/x-dc" data-dc-script>([\s\S]*?)<\/script>/)[1] + ';globalThis.C=Component;', ctx);
+  const mem = { h6_settings_v1: JSON.stringify({ setupCompleted: true }) };
+  ctx.window.localStorage = { getItem: (k) => (k in mem ? mem[k] : null), setItem() {} };
+  vm.runInContext('globalThis.localStorage = window.localStorage;', ctx);
+  const upgraded = Object.create(ctx.C.prototype);
+  upgraded.state = { plateText: 'HAV4L06', plateOn: true };
+  upgraded._loadSavedSettingsIntoState();
+  assert.equal(upgraded.state.plateOn, false);
+}, 'upgrade plate negative control');
+
 console.log('Plate contract: sanitising, formats, persistence, repaint, placeholders in both GLBs and UI entry points OK');

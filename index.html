@@ -11417,7 +11417,15 @@ class Component extends DCLogic {
       s.modelVariant = saved.modelVariant;
     }
     if (typeof saved.plateText === 'string') s.plateText = h6SanitizePlate(saved.plateText);
-    if (saved.plateOn === false) s.plateOn = false;
+    // A finished install written before the plate has no plateOn key. Leave the
+    // black bumper slab. First run (setup not completed) keeps the Mercosul default.
+    let setupDone = !!saved.setupCompleted;
+    try {
+      if (localStorage.getItem('h6_setup_completed') === '1'
+          || localStorage.getItem('h6_first_run_completed') === '1') setupDone = true;
+    } catch (e) {}
+    if (saved.plateOn === true) s.plateOn = true;
+    else if (saved.plateOn === false || setupDone) s.plateOn = false;
     if (saved.setupCompleted) this._setupCompleted = true;
     if (typeof saved.carColor === 'string' || saved.carColor === null) s.carColor = saved.carColor;
     if (saved.paintFinish && typeof saved.paintFinish === 'object') s.paintFinish = { ...saved.paintFinish };
