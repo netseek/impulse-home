@@ -43,6 +43,7 @@
       out.push('<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + r + '" fill="' + fill + '"' + (stroke ? ' stroke="' + stroke + '" stroke-width="' + (width || 1) + '"' : '') + '/>');
     }
     function text(value, x, y, textSize, fill, weight, anchor, maxWidth, family) {
+      if (size !== 'rail') textSize = Math.max(textSize, size === '1x1' ? 12 : size === '2x1' ? 13 : 11);
       out.push('<text x="' + x + '" y="' + y + '" fill="' + (fill || ink) + '" font-family="' + (family || 'Arial, sans-serif') + '" font-size="' + textSize + '" font-weight="' + (weight || 700) + '" text-anchor="' + (anchor || 'start') + '"' + (maxWidth ? ' textLength="' + maxWidth + '" lengthAdjust="spacingAndGlyphs"' : '') + '>' + escape(value) + '</text>');
     }
     function label(value, x, y, size, fill, weight, anchor, maxWidth) {
@@ -62,7 +63,7 @@
       out.push('<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + fill + '"' + (stroke ? ' stroke="' + stroke + '" stroke-width="' + (width || 1) + '"' : '') + '/>');
     }
 
-    var dateLabel = [snap.weekdayShort, snap.day, snap.monthShort].join(' ').toUpperCase();
+    var dateLabel = (size === 'rail' ? [snap.weekdayShort, snap.day, snap.monthShort] : [snap.day, snap.monthShort]).join(' ').toUpperCase();
     var period = snap.dayPeriod || '';
 
     out.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + svgWidth + '" height="' + svgHeight + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escape(snap.accessible) + '"><defs>'
@@ -97,13 +98,13 @@
       if (size === '1x1') {
         drawDial(73, 50, 42);
         text(snap.time, 73, 106, 20, ink, 700, 'middle');
-        label(dateLabel, 73, 118, 8, muted, 600, 'middle', 110);
+        label(snap.day + ' ' + String(snap.monthShort).toUpperCase(), 73, 119, 12, muted, 600, 'middle', 110);
       } else if (size === '1x2') {
         drawDial(62, 64, 50);
         line(14, 124, 110, 124, edge, 0.8);
         text(snap.time, 62, 158, 32, ink, 700, 'middle');
         if (period) text(period, 110, 142, 8, accent, 700, 'end');
-        text(String(snap.weekdayShort).toUpperCase(), 62, 178, 10, muted, 600, 'middle');
+        text(String(snap.weekdayShort).toUpperCase(), 62, 178, 11, muted, 600, 'middle');
         text(snap.day + ' ' + String(snap.monthShort).toUpperCase(), 62, 198, 13, ink, 700, 'middle');
       } else if (size === '2x2') {
         // Dial and readout share 244 units: the column right of the divider
@@ -112,16 +113,16 @@
         line(128, 26, 128, 182, edge, 0.8);
         label(snap.time, 138, 90, 38, ink, 700, 'start', 98);
         if (period) text(period, 236, 58, 10, accent, 700, 'end');
-        label(String(snap.weekdayLong || snap.weekdayShort).toUpperCase(), 138, 118, 12, muted, 600, 'start', 98);
+        label(String(snap.weekdayShort).toUpperCase(), 138, 118, 13, muted, 600, 'start', 98);
         text(snap.day, 138, 156, 36, ink, 700, 'start');
-        label(String(snap.monthLong || snap.monthShort).toUpperCase() + ' ' + snap.year, 138, 176, 11, muted, 600, 'start', 98);
+        label(String(snap.monthShort).toUpperCase() + ' ' + snap.year, 138, 176, 13, muted, 600, 'start', 98);
       } else if (size === '2x1') {
         // Wide 2x1 card (296x124)
         drawDial(72, 62, 54);
         line(146, 16, 146, 108, edge, 0.8);
         text(snap.time, 160, 68, 44, ink, 700, 'start');
         if (period) text(period, 282, 52, 9, accent, 700, 'end');
-        label(dateLabel, 160, 92, 11, muted, 600, 'start', 122);
+        label(snap.day + ' ' + String(snap.monthShort).toUpperCase(), 160, 92, 13, muted, 600, 'start', 122);
       } else {
         // Standard rail card (224x124)
         drawDial(58, 62, 54);
@@ -254,7 +255,7 @@
         }
         if (period) text(period, 96, 58, 7, muted, 600, 'end');
       } else if (size === '1x2') {
-        label(String(snap.weekdayLong || snap.weekdayShort).toUpperCase(), 62, 34, 11, muted, 600, 'middle', 100);
+        label(String(snap.weekdayShort).toUpperCase(), 62, 34, 11, muted, 600, 'middle', 100);
         rect(42, 46, 40, 20, 6, accent);
         label(String(snap.monthShort).toUpperCase(), 62, 60, 10, ground, 700, 'middle', 32);
         text(snap.time, 62, 106, 42, ink, 700, 'middle');
@@ -267,14 +268,14 @@
           var isW1 = c1.getUTCDay() === 0 || c1.getUTCDay() === 6;
           text(String(c1.getUTCDate()).padStart(2, '0'), x1 + 7, 154, 9, d1 === offset ? ground : (isW1 ? accent : muted), d1 === offset ? 700 : 500, 'middle');
         }
-        text(snap.day + ' ' + String(snap.monthLong || snap.monthShort) + ' ' + snap.year, 62, 190, 10, muted, 600, 'middle');
+        text(snap.day + ' ' + String(snap.monthShort) + ' ' + snap.year, 62, 190, 10, muted, 600, 'middle');
       } else if (size === '2x2') {
         // Time + week strip only (the spelled-out date repeated both), centred
         // vertically: weekday cap top 49 to strip bottom 158 in 208. A 12h
         // time shrinks to leave the period room before the month pill at 178.
         label(snap.time, 18, 92, 54, ink, 700, 'start', period ? 128 : 150);
         if (period) text(period, 150, 92, 10, muted, 600, 'start');
-        label(String(snap.weekdayLong || snap.weekdayShort).toUpperCase(), 204, 58, 12, muted, 600, 'middle', 60);
+        label(String(snap.weekdayShort).toUpperCase(), 204, 58, 12, muted, 600, 'middle', 60);
         rect(178, 70, 52, 28, 8, accent);
         label(String(snap.monthShort).toUpperCase(), 204, 89, 13, ground, 700, 'middle', 36);
         line(16, 110, 228, 110, edge, 0.8);
