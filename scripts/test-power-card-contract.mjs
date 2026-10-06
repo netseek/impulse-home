@@ -74,9 +74,17 @@ for (const label of [
   "'AO VIVO · FLUXO INFORMADO'",
   "'PARCIAL · SINAIS DE POTÊNCIA DO VEÍCULO'",
   "'DESATUALIZADO · SINAL DE POTÊNCIA'",
-  "'UNAVAILABLE · NO POWER SIGNAL'",
-  "'DEMO · SIMULATED · NOT VEHICLE'",
 ]) assert.ok(powerStatus.includes(label), `missing power state: ${label}`);
+// The two provenance states are asserted by property, not by exact wording: the missing signal
+// is marked unavailable and names the signal, and demo data says it is simulated and not the car.
+const UNAVAILABLE_LABEL = /'INDISPONÍVEL · [^']*SINAL[^']*'/;
+const DEMO_LABEL = /'DEMO · (?=[^']*SIMULAD)(?=[^']*NÃO É DO VEÍCULO)[^']+'/;
+assert.match(powerStatus, UNAVAILABLE_LABEL, 'a missing power signal must read as unavailable');
+assert.match(powerStatus, DEMO_LABEL, 'demo power data must say it is simulated and not the vehicle');
+// Negative controls: each property fails without its keyword, and the English wording is gone.
+assert.doesNotMatch(powerStatus.replace('INDISPONÍVEL', ''), UNAVAILABLE_LABEL);
+assert.doesNotMatch(powerStatus.replace('NÃO É DO VEÍCULO', ''), DEMO_LABEL);
+assert.ok(!/NO POWER SIGNAL|NOT VEHICLE/.test(powerStatus), 'visible provenance is Portuguese');
 const powerModel = method(html, '_powerModel');
 assert.ok(!powerModel.includes('evRange') && !powerModel.includes('fuelRange'),
   'Power must not duplicate Range forecasting');
@@ -98,3 +106,38 @@ assert.ok(java.includes('www/assets/power/graphics/'));
 assert.ok(java.includes('Abre os detalhes do fluxo de energia.'));
 
 console.log('power card contract: OK');
+
+assert.doesNotMatch(powerStatus.replace('SIMULADO', ''), DEMO_LABEL, 'negative control: simulation must be explicit');
+
+// Native TextViews use sp; Canvas must floor pixel sizes using scaledDensity.
+function nativeReadability(source) {
+  assert.match(source, /readableTextPx = 18f \* getResources\(\)\.getDisplayMetrics\(\)\.scaledDensity;/);
+  const sizes = [...source.matchAll(/\b(\w+)\.setTextSize\(([^;]+)\);/g)];
+  assert.ok(sizes.length > 0);
+  for (const [, receiver, size] of sizes) {
+    if (receiver === 'paint' || receiver === 'p') {
+      assert.match(size, /^Math\.max\(readableTextPx,/, 'Canvas respects the scaled minimum');
+    } else if (/^\d+(?:\.\d+)?f$/.test(size)) {
+      assert.ok(parseFloat(size) >= 18, 'native labels are at least 18sp');
+    }
+  }
+  const muted = source.match(/private int dockLabelColorMuted\(\)\s*\{\s*return dockUiLight \? 0xFF([0-9A-F]{6})/);
+  assert.ok(muted, 'light muted text is opaque');
+  const luminance = (hex) => {
+    const channels = hex.match(/../g).map((c) => parseInt(c, 16) / 255)
+      .map((c) => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
+    return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+  };
+  assert.ok((luminance('F7F9FB') + .05) / (luminance(muted[1]) + .05) >= 4.5,
+    'light muted text meets secondary contrast');
+}
+nativeReadability(java);
+for (const [from, to] of [
+  ['.scaledDensity;', '.density;'],
+  ['paint.setTextSize(Math.max(readableTextPx, px));', 'paint.setTextSize(px);'],
+  ['demoBadge.setTextSize(18f);', 'demoBadge.setTextSize(8f);'],
+  ['return dockUiLight ? 0xFF526171', 'return dockUiLight ? 0xFF9AA3AE'],
+]) {
+  assert.ok(java.includes(from), 'negative-control anchor exists');
+  assert.throws(() => nativeReadability(java.replace(from, to)), 'broken typography must fail');
+}

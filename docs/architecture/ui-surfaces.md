@@ -11,6 +11,14 @@ and agent briefs.
 | **widget** | the one full-size widget board, beside the car | the WebView | grid cells (1x1 … 3x2) |
 | **popup** | floating over everything, dismissed by a backdrop tap | the WebView | one shared frame |
 
+## Readability
+
+Authored labels use short PT-BR; keep DEMO, unavailable, partial and stale provenance explicit.
+Web surfaces use opaque `--hv-text-*` colors and footprint `--hv-fp-*` sizes, at least 18px;
+primary text targets 7:1 contrast and secondary text 4.5:1 over a readable local panel.
+Native labels use at least 18sp; Canvas converts that floor with cached `scaledDensity`.
+Light muted text uses `#526171`. Do not add per-frame typography work or hide state through opacity.
+
 ## card — the bottom rail
 
 A small native tile in the launcher rail. **It is not HTML.** It is built in

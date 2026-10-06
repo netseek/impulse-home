@@ -158,9 +158,17 @@ H.metrics = function (sel, banned) {
     if (Math.min(r.width, r.height) < 43.5) small.push(((b.innerText || b.getAttribute('aria-label') || b.className || 'button').trim().slice(0, 24)) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
   });
   const joined = texts.map((x) => x.t).join(' | ');
+  // A banned phrase counts only as whole words ('ETA' is not a hit inside 'METALIZADO').
+  const hasWord = (b) => {
+    for (let i = joined.indexOf(b); i >= 0; i = joined.indexOf(b, i + 1)) {
+      const pre = joined.charAt(i - 1) || ' ', post = joined.charAt(i + b.length) || ' ';
+      if (!/[A-Za-z\u00C0-\u00FF]/.test(pre) && !/[A-Za-z\u00C0-\u00FF]/.test(post)) return true;
+    }
+    return false;
+  };
   return { minFont: minFont === 1e9 ? null : minFont, below18: texts.filter((x) => x.fs < 18).length,
     count: texts.length, smallTargets: small.slice(0, 20), nSmall: small.length, lowOpacity: Array.from(new Set(low)).slice(0, 12), clipped: Array.from(new Set(clipped)).slice(0, 12),
-    banned: banned.filter((b) => joined.indexOf(b) >= 0), texts };
+    banned: banned.filter(hasWord), texts };
 };
 H.rect = function (sel) {
   const el = document.querySelector(sel);

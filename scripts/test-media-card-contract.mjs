@@ -210,10 +210,12 @@ includesAll(mediaView, [
   "'MÍDIA · SEM FAIXA'",
   "'ACESSO À MÍDIA NECESSÁRIO'",
 ], 'idle vocabulary from the widget data audit');
-assert.match(mediaView, /source = 'MEDIA UNAVAILABLE · NO MEDIA BRIDGE';/,
+// By property: the missing bridge is marked unavailable and says why, and a paused session
+// is told apart from a playing one in the source line.
+assert.match(mediaView, /source = 'MÍDIA INDISPONÍVEL · SEM [^']+';/,
   'a shell with no MediaBridge must say so rather than claim there is no track');
-assert.match(mediaView, /' · NOW PLAYING' : ' · PAUSED'/,
-  'a paused session must not be labelled NOW PLAYING');
+assert.match(mediaView, /' · TOCANDO' : ' · PAUSADO'/,
+  'a paused session must not be labelled as playing');
 
 assert.ok(!/\bDEMO\b/.test(mediaView),
   'media is never simulated: the builder must have no DEMO state to abbreviate');
@@ -224,8 +226,8 @@ const demoSources = html.slice(html.indexOf('const bottomCardDemoSources'),
 assert.ok(!/\bmedia:/.test(demoSources),
   'media must not appear in the rail demo-source map');
 // If a DEMO badge ever is introduced here it must be the full sentence.
-const shortDemo = /DEMO · (?!SIMULATED · NOT VEHICLE)/;
-assert.ok(!shortDemo.test(mediaView), 'a DEMO badge must carry the full DEMO · SIMULATED · NOT VEHICLE');
+const shortDemo = /DEMO · (?![^']*SIMULAD[^']*NÃO É DO VEÍCULO)/;
+assert.ok(!shortDemo.test(mediaView), 'a DEMO badge must carry the full DEMO · SIMULADO · NÃO É DO VEÍCULO');
 
 // ---------------------------------------------------------------------------
 // 6. Theme, accent and the layout classes.
@@ -416,3 +418,8 @@ assert.match(native, /quickMediaAvailable = hasTrack && mediaNowPlaying != null;
   'native transport availability must require an active track');
 
 console.log('media card contract: OK');
+
+const unavailableMedia = /source = 'MÍDIA INDISPONÍVEL · SEM [^']+';/;
+assert.doesNotMatch(mediaView.replace('INDISPONÍVEL', ''), unavailableMedia, 'negative control: missing bridge');
+const playbackStates = /' · TOCANDO' : ' · PAUSADO'/;
+assert.doesNotMatch(mediaView.replace('PAUSADO', 'TOCANDO'), playbackStates, 'negative control: paused is distinct');
