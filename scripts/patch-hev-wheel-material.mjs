@@ -1,6 +1,6 @@
 /**
- * Set HEV stock rim PBR to the tint used on the car (Appearance override):
- *   base color #121212, metallic 1.0, roughness 0.14
+ * Set HEV stock rim PBR to match Blender Principled BSDF (Rim Metal.004):
+ *   base color #2a2a2a, metallic 0.9, roughness 0.3
  *
  * JSON-only patch — BIN chunk copied through unchanged.
  */
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TARGET = path.join(root, 'assets', 'wheels', 'HavalHEV-wheel.glb');
-const RIM_BASE = [0x12 / 255, 0x12 / 255, 0x12 / 255, 1];
+const RIM_BASE = [0x2a / 255, 0x2a / 255, 0x2a / 255, 1];
 
 const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
@@ -60,8 +60,8 @@ function patchJson(json) {
     mat.pbrMetallicRoughness = {
       ...mat.pbrMetallicRoughness,
       baseColorFactor: RIM_BASE,
-      metallicFactor: 1.0,
-      roughnessFactor: 0.14,
+      metallicFactor: 0.9,
+      roughnessFactor: 0.3,
     };
     patched++;
   }
@@ -76,4 +76,4 @@ const output = buildGlb(json, binBuffer);
 const tmp = `${TARGET}.tmp`;
 fs.writeFileSync(tmp, output);
 fs.renameSync(tmp, TARGET);
-console.log(`patched ${path.relative(root, TARGET)}: ${count} Rim Metal slot(s) -> #121212 / metal 1.0 / rough 0.14`);
+console.log(`patched ${path.relative(root, TARGET)}: ${count} Rim Metal slot(s) -> #2a2a2a / metal 0.9 / rough 0.3`);
