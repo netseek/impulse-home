@@ -117,7 +117,10 @@ H.metrics = function (sel, banned) {
     const fs = parseFloat(cs.fontSize);
     const svg = !!el.closest('svg');
     const eff = svg ? fs * (el.getBoundingClientRect().height / Math.max(1, fs * 1.2)) : fs;
-    const rec = { t: s.slice(0, 48), fs: Math.round(fs * 10) / 10, fw: cs.fontWeight, op: Math.round(op * 100) / 100,
+    const cls = (e) => (e.tagName.toLowerCase() + (e.classList.length ? '.' + Array.from(e.classList).slice(0, 2).join('.') : ''));
+    let anc = el.parentElement;
+    while (anc && anc !== root && !anc.classList.length) anc = anc.parentElement;
+    const rec = { c: cls(el) + (anc && anc !== el ? ' < ' + cls(anc) : ''), t: s.slice(0, 48), fs: Math.round(fs * 10) / 10, fw: cs.fontWeight, op: Math.round(op * 100) / 100,
       a: Math.round(alpha * 100) / 100, ls: cs.letterSpacing };
     const key = rec.t + '|' + rec.fs;
     if (!seen.has(key)) { seen.add(key); texts.push(rec); }
@@ -225,7 +228,7 @@ async function record(page, name, sel, rect) {
   if (!matches(name)) return;
   const metrics = JSON.parse(await page.ev(`JSON.stringify(__snapH.metrics(${JSON.stringify(sel)}, ${JSON.stringify(BANNED)}))`));
   results[name] = { minFont: metrics.minFont, below18: metrics.below18, texts: metrics.count, lowOpacity: metrics.lowOpacity,
-    clipped: metrics.clipped, banned: metrics.banned, strings: metrics.texts.map((t) => `${t.t} [${t.fs}px/${t.fw}${t.op * t.a < 1 ? ' a' + Math.round(t.op * t.a * 100) : ''}]`) };
+    clipped: metrics.clipped, banned: metrics.banned, strings: metrics.texts.map((t) => `${t.t} [${t.fs}px/${t.fw}${t.op * t.a < 1 ? ' a' + Math.round(t.op * t.a * 100) : ''}] ${t.c}`) };
   await page.shot(path.join(OUT, name + '.png'), rect);
 }
 
