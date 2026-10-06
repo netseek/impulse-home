@@ -431,14 +431,16 @@ the former 30% enlarged feather-mask pane changed crop and jumped at handoff.
 The slide and widget fades remain animated. Unchanged automatic theme samples
 no longer force an extra desktop commit.
 
-Two fingers capture desktop navigation across the WebView, including widgets,
-controls and card popups. The midpoint drives the existing slide; ending uses
-the last midpoint so lifting one finger cannot jump the image. The capture
-prevents controls receiving the two-finger move/end and suppresses its trailing
-click. Existing editing/modal blockers remain. One-finger background navigation
-and interactive controls keep their normal behavior. Touch listeners are removed
-on unmount. Test: `test-desktop-slide.mjs` (crop, native gesture delivery, two-finger
-midpoint and negative controls).
+Two fingers capture desktop navigation in the same zone as a one-finger swipe:
+the background, widgets, controls and card popups, and not the car orbit disc.
+A two-finger press on the car is left for OrbitControls (pan and dolly). The
+midpoint drives the existing slide; ending uses the last midpoint so lifting
+one finger cannot jump the image. The capture prevents controls receiving the
+two-finger move/end and suppresses its trailing click. Existing editing/modal
+blockers remain. One-finger background navigation and interactive controls
+keep their normal behavior. Touch listeners are removed on unmount. Test:
+`test-desktop-slide.mjs` (crop, native gesture delivery, two-finger midpoint
+on and off the car, and negative controls).
 
 The splash video, held-frame canvas and native skip button use the original
 handoff. `test-splash.mjs` checks clip completion, skip, failure fallback,

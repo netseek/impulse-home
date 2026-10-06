@@ -1541,6 +1541,15 @@ window.HavalSplash = (function () {
           <button type="button" onClick="{{ mi.onClick }}" style="background: {{ mi.bg }}; color: {{ mi.col }};">{{ mi.label }}</button>
         </sc-for>
       </div>
+
+      <div class="hv-config-section-label">PLACA <span class="hv-plate-hint">{{ plateHint }}</span></div>
+      <div class="hv-plate-row dark {{ plateRowClass }}">
+        <div class="hv-plate-preview {{ platePreviewClass }}" aria-hidden="true"><span class="hv-plate-band">BRASIL</span><span class="hv-plate-chars">{{ platePreviewText }}</span></div>
+        <div class="hv-plate-controls">
+          <input type="text" class="hv-plate-input" value="{{ plateText }}" placeholder="HAV4L06" maxlength="7" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Placa do veículo" onInput="{{ onPlateInput }}" onChange="{{ onPlateChange }}" onFocus="{{ onPlateFocus }}" onBlur="{{ onPlateBlur }}" onKeyDown="{{ onPlateKeyDown }}">
+          <button type="button" class="hv-plate-off {{ plateOffClass }}" onClick="{{ togglePlateOff }}" aria-pressed="{{ plateOffPressed }}" aria-label="Sem placa">SEM PLACA</button>
+        </div>
+      </div>
     </sc-if>
 
     </div>
@@ -2333,6 +2342,14 @@ window.HavalSplash = (function () {
       font-family: 'DM Sans'; font-style: normal; font-weight: 400; font-display: swap;
       src: url('vendor/fonts/dm-sans-latin-ext-400.woff2') format('woff2');
       unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    /* Licence-plate typeface: GL-Nummernschild-Mtl (FE-Mittelschrift, the
+       Mercosul / German plate face) by Gutenberg Labo, free software
+       (vendor/fonts/GL-Nummernschild-LICENSE.txt), subset to A-Z 0-9. */
+    @font-face {
+      font-family: 'FE Mittelschrift'; font-style: normal; font-weight: 400; font-display: block;
+      src: url('vendor/fonts/gl-nummernschild-mtl.woff2') format('woff2');
+      unicode-range: U+0020, U+002D, U+0030-0039, U+0041-005A;
     }
     @font-face {
       font-family: 'DM Sans'; font-style: normal; font-weight: 600; font-display: swap;
@@ -3825,7 +3842,9 @@ window.HavalSplash = (function () {
       display: flex;
       align-items: center;
       justify-content: flex-start;
-      padding-left: 64px;
+      /* Sit in the band above the native card rail. Centering on the full
+         panel put the confirm button under those cards once PLACA was added. */
+      padding: var(--hv-popup-top, 46px) 0 var(--hv-popup-bottom-inset, 168px) 64px;
       box-sizing: border-box;
       /* No backdrop blur: the car beside the modal is the preview. */
       background: linear-gradient(90deg, rgba(10, 16, 24, 0.38) 0%, rgba(10, 16, 24, 0.08) 50%, rgba(10, 16, 24, 0) 64%);
@@ -3836,7 +3855,9 @@ window.HavalSplash = (function () {
     }
     .hv-first-run-backdrop.on {
       opacity: 1;
-      pointer-events: auto;
+      /* The car beside the modal has to take the drag. The modal itself opts
+         back in below; the dimmed band does not. */
+      pointer-events: none;
     }
     .hv-first-run-modal {
       width: min(760px, 46vw);
@@ -3846,12 +3867,15 @@ window.HavalSplash = (function () {
       border: 1px solid rgba(0, 0, 0, 0.08);
       box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18), 0 2px 12px rgba(0, 0, 0, 0.06);
       backdrop-filter: blur(28px) saturate(1.25);
+      pointer-events: auto;
       -webkit-backdrop-filter: blur(28px) saturate(1.25);
       color: #1c2430;
       display: flex;
       flex-direction: column;
       gap: 16px;
       box-sizing: border-box;
+      max-height: 100%;
+      overflow: auto;
     }
     .hv-first-run-head {
       display: flex;
@@ -3891,6 +3915,45 @@ window.HavalSplash = (function () {
       letter-spacing: .04em;
       color: var(--hv-accent, #0e8594);
     }
+    /* Licence plate field: a 2D Mercosul mock beside the input, so the text is
+       checked before it is painted on the car. Shared by first-run and Tuning. */
+    .hv-plate-row { display:flex; align-items:center; gap:12px; }
+    .hv-plate-controls { flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:8px; }
+    .hv-plate-preview { position:relative; flex:0 0 auto; width:132px; height:43px; border-radius:5px; border:2px solid #1a1a1a; background:#f4f5f2; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,.25); }
+    .hv-plate-band { position:absolute; left:0; right:0; top:0; height:10px; background:#0a3d91; color:#fff; font:700 6px/10px 'Space Grotesk',sans-serif; text-align:center; letter-spacing:.14em; }
+    .hv-plate-chars { position:absolute; left:0; right:0; top:11px; bottom:0; display:flex; align-items:center; justify-content:center; color:#111; font:400 22px/1 'FE Mittelschrift','Space Grotesk',sans-serif; letter-spacing:.02em; padding-left:8px; }
+    .hv-plate-preview.empty .hv-plate-chars { color:rgba(17,17,17,.28); }
+    .hv-plate-input { flex:1 1 50%; width:50%; max-width:50%; min-width:0; height:44px; padding:0 14px; box-sizing:border-box; border-radius:10px; border:1px solid rgba(0,0,0,.14); background:#fff; color:#111827; -webkit-text-fill-color:#111827; caret-color:#0e8594; font:700 18px/1 'Space Mono',monospace; letter-spacing:.12em; text-transform:uppercase; outline:none; }
+    .hv-plate-input:focus { border-color:var(--hv-accent,#0e8594); box-shadow:0 0 0 3px rgba(14,133,148,.15); }
+    .hv-plate-off { flex:1 1 50%; width:50%; max-width:50%; min-width:0; height:44px; padding:0 8px; box-sizing:border-box; border-radius:10px; border:1px solid rgba(0,0,0,.14); background:rgba(0,0,0,.03); color:#111827; font:700 12px/1 'Space Grotesk',var(--hv-font),sans-serif; letter-spacing:.06em; cursor:pointer; white-space:nowrap; }
+    .hv-plate-off.on { background:var(--hv-accent,#0e8594); border-color:transparent; color:#fff; }
+    .hv-plate-row.off .hv-plate-preview,
+    .hv-plate-row.off .hv-plate-input { opacity:.4; }
+    /* The head-unit keyboard covers everything below ~256px. While the plate
+       field is focused, drop modelo/cor/confirm so the field and its preview
+       sit in the band the keyboard does not cover. */
+    .hv-first-run-backdrop.plate-editing {
+      align-items: flex-start;
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+    .hv-first-run-backdrop.plate-editing .hv-first-run-pick,
+    .hv-first-run-backdrop.plate-editing .hv-first-run-footer { display: none; }
+    .hv-first-run-backdrop.plate-editing .hv-first-run-modal {
+      width: min(680px, 44vw);
+      padding: 14px 20px 14px;
+    }
+    .hv-first-run-backdrop.plate-editing .hv-plate-preview { width: 210px; height: 68px; }
+    .hv-first-run-backdrop.plate-editing .hv-plate-band { height: 14px; font-size: 8px; line-height: 14px; }
+    .hv-first-run-backdrop.plate-editing .hv-plate-chars { top: 16px; font-size: 34px; padding-left: 14px; }
+    .hv-first-run-backdrop.plate-editing .hv-plate-input { height: 52px; font-size: 22px; background: #fff; }
+    .hv-first-run-backdrop.plate-editing .hv-plate-off { height: 52px; }
+    .hv-plate-input::placeholder { color:rgba(17,24,39,.3); letter-spacing:.18em; }
+    .hv-plate-row.dark .hv-plate-input { border-color:rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:#eaf2f8; -webkit-text-fill-color:#eaf2f8; caret-color:#9ad7e8; }
+    .hv-plate-row.dark .hv-plate-off { border-color:rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:#eaf2f8; }
+    .hv-plate-row.dark .hv-plate-off.on { background:var(--hv-accent,#0e8594); border-color:transparent; color:#fff; }
+    .hv-plate-row.dark .hv-plate-input::placeholder { color:rgba(255,255,255,.28); }
+    .hv-plate-hint { margin-left:8px; font-weight:500; opacity:.6; letter-spacing:.06em; }
     .hv-first-run-models {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -9057,7 +9120,7 @@ window.HavalSplash = (function () {
         <div class="hv-first-run-title">HAVAL H6</div>
       </div>
 
-      <div class="hv-first-run-section">
+      <div class="hv-first-run-section hv-first-run-pick">
         <div class="hv-first-run-label">MODELO</div>
         <div class="hv-first-run-models">
           <sc-for list="{{ firstRunModels }}" as="frm">
@@ -9073,7 +9136,7 @@ window.HavalSplash = (function () {
         </div>
       </div>
 
-      <div class="hv-first-run-section">
+      <div class="hv-first-run-section hv-first-run-pick">
         <div class="hv-first-run-label-row">
           <span class="hv-first-run-label">COR</span>
           <span class="hv-first-run-color-name">{{ firstRunSelectedColorName }}</span>
@@ -9084,6 +9147,20 @@ window.HavalSplash = (function () {
               <span class="hv-first-run-color-check">✓</span>
             </button>
           </sc-for>
+        </div>
+      </div>
+
+      <div class="hv-first-run-section">
+        <div class="hv-first-run-label-row">
+          <span class="hv-first-run-label">PLACA</span>
+          <span class="hv-first-run-color-name">{{ plateHint }}</span>
+        </div>
+        <div class="hv-plate-row {{ plateRowClass }}">
+          <div class="hv-plate-preview {{ platePreviewClass }}" aria-hidden="true"><span class="hv-plate-band">BRASIL</span><span class="hv-plate-chars">{{ platePreviewText }}</span></div>
+          <div class="hv-plate-controls">
+            <input type="text" class="hv-plate-input" value="{{ plateText }}" placeholder="HAV4L06" maxlength="7" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Placa do veículo" onInput="{{ onPlateInput }}" onChange="{{ onPlateChange }}" onFocus="{{ onPlateFocus }}" onBlur="{{ onPlateBlur }}" onKeyDown="{{ onPlateKeyDown }}">
+            <button type="button" class="hv-plate-off {{ plateOffClass }}" onClick="{{ togglePlateOff }}" aria-pressed="{{ plateOffPressed }}" aria-label="Sem placa">SEM PLACA</button>
+          </div>
         </div>
       </div>
 
@@ -9949,6 +10026,33 @@ const CAR_DOOR_SLOTS = { fl: 0, fr: 1, rl: 2, rr: 3, trunk: 5 };
 // makes it easy to compare each open asset against its matching closed panel.
 // This is presentation state only: live door telemetry and _carDoorSlots remain
 // authoritative and are never modified by the ticker below.
+// ── Licence plate (Mercosul / Brasil) ────────────────────────────────────────
+// Both bodies ship a flat plate-shaped placeholder at each end (found with a
+// bounds scan of the lite GLBs: 0.49 x 0.16 m at the HEV nose, 0.44 x 0.14 m
+// on both tailgates, "Plastic Black", no UVs). A textured plane is hung on
+// each placeholder rather than re-UV-ing it: the rear ones already ride the
+// tailgate hinge (_initTrunk lists them), so the plate swings with the lid.
+const H6_PLATE_PLACEHOLDERS = {
+  hev: { front: 'BuildingMesh-00085', rear: 'BuildingMesh-00084' },
+  gt: { front: '11_licence_map_c', rear: '11_trunk_licence_map_c' },
+};
+/** Mercosul plate is 400 x 130 mm. */
+const H6_PLATE_ASPECT = 400 / 130;
+/** Brazil's Mercosul layout is LLLNLNN: the fifth slot is always a letter. */
+const H6_PLATE_MERCOSUL_RE = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
+const H6_PLATE_LEGACY_RE = /^[A-Z]{3}[0-9]{4}$/;
+/** Upper-case alphanumerics only, at most seven: what a plate can carry. */
+function h6SanitizePlate(raw) {
+  return String(raw == null ? '' : raw).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 7);
+}
+/** 'empty' | 'partial' | 'mercosul' | 'legacy' (AAA9999, pre-2018). */
+function h6PlateFormat(text) {
+  const t = h6SanitizePlate(text);
+  if (!t) return 'empty';
+  if (H6_PLATE_MERCOSUL_RE.test(t)) return 'mercosul';
+  if (H6_PLATE_LEGACY_RE.test(t)) return 'legacy';
+  return 'partial';
+}
 const DEMO_DOOR_SEQUENCE = [
   { key: 'closed', label: 'Todas as portas fechadas', open: {} },
   { key: 'fl', label: 'Porta do motorista aberta', open: { fl: true } },
@@ -10318,6 +10422,8 @@ let _introFromDir = null, _introToDir = null, _introQa = null, _introQb = null;
 // View shift for the front hold while the first-run modal is up: moves the
 // car into the right half of the panel, clear of the left-anchored modal.
 const FIRST_RUN_VIEW_SHIFT = 0.24;
+const WELCOME_VIEW_NUDGE = 0.14;
+const WELCOME_ORBIT_SPEED = 1.5;
 
 // ── Boot shell layout ─────────────────────────────────────────────────────────
 // Native owns the saved layout, but it can only PUSH it (notifyViewerShellLayout
@@ -10511,6 +10617,10 @@ class Component extends DCLogic {
     activeGroup: null, // 'tuning' | 'override' | 'env' | 'camera' | 'time' | null — which top-level section owns the submenu
     modelVariant: 'hev',
     modelTrim: 'phev34',
+    // Licence plate text; see H6_PLATE_PLACEHOLDERS. Owner-chosen default so a
+    // fresh install already shows a Mercosul plate; first-run setup asks for it.
+    plateText: 'HAV4L06',
+    plateOn: true,
     motionSpeed: 0,
     wheelAngle: 0,
     carHeightOffset: 0,
@@ -10535,9 +10645,9 @@ class Component extends DCLogic {
     rearGlassTweaks: { opacity: 0.6, roughness: 0.15, transmission: 0.6, envMap: 0.5, clearcoat: 1.0, color: '#5c0808' },
     wheelStyle: 'default', // 'default' | 'custom' — set to 'custom' once the initial stock catalog wheel load lands (see onModelLoaded)
     wheelSubTab: 'catalog', // 'catalog' | 'settings' | 'custom'
-    wheelColor: '#3a3a3d',
-    wheelRoughness: 0.15,
-    wheelMetalness: 0.95,
+    wheelColor: '#121212',
+    wheelRoughness: 0.14,
+    wheelMetalness: 1,
     wheelDepthOffset: 0.0,
     wheelSizeInch: 19, // 19inch — smallest of the four selectable sizes (19"-22")
     wheelTintOverride: false,
@@ -11306,6 +11416,16 @@ class Component extends DCLogic {
     if (saved.modelVariant === 'hev' || saved.modelVariant === 'gt') {
       s.modelVariant = saved.modelVariant;
     }
+    if (typeof saved.plateText === 'string') s.plateText = h6SanitizePlate(saved.plateText);
+    // A finished install written before the plate has no plateOn key. Leave the
+    // black bumper slab. First run (setup not completed) keeps the Mercosul default.
+    let setupDone = !!saved.setupCompleted;
+    try {
+      if (localStorage.getItem('h6_setup_completed') === '1'
+          || localStorage.getItem('h6_first_run_completed') === '1') setupDone = true;
+    } catch (e) {}
+    if (saved.plateOn === true) s.plateOn = true;
+    else if (saved.plateOn === false || setupDone) s.plateOn = false;
     if (saved.setupCompleted) this._setupCompleted = true;
     if (typeof saved.carColor === 'string' || saved.carColor === null) s.carColor = saved.carColor;
     if (saved.paintFinish && typeof saved.paintFinish === 'object') s.paintFinish = { ...saved.paintFinish };
@@ -15903,6 +16023,8 @@ class Component extends DCLogic {
       widgetThemeMode: (s.widgetThemeMode === 'light' || s.widgetThemeMode === 'auto') ? s.widgetThemeMode : 'dark',
       modelVariant: s.modelVariant,
       modelTrim: s.modelTrim || 'phev34',
+      plateText: h6SanitizePlate(s.plateText || ''),
+      plateOn: s.plateOn !== false,
       carColor: s.carColor,
       paintFinish: { ...s.paintFinish },
       windowTint: s.windowTint,
@@ -16129,7 +16251,8 @@ class Component extends DCLogic {
     const themeBtn = hv(themeMode !== 'auto');
     const fields = {
       firstRunDisplay: s.firstRunSetupOpen ? 'flex' : 'none',
-      firstRunBackdropClass: s.firstRunSetupOpen ? 'on' : '',
+      firstRunBackdropClass: (s.firstRunSetupOpen ? 'on' : '')
+        + (s.plateFieldFocused ? ' plate-editing' : ''),
       firstRunModels: firstRunModelsList,
       firstRunColors: firstRunColorsList,
       firstRunSelectedColorName: activeColorObj.title,
@@ -16140,6 +16263,19 @@ class Component extends DCLogic {
       confirmFirstRunDisabled: isPendingConfirm ? 'disabled' : undefined,
       confirmFirstRunSpinnerDisplay: isPendingConfirm ? 'inline-block' : 'none',
       confirmFirstRunSetup: () => this._confirmFirstRunSetup(),
+      plateText: s.plateText || '',
+      plateHint: s.plateOn === false ? 'SEM PLACA' : this._plateHint(s.plateText),
+      platePreviewText: s.plateText || 'HAV4L06',
+      platePreviewClass: (s.plateText ? '' : 'empty'),
+      plateRowClass: s.plateOn === false ? 'off' : '',
+      plateOffClass: s.plateOn === false ? 'on' : '',
+      plateOffPressed: s.plateOn === false ? 'true' : 'false',
+      togglePlateOff: () => this._setPlateOn(this.state.plateOn === false),
+      onPlateInput: (ev) => this._onPlateInput(ev),
+      onPlateChange: (ev) => this._onPlateChange(ev),
+      onPlateFocus: (ev) => this._onPlateFocus(ev),
+      onPlateBlur: (ev) => this._onPlateBlur(ev),
+      onPlateKeyDown: (ev) => this._onPlateKeyDown(ev),
       containerRef: this.containerRef,
       outerRef: this.outerRef,
       nightMode: s.nightMode,
@@ -17612,6 +17748,8 @@ class Component extends DCLogic {
 
   _finishConfirmFirstRunSetup() {
     this._firstRunPendingConfirm = false;
+    this._welcomeOrbit = false;
+    if (this.controls) this.controls.autoRotate = false;
     this._setupCompleted = true;
     try {
       localStorage.setItem('h6_setup_completed', '1');
@@ -17623,6 +17761,7 @@ class Component extends DCLogic {
     this.setState({
       firstRunSetupOpen: false,
       firstRunLoadingConfirm: false,
+      plateFieldFocused: false,
       carColor: this.state.carColor,
     }, () => {
       this.saveSettings({ keepCamera: true });
@@ -20263,6 +20402,291 @@ class Component extends DCLogic {
   // Trunk/tailgate lid, its glass, badge, trim and inner liner — grouped under
   // one hinge per model variant since the two GLBs use unrelated naming
   // ("BuildingMesh-NNNNN" on HEV vs explicit "NN_trunk_*" names on GT).
+  /**
+   * ── Licence plates ───────────────────────────────────────────────────────
+   * One textured plane per end, child of the body's own plate placeholder
+   * (H6_PLATE_PLACEHOLDERS) so it inherits the placeholder's transform and, at
+   * the rear, the tailgate hinge. Size and facing are measured from the
+   * placeholder geometry, not hard-coded: its long side is the plate width,
+   * its vertex normals (pointed away from the car's centre) are the facing.
+   */
+  _installLicensePlates(obj, profile) {
+    const THREE = this.THREE;
+    const names = profile && H6_PLATE_PLACEHOLDERS[profile.key];
+    if (!THREE || !obj || !names) return;
+    obj.updateMatrixWorld(true);
+    const carCenter = new THREE.Box3().setFromObject(obj).getCenter(new THREE.Vector3());
+    Object.keys(names).forEach((side) => {
+      const host = obj.getObjectByName(names[side]);
+      if (!host || !host.isMesh || !host.geometry) {
+        console.warn('[Plate] placeholder missing for', profile.key, side, names[side]);
+        return;
+      }
+      if (host.getObjectByName('h6-plate-' + side)) return;
+      const geo = host.geometry;
+      geo.computeBoundingBox();
+      const size = geo.boundingBox.getSize(new THREE.Vector3());
+      const center = geo.boundingBox.getCenter(new THREE.Vector3());
+      // Facing: mean vertex normal; a degenerate result falls back to the
+      // thinnest bounding-box axis (a plate is a slab).
+      const n = new THREE.Vector3();
+      const na = geo.getAttribute('normal');
+      if (na) {
+        const v = new THREE.Vector3();
+        for (let i = 0; i < na.count; i++) n.add(v.fromBufferAttribute(na, i));
+      }
+      if (n.lengthSq() < 1e-6) {
+        const axis = ['x', 'y', 'z'].reduce((a, b) => (size[a] <= size[b] ? a : b));
+        n.set(0, 0, 0);
+        n[axis] = 1;
+      }
+      n.normalize();
+      const nWorld = n.clone().transformDirection(host.matrixWorld);
+      const cWorld = center.clone().applyMatrix4(host.matrixWorld);
+      if (nWorld.dot(cWorld.sub(carCenter)) < 0) n.negate();
+      const dims = [size.x, size.y, size.z].sort((a, b) => b - a);
+      const w = dims[0] * 0.94;
+      const h = w / H6_PLATE_ASPECT;
+      // +Z of the plane -> n, +Y -> world up expressed in the host's space.
+      const hostInv = new THREE.Matrix4().copy(host.matrixWorld).invert();
+      const up = new THREE.Vector3(0, 1, 0).transformDirection(hostInv).normalize();
+      const rot = new THREE.Matrix4().lookAt(new THREE.Vector3(), n.clone().negate(), up);
+      const cv = document.createElement('canvas');
+      cv.width = 1024;
+      cv.height = Math.round(1024 / H6_PLATE_ASPECT);
+      const tex = new THREE.CanvasTexture(cv);
+      if ('colorSpace' in tex && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = this.renderer && this.renderer.capabilities ? Math.min(8, this.renderer.capabilities.getMaxAnisotropy()) : 1;
+      const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      if ('envMapIntensity' in mat) mat.envMapIntensity = 0.35;
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+      plate.name = 'h6-plate-' + side;
+      plate.userData.h6Plate = { side: side, body: profile.key, cv: cv, tex: tex };
+      // Just proud of the placeholder's outer face.
+      plate.position.copy(center).addScaledVector(n, dims[2] * 0.5 + w * 0.008);
+      plate.quaternion.setFromRotationMatrix(rot);
+      plate.renderOrder = 2;
+      host.add(plate);
+      this._paintLicensePlate(cv, this.state.plateText);
+      tex.needsUpdate = true;
+    });
+    this._syncLicensePlateVisibility();
+    // Web fonts may still be loading on a cold boot; repaint once they are.
+    if (document.fonts && document.fonts.ready && !this._plateFontRepaint) {
+      this._plateFontRepaint = true;
+      document.fonts.ready.then(() => this._repaintLicensePlates()).catch(() => {});
+    }
+  }
+
+  _licensePlateMeshes() {
+    const out = [];
+    if (!this.scene) return out;
+    this.scene.traverse((o) => { if (o.userData && o.userData.h6Plate) out.push(o); });
+    return out;
+  }
+
+  _syncLicensePlateVisibility() {
+    // 1.0.1 had no plate feature. Both bodies already carry a flat black
+    // plastic slab at each end ("Plastic Black", no UVs). The Mercosul plate
+    // is only the textured plane hung on that slab, so "sem placa" hides the
+    // plane and leaves the slab — the bumper 1.0.1 showed.
+    const on = !this.state || this.state.plateOn !== false;
+    this._licensePlateMeshes().forEach((m) => { m.visible = on; });
+    if (this.requestRender) this.requestRender(2);
+  }
+
+  _setPlateOn(on) {
+    const next = !!on;
+    if ((this.state.plateOn !== false) === next) return;
+    this._uiOnlyStateWrite = true;
+    this.setState({ plateOn: next }, () => this._syncLicensePlateVisibility());
+    try {
+      const raw = localStorage.getItem(this._settingsStorageKey());
+      const saved = raw ? JSON.parse(raw) : {};
+      if (!saved || typeof saved !== 'object') return;
+      saved.plateOn = next;
+      localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
+      if (this._savedSettings) this._savedSettings.plateOn = next;
+    } catch (e) {}
+  }
+
+  _repaintLicensePlates() {
+    const text = this.state ? this.state.plateText : '';
+    this._licensePlateMeshes().forEach((m) => {
+      this._paintLicensePlate(m.userData.h6Plate.cv, text);
+      m.userData.h6Plate.tex.needsUpdate = true;
+    });
+    if (this.requestRender) this.requestRender(2);
+  }
+
+  /**
+   * Brazilian Mercosul plate: white field, blue header with the Mercosul
+   * emblem, BRASIL and the flag, black characters. Proportions follow the
+   * 400 x 130 mm plate; the typeface is the app's own (the legal FE-Schrift is
+   * not bundled), which reads right at the sizes this car is ever seen at.
+   */
+  _paintLicensePlate(cv, text) {
+    const g = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const t = h6SanitizePlate(text);
+    const r = Math.round(W * 0.03);
+    g.clearRect(0, 0, W, H);
+    const rr = (x, y, w, h, rad) => {
+      g.beginPath();
+      g.moveTo(x + rad, y); g.lineTo(x + w - rad, y); g.quadraticCurveTo(x + w, y, x + w, y + rad);
+      g.lineTo(x + w, y + h - rad); g.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+      g.lineTo(x + rad, y + h); g.quadraticCurveTo(x, y + h, x, y + h - rad);
+      g.lineTo(x, y + rad); g.quadraticCurveTo(x, y, x + rad, y); g.closePath();
+    };
+    // Field
+    rr(0, 0, W, H, r); g.fillStyle = '#f7f7f5'; g.fill();
+    // Blue header: on the real plate about a quarter of the height.
+    const band = Math.round(H * 0.245);
+    g.save(); rr(0, 0, W, H, r); g.clip();
+    g.fillStyle = '#0b3d91'; g.fillRect(0, 0, W, band);
+    g.restore();
+    // BRASIL — wide-set caps, centred in the band.
+    g.fillStyle = '#ffffff';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '700 ' + Math.round(band * 0.60) + 'px "Space Grotesk", Arial, sans-serif';
+    if ('letterSpacing' in g) g.letterSpacing = Math.round(band * 0.06) + 'px';
+    g.fillText('BRASIL', W / 2, band * 0.53);
+    if ('letterSpacing' in g) g.letterSpacing = '0px';
+    // Mercosul emblem (left): four stars on an arc over the word MERCOSUL.
+    const ex = W * 0.095, er = band * 0.30;
+    const star = (x, y, sz) => {
+      g.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? sz * 0.45 : sz;
+        g.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+      }
+      g.closePath(); g.fill();
+    };
+    g.fillStyle = '#ffffff';
+    [-1, -0.33, 0.33, 1].forEach((k) => star(ex + k * er * 1.15, band * 0.30 + Math.abs(k) * er * 0.30, band * 0.075));
+    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = Math.max(1, band * 0.035);
+    g.beginPath(); g.arc(ex, band * 0.30 + er * 1.05, er * 1.25, Math.PI * 1.22, Math.PI * 1.78); g.stroke();
+    g.font = '600 ' + Math.round(band * 0.30) + 'px "Space Grotesk", Arial, sans-serif';
+    g.fillText('MERCOSUL', ex, band * 0.80);
+    // Brazilian flag (right)
+    const fw = band * 1.5, fh = band * 0.7, fx = W - W * 0.035 - fw, fy = (band - fh) / 2;
+    g.fillStyle = '#009c3b'; g.fillRect(fx, fy, fw, fh);
+    g.fillStyle = '#ffdf00';
+    g.beginPath(); g.moveTo(fx + fw * 0.5, fy + fh * 0.08); g.lineTo(fx + fw * 0.92, fy + fh * 0.5);
+    g.lineTo(fx + fw * 0.5, fy + fh * 0.92); g.lineTo(fx + fw * 0.08, fy + fh * 0.5); g.closePath(); g.fill();
+    g.fillStyle = '#002776';
+    g.beginPath(); g.arc(fx + fw * 0.5, fy + fh * 0.5, fh * 0.27, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(1, fh * 0.06);
+    g.beginPath(); g.arc(fx + fw * 0.5, fy + fh * 0.64, fh * 0.36, Math.PI * 1.22, Math.PI * 1.78); g.stroke();
+    // Border: thin black line just inside the edge.
+    rr(r * 0.45, r * 0.45, W - r * 0.9, H - r * 0.9, r * 0.75);
+    g.strokeStyle = '#111'; g.lineWidth = Math.max(2, W * 0.007); g.stroke();
+    // White field: QR mark top-left, BR bottom-left.
+    const field = H - band;
+    // QR sits inside the left text margin (see `margin` below).
+    const qs = Math.min(field * 0.24, W * 0.058), qx = W * 0.03, qy = band + field * 0.08;
+    g.fillStyle = '#8a8a8a';
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) if ((i * 7 + j * 3 + i * j) % 3) g.fillRect(qx + i * qs / 6, qy + j * qs / 6, qs / 6, qs / 6);
+    g.fillStyle = '#111111';
+    g.font = '700 ' + Math.round(field * 0.20) + 'px "Space Grotesk", Arial, sans-serif';
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.fillText('BR', qx, H - field * 0.08);
+    // Characters: tall and condensed like FE-Schrift, ~80% of the field height,
+    // spread on a fixed pitch across the field to the right of the QR mark.
+    if (t) {
+      // FE-Mittelschrift (GL-Nummernschild-Mtl) is the real plate face; it
+      // only needs the right size. Fall back to a condensed Space Grotesk
+      // while the web font is still loading (the load promise repaints).
+      const feReady = !document.fonts || document.fonts.check('40px "FE Mittelschrift"');
+      // Same margin on both sides of the character block; the QR and BR
+      // marks live inside the left one.
+      const margin = W * 0.10;
+      const left = margin, right = W - margin;
+      const room = right - left;
+      const pitch = room / Math.max(t.length, 7);
+      const family = feReady ? '"FE Mittelschrift"' : '"Space Grotesk", Arial, sans-serif';
+      const weight = feReady ? '400' : '700';
+      // Size from BOTH constraints: caps at ~64% of the white field (the real
+      // plate's 63 mm on a 100 mm field) and the widest glyph inside its slot.
+      // GL-Nummernschild's cap height is 0.60 em; Space Grotesk's about 0.70.
+      const capRatio = feReady ? 0.60 : 0.70;
+      g.font = weight + ' 100px ' + family;
+      const widest100 = Math.max.apply(Math, t.split('').map((ch) => g.measureText(ch).width)) / 100;
+      const px = Math.floor(Math.min(field * 0.64 / capRatio, pitch * 0.92 / Math.max(0.2, widest100)));
+      g.fillStyle = '#111111';
+      g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+      g.font = weight + ' ' + px + 'px ' + family;
+      // Centre the CAPS (baseline + half cap height) on the field's middle.
+      const baseline = band + field * 0.52 + px * capRatio / 2;
+      const x0 = left + pitch / 2 + (room - pitch * t.length) / 2;
+      for (let i = 0; i < t.length; i++) g.fillText(t[i], x0 + i * pitch, baseline);
+      if (!feReady && document.fonts && !this._plateFeLoading) {
+        this._plateFeLoading = true;
+        document.fonts.load('40px "FE Mittelschrift"').then(() => this._repaintLicensePlates()).catch(() => {});
+      }
+    }
+  }
+
+  _setPlateText(raw, persist) {
+    const text = h6SanitizePlate(raw);
+    if (text !== (this.state.plateText || '')) {
+      this._uiOnlyStateWrite = true;
+      this.setState({ plateText: text }, () => this._repaintLicensePlates());
+    }
+    if (persist) this._persistPlateText(text);
+  }
+
+  _persistPlateText(text) {
+    try {
+      const raw = localStorage.getItem(this._settingsStorageKey());
+      const saved = raw ? JSON.parse(raw) : {};
+      if (!saved || typeof saved !== 'object') return;
+      saved.plateText = text;
+      localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
+      if (this._savedSettings) this._savedSettings.plateText = text;
+    } catch (e) {}
+  }
+
+  _plateHint(text) {
+    switch (h6PlateFormat(text)) {
+      case 'mercosul': return 'PADRÃO MERCOSUL';
+      case 'legacy': return 'FORMATO ANTIGO';
+      case 'partial': return 'INCOMPLETA';
+      default: return 'OPCIONAL';
+    }
+  }
+
+  _onPlateInput(ev) {
+    const el = ev && ev.target;
+    if (!el) return;
+    const clean = h6SanitizePlate(el.value);
+    if (el.value !== clean) el.value = clean;
+    this._setPlateText(clean, false);
+  }
+
+  _onPlateChange(ev) {
+    const el = ev && ev.target;
+    this._setPlateText(el ? el.value : this.state.plateText, true);
+  }
+
+  _onPlateFocus(ev) {
+    const el = ev && ev.target;
+    if (!el || !el.closest || !el.closest('.hv-first-run-backdrop')) return;
+    if (this.state.plateFieldFocused) return;
+    this.setState({ plateFieldFocused: true });
+  }
+
+  _onPlateBlur() {
+    if (!this.state.plateFieldFocused) return;
+    this.setState({ plateFieldFocused: false });
+  }
+
+  _onPlateKeyDown(ev) {
+    if (!ev || ev.key !== 'Enter') return;
+    if (ev.target && ev.target.blur) ev.target.blur();
+  }
+
   _initTrunk(obj, profile) {
     if (!obj || !this.THREE) return;
     const THREE = this.THREE;
@@ -29221,10 +29645,14 @@ class Component extends DCLogic {
         const p = this._eventClientPoint(ev);
         if (p && this._pointInDesktopSwipeZone(p.x, p.y, ev)) {
           if (this.controls) this.controls.enabled = false;
-        } else if (!this._desktopGesture && !this.state.desktopStudioOpen && !this.state.firstRunSetupOpen) {
-          if (this.controls && this._shouldShowCar()) this.controls.enabled = true;
-        } else if (this.controls && this.state.firstRunSetupOpen) {
-          this.controls.enabled = false;
+        } else if (!this._desktopGesture && !this.state.desktopStudioOpen) {
+          if (this.controls && this._shouldShowCar()) {
+            // Grabbing the car during the welcome slide takes over from the
+            // tween; the slow orbit keeps going once the finger lifts.
+            if (this._welcomeOrbit && this._camAnim) this._camAnim = null;
+            this.controls.enabled = true;
+            if (this._welcomeOrbit) this._syncCamOrbit();
+          }
         }
       }, { capture: true });
       this._bindDesktopGestures(renderer.domElement);
@@ -30598,7 +31026,7 @@ class Component extends DCLogic {
           this._postFxDirty = true;
           this.requestRender(2);
         }
-        if (!this._introActive && !this._camAnim && this._tickFitCamera(_dt)) {
+        if (!this._introActive && !this._camAnim && !this._welcomeOrbit && this._tickFitCamera(_dt)) {
           cameraBusy = true;
           needRender = true;
           this._postFxDirty = true;
@@ -31015,9 +31443,18 @@ class Component extends DCLogic {
       this._awaitBodySwap(prev);
     } else if (onPlaceholderWheel) {
       // Same shell (HEV body), different trim — follow with that trim's stock rim.
+      // The callback form of _loadCatalogWheelByKey does not finish the load
+      // itself (the boot path finishes in its own callback). Forgetting it
+      // here leaves loading true, so the first-run picker stays on
+      // "Carregando" after the HEV rim has already landed.
       this._pendingWheelSizeInch = 19;
       this.setState({ wheelSizeInch: 19 });
-      this._loadCatalogWheelByKey(this._stockCatalogKeyFor(next.key), () => {
+      const stockKey = this._stockCatalogKeyFor(next.key);
+      this._loadCatalogWheelByKey(stockKey, () => {
+        this._finishLoading({
+          catalogLoadingKey: null,
+          selectedCatalogKey: stockKey,
+        });
         if (this.state.powertrainOn) this._syncPowertrainToBody();
       });
     }
@@ -35133,6 +35570,7 @@ class Component extends DCLogic {
     this._initWindows(obj, profile, findMesh);
     this._initMirrors(obj);
     this._initTrunk(obj, profile);
+    this._installLicensePlates(obj, profile);
     this._fixRearGlassSurfaces(obj, profile);
     this._initGtCosmeticFixes(obj, profile);
     // Wheel-arch trim ring + shared lower-body cladding: was raw glossy
@@ -35704,7 +36142,7 @@ class Component extends DCLogic {
     // While the load intro (or a preset tween) owns the camera, only remember
     // the shell framing — don't snap or apply view-offset over the animation.
     // Applying view-offset here desyncs bloom/streak overlays from the car.
-    if (this._introActive || this._camAnim || this._camEventKind) {
+    if (this._introActive || this._camAnim || this._camEventKind || this._welcomeOrbit) {
       const modeChanged = this._fitCamMode !== mode;
       this._fitCam = { distMul: target.distMul, viewShift };
       this._fitCamMode = mode;
@@ -36633,10 +37071,13 @@ class Component extends DCLogic {
 
   _syncCamOrbit() {
     if (!this.controls) return;
-    const on = !!(this.state && this.state.camOrbitEnabled)
-      && !this._introActive && !this._camAnim;
+    const welcome = !!this._welcomeOrbit && !this._introActive && !this._camAnim;
+    const on = welcome || (
+      !!(this.state && this.state.camOrbitEnabled)
+      && !this._introActive && !this._camAnim
+    );
     this.controls.autoRotate = on;
-    if (on) this.controls.autoRotateSpeed = CAM_ORBIT_SPEED;
+    if (on) this.controls.autoRotateSpeed = welcome ? WELCOME_ORBIT_SPEED : CAM_ORBIT_SPEED;
   }
 
   _camFov() {
@@ -37466,11 +37907,7 @@ class Component extends DCLogic {
     if (!this._hasCompletedSetup()) {
       this._intro = null;
       this._introActive = false;
-      if (this.controls) this.controls.enabled = false;
-      // The setup modal sits on the left; keep the car visible beside it so
-      // the model and colour being picked are actually on screen.
-      this._applyShellViewOffset(FIRST_RUN_VIEW_SHIFT);
-      if (this.requestRender) this.requestRender(4);
+      this._beginWelcomeCamera();
       this._checkFirstRunSetup(true);
       return;
     }
@@ -37504,6 +37941,27 @@ class Component extends DCLogic {
     };
     // Hold + orbit can now run ~5.5 s; keep the on-demand loop alive for it.
     if (this.requestRender) this.requestRender(360);
+  }
+
+  /**
+   * Welcome modal: slide from the splash pose to the card home, nudged right
+   * so the car clears the dialog, then a slow orbit. Dragging the car cancels
+   * the slide and orbits from there. Confirm ends this and plays the return.
+   */
+  _beginWelcomeCamera() {
+    this._welcomeOrbit = true;
+    const home = this._homeCameraPose();
+    if (!home || !this.camera || !this.controls) {
+      this._applyShellViewOffset(FIRST_RUN_VIEW_SHIFT);
+      if (this.controls) {
+        this.controls.enabled = true;
+        this._syncCamOrbit();
+      }
+      if (this.requestRender) this.requestRender(8);
+      return;
+    }
+    const shift = Math.min(0.46, (home.viewShift || 0) + WELCOME_VIEW_NUDGE);
+    this._animateCameraTo(Object.assign({}, home, { viewShift: shift }), 1.15);
   }
 
   /**
@@ -39019,9 +39477,11 @@ class Component extends DCLogic {
     this._lastDesktopGestureEndAt = Date.now();
     this._suppressDesktopClickUntil = Math.max(this._suppressDesktopClickUntil || 0, Date.now() + 1200);
     this._suppressNextWidgetClick(1200);
-    if (this.controls && !this._desktopGesture && !this.state.desktopStudioOpen && !this.state.firstRunSetupOpen
+    if (this.controls && !this._desktopGesture && !this.state.desktopStudioOpen
+      && (!this.state.firstRunSetupOpen || this._welcomeOrbit)
       && this._shouldShowCar() && !this._camAnim) {
       this.controls.enabled = true;
+      if (this._welcomeOrbit) this._syncCamOrbit();
     }
   }
 
@@ -40233,10 +40693,14 @@ class Component extends DCLogic {
       currentTarget: this._desktopGestureEl, _desktopTwoFinger: true,
       touches: ending ? [] : [point], changedTouches: [point] };
     if (starting) {
-      this._clearWidgetHold();
-      this._cancelCenterHold();
+      // Probe first — if the midpoint is on the car disc, leave the touches
+      // alone so OrbitControls can pan/dolly.
       this._onDesktopGestureStart(gestureEvent);
       this._twoFingerDesktopActive = !!this._desktopGesture;
+      if (this._twoFingerDesktopActive) {
+        this._clearWidgetHold();
+        this._cancelCenterHold();
+      }
     } else if (ev.type === 'touchmove') {
       this._onDesktopGestureMove(gestureEvent);
     } else if (ending) {
@@ -40258,7 +40722,11 @@ class Component extends DCLogic {
     // Background, outer edges, the widget board, and card popups (plus their
     // dimmed backdrop). Map pans / chrome controls keep ownership; the car
     // orbit disc is excluded so a drag on the model still rotates it.
-    if (!p || (!ev._desktopTwoFinger && !this._pointInDesktopSwipeZone(p.x, p.y, ev)) || mode === 'appsOnly'
+    //
+    // Two-finger must use the same zone test: OrbitControls maps TWO →
+    // DOLLY_PAN, and the document capture handler below would otherwise steal
+    // every two-finger press (including on the car) for desktop switching.
+    if (!p || !this._pointInDesktopSwipeZone(p.x, p.y, ev) || mode === 'appsOnly'
       || this.state.desktopStudioOpen || this._widgetAddingOn() || this.state.graphEditId
       || this.state.widgetMenuId || this.state.widgetPickerStep
       || this.state.widgetPlaceMode === 'move'
@@ -47375,7 +47843,9 @@ class Component extends DCLogic {
     this._applyWindowTint(0.5);
     this.setState({
       windowTint: 0.5,
-      wheelColor: '#3a3a3d',
+      wheelColor: '#121212',
+      wheelRoughness: 0.14,
+      wheelMetalness: 1,
       wheelTintOverride: false,
     }, () => {
       if (typeof this.applyWheelMaterialProperties === 'function') {

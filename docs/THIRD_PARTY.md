@@ -17,6 +17,7 @@ Impulse Launcher bundles the components below. Each stays under its own license.
 | Font | License | Path |
 |---|---|---|
 | DM Sans (latin, latin-ext, weights 400 and 600) | SIL Open Font License 1.1 | `vendor/fonts/` |
+| GL-Nummernschild-Mtl (FE-Mittelschrift, subset to space, hyphen, A–Z and 0–9) | Gutenberg Labo free-software notice (`vendor/fonts/GL-Nummernschild-LICENSE.txt`): use, copy and distribute, with or without modification, commercially or not, without warranty | `vendor/fonts/gl-nummernschild-mtl.woff2` |
 
 ## Icons and data
 
