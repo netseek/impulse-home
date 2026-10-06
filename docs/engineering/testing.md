@@ -95,7 +95,10 @@ for the cards that have them). The markup and CSS are the shipped ones, so it ne
 Widgets render in a 342x194 cell (8 px gap, the 1x1 budget the type scale is written against);
 everything else renders at 1920x720. `metrics.json` records, per surface, the smallest text, the text
 drawn below 18 px or with opacity below 1, text that overflows its box, and whether a banned phrase is
-on screen, so a before/after run is a diff of numbers. Run it before and after a typography or copy
+on screen, including clock Shadow DOM text measured through the SVG screen transform and buttons below
+44×44px. Contrast records compose CSS colors only when a known opaque ancestor backs the
+text; gradients, photos and unknown translucent backings require visual review. A before/after
+run is a diff of numbers. Run it before and after a typography or copy
 change and read the PNGs; the demo signals keep moving, so compare layout, not bytes. It does not
 cover the 3D scene, the native rail, real signals or the car's GPU.
 

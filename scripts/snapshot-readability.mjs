@@ -109,12 +109,48 @@ H.run = async function (code) { return await (0, eval)('(async()=>{' + code + '}
 H.metrics = function (sel, banned) {
   const root = document.querySelector(sel);
   if (!root) return { missing: true };
-  const texts = [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const texts = [], contrast = [];
+  // Only report a local composition when an opaque ancestor backs it. Gradients,
+  // photos and translucent panels without a known backing still need image QA.
+  const rgb = (color) => {
+    const match = /rgba?\(([^)]+)\)/.exec(color);
+    if (!match) return null;
+    const values = match[1].split(',').map(Number);
+    return [values[0], values[1], values[2], values.length > 3 ? values[3] : 1];
+  };
+  const luminance = (color) => color.slice(0,3).map((v) => {
+    v /= 255; return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4);
+  }).reduce((sum,v,i) => sum + v * [.2126,.7152,.0722][i], 0);
+  const localContrast = (el, foreground) => {
+    const layers = [];
+    for (let e = el; e; e = e.parentElement || (e.getRootNode().host || null)) {
+      const style = getComputedStyle(e);
+      if (style.backgroundImage !== 'none') return null;
+      const color = rgb(style.backgroundColor);
+      if (!color || color[3] === 0) continue;
+      layers.push(color);
+      if (color[3] < .999) continue;
+      let backing = layers.pop();
+      while (layers.length) {
+        const top = layers.pop();
+        backing = top.slice(0,3).map((v,i) => v * top[3] + backing[i] * (1 - top[3]));
+      }
+      const a = luminance(foreground), b = luminance(backing);
+      return { ratio: Math.round((Math.max(a,b)+.05)/(Math.min(a,b)+.05)*100)/100,
+        foreground: foreground.slice(0,3), backing: backing.slice(0,3).map(Math.round) };
+    }
+    return null;
+  };
+  const nodes = [];
+  const collect = (scope) => {
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    scope.querySelectorAll('*').forEach((el) => { if (el.shadowRoot) collect(el.shadowRoot); });
+  };
+  collect(root);
   let minFont = 1e9, low = [], clipped = [];
   const seen = new Set();
-  while (walker.nextNode()) {
-    const n = walker.currentNode;
+  for (const n of nodes) {
     const s = n.nodeValue.replace(/\s+/g, ' ').trim();
     if (!s) continue;
     const el = n.parentElement;
@@ -132,15 +168,21 @@ H.metrics = function (sel, banned) {
     const alpha = m && m[1].split(',').length > 3 ? parseFloat(m[1].split(',')[3]) : 1;
     const fs = parseFloat(cs.fontSize);
     const svg = !!el.closest('svg');
-    const eff = svg ? fs * (el.getBoundingClientRect().height / Math.max(1, fs * 1.2)) : fs;
+    const matrix = svg && el.getScreenCTM ? el.getScreenCTM() : null;
+    const eff = matrix ? fs * Math.hypot(matrix.c, matrix.d) : fs;
     const cls = (e) => (e.tagName.toLowerCase() + (e.classList.length ? '.' + Array.from(e.classList).slice(0, 2).join('.') : ''));
     let anc = el.parentElement;
     while (anc && anc !== root && !anc.classList.length) anc = anc.parentElement;
-    const rec = { c: cls(el) + (anc && anc !== el ? ' < ' + cls(anc) : ''), t: s.slice(0, 48), fs: Math.round(fs * 10) / 10, fw: cs.fontWeight, op: Math.round(op * 100) / 100,
+    const rec = { c: cls(el) + (anc && anc !== el ? ' < ' + cls(anc) : ''), t: s.slice(0, 48), fs: Math.round(eff * 10) / 10, fw: cs.fontWeight, op: Math.round(op * 100) / 100,
       a: Math.round(alpha * 100) / 100, ls: cs.letterSpacing };
     const key = rec.t + '|' + rec.fs;
-    if (!seen.has(key)) { seen.add(key); texts.push(rec); }
-    if (!svg) minFont = Math.min(minFont, fs);
+    if (!seen.has(key)) {
+      seen.add(key); texts.push(rec);
+      const foreground = rgb(cs.color);
+      const local = !svg && foreground && alpha === 1 && op === 1 ? localContrast(el, foreground) : null;
+      if (local) contrast.push({ t: rec.t, c: rec.c, ...local });
+    }
+    minFont = Math.min(minFont, eff);
     if (op * alpha < 0.999) low.push(rec.t);
     if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0 && /hidden|clip|auto|scroll/.test(cs.overflowX + cs.overflow)
       && cs.display !== 'inline') clipped.push(rec.t);
@@ -166,7 +208,7 @@ H.metrics = function (sel, banned) {
     }
     return false;
   };
-  return { minFont: minFont === 1e9 ? null : minFont, below18: texts.filter((x) => x.fs < 18).length,
+  return { contrast, minFont: minFont === 1e9 ? null : minFont, below18: texts.filter((x) => x.fs < 18).length,
     count: texts.length, smallTargets: small.slice(0, 20), nSmall: small.length, lowOpacity: Array.from(new Set(low)).slice(0, 12), clipped: Array.from(new Set(clipped)).slice(0, 12),
     banned: banned.filter(hasWord), texts };
 };
@@ -263,7 +305,7 @@ async function record(page, name, sel, rect) {
   if (!matches(name)) return;
   const metrics = JSON.parse(await page.ev(`JSON.stringify(__snapH.metrics(${JSON.stringify(sel)}, ${JSON.stringify(BANNED)}))`));
   results[name] = { minFont: metrics.minFont, below18: metrics.below18, texts: metrics.count, smallTargets: metrics.nSmall, smallTargetList: metrics.smallTargets, lowOpacity: metrics.lowOpacity,
-    clipped: metrics.clipped, banned: metrics.banned, strings: metrics.texts.map((t) => `${t.t} [${t.fs}px/${t.fw}${t.op * t.a < 1 ? ' a' + Math.round(t.op * t.a * 100) : ''}] ${t.c}`) };
+    clipped: metrics.clipped, contrast: metrics.contrast, banned: metrics.banned, strings: metrics.texts.map((t) => `${t.t} [${t.fs}px/${t.fw}${t.op * t.a < 1 ? ' a' + Math.round(t.op * t.a * 100) : ''}] ${t.c}`) };
   await page.shot(path.join(OUT, name + '.png'), rect);
 }
 
@@ -317,6 +359,7 @@ const LIVE = String.raw`(() => {
   const grd = g.createLinearGradient(0, 0, 160, 160);
   grd.addColorStop(0, '#1d3b5a'); grd.addColorStop(0.55, '#7a3f8f'); grd.addColorStop(1, '#f08a5d');
   g.fillStyle = grd; g.fillRect(0, 0, 160, 160);
+  window.MediaBridge = { playPause() {}, next() {}, previous() {} };
   a.applyMediaNowPlaying({ title: 'Midnight City', artist: 'M83', album: 'Album', playing: true,
     durationMs: 243000, positionMs: 96000, appLabel: 'Spotify', hasTrack: true, canLaunch: true, artDataUrl: c.toDataURL('image/png') });
 })();`;
