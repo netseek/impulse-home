@@ -77,6 +77,28 @@ And two ways to invalidate your own experiment:
   `needsUpdate` note below; after any such poke, reload before believing
   anything.
 
+## Readability snapshots (no 3D bundle, no device)
+
+```bash
+node scripts/snapshot-readability.mjs --out <dir>              # ~190 PNGs + metrics.json
+node scripts/snapshot-readability.mjs --out <dir> --only widget-power,popup-clima
+node scripts/snapshot-readability.mjs --list                   # the surface names
+```
+
+`scripts/snapshot-readability.mjs` serves the working tree, opens the real `index.html` in headless
+Chrome as the Android shell (`?android&demo=1`), hides the model canvas and the load-error overlay, and
+drives the live `__app` to put one surface on screen at a time: every widget at every size
+`_widgetCatalog()` allows, the card popups, the layout manager tabs, the pickers, the wallpaper picker
+and the settings panels, in the dark and the light widget theme (plus live-signal and no-signal states
+for the cards that have them). The markup and CSS are the shipped ones, so it needs no assets.
+
+Widgets render in a 342x194 cell (8 px gap, the 1x1 budget the type scale is written against);
+everything else renders at 1920x720. `metrics.json` records, per surface, the smallest text, the text
+drawn below 18 px or with opacity below 1, text that overflows its box, and whether a banned phrase is
+on screen, so a before/after run is a diff of numbers. Run it before and after a typography or copy
+change and read the PNGs; the demo signals keep moving, so compare layout, not bytes. It does not
+cover the 3D scene, the native rail, real signals or the car's GPU.
+
 ## Checking a change without rebuilding the APK
 
 `scripts/device-cdp.mjs` wraps the CDP harness this file keeps referring to and
