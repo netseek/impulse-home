@@ -32,9 +32,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 const opt = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : null; };
+// --root <dir> snapshots another checkout of the repository (a before/after pair).
+const ROOT = path.resolve(opt('--root') || path.join(path.dirname(fileURLToPath(import.meta.url)), '..'));
 const OUT = path.resolve(opt('--out') || path.join(os.tmpdir(), 'impulse-readability'));
 const ONLY = (opt('--only') || '').split(',').filter(Boolean);
 
@@ -60,7 +61,7 @@ H.boot = async function (theme, bounds, bg) {
   document.body.classList.remove('hv-boot', 'hv-splash-up');
   let st = document.getElementById('snap-style');
   if (!st) { st = document.createElement('style'); st.id = 'snap-style'; document.head.appendChild(st); }
-  st.textContent = 'canvas,.hv-wallpaper,.hv-canvas-host{visibility:hidden!important}'
+  st.textContent = '.hv-wallpaper,.hv-canvas-host{visibility:hidden!important}'
     + 'html,body,#hv-root{background:' + bg + '!important}'
     + '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition:none!important}';
   a.applyShellLayout({ mode: 'appCar', splitRatio: '50', right: 'idle', left: false,
@@ -82,6 +83,21 @@ H.reset = function () {
   a.setState({ graphEditId: null, focusedCardType: null, desktopStudioOpen: false, widgetPickerStep: null, widgetPlaceType: null,
     widgetPlaceW: 0, widgetPlaceH: 0, widgetMenuId: null, panelOpen: false, activeGroup: null,
     wallpaperPopupOpen: false, configExpanded: false, error: null, loading: false });
+};
+// A graphs widget paints its sparkline from samples taken since boot: wait for pixels.
+H.settle = async function (type) {
+  await sleep(1100);
+  if (type !== 'graphs') return;
+  for (let i = 0; i < 40; i++) {
+    const cs = Array.from(document.querySelectorAll('.hv-graphs-canvas'));
+    const painted = cs.length && cs.every((c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      for (let k = 3; k < d.length; k += 4 * 7) if (d[k]) return true;
+      return false;
+    });
+    if (painted) return;
+    await sleep(250);
+  }
 };
 H.layout = function (items) {
   const a = window.__app;
@@ -130,9 +146,20 @@ H.metrics = function (sel, banned) {
       && cs.display !== 'inline') clipped.push(rec.t);
     if (el.scrollHeight > el.clientHeight + 2 && el.clientHeight > 0 && /hidden|clip/.test(cs.overflowY) && cs.display !== 'inline') clipped.push(rec.t + ' (v)');
   }
+  // Touch targets: visible buttons whose smaller side is under 44 px.
+  const small = [];
+  root.querySelectorAll('button,[role=button]').forEach((b) => {
+    const r = b.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1 || getComputedStyle(b).visibility === 'hidden') return;
+    if (r.right < 0 || r.bottom < 0 || r.left > innerWidth || r.top > innerHeight) return;
+    let o = 1;
+    for (let e = b; e && e !== document.documentElement; e = e.parentElement) o *= parseFloat(getComputedStyle(e).opacity);
+    if (o < 0.02) return;
+    if (Math.min(r.width, r.height) < 43.5) small.push(((b.innerText || b.getAttribute('aria-label') || b.className || 'button').trim().slice(0, 24)) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
+  });
   const joined = texts.map((x) => x.t).join(' | ');
   return { minFont: minFont === 1e9 ? null : minFont, below18: texts.filter((x) => x.fs < 18).length,
-    count: texts.length, lowOpacity: Array.from(new Set(low)).slice(0, 12), clipped: Array.from(new Set(clipped)).slice(0, 12),
+    count: texts.length, smallTargets: small.slice(0, 20), nSmall: small.length, lowOpacity: Array.from(new Set(low)).slice(0, 12), clipped: Array.from(new Set(clipped)).slice(0, 12),
     banned: banned.filter((b) => joined.indexOf(b) >= 0), texts };
 };
 H.rect = function (sel) {
@@ -227,7 +254,7 @@ const results = {};
 async function record(page, name, sel, rect) {
   if (!matches(name)) return;
   const metrics = JSON.parse(await page.ev(`JSON.stringify(__snapH.metrics(${JSON.stringify(sel)}, ${JSON.stringify(BANNED)}))`));
-  results[name] = { minFont: metrics.minFont, below18: metrics.below18, texts: metrics.count, lowOpacity: metrics.lowOpacity,
+  results[name] = { minFont: metrics.minFont, below18: metrics.below18, texts: metrics.count, smallTargets: metrics.nSmall, smallTargetList: metrics.smallTargets, lowOpacity: metrics.lowOpacity,
     clipped: metrics.clipped, banned: metrics.banned, strings: metrics.texts.map((t) => `${t.t} [${t.fs}px/${t.fw}${t.op * t.a < 1 ? ' a' + Math.round(t.op * t.a * 100) : ''}] ${t.c}`) };
   await page.shot(path.join(OUT, name + '.png'), rect);
 }
@@ -256,7 +283,7 @@ async function widgetRound(port, theme, listOnly) {
           if (!matches(name)) continue;
           if (listOnly) { console.log(name); continue; }
           await page.ev(`(async()=>{__snapH.reset();${state.noDemo ? 'window.__app._demoPreview = false;' : ''}
-            __snapH.layout([{id:'snap',type:${JSON.stringify(type)},x:0,y:0,w:${w},h:${h}}]);await __snapH.sleep(1100);})()`);
+            __snapH.layout([{id:'snap',type:${JSON.stringify(type)},x:0,y:0,w:${w},h:${h}}]);await __snapH.settle(${JSON.stringify(type)});})()`);
           const rect = JSON.parse(await page.ev(`JSON.stringify(__snapH.rect('.hv-widget-card'))`));
           if (!rect) { console.log('missing', name); continue; }
           const px = widgetPx(w, h);
