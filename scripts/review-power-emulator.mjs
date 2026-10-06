@@ -14,7 +14,7 @@ if(!evaluate('typeof window.__app?._powerBatteryVisual === "function"'))throw Er
 evaluate(`(() => {
   const a=window.__app;
   a._desktopBottomCards=['power','range','tires'];
-  a._powerStatus=()=>({key:'live',source:'DEMO · SIMULATED · NOT VEHICLE',flowFresh:true,voltageFresh:true,currentFresh:true});
+  a._powerStatus=()=>({key:'live',source:'DEMO · SIMULADO · NÃO É DO VEÍCULO',flowFresh:true,voltageFresh:true,currentFresh:true});
   a._powerLive={flow:'v1|charge|0|0|0',soc:'64',voltage:'360',current:'18'};
   a._carSignalAt=a._carSignalAt||{};
   a._carSignalAt['car.ev_info.cur_battery_power_percentage']=Date.now();

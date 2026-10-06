@@ -8,7 +8,7 @@
   // main thread 25-160 ms/s on the car (a 1 Hz hitch in the 3D view), so the
   // card face is rasterized with omitSweep once a minute and native strokes
   // the exact path that sweep() describes.
-  var names = { panorama: 'Orbit', meridian: 'Chronograph', split: 'Monogram', 'date-spine': 'Dashboard' };
+  var names = { panorama: 'Órbita', meridian: 'Cronógrafo', split: 'Monograma', 'date-spine': 'Painel' };
   function escape(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c];
