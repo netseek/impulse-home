@@ -122,9 +122,10 @@ session shows `controllers: 2` (the app plus the viewer) under
 
 Once the home is up, and first-run setup is done, a Portuguese prompt lists
 whatever is still missing among location, storage and this notification
-access. It has no skip. Permitir asks for location and storage first; when
-those are granted, the same button opens notification access. Denying, or
-leaving that screen, brings the prompt back. A permanent denial of location
+access. × closes it for 10 seconds; it returns on its own if anything is
+still missing. Permitir asks for location and storage first; when those are
+granted, the same button opens notification access. Denying, or leaving that
+screen, brings the prompt back. A permanent denial of location
 or storage opens the app's permission screen, because the system dialog will
 not. `test-runtime-permissions.mjs`.
 
