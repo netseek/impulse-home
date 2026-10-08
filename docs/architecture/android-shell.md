@@ -120,6 +120,14 @@ The viewer's component has to appear in that colon-separated list. A live
 session shows `controllers: 2` (the app plus the viewer) under
 `adb shell dumpsys media_session`.
 
+Once the home is up, and first-run setup is done, a Portuguese prompt lists
+whatever is still missing among location, storage and this notification
+access. It has no skip. Permitir asks for location and storage first; when
+those are granted, the same button opens notification access. Denying, or
+leaving that screen, brings the prompt back. A permanent denial of location
+or storage opens the app's permission screen, because the system dialog will
+not. `test-runtime-permissions.mjs`.
+
 Then reopen the viewer. Transport buttons (prev / play-pause / next) talk to the
 session’s `MediaController`.
 
@@ -537,11 +545,5 @@ signals are applied after saved settings on load, so the car wins over them.
 
 ## Default home selection
 
-Appearance settings offer **Set as home screen** in both Desktop Studio and the
-layout panel. The button calls `AppLauncherBridge.openHomeSettings()`, which
-opens `Settings.ACTION_HOME_SETTINGS` on the UI thread. The user makes the
-selection in Android's native settings screen. If the firmware does not provide
-or blocks this activity, a message explains that it is unavailable. The button
-is disabled in a browser or with an older bridge. The Activity already declares
-`MAIN`, `HOME` and `DEFAULT`; this option does not silently change preferences
-or configure startup when the head unit powers on.
+The viewer does not offer a control for this. Impulse configures the default
+home screen. The Activity still declares `MAIN`, `HOME` and `DEFAULT`.

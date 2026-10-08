@@ -205,7 +205,9 @@
   <!-- autoplay+muted must be content attributes (not just JS play()) or
        Chromium treats this as a paused media element and draws its tap-to-play
        overlay. webkit-playsinline keeps WebView 91 from promoting to fullscreen. -->
-  <video id="hv-splash-video" src="assets/app-splash.mp4" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay muted playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
+  <!-- src is assigned below, and only when the intro is on. A content src
+       would start the fetch during parse, before settings can cancel it. -->
+  <video id="hv-splash-video" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay muted playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
   <canvas id="hv-splash-canvas"></canvas>
   <button type="button" id="hv-splash-skip">PULAR</button>
 </div>
@@ -250,11 +252,23 @@ window.HavalSplash = (function () {
     for (var i = 0; i < cbs.length; i++) { try { cbs[i](); } catch (e) { console.warn('[Splash]', e); } }
   }
 
+  // Absent, or any value other than false, keeps the clip. The layout manager
+  // writes introVideo; h6OfferIntroVideoOff (in the app script) is the prompt.
+  function introVideoOn() {
+    try {
+      var raw = localStorage.getItem('h6_settings_v1');
+      if (!raw) return true;
+      var saved = JSON.parse(raw);
+      return !(saved && saved.introVideo === false);
+    } catch (e) { return true; }
+  }
   // ?nosplash — boot straight to the loader with no clip and no decoding, so a
   // cold start can be timed with the splash's cost removed. Kept in because
   // "is the splash slowing the boot down?" is otherwise unanswerable without a
   // rebuild, and the answer decides whether the clip needs re-encoding.
-  var noSplash = /[?&#]nosplash\b/.test(location.search + location.hash);
+  // The same path serves the user setting, which must not fetch the file.
+  var settingOff = !introVideoOn();
+  var noSplash = settingOff || /[?&#]nosplash\b/.test(location.search + location.hash);
   if (noSplash && video && video.parentNode) {
     try { video.pause(); } catch (e) {}
     video.removeAttribute('src');
@@ -265,9 +279,14 @@ window.HavalSplash = (function () {
 
   if (!el || !video) {
     releasePage();
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.endSplashOverlay === 'function') {
+        window.AppLauncherBridge.endSplashOverlay();
+      }
+    } catch (e) {}
     finish();
     return {
-      active: false, fadeMs: 0,
+      active: false, userOff: settingOff, fadeMs: 0,
       whenDone: function (cb) { cb(); },
       fadeOut: function () {},
       skip: function () {},
@@ -279,6 +298,10 @@ window.HavalSplash = (function () {
       setStatus: function () {},
     };
   }
+
+  // Content src would start the fetch before this script can see the setting.
+  try { video.setAttribute('src', 'assets/app-splash.mp4'); } catch (e) {}
+  video.src = 'assets/app-splash.mp4';
 
   // ── Presenter ─────────────────────────────────────────────────────────────
   // Playback is the WebView's own video overlay, letterboxed. A canvas is only
@@ -575,6 +598,7 @@ window.HavalSplash = (function () {
 
   return {
     active: true,
+    userOff: false,
     /** Kept in step with the #hv-splash opacity transition in <head>. */
     fadeMs: 1100,
     /** True once the clip has ended, been skipped, or failed. Overlay may still be up. */
@@ -1225,7 +1249,6 @@ window.HavalSplash = (function () {
 
     <!-- ── LAYOUT (background + widget hint) ── -->
     <sc-if value="{{ sectionIsLayout }}" hint-placeholder-val="{{ false }}">
-      <button type="button" class="hv-config-reset" onClick="{{ openHomeSettings }}" disabled="{{ !homeSettingsAvailable }}">DEFINIR COMO TELA INICIAL</button>
       <sc-if value="{{ layoutSectionVisible }}" hint-placeholder-val="{{ false }}">
       <div style="font-family: var(--hv-font); font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 8px;">PREENCHIMENTO CENTRAL</div>
       <div class="hv-layout-fill-row">
@@ -1771,14 +1794,20 @@ window.HavalSplash = (function () {
               <button type="button" class="{{ studioTimeClass }}" onClick="{{ studioTimeCycle }}" title="Toque para alternar: Dia, Noite, Auto">{{ studioTimeLabel }}</button>
             </div>
             <div class="hv-studio-note">{{ studioTimeNote }}</div>
-            <div class="hv-studio-label">TELA INICIAL</div>
-            <button type="button" class="hv-studio-custom-btn" onClick="{{ openHomeSettings }}" disabled="{{ !homeSettingsAvailable }}">Definir como tela inicial</button>
-            <div class="hv-studio-note">Escolha o Impulse Home na tela do Android. Disponível se a central permitir.</div>
             <div class="hv-studio-label">IMAGEM</div>
             <button type="button" class="hv-studio-wall {{ studioWallClass }}" onClick="{{ studioOpenWallpaper }}" aria-label="{{ studioWallLabel }}" title="{{ studioWallLabel }}">
               <span class="hv-studio-wall-img" style="{{ studioWallStyle }}"></span>
               <span class="hv-studio-wall-edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"></path></svg></span>
             </button>
+            <div class="hv-studio-label">VÍDEO DE ABERTURA</div>
+            <label class="hv-studio-dynamic-col hv-studio-intro-video">
+              <span>Reproduzir ao iniciar</span>
+              <span class="hv-studio-toggle-wrap">
+                <input type="checkbox" checked="{{ studioIntroVideoChecked }}" onChange="{{ studioToggleIntroVideo }}" />
+                <span class="hv-studio-toggle-switch"></span>
+              </span>
+            </label>
+            <div class="hv-studio-note">Desligue para ir direto à tela, sem o vídeo.</div>
           </div>
         </div>
         <div class="hv-studio-foot"><button type="button" onClick="{{ studioApplyAppearanceAll }}" disabled="{{ studioApplyAllDisabled }}">Aplicar a todas as telas</button></div>
@@ -6801,6 +6830,7 @@ window.HavalSplash = (function () {
       gap: 10px;
       margin: -6px 0 18px;
     }
+    .hv-studio-intro-video { width: 100%; margin: 10px 0 8px; }
     .hv-studio-dynamic-col {
       display: flex;
       align-items: center;
@@ -7758,6 +7788,23 @@ window.HavalSplash = (function () {
     .hv-energy-ask-box { width:min(468px,calc(100vw - 48px)); display:flex; flex-direction:column; gap:12px; padding:20px; border-radius:22px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
     .hv-energy-ask-box > strong { font:600 18px/1.2 var(--hv-font); }
     .hv-energy-ask-box > p { margin:0; font-size:14px; opacity:.78; }
+    .hv-intro-offer { position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:flex-start; padding:var(--hv-popup-top,46px) 0 var(--hv-popup-bottom-inset,168px) 64px; box-sizing:border-box; background:linear-gradient(90deg, rgba(10,16,24,.42) 0%, rgba(10,16,24,.08) 46%, rgba(10,16,24,0) 62%); }
+    .hv-intro-offer-box { width:min(460px, 42vw); display:flex; flex-direction:column; gap:12px; padding:22px 22px 18px; border-radius:20px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
+    .hv-intro-offer-box > strong { font:700 16px/1.2 var(--hv-font); letter-spacing:.04em; }
+    .hv-intro-offer-box > p { margin:0; font-size:14px; line-height:1.45; }
+    .hv-intro-offer-hint { opacity:.72; font-size:13px; }
+    .hv-intro-offer-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .hv-intro-offer-actions > button { min-height:46px; border:0; border-radius:12px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:600 14px/1 var(--hv-font); cursor:pointer; }
+    .hv-intro-offer-actions > button.primary { background:var(--hv-accent,#2aa7b7); color:#08131a; }
+    .hv-intro-offer-actions > button.wide { grid-column:1 / -1; opacity:.8; }
+    .hv-intro-offer-actions > button:active { filter:brightness(1.12); }
+    .hv-perm-offer { position:fixed; inset:0; z-index:130; display:flex; align-items:center; justify-content:flex-start; padding:var(--hv-popup-top,46px) 0 var(--hv-popup-bottom-inset,168px) 64px; box-sizing:border-box; background:linear-gradient(90deg, rgba(10,16,24,.42) 0%, rgba(10,16,24,.08) 46%, rgba(10,16,24,0) 62%); }
+    .hv-perm-offer-box { width:min(460px, 42vw); display:flex; flex-direction:column; gap:12px; padding:22px 22px 18px; border-radius:20px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
+    .hv-perm-offer-box > strong { font:700 16px/1.2 var(--hv-font); letter-spacing:.04em; }
+    .hv-perm-offer-box > p { margin:0; font-size:14px; line-height:1.45; }
+    .hv-perm-offer-hint { opacity:.72; font-size:13px; }
+    .hv-perm-offer-box > button { min-height:46px; border:0; border-radius:12px; background:var(--hv-accent,#2aa7b7); color:#08131a; font:600 14px/1 var(--hv-font); cursor:pointer; }
+    .hv-perm-offer-box > button:active { filter:brightness(1.12); }
     .hv-energy-ask-box label { display:flex; flex-direction:column; gap:6px; }
     .hv-energy-ask-box label > small { font:600 10px/1.3 var(--hv-font); letter-spacing:.06em; opacity:.72; }
     .hv-energy-ask-box input { height:48px; padding:0 14px; border:1px solid rgba(255,255,255,.2); border-radius:12px; background:rgba(255,255,255,.06); color:inherit; font:500 20px/1 var(--hv-font); }
@@ -9173,6 +9220,41 @@ window.HavalSplash = (function () {
     </div>
   </div>
 
+  <sc-if value="{{ introSkipOfferOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="hv-intro-offer" role="dialog" aria-label="Vídeo de abertura">
+      <div class="hv-intro-offer-box">
+        <strong>Vídeo de abertura</strong>
+        <p>Você pulou o vídeo de abertura. Quer desativá-lo nas próximas vezes?</p>
+        <p class="hv-intro-offer-hint">Para mudar depois, abra o gerenciador de layout, vá em Aparência e use Vídeo de abertura.</p>
+        <div class="hv-intro-offer-actions">
+          <button type="button" class="primary" onClick="{{ introSkipOfferYes }}">Sim</button>
+          <button type="button" onClick="{{ introSkipOfferNo }}">Não</button>
+          <button type="button" class="wide" onClick="{{ introSkipOfferNever }}">Não perguntar de novo</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ runtimePermOfferOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="hv-perm-offer" role="dialog" aria-label="Permissões">
+      <div class="hv-perm-offer-box">
+        <strong>Permissões necessárias</strong>
+        <p>Para o Impulse Home funcionar por completo, confirme o que ainda falta.</p>
+        <sc-if value="{{ runtimePermShowLocation }}" hint-placeholder-val="{{ false }}">
+          <p>A localização mostra a cidade no cartão de navegação e registra as viagens.</p>
+        </sc-if>
+        <sc-if value="{{ runtimePermShowStorage }}" hint-placeholder-val="{{ false }}">
+          <p>O armazenamento guarda as configurações e o histórico de viagens, mesmo se o aplicativo for reinstalado.</p>
+        </sc-if>
+        <sc-if value="{{ runtimePermShowMedia }}" hint-placeholder-val="{{ false }}">
+          <p>O acesso à mídia deixa o cartão mostrar a música que está tocando. Na tela do Android, ative o Impulse Home em Acesso às notificações.</p>
+        </sc-if>
+        <p class="hv-perm-offer-hint">Toque em Permitir e confirme na tela do Android. Esta pergunta continua até cada permissão ser concedida.</p>
+        <button type="button" onClick="{{ runtimePermAllow }}">Permitir</button>
+      </div>
+    </div>
+  </sc-if>
+
   <div class="hv-wallpaper-backdrop {{ wallpaperBackdropClass }}" onClick="{{ closeWallpaperPopup }}"></div>
   {{ wallpaperPanelView }}
 
@@ -10053,6 +10135,18 @@ function h6PlateFormat(text) {
   if (H6_PLATE_LEGACY_RE.test(t)) return 'legacy';
   return 'partial';
 }
+/**
+ * Ask to turn the intro clip off only when the user skipped it after the home
+ * had already finished loading. A skip during the boot spinner, a clip that
+ * played out, first-run setup, or a stored "don't ask" all stay quiet.
+ * introVideo / introVideoPrompt default to on when the key is absent.
+ */
+function h6OfferIntroVideoOff(opts) {
+  var o = opts || {};
+  if (!o.skipped || o.loading || !o.setupDone) return false;
+  if (o.introVideo === false || o.introVideoPrompt === false) return false;
+  return true;
+}
 const DEMO_DOOR_SEQUENCE = [
   { key: 'closed', label: 'Todas as portas fechadas', open: {} },
   { key: 'fl', label: 'Porta do motorista aberta', open: { fl: true } },
@@ -10604,6 +10698,11 @@ class Component extends DCLogic {
     overrideSubTab: 'motion', // 'motion' | 'doors' | 'lights'
     cameraPreset: null, // custom slot key ('view0'..) or event preset name
     cameraShortcutEnabled: false, // shows/hides the camera quick-access icon on the car stage
+    introVideo: true, // boot splash clip; false skips the file (see HavalSplash)
+    introVideoPrompt: true, // false: never ask again after a late skip
+    introSkipOfferOpen: false,
+    runtimePermOfferOpen: false,
+    runtimePermMissing: '',
     camEventEnabled: false,
     camCycleEnabled: false,
     camOrbitEnabled: false,
@@ -11463,6 +11562,8 @@ class Component extends DCLogic {
     if (typeof saved.wheelTintOverride === 'boolean') s.wheelTintOverride = saved.wheelTintOverride;
     if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
     if (typeof saved.cameraShortcutEnabled === 'boolean') s.cameraShortcutEnabled = saved.cameraShortcutEnabled;
+    if (saved.introVideo === false) s.introVideo = false;
+    if (saved.introVideoPrompt === false) s.introVideoPrompt = false;
     if (typeof saved.camEventEnabled === 'boolean') s.camEventEnabled = saved.camEventEnabled;
     if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
     if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
@@ -16060,6 +16161,8 @@ class Component extends DCLogic {
       showFps: !!s.showFps,
       resScaleMode: s.resScaleMode || 'off',
       cameraShortcutEnabled: !!s.cameraShortcutEnabled,
+      introVideo: s.introVideo !== false,
+      introVideoPrompt: s.introVideoPrompt !== false,
       camEventEnabled: !!s.camEventEnabled,
       camCycleEnabled: !!s.camCycleEnabled,
       camOrbitEnabled: !!s.camOrbitEnabled,
@@ -16250,6 +16353,15 @@ class Component extends DCLogic {
     const themeMode = s.widgetThemeMode || 'dark';
     const themeBtn = hv(themeMode !== 'auto');
     const fields = {
+      introSkipOfferOpen: !!s.introSkipOfferOpen,
+      introSkipOfferYes: () => this._answerIntroVideoOffer('yes'),
+      introSkipOfferNo: () => this._answerIntroVideoOffer('no'),
+      introSkipOfferNever: () => this._answerIntroVideoOffer('never'),
+      runtimePermOfferOpen: !!s.runtimePermOfferOpen,
+      runtimePermShowLocation: String(s.runtimePermMissing || '').indexOf('location') >= 0,
+      runtimePermShowStorage: String(s.runtimePermMissing || '').indexOf('storage') >= 0,
+      runtimePermShowMedia: String(s.runtimePermMissing || '').indexOf('media') >= 0,
+      runtimePermAllow: () => this._requestRuntimePermissions(),
       firstRunDisplay: s.firstRunSetupOpen ? 'flex' : 'none',
       firstRunBackdropClass: (s.firstRunSetupOpen ? 'on' : '')
         + (s.plateFieldFocused ? ' plate-editing' : ''),
@@ -16548,8 +16660,6 @@ class Component extends DCLogic {
         });
       })(),
       onSaveSettings: () => this.saveSettings(),
-      homeSettingsAvailable: !!(window.AppLauncherBridge && typeof window.AppLauncherBridge.openHomeSettings === 'function'),
-      openHomeSettings: () => window.AppLauncherBridge.openHomeSettings(),
       // The camera section has its own save-to-desktop row; a second SAVE
       // up here only made it unclear which one stores the view.
       configSaveDisplay: s.configSection === 'camera' ? 'none' : '',
@@ -17780,6 +17890,7 @@ class Component extends DCLogic {
       } catch (e) {}
       this._scheduleCamIconWarmup();
       this._scheduleDesktopShot(3000);
+      this._syncRuntimePermOffer();
       if (this.requestRender) this.requestRender(60);
     });
   }
@@ -29524,6 +29635,11 @@ class Component extends DCLogic {
         if (this._unmounted) return;
         this._trySplashHandOff();
       });
+    } else if (splash && splash.userOff && this.state.loading && !this.state.error) {
+      // Setting off: no clip, and don't hold the shell for a fade that isn't coming.
+      this._revealShellChrome({ immediate: true, keepHud: true });
+    } else if (splash && splash.userOff) {
+      this._trySplashHandOff();
     } else {
       this._revealShellChrome();
     }
@@ -37237,7 +37353,13 @@ class Component extends DCLogic {
    * so the icons don't fade in behind a still-up last frame.
    */
   _revealShellChrome(opts) {
-    if (this._shellChromeRevealed) return;
+    if (this._shellChromeRevealed) {
+      // Skip-during-load already raised the shell. The question is armed only
+      // once the model is in, so schedule it on this later call.
+      if (this._introVideoOfferArmed && !this._introVideoOfferTimer) this._scheduleIntroVideoOffer();
+      this._syncRuntimePermOffer();
+      return;
+    }
     this._shellChromeRevealed = true;
     // Chrome is going up while the GLB may still be arriving (skip). Any layout
     // notify that landed during the load parked its patch instead of painting
@@ -37276,6 +37398,8 @@ class Component extends DCLogic {
     } else {
       this._checkFirstRunSetup(true);
     }
+    this._scheduleIntroVideoOffer();
+    this._syncRuntimePermOffer();
   }
 
   _shouldShowCar() {
@@ -37662,6 +37786,118 @@ class Component extends DCLogic {
   }
 
   /**
+   * Merge a few keys into the settings blob without rewriting the camera.
+   * saveSettings replaces the whole blob, so these keys are also in its payload.
+   */
+  _patchSavedSettings(partial) {
+    if (!partial || typeof partial !== 'object') return;
+    try {
+      const raw = localStorage.getItem(this._settingsStorageKey());
+      const saved = raw ? JSON.parse(raw) : {};
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return;
+      Object.assign(saved, partial);
+      localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
+      this._savedSettings = Object.assign({}, this._savedSettings || {}, partial);
+    } catch (e) {
+      console.warn('[Settings] patch failed', e);
+    }
+  }
+
+  _setIntroVideoEnabled(on) {
+    const enabled = !!on;
+    const patch = { introVideo: enabled };
+    // Turning it back on may ask again the next time a late skip happens.
+    if (enabled) patch.introVideoPrompt = true;
+    this.setState(patch);
+    this._patchSavedSettings(patch);
+  }
+
+  _answerIntroVideoOffer(answer) {
+    const saved = {};
+    if (answer === 'yes') {
+      saved.introVideo = false;
+      saved.introVideoPrompt = false;
+    } else if (answer === 'never') {
+      saved.introVideoPrompt = false;
+    }
+    this.setState(Object.assign({ introSkipOfferOpen: false }, saved));
+    if (answer === 'yes' || answer === 'never') this._patchSavedSettings(saved);
+  }
+
+  _scheduleIntroVideoOffer() {
+    if (!this._introVideoOfferArmed) return;
+    clearTimeout(this._introVideoOfferTimer);
+    // Widgets already on screen (skip while the spinner was up): ask as soon
+    // as this load has finished. Otherwise wait out the splash fade and the
+    // widget fade, so the question does not land on a half-drawn home.
+    const widgetsUp = !(document.body && document.body.classList.contains('hv-boot'));
+    const delay = widgetsUp ? 0 : this._shellChromeTiming(false).readyMs;
+    this._introVideoOfferTimer = setTimeout(() => this._openIntroVideoOffer(), delay);
+  }
+
+  _armIntroVideoOffer() {
+    if (this._introVideoOfferArmed || (this.state && this.state.introSkipOfferOpen)) return;
+    const splash = window.HavalSplash;
+    const skipped = !!(splash && splash.wasSkipped && splash.wasSkipped());
+    if (!h6OfferIntroVideoOff({
+      skipped,
+      loading: !!(this.state && this.state.loading),
+      setupDone: this._hasCompletedSetup(),
+      introVideo: this.state.introVideo !== false,
+      introVideoPrompt: this.state.introVideoPrompt !== false,
+    })) return;
+    this._introVideoOfferArmed = true;
+  }
+
+  _openIntroVideoOffer() {
+    this._introVideoOfferArmed = false;
+    if (this._unmounted || !this.state || this.state.introSkipOfferOpen || this.state.firstRunSetupOpen) return;
+    const splash = window.HavalSplash;
+    if (!h6OfferIntroVideoOff({
+      skipped: !!(splash && splash.wasSkipped && splash.wasSkipped()),
+      loading: !!this.state.loading,
+      setupDone: this._hasCompletedSetup(),
+      introVideo: this.state.introVideo !== false,
+      introVideoPrompt: this.state.introVideoPrompt !== false,
+    })) return;
+    this.setState({ introSkipOfferOpen: true });
+  }
+
+  _runtimePermBlocked() {
+    if (!this.state || this.state.loading || this.state.firstRunSetupOpen) return true;
+    if (!this._hasCompletedSetup()) return true;
+    const splash = window.HavalSplash;
+    return !!(splash && splash.active && splash.isDone && !splash.isDone());
+  }
+
+  _runtimePermsMissing() {
+    try {
+      const b = window.AppLauncherBridge;
+      if (!b || typeof b.missingRuntimePermissions !== 'function') return '';
+      return String(b.missingRuntimePermissions() || '');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  _syncRuntimePermOffer() {
+    if (this._unmounted || !this.state) return;
+    const missing = this._runtimePermBlocked() ? '' : this._runtimePermsMissing();
+    const open = !!missing;
+    if (open === !!this.state.runtimePermOfferOpen && missing === (this.state.runtimePermMissing || '')) return;
+    this.setState({ runtimePermOfferOpen: open, runtimePermMissing: missing });
+  }
+
+  _requestRuntimePermissions() {
+    try {
+      const b = window.AppLauncherBridge;
+      if (b && typeof b.requestRuntimePermissions === 'function') b.requestRuntimePermissions();
+    } catch (e) {
+      console.warn('[Perm] request failed', e);
+    }
+  }
+
+  /**
    * Gate for splash → live model. The clip is allowed to play out even if the
    * GLB finished early. Skip OR natural clip-end while still loading tears the
    * overlay down and swaps the bottom progress line for a center spinner.
@@ -37684,7 +37920,8 @@ class Component extends DCLogic {
     if (this.state.loading && !this.state.error) {
       // Skip or clip finished while the model is still arriving: drop the
       // overlay so the shell can paint, replace the bottom line with a
-      // center spinner where the car will land.
+      // center spinner where the car will land. A skip is kept; the question
+      // waits until this load finishes and the home is up.
       this._applyChromeMainLeftVar();
       if (splash && typeof splash.dropNow === 'function') splash.dropNow();
       else if (splash && splash.fadeOut) splash.fadeOut();
@@ -37700,6 +37937,9 @@ class Component extends DCLogic {
       this._introPlayed = true;
       return;
     }
+    // Any skip asks, but only from here — loading is finished, so cards and
+    // widgets are up (or about to finish fading in).
+    if (skipped) this._armIntroVideoOffer();
     this._kickIntroReveal();
   }
 
@@ -41399,6 +41639,8 @@ class Component extends DCLogic {
           : 'Noite quando os faróis acendem. Raio-X salvo nesta área de trabalho.'),
       // setState is async: save on the next tick, or it stores the old mode.
       studioTimeCycle: () => { this.cycleTimeMode(); setTimeout(() => this.saveSettings({ keepCamera: true }), 0); },
+      studioIntroVideoChecked: s.introVideo !== false,
+      studioToggleIntroVideo: (e) => this._setIntroVideoEnabled(!!(e && e.target && e.target.checked)),
       // 3D mode has no wallpaper: the thumb shows greyed out and empty, and a
       // tap still opens the editor (which switches the background to it).
       studioWallClass: fill === 'car' ? 'off' : '',
@@ -50537,6 +50779,7 @@ class Component extends DCLogic {
     clearTimeout(this._widgetRevealTimer);
     clearTimeout(this._splashHoldTimer);
     clearTimeout(this._introKickTimer);
+    clearTimeout(this._introVideoOfferTimer);
     clearTimeout(this._warmupIdleTimer);
     clearTimeout(this._warmupFallbackTimer);
     clearTimeout(this._blurCaptureTimer);

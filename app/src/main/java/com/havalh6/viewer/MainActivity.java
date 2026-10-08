@@ -494,8 +494,9 @@ public final class MainActivity extends Activity {
                 }
                 // Here rather than at WebView setup: a permission dialog raised
                 // during onCreate lands on top of the boot splash clip, which
-                // holds for ~18-22 s. This fires once the car is on screen.
-                ensurePlaceLocationPermission();
+                // holds for ~18-22 s. The page shows its own explanation once
+                // the home is up, and only then asks.
+                notifyRuntimePermOffer();
             });
         }
 
@@ -578,17 +579,13 @@ public final class MainActivity extends Activity {
 
     public class AppLauncherBridge {
         @JavascriptInterface
-        public void openHomeSettings() {
-            runOnUiThread(() -> {
-                try {
-                    startActivity(new Intent(android.provider.Settings.ACTION_HOME_SETTINGS));
-                } catch (android.content.ActivityNotFoundException | SecurityException e) {
-                    Log.w(TAG, "Home selection unavailable", e);
-                    android.widget.Toast.makeText(MainActivity.this,
-                            "Esta central não permite escolher a tela inicial pelas configurações do Android.",
-                            android.widget.Toast.LENGTH_LONG).show();
-                }
-            });
+        public String missingRuntimePermissions() {
+            return MainActivity.this.missingRuntimePermissions();
+        }
+
+        @JavascriptInterface
+        public void requestRuntimePermissions() {
+            runOnUiThread(MainActivity.this::requestNextRuntimePermission);
         }
 
         @JavascriptInterface
@@ -1227,8 +1224,10 @@ public final class MainActivity extends Activity {
     /** Log the missing RECORD_AUDIO grant once, not on every play/pause. */
     private boolean mediaVizPermissionLogged;
     private static final int REQ_PLACE_LOCATION = 7102;
-    /** onViewerReady fires again on post-boot loads; ask for location only once. */
-    private boolean placeLocationAsked;
+    /** True while the system dialog for location/storage is up. */
+    private boolean runtimePermRequestInFlight;
+    /** True after one system request, so a silent deny can open app settings. */
+    private boolean runtimePermRequestedOnce;
     /**
      * The last now-playing payload, replayed after the rail is rebuilt.
      *
@@ -1968,27 +1967,39 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * Ask for location, once, for the navigation card's idle city line.
+     * Location, storage and notification access the home still lacks.
      *
-     * targetSdk is 28, so ACCESS_*_LOCATION is a RUNTIME grant — declaring it
-     * in the manifest is not enough. It was declared and never requested, so
-     * PlaceGlance returned on its first line on every 45 s tick and the card
-     * sat at an em dash forever. Measured on the car 2026-09-11: the only
-     * runtime permission the viewer held was RECORD_AUDIO.
-     *
-     * A denial is not retried — the glance is a nicety, and re-prompting on
-     * every launch would be worse than the em dash.
+     * targetSdk is 28, so location and storage are runtime grants. Notification
+     * access is a separate settings screen. The page explains all three in
+     * Portuguese and keeps the prompt up until each one is granted. A denial
+     * does not latch off: Permitir asks again, and a permanent denial opens
+     * the app's permission screen because the system dialog will not.
      */
-    private void ensurePlaceLocationPermission() {
-        if (placeLocationAsked) return;
-        placeLocationAsked = true;
-        // Storage rides the same dialog (PersistBackup): Android shows one
-        // request at a time, and a second one raised here would be dropped.
+    private String missingRuntimePermissions() {
+        StringBuilder missing = new StringBuilder();
+        if (!hasLocationPermission()) missing.append("location");
+        if (!PersistBackup.hasPermission(this)) {
+            if (missing.length() > 0) missing.append(',');
+            missing.append("storage");
+        }
+        if (!mediaNowPlaying.hasListenerAccess()) {
+            if (missing.length() > 0) missing.append(',');
+            missing.append("media");
+        }
+        return missing.toString();
+    }
+
+    private boolean hasLocationPermission() {
+        return checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestNextRuntimePermission() {
+        if (runtimePermRequestInFlight) return;
         java.util.ArrayList<String> want = new java.util.ArrayList<>();
-        if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED
-                && checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        if (!hasLocationPermission()) {
             want.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
             want.add(android.Manifest.permission.ACCESS_COARSE_LOCATION);
         }
@@ -1996,12 +2007,63 @@ public final class MainActivity extends Activity {
             want.add(android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
             want.add(android.Manifest.permission.READ_EXTERNAL_STORAGE);
         }
-        if (want.isEmpty()) return;
-        try {
-            requestPermissions(want.toArray(new String[0]), REQ_PLACE_LOCATION);
-        } catch (Throwable t) {
-            Log.w(TAG, "location permission request failed", t);
+        if (!want.isEmpty()) {
+            if (runtimePermRequestedOnce && runtimePermsPermanentlyDenied(want)) {
+                openAppPermissionSettings();
+                return;
+            }
+            runtimePermRequestedOnce = true;
+            runtimePermRequestInFlight = true;
+            try {
+                requestPermissions(want.toArray(new String[0]), REQ_PLACE_LOCATION);
+            } catch (Throwable t) {
+                runtimePermRequestInFlight = false;
+                Log.w(TAG, "location permission request failed", t);
+            }
+            return;
         }
+        if (!mediaNowPlaying.hasListenerAccess()) {
+            openNotificationListenerSettings();
+            return;
+        }
+        notifyRuntimePermOffer();
+    }
+
+    private boolean runtimePermsPermanentlyDenied(java.util.List<String> want) {
+        for (String permission : want) {
+            if (shouldShowRequestPermissionRationale(permission)) return false;
+        }
+        return true;
+    }
+
+    private void openAppPermissionSettings() {
+        try {
+            android.content.Intent intent = new android.content.Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(android.net.Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        } catch (android.content.ActivityNotFoundException | SecurityException e) {
+            Log.w(TAG, "App permission settings unavailable", e);
+        }
+    }
+
+    private void openNotificationListenerSettings() {
+        try {
+            startActivity(new android.content.Intent(
+                    android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+        } catch (android.content.ActivityNotFoundException | SecurityException e) {
+            Log.w(TAG, "Notification listener settings unavailable", e);
+            android.widget.Toast.makeText(this,
+                    "Ative o Impulse Home em Acesso às notificações.",
+                    android.widget.Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void notifyRuntimePermOffer() {
+        if (webView == null) return;
+        webView.post(() -> webView.evaluateJavascript(
+                "(function(){try{if(window.__app&&window.__app._syncRuntimePermOffer)window.__app._syncRuntimePermOffer();}catch(e){}})()",
+                null));
     }
 
     @Override
@@ -2009,6 +2071,7 @@ public final class MainActivity extends Activity {
             int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_PLACE_LOCATION) {
+            runtimePermRequestInFlight = false;
             boolean granted = false;
             boolean storage = false;
             for (int i = 0; i < grantResults.length && i < permissions.length; i++) {
@@ -2027,6 +2090,7 @@ public final class MainActivity extends Activity {
             // The worker is already ticking; poke it so the city does not wait
             // out the remainder of the current 45 s gap.
             if (granted && placeGlance != null) placeGlance.pokeNow();
+            notifyRuntimePermOffer();
             return;
         }
     }
@@ -14862,6 +14926,7 @@ public final class MainActivity extends Activity {
         if (climateHandoff != null) climateHandoff.setForeground(true);
         mediaNowPlaying.start();
         mediaNowPlaying.pushNow();
+        notifyRuntimePermOffer();
         // Permission may have been granted via adb while we were paused; retry.
         mainHandler.removeCallbacks(mediaVizPoll);
         mainHandler.post(mediaVizPoll);

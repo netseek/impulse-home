@@ -447,6 +447,17 @@ handoff. `test-splash.mjs` checks clip completion, skip, failure fallback,
 decoder-element cleanup and the explicit `nosplash` diagnostic path, with
 negative controls. Existing music keeps the clip muted.
 
+The clip can be turned off. `h6_settings_v1.introVideo === false` never assigns
+the file (same hand-off as `?nosplash`, and the native PULAR button comes down
+at once). The switch is in the layout manager: Aparência → Vídeo de abertura.
+Skipping the clip asks once, in Portuguese, whether to turn it off. A skip
+while the boot spinner is still up waits: the question opens only after that
+load has finished and the cards and widgets are up. Letting the clip play out
+does not ask. Sim stores `introVideo: false`. Não leaves it on and may ask again.
+Não perguntar de novo stores `introVideoPrompt: false` and keeps the clip. A missing
+key means the clip plays and the question is allowed. `test-intro-video.mjs`
+covers the offer rule, the setting and the three answers.
+
 On-device verification of 1.0.25-preview.1 confirmed decoded splash frames,
 intro completion, video removal and a loaded model with no application error.
 Switching through Drive, Lounge and Focus settled with one active widget page
