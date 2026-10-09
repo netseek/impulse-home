@@ -73,11 +73,12 @@ const dockCommand = blockFrom(html, dockCommandToken, 'dock command handler');
 assert.match(dockCommand,
   /case\s+['"]openMedia['"]\s*:\s*this\._openFocusedCard\(\s*['"]media['"]\s*\)/,
   'openMedia must open the focused MEDIA workspace');
-// A gesture must always answer. With nothing to open, openMediaApp shows the
-// popup rather than doing nothing at all.
 assert.match(dockCommand,
-  /case 'openMediaApp':[\s\S]*?this\.state\.mediaCanLaunch && this\.state\.mediaPackageName[\s\S]*?else this\._openFocusedCard\('media'\);/,
-  'openMediaApp must launch the player, falling back to the popup');
+  /case 'openMediaApp':\s*this\._openMediaApp\(null\);/,
+  'openMediaApp must launch through the media opener');
+assert.match(dockCommand,
+  /case 'pickDefaultApp:media':\s*this\._openDefaultAppPicker\('media', false\);/,
+  'the media ⋯ row must open the default-app list without launching');
 
 const nativeActions = native.slice(
   native.indexOf('BOTTOM_CARD_ACTIONS'),
@@ -195,10 +196,15 @@ assert.match(mediaView, /const canLaunch = !!\(hasTrack && s\.mediaPackageName &
   'the card must only offer to open a package the native side says is launchable');
 assert.match(mediaView, /mediaOpenDisabled: !canLaunch,/,
   "the popup's OPEN button must be disabled when there is nothing to open");
-assert.match(mediaView, /if \(!canLaunch\) \{ this\._openFocusedCard\('media'\); return; \}/,
-  'a widget tap with nothing to open must fall back to the popup, not do nothing');
 assert.match(mediaView, /this\._openMediaApp\(ev\);/,
   'the widget body must open the playing app');
+const openMediaApp = blockFrom(html, '  _openMediaApp(ev) {', 'media opener');
+assert.match(openMediaApp, /s\.mediaCanLaunch && s\.mediaPackageName/,
+  'a launchable session must still open the playing app');
+assert.match(openMediaApp, /this\._openFocusedCard\('media'\)/,
+  'a track that cannot be launched must still open the MEDIA popup');
+assert.match(openMediaApp, /this\._launchDefaultOrPick\('media'\)/,
+  'an idle media card must launch the saved default, or ask for one');
 
 // ---------------------------------------------------------------------------
 // 5. Source vocabulary.

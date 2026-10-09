@@ -67,20 +67,25 @@ trusting the `disabled` attribute.
 
 | Surface | Gesture | What it does |
 | --- | --- | --- |
-| rail card | tap the body | opens the **playing app** |
+| rail card | tap the body | opens the **playing app**, or the saved default when the card is idle |
 | rail card | hold | opens the MEDIA popup |
 | rail card | tap a transport button | prev / play-pause / next |
-| widget | tap the body | opens the **playing app** |
+| widget | tap the body | opens the **playing app**, or the saved default when the card is idle |
 | widget | hold → `OPEN` | opens the MEDIA popup |
 | popup | `OPEN <APP>` | opens the playing app |
 
 The body opens the player because that is what a driver wants from a
-now-playing card. **It falls back to the popup when there is nothing to open**,
-on both surfaces, so the gesture always answers instead of doing nothing — and
-"nothing to open" is a real state: a projection source can publish a track from
-a package with no launcher entry, and `launchAppFullscreen` returns silently
-there. That is what `canLaunch` is for; the popup's OPEN button is disabled and
-reads `NO APP TO OPEN` in the same case.
+now-playing card. A track whose package cannot be raised still opens the
+popup: a projection source can publish a track from a package with no
+launcher entry, and `launchAppFullscreen` returns silently there. That is
+what `canLaunch` is for; the popup's OPEN button is disabled and reads
+`NO APP TO OPEN` in the same case.
+
+An **idle** card (no track on screen) launches the default app saved for
+Mídia. With none saved, the tap opens the installed-app list and keeps the
+pick. The same list is **App padrão…** on the card's ⋯ while Layout manager
+→ Cards is open, so the choice can be changed later. It is one preference
+(`h6_default_apps`), shared by the rail card and the widget.
 
 **The rail card is clickable unconditionally**, even with nothing to open. A
 non-clickable native View does not consume its touch, and the 3D canvas sits
@@ -257,8 +262,9 @@ MEDIA popup, and the chip drew YouTube's real icon and label.
    CarPlay bind to OEM services that do not exist on the emulator, so every
    capture here came from a MediaSession. `appIcon` and `canLaunch` resolve the
    package those sources report, and the projection packages are exactly the
-   ones most likely to have no launcher entry — which is why the tap falls back
-   to the popup rather than failing silently. **Verify on the car** that
+   ones most likely to have no launcher entry — which is why a track that
+   cannot be raised still opens the popup. An idle card, with nothing on
+   screen, launches the saved default instead. **Verify on the car** that
    `com.beantechs.mediacenter` and `com.ts.carplay` report the icon and
    launchability you expect.
 2. **A very long title still ellipsises on a narrow slot.** A 400px `2x1`

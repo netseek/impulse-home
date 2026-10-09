@@ -3252,6 +3252,27 @@ window.HavalSplash = (function () {
       -webkit-box-orient: vertical;
       opacity: 0.9;
     }
+    /* Default app for an idle media or navigation card. Same frame as the
+       other popups, above the layout studio (z 83) so card edit can open it. */
+    .hv-default-app-pop {
+      position: absolute; z-index: 90; display: none; flex-direction: column;
+      left: var(--hv-pop-left, 24px); top: var(--hv-pop-top, 60px);
+      width: var(--hv-pop-width, 900px); height: var(--hv-pop-height, 460px);
+      box-sizing: border-box; padding: 12px 16px 16px; color: var(--hv-widget-fg, #edf5fa);
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.18)); border-radius: 22px;
+      background: var(--hv-frost-fill-strong, rgba(12,18,24,.94));
+      box-shadow: var(--hv-frost-shadow, 0 18px 50px rgba(0,0,0,.38));
+    }
+    .hv-default-app-head { height: 48px; display: flex; align-items: center; gap: 12px; flex: none; }
+    .hv-default-app-head button {
+      width: 44px; height: 44px; border: 0; border-radius: 14px;
+      background: rgba(255,255,255,.07); color: inherit; font-size: 22px; cursor: pointer;
+    }
+    .hv-default-app-title { flex: 1; font: 600 16px/1.2 var(--hv-font); letter-spacing: .02em; }
+    .hv-default-app-clear { width: auto; padding: 0 14px; font: 600 13px/1 var(--hv-font); }
+    .hv-default-app-grid { min-height: 0; flex: 1; overflow: auto; }
+    .hv-default-app-pop .hv-apps-tile.on { outline: 2px solid var(--hv-accent); outline-offset: -2px; }
+    .hv-default-app-empty { margin: 24px 8px; font-size: 14px; opacity: .7; }
     .hv-widget-toolbar {
       display: flex;
       flex-direction: row;
@@ -9117,6 +9138,27 @@ window.HavalSplash = (function () {
     </div>
   </div>
 
+  <div class="hv-default-app-pop" style="display: {{ defaultAppPickerDisplay }};" role="dialog" aria-label="{{ defaultAppPickerTitle }}">
+    <div class="hv-default-app-head">
+      <button type="button" onClick="{{ closeDefaultAppPicker }}" aria-label="Fechar">×</button>
+      <span class="hv-default-app-title">{{ defaultAppPickerTitle }}</span>
+      <sc-if value="{{ defaultAppPickerCanClear }}" hint-placeholder-val="{{ false }}">
+        <button type="button" class="hv-default-app-clear" onClick="{{ clearDefaultApp }}">LIMPAR</button>
+      </sc-if>
+    </div>
+    <sc-if value="{{ defaultAppPickerEmpty }}" hint-placeholder-val="{{ false }}">
+      <p class="hv-default-app-empty">Nenhum app para escolher.</p>
+    </sc-if>
+    <div class="hv-apps-grid hv-default-app-grid">
+      <sc-for list="{{ defaultAppPickerItems }}" as="ap" hint-placeholder-count="0">
+        <button type="button" class="hv-apps-tile {{ ap.cls }}" onClick="{{ ap.onClick }}" title="{{ ap.label }}">
+          <img src="{{ ap.icon }}" alt="">
+          <span class="hv-apps-tile-label">{{ ap.label }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+
   <div class="hv-widget-slot-banner" style="display: {{ widgetSlotBannerDisplay }};">
     <span class="hv-widget-slot-banner-text">{{ widgetSlotBannerText }}</span>
     <button type="button" class="hv-widget-slot-banner-close" onClick="{{ closeWidgetPicker }}" title="Fechar">×</button>
@@ -10846,6 +10888,7 @@ class Component extends DCLogic {
     appsFabOpen: false,
     splitRatio: BOOT_SHELL.splitRatio,
     appsCatalogRev: 0,
+    defaultAppPicker: null,
     desktopIndex: 0,
     desktopRev: 0,
     desktopStudioOpen: false,
@@ -10871,6 +10914,7 @@ class Component extends DCLogic {
     this.outerRef = React.createRef();
     this._customAccents = this._loadCustomAccents();
     try { this._rangeUnit = localStorage.getItem('h6_range_unit') === 'mi' ? 'mi' : 'km'; } catch (e) { this._rangeUnit = 'km'; }
+    this._defaultApps = this._loadDefaultApps();
     try { this._rangeCardStyle = localStorage.getItem('h6_range_card_style') === 'gauge' ? 'gauge' : 'linear'; } catch (e) { this._rangeCardStyle = 'linear'; }
     try {
       const savedRangeMode = localStorage.getItem('h6_range_source_mode');
@@ -37895,6 +37939,7 @@ class Component extends DCLogic {
     this.setState({ runtimePermOfferOpen: open, runtimePermMissing: missing });
   }
 
+  /** Hide the prompt for 10 s. It returns on its own if anything is still missing. */
   _dismissRuntimePermOffer() {
     this._runtimePermSnoozeUntil = Date.now() + 10000;
     clearTimeout(this._runtimePermSnoozeTimer);
@@ -46168,16 +46213,18 @@ class Component extends DCLogic {
   }
 
   _openNavigationApp() {
-    try {
-      const B = window.AppLauncherBridge;
-      if (!B) return;
-      if (this._aaSession === 'active') {
-        if (typeof B.launchProjection === 'function') B.launchProjection('AA');
-        else if (typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_AA_PACKAGE);
-        return;
-      }
-      if (typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_NAV_PACKAGE);
-    } catch (e) {}
+    // A live session or a route on screen still raises the projection.
+    // The saved default is only for the idle card. Missing the bridge must
+    // not swallow that idle path — only the projection launch needs it.
+    if (this._aaSession === 'active' || (this._navLive && this._navLive.active)) {
+      try {
+        const B = window.AppLauncherBridge;
+        if (B && typeof B.launchProjection === 'function') B.launchProjection('AA');
+        else if (B && typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_AA_PACKAGE);
+      } catch (e) {}
+      return;
+    }
+    this._launchDefaultOrPick('navigation');
   }
 
   _tiresWidgetView(item) {
@@ -46792,7 +46839,7 @@ class Component extends DCLogic {
       },
       onEdit: (ev) => {
         if (ev && ev.stopPropagation) ev.stopPropagation();
-        this._openMediaApp(ev);
+        this._openFocusedCard('media');
       },
     };
   }
@@ -48268,8 +48315,16 @@ class Component extends DCLogic {
         this._openFocusedCard('driving');
         break;
       case 'openMedia':
+        this._openFocusedCard('media');
+        break;
       case 'openMediaApp':
         this._openMediaApp(null);
+        break;
+      case 'pickDefaultApp:media':
+        this._openDefaultAppPicker('media', false);
+        break;
+      case 'pickDefaultApp:navigation':
+        this._openDefaultAppPicker('navigation', false);
         break;
       case 'openPower':
         this._openFocusedCard('power');
@@ -48726,6 +48781,14 @@ class Component extends DCLogic {
    */
   _railEditMenuRows(cardId) {
     const rows = [];
+    if (cardId === 'media' || cardId === 'navigation') {
+      const saved = this._defaultApp(cardId);
+      rows.push({
+        label: this._defaultAppMenuLabel(saved),
+        command: 'pickDefaultApp:' + cardId,
+        selected: !!saved,
+      });
+    }
     const focusType = H6_CARD_POPUP_TYPES[cardId] || '';
     if (focusType) {
       const list = this._desktops || [];
@@ -49571,6 +49634,7 @@ class Component extends DCLogic {
       chromeMainLeft: this._androidApp ? (this._chromeMainLeftPx(boardLeftPx) + 'px') : '96px',
       ...dock,
       ...appsFields,
+      ...this._defaultAppPickerFields(s),
       leftBoardDisplay: showLeft ? 'flex' : 'none',
       leftBoardLeft: leftRect.left,
       leftBoardTop: leftRect.top,
@@ -50230,15 +50294,185 @@ class Component extends DCLogic {
 
   _openMediaApp(ev) {
     if (ev && ev.stopPropagation) ev.stopPropagation();
-    const pkg = this.state.mediaPackageName || this._lastMediaPackageName;
+    const s = this.state;
+    // A launchable session is the app that is actually playing. A track whose
+    // package cannot be raised (a projection with no launcher entry) still
+    // has something on the card, so the popup is the answer. An empty card
+    // launches the saved default, or asks for one.
+    if (s.mediaCanLaunch && s.mediaPackageName) {
+      this._launchPackage(s.mediaPackageName);
+      return;
+    }
+    if (s.mediaTitle || s.mediaArtist || s.mediaAlbum) {
+      this._openFocusedCard('media');
+      return;
+    }
+    this._launchDefaultOrPick('media');
+  }
+
+  /**
+   * The app an idle media or navigation card opens. One choice per card,
+   * shared by the rail tile and the widget, kept beside the other launcher
+   * preferences (PersistBackup mirrors the key).
+   */
+  _loadDefaultApps() {
+    const out = { media: null, navigation: null };
+    try {
+      const raw = JSON.parse(localStorage.getItem('h6_default_apps') || '{}');
+      ['media', 'navigation'].forEach((kind) => {
+        const row = raw && raw[kind];
+        const pkg = row && typeof row.packageName === 'string' ? row.packageName : '';
+        if (/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(pkg)) {
+          out[kind] = { packageName: pkg, label: String(row.label || pkg).slice(0, 40) };
+        }
+      });
+    } catch (e) {}
+    return out;
+  }
+
+  _defaultApp(kind) {
+    const row = this._defaultApps && this._defaultApps[kind];
+    return row && row.packageName ? row : null;
+  }
+
+  _defaultAppMenuLabel(saved) {
+    if (!saved) return 'App padrão…';
+    const prefix = 'Padrão: ';
+    const name = saved.label || saved.packageName;
+    const room = 28 - prefix.length;
+    const shown = name.length > room ? (name.slice(0, Math.max(0, room - 1)) + '…') : name;
+    return prefix + shown;
+  }
+
+  _persistDefaultApps() {
+    try {
+      const out = {};
+      ['media', 'navigation'].forEach((kind) => {
+        const row = this._defaultApp(kind);
+        if (row) out[kind] = { packageName: row.packageName, label: row.label || '' };
+      });
+      localStorage.setItem('h6_default_apps', JSON.stringify(out));
+    } catch (e) {}
+  }
+
+  _setDefaultApp(kind, packageName, label) {
+    if (kind !== 'media' && kind !== 'navigation') return;
+    if (!this._defaultApps) this._defaultApps = { media: null, navigation: null };
+    this._defaultApps[kind] = {
+      packageName: packageName,
+      label: String(label || packageName).slice(0, 40),
+    };
+    this._persistDefaultApps();
+    this._syncDockIndicators();
+  }
+
+  _clearDefaultApp(kind) {
+    if (!this._defaultApps) return;
+    this._defaultApps[kind] = null;
+    this._persistDefaultApps();
+    this._syncDockIndicators();
+  }
+
+  _launchPackage(pkg) {
     if (!pkg) return;
     try {
       if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
         window.AppLauncherBridge.launchAppInPopup(pkg);
       }
     } catch (e) {
-      console.warn('[media] open app failed', pkg, e);
+      console.warn('[apps] launch failed', pkg, e);
     }
+  }
+
+  /** Idle card: open the saved app, or the list that saves the next one. */
+  _launchDefaultOrPick(kind) {
+    const saved = this._defaultApp(kind);
+    if (saved) {
+      this._launchPackage(saved.packageName);
+      return;
+    }
+    this._openDefaultAppPicker(kind, true);
+  }
+
+  _openDefaultAppPicker(kind, launchOnPick) {
+    if (kind !== 'media' && kind !== 'navigation') return;
+    this._defaultAppLaunchOnPick = !!launchOnPick;
+    this._ensureAppsCatalog();
+    this._uiOnlyStateWrite = true;
+    this.setState({ defaultAppPicker: kind });
+  }
+
+  _closeDefaultAppPicker() {
+    if (!this.state.defaultAppPicker) return;
+    this._defaultAppLaunchOnPick = false;
+    this._uiOnlyStateWrite = true;
+    this.setState({ defaultAppPicker: null });
+  }
+
+  _chooseDefaultApp(kind, app) {
+    const pkg = app && app.packageName;
+    if (!pkg || !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(pkg)) return;
+    const launch = !!this._defaultAppLaunchOnPick;
+    this._setDefaultApp(kind, pkg, app.label || pkg);
+    this._closeDefaultAppPicker();
+    if (launch) this._launchPackage(pkg);
+  }
+
+  /**
+   * Navigation's list leads with CarPlay and Android Auto. They are not in
+   * the installed-app catalog — that catalog skips projection packages —
+   * and launching either package raises the projection task.
+   */
+  _defaultAppChoices(kind, catalog) {
+    const list = Array.isArray(catalog) ? catalog : [];
+    if (kind !== 'navigation') return list;
+    const pinned = [
+      { packageName: 'com.ts.carplay.app', label: 'CarPlay' },
+      { packageName: CAR_AA_PACKAGE, label: 'Android Auto' },
+    ];
+    const skip = {};
+    pinned.forEach((app) => { skip[app.packageName] = true; });
+    const rest = list.filter((app) => app && !skip[app.packageName]
+      && !/androidauto|carplay|projection\.gearhead/i.test(String(app.packageName || '')));
+    return pinned.concat(rest);
+  }
+
+  _defaultAppPickerFields(s) {
+    const kind = s.defaultAppPicker === 'media' || s.defaultAppPicker === 'navigation'
+      ? s.defaultAppPicker : '';
+    const closeDefaultAppPicker = () => this._closeDefaultAppPicker();
+    if (!kind) {
+      return {
+        defaultAppPickerDisplay: 'none',
+        defaultAppPickerTitle: '',
+        defaultAppPickerItems: [],
+        defaultAppPickerEmpty: false,
+        defaultAppPickerCanClear: false,
+        closeDefaultAppPicker: closeDefaultAppPicker,
+        clearDefaultApp: () => {},
+      };
+    }
+    const catalog = Array.isArray(this._appsCatalog) ? this._appsCatalog : [];
+    const choices = this._defaultAppChoices(kind, catalog);
+    const FALLBACK_ICON = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    const current = this._defaultApp(kind);
+    return {
+      defaultAppPickerDisplay: 'flex',
+      defaultAppPickerTitle: kind === 'media' ? 'APP PADRÃO · MÍDIA' : 'APP PADRÃO · NAVEGAÇÃO',
+      defaultAppPickerItems: choices.map((app) => ({
+        label: app.label || app.packageName || '',
+        icon: app.icon || this._navAppIcon(app.packageName) || FALLBACK_ICON,
+        cls: current && current.packageName === app.packageName ? 'on' : '',
+        onClick: () => this._chooseDefaultApp(kind, app),
+      })),
+      defaultAppPickerEmpty: choices.length === 0,
+      defaultAppPickerCanClear: !!current,
+      closeDefaultAppPicker: closeDefaultAppPicker,
+      clearDefaultApp: () => {
+        this._clearDefaultApp(kind);
+        this._closeDefaultAppPicker();
+      },
+    };
   }
 
   applyMediaNowPlaying(payload) {

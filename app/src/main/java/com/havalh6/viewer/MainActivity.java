@@ -1971,8 +1971,9 @@ public final class MainActivity extends Activity {
      *
      * targetSdk is 28, so location and storage are runtime grants. Notification
      * access is a separate settings screen. The page explains all three in
-     * Portuguese and keeps the prompt up until each one is granted. A denial
-     * does not latch off: Permitir asks again, and a permanent denial opens
+     * Portuguese. Closing the prompt hides it for 10 seconds; it returns while
+     * anything is still missing. A denial does not latch off: Permitir asks
+     * again, and a permanent denial opens
      * the app's permission screen because the system dialog will not.
      */
     private String missingRuntimePermissions() {
@@ -12168,9 +12169,10 @@ public final class MainActivity extends Activity {
     }
 
     /**
-     * Rows for a rail card's ⋯ in edit mode. Only two command shapes are
-     * relayed: a destination (cardAction:...) and the clock face. The page
-     * re-checks both; anything else is dropped here.
+     * Rows for a rail card's ⋯ in edit mode. Three command shapes are relayed:
+     * a destination (cardAction:...), the clock face, and the default app for
+     * media and navigation. The page re-checks all three; anything else is
+     * dropped here.
      */
     private java.util.List<QuickMenuRow> parseEditMenu(JSONArray raw) {
         if (raw == null || raw.length() == 0) return java.util.Collections.emptyList();
@@ -12182,10 +12184,16 @@ public final class MainActivity extends Activity {
             String label = cleanBottomCardText(item.optString("label", ""), 28);
             String command = item.optString("command", "").trim();
             if (label.isEmpty()) continue;
-            if (!isCardActionCommand(command) && !"openClockSettings".equals(command)) continue;
+            if (!isCardActionCommand(command) && !"openClockSettings".equals(command)
+                    && !isDefaultAppCommand(command)) continue;
             rows.add(new QuickMenuRow(label, command, item.optBoolean("selected", false)));
         }
         return rows;
+    }
+
+    /** pickDefaultApp:media|navigation — the idle-card launcher, from the ⋯ menu. */
+    private boolean isDefaultAppCommand(String command) {
+        return "pickDefaultApp:media".equals(command) || "pickDefaultApp:navigation".equals(command);
     }
 
     /** cardAction:&lt;card&gt;:popup|new|desktop:&lt;desktopId&gt;; ids letters, digits, '_' and '-'. */
