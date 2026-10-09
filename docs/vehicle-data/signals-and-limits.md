@@ -30,7 +30,9 @@ vehicle `READY` state where relevant, and a pending state in the UI.
 ## Climate and weather
 
 The climate card is wired to the vehicle: its keys are the HVAC family above, and Impulse relays
-the writes. The outside temperature is a vehicle signal (`car.basic.outside_temp`). The forecast and
+the writes. The car's own A/C panel pulse (`car.hvac.panel_display_notify`) opens this popup.
+A pulse that only arrives with a recirculation change (`car.hvac.cycle_mode`) does not: in AUTO
+that state moves on its own. The outside temperature is a vehicle signal (`car.basic.outside_temp`). The forecast and
 an outdoor PM2.5 figure are the external dependency: they come from
 [Open-Meteo](https://open-meteo.com/), the request carries only a position rounded to two decimals
 (about 1 km) and no key, and the manifest requests `INTERNET` and the location permissions for it.

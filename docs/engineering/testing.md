@@ -6,7 +6,7 @@ The test base of this repository and how to run it.
 
 | Layer | Run it with | What it covers |
 |---|---|---|
-| Node contract tests | `node scripts/run-tests.mjs` | Every `scripts/test-*.mjs`: card, widget and popup contracts read from the source text, plus pure logic (energy insights and map maths, power behaviour, clock labels and sweep, the climate SYNC mirror). |
+| Node contract tests | `node scripts/run-tests.mjs` | Every `scripts/test-*.mjs`: card, widget and popup contracts read from the source text, plus pure logic (energy insights and map maths, power behaviour, clock labels and sweep, the climate SYNC mirror, the climate popup's recirculation gate). |
 | JVM unit tests | `./gradlew :app:testDebugUnitTest` | The pure-Java logic of the native side: `TripEngineTest`, `TripSignalsTest`, `TripMapMathTest`, `RangeLedgerTest`. Nothing in them may touch an Android stub. |
 | Docs guard | `node scripts/test-docs.mjs` (also run by `run-tests.mjs`) | Every relative link in the Markdown resolves; every file under `docs/` is listed in `docs/README.md`; no personal data, local paths or AI-agent memory files are tracked; the repository root holds a single Markdown file, `README.md`. |
 | Device harness | `npm run car:perf`, `scripts/device-cdp.mjs` | Frame rate, main-thread blocking and commit cost, on the car or the emulator. Read the signals in pairs; see [measuring-and-performance](measuring-and-performance.md). |
