@@ -47,6 +47,11 @@ final class MediaNowPlaying {
     interface Callback {
         void onUpdate(JSONObject payload);
         void onPosition(long positionMs);
+        /**
+         * Answer to {@link #requestLyrics()}. {@code definitive} is false when the
+         * lookup could not reach the server, so the page may offer a retry.
+         */
+        void onLyrics(String trackKey, String lrc, boolean definitive);
     }
 
     private static final String TAG = "H6Media";
@@ -79,6 +84,9 @@ final class MediaNowPlaying {
     private String lastArtKey = "";
     private String lastArtData = "";
     private Handler artHandler;
+    private Handler lyricsHandler;
+    private LyricsFetcher lyricsFetcher;
+    private String inflightLyrics = "";
     private String inflightArtUri = "";
     private boolean started;
 
@@ -243,6 +251,43 @@ final class MediaNowPlaying {
     boolean isPlaying() {
         MediaTrack winner = winner();
         return winner != null && winner.playing;
+    }
+
+    /**
+     * Looks up synced lyrics for whatever is playing and answers through
+     * {@link Callback#onLyrics}. Only ever called when the driver opens the
+     * lyrics view, so a car nobody asks anything of makes no requests.
+     */
+    void requestLyrics() {
+        if (callback == null || appContext == null) return;
+        final MediaTrack w = winner();
+        if (w == null || w.title.isEmpty()) {
+            callback.onLyrics("", "", true);
+            return;
+        }
+        final String key = lyricsKey(w.title, w.artist);
+        if (key.equals(inflightLyrics)) return;
+        inflightLyrics = key;
+        if (lyricsHandler == null) {
+            HandlerThread t = new HandlerThread("H6Lyrics");
+            t.start();
+            lyricsHandler = new Handler(t.getLooper());
+            lyricsFetcher = new LyricsFetcher(appContext);
+        }
+        final String title = w.title, artist = w.artist, album = w.album;
+        final long durationMs = w.durationMs;
+        lyricsHandler.post(() -> {
+            LyricsFetcher.Result r = lyricsFetcher.fetch(artist, title, album, durationMs);
+            handler.post(() -> {
+                if (key.equals(inflightLyrics)) inflightLyrics = "";
+                if (callback != null) callback.onLyrics(key, r.lrc, r.definitive);
+            });
+        });
+    }
+
+    /** Must match the page's own track identity (title, U+0001, artist). */
+    static String lyricsKey(String title, String artist) {
+        return (title == null ? "" : title) + "\u0001" + (artist == null ? "" : artist);
     }
 
     private void dispatchMediaKey(int keyCode) {

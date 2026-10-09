@@ -63,9 +63,16 @@ The editing itself happens on the real rail: while the Cards tab is open
 `_syncDockIndicators` sends `railEdit: true`, and native jiggles the rail
 cards, draws × (remove) and ⋯ (options) badges on each one's view overlay, and
 lets them be dragged. ⋯ opens a native menu built from the card's `editMenu`
-rows (`_railEditMenuRows`): where the card opens, and the clock face. Its
-commands (`cardAction:<card>:popup|new|desktop:<id>`) are checked natively by
-`isCardActionCommand` and again on the page by `_applyCardActionCommand`.
+rows (`_railEditMenuRows`): where the card opens, the clock face, and — on
+Mídia and Navegação — **App padrão…**. That row opens the installed-app list
+(`pickDefaultApp:media` / `pickDefaultApp:navigation`). The choice is one
+launcher preference, `h6_default_apps`, shared by the rail card and the widget.
+An idle tap launches it; with none saved, the same list opens and the pick is
+kept. A live session still wins over the default. Navegação's list starts with
+CarPlay and Android Auto, which the installed-app catalog leaves out because
+they launch as projection. Native relays the row only
+when `isDefaultAppCommand` matches, the same way `isCardActionCommand` checks
+`cardAction:<card>:popup|new|desktop:<id>` before `_applyCardActionCommand`.
 `railEdit` is applied after the card list in `applyDockIndicators`, or the
 badges would be drawn before the menus arrive.
 

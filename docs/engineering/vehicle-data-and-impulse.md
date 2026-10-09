@@ -241,8 +241,9 @@ fallback for that is `—`. Both are worth knowing because both look like nothin
     android.permission.RECORD_AUDIO: granted=true
   ```
 
-  `ensurePlaceLocationPermission()` now asks once at startup. A denial is not
-  retried.
+  Location and storage are part of the permission prompt in
+  [android-shell](../architecture/android-shell.md). A denial is asked again
+  until both are granted.
 
 - **`android.location.Geocoder` does not work on this MMI**, and it fails in the
   most misleading way available: `Geocoder.isPresent()` returns **true**, and

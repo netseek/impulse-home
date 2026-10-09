@@ -10,7 +10,7 @@ regular rendering mode with an Android-specific decoder compatibility flag.
 - JDK 21
 - Gradle 9.3.1 (or import the project into a compatible Android Studio version)
 
-No Java/Kotlin library dependencies and no Android network permission are used.
+No AndroidX UI. The Shizuku client is the one packaged Java library, and only the GWM hub's Reboot tile uses it.
 
 ## Build
 
@@ -119,6 +119,15 @@ adb shell settings get secure enabled_notification_listeners
 The viewer's component has to appear in that colon-separated list. A live
 session shows `controllers: 2` (the app plus the viewer) under
 `adb shell dumpsys media_session`.
+
+Once the home is up, and first-run setup is done, a Portuguese prompt lists
+whatever is still missing among location, storage and this notification
+access. × closes it for 10 seconds; it returns on its own if anything is
+still missing. Permitir asks for location and storage first; when those are
+granted, the same button opens notification access. Denying, or leaving that
+screen, brings the prompt back. A permanent denial of location
+or storage opens the app's permission screen, because the system dialog will
+not. `test-runtime-permissions.mjs`.
 
 Then reopen the viewer. Transport buttons (prev / play-pause / next) talk to the
 session’s `MediaController`.
@@ -535,13 +544,30 @@ Persisted viewer preferences (including `timeMode`) are stored in WebView
 `localStorage` under `h6_settings_v1` when the user taps **Save**. Live car
 signals are applied after saved settings on load, so the car wins over them.
 
+## GWM hub
+
+The GWM tile on the launcher strip opens one card the size of a bottom-left 2×1
+on the 6×2 widget board: two columns of the lower row, the same gap the page
+uses between widgets. Five actions sit in that card. The top row is Início,
+Energia and Reiniciar; the bottom row is Sistema and Veículo.
+
+| Tile | Opens |
+| --- | --- |
+| Início | `com.beantechs.applist` |
+| Energia | `com.beantechs.energyassistant` |
+| Reiniciar | `/system/bin/reboot` through Shizuku |
+| Sistema | `com.beantechs.settings` |
+| Veículo | `com.beantechs.vehiclecenter` |
+
+Shizuku asks for its grant the first time Reiniciar is tapped. The shell
+command itself runs in a Shizuku user service (`GwmRebootService`), as
+whichever user started Shizuku. The client library declares minSdk
+24; the shell stays at 23 and overrides that, because the call only happens on
+the Android 9 head unit. The × on the card closes it, and so does a tap outside
+the card. `com.beantechs.launcher` (the OEM home) is not a hub destination and
+stays off the scrolling app row.
+
 ## Default home selection
 
-Appearance settings offer **Set as home screen** in both Desktop Studio and the
-layout panel. The button calls `AppLauncherBridge.openHomeSettings()`, which
-opens `Settings.ACTION_HOME_SETTINGS` on the UI thread. The user makes the
-selection in Android's native settings screen. If the firmware does not provide
-or blocks this activity, a message explains that it is unavailable. The button
-is disabled in a browser or with an older bridge. The Activity already declares
-`MAIN`, `HOME` and `DEFAULT`; this option does not silently change preferences
-or configure startup when the head unit powers on.
+The viewer does not offer a control for this. Impulse configures the default
+home screen. The Activity still declares `MAIN`, `HOME` and `DEFAULT`.

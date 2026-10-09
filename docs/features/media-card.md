@@ -1,12 +1,12 @@
 # MEDIA card — now playing, transport, and the app behind it
 
-Replaces a rail tile whose body opened the widget picker, a widget with no
-builder of its own, and a popup that did not exist. The three surfaces now come
-out of one builder, the way `docs/architecture/ui-surfaces.md` recommends and `DRIVING` does
-it: `_focusedCardRenderFields` re-exports every key of `_mediaWidgetView` whose
-name starts with the card type, so `mediaTitle` reaches the popup markup as
-`{{ focusedMediaTitle }}` with no second code path, and `_syncDockIndicators`
-reads the same object for the rail payload.
+Replaces a rail tile whose body opened the widget picker and a widget with no
+builder of its own. The two surfaces now come out of one builder,
+`_mediaWidgetView`: the widget reads it directly and `_syncDockIndicators`
+reads the same object for the rail payload. **There is no media popup**: the
+card exists to open the app that is playing, so it has no popup to choose and
+no desktop to open as (it is absent from `H6_CARD_POPUP_TYPES`, and its ⋯ row
+only offers the default app).
 
 ## What is connected
 
@@ -67,20 +67,22 @@ trusting the `disabled` attribute.
 
 | Surface | Gesture | What it does |
 | --- | --- | --- |
-| rail card | tap the body | opens the **playing app** |
-| rail card | hold | opens the MEDIA popup |
+| rail card | tap the body | opens the **playing app**, or the saved default when the card is idle |
 | rail card | tap a transport button | prev / play-pause / next |
-| widget | tap the body | opens the **playing app** |
-| widget | hold → `OPEN` | opens the MEDIA popup |
-| popup | `OPEN <APP>` | opens the playing app |
+| widget | tap the body | opens the **playing app**, or the saved default when the card is idle |
+| widget | tap `LETRAS` | opens or closes the synced lyrics (not at 1x1) |
 
 The body opens the player because that is what a driver wants from a
-now-playing card. **It falls back to the popup when there is nothing to open**,
-on both surfaces, so the gesture always answers instead of doing nothing — and
-"nothing to open" is a real state: a projection source can publish a track from
-a package with no launcher entry, and `launchAppFullscreen` returns silently
-there. That is what `canLaunch` is for; the popup's OPEN button is disabled and
-reads `NO APP TO OPEN` in the same case.
+now-playing card. A track whose package cannot be raised opens nothing: a
+projection source can publish a track from a package with no launcher entry,
+and `launchAppFullscreen` returns silently there. That is what `canLaunch`
+is for.
+
+An **idle** card (no track on screen) launches the default app saved for
+Mídia. With none saved, the tap opens the installed-app list and keeps the
+pick. The same list is **App padrão…** on the card's ⋯ while Layout manager
+→ Cards is open, so the choice can be changed later. It is one preference
+(`h6_default_apps`), shared by the rail card and the widget.
 
 **The rail card is clickable unconditionally**, even with nothing to open. A
 non-clickable native View does not consume its touch, and the 3D canvas sits
@@ -214,21 +216,21 @@ rather than the board.
 
 `componentDidUpdate` asks for a 3D frame after every `setState`, and the player
 publishes a position roughly every second. `_syncMediaPositionDom` pokes the
-painted nodes instead — and there are now two per surface (widget and popup),
+painted nodes instead — and there can be several (one per media widget),
 which is why it is `querySelectorAll` and class-addressed rather than by id.
 `applyMediaPosition` only reaches `setState` on a drift of 400 ms or more, so
 the React copy stays in step for re-renders without firing at the tick rate.
 The contract test guards both.
 
-## The popup
+## Lyrics
 
-`focusedCardIsMedia`, one builder, one block of markup. It sizes to its content
-(`.fit`, like DRIVING) and takes a narrower frame than the shared 760px
-(`.narrow`): media carries art, four lines and three buttons, and the shared
-width left a third of the dialog empty.
-
-The title is clamped to two lines with `-webkit-line-clamp`. A video title runs
-long and `overflow: hidden` alone guillotines the second line mid-word.
+The widget's `LETRAS` button (not at 1x1) swaps the title block for a
+five-line panel that follows playback. Lyrics come from LRCLIB by
+artist/title/duration, are fetched only when the panel is opened and cached on
+disk (misses for 24 h). The current line is found from the 4 Hz position tick
+and painted straight into the DOM (`_paintLyrics`), so React commits only on
+the open/close toggle. The panel is the one `.hv-lyrics` host in the widget
+block; the open flag (`mediaLyricsOpen`) is shared by every media widget.
 
 ## Screenshots
 
@@ -241,15 +243,12 @@ emulator has no OEM media source, so a real player was driven to produce one):
 | `media-dark-1x1-1x2-2x2.png` | dark, cover layouts |
 | `media-dark-2x1-3x1.png` | dark, split layouts |
 | `media-light-2x1-3x1.png` | light, split layouts |
-| `media-dark-popup.png` | dark popup |
-| `media-light-popup.png` | light popup |
 | `media-accent-coral.png` | accent `#ff866e` on every surface |
 | `media-no-track.png` | idle — `MEDIA · NO TRACK`, transport inert |
-| `media-access-required-popup.png` | notification access missing |
 
 The rail card was verified separately against the same session: the body opened
-YouTube (`mCurrentFocus` became the YouTube activity), a long press opened the
-MEDIA popup, and the chip drew YouTube's real icon and label.
+YouTube (`mCurrentFocus` became the YouTube activity) and the chip drew
+YouTube's real icon and label.
 
 ## Known limitations
 
@@ -257,8 +256,9 @@ MEDIA popup, and the chip drew YouTube's real icon and label.
    CarPlay bind to OEM services that do not exist on the emulator, so every
    capture here came from a MediaSession. `appIcon` and `canLaunch` resolve the
    package those sources report, and the projection packages are exactly the
-   ones most likely to have no launcher entry — which is why the tap falls back
-   to the popup rather than failing silently. **Verify on the car** that
+   ones most likely to have no launcher entry — which is why a track that
+   cannot be raised opens nothing. An idle card, with nothing on
+   screen, launches the saved default instead. **Verify on the car** that
    `com.beantechs.mediacenter` and `com.ts.carplay` report the icon and
    launchability you expect.
 2. **A very long title still ellipsises on a narrow slot.** A 400px `2x1`

@@ -267,8 +267,18 @@ includesAll(htmlRoot, [
 includesAll(method('_openNavigationApp'), [
   "this._aaSession === 'active'",
   "B.launchProjection('AA')",
-  'CAR_NAV_PACKAGE',
-], 'AA session tap must raise projection, not fake navigation');
+  "this._launchDefaultOrPick('navigation')",
+], 'AA session tap must raise projection; an idle card uses the saved default');
+assert.ok(!method('_openNavigationApp').includes('CAR_NAV_PACKAGE'),
+  'an idle navigation card must not launch the fake navigation package');
+includesAll(htmlRoot, [
+  "case 'pickDefaultApp:navigation':",
+  "this._openDefaultAppPicker('navigation', false)",
+  'pickDefaultApp:\' + cardId',
+  'h6_default_apps',
+], 'idle navigation can save a default app from the ⋯ menu');
+assert.ok(java.includes('isDefaultAppCommand'),
+  'native must relay pickDefaultApp or the ⋯ row is dropped');
 includesAll(method('_ensureDemoNavTicker'), [
   'DEMO_NAV_INTERVAL_MS',
   "this._aaSession === 'active'",

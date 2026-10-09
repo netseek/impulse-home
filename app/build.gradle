@@ -10,6 +10,9 @@ def appVersionCode = (findProperty("appVersionCode") ?: "10002").toString().toIn
 android {
     namespace "com.havalh6.viewer"
     compileSdk 36
+    buildFeatures {
+        aidl true
+    }
 
     defaultConfig {
         applicationId "com.havalh6.viewer"
@@ -116,6 +119,13 @@ tasks.configureEach { task ->
 tasks.register("prepareKotlinBuildScriptModel") {}
 
 dependencies {
+    // GWM hub Reboot binds a Shizuku user service that runs /system/bin/reboot.
+    // The provider merges the binder ContentProvider; the api is the client.
+    implementation "dev.rikka.shizuku:api:13.1.5"
+    implementation "dev.rikka.shizuku:provider:13.1.5"
+    // Shizuku's public methods are annotated with RestrictTo. Compile-only,
+    // so it is not packaged.
+    compileOnly "androidx.annotation:annotation:1.8.2"
     // JVM tests for the pure-Java trip engine (TripEngineTest, TripSignalsTest).
     testImplementation "junit:junit:4.13.2"
 }

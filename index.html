@@ -205,7 +205,9 @@
   <!-- autoplay+muted must be content attributes (not just JS play()) or
        Chromium treats this as a paused media element and draws its tap-to-play
        overlay. webkit-playsinline keeps WebView 91 from promoting to fullscreen. -->
-  <video id="hv-splash-video" src="assets/app-splash.mp4" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay muted playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
+  <!-- src is assigned below, and only when the intro is on. A content src
+       would start the fetch during parse, before settings can cancel it. -->
+  <video id="hv-splash-video" poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoplay muted playsinline webkit-playsinline preload="auto" disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback"></video>
   <canvas id="hv-splash-canvas"></canvas>
   <button type="button" id="hv-splash-skip">PULAR</button>
 </div>
@@ -250,11 +252,23 @@ window.HavalSplash = (function () {
     for (var i = 0; i < cbs.length; i++) { try { cbs[i](); } catch (e) { console.warn('[Splash]', e); } }
   }
 
+  // Absent, or any value other than false, keeps the clip. The layout manager
+  // writes introVideo; h6OfferIntroVideoOff (in the app script) is the prompt.
+  function introVideoOn() {
+    try {
+      var raw = localStorage.getItem('h6_settings_v1');
+      if (!raw) return true;
+      var saved = JSON.parse(raw);
+      return !(saved && saved.introVideo === false);
+    } catch (e) { return true; }
+  }
   // ?nosplash — boot straight to the loader with no clip and no decoding, so a
   // cold start can be timed with the splash's cost removed. Kept in because
   // "is the splash slowing the boot down?" is otherwise unanswerable without a
   // rebuild, and the answer decides whether the clip needs re-encoding.
-  var noSplash = /[?&#]nosplash\b/.test(location.search + location.hash);
+  // The same path serves the user setting, which must not fetch the file.
+  var settingOff = !introVideoOn();
+  var noSplash = settingOff || /[?&#]nosplash\b/.test(location.search + location.hash);
   if (noSplash && video && video.parentNode) {
     try { video.pause(); } catch (e) {}
     video.removeAttribute('src');
@@ -265,9 +279,14 @@ window.HavalSplash = (function () {
 
   if (!el || !video) {
     releasePage();
+    try {
+      if (window.AppLauncherBridge && typeof window.AppLauncherBridge.endSplashOverlay === 'function') {
+        window.AppLauncherBridge.endSplashOverlay();
+      }
+    } catch (e) {}
     finish();
     return {
-      active: false, fadeMs: 0,
+      active: false, userOff: settingOff, fadeMs: 0,
       whenDone: function (cb) { cb(); },
       fadeOut: function () {},
       skip: function () {},
@@ -279,6 +298,10 @@ window.HavalSplash = (function () {
       setStatus: function () {},
     };
   }
+
+  // Content src would start the fetch before this script can see the setting.
+  try { video.setAttribute('src', 'assets/app-splash.mp4'); } catch (e) {}
+  video.src = 'assets/app-splash.mp4';
 
   // ── Presenter ─────────────────────────────────────────────────────────────
   // Playback is the WebView's own video overlay, letterboxed. A canvas is only
@@ -575,6 +598,7 @@ window.HavalSplash = (function () {
 
   return {
     active: true,
+    userOff: false,
     /** Kept in step with the #hv-splash opacity transition in <head>. */
     fadeMs: 1100,
     /** True once the clip has ended, been skipped, or failed. Overlay may still be up. */
@@ -659,7 +683,7 @@ window.HavalSplash = (function () {
             <div class="hv-navigation {{ wg.navigationSizeClass }} {{ wg.navigationLiveClass }}" onClick="{{ wg.onNavigationOpen }}"><div class="hv-glance-head"><span>NAVEGAÇÃO</span><span class="hv-nav-head-meta"><sc-if value="{{ wg.navigationHasAppIcon }}" hint-placeholder-val="{{ false }}"><img class="hv-nav-app-icon" src="{{ wg.navigationAppIcon }}" alt=""></sc-if><small>{{ wg.navigationSource }}</small></span></div><div class="hv-navigation-tbt"><div class="hv-navigation-maneuver"><div class="hv-navigation-turn"><sc-if value="{{ wg.navigationHasTurnIcon }}" hint-placeholder-val="{{ true }}"><span class="hv-navigation-turn-icon" style="{{ wg.navigationTurnStyle }}"></span></sc-if><sc-if value="{{ wg.navigationHasTurnGlyph }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24"><path d="{{ wg.navigationTurnGlyph }}"></path></svg></sc-if></div><strong>{{ wg.navigationDistance }}</strong><svg class="hv-navigation-doodle" viewBox="0 0 60 60" aria-hidden="true"><path class="track" d="M9 52C13 30 30 40 32 25S45 9 55 9"></path><path class="route" d="M9 52C13 30 30 40 32 25S45 9 55 9"></path><circle cx="9" cy="52" r="3"></circle></svg></div><div class="hv-navigation-text"><strong>{{ wg.navigationHeadline }}</strong><div class="hv-navigation-metrics"><sc-if value="{{ wg.navigationHasRemaining }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationRemaining }}</strong><span>REMAINING</span></div></sc-if><sc-if value="{{ wg.navigationHasDuration }}" hint-placeholder-val="{{ true }}"><div class="hv-navigation-metric"><strong>{{ wg.navigationDuration }}</strong><span>HORA</span></div></sc-if><sc-if value="{{ wg.navigationHasEta }}" hint-placeholder-val="{{ false }}"><div class="hv-navigation-metric is-eta"><strong>{{ wg.navigationEta }}</strong><span>ETA</span></div></sc-if></div><div class="hv-navigation-idle"><sc-if value="{{ wg.navigationHasIdleCity }}" hint-placeholder-val="{{ false }}"><span class="hv-navigation-idle-city">{{ wg.navigationIdleCity }}</span></sc-if><span class="hv-navigation-idle-action">{{ wg.navigationIdleActionHint }}</span></div></div></div></div>
           </sc-if>
           <sc-if value="{{ wg.isMedia }}" hint-placeholder-val="{{ false }}">
-            <div class="hv-media {{ wg.mediaSizeClass }} {{ wg.mediaLayoutClass }} {{ wg.mediaArtClass }} {{ wg.mediaOpenClass }}" onClick="{{ wg.onMediaOpen }}">
+            <div class="hv-media {{ wg.mediaSizeClass }} {{ wg.mediaLayoutClass }} {{ wg.mediaArtClass }} {{ wg.mediaOpenClass }} {{ wg.mediaLyricsClass }}" onClick="{{ wg.onMediaOpen }}">
               <div class="hv-media-art">
                 <sc-if value="{{ wg.mediaHasArt }}" hint-placeholder-val="{{ false }}"><img src="{{ wg.mediaArt }}" alt=""></sc-if>
                 <sc-if value="{{ wg.mediaShowArtPlaceholder }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.4"></circle></svg></sc-if>
@@ -672,6 +696,7 @@ window.HavalSplash = (function () {
               </sc-if>
               <div class="hv-media-body">
                 <div class="hv-media-chrome">
+                  <sc-if value="{{ wg.mediaLyricsOpen }}" hint-placeholder-val="{{ false }}"><div class="hv-lyrics" role="region" aria-label="Letras" aria-live="off" onClick="{{ wg.mediaLyricsRetry }}"></div></sc-if>
                   <div class="hv-media-source {{ wg.mediaSourceClass }}" role="status">{{ wg.mediaSource }}</div>
                   <div class="hv-media-title">{{ wg.mediaTitle }}</div>
                   <sc-if value="{{ wg.mediaShowArtist }}" hint-placeholder-val="{{ true }}"><div class="hv-media-artist">{{ wg.mediaArtist }}</div></sc-if>
@@ -685,6 +710,7 @@ window.HavalSplash = (function () {
                     <sc-if value="{{ wg.mediaShowPlay }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"></path></svg></sc-if>
                   </button>
                   <sc-if value="{{ wg.mediaShowSkip }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ wg.mediaNext }}" aria-label="Próxima faixa" title="Próxima faixa" disabled="{{ wg.mediaControlsDisabled }}" aria-disabled="{{ wg.mediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg></button></sc-if>
+                  <sc-if value="{{ wg.mediaShowLyricsBtn }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-media-lyrics-btn" onClick="{{ wg.mediaLyricsToggle }}" aria-label="{{ wg.mediaLyricsToggleLabel }}" title="{{ wg.mediaLyricsToggleLabel }}" aria-pressed="{{ wg.mediaLyricsOpen }}" disabled="{{ wg.mediaLyricsDisabled }}" aria-disabled="{{ wg.mediaLyricsDisabled }}">LETRA</button></sc-if>
                 </div>
               </div>
             </div>
@@ -1225,7 +1251,6 @@ window.HavalSplash = (function () {
 
     <!-- ── LAYOUT (background + widget hint) ── -->
     <sc-if value="{{ sectionIsLayout }}" hint-placeholder-val="{{ false }}">
-      <button type="button" class="hv-config-reset" onClick="{{ openHomeSettings }}" disabled="{{ !homeSettingsAvailable }}">DEFINIR COMO TELA INICIAL</button>
       <sc-if value="{{ layoutSectionVisible }}" hint-placeholder-val="{{ false }}">
       <div style="font-family: var(--hv-font); font-size: 9px; letter-spacing: .18em; opacity: .5; margin-bottom: 8px;">PREENCHIMENTO CENTRAL</div>
       <div class="hv-layout-fill-row">
@@ -1771,14 +1796,20 @@ window.HavalSplash = (function () {
               <button type="button" class="{{ studioTimeClass }}" onClick="{{ studioTimeCycle }}" title="Toque para alternar: Dia, Noite, Auto">{{ studioTimeLabel }}</button>
             </div>
             <div class="hv-studio-note">{{ studioTimeNote }}</div>
-            <div class="hv-studio-label">TELA INICIAL</div>
-            <button type="button" class="hv-studio-custom-btn" onClick="{{ openHomeSettings }}" disabled="{{ !homeSettingsAvailable }}">Definir como tela inicial</button>
-            <div class="hv-studio-note">Escolha o Impulse Home na tela do Android. Disponível se a central permitir.</div>
             <div class="hv-studio-label">IMAGEM</div>
             <button type="button" class="hv-studio-wall {{ studioWallClass }}" onClick="{{ studioOpenWallpaper }}" aria-label="{{ studioWallLabel }}" title="{{ studioWallLabel }}">
               <span class="hv-studio-wall-img" style="{{ studioWallStyle }}"></span>
               <span class="hv-studio-wall-edit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"></path></svg></span>
             </button>
+            <div class="hv-studio-label">VÍDEO DE ABERTURA</div>
+            <label class="hv-studio-dynamic-col hv-studio-intro-video">
+              <span>Reproduzir ao iniciar</span>
+              <span class="hv-studio-toggle-wrap">
+                <input type="checkbox" checked="{{ studioIntroVideoChecked }}" onChange="{{ studioToggleIntroVideo }}" />
+                <span class="hv-studio-toggle-switch"></span>
+              </span>
+            </label>
+            <div class="hv-studio-note">Desligue para ir direto à tela, sem o vídeo.</div>
           </div>
         </div>
         <div class="hv-studio-foot"><button type="button" onClick="{{ studioApplyAppearanceAll }}" disabled="{{ studioApplyAllDisabled }}">Aplicar a todas as telas</button></div>
@@ -2280,41 +2311,6 @@ window.HavalSplash = (function () {
         </section>
         </div>
         <sc-if value="{{ focusedDrivingShowNote }}" hint-placeholder-val="{{ false }}"><div class="hv-driving-note">{{ focusedDrivingNote }}</div></sc-if>
-      </div>
-    </sc-if>
-    <sc-if value="{{ focusedCardIsMedia }}" hint-placeholder-val="{{ false }}">
-      <div class="hv-media-focus {{ focusedMediaArtClass }}">
-        <div class="hv-media-focus-main">
-          <div class="hv-media-focus-art">
-            <sc-if value="{{ focusedMediaHasArt }}" hint-placeholder-val="{{ false }}"><img src="{{ focusedMediaArt }}" alt=""></sc-if>
-            <sc-if value="{{ focusedMediaShowArtPlaceholder }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.4"></circle></svg></sc-if>
-          </div>
-          <div class="hv-media-focus-copy">
-            <sc-if value="{{ focusedMediaShowApp }}" hint-placeholder-val="{{ false }}">
-              <div class="hv-media-app">
-                <sc-if value="{{ focusedMediaHasAppIcon }}" hint-placeholder-val="{{ false }}"><img src="{{ focusedMediaAppIcon }}" alt=""></sc-if>
-                <span class="hv-media-app-name">{{ focusedMediaAppLabel }}</span>
-              </div>
-            </sc-if>
-            <div class="hv-media-title">{{ focusedMediaTitle }}</div>
-            <sc-if value="{{ focusedMediaShowArtist }}" hint-placeholder-val="{{ true }}"><div class="hv-media-artist">{{ focusedMediaArtist }}</div></sc-if>
-            <sc-if value="{{ focusedMediaShowAlbum }}" hint-placeholder-val="{{ true }}"><div class="hv-media-focus-album">{{ focusedMediaAlbum }}</div></sc-if>
-            <sc-if value="{{ focusedMediaShowProgress }}" hint-placeholder-val="{{ true }}"><div class="hv-media-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ focusedMediaProgressPct }}"><span style="width: {{ focusedMediaProgressWidth }};"></span></div></sc-if>
-            <sc-if value="{{ focusedMediaShowTimes }}" hint-placeholder-val="{{ true }}"><div class="hv-media-times"><span class="hv-media-time-cur">{{ focusedMediaTimeCur }}</span><span class="hv-media-time-dur">{{ focusedMediaTimeDur }}</span></div></sc-if>
-          </div>
-        </div>
-        <div class="hv-media-transport">
-          <button type="button" onClick="{{ focusedMediaPrev }}" aria-label="Faixa anterior" title="Faixa anterior" disabled="{{ focusedMediaControlsDisabled }}" aria-disabled="{{ focusedMediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg></button>
-          <button type="button" class="hv-media-play" onClick="{{ focusedMediaPlayPause }}" aria-label="{{ focusedMediaPlayLabel }}" title="{{ focusedMediaPlayLabel }}" disabled="{{ focusedMediaControlsDisabled }}" aria-disabled="{{ focusedMediaControlsDisabled }}">
-            <sc-if value="{{ focusedMediaPlaying }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"></path></svg></sc-if>
-            <sc-if value="{{ focusedMediaShowPlay }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"></path></svg></sc-if>
-          </button>
-          <button type="button" onClick="{{ focusedMediaNext }}" aria-label="Próxima faixa" title="Próxima faixa" disabled="{{ focusedMediaControlsDisabled }}" aria-disabled="{{ focusedMediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg></button>
-        </div>
-        <div class="hv-media-focus-foot">
-          <p class="hv-media-focus-note">{{ focusedMediaNote }}</p>
-          <button type="button" class="hv-media-focus-app" onClick="{{ focusedMediaOpenApp }}" disabled="{{ focusedMediaOpenDisabled }}" aria-disabled="{{ focusedMediaOpenDisabled }}">{{ focusedMediaOpenLabel }}</button>
-        </div>
       </div>
     </sc-if>
   </section>
@@ -3223,6 +3219,27 @@ window.HavalSplash = (function () {
       -webkit-box-orient: vertical;
       opacity: 0.9;
     }
+    /* Default app for an idle media or navigation card. Same frame as the
+       other popups, above the layout studio (z 83) so card edit can open it. */
+    .hv-default-app-pop {
+      position: absolute; z-index: 90; display: none; flex-direction: column;
+      left: var(--hv-pop-left, 24px); top: var(--hv-pop-top, 60px);
+      width: var(--hv-pop-width, 900px); height: var(--hv-pop-height, 460px);
+      box-sizing: border-box; padding: 12px 16px 16px; color: var(--hv-widget-fg, #edf5fa);
+      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.18)); border-radius: 22px;
+      background: var(--hv-frost-fill-strong, rgba(12,18,24,.94));
+      box-shadow: var(--hv-frost-shadow, 0 18px 50px rgba(0,0,0,.38));
+    }
+    .hv-default-app-head { height: 48px; display: flex; align-items: center; gap: 12px; flex: none; }
+    .hv-default-app-head button {
+      width: 44px; height: 44px; border: 0; border-radius: 14px;
+      background: rgba(255,255,255,.07); color: inherit; font-size: 22px; cursor: pointer;
+    }
+    .hv-default-app-title { flex: 1; font: 600 16px/1.2 var(--hv-font); letter-spacing: .02em; }
+    .hv-default-app-clear { width: auto; padding: 0 14px; font: 600 13px/1 var(--hv-font); }
+    .hv-default-app-grid { min-height: 0; flex: 1; overflow: auto; }
+    .hv-default-app-pop .hv-apps-tile.on { outline: 2px solid var(--hv-accent); outline-offset: -2px; }
+    .hv-default-app-empty { margin: 24px 8px; font-size: 14px; opacity: .7; }
     .hv-widget-toolbar {
       display: flex;
       flex-direction: row;
@@ -5239,74 +5256,102 @@ window.HavalSplash = (function () {
     .hv-media-3x2 { --hv-media-btn: 52px; --hv-media-title: 21px; }
     .hv-media-3x2 .hv-media-artist, .hv-media-2x2 .hv-media-artist { font-size: 12px; }
 
-    /* ── MEDIA popup ─────────────────────────────────────────────────────────
-       The same parts at the size a dialog can afford: art large enough to be
-       the cover it is, the metadata the source actually published, and the
-       three transport commands the bridge actually exposes. There is no seek
-       control because MediaBridge has no seek — the bar is a readout. */
-    .hv-media-focus { display: flex; flex-direction: column; gap: 12px; min-width: 0; --hv-media-btn: 52px; }
-    .hv-media-focus-main { display: flex; gap: 16px; align-items: stretch; min-width: 0; }
-    .hv-media-focus-art {
-      flex: 0 0 auto;
-      width: 168px;
-      height: 168px;
-      border-radius: 14px;
+    /* Lyrics: five fixed slots, painted by _paintLyrics straight into the DOM.
+       Nothing here is React-driven per line -- see the _live note in CLAUDE.md. */
+    /* In a widget the panel takes the place of the title block, so it fills the
+       chrome column rather than carrying a height of its own. */
+    .hv-media.lyrics-on .hv-media-chrome > :not(.hv-lyrics) { display: none; }
+    .hv-media.lyrics-on .hv-media-chrome { justify-content: stretch; }
+    /* A tall or big card (two rows) spends its top on the cover: full width,
+       fading into the card, with the lyrics running in the room beneath it. */
+    .hv-media { --hv-lyric-art-h: 140px; }
+    .hv-media-1x3 { --hv-lyric-art-h: 170px; }
+    .hv-media.cover.lyrics-on > .hv-media-art {
+      inset: 0 0 auto 0;
+      width: auto;
+      height: var(--hv-lyric-art-h);
+      border-radius: 0;
+      border: 0;
       overflow: hidden;
-      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.16));
-      background: var(--hv-frost-inner, rgba(255,255,255,.075));
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      z-index: 0;
+      -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
     }
-    .hv-media-focus-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .hv-media-focus-art svg { width: 40%; height: 40%; opacity: .45; }
-    .hv-media-focus-copy { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
-    /* Two lines, then a real ellipsis. A video title runs long and `overflow:
-       hidden` alone just guillotines the second line mid-word. */
-    .hv-media-focus-copy > .hv-media-title {
-      font-size: 22px;
-      white-space: normal;
-      line-height: 1.2;
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
+    .hv-media.cover.lyrics-on > .hv-media-art img { width: 100%; height: 100%; object-fit: cover; }
+    .hv-media.cover.lyrics-on.no-art > .hv-media-art { display: none; }
+    /* The cover banner sits under the body, so the body must not paint over it. */
+    .hv-media.cover.lyrics-on > .hv-media-body {
+      background: none;
+      color: inherit;
+      padding-top: var(--hv-media-pad);
     }
-    .hv-media-focus-copy > .hv-media-artist { font-size: 11px; }
-    .hv-media-focus-album {
-      font-family: var(--hv-font);
-      font-size: 8px;
+    .hv-media.cover.lyrics-on.has-art > .hv-media-body {
+      padding-top: calc(var(--hv-lyric-art-h) - 14px);
+    }
+    .hv-media-transport button.hv-media-lyrics-btn {
+      width: auto;
+      height: calc(var(--hv-media-btn) * .7);
+      padding: 0 12px;
+      border-radius: 999px;
+      font: 11px/1 var(--hv-font);
       letter-spacing: .1em;
-      text-transform: uppercase;
-      opacity: .6;
+      white-space: nowrap;
+    }
+    .hv-media-transport button.hv-media-lyrics-btn[aria-pressed="true"] {
+      background: var(--hv-accent, #2aa7b7);
+      border-color: var(--hv-accent, #2aa7b7);
+      color: #06131a;
+    }
+    .hv-lyrics {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 3px;
+      overflow: hidden;
+      text-align: center;
+      cursor: default;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+    }
+    .hv-lyric {
+      width: 100%;
+      min-height: 1.3em;
+      font: 600 11px/1.3 var(--hv-font);
+      opacity: .32;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    /* The app pill sits in the dialog's flow rather than pinned to a corner:
-       there is no artwork behind the copy here for it to label. */
-    .hv-media-focus .hv-media-app { position: static; align-self: flex-start; margin-bottom: 2px; max-width: 100%; }
-    .hv-media-focus .hv-media-transport { justify-content: center; gap: 16px; margin-top: 10px; }
-    .hv-media-focus-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .hv-media-focus-app {
-      min-height: 30px;
-      padding: 0 14px;
-      border-radius: 999px;
-      border: 1px solid var(--hv-frost-edge, rgba(255,255,255,.16));
-      background: transparent;
-      color: inherit;
-      font: 8px/1 var(--hv-font);
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      cursor: pointer;
-      white-space: nowrap;
+    .hv-lyric.is-near { opacity: .52; }
+    .hv-lyric.is-cur { font-size: 15px; opacity: 1; }
+    .hv-media-3x1 .hv-lyric { font-size: 13px; }
+    .hv-media-3x1 .hv-lyric.is-cur { font-size: 18px; }
+    .hv-media-1x2 .hv-lyric, .hv-media-1x3 .hv-lyric { font-size: 15px; }
+    .hv-media-1x2 .hv-lyric.is-cur, .hv-media-1x3 .hv-lyric.is-cur { font-size: 20px; }
+    .hv-media-1x2 .hv-lyrics, .hv-media-1x3 .hv-lyrics { gap: 6px; }
+    .hv-media-2x2 .hv-lyric { font-size: 18px; }
+    .hv-media-2x2 .hv-lyric.is-cur { font-size: 26px; }
+    .hv-media-2x2 .hv-lyrics { gap: 8px; }
+    .hv-media-3x2 .hv-lyric { font-size: 21px; }
+    .hv-media-3x2 .hv-lyric.is-cur { font-size: 31px; }
+    .hv-media-3x2 .hv-lyrics { gap: 9px; }
+    /* Tall and big cards let a long line wrap onto up to three rows. Rows of one
+       line sit close (1.12) while the gap between lines stays wide, so a wrapped
+       line still reads as a single line. */
+    .hv-media-1x2 .hv-lyric, .hv-media-1x3 .hv-lyric,
+    .hv-media-2x2 .hv-lyric, .hv-media-3x2 .hv-lyric {
+      white-space: normal;
+      line-height: 1.12;
+      min-height: 1.12em;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      text-overflow: clip;
     }
-    .hv-media-focus-app[disabled] { opacity: .34; cursor: default; }
-    .hv-media-focus-note {
-      font: 7px/1.45 var(--hv-font);
-      letter-spacing: .05em;
-      opacity: .72;
-      margin: 0;
-    }
+    .hv-lyrics.is-msg .hv-lyric { opacity: .6; font-size: 11px; white-space: normal; }
     .hv-chrome {
       position: absolute;
       top: var(--hv-safe-top, 22px);
@@ -6801,6 +6846,7 @@ window.HavalSplash = (function () {
       gap: 10px;
       margin: -6px 0 18px;
     }
+    .hv-studio-intro-video { width: 100%; margin: 10px 0 8px; }
     .hv-studio-dynamic-col {
       display: flex;
       align-items: center;
@@ -7758,6 +7804,24 @@ window.HavalSplash = (function () {
     .hv-energy-ask-box { width:min(468px,calc(100vw - 48px)); display:flex; flex-direction:column; gap:12px; padding:20px; border-radius:22px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
     .hv-energy-ask-box > strong { font:600 18px/1.2 var(--hv-font); }
     .hv-energy-ask-box > p { margin:0; font-size:14px; opacity:.78; }
+    .hv-intro-offer { position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:flex-start; padding:var(--hv-popup-top,46px) 0 var(--hv-popup-bottom-inset,168px) 64px; box-sizing:border-box; background:linear-gradient(90deg, rgba(10,16,24,.42) 0%, rgba(10,16,24,.08) 46%, rgba(10,16,24,0) 62%); }
+    .hv-intro-offer-box { width:min(460px, 42vw); display:flex; flex-direction:column; gap:12px; padding:22px 22px 18px; border-radius:20px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
+    .hv-intro-offer-box > strong { font:700 16px/1.2 var(--hv-font); letter-spacing:.04em; }
+    .hv-intro-offer-box > p { margin:0; font-size:14px; line-height:1.45; }
+    .hv-intro-offer-hint { opacity:.72; font-size:13px; }
+    .hv-intro-offer-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .hv-intro-offer-actions > button { min-height:46px; border:0; border-radius:12px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:600 14px/1 var(--hv-font); cursor:pointer; }
+    .hv-intro-offer-actions > button.primary { background:var(--hv-accent,#2aa7b7); color:#08131a; }
+    .hv-intro-offer-actions > button.wide { grid-column:1 / -1; opacity:.8; }
+    .hv-intro-offer-actions > button:active { filter:brightness(1.12); }
+    .hv-perm-offer { position:fixed; inset:0; z-index:130; display:flex; align-items:center; justify-content:flex-start; padding:var(--hv-popup-top,46px) 0 var(--hv-popup-bottom-inset,168px) 64px; box-sizing:border-box; background:linear-gradient(90deg, rgba(10,16,24,.42) 0%, rgba(10,16,24,.08) 46%, rgba(10,16,24,0) 62%); }
+    .hv-perm-offer-box { position:relative; width:min(460px, 42vw); display:flex; flex-direction:column; gap:12px; padding:22px 22px 18px; border-radius:20px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
+    .hv-perm-offer-box > strong { font:700 16px/1.2 var(--hv-font); letter-spacing:.04em; padding-right:36px; }
+    .hv-perm-offer-box > p { margin:0; font-size:14px; line-height:1.45; }
+    .hv-perm-offer-hint { opacity:.72; font-size:13px; }
+    .hv-perm-offer-box > button { min-height:46px; border:0; border-radius:12px; background:var(--hv-accent,#2aa7b7); color:#08131a; font:600 14px/1 var(--hv-font); cursor:pointer; }
+    .hv-perm-offer-box > button:active { filter:brightness(1.12); }
+    .hv-perm-offer-box > button.hv-perm-offer-close { position:absolute; top:10px; right:10px; width:36px; height:36px; min-height:36px; padding:0; border-radius:10px; background:rgba(255,255,255,.08); color:inherit; font-size:20px; line-height:1; }
     .hv-energy-ask-box label { display:flex; flex-direction:column; gap:6px; }
     .hv-energy-ask-box label > small { font:600 10px/1.3 var(--hv-font); letter-spacing:.06em; opacity:.72; }
     .hv-energy-ask-box input { height:48px; padding:0 14px; border:1px solid rgba(255,255,255,.2); border-radius:12px; background:rgba(255,255,255,.06); color:inherit; font:500 20px/1 var(--hv-font); }
@@ -9069,6 +9133,27 @@ window.HavalSplash = (function () {
     </div>
   </div>
 
+  <div class="hv-default-app-pop" style="display: {{ defaultAppPickerDisplay }};" role="dialog" aria-label="{{ defaultAppPickerTitle }}">
+    <div class="hv-default-app-head">
+      <button type="button" onClick="{{ closeDefaultAppPicker }}" aria-label="Fechar">×</button>
+      <span class="hv-default-app-title">{{ defaultAppPickerTitle }}</span>
+      <sc-if value="{{ defaultAppPickerCanClear }}" hint-placeholder-val="{{ false }}">
+        <button type="button" class="hv-default-app-clear" onClick="{{ clearDefaultApp }}">LIMPAR</button>
+      </sc-if>
+    </div>
+    <sc-if value="{{ defaultAppPickerEmpty }}" hint-placeholder-val="{{ false }}">
+      <p class="hv-default-app-empty">Nenhum app para escolher.</p>
+    </sc-if>
+    <div class="hv-apps-grid hv-default-app-grid">
+      <sc-for list="{{ defaultAppPickerItems }}" as="ap" hint-placeholder-count="0">
+        <button type="button" class="hv-apps-tile {{ ap.cls }}" onClick="{{ ap.onClick }}" title="{{ ap.label }}">
+          <img src="{{ ap.icon }}" alt="">
+          <span class="hv-apps-tile-label">{{ ap.label }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+
   <div class="hv-widget-slot-banner" style="display: {{ widgetSlotBannerDisplay }};">
     <span class="hv-widget-slot-banner-text">{{ widgetSlotBannerText }}</span>
     <button type="button" class="hv-widget-slot-banner-close" onClick="{{ closeWidgetPicker }}" title="Fechar">×</button>
@@ -9172,6 +9257,42 @@ window.HavalSplash = (function () {
       </div>
     </div>
   </div>
+
+  <sc-if value="{{ introSkipOfferOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="hv-intro-offer" role="dialog" aria-label="Vídeo de abertura">
+      <div class="hv-intro-offer-box">
+        <strong>Vídeo de abertura</strong>
+        <p>Você pulou o vídeo de abertura. Quer desativá-lo nas próximas vezes?</p>
+        <p class="hv-intro-offer-hint">Para mudar depois, abra o gerenciador de layout, vá em Aparência e use Vídeo de abertura.</p>
+        <div class="hv-intro-offer-actions">
+          <button type="button" class="primary" onClick="{{ introSkipOfferYes }}">Sim</button>
+          <button type="button" onClick="{{ introSkipOfferNo }}">Não</button>
+          <button type="button" class="wide" onClick="{{ introSkipOfferNever }}">Não perguntar de novo</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ runtimePermOfferOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="hv-perm-offer" role="dialog" aria-label="Permissões">
+      <div class="hv-perm-offer-box">
+        <button type="button" class="hv-perm-offer-close" onClick="{{ runtimePermDismiss }}" aria-label="Fechar">×</button>
+        <strong>Permissões necessárias</strong>
+        <p>Para o Impulse Home funcionar por completo, confirme o que ainda falta.</p>
+        <sc-if value="{{ runtimePermShowLocation }}" hint-placeholder-val="{{ false }}">
+          <p>A localização mostra a cidade no cartão de navegação e registra as viagens.</p>
+        </sc-if>
+        <sc-if value="{{ runtimePermShowStorage }}" hint-placeholder-val="{{ false }}">
+          <p>O armazenamento guarda as configurações e o histórico de viagens, mesmo se o aplicativo for reinstalado.</p>
+        </sc-if>
+        <sc-if value="{{ runtimePermShowMedia }}" hint-placeholder-val="{{ false }}">
+          <p>O acesso à mídia deixa o cartão mostrar a música que está tocando. Na tela do Android, ative o Impulse Home em Acesso às notificações.</p>
+        </sc-if>
+        <p class="hv-perm-offer-hint">Toque em Permitir e confirme na tela do Android. Se fechar, a pergunta volta em 10 segundos enquanto ainda faltar alguma permissão.</p>
+        <button type="button" onClick="{{ runtimePermAllow }}">Permitir</button>
+      </div>
+    </div>
+  </sc-if>
 
   <div class="hv-wallpaper-backdrop {{ wallpaperBackdropClass }}" onClick="{{ closeWallpaperPopup }}"></div>
   {{ wallpaperPanelView }}
@@ -9458,6 +9579,16 @@ const CAR_CLIMATE_HANDOFF = 'app.viewer.climate_handoff';
 // pulse (plus the burst a knob turn produces) into a single opening.
 const CLIMATE_PANEL_HOLD_MS = 10000;
 const CLIMATE_PANEL_COALESCE_MS = 600;
+// A recirculation change (AUTO, or AQS) pulses the same notify as a button.
+// The recycle echo can land just before the notify or just after it. Wait out
+// the late one; a change already inside the slop still belongs to this pulse.
+const CLIMATE_PANEL_RECIRC_SLOP_MS = 250;
+const CLIMATE_PANEL_RECIRC_GRACE_MS = 400;
+// Sensors and Impulse prefs move without anyone asking for the panel.
+const CLIMATE_PANEL_QUIET_FIELDS = {
+  inside: 1, outside: 1, pm: 1, tempRange: 1, fanRange: 1, ventMax: 1,
+  maxAcUnlock: 1, ventWithAc: 1,
+};
 const CAR_HVAC_FIELD = Object.keys(CAR_HVAC).reduce((m, f) => { m[CAR_HVAC[f]] = f; return m; }, {});
 const CLIM_BOOL = { power: 1, auto: 1, sync: 1, ac: 1, front: 1, rear: 1, anion: 1, aqs: 1, heating: 1, autoDefrost: 1, limit: 1, maxAcUnlock: 1, ventWithAc: 1 };
 // Long enough for a round trip through Impulse and the bus; a write that never
@@ -9800,7 +9931,7 @@ const H6_BOTTOM_CARD_CATALOG = [
   // The card is a weather glance that opens CLIMA; power lives in the popup.
   { id: 'climate', title: 'Ar Condicionado', action: 'openClimate' },
   { id: 'consumption', title: 'Consumo', action: 'openConsumption' },
-  { id: 'media', title: 'Mídia', action: 'openMediaApp', longAction: 'openMedia' },
+  { id: 'media', title: 'Mídia', action: 'openMediaApp' },
   { id: 'range', title: 'Autonomia', action: 'openRange' },
   { id: 'power', title: 'Fluxo de energia', action: 'openPower' },
   { id: 'status', title: 'Status do veículo', action: 'openVehicleStatus' },
@@ -9993,7 +10124,6 @@ const CAR_SPORT_ACCENT = '#e0392c';
  */
 const H6_CARD_POPUP_TYPES = {
   climate: 'climate',
-  media: 'media',
   consumption: 'consumption',
   range: 'range',
   power: 'power',
@@ -10052,6 +10182,18 @@ function h6PlateFormat(text) {
   if (H6_PLATE_MERCOSUL_RE.test(t)) return 'mercosul';
   if (H6_PLATE_LEGACY_RE.test(t)) return 'legacy';
   return 'partial';
+}
+/**
+ * Ask to turn the intro clip off only when the user skipped it after the home
+ * had already finished loading. A skip during the boot spinner, a clip that
+ * played out, first-run setup, or a stored "don't ask" all stay quiet.
+ * introVideo / introVideoPrompt default to on when the key is absent.
+ */
+function h6OfferIntroVideoOff(opts) {
+  var o = opts || {};
+  if (!o.skipped || o.loading || !o.setupDone) return false;
+  if (o.introVideo === false || o.introVideoPrompt === false) return false;
+  return true;
 }
 const DEMO_DOOR_SEQUENCE = [
   { key: 'closed', label: 'Todas as portas fechadas', open: {} },
@@ -10604,6 +10746,11 @@ class Component extends DCLogic {
     overrideSubTab: 'motion', // 'motion' | 'doors' | 'lights'
     cameraPreset: null, // custom slot key ('view0'..) or event preset name
     cameraShortcutEnabled: false, // shows/hides the camera quick-access icon on the car stage
+    introVideo: true, // boot splash clip; false skips the file (see HavalSplash)
+    introVideoPrompt: true, // false: never ask again after a late skip
+    introSkipOfferOpen: false,
+    runtimePermOfferOpen: false,
+    runtimePermMissing: '',
     camEventEnabled: false,
     camCycleEnabled: false,
     camOrbitEnabled: false,
@@ -10677,6 +10824,7 @@ class Component extends DCLogic {
     mediaPackageName: '',
     mediaArt: '',
     mediaHasTrack: false,
+    mediaLyricsOpen: false,
     mediaAppIcon: '',
     mediaCanLaunch: false,
     shellMode: BOOT_SHELL.mode,
@@ -10745,6 +10893,7 @@ class Component extends DCLogic {
     appsFabOpen: false,
     splitRatio: BOOT_SHELL.splitRatio,
     appsCatalogRev: 0,
+    defaultAppPicker: null,
     desktopIndex: 0,
     desktopRev: 0,
     desktopStudioOpen: false,
@@ -10770,6 +10919,7 @@ class Component extends DCLogic {
     this.outerRef = React.createRef();
     this._customAccents = this._loadCustomAccents();
     try { this._rangeUnit = localStorage.getItem('h6_range_unit') === 'mi' ? 'mi' : 'km'; } catch (e) { this._rangeUnit = 'km'; }
+    this._defaultApps = this._loadDefaultApps();
     try { this._rangeCardStyle = localStorage.getItem('h6_range_card_style') === 'gauge' ? 'gauge' : 'linear'; } catch (e) { this._rangeCardStyle = 'linear'; }
     try {
       const savedRangeMode = localStorage.getItem('h6_range_source_mode');
@@ -11463,6 +11613,8 @@ class Component extends DCLogic {
     if (typeof saved.wheelTintOverride === 'boolean') s.wheelTintOverride = saved.wheelTintOverride;
     if (typeof saved.wheelStyle === 'string') s.wheelStyle = saved.wheelStyle;
     if (typeof saved.cameraShortcutEnabled === 'boolean') s.cameraShortcutEnabled = saved.cameraShortcutEnabled;
+    if (saved.introVideo === false) s.introVideo = false;
+    if (saved.introVideoPrompt === false) s.introVideoPrompt = false;
     if (typeof saved.camEventEnabled === 'boolean') s.camEventEnabled = saved.camEventEnabled;
     if (typeof saved.camCycleEnabled === 'boolean') s.camCycleEnabled = saved.camCycleEnabled;
     if (typeof saved.camOrbitEnabled === 'boolean') s.camOrbitEnabled = saved.camOrbitEnabled;
@@ -16060,6 +16212,8 @@ class Component extends DCLogic {
       showFps: !!s.showFps,
       resScaleMode: s.resScaleMode || 'off',
       cameraShortcutEnabled: !!s.cameraShortcutEnabled,
+      introVideo: s.introVideo !== false,
+      introVideoPrompt: s.introVideoPrompt !== false,
       camEventEnabled: !!s.camEventEnabled,
       camCycleEnabled: !!s.camCycleEnabled,
       camOrbitEnabled: !!s.camOrbitEnabled,
@@ -16250,6 +16404,16 @@ class Component extends DCLogic {
     const themeMode = s.widgetThemeMode || 'dark';
     const themeBtn = hv(themeMode !== 'auto');
     const fields = {
+      introSkipOfferOpen: !!s.introSkipOfferOpen,
+      introSkipOfferYes: () => this._answerIntroVideoOffer('yes'),
+      introSkipOfferNo: () => this._answerIntroVideoOffer('no'),
+      introSkipOfferNever: () => this._answerIntroVideoOffer('never'),
+      runtimePermOfferOpen: !!s.runtimePermOfferOpen,
+      runtimePermShowLocation: String(s.runtimePermMissing || '').indexOf('location') >= 0,
+      runtimePermShowStorage: String(s.runtimePermMissing || '').indexOf('storage') >= 0,
+      runtimePermShowMedia: String(s.runtimePermMissing || '').indexOf('media') >= 0,
+      runtimePermAllow: () => this._requestRuntimePermissions(),
+      runtimePermDismiss: () => this._dismissRuntimePermOffer(),
       firstRunDisplay: s.firstRunSetupOpen ? 'flex' : 'none',
       firstRunBackdropClass: (s.firstRunSetupOpen ? 'on' : '')
         + (s.plateFieldFocused ? ' plate-editing' : ''),
@@ -16548,8 +16712,6 @@ class Component extends DCLogic {
         });
       })(),
       onSaveSettings: () => this.saveSettings(),
-      homeSettingsAvailable: !!(window.AppLauncherBridge && typeof window.AppLauncherBridge.openHomeSettings === 'function'),
-      openHomeSettings: () => window.AppLauncherBridge.openHomeSettings(),
       // The camera section has its own save-to-desktop row; a second SAVE
       // up here only made it unclear which one stores the view.
       configSaveDisplay: s.configSection === 'camera' ? 'none' : '',
@@ -17780,6 +17942,7 @@ class Component extends DCLogic {
       } catch (e) {}
       this._scheduleCamIconWarmup();
       this._scheduleDesktopShot(3000);
+      this._syncRuntimePermOffer();
       if (this.requestRender) this.requestRender(60);
     });
   }
@@ -29524,6 +29687,11 @@ class Component extends DCLogic {
         if (this._unmounted) return;
         this._trySplashHandOff();
       });
+    } else if (splash && splash.userOff && this.state.loading && !this.state.error) {
+      // Setting off: no clip, and don't hold the shell for a fade that isn't coming.
+      this._revealShellChrome({ immediate: true, keepHud: true });
+    } else if (splash && splash.userOff) {
+      this._trySplashHandOff();
     } else {
       this._revealShellChrome();
     }
@@ -37237,7 +37405,13 @@ class Component extends DCLogic {
    * so the icons don't fade in behind a still-up last frame.
    */
   _revealShellChrome(opts) {
-    if (this._shellChromeRevealed) return;
+    if (this._shellChromeRevealed) {
+      // Skip-during-load already raised the shell. The question is armed only
+      // once the model is in, so schedule it on this later call.
+      if (this._introVideoOfferArmed && !this._introVideoOfferTimer) this._scheduleIntroVideoOffer();
+      this._syncRuntimePermOffer();
+      return;
+    }
     this._shellChromeRevealed = true;
     // Chrome is going up while the GLB may still be arriving (skip). Any layout
     // notify that landed during the load parked its patch instead of painting
@@ -37276,6 +37450,8 @@ class Component extends DCLogic {
     } else {
       this._checkFirstRunSetup(true);
     }
+    this._scheduleIntroVideoOffer();
+    this._syncRuntimePermOffer();
   }
 
   _shouldShowCar() {
@@ -37662,6 +37838,141 @@ class Component extends DCLogic {
   }
 
   /**
+   * Merge a few keys into the settings blob without rewriting the camera.
+   * saveSettings replaces the whole blob, so these keys are also in its payload.
+   */
+  _patchSavedSettings(partial) {
+    if (!partial || typeof partial !== 'object') return;
+    try {
+      const raw = localStorage.getItem(this._settingsStorageKey());
+      const saved = raw ? JSON.parse(raw) : {};
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return;
+      Object.assign(saved, partial);
+      localStorage.setItem(this._settingsStorageKey(), JSON.stringify(saved));
+      this._savedSettings = Object.assign({}, this._savedSettings || {}, partial);
+    } catch (e) {
+      console.warn('[Settings] patch failed', e);
+    }
+  }
+
+  _setIntroVideoEnabled(on) {
+    const enabled = !!on;
+    const patch = { introVideo: enabled };
+    // Turning it back on may ask again the next time a late skip happens.
+    if (enabled) patch.introVideoPrompt = true;
+    this.setState(patch);
+    this._patchSavedSettings(patch);
+  }
+
+  _answerIntroVideoOffer(answer) {
+    const saved = {};
+    if (answer === 'yes') {
+      saved.introVideo = false;
+      saved.introVideoPrompt = false;
+    } else if (answer === 'never') {
+      saved.introVideoPrompt = false;
+    }
+    this.setState(Object.assign({ introSkipOfferOpen: false }, saved));
+    if (answer === 'yes' || answer === 'never') this._patchSavedSettings(saved);
+  }
+
+  _scheduleIntroVideoOffer() {
+    if (!this._introVideoOfferArmed) return;
+    clearTimeout(this._introVideoOfferTimer);
+    // Widgets already on screen (skip while the spinner was up): ask as soon
+    // as this load has finished. Otherwise wait out the splash fade and the
+    // widget fade, so the question does not land on a half-drawn home.
+    const widgetsUp = !(document.body && document.body.classList.contains('hv-boot'));
+    const delay = widgetsUp ? 0 : this._shellChromeTiming(false).readyMs;
+    this._introVideoOfferTimer = setTimeout(() => this._openIntroVideoOffer(), delay);
+  }
+
+  _armIntroVideoOffer() {
+    if (this._introVideoOfferArmed || (this.state && this.state.introSkipOfferOpen)) return;
+    const splash = window.HavalSplash;
+    const skipped = !!(splash && splash.wasSkipped && splash.wasSkipped());
+    if (!h6OfferIntroVideoOff({
+      skipped,
+      loading: !!(this.state && this.state.loading),
+      setupDone: this._hasCompletedSetup(),
+      introVideo: this.state.introVideo !== false,
+      introVideoPrompt: this.state.introVideoPrompt !== false,
+    })) return;
+    this._introVideoOfferArmed = true;
+  }
+
+  _openIntroVideoOffer() {
+    this._introVideoOfferArmed = false;
+    if (this._unmounted || !this.state || this.state.introSkipOfferOpen || this.state.firstRunSetupOpen) return;
+    const splash = window.HavalSplash;
+    if (!h6OfferIntroVideoOff({
+      skipped: !!(splash && splash.wasSkipped && splash.wasSkipped()),
+      loading: !!this.state.loading,
+      setupDone: this._hasCompletedSetup(),
+      introVideo: this.state.introVideo !== false,
+      introVideoPrompt: this.state.introVideoPrompt !== false,
+    })) return;
+    this.setState({ introSkipOfferOpen: true });
+  }
+
+  _runtimePermBlocked() {
+    if (!this.state || this.state.loading || this.state.firstRunSetupOpen) return true;
+    if (!this._hasCompletedSetup()) return true;
+    const splash = window.HavalSplash;
+    return !!(splash && splash.active && splash.isDone && !splash.isDone());
+  }
+
+  _runtimePermsMissing() {
+    try {
+      const b = window.AppLauncherBridge;
+      if (!b || typeof b.missingRuntimePermissions !== 'function') return '';
+      return String(b.missingRuntimePermissions() || '');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  _syncRuntimePermOffer() {
+    if (this._unmounted || !this.state) return;
+    const blocked = this._runtimePermBlocked();
+    const missing = blocked ? '' : this._runtimePermsMissing();
+    if (!blocked && !missing) this._clearRuntimePermSnooze();
+    const snoozed = this._runtimePermSnoozeUntil && Date.now() < this._runtimePermSnoozeUntil;
+    const open = !!missing && !snoozed;
+    if (open === !!this.state.runtimePermOfferOpen && missing === (this.state.runtimePermMissing || '')) return;
+    this._uiOnlyStateWrite = true;
+    this.setState({ runtimePermOfferOpen: open, runtimePermMissing: missing });
+  }
+
+  /** Hide the prompt for 10 s. It returns on its own if anything is still missing. */
+  _dismissRuntimePermOffer() {
+    this._runtimePermSnoozeUntil = Date.now() + 10000;
+    clearTimeout(this._runtimePermSnoozeTimer);
+    this._runtimePermSnoozeTimer = setTimeout(() => {
+      this._runtimePermSnoozeTimer = 0;
+      this._runtimePermSnoozeUntil = 0;
+      if (!this._unmounted) this._syncRuntimePermOffer();
+    }, 10000);
+    this._uiOnlyStateWrite = true;
+    this.setState({ runtimePermOfferOpen: false });
+  }
+
+  _clearRuntimePermSnooze() {
+    this._runtimePermSnoozeUntil = 0;
+    clearTimeout(this._runtimePermSnoozeTimer);
+    this._runtimePermSnoozeTimer = 0;
+  }
+
+  _requestRuntimePermissions() {
+    try {
+      const b = window.AppLauncherBridge;
+      if (b && typeof b.requestRuntimePermissions === 'function') b.requestRuntimePermissions();
+    } catch (e) {
+      console.warn('[Perm] request failed', e);
+    }
+  }
+
+  /**
    * Gate for splash → live model. The clip is allowed to play out even if the
    * GLB finished early. Skip OR natural clip-end while still loading tears the
    * overlay down and swaps the bottom progress line for a center spinner.
@@ -37684,7 +37995,8 @@ class Component extends DCLogic {
     if (this.state.loading && !this.state.error) {
       // Skip or clip finished while the model is still arriving: drop the
       // overlay so the shell can paint, replace the bottom line with a
-      // center spinner where the car will land.
+      // center spinner where the car will land. A skip is kept; the question
+      // waits until this load finishes and the home is up.
       this._applyChromeMainLeftVar();
       if (splash && typeof splash.dropNow === 'function') splash.dropNow();
       else if (splash && splash.fadeOut) splash.fadeOut();
@@ -37700,6 +38012,9 @@ class Component extends DCLogic {
       this._introPlayed = true;
       return;
     }
+    // Any skip asks, but only from here — loading is finished, so cards and
+    // widgets are up (or about to finish fading in).
+    if (skipped) this._armIntroVideoOffer();
     this._kickIntroReveal();
   }
 
@@ -40188,10 +40503,6 @@ class Component extends DCLogic {
       document.body.classList.contains('hv-desk-animating') ||
       document.body.classList.contains('hv-desk-bg-up')
     )) return;
-    if (type === 'media') {
-      this._openMediaApp(null);
-      return;
-    }
     if (this.state.focusedCardType === type) {
       this._closeFocusedCard();
       return;
@@ -40210,16 +40521,6 @@ class Component extends DCLogic {
     this.setState({ focusedCardType: type, desktopStudioOpen: false, panelOpen: false });
   }
 
-  /**
-   * The car wants its climate panel shown. Raises OUR popup instead, for
-   * CLIMATE_PANEL_HOLD_MS, and only while Impulse is actually holding the OEM app back --
-   * otherwise both would appear.
-   *
-   * This is a USER ACTION (a button or knob press), not a per-tick signal, so a React commit
-   * here is the same cost as tapping the card. What must not happen is one commit per bus
-   * frame: a single press arrives as 0 -> 2 -> 0 and a knob turn produces a burst, hence the
-   * coalescing window. See the `_live` seam notes in docs/engineering for why that matters.
-   */
   /**
    * Whether Impulse is really holding the OEM A/C app back for us.
    *
@@ -40244,6 +40545,56 @@ class Component extends DCLogic {
     this._suppressAutoClimateOpenUntil = Date.now() + (durationMs || 2500);
   }
 
+  /**
+   * The car wants its climate panel shown. Raises OUR popup instead, for
+   * CLIMATE_PANEL_HOLD_MS, and only while Impulse is actually holding the OEM app back --
+   * otherwise both would appear.
+   *
+   * This is a USER ACTION (a button or knob press), not a per-tick signal, so a React commit
+   * here is the same cost as tapping the card. What must not happen is one commit per bus
+   * frame: a single press arrives as 0 -> 2 -> 0 and a knob turn produces a burst, hence the
+   * coalescing window. See the `_live` seam notes in docs/engineering for why that matters.
+   *
+   * Recirculation is not one of those presses. In AUTO the car flips cycle_mode on its own
+   * and the same notify rides along, which was raising this popup over and over. A pulse
+   * whose only control change is recirculation is ignored. The open waits a short grace so
+   * a recycle echo that arrives just after the notify can still cancel it; a temperature,
+   * fan or mode echo opens immediately.
+   */
+  _noteClimatePanelCause(field) {
+    if (!this._climCauseAt) this._climCauseAt = {};
+    this._climCauseAt[field] = Date.now();
+    if (this._climatePanelDeferTimer) {
+      const pulseAt = this._climatePanelPulseAt || Date.now();
+      if (this._climatePanelHasUserCause(pulseAt, Date.now())) this._flushClimatePanelDefer();
+      return;
+    }
+    if (field === 'recirc') this._retractRecircClimatePanel();
+  }
+
+  _climateCauseInPulse(field, pulseAt, now) {
+    const at = this._climCauseAt && this._climCauseAt[field];
+    return !!at && at >= pulseAt - CLIMATE_PANEL_RECIRC_SLOP_MS && at <= now;
+  }
+
+  _climatePanelHasUserCause(pulseAt, now) {
+    const at = this._climCauseAt || {};
+    return Object.keys(at).some((field) => field !== 'recirc'
+      && !CLIMATE_PANEL_QUIET_FIELDS[field]
+      && this._climateCauseInPulse(field, pulseAt, now));
+  }
+
+  _climatePanelRecircOnly(pulseAt, now) {
+    if (!this._climateCauseInPulse('recirc', pulseAt, now)) return false;
+    return !this._climatePanelHasUserCause(pulseAt, now);
+  }
+
+  _climatePanelSuppressed(now) {
+    return this.state.focusedCardType !== 'climate'
+      && this._suppressAutoClimateOpenUntil
+      && now < this._suppressAutoClimateOpenUntil;
+  }
+
   _onCarClimatePanelRequest(value) {
     if (this._isDeskSwitchingOrRecent && this._isDeskSwitchingOrRecent()) return;
     // Only the rising edge. The trailing 0 is the car closing a panel we never opened.
@@ -40252,12 +40603,52 @@ class Component extends DCLogic {
     if (!this._climateHandoffOn()) return;
 
     const now = Date.now();
-    if (this.state.focusedCardType !== 'climate'
-        && this._suppressAutoClimateOpenUntil
-        && now < this._suppressAutoClimateOpenUntil) {
+    if (this._climatePanelSuppressed(now)) return;
+    // A second edge of this same pulse is already waiting on the recycle echo.
+    if (this._climatePanelDeferTimer) return;
+
+    this._climatePanelPulseAt = now;
+    if (this._climatePanelHasUserCause(now, now)) {
+      this._raiseClimatePanelFromCar(now);
       return;
     }
+    this._climatePanelDeferTimer = setTimeout(() => this._flushClimatePanelDefer(), CLIMATE_PANEL_RECIRC_GRACE_MS);
+  }
 
+  _flushClimatePanelDefer() {
+    if (this._climatePanelDeferTimer) {
+      clearTimeout(this._climatePanelDeferTimer);
+      this._climatePanelDeferTimer = null;
+    }
+    if (this._unmounted) return;
+    const now = Date.now();
+    const pulseAt = this._climatePanelPulseAt || now;
+    if (this._climatePanelSuppressed(now)) return;
+    if (this._climatePanelRecircOnly(pulseAt, now)) return;
+    this._raiseClimatePanelFromCar(now);
+  }
+
+  /**
+   * The notify won the race and the popup is already up, then the recycle echo
+   * shows the pulse was only recirculation. Put it away. A popup the user opened
+   * themselves has _climatePanelOpened clear, so this does not touch it.
+   */
+  _retractRecircClimatePanel() {
+    if (!this._climatePanelOpened || !this._climatePanelPulseAt) return;
+    const now = Date.now();
+    if (now - this._climatePanelPulseAt > CLIMATE_PANEL_RECIRC_GRACE_MS + CLIMATE_PANEL_RECIRC_SLOP_MS) return;
+    if (!this._climatePanelRecircOnly(this._climatePanelPulseAt, now)) return;
+    this._climatePanelOpened = false;
+    if (this._climatePanelTimer) {
+      clearTimeout(this._climatePanelTimer);
+      this._climatePanelTimer = null;
+    }
+    if (this.state.focusedCardType === 'climate') this._closeFocusedCard();
+  }
+
+  _raiseClimatePanelFromCar(now) {
+    if (this._isDeskSwitchingOrRecent && this._isDeskSwitchingOrRecent()) return;
+    if (!this._climateHandoffOn()) return;
     if (this._climatePanelAt && (now - this._climatePanelAt) < CLIMATE_PANEL_COALESCE_MS
         && this.state.focusedCardType === 'climate') {
       // Same press, or the next step of the same knob turn: just hold it up longer.
@@ -40266,7 +40657,6 @@ class Component extends DCLogic {
       return;
     }
     this._climatePanelAt = now;
-
     if (this.state.focusedCardType !== 'climate') {
       // _openFocusedCard TOGGLES, so it would close an already-open climate popup.
       this._openFocusedCard('climate');
@@ -40301,6 +40691,8 @@ class Component extends DCLogic {
   _clearClimatePanelHold() {
     if (this._climatePanelTimer) clearTimeout(this._climatePanelTimer);
     this._climatePanelTimer = null;
+    if (this._climatePanelDeferTimer) clearTimeout(this._climatePanelDeferTimer);
+    this._climatePanelDeferTimer = null;
     this._climatePanelOpened = false;
   }
 
@@ -40927,9 +41319,8 @@ class Component extends DCLogic {
     const base = {
       // Driving sizes to its content now that it fits; the others keep the
       // fixed frame their layouts were built against.
-      focusedCardPopupClass: (type ? 'on' : '') + (type === 'driving' || type === 'media' ? ' fit' : '')
+      focusedCardPopupClass: (type ? 'on' : '') + (type === 'driving' ? ' fit' : '')
         + (type === 'power' ? ' power-popup fit' : '')
-        + (type === 'media' ? ' narrow' : '')
         + (type === 'consumption' && this._energyPopupWideOn() ? ' wide' : '')
         + (type === 'climate' && this._climatePopupWideOn() ? ' wide' : '')
         + (type === 'range' ? (this._rangePopupWideOn() ? ' range-popup wide' : ' range-popup fit') : ''),
@@ -40938,12 +41329,11 @@ class Component extends DCLogic {
         : (type === 'consumption' ? 'CONSUMO'
           : (type === 'status' ? 'STATUS DO VEÍCULO'
               : (type === 'driving' ? 'CONTROLES DE CONDUÇÃO'
-                : (type === 'media' ? 'MEDIA'
-                  : (type === 'power' ? 'FLUXO DE ENERGIA' : 'AR CONDICIONADO'))))),
+                : (type === 'power' ? 'FLUXO DE ENERGIA' : 'AR CONDICIONADO')))),
       focusedCardIsClimate: type === 'climate', focusedCardIsConsumption: type === 'consumption',
       focusedCardIsStatus: type === 'status',
       focusedCardIsRange: type === 'range', focusedCardIsDriving: type === 'driving',
-      focusedCardIsMedia: type === 'media', focusedCardIsPower: type === 'power',
+      focusedCardIsPower: type === 'power',
       focusedCardBadge: '', focusedCardBadgeClass: '',
       // ENERGIA and RANGE carry action buttons beside the close button.
       focusedCardHeadClass: '',
@@ -40977,9 +41367,8 @@ class Component extends DCLogic {
         : (type === 'status' ? this._statusWidgetView(entry.item)
           : (type === 'range' ? this._rangeWidgetView({ type: 'range', w: 2, h: 2, popup: true })
             : (type === 'driving' ? this._drivingWidgetView(entry.item)
-              : (type === 'media' ? this._mediaWidgetView(entry.item)
-                : (type === 'power' ? this._powerWidgetView(entry.item)
-                  : this._consumptionWidgetView(entry.item, 'popup'))))));
+              : (type === 'power' ? this._powerWidgetView(entry.item)
+                : this._consumptionWidgetView(entry.item, 'popup')))));
     Object.keys(view).forEach((key) => {
       if (key.indexOf(type) === 0) base['focused' + key.charAt(0).toUpperCase() + key.slice(1)] = view[key];
     });
@@ -40999,12 +41388,6 @@ class Component extends DCLogic {
     } else if (type === 'status') {
       base.focusedCardBadge = view.statusSource;
       base.focusedCardBadgeClass = 'on ' + view.statusState;
-    }
-    // Media states its source beside the popup title for the same reason: a
-    // dialog's status belongs in its header, not in a row of its own.
-    if (type === 'media') {
-      base.focusedCardBadge = view.mediaSource;
-      base.focusedCardBadgeClass = 'on ' + view.mediaSourceClass;
     }
     // ENERGIA's tab bar has no room for its source line; simulated data is still said, here.
     if (type === 'consumption' && view.consumptionDemo) {
@@ -41399,6 +41782,8 @@ class Component extends DCLogic {
           : 'Noite quando os faróis acendem. Raio-X salvo nesta área de trabalho.'),
       // setState is async: save on the next tick, or it stores the old mode.
       studioTimeCycle: () => { this.cycleTimeMode(); setTimeout(() => this.saveSettings({ keepCamera: true }), 0); },
+      studioIntroVideoChecked: s.introVideo !== false,
+      studioToggleIntroVideo: (e) => this._setIntroVideoEnabled(!!(e && e.target && e.target.checked)),
       // 3D mode has no wallpaper: the thumb shows greyed out and empty, and a
       // tap still opens the editor (which switches the background to it).
       studioWallClass: fill === 'car' ? 'off' : '',
@@ -41481,9 +41866,17 @@ class Component extends DCLogic {
     const v = this._climParse(field, value);
     if (v === null) return;
     const c = this._climModel();
+    const prev = c[field];
     if (field === 'tempRange') { c.tMin = v[0]; c.tMax = v[1]; }
     else if (field === 'fanRange') { if (v > 0) c.fanMax = v; }
     else c[field] = v;
+    // First sight of a control is the boot snapshot, not a press. Recirculation
+    // is the exception: AUTO can publish it for the first time as the flip that
+    // also asked for the panel, and that flip must still be visible to the gate.
+    const recircChanged = field === 'recirc' && prev !== c.recirc;
+    const controlChanged = field !== 'recirc' && !CLIMATE_PANEL_QUIET_FIELDS[field]
+      && prev !== undefined && !this._climSame(field, prev, c[field]);
+    if (recircChanged || controlChanged) this._noteClimatePanelCause(field);
     // SYNC is one setpoint for both zones, and the car only reports the driver's
     // when a wheel button or its own panel moves it: the passenger number then
     // sat on whatever it was last told, sometimes for hours, while the car had
@@ -45901,16 +46294,18 @@ class Component extends DCLogic {
   }
 
   _openNavigationApp() {
-    try {
-      const B = window.AppLauncherBridge;
-      if (!B) return;
-      if (this._aaSession === 'active') {
-        if (typeof B.launchProjection === 'function') B.launchProjection('AA');
-        else if (typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_AA_PACKAGE);
-        return;
-      }
-      if (typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_NAV_PACKAGE);
-    } catch (e) {}
+    // A live session or a route on screen still raises the projection.
+    // The saved default is only for the idle card. Missing the bridge must
+    // not swallow that idle path — only the projection launch needs it.
+    if (this._aaSession === 'active' || (this._navLive && this._navLive.active)) {
+      try {
+        const B = window.AppLauncherBridge;
+        if (B && typeof B.launchProjection === 'function') B.launchProjection('AA');
+        else if (B && typeof B.launchAppInPopup === 'function') B.launchAppInPopup(CAR_AA_PACKAGE);
+      } catch (e) {}
+      return;
+    }
+    this._launchDefaultOrPick('navigation');
   }
 
   _tiresWidgetView(item) {
@@ -46383,13 +46778,10 @@ class Component extends DCLogic {
   }
 
   /**
-   * MEDIA card + widget + popup.
+   * MEDIA card + widget. No popup: the body opens the playing app.
    *
-   * One builder for all three surfaces, the way DRIVING does it:
-   * `_focusedCardRenderFields` re-exports every key starting with the card type,
-   * so `mediaTitle` reaches the popup markup as `focusedMediaTitle` with no
-   * second code path to keep in sync, and `_syncDockIndicators` reads the same
-   * object for the rail tile.
+   * One builder for both surfaces: the widget reads it directly and
+   * `_syncDockIndicators` reads the same object for the rail tile.
    *
    * Nothing here is simulated. Every field traces to a key MediaNowPlaying
    * actually publishes (title / artist / album / durationMs / positionMs /
@@ -46458,7 +46850,7 @@ class Component extends DCLogic {
     // has a launcher entry, which the native side reports rather than us
     // assuming. Without it the tap would be a silent no-op.
     const canLaunch = !!(hasTrack && s.mediaPackageName && s.mediaCanLaunch);
-    const openApp = (ev) => this._openMediaApp(ev);
+    const lyricsOn = !!s.mediaLyricsOpen && !compact;
     const appIcon = s.mediaAppIcon || (hasTrack && (s.mediaPackageName || s.mediaAppLabel)
       ? this._mediaAppIcon(s.mediaPackageName, s.mediaAppLabel) : '');
     return {
@@ -46503,28 +46895,22 @@ class Component extends DCLogic {
       mediaPrev: (ev) => this._mediaTransport('prev', ev),
       mediaPlayPause: (ev) => this._mediaTransport('playPause', ev),
       mediaNext: (ev) => this._mediaTransport('next', ev),
-      mediaNote: controlsDisabled
-        ? (needsListener
-          ? 'Transport is disabled until H6 3D is granted Notification access. Nothing is sent to a player while it is.'
-          : (bridge
-            ? 'Transport is disabled while no player reports an active track. Nothing is sent to a player while it is.'
-            : 'This shell has no MediaBridge, so no transport command can reach a player.'))
-        : 'Play, pause and skip are sent to the session that published this track.',
-      mediaOpenLabel: canLaunch ? ('OPEN ' + (s.mediaAppLabel || 'APP')) : 'NENHUM APP PARA ABRIR',
+      // Lyrics live on the widget only. Not at 1x1: there is room for one
+      // control there and it is play/pause.
+      mediaShowLyricsBtn: !compact,
+      mediaLyricsOpen: lyricsOn,
+      mediaLyricsClass: lyricsOn ? 'lyrics-on' : '',
+      mediaLyricsToggleLabel: lyricsOn ? 'Ocultar letra' : 'Letra',
+      mediaLyricsDisabled: !(hasTrack && bridge && typeof window.MediaBridge.requestLyrics === 'function'),
+      mediaLyricsToggle: (ev) => this._toggleMediaLyrics(ev),
+      mediaLyricsRetry: (ev) => this._retryMediaLyrics(ev),
       mediaCanLaunch: canLaunch,
-      mediaOpenDisabled: !canLaunch,
-      mediaOpenApp: openApp,
-      // The body opens the PLAYER, not the popup: the thing a driver wants from
-      // a now-playing card is the app it is playing from. The MEDIA popup is
-      // one long press away, on the widget's own menu and on the rail card.
+      // The body opens the PLAYER: the thing a driver wants from a now-playing
+      // card is the app it is playing from.
       mediaOpenClass: canLaunch ? 'can-open' : '',
       onMediaOpen: (ev) => {
         this._cardControlEvent(ev);
         if (this._widgetSuppressClick || this.state.widgetMenuId) return;
-        this._openMediaApp(ev);
-      },
-      onEdit: (ev) => {
-        if (ev && ev.stopPropagation) ev.stopPropagation();
         this._openMediaApp(ev);
       },
     };
@@ -48000,9 +48386,14 @@ class Component extends DCLogic {
       case 'openDriving':
         this._openFocusedCard('driving');
         break;
-      case 'openMedia':
       case 'openMediaApp':
         this._openMediaApp(null);
+        break;
+      case 'pickDefaultApp:media':
+        this._openDefaultAppPicker('media', false);
+        break;
+      case 'pickDefaultApp:navigation':
+        this._openDefaultAppPicker('navigation', false);
         break;
       case 'openPower':
         this._openFocusedCard('power');
@@ -48459,6 +48850,14 @@ class Component extends DCLogic {
    */
   _railEditMenuRows(cardId) {
     const rows = [];
+    if (cardId === 'media' || cardId === 'navigation') {
+      const saved = this._defaultApp(cardId);
+      rows.push({
+        label: this._defaultAppMenuLabel(saved),
+        command: 'pickDefaultApp:' + cardId,
+        selected: !!saved,
+      });
+    }
     const focusType = H6_CARD_POPUP_TYPES[cardId] || '';
     if (focusType) {
       const list = this._desktops || [];
@@ -48643,10 +49042,10 @@ class Component extends DCLogic {
       menuOpen: menuOpen,
       showEdit: item.type === 'profile' || item.type === 'graphs' || item.type === 'climate'
         || item.type === 'consumption' || item.type === 'status'
-        || item.type === 'driving' || item.type === 'media' || item.type === 'power' || item.type === 'clock' || item.type === 'range',
+        || item.type === 'driving' || item.type === 'power' || item.type === 'clock' || item.type === 'range',
       editLabel: item.type === 'profile' ? 'CUSTOMIZE'
         : (item.type === 'clock' ? 'CUSTOMIZE' : ((item.type === 'climate' || item.type === 'consumption'
-          || item.type === 'status' || item.type === 'driving' || item.type === 'media'
+          || item.type === 'status' || item.type === 'driving'
           || item.type === 'power' || item.type === 'range') ? 'OPEN' : 'CONFIGURE')),
       showResize: this._widgetResizeSizes(item).length > 0,
       showMove: this._widgetCanMove(item, side),
@@ -49304,6 +49703,7 @@ class Component extends DCLogic {
       chromeMainLeft: this._androidApp ? (this._chromeMainLeftPx(boardLeftPx) + 'px') : '96px',
       ...dock,
       ...appsFields,
+      ...this._defaultAppPickerFields(s),
       leftBoardDisplay: showLeft ? 'flex' : 'none',
       leftBoardLeft: leftRect.left,
       leftBoardTop: leftRect.top,
@@ -49943,6 +50343,179 @@ class Component extends DCLogic {
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
+  // ── Lyrics ────────────────────────────────────────────────────────────────
+  // Lines live on `this._lyrics`, NOT in React state: the current line changes
+  // every few seconds and a commit here costs ~197 ms (see the _live seam in
+  // CLAUDE.md). Only the open/closed toggle commits. The current line is found
+  // from `_mediaPositionMs` on the 4 Hz position tick and painted into the DOM.
+
+  _lyricsTrackKey() {
+    const s = this.state;
+    return (s.mediaTitle || '') + '\u0001' + (s.mediaArtist || '');
+  }
+
+  _toggleMediaLyrics(ev) {
+    if (ev) {
+      if (ev.stopPropagation) ev.stopPropagation();
+      if (ev.preventDefault) ev.preventDefault();
+    }
+    const open = !this.state.mediaLyricsOpen;
+    this.setState({ mediaLyricsOpen: open }, () => {
+      if (!open) { clearTimeout(this._lyricsRetryTimer); return; }
+      const key = this._lyricsTrackKey();
+      if (!(this._lyrics && this._lyrics.key === key && this._lyrics.status !== 'offline')) {
+        this._requestMediaLyrics(key);
+      }
+      this._paintLyrics(true);
+    });
+  }
+
+  _retryMediaLyrics(ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    if (this._lyrics && this._lyrics.status === 'offline') {
+      this._requestMediaLyrics(this._lyricsTrackKey());
+    }
+  }
+
+  _requestMediaLyrics(key, auto) {
+    clearTimeout(this._lyricsRetryTimer);
+    if (!auto) this._lyricsRetryN = 0;
+    this._lyrics = { key, status: 'loading', lines: null };
+    this._lyricsPaintedIdx = -2;
+    // No title means nothing to look up; the native side would answer with an
+    // empty key that this page (rightly) ignores, leaving "loading" up forever.
+    if (key.charAt(0) === '\u0001') this._lyrics.status = 'none';
+    this._paintLyrics(true);
+    if (this._lyrics.status === 'none') return;
+    try {
+      if (window.MediaBridge && typeof window.MediaBridge.requestLyrics === 'function') {
+        window.MediaBridge.requestLyrics();
+      } else {
+        this._lyrics.status = 'none';
+        this._paintLyrics(true);
+      }
+    } catch (e) {
+      console.warn('[media] lyrics request failed', e);
+      this._lyrics.status = 'offline';
+      this._paintLyrics(true);
+    }
+  }
+
+  /** Called by MainActivity.notifyMediaLyrics with the raw LRC text. */
+  applyMediaLyrics(key, lrc, definitive) {
+    // An answer for a track we have already left must not overwrite the new one.
+    if (!this._lyrics || this._lyrics.key !== key) return;
+    const lines = this._parseLrc(lrc);
+    this._lyrics.lines = lines;
+    this._lyrics.status = lines.length ? 'ok' : (definitive ? 'none' : 'offline');
+    this._lyricsPaintedIdx = -2;
+    this._paintLyrics(true);
+    if (this._lyrics.status === 'offline') this._scheduleLyricsAutoRetry();
+  }
+
+  /**
+   * The native side already retries a few times; this covers a longer outage.
+   * Backs off 4 s, 10 s, 20 s, then leaves the tap-to-retry message up. Stops
+   * when the panel closes, the track changes, or a manual retry takes over.
+   */
+  _scheduleLyricsAutoRetry() {
+    clearTimeout(this._lyricsRetryTimer);
+    const L = this._lyrics;
+    const delays = [4000, 10000, 20000];
+    const n = this._lyricsRetryN || 0;
+    if (!L || L.status !== 'offline' || n >= delays.length) return;
+    const key = L.key;
+    this._lyricsRetryTimer = setTimeout(() => {
+      const cur = this._lyrics;
+      if (!this.state.mediaLyricsOpen || !cur || cur.key !== key || cur.status !== 'offline') return;
+      this._lyricsRetryN = n + 1;
+      this._requestMediaLyrics(key, true);
+    }, delays[n]);
+  }
+
+  /** `[mm:ss.xx] text`, several stamps per line allowed, `[ar:..]` tags skipped. */
+  _parseLrc(lrc) {
+    const out = [];
+    const stamp = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+    String(lrc || '').split(/\r?\n/).forEach((raw) => {
+      const times = [];
+      let m;
+      let last = 0;
+      stamp.lastIndex = 0;
+      while ((m = stamp.exec(raw)) !== null) {
+        const frac = m[3] ? Number((m[3] + '00').slice(0, 3)) : 0;
+        times.push((Number(m[1]) * 60 + Number(m[2])) * 1000 + frac);
+        last = stamp.lastIndex;
+      }
+      if (!times.length) return;
+      const text = raw.slice(last).trim();
+      times.forEach((t) => out.push({ t, text }));
+    });
+    out.sort((a, b) => a.t - b.t);
+    return out;
+  }
+
+  /** Index of the last line that has started by `ms`, or -1 before the first. */
+  _lyricsIndexAt(lines, ms) {
+    let lo = 0;
+    let hi = lines.length - 1;
+    let ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (lines[mid].t <= ms) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+    return ans;
+  }
+
+  _paintLyrics(force) {
+    if (!this.state.mediaLyricsOpen) return;
+    const L = this._lyrics;
+    if (!L) return;
+    const hosts = document.querySelectorAll('.hv-lyrics');
+    if (!hosts.length) return;
+
+    let texts;
+    let cur = 2;
+    let msg = false;
+    if (L.status === 'ok') {
+      const idx = this._lyricsIndexAt(L.lines, (this._mediaPositionMs || 0));
+      // The tick is 4 Hz and a line lasts seconds: nearly every call lands here.
+      // (a host React just remounted is empty and must be filled regardless)
+      if (!force && idx === this._lyricsPaintedIdx && hosts[0].childElementCount === 5) return;
+      this._lyricsPaintedIdx = idx;
+      texts = [];
+      for (let k = -2; k <= 2; k += 1) {
+        const ln = L.lines[idx + k];
+        // An empty stamp is an instrumental gap; show a note instead of a hole.
+        texts.push(idx + k < 0 || !ln ? '' : (ln.text || '♪'));
+      }
+    } else {
+      msg = true;
+      this._lyricsPaintedIdx = -2;
+      const m = L.status === 'loading' ? 'A procurar letras…'
+        : L.status === 'offline' ? 'Letras indisponíveis agora — toque para tentar de novo'
+        : 'Sem letras sincronizadas para esta faixa';
+      texts = ['', '', m, '', ''];
+    }
+
+    hosts.forEach((host) => {
+      if (host.childElementCount !== 5) {
+        host.textContent = '';
+        for (let i = 0; i < 5; i += 1) {
+          const d = document.createElement('div');
+          host.appendChild(d);
+        }
+      }
+      host.classList.toggle('is-msg', msg);
+      for (let i = 0; i < 5; i += 1) {
+        const d = host.children[i];
+        if (d.textContent !== texts[i]) d.textContent = texts[i];
+        const cls = 'hv-lyric' + (i === cur ? ' is-cur' : (i === 1 || i === 3 ? ' is-near' : ''));
+        if (d.className !== cls) d.className = cls;
+      }
+    });
+  }
+
   _mediaTransport(cmd, ev) {
     if (ev) {
       if (ev.stopPropagation) ev.stopPropagation();
@@ -49963,15 +50536,183 @@ class Component extends DCLogic {
 
   _openMediaApp(ev) {
     if (ev && ev.stopPropagation) ev.stopPropagation();
-    const pkg = this.state.mediaPackageName || this._lastMediaPackageName;
+    const s = this.state;
+    // Only a session with a track, or one that is playing, counts as a player.
+    // A stopped session with no metadata (the Bluetooth stack keeps one around)
+    // is not: the card is idle and the saved default applies.
+    const active = !!(s.mediaHasTrack || s.mediaPlaying || s.mediaTitle || s.mediaArtist || s.mediaAlbum);
+    // An active player opens its own app. A track whose package cannot be
+    // raised (a projection with no launcher entry) has nothing to open.
+    if (active) {
+      if (s.mediaCanLaunch && s.mediaPackageName) this._launchPackage(s.mediaPackageName);
+      return;
+    }
+    this._launchDefaultOrPick('media');
+  }
+
+  /**
+   * The app an idle media or navigation card opens. One choice per card,
+   * shared by the rail tile and the widget, kept beside the other launcher
+   * preferences (PersistBackup mirrors the key).
+   */
+  _loadDefaultApps() {
+    const out = { media: null, navigation: null };
+    try {
+      const raw = JSON.parse(localStorage.getItem('h6_default_apps') || '{}');
+      ['media', 'navigation'].forEach((kind) => {
+        const row = raw && raw[kind];
+        const pkg = row && typeof row.packageName === 'string' ? row.packageName : '';
+        if (/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(pkg)) {
+          out[kind] = { packageName: pkg, label: String(row.label || pkg).slice(0, 40) };
+        }
+      });
+    } catch (e) {}
+    return out;
+  }
+
+  _defaultApp(kind) {
+    const row = this._defaultApps && this._defaultApps[kind];
+    return row && row.packageName ? row : null;
+  }
+
+  _defaultAppMenuLabel(saved) {
+    if (!saved) return 'App padrão…';
+    const prefix = 'Padrão: ';
+    const name = saved.label || saved.packageName;
+    const room = 28 - prefix.length;
+    const shown = name.length > room ? (name.slice(0, Math.max(0, room - 1)) + '…') : name;
+    return prefix + shown;
+  }
+
+  _persistDefaultApps() {
+    try {
+      const out = {};
+      ['media', 'navigation'].forEach((kind) => {
+        const row = this._defaultApp(kind);
+        if (row) out[kind] = { packageName: row.packageName, label: row.label || '' };
+      });
+      localStorage.setItem('h6_default_apps', JSON.stringify(out));
+    } catch (e) {}
+  }
+
+  _setDefaultApp(kind, packageName, label) {
+    if (kind !== 'media' && kind !== 'navigation') return;
+    if (!this._defaultApps) this._defaultApps = { media: null, navigation: null };
+    this._defaultApps[kind] = {
+      packageName: packageName,
+      label: String(label || packageName).slice(0, 40),
+    };
+    this._persistDefaultApps();
+    this._syncDockIndicators();
+  }
+
+  _clearDefaultApp(kind) {
+    if (!this._defaultApps) return;
+    this._defaultApps[kind] = null;
+    this._persistDefaultApps();
+    this._syncDockIndicators();
+  }
+
+  _launchPackage(pkg) {
     if (!pkg) return;
     try {
       if (window.AppLauncherBridge && typeof window.AppLauncherBridge.launchAppInPopup === 'function') {
         window.AppLauncherBridge.launchAppInPopup(pkg);
       }
     } catch (e) {
-      console.warn('[media] open app failed', pkg, e);
+      console.warn('[apps] launch failed', pkg, e);
     }
+  }
+
+  /** Idle card: open the saved app, or the list that saves the next one. */
+  _launchDefaultOrPick(kind) {
+    const saved = this._defaultApp(kind);
+    if (saved) {
+      this._launchPackage(saved.packageName);
+      return;
+    }
+    this._openDefaultAppPicker(kind, true);
+  }
+
+  _openDefaultAppPicker(kind, launchOnPick) {
+    if (kind !== 'media' && kind !== 'navigation') return;
+    this._defaultAppLaunchOnPick = !!launchOnPick;
+    this._ensureAppsCatalog();
+    this._uiOnlyStateWrite = true;
+    this.setState({ defaultAppPicker: kind });
+  }
+
+  _closeDefaultAppPicker() {
+    if (!this.state.defaultAppPicker) return;
+    this._defaultAppLaunchOnPick = false;
+    this._uiOnlyStateWrite = true;
+    this.setState({ defaultAppPicker: null });
+  }
+
+  _chooseDefaultApp(kind, app) {
+    const pkg = app && app.packageName;
+    if (!pkg || !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(pkg)) return;
+    const launch = !!this._defaultAppLaunchOnPick;
+    this._setDefaultApp(kind, pkg, app.label || pkg);
+    this._closeDefaultAppPicker();
+    if (launch) this._launchPackage(pkg);
+  }
+
+  /**
+   * Navigation's list leads with CarPlay and Android Auto. They are not in
+   * the installed-app catalog — that catalog skips projection packages —
+   * and launching either package raises the projection task.
+   */
+  _defaultAppChoices(kind, catalog) {
+    const list = Array.isArray(catalog) ? catalog : [];
+    if (kind !== 'navigation') return list;
+    const pinned = [
+      { packageName: 'com.ts.carplay.app', label: 'CarPlay' },
+      { packageName: CAR_AA_PACKAGE, label: 'Android Auto' },
+    ];
+    const skip = {};
+    pinned.forEach((app) => { skip[app.packageName] = true; });
+    const rest = list.filter((app) => app && !skip[app.packageName]
+      && !/androidauto|carplay|projection\.gearhead/i.test(String(app.packageName || '')));
+    return pinned.concat(rest);
+  }
+
+  _defaultAppPickerFields(s) {
+    const kind = s.defaultAppPicker === 'media' || s.defaultAppPicker === 'navigation'
+      ? s.defaultAppPicker : '';
+    const closeDefaultAppPicker = () => this._closeDefaultAppPicker();
+    if (!kind) {
+      return {
+        defaultAppPickerDisplay: 'none',
+        defaultAppPickerTitle: '',
+        defaultAppPickerItems: [],
+        defaultAppPickerEmpty: false,
+        defaultAppPickerCanClear: false,
+        closeDefaultAppPicker: closeDefaultAppPicker,
+        clearDefaultApp: () => {},
+      };
+    }
+    const catalog = Array.isArray(this._appsCatalog) ? this._appsCatalog : [];
+    const choices = this._defaultAppChoices(kind, catalog);
+    const FALLBACK_ICON = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    const current = this._defaultApp(kind);
+    return {
+      defaultAppPickerDisplay: 'flex',
+      defaultAppPickerTitle: kind === 'media' ? 'APP PADRÃO · MÍDIA' : 'APP PADRÃO · NAVEGAÇÃO',
+      defaultAppPickerItems: choices.map((app) => ({
+        label: app.label || app.packageName || '',
+        icon: app.icon || this._navAppIcon(app.packageName) || FALLBACK_ICON,
+        cls: current && current.packageName === app.packageName ? 'on' : '',
+        onClick: () => this._chooseDefaultApp(kind, app),
+      })),
+      defaultAppPickerEmpty: choices.length === 0,
+      defaultAppPickerCanClear: !!current,
+      closeDefaultAppPicker: closeDefaultAppPicker,
+      clearDefaultApp: () => {
+        this._clearDefaultApp(kind);
+        this._closeDefaultAppPicker();
+      },
+    };
   }
 
   applyMediaNowPlaying(payload) {
@@ -50048,6 +50789,11 @@ class Component extends DCLogic {
     });
     this._mediaPositionMs = Number(p.positionMs) || 0;
     this._syncMediaPositionDom(this._mediaPositionMs, Number(p.durationMs) || 0);
+    // A new track while the lyrics are open: the old lines are for another song.
+    if (this.state.mediaLyricsOpen && hasTrack) {
+      const lyricsKey = (p.title || '') + '\u0001' + (p.artist || '');
+      if (!this._lyrics || this._lyrics.key !== lyricsKey) this._requestMediaLyrics(lyricsKey);
+    }
     if (art) {
       setTimeout(() => {
         if (this.state.loading) return;
@@ -50079,6 +50825,7 @@ class Component extends DCLogic {
     const time = this._fmtMediaTime(pos);
     this._widgetNodes('.hv-media-progress > span').forEach((el) => { el.style.width = width; });
     this._widgetNodes('.hv-media-time-cur').forEach((el) => { el.textContent = time; });
+    if (this._lyrics && this.state.mediaLyricsOpen) this._paintLyrics(false);
   }
 
   _finishLoading(extra) {
@@ -50537,6 +51284,8 @@ class Component extends DCLogic {
     clearTimeout(this._widgetRevealTimer);
     clearTimeout(this._splashHoldTimer);
     clearTimeout(this._introKickTimer);
+    clearTimeout(this._introVideoOfferTimer);
+    clearTimeout(this._runtimePermSnoozeTimer);
     clearTimeout(this._warmupIdleTimer);
     clearTimeout(this._warmupFallbackTimer);
     clearTimeout(this._blurCaptureTimer);
