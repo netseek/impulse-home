@@ -483,6 +483,12 @@ public final class MainActivity extends Activity {
             mainHandler.post(mediaNowPlaying::next);
         }
 
+        /** Synced lyrics for the current track; the answer arrives via applyMediaLyrics. */
+        @JavascriptInterface
+        public void requestLyrics() {
+            mainHandler.post(mediaNowPlaying::requestLyrics);
+        }
+
         /** Called by the viewer once the model loader overlay can clear. */
         @JavascriptInterface
         public void onViewerReady() {
@@ -6250,6 +6256,16 @@ public final class MainActivity extends Activity {
         webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
+    private void notifyMediaLyrics(String trackKey, String lrc, boolean definitive) {
+        if (webView == null) return;
+        // JSONObject.quote escapes quotes, newlines and U+2028/9, so the LRC
+        // text cannot break out of the string literal.
+        final String js = "try{if(window.__app&&window.__app.applyMediaLyrics){"
+                + "window.__app.applyMediaLyrics(" + JSONObject.quote(trackKey) + ","
+                + JSONObject.quote(lrc) + "," + definitive + ");}}catch(e){}";
+        webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
     private boolean hasOverlayWindow() {
         return (activePopupPackage != null && !activePopupPackage.isEmpty())
                 || (activeMediaPackage != null && !activeMediaPackage.isEmpty());
@@ -7423,6 +7439,11 @@ public final class MainActivity extends Activity {
             @Override
             public void onPosition(long positionMs) {
                 notifyMediaPosition(positionMs);
+            }
+
+            @Override
+            public void onLyrics(String trackKey, String lrc, boolean definitive) {
+                notifyMediaLyrics(trackKey, lrc, definitive);
             }
         });
         // Defer session listen until after first paint so a broken MediaSession

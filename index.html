@@ -2312,7 +2312,7 @@ window.HavalSplash = (function () {
       </div>
     </sc-if>
     <sc-if value="{{ focusedCardIsMedia }}" hint-placeholder-val="{{ false }}">
-      <div class="hv-media-focus {{ focusedMediaArtClass }}">
+      <div class="hv-media-focus {{ focusedMediaArtClass }} {{ focusedMediaLyricsClass }}">
         <div class="hv-media-focus-main">
           <div class="hv-media-focus-art">
             <sc-if value="{{ focusedMediaHasArt }}" hint-placeholder-val="{{ false }}"><img src="{{ focusedMediaArt }}" alt=""></sc-if>
@@ -2332,6 +2332,7 @@ window.HavalSplash = (function () {
             <sc-if value="{{ focusedMediaShowTimes }}" hint-placeholder-val="{{ true }}"><div class="hv-media-times"><span class="hv-media-time-cur">{{ focusedMediaTimeCur }}</span><span class="hv-media-time-dur">{{ focusedMediaTimeDur }}</span></div></sc-if>
           </div>
         </div>
+        <sc-if value="{{ focusedMediaLyricsOpen }}" hint-placeholder-val="{{ false }}"><div class="hv-lyrics" role="region" aria-label="Letras" aria-live="off" onClick="{{ focusedMediaLyricsRetry }}"></div></sc-if>
         <div class="hv-media-transport">
           <button type="button" onClick="{{ focusedMediaPrev }}" aria-label="Faixa anterior" title="Faixa anterior" disabled="{{ focusedMediaControlsDisabled }}" aria-disabled="{{ focusedMediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6V6zm3.5 6 8.5 6V6l-8.5 6z"></path></svg></button>
           <button type="button" class="hv-media-play" onClick="{{ focusedMediaPlayPause }}" aria-label="{{ focusedMediaPlayLabel }}" title="{{ focusedMediaPlayLabel }}" disabled="{{ focusedMediaControlsDisabled }}" aria-disabled="{{ focusedMediaControlsDisabled }}">
@@ -2342,6 +2343,7 @@ window.HavalSplash = (function () {
         </div>
         <div class="hv-media-focus-foot">
           <p class="hv-media-focus-note">{{ focusedMediaNote }}</p>
+          <button type="button" class="hv-media-focus-app hv-media-lyrics-btn" onClick="{{ focusedMediaLyricsToggle }}" disabled="{{ focusedMediaLyricsDisabled }}" aria-disabled="{{ focusedMediaLyricsDisabled }}" aria-pressed="{{ focusedMediaLyricsOpen }}">{{ focusedMediaLyricsLabel }}</button>
           <button type="button" class="hv-media-focus-app" onClick="{{ focusedMediaOpenApp }}" disabled="{{ focusedMediaOpenDisabled }}" aria-disabled="{{ focusedMediaOpenDisabled }}">{{ focusedMediaOpenLabel }}</button>
         </div>
       </div>
@@ -5351,6 +5353,34 @@ window.HavalSplash = (function () {
       white-space: nowrap;
     }
     .hv-media-focus-app[disabled] { opacity: .34; cursor: default; }
+    /* Lyrics: five fixed slots, painted by _paintLyrics straight into the DOM.
+       Nothing here is React-driven per line -- see the _live note in CLAUDE.md. */
+    .hv-media-focus.lyrics-on .hv-media-focus-art { width: 104px; height: 104px; }
+    .hv-lyrics {
+      height: 150px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      text-align: center;
+      cursor: default;
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+    }
+    .hv-lyric {
+      width: 100%;
+      min-height: 1.3em;
+      font: 600 15px/1.3 var(--hv-font);
+      opacity: .32;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hv-lyric.is-near { opacity: .52; }
+    .hv-lyric.is-cur { font-size: 20px; opacity: 1; }
+    .hv-lyrics.is-msg .hv-lyric { opacity: .6; font-size: 13px; white-space: normal; }
     .hv-media-focus-note {
       font: 7px/1.45 var(--hv-font);
       letter-spacing: .05em;
@@ -10830,6 +10860,7 @@ class Component extends DCLogic {
     mediaPackageName: '',
     mediaArt: '',
     mediaHasTrack: false,
+    mediaLyricsOpen: false,
     mediaAppIcon: '',
     mediaCanLaunch: false,
     shellMode: BOOT_SHELL.mode,
@@ -46923,6 +46954,12 @@ class Component extends DCLogic {
             ? 'Transport is disabled while no player reports an active track. Nothing is sent to a player while it is.'
             : 'This shell has no MediaBridge, so no transport command can reach a player.'))
         : 'Play, pause and skip are sent to the session that published this track.',
+      mediaLyricsOpen: !!s.mediaLyricsOpen,
+      mediaLyricsClass: s.mediaLyricsOpen ? 'lyrics-on' : '',
+      mediaLyricsLabel: s.mediaLyricsOpen ? 'OCULTAR LETRAS' : 'LETRAS',
+      mediaLyricsDisabled: !(hasTrack && bridge && typeof window.MediaBridge.requestLyrics === 'function'),
+      mediaLyricsToggle: (ev) => this._toggleMediaLyrics(ev),
+      mediaLyricsRetry: (ev) => this._retryMediaLyrics(ev),
       mediaOpenLabel: canLaunch ? ('OPEN ' + (s.mediaAppLabel || 'APP')) : 'NENHUM APP PARA ABRIR',
       mediaCanLaunch: canLaunch,
       mediaOpenDisabled: !canLaunch,
@@ -50373,6 +50410,156 @@ class Component extends DCLogic {
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
+  // ── Lyrics ────────────────────────────────────────────────────────────────
+  // Lines live on `this._lyrics`, NOT in React state: the current line changes
+  // every few seconds and a commit here costs ~197 ms (see the _live seam in
+  // CLAUDE.md). Only the open/closed toggle commits. The current line is found
+  // from `_mediaPositionMs` on the 4 Hz position tick and painted into the DOM.
+
+  _lyricsTrackKey() {
+    const s = this.state;
+    return (s.mediaTitle || '') + '\u0001' + (s.mediaArtist || '');
+  }
+
+  _toggleMediaLyrics(ev) {
+    if (ev) {
+      if (ev.stopPropagation) ev.stopPropagation();
+      if (ev.preventDefault) ev.preventDefault();
+    }
+    const open = !this.state.mediaLyricsOpen;
+    this.setState({ mediaLyricsOpen: open }, () => {
+      if (!open) return;
+      const key = this._lyricsTrackKey();
+      if (!(this._lyrics && this._lyrics.key === key && this._lyrics.status !== 'offline')) {
+        this._requestMediaLyrics(key);
+      }
+      this._paintLyrics(true);
+    });
+  }
+
+  _retryMediaLyrics(ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    if (this._lyrics && this._lyrics.status === 'offline') {
+      this._requestMediaLyrics(this._lyricsTrackKey());
+    }
+  }
+
+  _requestMediaLyrics(key) {
+    this._lyrics = { key, status: 'loading', lines: null };
+    this._lyricsPaintedIdx = -2;
+    // No title means nothing to look up; the native side would answer with an
+    // empty key that this page (rightly) ignores, leaving "loading" up forever.
+    if (key.charAt(0) === '\u0001') this._lyrics.status = 'none';
+    this._paintLyrics(true);
+    if (this._lyrics.status === 'none') return;
+    try {
+      if (window.MediaBridge && typeof window.MediaBridge.requestLyrics === 'function') {
+        window.MediaBridge.requestLyrics();
+      } else {
+        this._lyrics.status = 'none';
+        this._paintLyrics(true);
+      }
+    } catch (e) {
+      console.warn('[media] lyrics request failed', e);
+      this._lyrics.status = 'offline';
+      this._paintLyrics(true);
+    }
+  }
+
+  /** Called by MainActivity.notifyMediaLyrics with the raw LRC text. */
+  applyMediaLyrics(key, lrc, definitive) {
+    // An answer for a track we have already left must not overwrite the new one.
+    if (!this._lyrics || this._lyrics.key !== key) return;
+    const lines = this._parseLrc(lrc);
+    this._lyrics.lines = lines;
+    this._lyrics.status = lines.length ? 'ok' : (definitive ? 'none' : 'offline');
+    this._lyricsPaintedIdx = -2;
+    this._paintLyrics(true);
+  }
+
+  /** `[mm:ss.xx] text`, several stamps per line allowed, `[ar:..]` tags skipped. */
+  _parseLrc(lrc) {
+    const out = [];
+    const stamp = /\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+    String(lrc || '').split(/\r?\n/).forEach((raw) => {
+      const times = [];
+      let m;
+      let last = 0;
+      stamp.lastIndex = 0;
+      while ((m = stamp.exec(raw)) !== null) {
+        const frac = m[3] ? Number((m[3] + '00').slice(0, 3)) : 0;
+        times.push((Number(m[1]) * 60 + Number(m[2])) * 1000 + frac);
+        last = stamp.lastIndex;
+      }
+      if (!times.length) return;
+      const text = raw.slice(last).trim();
+      times.forEach((t) => out.push({ t, text }));
+    });
+    out.sort((a, b) => a.t - b.t);
+    return out;
+  }
+
+  /** Index of the last line that has started by `ms`, or -1 before the first. */
+  _lyricsIndexAt(lines, ms) {
+    let lo = 0;
+    let hi = lines.length - 1;
+    let ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (lines[mid].t <= ms) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+    return ans;
+  }
+
+  _paintLyrics(force) {
+    if (!this.state.mediaLyricsOpen) return;
+    const L = this._lyrics;
+    if (!L) return;
+    const hosts = document.querySelectorAll('.hv-lyrics');
+    if (!hosts.length) return;
+
+    let texts;
+    let cur = 2;
+    let msg = false;
+    if (L.status === 'ok') {
+      const idx = this._lyricsIndexAt(L.lines, (this._mediaPositionMs || 0));
+      // The tick is 4 Hz and a line lasts seconds: nearly every call lands here.
+      // (a host React just remounted is empty and must be filled regardless)
+      if (!force && idx === this._lyricsPaintedIdx && hosts[0].childElementCount === 5) return;
+      this._lyricsPaintedIdx = idx;
+      texts = [];
+      for (let k = -2; k <= 2; k += 1) {
+        const ln = L.lines[idx + k];
+        // An empty stamp is an instrumental gap; show a note instead of a hole.
+        texts.push(idx + k < 0 || !ln ? '' : (ln.text || '♪'));
+      }
+    } else {
+      msg = true;
+      this._lyricsPaintedIdx = -2;
+      const m = L.status === 'loading' ? 'A procurar letras…'
+        : L.status === 'offline' ? 'Sem conexão — toque para tentar de novo'
+        : 'Sem letras sincronizadas para esta faixa';
+      texts = ['', '', m, '', ''];
+    }
+
+    hosts.forEach((host) => {
+      if (host.childElementCount !== 5) {
+        host.textContent = '';
+        for (let i = 0; i < 5; i += 1) {
+          const d = document.createElement('div');
+          host.appendChild(d);
+        }
+      }
+      host.classList.toggle('is-msg', msg);
+      for (let i = 0; i < 5; i += 1) {
+        const d = host.children[i];
+        if (d.textContent !== texts[i]) d.textContent = texts[i];
+        const cls = 'hv-lyric' + (i === cur ? ' is-cur' : (i === 1 || i === 3 ? ' is-near' : ''));
+        if (d.className !== cls) d.className = cls;
+      }
+    });
+  }
+
   _mediaTransport(cmd, ev) {
     if (ev) {
       if (ev.stopPropagation) ev.stopPropagation();
@@ -50648,6 +50835,11 @@ class Component extends DCLogic {
     });
     this._mediaPositionMs = Number(p.positionMs) || 0;
     this._syncMediaPositionDom(this._mediaPositionMs, Number(p.durationMs) || 0);
+    // A new track while the lyrics are open: the old lines are for another song.
+    if (this.state.mediaLyricsOpen && hasTrack) {
+      const lyricsKey = (p.title || '') + '\u0001' + (p.artist || '');
+      if (!this._lyrics || this._lyrics.key !== lyricsKey) this._requestMediaLyrics(lyricsKey);
+    }
     if (art) {
       setTimeout(() => {
         if (this.state.loading) return;
@@ -50679,6 +50871,7 @@ class Component extends DCLogic {
     const time = this._fmtMediaTime(pos);
     this._widgetNodes('.hv-media-progress > span').forEach((el) => { el.style.width = width; });
     this._widgetNodes('.hv-media-time-cur').forEach((el) => { el.textContent = time; });
+    if (this._lyrics && this.state.mediaLyricsOpen) this._paintLyrics(false);
   }
 
   _finishLoading(extra) {
