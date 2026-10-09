@@ -5262,39 +5262,31 @@ window.HavalSplash = (function () {
        chrome column rather than carrying a height of its own. */
     .hv-media.lyrics-on .hv-media-chrome > :not(.hv-lyrics) { display: none; }
     .hv-media.lyrics-on .hv-media-chrome { justify-content: stretch; }
-    /* A tall card keeps the cover as a thumbnail in the corner while the lyrics
-       run beneath it; the lyrics take the rest of the card. */
-    .hv-media { --hv-lyric-art: 44px; }
-    .hv-media-1x2 { --hv-lyric-art: 92px; }
-    .hv-media-2x2 { --hv-lyric-art: 56px; }
-    .hv-media-3x2 { --hv-lyric-art: 72px; }
+    /* A tall or big card (two rows) spends its top on the cover: full width,
+       fading into the card, with the lyrics running in the room beneath it. */
+    .hv-media { --hv-lyric-art-h: 140px; }
+    .hv-media-1x3 { --hv-lyric-art-h: 170px; }
     .hv-media.cover.lyrics-on > .hv-media-art {
-      inset: auto;
-      top: var(--hv-media-pad, 10px);
-      left: var(--hv-media-pad, 10px);
-      width: var(--hv-lyric-art);
-      height: var(--hv-lyric-art);
-      border-radius: 10px;
+      inset: 0 0 auto 0;
+      width: auto;
+      height: var(--hv-lyric-art-h);
+      border-radius: 0;
+      border: 0;
       overflow: hidden;
-      z-index: 1;
+      z-index: 0;
+      -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
     }
+    .hv-media.cover.lyrics-on > .hv-media-art img { width: 100%; height: 100%; object-fit: cover; }
     .hv-media.cover.lyrics-on.no-art > .hv-media-art { display: none; }
-    /* One column wide, two rows tall: the corner thumbnail would leave the width
-       empty, so the cover sits beside the lyrics instead of above them. */
-    .hv-media-1x2.cover.lyrics-on.has-art > .hv-media-body {
-      padding-top: var(--hv-media-pad, 10px);
-    }
-    .hv-media-1x2.cover.lyrics-on.has-art .hv-media-chrome {
-      padding-left: calc(var(--hv-lyric-art) + 10px);
-    }
-    .hv-media-1x2.lyrics-on > .hv-media-app { display: none; }
-    .hv-media.cover.lyrics-on.has-art > .hv-media-body {
-      padding-top: calc(var(--hv-media-pad, 10px) + var(--hv-lyric-art) + 8px);
-    }
+    /* The cover banner sits under the body, so the body must not paint over it. */
     .hv-media.cover.lyrics-on > .hv-media-body {
-      background: var(--hv-frost-inner, rgba(255,255,255,.075));
+      background: none;
       color: inherit;
       padding-top: var(--hv-media-pad);
+    }
+    .hv-media.cover.lyrics-on.has-art > .hv-media-body {
+      padding-top: calc(var(--hv-lyric-art-h) - 14px);
     }
     .hv-media-transport button.hv-media-lyrics-btn {
       width: auto;
@@ -5337,16 +5329,28 @@ window.HavalSplash = (function () {
     .hv-lyric.is-cur { font-size: 15px; opacity: 1; }
     .hv-media-3x1 .hv-lyric { font-size: 13px; }
     .hv-media-3x1 .hv-lyric.is-cur { font-size: 18px; }
-    .hv-media-1x2 .hv-lyric { font-size: 12px; }
-    .hv-media-1x2 .hv-lyric.is-cur { font-size: 15px; }
-    .hv-media-1x3 .hv-lyric { font-size: 13px; }
-    .hv-media-1x3 .hv-lyric.is-cur { font-size: 18px; }
-    .hv-media-2x2 .hv-lyric { font-size: 16px; }
-    .hv-media-2x2 .hv-lyric.is-cur { font-size: 23px; }
-    .hv-media-2x2 .hv-lyrics { gap: 6px; }
-    .hv-media-3x2 .hv-lyric { font-size: 19px; }
-    .hv-media-3x2 .hv-lyric.is-cur { font-size: 28px; }
-    .hv-media-3x2 .hv-lyrics { gap: 8px; }
+    .hv-media-1x2 .hv-lyric, .hv-media-1x3 .hv-lyric { font-size: 15px; }
+    .hv-media-1x2 .hv-lyric.is-cur, .hv-media-1x3 .hv-lyric.is-cur { font-size: 20px; }
+    .hv-media-1x2 .hv-lyrics, .hv-media-1x3 .hv-lyrics { gap: 6px; }
+    .hv-media-2x2 .hv-lyric { font-size: 18px; }
+    .hv-media-2x2 .hv-lyric.is-cur { font-size: 26px; }
+    .hv-media-2x2 .hv-lyrics { gap: 8px; }
+    .hv-media-3x2 .hv-lyric { font-size: 21px; }
+    .hv-media-3x2 .hv-lyric.is-cur { font-size: 31px; }
+    .hv-media-3x2 .hv-lyrics { gap: 9px; }
+    /* Tall and big cards let a long line wrap onto up to three rows. Rows of one
+       line sit close (1.12) while the gap between lines stays wide, so a wrapped
+       line still reads as a single line. */
+    .hv-media-1x2 .hv-lyric, .hv-media-1x3 .hv-lyric,
+    .hv-media-2x2 .hv-lyric, .hv-media-3x2 .hv-lyric {
+      white-space: normal;
+      line-height: 1.12;
+      min-height: 1.12em;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      text-overflow: clip;
+    }
     .hv-lyrics.is-msg .hv-lyric { opacity: .6; font-size: 11px; white-space: normal; }
     .hv-chrome {
       position: absolute;
@@ -50533,17 +50537,16 @@ class Component extends DCLogic {
   _openMediaApp(ev) {
     if (ev && ev.stopPropagation) ev.stopPropagation();
     const s = this.state;
-    // A launchable session is the app that is actually playing. A track whose
-    // package cannot be raised (a projection with no launcher entry) has
-    // nothing to open. An empty card launches the saved default, or asks for one.
-    if (s.mediaCanLaunch && s.mediaPackageName) {
-      this._launchPackage(s.mediaPackageName);
+    // Only a session with a track, or one that is playing, counts as a player.
+    // A stopped session with no metadata (the Bluetooth stack keeps one around)
+    // is not: the card is idle and the saved default applies.
+    const active = !!(s.mediaHasTrack || s.mediaPlaying || s.mediaTitle || s.mediaArtist || s.mediaAlbum);
+    // An active player opens its own app. A track whose package cannot be
+    // raised (a projection with no launcher entry) has nothing to open.
+    if (active) {
+      if (s.mediaCanLaunch && s.mediaPackageName) this._launchPackage(s.mediaPackageName);
       return;
     }
-    // Anything that says a player is active (even one whose package cannot be
-    // raised) means the saved default must stay shut: it is for an idle card.
-    if (s.mediaHasTrack || s.mediaPlaying || s.mediaPackageName
-        || s.mediaTitle || s.mediaArtist || s.mediaAlbum) return;
     this._launchDefaultOrPick('media');
   }
 

@@ -39,9 +39,11 @@ assert.doesNotMatch(openMedia, /_openFocusedCard/,
 // The default is for an idle card only: every sign of an active player must return before it.
 const defaultAt = openMedia.indexOf("this._launchDefaultOrPick('media')");
 const guard = openMedia.slice(0, defaultAt);
-for (const sign of ['s.mediaHasTrack', 's.mediaPlaying', 's.mediaPackageName', 's.mediaTitle']) {
+for (const sign of ['s.mediaHasTrack', 's.mediaPlaying', 's.mediaTitle']) {
   assert.ok(guard.includes(sign), `${sign} must keep the saved default from opening`);
 }
+assert.ok(!guard.includes('s.mediaPackageName') || guard.indexOf('const active') < guard.indexOf('s.mediaPackageName'),
+  'a bare package (an idle Bluetooth session) must not count as a player');
 assert.match(openMedia, /this\._launchDefaultOrPick\('media'\)/,
   'an idle media card launches the saved default or asks for one');
 

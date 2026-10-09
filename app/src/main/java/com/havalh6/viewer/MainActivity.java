@@ -10599,8 +10599,11 @@ public final class MainActivity extends Activity {
         card.setClickable(true);
         card.setFocusable(true);
         card.setOnClickListener(v -> {
-            String pkg = quickMediaPackage;
-            if (pkg == null || pkg.isEmpty()) {
+            // Only a player with a track (or one that is playing) is opened here.
+            // An idle session with no metadata falls through to the page, which
+            // opens the saved default app.
+            String pkg = (quickMediaAvailable || quickMediaPlaying) ? quickMediaPackage : "";
+            if ((pkg == null || pkg.isEmpty()) && (quickMediaAvailable || quickMediaPlaying)) {
                 if (mediaNowPlaying != null) {
                     MediaTrack w = mediaNowPlaying.winner();
                     if (w != null && w.packageName != null && !w.packageName.isEmpty()) {
