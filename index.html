@@ -710,7 +710,7 @@ window.HavalSplash = (function () {
                     <sc-if value="{{ wg.mediaShowPlay }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"></path></svg></sc-if>
                   </button>
                   <sc-if value="{{ wg.mediaShowSkip }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ wg.mediaNext }}" aria-label="Próxima faixa" title="Próxima faixa" disabled="{{ wg.mediaControlsDisabled }}" aria-disabled="{{ wg.mediaControlsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2V6zM6 18l8.5-6L6 6v12z"></path></svg></button></sc-if>
-                  <sc-if value="{{ wg.mediaShowLyricsBtn }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-media-lyrics-btn" onClick="{{ wg.mediaLyricsToggle }}" aria-label="{{ wg.mediaLyricsToggleLabel }}" title="{{ wg.mediaLyricsToggleLabel }}" aria-pressed="{{ wg.mediaLyricsOpen }}" disabled="{{ wg.mediaLyricsDisabled }}" aria-disabled="{{ wg.mediaLyricsDisabled }}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 6h16v2H4V6zm3 5h10v2H7v-2zm-3 5h16v2H4v-2z"></path></svg></button></sc-if>
+                  <sc-if value="{{ wg.mediaShowLyricsBtn }}" hint-placeholder-val="{{ true }}"><button type="button" class="hv-media-lyrics-btn" onClick="{{ wg.mediaLyricsToggle }}" aria-label="{{ wg.mediaLyricsToggleLabel }}" title="{{ wg.mediaLyricsToggleLabel }}" aria-pressed="{{ wg.mediaLyricsOpen }}" disabled="{{ wg.mediaLyricsDisabled }}" aria-disabled="{{ wg.mediaLyricsDisabled }}">LETRA</button></sc-if>
                 </div>
               </div>
             </div>
@@ -5269,8 +5269,13 @@ window.HavalSplash = (function () {
       padding-top: var(--hv-media-pad);
     }
     .hv-media-transport button.hv-media-lyrics-btn {
-      width: calc(var(--hv-media-btn) * .8);
-      height: calc(var(--hv-media-btn) * .8);
+      width: auto;
+      height: calc(var(--hv-media-btn) * .7);
+      padding: 0 12px;
+      border-radius: 999px;
+      font: 11px/1 var(--hv-font);
+      letter-spacing: .1em;
+      white-space: nowrap;
     }
     .hv-media-transport button.hv-media-lyrics-btn[aria-pressed="true"] {
       background: var(--hv-accent, #2aa7b7);
@@ -46853,7 +46858,7 @@ class Component extends DCLogic {
       mediaShowLyricsBtn: !compact,
       mediaLyricsOpen: lyricsOn,
       mediaLyricsClass: lyricsOn ? 'lyrics-on' : '',
-      mediaLyricsToggleLabel: lyricsOn ? 'Ocultar letras' : 'Letras',
+      mediaLyricsToggleLabel: lyricsOn ? 'Ocultar letra' : 'Letra',
       mediaLyricsDisabled: !(hasTrack && bridge && typeof window.MediaBridge.requestLyrics === 'function'),
       mediaLyricsToggle: (ev) => this._toggleMediaLyrics(ev),
       mediaLyricsRetry: (ev) => this._retryMediaLyrics(ev),
@@ -50314,7 +50319,7 @@ class Component extends DCLogic {
     }
     const open = !this.state.mediaLyricsOpen;
     this.setState({ mediaLyricsOpen: open }, () => {
-      if (!open) return;
+      if (!open) { clearTimeout(this._lyricsRetryTimer); return; }
       const key = this._lyricsTrackKey();
       if (!(this._lyrics && this._lyrics.key === key && this._lyrics.status !== 'offline')) {
         this._requestMediaLyrics(key);
@@ -50330,7 +50335,9 @@ class Component extends DCLogic {
     }
   }
 
-  _requestMediaLyrics(key) {
+  _requestMediaLyrics(key, auto) {
+    clearTimeout(this._lyricsRetryTimer);
+    if (!auto) this._lyricsRetryN = 0;
     this._lyrics = { key, status: 'loading', lines: null };
     this._lyricsPaintedIdx = -2;
     // No title means nothing to look up; the native side would answer with an
@@ -50361,6 +50368,27 @@ class Component extends DCLogic {
     this._lyrics.status = lines.length ? 'ok' : (definitive ? 'none' : 'offline');
     this._lyricsPaintedIdx = -2;
     this._paintLyrics(true);
+    if (this._lyrics.status === 'offline') this._scheduleLyricsAutoRetry();
+  }
+
+  /**
+   * The native side already retries a few times; this covers a longer outage.
+   * Backs off 4 s, 10 s, 20 s, then leaves the tap-to-retry message up. Stops
+   * when the panel closes, the track changes, or a manual retry takes over.
+   */
+  _scheduleLyricsAutoRetry() {
+    clearTimeout(this._lyricsRetryTimer);
+    const L = this._lyrics;
+    const delays = [4000, 10000, 20000];
+    const n = this._lyricsRetryN || 0;
+    if (!L || L.status !== 'offline' || n >= delays.length) return;
+    const key = L.key;
+    this._lyricsRetryTimer = setTimeout(() => {
+      const cur = this._lyrics;
+      if (!this.state.mediaLyricsOpen || !cur || cur.key !== key || cur.status !== 'offline') return;
+      this._lyricsRetryN = n + 1;
+      this._requestMediaLyrics(key, true);
+    }, delays[n]);
   }
 
   /** `[mm:ss.xx] text`, several stamps per line allowed, `[ar:..]` tags skipped. */
