@@ -2,6 +2,14 @@
 
 Impulse Launcher bundles the components below. Each stays under its own license.
 
+## Android libraries
+
+Resolved from Maven when the APK is built. Not copied into the repository.
+
+| Library | Version | License | Why it is here |
+| --- | --- | --- | --- |
+| Shizuku API and provider (`dev.rikka.shizuku`) | 13.1.5 | Apache-2.0 | The GWM hub's Reiniciar tile runs `/system/bin/reboot` in Shizuku's shell. |
+
 ## Code, vendored in `vendor/`
 
 | Component | Version | License | Path |

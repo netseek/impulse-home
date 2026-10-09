@@ -10,7 +10,7 @@ regular rendering mode with an Android-specific decoder compatibility flag.
 - JDK 21
 - Gradle 9.3.1 (or import the project into a compatible Android Studio version)
 
-No Java/Kotlin library dependencies and no Android network permission are used.
+No AndroidX UI. The Shizuku client is the one packaged Java library, and only the GWM hub's Reboot tile uses it.
 
 ## Build
 
@@ -543,6 +543,29 @@ The viewer config panel exposes `timeMode`: `day`, `night`, or `auto`.
 Persisted viewer preferences (including `timeMode`) are stored in WebView
 `localStorage` under `h6_settings_v1` when the user taps **Save**. Live car
 signals are applied after saved settings on load, so the car wins over them.
+
+## GWM hub
+
+The GWM tile on the launcher strip opens one card the size of a bottom-left 2×1
+on the 6×2 widget board: two columns of the lower row, the same gap the page
+uses between widgets. Five actions sit in that card. The top row is Início,
+Energia and Reiniciar; the bottom row is Sistema and Veículo.
+
+| Tile | Opens |
+| --- | --- |
+| Início | `com.beantechs.applist` |
+| Energia | `com.beantechs.energyassistant` |
+| Reiniciar | `/system/bin/reboot` through Shizuku |
+| Sistema | `com.beantechs.settings` |
+| Veículo | `com.beantechs.vehiclecenter` |
+
+Shizuku asks for its grant the first time Reiniciar is tapped. The shell
+command itself runs in a Shizuku user service (`GwmRebootService`), as
+whichever user started Shizuku. The client library declares minSdk
+24; the shell stays at 23 and overrides that, because the call only happens on
+the Android 9 head unit. The × on the card closes it, and so does a tap outside
+the card. `com.beantechs.launcher` (the OEM home) is not a hub destination and
+stays off the scrolling app row.
 
 ## Default home selection
 

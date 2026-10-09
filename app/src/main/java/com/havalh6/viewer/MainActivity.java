@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import android.app.ActivityOptions;
 import android.widget.FrameLayout;
 import android.content.pm.PackageManager;
+import rikka.shizuku.Shizuku;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -515,13 +516,9 @@ public final class MainActivity extends Activity {
         }
     }
 
-    /** Always-left GWM shortcuts, same order as the OEM AppList. */
-    private static final String[] PINNED_PACKAGES = {
-        "com.beantechs.vehiclecenter",
-        "com.beantechs.settings",
-        "com.beantechs.energyassistant",
-        "com.beantechs.launcher"
-    };
+    /** Packages the GWM hub can open. Reboot is not a package; see {@link GwmHub}. */
+    private static final String[] PINNED_PACKAGES = GwmHub.packages();
+    private static final int SHIZUKU_REBOOT_REQUEST = 51;
     /** Extra scrolling-row GWM stubs on emulator when OEM packages are absent. */
     private static final String[][] EMULATOR_EXTRA_GWM_STUBS = {
         {"com.beantechs.fake.mediacenter", "Media Center"},
@@ -538,7 +535,9 @@ public final class MainActivity extends Activity {
         "com.beantechs.personalcenter",
         "com.beantechs.operatorcenter",
         "com.beantechs.account",
+        // Hub Home opens the app list; the OEM launcher is not a dock-row icon.
         "com.beantechs.applist",
+        "com.beantechs.launcher",
         "com.beantechs.guidance",
         "com.beantechs.fotaui",
         "com.beantechs.PKIMaintain",
@@ -4058,10 +4057,24 @@ public final class MainActivity extends Activity {
     private final java.util.Set<String> pendingProjectionPackages = new java.util.HashSet<>();
     private Runnable pendingProjectionTimeout;
     /**
-     * Single GWM hub that opens a flyout of {@link #PINNED_PACKAGES}. Destinations
-     * still tracked in {@link #pinnedBound}; only the hub is drawn on the strip.
+     * Single GWM hub. Tap opens a 2×1 card of {@link GwmHub#actions()}.
+     * Destinations are tracked in {@link #pinnedBound}; only the hub is drawn
+     * on the strip.
      */
     private MotionTrailLayout gwmHubItem;
+    private boolean shizukuRebootListening;
+    private android.content.ServiceConnection gwmRebootConnection;
+    private final Shizuku.OnRequestPermissionResultListener shizukuRebootListener =
+            (requestCode, grantResult) -> mainHandler.post(() -> {
+                if (requestCode != SHIZUKU_REBOOT_REQUEST) return;
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    runRebootProcess();
+                } else {
+                    android.widget.Toast.makeText(MainActivity.this,
+                            "Permissão do Shizuku negada",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
     /** Launcher tile that enters Side by Side (the two-app split). Not a package. */
     private MotionTrailLayout sideBySideItem;
     /** Layout manager → Cards is open on the page: the rail jiggles and can be dragged. */
@@ -13005,6 +13018,7 @@ public final class MainActivity extends Activity {
     private void showQuickMenuRows(View anchor, java.util.List<QuickMenuRow> rows, boolean lastIsExit) {
         if (rows == null || rows.isEmpty()) return;
         dismissQuickMenu();
+        dismissGwmHubMenu();
         float density = getResources().getDisplayMetrics().density;
         android.widget.LinearLayout list = new android.widget.LinearLayout(this);
         list.setOrientation(android.widget.LinearLayout.VERTICAL);
@@ -13101,9 +13115,13 @@ public final class MainActivity extends Activity {
     }
 
     private android.graphics.drawable.GradientDrawable makeDockPopupPanel(float density) {
+        return makeDockPopupPanel(density, 14f);
+    }
+
+    private android.graphics.drawable.GradientDrawable makeDockPopupPanel(float density, float radiusDp) {
         android.graphics.drawable.GradientDrawable panel =
                 new android.graphics.drawable.GradientDrawable();
-        panel.setCornerRadius(14f * density);
+        panel.setCornerRadius(radiusDp * density);
         panel.setColor(dockUiLight ? 0xFCF7FAFC : 0xFA0B1016);
         panel.setStroke(Math.max(1, Math.round(density)),
                 dockUiLight ? 0x2225303B : 0x26FFFFFF);
@@ -13306,10 +13324,10 @@ public final class MainActivity extends Activity {
      * screen. These are the names drawn on the icons.
      */
     private String pinnedLabel(String pkg, PackageManager pm, ResolveInfo info) {
-        if ("com.beantechs.vehiclecenter".equals(pkg)) return "Configurações do Veículo";
-        if ("com.beantechs.settings".equals(pkg)) return "Configurações do Sistema";
-        if ("com.beantechs.energyassistant".equals(pkg)) return "Energy Assistant";
-        if ("com.beantechs.launcher".equals(pkg)) return "GWM Home";
+        if (GwmHub.CAR.equals(pkg)) return "Configurações do Veículo";
+        if (GwmHub.SYSTEM.equals(pkg)) return "Configurações do Sistema";
+        if (GwmHub.ENERGY.equals(pkg)) return "Energy Assistant";
+        if (GwmHub.HOME.equals(pkg)) return "Início";
         return launcherLabel(pm, info);
     }
 
@@ -13656,88 +13674,295 @@ public final class MainActivity extends Activity {
         return new BitmapDrawable(getResources(), bmp);
     }
 
+    /**
+     * Bottom-left 2×1 of the widget board, in this window's pixels. The page
+     * grid gap is 8 CSS pixels, so the device gap is 8×density.
+     */
+    private GwmHub.Cell gwmHubCardCell() {
+        float density = getResources().getDisplayMetrics().density;
+        android.graphics.Rect origin = pageOriginRect();
+        android.graphics.Rect left = toWindowRect(leftFreeformBounds(), origin);
+        int boardL = Math.max(0, left.left);
+        int boardT = left.top;
+        int boardR = Math.max(boardL + 1, origin.width() - boardL);
+        int boardB = Math.max(boardT + 1, left.bottom);
+        int gap = Math.round(8f * density);
+        GwmHub.Cell cell = GwmHub.cardRect(boardL, boardT, boardR, boardB, gap);
+        int minW = Math.round(280 * density);
+        int minH = Math.round(140 * density);
+        if (cell.width >= minW && cell.height >= minH) return cell;
+        int width = Math.max(minW, cell.width);
+        int height = Math.max(minH, cell.height);
+        int top = Math.max(0, boardB - height);
+        return new GwmHub.Cell(boardL, top, width, height);
+    }
+
+    private boolean hubPackageBound(String pkg) {
+        if (pkg == null) return false;
+        for (int i = 0; i < PINNED_PACKAGES.length; i++) {
+            if (PINNED_PACKAGES[i].equals(pkg)) return pinnedBound[i];
+        }
+        return false;
+    }
+
     private void showGwmHubMenu(View anchor) {
         if (anchor == null) return;
         dismissGwmHubMenu();
         dismissDockEditMenu();
+        dismissQuickMenu();
         float d = getResources().getDisplayMetrics().density;
-        PackageManager pm = getPackageManager();
+        GwmHub.Cell cell = gwmHubCardCell();
+
         android.widget.LinearLayout box = new android.widget.LinearLayout(this);
         box.setOrientation(android.widget.LinearLayout.VERTICAL);
-        box.setBackgroundColor(0xF2141820);
-        box.setElevation(14f * d);
-        int pad = Math.round(18 * d);
-        box.setPadding(pad, Math.round(12 * d), pad, Math.round(12 * d));
-        box.setMinimumWidth(Math.round(280 * d));
+        box.setBackground(makeDockPopupPanel(d, 22f));
+        box.setClipToOutline(true);
+        box.setElevation(16f * d);
+        int pad = Math.round(12 * d);
+        box.setPadding(pad, Math.round(8 * d), pad, pad);
+        box.addView(makeGwmHubHeader(d));
 
-        int shown = 0;
-        int iconPx = Math.round(40 * d);
-        for (int i = 0; i < PINNED_PACKAGES.length; i++) {
-            if (!pinnedBound[i]) continue;
-            String pkg = PINNED_PACKAGES[i];
-            if (isUserHidden(pkg)) continue;
-            String label = resolveDockLabel(pkg, pinnedLabel(pkg, pm, null));
-            Drawable icon = flyoutIconForPinned(pkg);
-
-            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
-            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            row.setPadding(Math.round(8 * d), Math.round(14 * d), Math.round(8 * d), Math.round(14 * d));
-            row.setMinimumHeight(Math.round(56 * d));
-            row.setClickable(true);
-            row.setFocusable(true);
-
-            android.widget.ImageView iv = new android.widget.ImageView(this);
-            iv.setImageDrawable(icon);
-            android.widget.LinearLayout.LayoutParams ilp =
-                    new android.widget.LinearLayout.LayoutParams(iconPx, iconPx);
-            ilp.rightMargin = Math.round(14 * d);
-            row.addView(iv, ilp);
-
-            android.widget.TextView tv = new android.widget.TextView(this);
-            tv.setText(label);
-            tv.setTextColor(0xFFFFFFFF);
-            tv.setTextSize(17f);
-            row.addView(tv);
-
-            final String targetPkg = pkg;
-            final String targetLabel = label;
-            row.setOnClickListener(v -> {
-                dismissGwmHubMenu();
-                launchAppForPackage(targetPkg, targetLabel);
-            });
-            box.addView(row);
-            shown++;
+        android.widget.LinearLayout top = makeGwmHubRow(d);
+        android.widget.LinearLayout bottom = makeGwmHubRow(d);
+        for (GwmHub.Action action : GwmHub.actions()) {
+            (action.row == 0 ? top : bottom).addView(makeGwmHubTile(action, d));
         }
-        if (shown == 0) {
-            android.widget.TextView empty = new android.widget.TextView(this);
-            empty.setText("Nenhum app GWM");
-            empty.setTextColor(0x99FFFFFF);
-            empty.setTextSize(15f);
-            empty.setPadding(Math.round(8 * d), Math.round(10 * d), Math.round(8 * d), Math.round(10 * d));
-            box.addView(empty);
-        }
+        box.addView(top);
+        box.addView(bottom);
 
         android.widget.PopupWindow popup = new android.widget.PopupWindow(
-                box,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                true);
+                box, cell.width, cell.height, true);
         popup.setOutsideTouchable(true);
         popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
         popup.setOnDismissListener(() -> {
             if (gwmHubMenu == popup) gwmHubMenu = null;
         });
         gwmHubMenu = popup;
-        box.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        int xOff = (anchor.getWidth() - box.getMeasuredWidth()) / 2;
-        int yOff = -(box.getMeasuredHeight() + anchor.getHeight() + Math.round(10 * d));
-        popup.showAsDropDown(anchor, xOff, yOff);
+        View tokenSrc = getWindow() != null ? getWindow().getDecorView() : anchor;
+        if (tokenSrc.getWindowToken() == null) tokenSrc = anchor;
+        popup.showAtLocation(tokenSrc,
+                android.view.Gravity.TOP | android.view.Gravity.START,
+                cell.left, cell.top);
     }
+
     private void dismissGwmHubMenu() {
         if (gwmHubMenu == null) return;
         try { gwmHubMenu.dismiss(); } catch (Exception ignored) {}
         gwmHubMenu = null;
+    }
+
+    private android.widget.LinearLayout makeGwmHubHeader(float d) {
+        android.widget.LinearLayout head = new android.widget.LinearLayout(this);
+        head.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        head.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int btn = Math.round(42 * d);
+        android.widget.TextView close = new android.widget.TextView(this);
+        close.setText("×");
+        close.setGravity(android.view.Gravity.CENTER);
+        close.setTextSize(21f);
+        close.setIncludeFontPadding(false);
+        close.setTextColor(dockLabelColor());
+        android.graphics.drawable.GradientDrawable bg =
+                new android.graphics.drawable.GradientDrawable();
+        bg.setCornerRadius(12f * d);
+        bg.setColor(dockUiLight ? 0x0F25303B : 0x12FFFFFF);
+        close.setBackground(bg);
+        close.setContentDescription("Fechar");
+        close.setOnClickListener(v -> dismissGwmHubMenu());
+        head.addView(close, new android.widget.LinearLayout.LayoutParams(btn, btn));
+
+        android.widget.TextView title = new android.widget.TextView(this);
+        title.setText("GWM");
+        title.setTextColor(dockLabelColor());
+        title.setTextSize(16f);
+        title.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        android.widget.LinearLayout.LayoutParams titleLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        titleLp.leftMargin = Math.round(10 * d);
+        head.addView(title, titleLp);
+        return head;
+    }
+
+    private android.widget.LinearLayout makeGwmHubRow(float d) {
+        android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER);
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
+        lp.topMargin = Math.round(8 * d);
+        row.setLayoutParams(lp);
+        return row;
+    }
+
+    private View makeGwmHubTile(GwmHub.Action action, float d) {
+        boolean ready = action.reboot
+                || (hubPackageBound(action.packageName) && !isUserHidden(action.packageName));
+        android.widget.LinearLayout tile = new android.widget.LinearLayout(this);
+        tile.setOrientation(android.widget.LinearLayout.VERTICAL);
+        tile.setGravity(android.view.Gravity.CENTER);
+        int pad = Math.round(6 * d);
+        tile.setPadding(pad, pad, pad, pad);
+        tile.setBackground(makeQuickMenuItemBackground(false, false, d));
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        if (!ready) tile.setAlpha(0.4f);
+        android.widget.LinearLayout.LayoutParams lp =
+                new android.widget.LinearLayout.LayoutParams(
+                        0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+        int gap = Math.round(4 * d);
+        lp.setMargins(gap, 0, gap, 0);
+        tile.setLayoutParams(lp);
+
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        iv.setImageDrawable(gwmHubIcon(action));
+        int icon = Math.round(28 * d);
+        tile.addView(iv, new android.widget.LinearLayout.LayoutParams(icon, icon));
+
+        android.widget.TextView label = new android.widget.TextView(this);
+        label.setText(action.label);
+        label.setTextColor(dockLabelColor());
+        label.setTextSize(13f);
+        label.setGravity(android.view.Gravity.CENTER);
+        label.setMaxLines(2);
+        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        android.widget.LinearLayout.LayoutParams labelLp =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        labelLp.topMargin = Math.round(4 * d);
+        tile.addView(label, labelLp);
+
+        tile.setOnClickListener(v -> {
+            if (!ready) {
+                if (!action.reboot && !hubPackageBound(action.packageName)) {
+                    android.widget.Toast.makeText(this, "Não instalado",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
+            dismissGwmHubMenu();
+            if (action.reboot) rebootViaShizuku();
+            else launchAppForPackage(action.packageName, action.label);
+        });
+        return tile;
+    }
+
+    /** Glyph for a hub tile. Energy keeps its own colour; the rest follow the theme. */
+    private Drawable gwmHubIcon(GwmHub.Action action) {
+        int res;
+        boolean tint = true;
+        if (action.reboot) {
+            res = R.drawable.ic_hub_reboot;
+        } else if (GwmHub.HOME.equals(action.packageName)) {
+            res = R.drawable.ic_hub_home;
+        } else if (GwmHub.ENERGY.equals(action.packageName)) {
+            res = R.drawable.ic_energy_assistant;
+            tint = false;
+        } else if (GwmHub.SYSTEM.equals(action.packageName)) {
+            res = R.drawable.ic_sub_settings;
+        } else {
+            res = R.drawable.ic_sub_haval;
+        }
+        Drawable drawn = null;
+        try { drawn = getDrawable(res); } catch (Exception ignored) {}
+        if (drawn != null && tint) {
+            drawn = drawn.mutate();
+            drawn.setColorFilter(dockLabelColor(), PorterDuff.Mode.SRC_IN);
+        }
+        return drawn;
+    }
+
+    private void ensureShizukuRebootListener() {
+        if (shizukuRebootListening) return;
+        try {
+            Shizuku.addRequestPermissionResultListener(shizukuRebootListener);
+            shizukuRebootListening = true;
+        } catch (Throwable t) {
+            Log.w(TAG, "Shizuku listener failed", t);
+        }
+    }
+
+    /** Reboot the head unit through Shizuku. The first tap asks for its grant. */
+    private void rebootViaShizuku() {
+        try {
+            if (!Shizuku.pingBinder()) {
+                android.widget.Toast.makeText(this, "Shizuku não está em execução",
+                        android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+                ensureShizukuRebootListener();
+                Shizuku.requestPermission(SHIZUKU_REBOOT_REQUEST);
+                return;
+            }
+            runRebootProcess();
+        } catch (Throwable t) {
+            Log.w(TAG, "Shizuku reboot failed", t);
+            android.widget.Toast.makeText(this, "Não foi possível reiniciar",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private Shizuku.UserServiceArgs gwmRebootArgs() {
+        return new Shizuku.UserServiceArgs(
+                new android.content.ComponentName(this, GwmRebootService.class))
+                .daemon(false)
+                .processNameSuffix("reboot")
+                .debuggable(false)
+                .version(1);
+    }
+
+    private void unbindGwmReboot() {
+        android.content.ServiceConnection connection = gwmRebootConnection;
+        gwmRebootConnection = null;
+        if (connection == null) return;
+        try {
+            Shizuku.unbindUserService(gwmRebootArgs(), connection, true);
+        } catch (Throwable ignored) {}
+    }
+
+    /**
+     * Shizuku 13 keeps shell execution inside a user service. That service
+     * runs as the Shizuku user and starts {@link GwmHub#REBOOT_COMMAND}.
+     */
+    private void runRebootProcess() {
+        if (gwmRebootConnection != null) return;
+        Log.w(TAG, "GWM hub reboot via Shizuku");
+        gwmRebootConnection = new android.content.ServiceConnection() {
+            @Override
+            public void onServiceConnected(android.content.ComponentName name, android.os.IBinder binder) {
+                int code = -1;
+                try {
+                    code = IGwmRebootService.Stub.asInterface(binder).reboot();
+                } catch (Throwable t) {
+                    Log.w(TAG, "reboot binder failed", t);
+                }
+                if (code != 0) {
+                    android.widget.Toast.makeText(MainActivity.this,
+                            "Não foi possível reiniciar",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    unbindGwmReboot();
+                }
+            }
+
+            @Override
+            public void onServiceDisconnected(android.content.ComponentName name) {
+                gwmRebootConnection = null;
+            }
+        };
+        try {
+            Shizuku.bindUserService(gwmRebootArgs(), gwmRebootConnection);
+        } catch (Throwable t) {
+            Log.w(TAG, "bind reboot service failed", t);
+            gwmRebootConnection = null;
+            android.widget.Toast.makeText(this, "Não foi possível reiniciar",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        }
     }
 
     /** Small leading glyph for each GWM flyout row. */
@@ -14971,6 +15196,14 @@ public final class MainActivity extends Activity {
         mainHandler.removeCallbacks(mediaVizPoll);
         mediaNowPlaying.stop();
         dismissDockEditMenu();
+        dismissGwmHubMenu();
+        if (shizukuRebootListening) {
+            try {
+                Shizuku.removeRequestPermissionResultListener(shizukuRebootListener);
+            } catch (Throwable ignored) {}
+            shizukuRebootListening = false;
+        }
+        unbindGwmReboot();
         if (projectionPresence != null) projectionPresence.stop();
         if (placeGlance != null) placeGlance.stop();
         // Drops the lease so Impulse restores the car's A/C app. A crash skips this, which is
@@ -15007,6 +15240,10 @@ public final class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (gwmHubMenu != null && gwmHubMenu.isShowing()) {
+            dismissGwmHubMenu();
+            return;
+        }
         if (webView.canGoBack()) webView.goBack();
         else super.onBackPressed();
     }
