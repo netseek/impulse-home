@@ -36,6 +36,12 @@ assert.match(openMedia, /this\._launchPackage\(s\.mediaPackageName\)/,
   'the playing package is what gets launched');
 assert.doesNotMatch(openMedia, /_openFocusedCard/,
   'a visible track that cannot be launched opens nothing: there is no MEDIA popup');
+// The default is for an idle card only: every sign of an active player must return before it.
+const defaultAt = openMedia.indexOf("this._launchDefaultOrPick('media')");
+const guard = openMedia.slice(0, defaultAt);
+for (const sign of ['s.mediaHasTrack', 's.mediaPlaying', 's.mediaPackageName', 's.mediaTitle']) {
+  assert.ok(guard.includes(sign), `${sign} must keep the saved default from opening`);
+}
 assert.match(openMedia, /this\._launchDefaultOrPick\('media'\)/,
   'an idle media card launches the saved default or asks for one');
 

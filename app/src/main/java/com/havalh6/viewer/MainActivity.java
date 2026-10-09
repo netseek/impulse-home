@@ -10696,7 +10696,7 @@ public final class MainActivity extends Activity {
         copy.addView(quickMediaTitle);
         quickMediaArtist = new android.widget.TextView(this);
         quickMediaArtist.setTag("frostSecondary");
-        quickMediaArtist.setText("Escolha um app de mídia");
+        quickMediaArtist.setText("");
         quickMediaArtist.setTextSize(9.5f);
         quickMediaArtist.setMaxLines(1);
         quickMediaArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -11045,7 +11045,7 @@ public final class MainActivity extends Activity {
         if (quickMediaArtist != null) {
             String album = payload.optString("album", "");
             quickMediaArtist.setText(!artist.isEmpty() ? artist
-                    : (hasTrack ? album : "Escolha um app de mídia"));
+                    : (hasTrack ? album : ""));
             quickMediaArtist.setVisibility(
                     quickMediaArtist.getText().length() == 0 ? View.INVISIBLE : View.VISIBLE);
         }

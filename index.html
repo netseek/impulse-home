@@ -5262,7 +5262,35 @@ window.HavalSplash = (function () {
        chrome column rather than carrying a height of its own. */
     .hv-media.lyrics-on .hv-media-chrome > :not(.hv-lyrics) { display: none; }
     .hv-media.lyrics-on .hv-media-chrome { justify-content: stretch; }
-    .hv-media.cover.lyrics-on > .hv-media-art { display: none; }
+    /* A tall card keeps the cover as a thumbnail in the corner while the lyrics
+       run beneath it; the lyrics take the rest of the card. */
+    .hv-media { --hv-lyric-art: 44px; }
+    .hv-media-1x2 { --hv-lyric-art: 92px; }
+    .hv-media-2x2 { --hv-lyric-art: 56px; }
+    .hv-media-3x2 { --hv-lyric-art: 72px; }
+    .hv-media.cover.lyrics-on > .hv-media-art {
+      inset: auto;
+      top: var(--hv-media-pad, 10px);
+      left: var(--hv-media-pad, 10px);
+      width: var(--hv-lyric-art);
+      height: var(--hv-lyric-art);
+      border-radius: 10px;
+      overflow: hidden;
+      z-index: 1;
+    }
+    .hv-media.cover.lyrics-on.no-art > .hv-media-art { display: none; }
+    /* One column wide, two rows tall: the corner thumbnail would leave the width
+       empty, so the cover sits beside the lyrics instead of above them. */
+    .hv-media-1x2.cover.lyrics-on.has-art > .hv-media-body {
+      padding-top: var(--hv-media-pad, 10px);
+    }
+    .hv-media-1x2.cover.lyrics-on.has-art .hv-media-chrome {
+      padding-left: calc(var(--hv-lyric-art) + 10px);
+    }
+    .hv-media-1x2.lyrics-on > .hv-media-app { display: none; }
+    .hv-media.cover.lyrics-on.has-art > .hv-media-body {
+      padding-top: calc(var(--hv-media-pad, 10px) + var(--hv-lyric-art) + 8px);
+    }
     .hv-media.cover.lyrics-on > .hv-media-body {
       background: var(--hv-frost-inner, rgba(255,255,255,.075));
       color: inherit;
@@ -5307,8 +5335,18 @@ window.HavalSplash = (function () {
     }
     .hv-lyric.is-near { opacity: .52; }
     .hv-lyric.is-cur { font-size: 15px; opacity: 1; }
-    .hv-media-3x1 .hv-lyric, .hv-media-2x2 .hv-lyric, .hv-media-3x2 .hv-lyric { font-size: 13px; }
-    .hv-media-3x1 .hv-lyric.is-cur, .hv-media-2x2 .hv-lyric.is-cur, .hv-media-3x2 .hv-lyric.is-cur { font-size: 18px; }
+    .hv-media-3x1 .hv-lyric { font-size: 13px; }
+    .hv-media-3x1 .hv-lyric.is-cur { font-size: 18px; }
+    .hv-media-1x2 .hv-lyric { font-size: 12px; }
+    .hv-media-1x2 .hv-lyric.is-cur { font-size: 15px; }
+    .hv-media-1x3 .hv-lyric { font-size: 13px; }
+    .hv-media-1x3 .hv-lyric.is-cur { font-size: 18px; }
+    .hv-media-2x2 .hv-lyric { font-size: 16px; }
+    .hv-media-2x2 .hv-lyric.is-cur { font-size: 23px; }
+    .hv-media-2x2 .hv-lyrics { gap: 6px; }
+    .hv-media-3x2 .hv-lyric { font-size: 19px; }
+    .hv-media-3x2 .hv-lyric.is-cur { font-size: 28px; }
+    .hv-media-3x2 .hv-lyrics { gap: 8px; }
     .hv-lyrics.is-msg .hv-lyric { opacity: .6; font-size: 11px; white-space: normal; }
     .hv-chrome {
       position: absolute;
@@ -50502,7 +50540,10 @@ class Component extends DCLogic {
       this._launchPackage(s.mediaPackageName);
       return;
     }
-    if (s.mediaTitle || s.mediaArtist || s.mediaAlbum) return;
+    // Anything that says a player is active (even one whose package cannot be
+    // raised) means the saved default must stay shut: it is for an idle card.
+    if (s.mediaHasTrack || s.mediaPlaying || s.mediaPackageName
+        || s.mediaTitle || s.mediaArtist || s.mediaAlbum) return;
     this._launchDefaultOrPick('media');
   }
 
