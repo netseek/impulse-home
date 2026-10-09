@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Source-level contract for the MEDIA card (rail tile + widget + popup).
+ * Source-level contract for the MEDIA card (rail tile + widget). There is no popup.
  *
  * Same shape as the Driving and Tires contracts: it reads index.html and
  * MainActivity.java rather than booting a browser, Gradle or a device. What it
@@ -54,7 +54,7 @@ const mediaView = blockFrom(html, '  _mediaWidgetView(item) {', 'media view buil
 // 1. The rail tile's gestures.
 //
 //    Body opens the PLAYER — the app that published the track, projection
-//    sources included. A hold opens the MEDIA popup. It used to be
+//    sources included. There is no popup and no hold action. It used to be
 //    `action: 'addWidget'`, which opened the widget PICKER: the one rail card
 //    whose body did something unrelated to its own subject.
 // ---------------------------------------------------------------------------
@@ -62,17 +62,18 @@ const catalogStart = html.indexOf('const H6_BOTTOM_CARD_CATALOG');
 assert.ok(catalogStart >= 0, 'missing bottom-card catalog');
 const catalog = html.slice(catalogStart, html.indexOf('];', catalogStart) + 2);
 assert.match(catalog,
-  /id:\s*'media'\s*,\s*title:\s*'Mídia'\s*,\s*action:\s*'openMediaApp'\s*,\s*longAction:\s*'openMedia'/,
-  "the media rail card's body opens the player and a hold opens the popup");
+  /id:\s*'media'\s*,\s*title:\s*'Mídia'\s*,\s*action:\s*'openMediaApp'\s*\}/,
+  "the media rail card's body opens the player and nothing else");
+assert.doesNotMatch(catalog, /id:\s*'media'[^}]*longAction/,
+  'the media rail card has no hold action: there is no popup to open');
 assert.doesNotMatch(catalog, /id:\s*'media'[^}]*action:\s*'addWidget'/,
   'the media card must not open the widget picker');
 
 // It must reach a real handler on both sides of the bridge.
 const dockCommandToken = html.includes('  _onDockCommand(') ? '  _onDockCommand(' : '  dockCommand(';
 const dockCommand = blockFrom(html, dockCommandToken, 'dock command handler');
-assert.match(dockCommand,
-  /case\s+['"]openMedia['"]\s*:\s*this\._openFocusedCard\(\s*['"]media['"]\s*\)/,
-  'openMedia must open the focused MEDIA workspace');
+assert.doesNotMatch(dockCommand, /case\s+['"]openMedia['"]/,
+  'there is no MEDIA popup, so no openMedia command');
 assert.match(dockCommand,
   /case 'openMediaApp':\s*this\._openMediaApp\(null\);/,
   'openMediaApp must launch through the media opener');
@@ -83,17 +84,20 @@ assert.match(dockCommand,
 const nativeActions = native.slice(
   native.indexOf('BOTTOM_CARD_ACTIONS'),
   native.indexOf('));', native.indexOf('BOTTOM_CARD_ACTIONS')) + 3);
-for (const command of ['openMedia', 'openMediaApp']) {
+for (const command of ['openMediaApp']) {
   assert.ok(new RegExp('"' + command + '"').test(nativeActions),
     `native action allow-list must include ${command}, or the command is dropped in transit`);
 }
 
-// The studio's destination chooser is keyed on the workspace a card opens, so
-// media has to be in that map or the "Change" row silently discards writes.
+// The studio's destination chooser is keyed on the workspace a card opens.
+// Media opens its app, so it must stay out of that map: a popup/desktop
+// destination row for it would point at nothing.
 const popupTypes = html.slice(html.indexOf('const H6_CARD_POPUP_TYPES'),
   html.indexOf('};', html.indexOf('const H6_CARD_POPUP_TYPES')) + 2);
-assert.match(popupTypes, /media:\s*'media'/,
-  'media must declare its focused workspace in H6_CARD_POPUP_TYPES');
+assert.doesNotMatch(popupTypes, /\bmedia:/,
+  'media has no focused workspace, so it is not in H6_CARD_POPUP_TYPES');
+assert.doesNotMatch(popupTypes, /\bnavigation:/,
+  'navigation opens its app, so it is not in H6_CARD_POPUP_TYPES');
 
 // ---------------------------------------------------------------------------
 // 2. One builder feeds all three surfaces.
@@ -107,11 +111,9 @@ assert.match(itemView, /if \(item\.type === 'media'\) Object\.assign\(view, this
   'the media widget must be built by _mediaWidgetView');
 
 const focusFields = blockFrom(html, '  _focusedCardRenderFields(s) {', 'focused card fields');
-includesAll(focusFields, [
-  "focusedCardIsMedia: type === 'media'",
-  "type === 'media' ? this._mediaWidgetView(entry.item)",
-  'base.focusedCardBadge = view.mediaSource;',
-], 'media popup wiring');
+for (const gone of ["focusedCardIsMedia", "this._mediaWidgetView(entry.item)", 'view.mediaSource']) {
+  assert.ok(!focusFields.includes(gone), `the focused-card popup must not carry media: ${gone}`);
+}
 
 const dockIndicators = blockFrom(html, '  _syncDockIndicators() {', 'dock indicator payload');
 assert.match(dockIndicators, /const media = this\._mediaWidgetView\(\{ type: 'media', w: 2, h: 1 \}\);/,
@@ -194,15 +196,13 @@ assert.match(nowPlaying, /private final java\.util\.Map<String, String> appIconC
 
 assert.match(mediaView, /const canLaunch = !!\(hasTrack && s\.mediaPackageName && s\.mediaCanLaunch\);/,
   'the card must only offer to open a package the native side says is launchable');
-assert.match(mediaView, /mediaOpenDisabled: !canLaunch,/,
-  "the popup's OPEN button must be disabled when there is nothing to open");
 assert.match(mediaView, /this\._openMediaApp\(ev\);/,
   'the widget body must open the playing app');
 const openMediaApp = blockFrom(html, '  _openMediaApp(ev) {', 'media opener');
 assert.match(openMediaApp, /s\.mediaCanLaunch && s\.mediaPackageName/,
   'a launchable session must still open the playing app');
-assert.match(openMediaApp, /this\._openFocusedCard\('media'\)/,
-  'a track that cannot be launched must still open the MEDIA popup');
+assert.doesNotMatch(openMediaApp, /_openFocusedCard/,
+  'a track that cannot be launched opens nothing: there is no MEDIA popup');
 assert.match(openMediaApp, /this\._launchDefaultOrPick\('media'\)/,
   'an idle media card must launch the saved default, or ask for one');
 
@@ -298,13 +298,22 @@ assert.match(itemView, /item\.type === 'media' \? ' has-controls' : ''/,
   'the media widget must mark itself has-controls');
 
 // ---------------------------------------------------------------------------
-// 7. One widget board carries the media block, and so does the one popup.
+// 7. One widget board carries the media block, and no popup does.
 // ---------------------------------------------------------------------------
 const widgetBlocks = html.match(/<sc-if value="\{\{ wg\.isMedia \}\}"/g) || [];
 assert.equal(widgetBlocks.length, 1,
   'the full-size widget board needs exactly one media block');
 const popupBlocks = html.match(/<sc-if value="\{\{ focusedCardIsMedia \}\}"/g) || [];
-assert.equal(popupBlocks.length, 1, 'the popup is one shared frame, so it carries one media block');
+assert.equal(popupBlocks.length, 0, 'the shared popup frame carries no media block');
+assert.ok(!html.includes('hv-media-focus'), 'the MEDIA popup markup and styles are gone');
+
+// Lyrics live on the widget: a toggle in the transport row and the panel in
+// the chrome column, both inside the single widget block.
+const lyricsBtn = html.match(/class="hv-media-lyrics-btn"/g) || [];
+assert.equal(lyricsBtn.length, 1, 'exactly one lyrics toggle, and it is on the widget');
+assert.match(mediaView, /mediaShowLyricsBtn: !compact,/, 'no lyrics toggle at 1x1');
+assert.match(html, /<div class="hv-lyrics"[^>]*onClick="\{\{ wg\.mediaLyricsRetry \}\}"/,
+  'the widget carries the lyrics panel');
 
 // The board's copy of the card, sliced out for the control checks below.
 const boardCopies = html.split('<sc-if value="{{ wg.isMedia }}"').slice(1)
@@ -375,8 +384,6 @@ assert.match(mediaCard, /card\.setClickable\(true\);\s*card\.setFocusable\(true\
   'the media rail card must consume its own touch even with nothing to open');
 assert.match(mediaCard, /callViewerDock\(bodyCommand\);/,
   'with nothing to open the body must fall back to the card command');
-assert.match(mediaCard, /final String longCommand = descriptor\.longAction;[\s\S]*?callViewerDock\(longCommand\);/,
-  'a hold on the rail card must reach the MEDIA popup');
 assert.match(mediaCard, /quickMediaAppRow = makeQuickMediaAppChip\(density\);/,
   "the rail card must carry the playing app's own chip");
 // The chip is shared with NAVIGATION (2bb5f71), so the hide rule may live in

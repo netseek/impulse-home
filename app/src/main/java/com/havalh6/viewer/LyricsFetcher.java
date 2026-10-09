@@ -35,6 +35,8 @@ final class LyricsFetcher {
     private static final String UA = "H6Viewer/1.0";
     private static final long MISS_TTL_MS = 24L * 60 * 60 * 1000;
     private static final int MAX_CACHE_FILES = 300;
+    private static final int HTTP_ATTEMPTS = 3;
+    private static final long RETRY_BACKOFF_MS = 700;
     /** Same recording is within a couple of seconds; a remaster or live cut is not. */
     private static final long DURATION_TOLERANCE_S = 3;
     private static final Pattern BRACKETS = Pattern.compile("\\s*[\\(\\[][^\\)\\]]*[\\)\\]]");
@@ -159,8 +161,34 @@ final class LyricsFetcher {
         return "null".equals(s) ? "" : s.trim();
     }
 
-    /** Null on 404 (a clean miss); throws on anything that means "could not ask". */
+    /**
+     * LRCLIB answers 503/429 in bursts while the connection is fine, and the
+     * same request succeeds seconds later. A few quick retries absorb that so
+     * it is not reported as "offline"; a persistent failure still throws.
+     */
     private static String httpGet(String url) throws java.io.IOException {
+        java.io.IOException last = null;
+        for (int attempt = 0; attempt < HTTP_ATTEMPTS; attempt++) {
+            if (attempt > 0) {
+                try {
+                    Thread.sleep(RETRY_BACKOFF_MS * attempt);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            try {
+                return httpGetOnce(url);
+            } catch (java.io.IOException e) {
+                last = e;
+                Log.w(TAG, "attempt " + (attempt + 1) + " failed: " + e);
+            }
+        }
+        throw last != null ? last : new java.io.IOException("interrupted");
+    }
+
+    /** Null on 404 (a clean miss); throws on anything that means "could not ask". */
+    private static String httpGetOnce(String url) throws java.io.IOException {
         HttpURLConnection conn = null;
         try {
             conn = (HttpURLConnection) new URL(url).openConnection();

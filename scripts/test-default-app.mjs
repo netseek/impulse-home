@@ -34,8 +34,8 @@ assert.match(openMedia, /s\.mediaCanLaunch && s\.mediaPackageName/,
   'a launchable session still opens the playing app');
 assert.match(openMedia, /this\._launchPackage\(s\.mediaPackageName\)/,
   'the playing package is what gets launched');
-assert.match(openMedia, /this\._openFocusedCard\('media'\)/,
-  'a visible track that cannot be launched still opens the MEDIA popup');
+assert.doesNotMatch(openMedia, /_openFocusedCard/,
+  'a visible track that cannot be launched opens nothing: there is no MEDIA popup');
 assert.match(openMedia, /this\._launchDefaultOrPick\('media'\)/,
   'an idle media card launches the saved default or asks for one');
 

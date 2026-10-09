@@ -107,7 +107,7 @@ public final class MainActivity extends Activity {
                     // invoke vehicle APIs from Android.
                     "openClimate", "openConsumption", "openNavigation", "openPower", "openRange",
                     "openTires", "openVehicleStatus", "openDriving", "openDrivingOnePedal",
-                    "openMedia", "openMediaApp",
+                    "openMediaApp",
                     // Retained for native shells installed before the three mode
                     // tiles were unified into one Driving controls card.
                     "cycleDriveMode", "cyclePowerMode", "cycleRegenMode",
@@ -10573,7 +10573,7 @@ public final class MainActivity extends Activity {
      *
      * What it borrows from the generic card is the part that was missing: the
      * body runs the descriptor's allow-listed action, so a tap anywhere that
-     * is not a control opens the MEDIA popup like every other card.
+     * is not a control opens the playing app (there is no media popup).
      */
     private View makeQuickMediaCard(float density, BottomCardDescriptor descriptor) {
         android.widget.LinearLayout card = new android.widget.LinearLayout(this);
@@ -10613,7 +10613,7 @@ public final class MainActivity extends Activity {
                         quickMediaTitle != null ? quickMediaTitle.getText().toString() : "Media");
             }
         });
-        if (descriptor != null && !descriptor.longAction.isEmpty() && !"openMedia".equals(descriptor.longAction)) {
+        if (descriptor != null && !descriptor.longAction.isEmpty()) {
             final String longCommand = descriptor.longAction;
             card.setLongClickable(true);
             card.setOnLongClickListener(v -> {
