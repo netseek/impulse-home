@@ -2962,15 +2962,11 @@ public final class MainActivity extends Activity {
                 float tempRight = w - pad;
                 c.drawText(inside, tempRight, bottomY, paint);
                 float numW = paint.measureText(inside);
-                android.graphics.Paint.FontMetrics numFm = paint.getFontMetrics();
                 paint.setTypeface(android.graphics.Typeface.create("sans-serif-light",
                         android.graphics.Typeface.NORMAL));
                 paint.setTextSize(Math.max(8f, h * .11f));
-                android.graphics.Paint.FontMetrics labFm = paint.getFontMetrics();
-                float numMid = bottomY + (numFm.ascent + numFm.descent) / 2f;
-                float labelBaseline = numMid - (labFm.ascent + labFm.descent) / 2f;
                 float labelGap = Math.max(3f, numSize * .14f);
-                c.drawText("INTERNA", tempRight - numW - labelGap, labelBaseline, paint);
+                c.drawText("INTERNA", tempRight - numW - labelGap, bottomY, paint);
             }
         }
 
