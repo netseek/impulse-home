@@ -41,7 +41,9 @@ assert.ok(html.slice(html.indexOf('async componentDidMount()'), html.indexOf('as
 assert.ok(/\.getRangeCycles\(/.test(method('_rangeCycles')), 'the expanded popup reads TripBridge.getRangeCycles');
 assert.ok(/this\._rangeBurnView\(/.test(method('_rangeWidgetView')), 'the range popup view carries the forecast check');
 assert.ok(html.includes('{{ focusedRangeBurnSocPath }}') && html.includes('{{ focusedRangeBurnOem0Path }}') && html.includes('{{ focusedRangeWideToggle }}'), 'expanded range popup markup is missing');
-assert.ok(method('_rangeBurnView').includes("rangeBurnYMax: '100%'") && method('_rangeBurnView').includes('rangeBurnSocPath'), 'burn chart plots absolute SOC vs distance with forecast diagonals');
+assert.ok(method('_rangeBurnView').includes("rangeBurnYMax: '100%'") && method('_rangeBurnView').includes('rangeBurnSocPath') && method('_rangeBurnView').includes('X(p.ev)'), 'burn chart plots absolute SOC against EV km with forecast diagonals');
+assert.ok(/this\._rangeBurnSeries\(/.test(method('_rangeBurnView')), 'hybrid stretches are split out of the burn');
+assert.ok(html.includes('hv-range-burn-mix') && html.includes('focusedRangeBurnRisePath') && html.includes('focusedRangeBurnAdjustPath'), 'hybrid strip, recharge step and adjusted forecast are in the popup');
 assert.ok(/histEvKmNum: !demo && hasHistEv/.test(method('_rangeTelemetry')), 'only a real history estimate may be reported, never demo or the OEM fallback');
 assert.ok(!method('_rangeTelemetry').includes('this._powerSource()'), 'range freshness cannot inherit generic power flow');
 console.log('range-card contracts: ok');
