@@ -86,10 +86,11 @@ includesAll(html, [
   "previewClock: key === 'clock'",
   "hasShot: key !== 'clock'",
 ], 'visual widget catalog');
+// RANGE reads nothing the widget loop produces; only POWER and graphs keep it.
 includesAll(method('_widgetRenderFields'), [
   "this._hasWidgetType(mode, 'power')",
-  "this._hasWidgetType(mode, 'range')",
-], 'range refresh loop');
+], 'power refresh loop');
+assert.ok(!method('_widgetRenderFields').includes("this._hasWidgetType(mode, 'range')"), 'range does not keep the widget loop');
 
 // Native rail cards get structured values for their large readout, compact
 // metrics and visual progress. The legacy value remains for older shells.
@@ -325,9 +326,12 @@ includesAll(method('_queueNavRefresh'), [
 ], 'TBT refresh throttle');
 includesAll(method('_commitNavUi'), [
   "_hasWidgetType(mode, 'navigation')",
-  'this._uiOnlyStateWrite = true',
+  'this._uiOnlySetState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }))',
   'this._syncDockIndicators()',
 ], 'TBT must not dirty the 3D loop');
+// No callback: a setState callback forces the root path (a full commit every guidance tick).
+assert.ok(!/this\._uiOnlySetState\([^;]*\}\)\s*,/.test(method('_commitNavUi')),
+  'TBT ui-only setState must not carry a callback');
 const dock = method('_syncDockIndicators');
 includesAll(dock, [
   'state: navigation.navigationCardState',

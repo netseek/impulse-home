@@ -62,7 +62,8 @@ final class TripRecorder implements TripEngine.Listener {
             TripEngine.KEY_READY, TripEngine.KEY_SPEED, TripEngine.KEY_ODOMETER,
             TripEngine.KEY_VOLTAGE, TripEngine.KEY_CURRENT, TripEngine.KEY_FUEL_INST,
             TripEngine.KEY_ICE, TripEngine.KEY_FLOW, TripEngine.KEY_FUEL_PCT, TripEngine.KEY_NAV, TripEngine.KEY_SOC,
-            RangeLedger.KEY_EV_RANGE));
+            RangeLedger.KEY_EV_RANGE,
+            TripSetting.KEY_DRIVE_MODE, TripSetting.KEY_POWER_MODE, TripSetting.KEY_RESERVE, TripSetting.KEY_SOC_TARGET));
 
     private static TripRecorder instance;
 
@@ -280,6 +281,137 @@ final class TripRecorder implements TripEngine.Listener {
         return m == null ? "" : m.dataUrl(startMs);
     }
 
+    // ── EXPORTAR VIAGENS ───────────────────────────────────────────────────
+
+    /** {state: idle | running | done | error, ...}; read by the page while it waits. */
+    private volatile String exportJson = "{\"state\":\"idle\"}";
+    private Thread exportThread;
+
+    String exportStatusJson() {
+        return exportJson;
+    }
+
+    /**
+     * Writes the stored trips (all of them, or only the start times in
+     * {@code only}) to shared storage (TripStore.exportTrips) on a thread of its
+     * own: a long history takes seconds, and on the worker it would hold back the
+     * signals being integrated. One export at a time.
+     */
+    synchronized String exportTrips(java.util.Set<Long> only) {
+        if (exportThread != null && exportThread.isAlive()) return exportJson;
+        TripStore s = store;
+        if (s == null) return exportJson = exportError("unavailable");
+        if (only != null && only.isEmpty()) return exportJson = exportError("empty");
+        if (!PersistBackup.hasPermission(app)) return exportJson = exportError("permission");
+        exportJson = "{\"state\":\"running\"}";
+        exportThread = new Thread(() -> runExport(s, only), "h6-trip-export");
+        exportThread.setPriority(Thread.MIN_PRIORITY);
+        exportThread.start();
+        return exportJson;
+    }
+
+    private void runExport(TripStore s, java.util.Set<Long> only) {
+        long t = now();
+        java.io.File dir = new java.io.File(PersistBackup.dir(), TripExport.DIR);
+        String stem = TripExport.fileStem(t);
+        java.io.File json = new java.io.File(dir, stem + ".json");
+        java.io.File csv = new java.io.File(dir, stem + ".csv");
+        java.io.File jsonTmp = new java.io.File(dir, stem + ".json.tmp");
+        java.io.File csvTmp = new java.io.File(dir, stem + ".csv.tmp");
+        java.io.File zip = new java.io.File(dir, stem + ".zip");
+        java.io.File zipTmp = new java.io.File(dir, stem + ".zip.tmp");
+        try {
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new java.io.IOException("mkdirs " + dir);
+            TripStore.ExportCount n;
+            try (java.io.Writer jw = new java.io.BufferedWriter(new java.io.OutputStreamWriter(
+                         new java.io.FileOutputStream(jsonTmp), java.nio.charset.StandardCharsets.UTF_8), 64 * 1024);
+                 java.io.Writer cw = new java.io.BufferedWriter(new java.io.OutputStreamWriter(
+                         new java.io.FileOutputStream(csvTmp), java.nio.charset.StandardCharsets.UTF_8))) {
+                // A BOM, so a spreadsheet opens the place names as UTF-8.
+                cw.write('﻿');
+                n = s.exportTrips(jw, cw, t, only);
+            }
+            // Renamed only once complete: a half-written export never looks like one.
+            if (!jsonTmp.renameTo(json) || !csvTmp.renameTo(csv)) throw new java.io.IOException("rename");
+            // Both in one zip for ENVIAR POR BLUETOOTH (TripExportProvider).
+            TripExport.zip(zipTmp, json, csv);
+            if (!zipTmp.renameTo(zip)) throw new java.io.IOException("rename zip");
+            android.media.MediaScannerConnection.scanFile(app,
+                    new String[]{json.getAbsolutePath(), csv.getAbsolutePath(), zip.getAbsolutePath()}, null, null);
+            JSONObject o = new JSONObject();
+            o.put("state", "done");
+            o.put("dir", dir.getAbsolutePath());
+            o.put("json", json.getName());
+            o.put("csv", csv.getName());
+            o.put("zip", zip.getName());
+            o.put("zipBytes", zip.length());
+            // Asked once here, so the page never queries the package manager while it renders.
+            o.put("bluetooth", TripExportProvider.canSendBluetooth(app));
+            o.put("scope", only == null ? "all" : "selection");
+            o.put("trips", n.trips);
+            o.put("points", n.points);
+            o.put("stops", n.stops);
+            o.put("bytes", json.length() + csv.length());
+            o.put("ms", now() - t);
+            exportJson = o.toString();
+            Log.w(TAG, "trips exported: " + exportJson);
+        } catch (Exception e) {
+            Log.w(TAG, "trip export failed", e);
+            jsonTmp.delete();
+            csvTmp.delete();
+            zipTmp.delete();
+            exportJson = exportError("write");
+        }
+    }
+
+    /**
+     * QR CODE: serves the export behind {@code zipName} on the unit's Wi-Fi
+     * (TripExportLink) and returns {state: on, ttlMs, links: [{label, url, qr,
+     * size}]}, the code as an SVG path in module units; or {state: error,
+     * reason: missing | no-wifi | failed}.
+     */
+    String exportLinkJson(String zipName) {
+        try {
+            JSONObject o = new JSONObject();
+            java.io.File dir = new java.io.File(PersistBackup.dir(), TripExport.DIR);
+            if (!TripExport.isZipName(zipName) || !new java.io.File(dir, zipName).isFile()) {
+                return exportError("missing");
+            }
+            String stem = zipName.substring(0, zipName.length() - 4);
+            List<TripExportLink.Link> links = TripExportLink.start(app, dir, stem);
+            if (links.isEmpty()) return exportError("no-wifi");
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (TripExportLink.Link l : links) {
+                io.nayuki.qrcodegen.QrCode qr = io.nayuki.qrcodegen.QrCode.encodeText(l.url, io.nayuki.qrcodegen.QrCode.Ecc.MEDIUM);
+                JSONObject j = new JSONObject();
+                j.put("label", l.label);
+                j.put("url", l.url);
+                j.put("qr", TripExport.qrSvgPath(qr));
+                j.put("size", qr.size + 8);
+                arr.put(j);
+            }
+            o.put("state", "on");
+            o.put("ttlMs", TripExportLink.TTL_MS);
+            o.put("links", arr);
+            return o.toString();
+        } catch (Exception e) {
+            Log.w(TAG, "export link failed", e);
+            return exportError("failed");
+        }
+    }
+
+    void stopExportLink() {
+        TripExportLink.stop();
+    }
+
+    boolean sendExportBluetooth(String zipName) {
+        return TripExportProvider.sendBluetooth(app, zipName);
+    }
+
+    private static String exportError(String reason) {
+        return "{\"state\":\"error\",\"reason\":\"" + reason + "\"}";
+    }
+
     // ── engine callbacks (worker thread) ───────────────────────────────────
 
     @Override
@@ -333,6 +465,15 @@ final class TripRecorder implements TripEngine.Listener {
     }
 
     @Override
+    public void onSetting(long startMs, TripSetting setting) {
+        TripStore s = store;
+        if (s == null) return;
+        s.insertSetting(startMs, setting);
+        Log.w(TAG, String.format(Locale.US, "trip setting %d: %s at %.2f km",
+                startMs, setting.label(), setting.km));
+    }
+
+    @Override
     public void onTripDiscarded(long startMs) {
         TripStore s = store;
         synchronized (pending) {
@@ -340,6 +481,7 @@ final class TripRecorder implements TripEngine.Listener {
         }
         if (s == null) return;
         s.deletePoints(startMs);
+        s.deleteSettings(startMs);
         s.clearCheckpoint();
         Log.w(TAG, "trip discarded " + startMs);
     }

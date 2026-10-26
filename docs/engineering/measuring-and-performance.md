@@ -18,6 +18,9 @@ Both of these turned out to be wrong when finally measured:
 - "The post-FX passes are the expensive part." They measured **2.0 ms/frame,
   5.6%** of the frame. A planned rewrite to merge them was abandoned because the
   realistic upside was ~1 ms for an invasive change to the post-FX core.
+  That was the lighter model. On the current one (~1.2M visible triangles, 157
+  draw calls) the two passes cost ~6 ms of a ~15 ms submit, because each renders
+  the whole scene again; see "Post-FX rebuilds while the camera moves" below.
 
 ### How to measure
 
@@ -102,7 +105,7 @@ The harness used for every number in this file is `scripts/device-cdp.mjs`.
 |---|---|
 | DPR 0.75 (motion tier) | ~22 fps |
 | DPR 1.0 native | ~14 fps (2.04x pixels, +26 ms/frame) |
-| All post-FX (bloom + streak) | +2.0 ms/frame |
+| All post-FX (bloom + streak) | +2.0 ms/frame on the earlier model; ~6 ms on the current one (bloom 3.8, streak 2.2) |
 | MSAA | 4x, and `MAX_SAMPLES` is 4 — already at the driver ceiling |
 | Main pass | ~210 draw calls, ~374k triangles |
 
@@ -190,6 +193,65 @@ explains it. Measure the specific change; do not reason from this table.
   So: when you find a per-tick `setState` guarded by a magnitude threshold,
   the threshold is the bug, not the fix. Check whether `renderVals` already
   reads a live mirror — twice now, it did.
+
+  **A setState callback is a root commit too.** Two bus paths still committed
+  the root on every frame. `_refreshTireTelemetry` ran a plain `setState` per
+  `tpms_status` or tyre-warning frame, and `_commitNavUi` passed
+  `_syncDockIndicators` as a callback with each guidance update (about 1 Hz).
+  `_uiOnlySetState` sends any update that has a callback to the root path. The
+  callback was redundant: both the root's and the desktop stage's
+  `componentDidUpdate` already sync the dock. Both paths now go through
+  `_uiOnlySetState` with no callback, so they repaint only the desktop stage, are
+  dropped during a slide (teardown refreshes), and fall back to the root only
+  while a popup or editor is open. Tyre frames also coalesce into one trailing
+  refresh 250 ms later, because `tpms_status` and its warning keys arrive
+  together. Nothing in the 3D scene reads tyre data.
+
+  Measured in headless Chrome, not on the car, with interleaved A/B/A/B arms at
+  4x CPU throttle and simulated traffic of 60 signals/s:
+
+  | | before | after |
+  |---|---|---|
+  | root commits/s, mixed bus incl. `tpms_status` | 4.78 / 4.78 | **0.30 / 0.30** |
+  | script time per 10 s window | 1.12 / 0.82 s | 0.83 / 0.57 s |
+  | root commits/s from guidance, navigation widget placed | 0.9 / 0.9 | **0** |
+
+  The 0.30 that remains is start-up `lights`/`splashActive` commits, present in
+  both arms. The simulated tyre value changed on every frame, which is harsher
+  than a real tyre. The real `tpms_status` rate while driving has not been
+  measured, so the effect on the car's frame rate is unknown. What the table
+  does establish is the count: one ~197 ms root commit per tyre frame, and one
+  per second of guidance, are gone. `test-bus-widget-refresh.mjs` checks the
+  coalescing, the stage-only path, the slide drop, unmount and the dock sync,
+  with negative controls.
+
+  The same traffic on an emulator with a navigation widget placed: Android 16 and
+  WebView 133, 4 vCPU and 4 GB at 1920x720, the emulator process held on the host's
+  efficiency cores, and the DPR ladder pinned. Debug APKs, a warm-up run discarded,
+  then A/B/A/B:
+
+  | | before | after |
+  |---|---|---|
+  | root commits/s | 4.8 / 5.1 | **0.6 / 0.4** |
+  | share of wall clock in commits | 21.3% / 19.0% | **2.8% / 1.5%** |
+  | fps | 41.4 / 48.3 | 46.3 / 50.2 |
+  | `timerLagP90` | 40.6 / 33.8 ms | 23.9 / 18.7 ms |
+  | signals the page kept up with in 10 s | 346 / 376 | 411 / 468 |
+
+  The injector runs on the page's main thread, so the busier arm received fewer
+  signals and still committed more. The Android 9 emulator image (WebView 66)
+  cannot run the viewer at all (`String.prototype.matchAll` needs Chrome 73), so it
+  could not be used.
+
+  On the car (WebView 91), parked, these two paths could not be exercised.
+  `tpms_status` arrived in 1 of 21 ten-second windows, and there was no guidance,
+  so the tyre and navigation A/B still needs a drive. The native batching
+  (`TelemetryBatch`, see [android-shell](../architecture/android-shell.md)) did show
+  on the parked bus: a burst of 141 broadcasts reached the page in one script
+  execution, where each would have been its own `evaluateJavascript`. A cold-start
+  A/B with and without the batching, three interleaved pairs on a rested unit,
+  showed no measurable change: `viewerReady` at 10.53 s against 10.60 s (medians),
+  with pairs of both signs, and the same intro frame rate (26-27 fps).
 
 - **A hidden WebView is still on the panel, and its render loop is dead.** The
   loop is driven only by `requestAnimationFrame`. When another app takes window
@@ -315,6 +377,45 @@ probe installed with `Page.addScriptToEvaluateOnNewDocument` (NOT a plain
 evaluate — the WebView navigates after attach and wipes anything you injected
 into the first document), recording `performance.getEntriesByType('resource')`
 plus a `longtask` observer and a poll for `__app._viewerReady`.
+
+## Post-FX rebuilds while the camera moves
+
+Measured on the car, camera orbiting (`camOrbitEnabled`), per frame: the scene was
+rendered three times, once for the frame and once inside each of the bloom and
+streak composers, for ~14 ms of the ~15 ms submit. `gl.finish()` stayed at 0.1 ms,
+so this is CPU-side again. A frame just over 16.7 ms lands on every other vsync,
+which is why the orbit sat at ~28-30 fps with the main thread still ~37% idle.
+
+The orbit dirties post-FX on every frame, so it rebuilt on every frame.
+`_postFxRebuildNow` now rebuilds on one frame in three (`POSTFX_MOTION_EVERY`)
+while `cameraBusy`, and reuses the cached overlay quads in between. A skipped
+frame keeps `_postFxDirty` set and queues one more frame with
+`requestRender(1, true)`. So the first frame after the camera settles always
+rebuilds: the resting glow is exact, and only a moving one can trail by up to two
+frames. With the camera still, nothing changed.
+
+Same car, same scene, the pre-change rule swapped in at runtime for arm A, 8 s
+windows, eight valid interleaved pairs (two windows dropped: another app hid the
+WebView):
+
+| | before | after | pairs with that sign |
+|---|---|---|---|
+| fps, camera orbiting | 29.8 | **35.5** | 8/8 |
+| post-FX rebuilds/s | 30.0 | **12.1** | 8/8 |
+| script time, ms per s | 456 | **385** | 8/8 |
+| `timerLagP90` | 19.9 ms | **16.6 ms** | 8/8 |
+| submit | 13.5 ms | 10.1 ms | 6/8 |
+
+It does not reach 60 fps: the main pass alone is ~4.7 ms of JS and the frame still
+crosses a vsync. The next levers are a bloom pass that does not re-render the
+whole scene, and fewer triangles.
+
+On r137, three.js draws a transparent `DoubleSide` material twice per render and
+sets `needsUpdate` on each pass, which re-derives its program parameters on every
+frame. Drawing those meshes single-sided saved 7 draw calls and about 1 fps,
+within noise, so it was not shipped. `test-postfx-motion-throttle.mjs` checks the
+one-in-three cadence, the queued settle frame, the still camera and the loop
+wiring, with negative controls.
 
 ## Anything Hz-denominated must run off the wall clock
 
@@ -507,3 +608,81 @@ experiments did not show consistent frame gains and were not shipped.
 `test-desktop-slide.mjs` checks fade endpoints, cancellation/restoration and
 teardown without inherited style writes, plus retained CSS transitions, with
 negative controls. Device verification remains necessary for frame pacing.
+
+
+### Open popups and the widget loop
+
+Three paths kept doing work while nothing on screen needed it.
+
+- **POWER popup.** An open popup sits over the board, so `_canRefreshDesktopStage()`
+  is false. Every `widgetRev` bump from `_commitPowerRefresh` (4 Hz from the bus) and
+  from the 1 Hz history ticker was therefore a root commit, for as long as the popup
+  stayed open. The popup is a `.hv-power` card, so `_updatePowerCards` already paints
+  its readings, and it now also paints the stage label and the peak. `_refreshPowerPopup`
+  commits only when what a render draws changes: the chart's data-or-placeholder
+  `sc-if`, its caption, or the DEMO badge. `_focusedCardRenderFields` records the last
+  shape that was drawn.
+- **Roof popup.** `_updateHotspotLayer` runs on every loop tick while the roof popup
+  is open, and it ended with `requestRender(2)`. The scene and post-FX redrew every
+  frame until the popup closed. The popup is fixed DOM and follows nothing in 3D.
+  Opening, camera input, camera tweens, the roof tweens and resize request their own
+  frames.
+- **Widget loop.** `_drawGraphs` derived consumption and smoothed the series on every
+  frame before it checked for a graph canvas, so a board with POWER but no graph paid
+  for a series that nothing read. Sampling now runs only while a graph canvas is
+  mounted, and still runs every frame then, because the EMA and the 40 ms bucket are
+  tuned to it. A graph on a desktop not visited yet therefore starts its history at
+  the first visit. RANGE no longer keeps the loop alive: since `f471c24` it reads
+  `_rangeTelemetry`, not `_graphNow`, which was written and never read and is gone.
+
+Measured on the HavalPerf emulator (Android 16, WebView 133, 4 vCPU, 4 GB,
+1920x720), not on the car. Debug APKs, DPR ladder pinned, 10 s windows, a warm-up arm
+discarded, three interleaved A/B pairs. The table shows the median of each arm:
+
+| Scenario | Metric | before | after | same sign in every pair |
+|---|---|---|---|---|
+| POWER popup open, bus traffic | root commits/s | 3.25 | **0.7** | yes |
+| | share of wall clock in commits | 38.6% | **8.4%** | yes |
+| | main-thread task time, ms per s | 835 | **712** | yes |
+| | `timerLagP90` | 102 ms | **66.5 ms** | yes |
+| Roof popup open, camera still | rendered fps | 21.6 | **2** (idle) | yes |
+| | main-thread task time, ms per s | 819 | **555** | yes |
+| | `timerLagP90` | 44.7 ms | **17.9 ms** | yes |
+| RANGE-only board | widget loop calls/s | 25.5 | **0** | yes |
+| | widget loop time, ms per s | 6.2 | **0** | yes |
+
+About 0.7-0.8 root commits/s remain in every scenario and in both builds. They come
+from an unrelated background commit. The POWER popup's frame rate did not change
+consistently, and its painter costs slightly more per call (about 4.7 to 5.3 ms),
+because it now does the caption and peak work the root commits used to do. On a board
+with both POWER and RANGE, skipping graph sampling showed no measurable effect: it
+removes work that nothing reads, without a measured gain.
+`test-power-popup-refresh.mjs`, `test-roof-popup-render.mjs` and
+`test-graph-loop-cadence.mjs` check each path, with negative controls.
+
+Measured on the car (WebView 91), parked, with one installed build and the pre-change
+method bodies swapped in at runtime for arm A, so the arms alternate every window
+without a reload (the method-wrapper approach above). 10 s windows, DPR ladder pinned,
+six interleaved pairs per scenario, median of each arm:
+
+| Scenario | Metric | before | after | same sign in every pair |
+|---|---|---|---|---|
+| POWER popup open, the car's own parked bus | root commits/s | 1.45 | **0** | 6/6 |
+| | script time, ms per s | 581 | **502** | 6/6 |
+| POWER popup open, plus power traffic at driving rates | root commits/s | 3.88 | **0** | 6/6 |
+| | share of wall clock in commits | 27.5% | **0%** | 6/6 |
+| | fps | 14.7 | **17.3** | 6/6 |
+| | `timerLagP90` | 32.5 ms | **25.1 ms** | 6/6 |
+| | main-thread task time, ms per s | 721 | **582** | 6/6 |
+| Roof popup open, camera still | rendered fps | 26.0 | **0** (idle) | 6/6 |
+| | main-thread task time, ms per s | 518 | **314** | 6/6 |
+| | `timerLagP90` | 20.8 ms | **7.9 ms** | 6/6 |
+| RANGE-only board, camera still | widget loop calls/s | 60.1 | **0** | 6/6 |
+| | main-thread task time, ms per s | 235 | **204** | 5 of 6 |
+
+**The camera orbit hides two of these.** With `camOrbitEnabled` on, the scene renders
+every frame anyway and `_applyGraphLoopGate` holds the widget loop while the camera
+moves. So with the orbit on, the roof and RANGE changes measured no difference
+(both arms about 26-28 fps, widget loop 0 in both). "Camera still" holds
+`_syncCamOrbit` off for the run only. The POWER popup result does not depend on it:
+it was measured with the orbit on.

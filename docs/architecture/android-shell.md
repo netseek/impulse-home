@@ -10,7 +10,7 @@ regular rendering mode with an Android-specific decoder compatibility flag.
 - JDK 21
 - Gradle 9.3.1 (or import the project into a compatible Android Studio version)
 
-No AndroidX UI. The Shizuku client is the one packaged Java library, and only the GWM hub's Reboot tile uses it.
+No AndroidX UI. The Shizuku client is the one packaged Java library. The GWM hub's Reboot tile uses it, and so does ENVIAR POR BLUETOOTH where the share activity is unexported (see below). The QR code encoder (Project Nayuki) is vendored as source under `app/src/main/java/io/nayuki/qrcodegen/`.
 
 ## Build
 
@@ -215,9 +215,22 @@ CAN bus → Shizuku IPC
   → havalshisuku ServiceManager.dispatchTelemetryOnly(key, value)
   → public broadcast {key, value}
   → MainActivity.telemetryReceiver  (registered in onCreate, held across pause)
+  → TelemetryBatch  (one evaluateJavascript per main-looper turn)
   → window.onCarDataUpdate(key, value)
   → carTelemetry  →  Component._applyCarSignal
 ```
+
+The receiver does not call `evaluateJavascript` per broadcast. Each call was its own
+UI-thread message, renderer IPC, V8 compile (no two scripts are equal) and renderer
+task. Broadcasts append to `TelemetryBatch` in arrival order, every value kept (an
+edge on a repeated key must not be lost), and one flush posted on the first signal
+of a batch sends them as a single script. There is no timer, so no latency is added;
+broadcasts already queued behind the first join it. `TelemetryBatch` also escapes
+backslashes and line terminators. The old `'%s'` formatting escaped only `'`. Sent
+through `am broadcast` on the emulator, `C:\new` reached the page as `C:`, a line
+break and `ew`. A raw line break or an invalid escape in a value produced broken
+JavaScript, and the signal was dropped. `TelemetryBatchTest` covers order, repeats,
+draining and escaping.
 
 Two broadcast actions are accepted, because the havalshisuku source trees differ
 on which one they send and both carry identical `key`/`value` string extras:
@@ -561,7 +574,18 @@ Energia and Reiniciar; the bottom row is Sistema and Veículo.
 
 Shizuku asks for its grant the first time Reiniciar is tapped. The shell
 command itself runs in a Shizuku user service (`GwmRebootService`), as
-whichever user started Shizuku. The client library declares minSdk
+whichever user started Shizuku. On the MMI that user is root
+(`shizuku_server` runs as uid 0, measured 2026-10-25).
+
+The same service has `shareFile`, for the trip export's ENVIAR POR BLUETOOTH.
+The MMI ships `com.android.bluetooth/.opp.BluetoothOppLauncherActivity`
+unexported ("not exported from uid 1002"), so an app cannot start it, but
+Shizuku's user can. `shareFile` runs `am start` with the zip as a `file://`
+stream. It takes no shell and checks both arguments: a component name, and an
+export zip under `/sdcard/HavalH6Viewer/exports`. Whichever of the two
+features is used first asks for the grant (`callGwmService`). The user
+service's `version` is 2, so Shizuku replaces a copy still running the old
+code. The client library declares minSdk
 24; the shell stays at 23 and overrides that, because the call only happens on
 the Android 9 head unit. The × on the card closes it, and so does a tap outside
 the card. `com.beantechs.launcher` (the OEM home) is not a hub destination and

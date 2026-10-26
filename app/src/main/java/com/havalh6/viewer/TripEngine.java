@@ -84,6 +84,8 @@ final class TripEngine {
     static final double ARRIVAL_M = 150;
     /** Guidance that has sent nothing for this long is a lost session and no longer holds a trip open. */
     static final long GUIDANCE_HOLD_MAX_MS = 60 * 60_000L;
+    /** A setting change is written once the settings have held this long: a slider drag is one change. */
+    static final long SETTING_SETTLE_MS = 5_000L;
     /** Impulse DASHBOARD_FUEL_TANK_CAPACITY_LITERS: one tank size across both apps (docs/engineering). */
     static final double TANK_LITRES = 55.0;
     /** A fuel level this much higher after a stop is a refuel, not gauge noise. */
@@ -116,6 +118,8 @@ final class TripEngine {
         void onTripDiscarded(long startMs);
         /** A refuel or charge noticed across a stop; {@code startMs} is the trip it belongs to. */
         void onStop(long startMs, TripStop stop);
+        /** The driving settings changed (or the trip opened): in force from {@code setting.t}. */
+        void onSetting(long startMs, TripSetting setting);
     }
 
     private final Listener listener;
@@ -156,6 +160,18 @@ final class TripEngine {
     private double alt = Double.NaN;
     private long fixT;
     private final Map<String, String> latestRaw = new HashMap<>();
+    // Driving settings (TripSetting). Not checkpointed: Impulse replays them after a restart.
+    private int driveMode = TripSetting.UNKNOWN;
+    private int powerMode = TripSetting.UNKNOWN;
+    private int reserve = TripSetting.UNKNOWN;
+    private int socTarget = TripSetting.UNKNOWN;
+    /**
+     * A change not written yet: when the burst began, with the trip's totals then,
+     * and when it last moved. Written by {@link #tick} once it has held
+     * {@link #SETTING_SETTLE_MS}, and on close.
+     */
+    private TripSetting settingAt;
+    private long settingMovedAt;
 
     TripEngine(Listener listener) {
         this.listener = listener;
@@ -227,6 +243,14 @@ final class TripEngine {
                     }
                     onLevel(true, v, t);
                 }
+                break;
+            }
+            case TripSetting.KEY_DRIVE_MODE:
+            case TripSetting.KEY_POWER_MODE:
+            case TripSetting.KEY_RESERVE:
+            case TripSetting.KEY_SOC_TARGET: {
+                int v = TripSetting.parse(key, raw);
+                if (v != TripSetting.UNKNOWN) onSetting(key, v, t);
                 break;
             }
             case KEY_SOC: {
@@ -475,6 +499,7 @@ final class TripEngine {
         advance(t);
         settleStops(t);
         if (!st.open) return;
+        if (settingAt != null && t - settingMovedAt >= SETTING_SETTLE_MS) flushSetting();
         if (!Boolean.TRUE.equals(ready)) {
             if (st.readyOffAt > 0 && t - st.readyOffAt >= MERGE_GAP_MS && !guidingNow(t)) close(st.readyOffAt);
             return;
@@ -558,6 +583,7 @@ final class TripEngine {
         if (saved == null || !saved.open) return;
         st = saved;
         ready = null;
+        settingAt = null;
         if (st.readyOffAt == 0) st.readyOffAt = st.lastT;
         if (now - st.readyOffAt >= MERGE_GAP_MS && !guidingNow(now)) close(st.readyOffAt);
     }
@@ -613,6 +639,9 @@ final class TripEngine {
         st.lastSpeedT = Double.isNaN(kmh) ? 0 : t;
         st.wasMoving = !Double.isNaN(kmh) && kmh > STOP_ARMED_ABOVE_KMH;
         listener.onTripOpened(t);
+        // The settings the trip starts with: written once the replay at READY has settled.
+        settingAt = snapshotSetting(t, 0, 0, 0, 0, 0, 0, 0);
+        settingMovedAt = t;
         // Stops noticed while no trip was open (parked between trips) belong to this one.
         for (TripStop stop : pendingStops) {
             listener.onStop(t, stop);
@@ -625,6 +654,7 @@ final class TripEngine {
     private void close(long endT) {
         // A level read while parked at the end of this trip belongs to this trip.
         flushCandidates();
+        flushSetting();
         if (st.guided && st.guideEndT == 0) {
             // Still guiding when the car was switched off: at the door counts as arrived.
             st.arrived = !Double.isNaN(st.lastRemainingM) && st.lastRemainingM <= 2 * ARRIVAL_M;
@@ -748,6 +778,46 @@ final class TripEngine {
         st.odoLast = v;
         st.lastOdoT = t;
         st.distIntAtOdo = st.distInt;
+    }
+
+    private void onSetting(String key, int v, long t) {
+        int before = TripSetting.KEY_DRIVE_MODE.equals(key) ? driveMode
+                : TripSetting.KEY_POWER_MODE.equals(key) ? powerMode
+                : TripSetting.KEY_RESERVE.equals(key) ? reserve : socTarget;
+        if (before == v) return;  // Impulse replays unchanged values
+        switch (key) {
+            case TripSetting.KEY_DRIVE_MODE: driveMode = v; break;
+            case TripSetting.KEY_POWER_MODE: powerMode = v; break;
+            case TripSetting.KEY_RESERVE: reserve = v; break;
+            default: socTarget = v; break;
+        }
+        if (!st.open) return;
+        // The burst's first moment owns the totals; later moves only update the values.
+        if (settingAt == null) {
+            settingAt = snapshotSetting(t, liveKm(), st.kwhOut, st.kwhIn, st.fuelL, st.evKm, st.driveMs, st.idleMs);
+        }
+        settingMovedAt = t;
+    }
+
+    private TripSetting snapshotSetting(long t, double km, double kwhOut, double kwhIn, double fuelL,
+                                        double evKm, long driveMs, long idleMs) {
+        return new TripSetting(t, driveMode, powerMode, reserve, socTarget, km, kwhOut, kwhIn, fuelL, evKm, driveMs, idleMs);
+    }
+
+    /**
+     * Writes the pending change with the values in force now, unless they are
+     * what this trip already has (a burst that ended where it began, or a replay
+     * after a restart).
+     */
+    private void flushSetting() {
+        TripSetting at = settingAt;
+        settingAt = null;
+        if (at == null || !st.open) return;
+        String sig = TripSetting.signature(driveMode, powerMode, reserve, socTarget);
+        if (sig.equals(st.settingsSig)) return;
+        st.settingsSig = sig;
+        listener.onSetting(st.startMs, new TripSetting(at.t, driveMode, powerMode, reserve, socTarget,
+                at.km, at.kwhOut, at.kwhIn, at.fuelL, at.evKm, at.driveMs, at.idleMs));
     }
 
     private double odoDelta() {

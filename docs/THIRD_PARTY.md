@@ -19,6 +19,7 @@ Resolved from Maven when the APK is built. Not copied into the repository.
 | Babel Standalone | 7.26.4 | MIT | `vendor/react/` |
 | Draco decoder (Google) | as vendored | Apache-2.0 | `vendor/draco/` |
 | Basis Universal transcoder | as vendored | Apache-2.0 | `vendor/basis/` |
+| QR Code generator library, Java ([Project Nayuki](https://www.nayuki.io/page/qr-code-generator-library)) | 1.8.0 | MIT | `app/src/main/java/io/nayuki/qrcodegen/` (the trip export's QR CODE) |
 
 ## Fonts
 

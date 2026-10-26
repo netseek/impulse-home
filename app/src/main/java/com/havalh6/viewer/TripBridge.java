@@ -90,6 +90,56 @@ final class TripBridge {
         return recorder.totalsJson();
     }
 
+    /**
+     * EXPORTAR VIAGENS: starts writing every stored trip to
+     * /sdcard/HavalH6Viewer/exports and returns at once with the status
+     * ({@link #getExportStatus}); the page polls that until it is done or error.
+     */
+    @JavascriptInterface
+    public String exportTrips() {
+        return recorder.exportTrips(null);
+    }
+
+    /**
+     * The same, for the chosen trips only: their start times, comma-separated
+     * (strings, as in getTrip). Unknown times are skipped; none at all is an error.
+     */
+    @JavascriptInterface
+    public String exportTripsOf(String startMsList) {
+        return recorder.exportTrips(TripExport.parseStarts(startMsList));
+    }
+
+    /** {state: idle | running | done | error}; done carries the folder, file names and counts, error a reason. */
+    @JavascriptInterface
+    public String getExportStatus() {
+        return recorder.exportStatusJson();
+    }
+
+    /**
+     * ENVIAR POR BLUETOOTH: opens the system's Bluetooth device picker for an
+     * export's zip (the {@code zip} name a done status carries). False when the
+     * head unit has no Bluetooth file transfer or the file is gone.
+     */
+    @JavascriptInterface
+    public boolean sendExportBluetooth(String zipName) {
+        return recorder.sendExportBluetooth(zipName);
+    }
+
+    /**
+     * QR CODE: serves an export's files on the unit's Wi-Fi for 5 minutes and
+     * returns the links with their codes (TripRecorder.exportLinkJson).
+     */
+    @JavascriptInterface
+    public String startExportLink(String zipName) {
+        return recorder.exportLinkJson(zipName);
+    }
+
+    /** Closing the code stops the server at once. */
+    @JavascriptInterface
+    public void stopExportLink() {
+        recorder.stopExportLink();
+    }
+
     /** FINALIZAR VIAGEM: ends the open trip; a new one starts at once if the car is still READY. */
     @JavascriptInterface
     public void finishTrip() {

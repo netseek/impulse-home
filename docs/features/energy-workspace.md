@@ -115,6 +115,7 @@ only flushes the recorder.
   - `days` (date, km, fuel L, kWh out, kWh regen, EV km, drive time) — forever
   - months — a `GROUP BY` over `days`, not a table
   - `open_trip` — the single-row checkpoint
+  - `trip_settings` (trip_id, t, drive mode, energy mode, HEV reserve, SOC target, running totals) — forever; see *Driving settings per trip*
 - **Clock.** Everything is stamped with the wall clock, and the MMI's clock may
   be wrong at boot until GNSS/NTP corrects it. A step longer than 10 s is never
   integrated across, so a correction cannot inflate a trip, but the START time of
@@ -383,6 +384,112 @@ are detected. DADOS, the list row and the header repaint each second.
   tiles that fail hide and the route stays.
 - **Not verified on the car yet**: GPS cadence, bridge cost of the per-second
   read on the MMI, and how the follow view feels at driving speed.
+
+## Exporting the trips
+
+EXPORTAR TUDO, in the popup's settings sheet (gear in the header), writes every
+saved trip to shared storage, so the history can leave the head unit (a USB stick,
+a file manager, `adb pull`). The section only shows when `window.TripBridge` has
+`exportTrips`.
+
+- **Files.** `/sdcard/HavalH6Viewer/exports/viagens-<yyyyMMdd-HHmmss>.json` and
+  `.csv` (`TripExport`). The JSON (`format` `impulse-trips`, `version` 1) holds the
+  daily and all-time totals and every trip, oldest first, with all of what
+  `getTrip` returns: the summary, `raw` (the trip computer's first and last
+  values), the kept `route`, its `stops`, and **every** sample while the trip is
+  among the last 30 (`detailKept`), never strided. `pointFields` and
+  `routeFields` name the array columns. The CSV is one row per trip (RFC 4180,
+  UTF-8 with BOM, dot decimals, local start / end times) for a spreadsheet.
+- **One trip or a selection.** In VIAGENS, a saved trip's DADOS pane has
+  EXPORTAR VIAGEM. SELECIONAR under the list turns the rows into ticks: the open
+  trip cannot be ticked because it is not saved yet. EXPORTAR n then exports
+  only the ticked trips (`TripBridge.exportTripsOf`, start times
+  comma-separated). The files are the same, with `scope` `selection` and without
+  `totals` and `days`, which cover every trip. The result, and ENVIAR POR
+  BLUETOOTH, show in a dialog over the popup. Selection is popup-only and resets
+  when the popup closes or the tab changes. Only the listed trips can be ticked:
+  the list shows the last 30.
+- **Cost.** `TripRecorder.exportTrips` runs `TripStore.exportTrips` on a thread of
+  its own at minimum priority: on the worker it would hold back the signals being
+  integrated, on the bridge thread it would block the page. It streams a trip at a
+  time and a sample at a time, so a long drive is never one JSON tree in memory.
+  The page polls `getExportStatus` once a second while it runs and commits only
+  when the status changes. Not measured on the car.
+- **Safety.** Written to `.tmp` and renamed once complete; a failed or cut export
+  leaves no file that looks finished. One export at a time. Needs the storage
+  grant `PersistBackup` already asks for; without it the note says so.
+- Map snapshots are not exported: they are tiles only, and the route is in the JSON.
+- **ENVIAR POR BLUETOOTH.** Each export also writes `viagens-<stamp>.zip` with
+  both files. A phone accepts a zip over Bluetooth where it may refuse a `.json`,
+  and the JSON deflates to a fraction of its size over a slow link. Once an
+  export is done, the button hands the zip to the system's Bluetooth file
+  transfer (OPP), which shows its own device picker and asks the phone to
+  accept. The button only shows when the recorder found a Bluetooth share it can
+  reach when the export finished (`bluetooth` in the status). The package is
+  OEM-specific and is matched by name.
+  - **Exported share:** `TripExportProvider` serves the zip, because targetSdk 28
+    forbids a `file://` URI in an intent and the app has no androidx. It is
+    read-only and not exported, serves export zips only, by their bare name, and
+    only to the caller the intent grants.
+  - **Unexported share, as on the MMI:** measured on the car 2026-10-25,
+    "Permission Denial … not exported from uid 1002". The share goes through
+    Shizuku's user service (`GwmRebootService.shareFile`, see
+    [android-shell](../architecture/android-shell.md)).
+  - **Checked on the car:** the device picker opens with the zip.
+  - **iPhones do not receive files over Bluetooth (OPP).** That is what QR
+    CODE is for.
+- **QR CODE.** After an export, QR CODE (beside BLUETOOTH, in the result dialog
+  and the settings sheet) serves that export's three files on the unit's Wi-Fi
+  and shows a code per Wi-Fi address. That is two on the MMI: its own hotspot
+  ("Wi-Fi do carro") and the network it joined ("Outra rede Wi-Fi", told apart
+  by `WifiManager`, hence `ACCESS_WIFI_STATE`). The phone, on the same Wi-Fi,
+  scans it and gets a page with the .zip, .csv and .json.
+  - **The server (`TripExportLink`):** one thread, GET only, behind a 26-letter
+    random token (`TripExport.linkRoute`; anything else is 404). It answers
+    only on `wlan*` / `ap*` addresses, never the car's internal VLANs, and
+    stops after 5 minutes or when the code is closed.
+  - **The code:** drawn with Project Nayuki's encoder as one SVG path
+    (`TripExport.qrSvgPath`).
+  - **Checked on the car 2026-10-25:** an iPhone on the car's Wi-Fi scanned it
+    and downloaded the zip. From the laptop on the hotspot, a wrong token and
+    `../trips.db` got 404, and the port closed once the code was dismissed.
+
+## Driving settings per trip
+
+Consumption alone says how a trip went, not why. Each trip therefore records the
+settings it was driven in, and the moment each changed, so a result can be put
+down to a setting.
+
+- **Keys** (Impulse's, read-only here): `car.drive_setting.drive_mode` (Eco 2 /
+  Normal 0 / Esportivo 1 / Neve / Areia / Lama / AWD, as the DRIVING card writes
+  them), `car.ev_setting.power_model_config` (0 HEV / 1 EVP / 3 EV),
+  `car.ev_setting.power_reserve_config` (in HEV, 2 = Prioritário, anything
+  else Inteligente) and `car.ev_setting.charge_soc_target_config` (the
+  Prioritário SOC target, the 20-80 % slider). All four reach the viewer;
+  checked on the car 2026-10-25.
+- **Rows** (`TripEngine.onSetting` → `trip_settings`). One row when the trip
+  opens, and one per change after that, each with the trip's running totals at
+  that moment: km, kWh out and in, fuel, EV km, drive and idle time. A row is
+  written once the settings have held for `SETTING_SETTLE_MS` (5 s), stamped
+  with the burst's first moment and totals, so a slider drag is one change and a
+  change undone within the burst is none. The last written combination is in
+  the checkpoint (`settingsSig`), so Impulse's replay after a restart is not a
+  change. A discarded trip takes its rows with it; `PersistBackup` merges the
+  table like `trip_stops`.
+- **Stretches** (`TripSetting.segments`, pure and JVM-tested). Each row runs
+  until the next one, or to the trip's end totals: its own km, kWh out and in,
+  fuel, EV km and time, with kWh/100 km and km/L. Totals that went backwards
+  count as 0.
+- **Where they show.**
+  - `getTrip` and every export carry `settings` and `settingSegments`.
+  - The CSV adds `settingsStart`, `settingsMain` (the combination with the most
+    km) and `settingChanges`.
+  - A closed trip's DADOS lists AJUSTES: one row per stretch, with its distance
+    and economy.
+  - Trips recorded before this have none.
+- **Limits.** A stretch is attribution, not proof: traffic, climb and
+  temperature change with it. A setting changed while parked belongs to the
+  next trip's first row. Unknown values (not yet replayed) show as `—`.
 
 ## Future (optional): refuel log and fuel price
 
