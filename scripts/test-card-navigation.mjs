@@ -325,9 +325,12 @@ includesAll(method('_queueNavRefresh'), [
 ], 'TBT refresh throttle');
 includesAll(method('_commitNavUi'), [
   "_hasWidgetType(mode, 'navigation')",
-  'this._uiOnlyStateWrite = true',
+  'this._uiOnlySetState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }))',
   'this._syncDockIndicators()',
 ], 'TBT must not dirty the 3D loop');
+// No callback: a setState callback forces the root path (a full commit every guidance tick).
+assert.ok(!/this\._uiOnlySetState\([^;]*\}\)\s*,/.test(method('_commitNavUi')),
+  'TBT ui-only setState must not carry a callback');
 const dock = method('_syncDockIndicators');
 includesAll(dock, [
   'state: navigation.navigationCardState',

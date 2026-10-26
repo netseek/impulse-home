@@ -191,6 +191,65 @@ explains it. Measure the specific change; do not reason from this table.
   the threshold is the bug, not the fix. Check whether `renderVals` already
   reads a live mirror — twice now, it did.
 
+  **A setState callback is a root commit too.** Two bus paths still committed
+  the root on every frame. `_refreshTireTelemetry` ran a plain `setState` per
+  `tpms_status` or tyre-warning frame, and `_commitNavUi` passed
+  `_syncDockIndicators` as a callback with each guidance update (about 1 Hz).
+  `_uiOnlySetState` sends any update that has a callback to the root path. The
+  callback was redundant: both the root's and the desktop stage's
+  `componentDidUpdate` already sync the dock. Both paths now go through
+  `_uiOnlySetState` with no callback, so they repaint only the desktop stage, are
+  dropped during a slide (teardown refreshes), and fall back to the root only
+  while a popup or editor is open. Tyre frames also coalesce into one trailing
+  refresh 250 ms later, because `tpms_status` and its warning keys arrive
+  together. Nothing in the 3D scene reads tyre data.
+
+  Measured in headless Chrome, not on the car, with interleaved A/B/A/B arms at
+  4x CPU throttle and simulated traffic of 60 signals/s:
+
+  | | before | after |
+  |---|---|---|
+  | root commits/s, mixed bus incl. `tpms_status` | 4.78 / 4.78 | **0.30 / 0.30** |
+  | script time per 10 s window | 1.12 / 0.82 s | 0.83 / 0.57 s |
+  | root commits/s from guidance, navigation widget placed | 0.9 / 0.9 | **0** |
+
+  The 0.30 that remains is start-up `lights`/`splashActive` commits, present in
+  both arms. The simulated tyre value changed on every frame, which is harsher
+  than a real tyre. The real `tpms_status` rate while driving has not been
+  measured, so the effect on the car's frame rate is unknown. What the table
+  does establish is the count: one ~197 ms root commit per tyre frame, and one
+  per second of guidance, are gone. `test-bus-widget-refresh.mjs` checks the
+  coalescing, the stage-only path, the slide drop, unmount and the dock sync,
+  with negative controls.
+
+  The same traffic on an emulator with a navigation widget placed: Android 16 and
+  WebView 133, 4 vCPU and 4 GB at 1920x720, the emulator process held on the host's
+  efficiency cores, and the DPR ladder pinned. Debug APKs, a warm-up run discarded,
+  then A/B/A/B:
+
+  | | before | after |
+  |---|---|---|
+  | root commits/s | 4.8 / 5.1 | **0.6 / 0.4** |
+  | share of wall clock in commits | 21.3% / 19.0% | **2.8% / 1.5%** |
+  | fps | 41.4 / 48.3 | 46.3 / 50.2 |
+  | `timerLagP90` | 40.6 / 33.8 ms | 23.9 / 18.7 ms |
+  | signals the page kept up with in 10 s | 346 / 376 | 411 / 468 |
+
+  The injector runs on the page's main thread, so the busier arm received fewer
+  signals and still committed more. The Android 9 emulator image (WebView 66)
+  cannot run the viewer at all (`String.prototype.matchAll` needs Chrome 73), so it
+  could not be used.
+
+  On the car (WebView 91), parked, these two paths could not be exercised.
+  `tpms_status` arrived in 1 of 21 ten-second windows, and there was no guidance,
+  so the tyre and navigation A/B still needs a drive. The native batching
+  (`TelemetryBatch`, see [android-shell](../architecture/android-shell.md)) did show
+  on the parked bus: a burst of 141 broadcasts reached the page in one script
+  execution, where each would have been its own `evaluateJavascript`. A cold-start
+  A/B with and without the batching, three interleaved pairs on a rested unit,
+  showed no measurable change: `viewerReady` at 10.53 s against 10.60 s (medians),
+  with pairs of both signs, and the same intro frame rate (26-27 fps).
+
 - **A hidden WebView is still on the panel, and its render loop is dead.** The
   loop is driven only by `requestAnimationFrame`. When another app takes window
   focus — a freeform app in a launcher slot, the OEM scene manager — Android

@@ -11242,6 +11242,8 @@ class Component extends DCLogic {
     this._tireTemperaturesC = [null, null, null, null];
     this._tireTpmsObserved = false;
     this._tireFreshTimer = 0;
+    this._tireRefreshTimer = 0;
+    this._tireRefreshPending = false;
     this._graphEvInstEma = null;
     this._graphBusEvTrip = false;
     this._graphBusFuelTrip = false;
@@ -11830,14 +11832,32 @@ class Component extends DCLogic {
     return flags;
   }
 
+  /**
+   * Tyre readings move only through widgetRev (the tyre card has no DOM
+   * painter), and tpms_status plus its warning keys arrive together. This used
+   * to be a plain root setState per frame: measured in headless Chrome at 4x
+   * CPU throttle, one root commit per tpms_status frame, each also dirtying the
+   * 3D scene. Nothing the scene draws reads tyre data, so the refresh goes
+   * through _uiOnlySetState with no callback (child stage only, dropped during
+   * a desktop slide because teardown refreshes), and a burst of frames
+   * coalesces into one trailing refresh like _queueNavRefresh. No callback
+   * needed: the stage's and the root's componentDidUpdate both sync the dock.
+   */
   _refreshTireTelemetry() {
     clearTimeout(this._tireFreshTimer);
+    // Re-armed by every frame; fires once the bus has gone quiet, so the
+    // card can flip from live to stale with no frame to trigger it.
     this._tireFreshTimer = setTimeout(() => {
       if (this._unmounted) return;
-      this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }), () => this._syncDockIndicators());
+      this._uiOnlySetState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }));
     }, 120050);
-    if (this._unmounted) return;
-    this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }), () => this._syncDockIndicators());
+    if (this._unmounted || this._tireRefreshPending) return;
+    this._tireRefreshPending = true;
+    this._tireRefreshTimer = setTimeout(() => {
+      this._tireRefreshTimer = 0;
+      this._tireRefreshPending = false;
+      if (!this._unmounted) this._uiOnlySetState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }));
+    }, 250);
   }
 
   /**
@@ -12205,12 +12225,13 @@ class Component extends DCLogic {
   _commitNavUi() {
     const mode = this._shellMode || this.state.shellMode;
     const needsWidget = this._hasWidgetType(mode, 'navigation');
-    const sync = () => this._syncDockIndicators();
     if (needsWidget) {
-      this._uiOnlyStateWrite = true;
-      this.setState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }), sync);
+      // No callback: a callback forces the root path, a full commit every
+      // second of guidance. The stage's and the root's componentDidUpdate
+      // both sync the dock, and a desktop slide drops it (teardown refreshes).
+      this._uiOnlySetState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }));
     } else {
-      sync();
+      this._syncDockIndicators();
     }
   }
 
@@ -12401,8 +12422,9 @@ class Component extends DCLogic {
    * never the intent.
    *
    * NOTE the tyre card is deliberately NOT changed the same way: it has no DOM
-   * painter, so its widgetRev bump is the only thing that moves its readings,
-   * and tyre pressure is not a hot signal.
+   * painter, so its widgetRev bump is the only thing that moves its readings.
+   * It does take the cheap path (_refreshTireTelemetry: stage-only, coalesced),
+   * because tpms_status arrives in bursts.
    */
   _commitPowerRefresh() {
     this._updatePowerCards(performance.now());
@@ -51305,6 +51327,7 @@ class Component extends DCLogic {
     clearTimeout(this._powerFreshTimer);
     clearTimeout(this._powerHistoryTimer);
     clearTimeout(this._tireFreshTimer);
+    clearTimeout(this._tireRefreshTimer);
     clearInterval(this._demoDoorTicker);
     this._demoDoorTicker = 0;
     clearInterval(this._demoPowerTicker);

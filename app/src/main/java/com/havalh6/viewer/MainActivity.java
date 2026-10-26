@@ -233,6 +233,11 @@ public final class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> pendingFiles;
     private final ConcurrentHashMap<String, String> telemetryCache = new ConcurrentHashMap<>();
+    private final TelemetryBatch telemetryBatch = new TelemetryBatch();
+    private final Runnable telemetryFlush = () -> {
+        String script = telemetryBatch.drain();
+        if (script != null && webView != null) webView.evaluateJavascript(script, null);
+    };
     private View launchAnchor;
     private final android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     /** Bing wallpaper JSON. One thread, so a refresh cannot pile onto the WebView. */
@@ -292,11 +297,18 @@ public final class MainActivity extends Activity {
 
             telemetryCache.put(key, value);
             if (webView != null) {
-                webView.post(() -> webView.evaluateJavascript(
-                        String.format("if(window.onCarDataUpdate){window.onCarDataUpdate('%s','%s');}",
-                                key.replace("'", "\\'"), value.replace("'", "\\'")),
-                        null
-                ));
+                // One evaluateJavascript per broadcast was one UI-thread message, one
+                // renderer IPC, one V8 compile (every string differs) and one renderer
+                // task per signal. Signals now join a batch flushed once per looper
+                // turn: no timer, so no added latency, and broadcasts already queued
+                // behind the first one ride along. Order and repeated values are kept.
+                // Nuance: a signal that arrives after some other posted push X, but
+                // before this flush runs, now reaches the page before X.
+                // mainHandler rather than webView.post: same FIFO queue while attached,
+                // and a detached view's run queue cannot strand the flag.
+                if (telemetryBatch.add(key, value)) {
+                    mainHandler.post(telemetryFlush);
+                }
             }
         }
     };
@@ -7318,10 +7330,10 @@ public final class MainActivity extends Activity {
         placeGlance = new PlaceGlance(this, mainHandler, json -> {
             telemetryCache.put(PlaceGlance.KEY, json);
             if (webView == null) return;
-            webView.evaluateJavascript(
-                    String.format("if(window.onCarDataUpdate){window.onCarDataUpdate('%s','%s');}",
-                            PlaceGlance.KEY.replace("'", "\\'"), json.replace("'", "\\'")),
-                    null);
+            // Share escaping and arrival order with broadcasts already awaiting a flush.
+            if (telemetryBatch.add(PlaceGlance.KEY, json)) {
+                mainHandler.post(telemetryFlush);
+            }
         });
         placeGlance.start();
 
@@ -15266,6 +15278,9 @@ public final class MainActivity extends Activity {
             unregisterReceiver(packageRemovedReceiver);
         } catch (Exception ignored) {}
         if (pendingFiles != null) pendingFiles.onReceiveValue(null);
+        // No queued renderer work may outlive the WebView; discard and reset the batch.
+        mainHandler.removeCallbacks(telemetryFlush);
+        telemetryBatch.drain();
         webView.stopLoading();
         webView.setWebChromeClient(null);
         webView.setWebViewClient(null);
