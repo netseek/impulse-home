@@ -22,9 +22,9 @@ async function browserCheck(source, support, react, reactDom) {
     const app = Object.create(App.prototype);
     app.state = {};
     app.__host = {};
-    app._energyPricesCache = { fuel: null, kwh: null, paid: {}, skipped: {} };
+    app._energyPricesCache = { fuel: null, kwh: null };
     // The real view bindings and input markup, compiled with the real template runtime.
-    const fields = html.match(/      consumptionCfgFuelPrice:([\s\S]*?)      consumptionCfgAskOnClass:/)[1];
+    const fields = html.match(/      consumptionCfgFuelPrice:([\s\S]*?)      consumptionMapMaxClose:/)[1];
     const view = new Function('return { consumptionCfgFuelPrice:' + fields + '};');
     const raw = [...html.matchAll(/<input\b[^>]*class="hv-energy-price"[^>]*>/g)].map(m => m[0]).join('');
     equal((raw.match(/<input/g) || []).length, 2, 'both price fields present');

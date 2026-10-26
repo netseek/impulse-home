@@ -1849,8 +1849,7 @@ window.HavalSplash = (function () {
               <p class="hv-energy-zlabel">PREÇOS</p>
               <div class="hv-energy-setrow"><small>COMBUSTÍVEL (R$/L)</small><input type="text" inputmode="decimal" class="hv-energy-price" value="{{ focusedConsumptionCfgFuelPrice }}" placeholder="ex. 6,29" onChange="{{ focusedConsumptionCfgFuelPriceChange }}" onBlur="{{ focusedConsumptionCfgFuelPriceBlur }}" /></div>
               <div class="hv-energy-setrow"><small>ENERGIA (R$/kWh)</small><input type="text" inputmode="decimal" class="hv-energy-price" value="{{ focusedConsumptionCfgKwhPrice }}" placeholder="ex. 0,95" onChange="{{ focusedConsumptionCfgKwhPriceChange }}" onBlur="{{ focusedConsumptionCfgKwhPriceBlur }}" /></div>
-              <div class="hv-energy-setrow"><small>PERGUNTAR AO ABASTECER / RECARREGAR</small><div class="hv-energy-seg"><button type="button" class="{{ focusedConsumptionCfgAskOnClass }}" onClick="{{ focusedConsumptionCfgAskOn }}">SIM</button><button type="button" class="{{ focusedConsumptionCfgAskOffClass }}" onClick="{{ focusedConsumptionCfgAskOff }}">NÃO</button></div></div>
-              <small class="hv-energy-setnote">Usados quando um abastecimento ou recarga não tem preço. Cada preço informado vale para o volume abastecido e se mistura ao que já havia no tanque ou na bateria.</small>
+              <small class="hv-energy-setnote">Usados para calcular o custo estimado de combustível e energia nas viagens e no histórico.</small>
             </section>
           </div>
         </sc-if>
@@ -7686,36 +7685,6 @@ window.HavalSplash = (function () {
     .hv-energy-kvg .hv-energy-kv { text-align:left; align-items:end; }
     .hv-energy-kvg .hv-energy-kv > li { display:flex; flex-direction:column; justify-content:flex-end; height:100%; }
     .hv-energy-kvg .hv-energy-kv li > small { white-space:normal; min-height:2.4em; display:flex; align-items:flex-end; }
-    /* Refuel price prompt, over everything. */
-    /* Anchored where the popups are (owner, 2026-09-23): the same left edge and the
-       same band between the header and the dock, so the prompt arrives where the eye
-       already looks for a panel instead of over the car. The scrim stays -- this one
-       wants an answer, so unlike a popup it is not dismissed by tapping outside. */
-    .hv-energy-ask { position:absolute; inset:0; z-index:95; display:grid; place-items:center start; padding:var(--hv-popup-top,52px) 0 var(--hv-popup-bottom-inset,72px) var(--hv-popup-left,24px); box-sizing:border-box; background:rgba(2,6,10,.55); }
-    .hv-energy-ask-box { width:min(468px,calc(100vw - 48px)); display:flex; flex-direction:column; gap:12px; padding:20px; border-radius:22px; color:var(--hv-widget-fg,#edf5fa); background:var(--hv-frost-fill-strong,rgba(14,20,27,.94)); box-shadow:0 18px 50px rgba(0,0,0,.4); }
-    .hv-energy-ask-box > strong { font:600 18px/1.2 var(--hv-font); }
-    .hv-energy-ask-box > p { margin:0; font-size:14px; opacity:.78; }
-    .hv-energy-ask-box label { display:flex; flex-direction:column; gap:6px; }
-    .hv-energy-ask-box label > small { font:600 10px/1.3 var(--hv-font); letter-spacing:.06em; opacity:.72; }
-    .hv-energy-ask-box input { height:48px; padding:0 14px; border:1px solid rgba(255,255,255,.2); border-radius:12px; background:rgba(255,255,255,.06); color:inherit; font:500 20px/1 var(--hv-font); }
-    /* Own keypad, not an <input>: the system IME covers most of a 720 px panel and
-       its decimal key is a guess per locale. Entry is cents-first (owner,
-       2026-09-23), so the digits fill from the right and no separator is typed. */
-    .hv-energy-askamt { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:6px 14px; border:1px solid rgba(255,255,255,.2); border-radius:12px; background:rgba(255,255,255,.06); }
-    .hv-energy-askamt > small { font:600 10px/1.3 var(--hv-font); letter-spacing:.06em; opacity:.72; }
-    .hv-energy-askamt > output { font:500 30px/1.1 var(--hv-font); font-variant-numeric:tabular-nums; }
-    .hv-energy-pad { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-    /* Dark ink, not white: --hv-accent is a pale blue in the day theme, where white
-       on it reads at ~1.8:1. Near-black clears 6.8:1 on the night teal and 10.7:1 on
-       the day blue, so one colour serves both. */
-    .hv-energy-pad > .k-ok { grid-column:4; grid-row:3 / span 2; background:var(--hv-accent,#2aa7b7); color:#08131a; font:600 18px/1 var(--hv-font); letter-spacing:.06em; }
-    .hv-energy-confirm-actions { display:flex; gap:10px; }
-    .hv-energy-confirm-actions > .hv-energy-askdef { flex:1; min-height:46px; border:0; border-radius:12px; background:var(--hv-control-fill,rgba(255,255,255,.08)); color:inherit; font:600 13px/1 var(--hv-font); letter-spacing:.04em; cursor:pointer; }
-    .hv-energy-confirm-actions > .hv-energy-askdef:active { background:rgba(255,255,255,.2); }
-    .hv-energy-confirm-actions > .hv-energy-askskip { flex:0 0 auto; min-width:90px; opacity:.75; }
-    .hv-energy-pad > button:active { background:rgba(255,255,255,.2); }
-    .hv-energy-pad > button.act { font:600 14px/1 var(--hv-font); letter-spacing:.06em; opacity:.8; }
-    .hv-energy-ask-box .primary { color:#fff; background:var(--hv-accent,#2aa7b7); }
     .hv-energy-chartctl { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 10px; }
     .hv-energy-chartctl .hv-energy-seg button { min-height:38px; padding:0 12px; font-size:13px; }
     .hv-card-focus-head .hv-energy-headtabs button { width:auto; height:auto; margin-left:0; min-height:36px; padding:0 12px; font:600 12px/1 var(--hv-font); letter-spacing:.04em; }
@@ -9101,22 +9070,6 @@ window.HavalSplash = (function () {
 
   <!-- Focused quick-card workspace. Bounds come from the shared popup workspace
        CSS variables so it cannot cover the launcher/dock on Android. -->
-  <sc-if value="{{ energyAskOpen }}" hint-placeholder-val="{{ false }}">
-    <div class="hv-energy-ask" role="alertdialog" aria-label="{{ energyAskTitle }}">
-      <div class="hv-energy-ask-box">
-        <strong>{{ energyAskTitle }}</strong>
-        <p>{{ energyAskText }}</p>
-        <div class="hv-energy-askamt"><small>{{ energyAskUnit }}</small><output data-energy-ask-value>{{ energyAskValue }}</output></div>
-        <div class="hv-energy-pad">
-          <sc-for list="{{ energyAskKeys }}" as="k" hint-placeholder-count="12"><button type="button" class="{{ k.cls }}" aria-label="{{ k.label }}" onClick="{{ k.onClick }}">{{ k.text }}</button></sc-for>
-        </div>
-        <div class="hv-energy-confirm-actions">
-          <button type="button" class="hv-energy-askdef" onClick="{{ energyAskAlt }}">{{ energyAskAltText }}</button>
-          <sc-if value="{{ energyAskHasDefault }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-energy-askdef hv-energy-askskip" onClick="{{ energyAskSkip }}">PULAR</button></sc-if>
-        </div>
-      </div>
-    </div>
-  </sc-if>
   <div class="hv-card-focus-backdrop {{ focusedCardBackdropClass }}" onClick="{{ closeFocusedCard }}" onTouchStart="{{ desktopSwipeStart }}" onTouchMove="{{ desktopSwipeMove }}" onTouchEnd="{{ desktopSwipeEnd }}" onTouchCancel="{{ desktopSwipeCancel }}" onMouseDown="{{ desktopSwipeStart }}" onMouseMove="{{ desktopSwipeMove }}" onMouseUp="{{ desktopSwipeEnd }}"></div>
   <sc-if value="{{ focusedCardIsConsumption }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedConsumptionGrowClass }}" onClick="{{ focusedConsumptionWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedConsumptionShrinkClass }}" onClick="{{ focusedConsumptionWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
   <sc-if value="{{ focusedCardIsClimate }}" hint-placeholder-val="{{ false }}"><button type="button" class="hv-pop-grow {{ focusedClimateGrowClass }}" onClick="{{ focusedClimateWideToggle }}" aria-label="Expandir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button><button type="button" class="hv-pop-shrink {{ focusedClimateShrinkClass }}" onClick="{{ focusedClimateWideToggle }}" aria-label="Compactar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg><span>COMPACTO</span></button></sc-if>
@@ -9660,6 +9613,10 @@ const H6_ENERGY_SPECS = {
   phev19: { label: 'H6 PHEV19', batteryKwh: 19, tankL: 55, evRangeKm: 115 },
   phev34: { label: 'H6 PHEV34', batteryKwh: 34, tankL: 55, evRangeKm: 170 },
   gt: { label: 'H6 GT PHEV', batteryKwh: 34, tankL: 55, evRangeKm: 170 },
+};
+const H6_DEFAULT_ENERGY_PRICES = {
+  fuel: 6.29,
+  kwh: 0.95,
 };
 // Material Icons (Google, Apache 2.0): 24 px paths exactly as published in
 // github.com/google/material-design-icons, not drawn here (owner, 2026-09-14).
@@ -18539,13 +18496,6 @@ class Component extends DCLogic {
     this._liveDefine('progress', {
       epsilon: 1,       // one whole percent - finer than the readout shows
       paint(v) { this._paintLoadProgress(v); },
-    });
-    // The fuel-price keypad: every press repaints this one <output> and commits nothing.
-    this._liveDefine('energyAskCents', {
-      paint(v) {
-        const out = document.querySelector('[data-energy-ask-value]');
-        if (out) out.textContent = this._energyAskDisplay(Number(v) || 0);
-      },
     });
   }
 
@@ -40491,17 +40441,6 @@ class Component extends DCLogic {
       focusedConsumptionMapMaxOpen: false,
       focusedConsumptionSettingsOpen: false,
       focusedConsumptionHeadDetail: false,
-      // Price of a refuel / charge just detected (owner, 2026-09-19).
-      energyAskOpen: !!this.state.energyAsk,
-      energyAskTitle: this.state.energyAsk ? this.state.energyAsk.title : '',
-      energyAskText: this.state.energyAsk ? this.state.energyAsk.text : '',
-      energyAskUnit: this.state.energyAsk ? this.state.energyAsk.unit : '',
-      energyAskValue: this._energyAskDisplay(),
-      energyAskKeys: this._energyAskKeys(),
-      energyAskAltText: this._energyAskAltLabel(),
-      energyAskAlt: (ev) => this._answerEnergyAskAlt(ev),
-      energyAskHasDefault: isFinite(this._energyAskDefaultPrice()),
-      energyAskSkip: (ev) => this._answerEnergyAsk(false, ev),
     };
     if (!type) return base;
     const entry = this._focusedCardEntry(type);
@@ -42113,7 +42052,6 @@ class Component extends DCLogic {
     if (!b) {
       this._energyCache = this._energyDemoOn() ? this._energyDemoHistory()
         : { trips: [], days: [], months: [], fetchedAt: Date.now() };
-      this._energyPriceLine = null;
       return;
     }
     const parse = (read) => {
@@ -42165,8 +42103,6 @@ class Component extends DCLogic {
       })(),
       fetchedAt: Date.now(),
     };
-    this._energyPriceLine = null;
-    this._energyCheckPriceAsk();
     // Deferred: this can be reached from _energyModel inside a render.
     if (commit && !this._unmounted) {
       setTimeout(() => {
@@ -42581,6 +42517,10 @@ class Component extends DCLogic {
    * Prices (owner, 2026-09-19), kept on this device: defaults for anything not
    * priced, a price per refuel / charge (keyed kind:t), and whether to ask.
    */
+  /**
+   * Prices kept on this device: custom prices if entered in settings, otherwise
+   * default values from H6_DEFAULT_ENERGY_PRICES (6.29 R$/L fuel, 0.95 R$/kWh).
+   */
   _energyPrices() {
     if (!this._energyPricesCache) {
       let v = null;
@@ -42589,10 +42529,6 @@ class Component extends DCLogic {
       this._energyPricesCache = {
         fuel: Number(v.fuel) > 0 ? Number(v.fuel) : null,
         kwh: Number(v.kwh) > 0 ? Number(v.kwh) : null,
-        ask: v.ask !== false,
-        paid: v.paid && typeof v.paid === 'object' ? v.paid : {},
-        skipped: v.skipped && typeof v.skipped === 'object' ? v.skipped : {},
-        since: Number(v.since) || 0,
       };
     }
     return this._energyPricesCache;
@@ -42600,119 +42536,12 @@ class Component extends DCLogic {
 
   _saveEnergyPrices() {
     try { localStorage.setItem('h6_energy_prices', JSON.stringify(this._energyPricesCache)); } catch (e) {}
-    this._energyPriceLine = null;
     this._energyPaintedSig = '';
   }
 
   _energyPriceText(v) { return Number(v) > 0 ? Number(v).toFixed(2).replace('.', ',') : ''; }
 
   _energyMoney(v) { return isFinite(v) ? 'R$ ' + v.toFixed(2).replace('.', ',') : '—'; }
-
-  /**
-   * The price prompt's own keypad. `_energyAskDraft` holds DIGITS only and is read
-   * as cents, so typing 1-2-5 walks 0,01 -> 0,12 -> 1,25 and no separator is ever
-   * typed -- which also removes the "is it a comma or a dot" question the system
-   * IME asks in a locale it may not share with the page.
-   *
-   * Nothing here goes through setState. A React commit costs 197 ms p50 on this car
-   * (docs/engineering), which on a keypad is one lost keypress in every press, so the
-   * readout is painted straight into the DOM through the _live seam and React sees
-   * the value once, when SALVAR is pressed.
-   */
-  _energyAskCents() { return Number(String(this._energyAskDraft || '').replace(/\D/g, '')) || 0; }
-
-  _energyAskDisplay(cents) {
-    const c = cents === undefined ? this._energyAskCents() : cents;
-    return (c / 100).toFixed(2).replace('.', ',');
-  }
-
-  /**
-   * Digits 1-9 over three columns with erase / clear / OK down a fourth, and a wide
-   * zero across the bottom -- the ATM layout. OK confirms from the pad itself, so the
-   * price is entered and accepted without the thumb leaving the keys (owner,
-   * 2026-09-23); SALVAR was there all along but sits away from where you are typing.
-   */
-  _energyAskKeys() {
-    const keys = [];
-    const digit = (d, cls) => ({ text: String(d), label: String(d), cls: cls || '', onClick: (ev) => this._energyAskDigit(d, ev) });
-    for (let d = 1; d <= 3; d++) keys.push(digit(d));
-    keys.push({ text: '⌫', label: 'Apagar', cls: 'act', onClick: (ev) => this._energyAskBack(ev) });
-    for (let d = 4; d <= 6; d++) keys.push(digit(d));
-    keys.push({ text: 'C', label: 'Limpar', cls: 'act', onClick: (ev) => this._energyAskClear(ev) });
-    for (let d = 7; d <= 9; d++) keys.push(digit(d));
-    keys.push({ text: 'OK', label: 'Confirmar', cls: 'k-ok', onClick: (ev) => this._answerEnergyAsk(true, ev) });
-    keys.push(digit(0, 'k-zero'));
-    return keys;
-  }
-
-  _energyAskDigit(d, ev) {
-    this._cardControlEvent(ev);
-    const next = String(this._energyAskDraft || '').replace(/\D/g, '') + String(d);
-    // Six digits is R$ 9999,99 -- past anything _energyParsePrice would accept anyway.
-    if (next.replace(/^0+/, '').length > 6) return;
-    this._energyAskDraft = next;
-    this._liveSet('energyAskCents', this._energyAskCents());
-  }
-
-  _energyAskBack(ev) {
-    this._cardControlEvent(ev);
-    this._energyAskDraft = String(this._energyAskDraft || '').replace(/\D/g, '').slice(0, -1);
-    this._liveSet('energyAskCents', this._energyAskCents());
-  }
-
-  _energyAskClear(ev) {
-    this._cardControlEvent(ev);
-    this._energyAskDraft = '';
-    this._liveSet('energyAskCents', 0);
-  }
-
-  /**
-   * The standing price for what was just put in -- which _answerEnergyAsk keeps as the
-   * last price paid, so it is the usual price at the usual pump. NaN before anything
-   * has ever been priced, which is when CANCELAR has nothing to offer and is not shown.
-   */
-  _energyAskDefaultPrice() {
-    const ask = this.state.energyAsk;
-    if (!ask) return NaN;
-    const pr = this._energyPrices();
-    const v = Number(ask.charge ? pr.kwh : pr.fuel);
-    return v > 0 ? v : NaN;
-  }
-
-  /** PADRAO with the price on it, or PULAR when there is no default to offer yet. */
-  _energyAskAltLabel() {
-    const v = this._energyAskDefaultPrice();
-    return isFinite(v) ? 'PADRÃO · ' + this._energyMoney(v) : 'PULAR';
-  }
-
-  /**
-   * The secondary action: price this stop at the default rather than typing it.
-   *
-   * There used to be a PULAR beside it, and it was redundant -- `_energyPriceLineFor`
-   * already falls back to the default for any stop with no price of its own, so
-   * skipping and accepting the default produced the SAME blended tank price. The one
-   * difference favoured writing it down: a skipped stop resolves against `pr.fuel` at
-   * READ time, so a default changed later silently rewrote the price of a fill from
-   * months ago. Writing the value pins it to what the fuel actually cost.
-   *
-   * With no default there is nothing to offer and this has to stay an escape from the
-   * prompt, so it skips instead -- the label says which it is doing.
-   *
-   * The default is NOT rewritten here: it already is this value, and re-saving it would
-   * make a run of these read as a run of confirmations.
-   */
-  _answerEnergyAskAlt(ev) {
-    const v = this._energyAskDefaultPrice();
-    if (!isFinite(v)) return this._answerEnergyAsk(false, ev);
-    this._cardControlEvent(ev);
-    const ask = this.state.energyAsk;
-    if (!ask) return;
-    const pr = this._energyPrices();
-    const keys = ask.keys || [ask.key];
-    keys.forEach((k) => { pr.paid[k] = v; });
-    this._saveEnergyPrices();
-    this.setState({ energyAsk: null }, () => this._energyCheckPriceAsk());
-  }
 
   _energyParsePrice(text) {
     const v = parseFloat(String(text || '').replace(/[^0-9,.]/g, '').replace(',', '.'));
@@ -42742,106 +42571,12 @@ class Component extends DCLogic {
     this._uiOnlySetState((st) => ({ energyRev: (st.energyRev || 0) + 1 }));
   }
 
-  _setEnergyPriceAsk(on, ev) {
-    this._cardControlEvent(ev);
-    this._energyPrices().ask = !!on;
-    this._saveEnergyPrices();
-    this._uiOnlySetState((st) => ({ energyRev: (st.energyRev || 0) + 1, energyAsk: on ? st.energyAsk : null }));
-  }
-
-  /** Every refuel and charge the recorder knows (demo: a priced pair). Merges duplicates from same session. */
-  _energyStopList() {
-    const h = this._energyCache;
-    if (h && h.stopList) {
-      if (h._dedupedStopList) return h._dedupedStopList;
-      const raw = h.stopList;
-      const out = [];
-      for (let i = 0; i < raw.length; i++) {
-        const cur = raw[i];
-        if (!cur) continue;
-        const curT = Number(cur.t) || 0;
-        const prev = out.length ? out[out.length - 1] : null;
-        const prevT = prev ? Number(prev.t) || 0 : 0;
-        // Merge with previous if same kind and within 2 hours or same startMs/t
-        const isSame = prev && prev.kind === cur.kind && (
-          curT === prevT ||
-          (cur.startMs && prev.startMs && cur.startMs === prev.startMs) ||
-          (Math.abs(curT - prevT) < 2 * 3600000)
-        );
-        if (isSame) {
-          prev.after = Math.max(Number(prev.after) || 0, Number(cur.after) || 0);
-          prev.before = Math.min(Number(prev.before) || 0, Number(cur.before) || 0);
-          if (cur.kind === 'charge') {
-            prev.amount = Math.max(0, prev.after - prev.before);
-          } else {
-            prev.amount = Math.max(Number(prev.amount) || 0, Number(cur.amount) || 0);
-          }
-          if (!prev.keys) prev.keys = [(prev.kind === 'charge' ? 'charge:' : 'refuel:') + prev.t];
-          prev.keys.push((cur.kind === 'charge' ? 'charge:' : 'refuel:') + cur.t);
-        } else {
-          const clone = Object.assign({}, cur);
-          clone.keys = [(clone.kind === 'charge' ? 'charge:' : 'refuel:') + clone.t];
-          out.push(clone);
-        }
-      }
-      h._dedupedStopList = out;
-      return out;
-    }
-    return [];
-  }
-
-  /**
-   * Average price of what is in the tank / pack over time. Each refuel or charge
-   * blends its volume at its price (or the default) into what was left, the way a
-   * tank really mixes: remaining = level before x capacity.
-   */
-  _energyPriceLineFor() {
-    if (this._energyPriceLine) return this._energyPriceLine;
+  /** The configured or default fuel/kwh price. */
+  _energyPriceAt(kind) {
     const pr = this._energyPrices();
-    const spec = this._energySpec();
-    const line = { fuel: [], kwh: [] };
-    let fuelAvg = pr.fuel;
-    let kwhAvg = pr.kwh;
-    this._energyStopList().forEach((sp) => {
-      const t = Number(sp.t) || 0;
-      const charge = sp.kind === 'charge';
-      const cap = charge ? spec.batteryKwh : spec.tankL;
-      const before = Number(sp.before);
-      const after = Number(sp.after);
-      const left = isFinite(before) ? Math.max(0, before) * cap / 100 : 0;
-      const added = charge
-        ? (isFinite(after) && isFinite(before) ? Math.max(0, after - before) * cap / 100 : 0)
-        : (Number(sp.amount) > 0 ? Number(sp.amount) : (isFinite(after) && isFinite(before) ? Math.max(0, after - before) * cap / 100 : 0));
-      const keys = sp.keys || [(charge ? 'charge:' : 'refuel:') + t];
-      let paid = NaN;
-      for (let i = 0; i < keys.length; i++) {
-        if (Number(pr.paid[keys[i]]) > 0) { paid = Number(pr.paid[keys[i]]); break; }
-      }
-      const price = paid > 0 ? paid : (charge ? pr.kwh : pr.fuel);
-      const prev = charge ? kwhAvg : fuelAvg;
-      let next = prev;
-      if (price > 0 && added > 0) next = prev > 0 && left > 0 ? (left * prev + added * price) / (left + added) : price;
-      if (charge) {
-        kwhAvg = next;
-        line.kwh.push({ t: t, v: next });
-      } else {
-        fuelAvg = next;
-        line.fuel.push({ t: t, v: next });
-      }
-    });
-    this._energyPriceLine = line;
-    return line;
-  }
-
-  /** The tank's (or pack's) average price at a moment; the default before any priced refuel. */
-  _energyPriceAt(kind, ms) {
-    const pr = this._energyPrices();
-    const list = this._energyPriceLineFor()[kind];
-    let v = kind === 'kwh' ? pr.kwh : pr.fuel;
-    // Demo prices, so the cost rows have something to show; a real car uses only what was entered.
-    if (!(v > 0) && this._energyDemoOn()) v = kind === 'kwh' ? 0.95 : 6.29;
-    for (let i = 0; i < list.length && list[i].t <= ms; i++) if (list[i].v > 0) v = list[i].v;
-    return v > 0 ? v : NaN;
+    const v = Number(kind === 'kwh' ? pr.kwh : pr.fuel);
+    if (v > 0) return v;
+    return H6_DEFAULT_ENERGY_PRICES[kind] || NaN;
   }
 
   /** What a trip (or a day / month row) cost: fuel at the tank's price, net pack energy at the pack's. */
@@ -42870,63 +42605,6 @@ class Component extends DCLogic {
       last.rows.push(r);
     });
     return out;
-  }
-
-  /**
-   * A new refuel or charge with no price: ask once, parked. Only stops after the
-   * first time this ran are asked about, so an existing history is not replayed.
-   */
-  _energyCheckPriceAsk() {
-    const pr = this._energyPrices();
-    if (!pr.since) {
-      pr.since = Date.now();
-      this._saveEnergyPrices();
-      return;
-    }
-    if (!pr.ask || this.state.energyAsk || this._energyDemoOn()) return;
-    const kmh = this._carSpeedKmh;
-    if (isFinite(kmh) && kmh > 5) return;
-    const spec = this._energySpec();
-    const next = this._energyStopList().find((sp) => {
-      const keys = sp.keys || [(sp.kind === 'charge' ? 'charge:' : 'refuel:') + sp.t];
-      const isHandled = keys.some((k) => pr.paid[k] || pr.skipped[k]);
-      return Number(sp.t) > pr.since && !isHandled;
-    });
-    if (!next) return;
-    const charge = next.kind === 'charge';
-    const qty = charge ? Math.max(0, (Number(next.after) || 0) - (Number(next.before) || 0)) * spec.batteryKwh / 100 : Number(next.amount) || 0;
-    const allKeys = next.keys || [(charge ? 'charge:' : 'refuel:') + next.t];
-    this._energyAskDraft = '';
-    this._liveSet('energyAskCents', 0);
-    this.setState({ energyAsk: {
-      key: allKeys[0],
-      keys: allKeys,
-      charge: charge,
-      title: charge ? 'Recarga detectada' : 'Abastecimento detectado',
-      text: (qty > 0 ? (charge ? '≈ ' + qty.toFixed(1) + ' kWh' : qty.toFixed(1) + ' L') + ' · ' : '') + this._energyWhen(Number(next.t)),
-      unit: charge ? 'R$ por kWh' : 'R$ por litro',
-    } });
-  }
-
-  _answerEnergyAsk(save, ev) {
-    this._cardControlEvent(ev);
-    const ask = this.state.energyAsk;
-    if (!ask) return;
-    const pr = this._energyPrices();
-    const cents = this._energyAskCents();
-    const v = cents > 0 && cents < 100000 ? cents / 100 : NaN;
-    const keys = ask.keys || [ask.key];
-    if (save && isFinite(v)) {
-      keys.forEach((k) => { pr.paid[k] = v; });
-      // The last price paid is the best guess for the next one.
-      if (ask.charge) pr.kwh = v; else pr.fuel = v;
-    } else if (!save) {
-      keys.forEach((k) => { pr.skipped[k] = 1; });
-    } else {
-      return;
-    }
-    this._saveEnergyPrices();
-    this.setState({ energyAsk: null }, () => this._energyCheckPriceAsk());
   }
 
   /** km/L of a trip or period under the chosen basis. */
@@ -43496,10 +43174,6 @@ class Component extends DCLogic {
       consumptionCfgKwhPriceChange: (e) => this._setEnergyDefaultPrice('kwh', e && e.target ? e.target.value : ''),
       consumptionCfgFuelPriceBlur: () => this._finishEnergyDefaultPrice('fuel'),
       consumptionCfgKwhPriceBlur: () => this._finishEnergyDefaultPrice('kwh'),
-      consumptionCfgAskOnClass: on(this._energyPrices().ask !== false),
-      consumptionCfgAskOffClass: on(this._energyPrices().ask === false),
-      consumptionCfgAskOn: (ev) => this._setEnergyPriceAsk(true, ev),
-      consumptionCfgAskOff: (ev) => this._setEnergyPriceAsk(false, ev),
       consumptionMapMaxClose: (ev) => this._setEnergyMapMax(false, ev),
       consumptionHaltsClass: on(this._energyShowHalts()),
       consumptionHaltsToggle: (ev) => this._toggleEnergyHalts(ev),
