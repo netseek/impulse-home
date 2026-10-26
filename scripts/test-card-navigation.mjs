@@ -86,10 +86,11 @@ includesAll(html, [
   "previewClock: key === 'clock'",
   "hasShot: key !== 'clock'",
 ], 'visual widget catalog');
+// RANGE reads nothing the widget loop produces; only POWER and graphs keep it.
 includesAll(method('_widgetRenderFields'), [
   "this._hasWidgetType(mode, 'power')",
-  "this._hasWidgetType(mode, 'range')",
-], 'range refresh loop');
+], 'power refresh loop');
+assert.ok(!method('_widgetRenderFields').includes("this._hasWidgetType(mode, 'range')"), 'range does not keep the widget loop');
 
 // Native rail cards get structured values for their large readout, compact
 // metrics and visual progress. The legacy value remains for older shells.

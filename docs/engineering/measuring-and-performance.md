@@ -566,3 +566,81 @@ experiments did not show consistent frame gains and were not shipped.
 `test-desktop-slide.mjs` checks fade endpoints, cancellation/restoration and
 teardown without inherited style writes, plus retained CSS transitions, with
 negative controls. Device verification remains necessary for frame pacing.
+
+
+### Open popups and the widget loop
+
+Three paths kept doing work while nothing on screen needed it.
+
+- **POWER popup.** An open popup sits over the board, so `_canRefreshDesktopStage()`
+  is false. Every `widgetRev` bump from `_commitPowerRefresh` (4 Hz from the bus) and
+  from the 1 Hz history ticker was therefore a root commit, for as long as the popup
+  stayed open. The popup is a `.hv-power` card, so `_updatePowerCards` already paints
+  its readings, and it now also paints the stage label and the peak. `_refreshPowerPopup`
+  commits only when what a render draws changes: the chart's data-or-placeholder
+  `sc-if`, its caption, or the DEMO badge. `_focusedCardRenderFields` records the last
+  shape that was drawn.
+- **Roof popup.** `_updateHotspotLayer` runs on every loop tick while the roof popup
+  is open, and it ended with `requestRender(2)`. The scene and post-FX redrew every
+  frame until the popup closed. The popup is fixed DOM and follows nothing in 3D.
+  Opening, camera input, camera tweens, the roof tweens and resize request their own
+  frames.
+- **Widget loop.** `_drawGraphs` derived consumption and smoothed the series on every
+  frame before it checked for a graph canvas, so a board with POWER but no graph paid
+  for a series that nothing read. Sampling now runs only while a graph canvas is
+  mounted, and still runs every frame then, because the EMA and the 40 ms bucket are
+  tuned to it. A graph on a desktop not visited yet therefore starts its history at
+  the first visit. RANGE no longer keeps the loop alive: since `f471c24` it reads
+  `_rangeTelemetry`, not `_graphNow`, which was written and never read and is gone.
+
+Measured on the HavalPerf emulator (Android 16, WebView 133, 4 vCPU, 4 GB,
+1920x720), not on the car. Debug APKs, DPR ladder pinned, 10 s windows, a warm-up arm
+discarded, three interleaved A/B pairs. The table shows the median of each arm:
+
+| Scenario | Metric | before | after | same sign in every pair |
+|---|---|---|---|---|
+| POWER popup open, bus traffic | root commits/s | 3.25 | **0.7** | yes |
+| | share of wall clock in commits | 38.6% | **8.4%** | yes |
+| | main-thread task time, ms per s | 835 | **712** | yes |
+| | `timerLagP90` | 102 ms | **66.5 ms** | yes |
+| Roof popup open, camera still | rendered fps | 21.6 | **2** (idle) | yes |
+| | main-thread task time, ms per s | 819 | **555** | yes |
+| | `timerLagP90` | 44.7 ms | **17.9 ms** | yes |
+| RANGE-only board | widget loop calls/s | 25.5 | **0** | yes |
+| | widget loop time, ms per s | 6.2 | **0** | yes |
+
+About 0.7-0.8 root commits/s remain in every scenario and in both builds. They come
+from an unrelated background commit. The POWER popup's frame rate did not change
+consistently, and its painter costs slightly more per call (about 4.7 to 5.3 ms),
+because it now does the caption and peak work the root commits used to do. On a board
+with both POWER and RANGE, skipping graph sampling showed no measurable effect: it
+removes work that nothing reads, without a measured gain.
+`test-power-popup-refresh.mjs`, `test-roof-popup-render.mjs` and
+`test-graph-loop-cadence.mjs` check each path, with negative controls.
+
+Measured on the car (WebView 91), parked, with one installed build and the pre-change
+method bodies swapped in at runtime for arm A, so the arms alternate every window
+without a reload (the method-wrapper approach above). 10 s windows, DPR ladder pinned,
+six interleaved pairs per scenario, median of each arm:
+
+| Scenario | Metric | before | after | same sign in every pair |
+|---|---|---|---|---|
+| POWER popup open, the car's own parked bus | root commits/s | 1.45 | **0** | 6/6 |
+| | script time, ms per s | 581 | **502** | 6/6 |
+| POWER popup open, plus power traffic at driving rates | root commits/s | 3.88 | **0** | 6/6 |
+| | share of wall clock in commits | 27.5% | **0%** | 6/6 |
+| | fps | 14.7 | **17.3** | 6/6 |
+| | `timerLagP90` | 32.5 ms | **25.1 ms** | 6/6 |
+| | main-thread task time, ms per s | 721 | **582** | 6/6 |
+| Roof popup open, camera still | rendered fps | 26.0 | **0** (idle) | 6/6 |
+| | main-thread task time, ms per s | 518 | **314** | 6/6 |
+| | `timerLagP90` | 20.8 ms | **7.9 ms** | 6/6 |
+| RANGE-only board, camera still | widget loop calls/s | 60.1 | **0** | 6/6 |
+| | main-thread task time, ms per s | 235 | **204** | 5 of 6 |
+
+**The camera orbit hides two of these.** With `camOrbitEnabled` on, the scene renders
+every frame anyway and `_applyGraphLoopGate` holds the widget loop while the camera
+moves. So with the orbit on, the roof and RANGE changes measured no difference
+(both arms about 26-28 fps, widget loop 0 in both). "Camera still" holds
+`_syncCamOrbit` off for the run only. The POWER popup result does not depend on it:
+it was measured with the orbit on.

@@ -11255,7 +11255,6 @@ class Component extends DCLogic {
     this._wireCarTelemetry();
     this._graphV = 0;
     this._graphI = 0;
-    this._graphNow = 0;
     this._graphAnyLive = false;
     this._graphLiveKeys = {};
     this._graphValues = {};
@@ -12405,9 +12404,9 @@ class Component extends DCLogic {
    *
    * The board's own cards are painted element by element by
    * _updatePowerCards -- className, source text, ICE/motor/battery art, SOC,
-   * floor -- so they never needed a re-render. React is required ONLY for the
-   * focused POWER popup, which renders out of renderVals via
-   * _focusedCardRenderFields (keyed on state.focusedCardType).
+   * floor -- so they never needed a re-render. The focused POWER popup is a
+   * .hv-power card too, so the same painter moves its readings; React is
+   * needed only when its shape changes (see _refreshPowerPopup).
    *
    * Measured on the car WHILE DRIVING (2026-09-11, monitor run): bumping
    * widgetRev on every tick cost a React commit of **92-100 ms p50, 211 ms
@@ -12432,11 +12431,31 @@ class Component extends DCLogic {
     // not need to be a setState callback -- called here it is if anything one
     // commit fresher than before.
     this._syncDockIndicators();
-    if (this.state.focusedCardType === 'power') {
-      // _uiOnlySetState so even this one does not dirty the scene or post-FX:
-      // a power readout changes nothing the 3D renderer draws.
-      this._uiOnlySetState({ widgetRev: (this.state.widgetRev || 0) + 1 });
-    }
+    if (this.state.focusedCardType === 'power') this._refreshPowerPopup();
+  }
+
+  /**
+   * The open popup sits over the board, so _canRefreshDesktopStage() is false
+   * and every widgetRev bump here was a root commit: 4 Hz from the bus plus
+   * the 1 Hz history ticker, for as long as the popup stayed open. Its
+   * readings, chart path, peak and labels are painted by _updatePowerCards;
+   * what only a render can change is the chart's sc-if (data or placeholder),
+   * its caption and the DEMO badge. Commit when those differ from what the
+   * last render drew (_focusedCardRenderFields records it).
+   */
+  _refreshPowerPopup() {
+    const model = this._powerModel(performance.now());
+    const shape = this._powerPopupShapeOf(Object.assign({ powerStateKey: model.stateKey,
+      powerSourceClass: model.sourceClass }, this._powerHistoryView(Date.now(), model.stateKey === 'demo')));
+    if (shape === this._powerPopupShape) return;
+    // _uiOnlySetState so even this one does not dirty the scene or post-FX:
+    // a power readout changes nothing the 3D renderer draws.
+    this._uiOnlySetState({ widgetRev: (this.state.widgetRev || 0) + 1 });
+  }
+
+  _powerPopupShapeOf(view) {
+    return [view.powerHistoryHasData ? 1 : 0, view.powerHistoryLabel,
+      view.powerSourceClass === 'demo' || view.powerStateKey === 'demo' ? 1 : 0].join('|');
   }
 
   _schedulePowerFreshness() {
@@ -12504,7 +12523,7 @@ class Component extends DCLogic {
       // only while the popup is open and never requests a 3D frame.
       if (!document.hidden) {
         this._updatePowerCards(performance.now());
-        this._uiOnlySetState((s) => ({ widgetRev: (s.widgetRev || 0) + 1 }));
+        this._refreshPowerPopup();
         this._syncDockIndicators();
       }
       this._ensurePowerHistoryTicker();
@@ -13145,6 +13164,9 @@ class Component extends DCLogic {
         el._powerTone = model.tone;
       }
       if (force || el.getAttribute('aria-label') !== model.ariaLabel) el.setAttribute('aria-label', model.ariaLabel);
+      // Both templates label the stage too, and the popup labels only it.
+      const stage = el.querySelector('.hv-power-stage');
+      if (stage && (force || stage.getAttribute('aria-label') !== model.ariaLabel)) stage.setAttribute('aria-label', model.ariaLabel);
       const source = el.querySelector('.hv-power-source');
       if (source) {
         const sourceClass = 'hv-power-source ' + model.sourceClass;
@@ -13163,10 +13185,11 @@ class Component extends DCLogic {
       text('.hv-power-axle-front', model.frontLabel);
       text('.hv-power-axle-rear', model.rearLabel);
       text('.hv-power-engine-label', model.engineLabel);
+      // The popup's path exists only while it has data (sc-if); its peak always.
       const historyPath = el.querySelector('.hv-power-history-path');
-      if (historyPath) {
+      if (historyPath || el.querySelector('.hv-power-history-peak')) {
         if (!history) history = this._powerHistoryView(Date.now(), model.stateKey === 'demo');
-        if (historyPath.getAttribute('d') !== history.powerHistoryPath) historyPath.setAttribute('d', history.powerHistoryPath);
+        if (historyPath && historyPath.getAttribute('d') !== history.powerHistoryPath) historyPath.setAttribute('d', history.powerHistoryPath);
         text('.hv-power-history-peak', history.powerHistoryPeak);
       }
       this._renderPowerGraphic(el, model, size, i);
@@ -14017,12 +14040,6 @@ class Component extends DCLogic {
   }
 
   _drawGraphs(now) {
-    // Sample every frame so the series keeps moving; paint can stay cheaper.
-    this._graphNow = now;
-    this._graphDeriveConsumption(now);
-    this._graphSmooth('evPowerKw', now);
-    this._graphSmooth('evInst', now);
-    if (this._graphLiveKeys.fuelInst) this._graphSmooth('fuelInst', now);
     // The power card is text and a keyed SVG, fed by a bus that moves a few
     // times a second: it has nothing to show at 60 Hz. Its animation is CSS
     // and runs on its own. Event-driven refreshes (_commitPowerRefresh, the
@@ -14038,7 +14055,25 @@ class Component extends DCLogic {
       this._graphCanvasCacheAt = now;
     }
     const canvases = this._graphCanvasCache;
-    if (!canvases || !canvases.length) return;
+    if (!canvases || !canvases.length) {
+      this._graphSeriesGap = true;
+      return;
+    }
+    // Sampling stops while no canvas is mounted, so the series keeps its old
+    // samples and the painters would join them to the new ones with a straight
+    // line across the gap: a trend that never happened. Restart the series (and
+    // the smoothed display, so the first new sample is the raw value) instead.
+    if (this._graphSeriesGap) {
+      this._graphSeriesGap = false;
+      this._graphSeries = {};
+      this._graphDisplay = {};
+    }
+    // Only a graph canvas reads the series. While one is mounted, sample every
+    // frame (the EMA and the 40 ms bucket are tuned to it); paint stays cheaper.
+    this._graphDeriveConsumption(now);
+    this._graphSmooth('evPowerKw', now);
+    this._graphSmooth('evInst', now);
+    if (this._graphLiveKeys.fuelInst) this._graphSmooth('fuelInst', now);
 
     const item = this._graphActiveItem();
     if (!item) return;
@@ -26144,7 +26179,8 @@ class Component extends DCLogic {
       }
       el.classList.toggle('act', active);
     });
-    if (this._hsRoofPopOpen && this.requestRender) this.requestRender(2);
+    // The roof popup is fixed DOM; opening, camera and layout changes request
+    // their own frames. Do not keep the 3D scene rendering while it is open.
   }
 
   // ── X-ray wheel-floor glows ───────────────────────────────────────────────
@@ -41401,6 +41437,7 @@ class Component extends DCLogic {
       base.focusedCardBadge = view.drivingSource;
       base.focusedCardBadgeClass = 'on ' + view.drivingSourceClass;
     } else if (type === 'power') {
+      this._powerPopupShape = this._powerPopupShapeOf(view);
       if (view.powerSourceClass === 'demo' || view.powerStateKey === 'demo') {
         base.focusedCardBadge = 'DEMO';
         base.focusedCardBadgeClass = 'on demo';
@@ -46450,8 +46487,8 @@ class Component extends DCLogic {
   /**
    * Walks the POWER demo while nothing real has arrived. The cycle is derived
    * from the clock (_powerDemoPacked), so this only repaints: DOM cards and the
-   * native rail through _commitPowerRefresh, which commits React ONLY while the
-   * popup is open. Goes quiet the moment a power signal lands.
+   * native rail through _commitPowerRefresh, which commits React only when the
+   * open popup changes shape. Goes quiet the moment a power signal lands.
    */
   _ensureDemoPowerTicker() {
     if (this._demoPowerTicker || !this._demoPreview || typeof setInterval !== 'function') return;
@@ -49709,8 +49746,7 @@ class Component extends DCLogic {
       !appsOnly
       && !this.state.loading
       && (this._hasWidgetType(mode, 'graphs')
-        || this._hasWidgetType(mode, 'power')
-        || this._hasWidgetType(mode, 'range')),
+        || this._hasWidgetType(mode, 'power')),
     );
     const editor = appsOnly ? {
       graphEditorDisplay: 'none',
