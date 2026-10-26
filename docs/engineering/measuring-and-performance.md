@@ -18,6 +18,9 @@ Both of these turned out to be wrong when finally measured:
 - "The post-FX passes are the expensive part." They measured **2.0 ms/frame,
   5.6%** of the frame. A planned rewrite to merge them was abandoned because the
   realistic upside was ~1 ms for an invasive change to the post-FX core.
+  That was the lighter model. On the current one (~1.2M visible triangles, 157
+  draw calls) the two passes cost ~6 ms of a ~15 ms submit, because each renders
+  the whole scene again; see "Post-FX rebuilds while the camera moves" below.
 
 ### How to measure
 
@@ -102,7 +105,7 @@ The harness used for every number in this file is `scripts/device-cdp.mjs`.
 |---|---|
 | DPR 0.75 (motion tier) | ~22 fps |
 | DPR 1.0 native | ~14 fps (2.04x pixels, +26 ms/frame) |
-| All post-FX (bloom + streak) | +2.0 ms/frame |
+| All post-FX (bloom + streak) | +2.0 ms/frame on the earlier model; ~6 ms on the current one (bloom 3.8, streak 2.2) |
 | MSAA | 4x, and `MAX_SAMPLES` is 4 — already at the driver ceiling |
 | Main pass | ~210 draw calls, ~374k triangles |
 
@@ -374,6 +377,45 @@ probe installed with `Page.addScriptToEvaluateOnNewDocument` (NOT a plain
 evaluate — the WebView navigates after attach and wipes anything you injected
 into the first document), recording `performance.getEntriesByType('resource')`
 plus a `longtask` observer and a poll for `__app._viewerReady`.
+
+## Post-FX rebuilds while the camera moves
+
+Measured on the car, camera orbiting (`camOrbitEnabled`), per frame: the scene was
+rendered three times, once for the frame and once inside each of the bloom and
+streak composers, for ~14 ms of the ~15 ms submit. `gl.finish()` stayed at 0.1 ms,
+so this is CPU-side again. A frame just over 16.7 ms lands on every other vsync,
+which is why the orbit sat at ~28-30 fps with the main thread still ~37% idle.
+
+The orbit dirties post-FX on every frame, so it rebuilt on every frame.
+`_postFxRebuildNow` now rebuilds on one frame in three (`POSTFX_MOTION_EVERY`)
+while `cameraBusy`, and reuses the cached overlay quads in between. A skipped
+frame keeps `_postFxDirty` set and queues one more frame with
+`requestRender(1, true)`. So the first frame after the camera settles always
+rebuilds: the resting glow is exact, and only a moving one can trail by up to two
+frames. With the camera still, nothing changed.
+
+Same car, same scene, the pre-change rule swapped in at runtime for arm A, 8 s
+windows, eight valid interleaved pairs (two windows dropped: another app hid the
+WebView):
+
+| | before | after | pairs with that sign |
+|---|---|---|---|
+| fps, camera orbiting | 29.8 | **35.5** | 8/8 |
+| post-FX rebuilds/s | 30.0 | **12.1** | 8/8 |
+| script time, ms per s | 456 | **385** | 8/8 |
+| `timerLagP90` | 19.9 ms | **16.6 ms** | 8/8 |
+| submit | 13.5 ms | 10.1 ms | 6/8 |
+
+It does not reach 60 fps: the main pass alone is ~4.7 ms of JS and the frame still
+crosses a vsync. The next levers are a bloom pass that does not re-render the
+whole scene, and fewer triangles.
+
+On r137, three.js draws a transparent `DoubleSide` material twice per render and
+sets `needsUpdate` on each pass, which re-derives its program parameters on every
+frame. Drawing those meshes single-sided saved 7 draw calls and about 1 fps,
+within noise, so it was not shipped. `test-postfx-motion-throttle.mjs` checks the
+one-in-three cadence, the queued settle frame, the still camera and the loop
+wiring, with negative controls.
 
 ## Anything Hz-denominated must run off the wall clock
 

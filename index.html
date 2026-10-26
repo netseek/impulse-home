@@ -10428,6 +10428,9 @@ const WHEEL_RAD_PER_S_PER_KMH = 15.2 / 40;
 // (see motionSpeedLabel, which renders Math.abs(motionSpeed) * 40 + ' km/h').
 // X-ray bloom rebuild ceiling, Hz. See the note at the _tickPowertrainFx call.
 const PT_POSTFX_HZ = 5;
+// While the camera moves, bloom + streak rebuild on one rendered frame in this many.
+// See _postFxRebuildNow.
+const POSTFX_MOTION_EVERY = 3;
 // Power card DOM refresh ceiling from the widget loop, ms. See _drawGraphs.
 const POWER_CARD_PAINT_MS = 100;
 // _powerFallbackPacked result lifetime, ms. Bus values do not move faster.
@@ -23330,6 +23333,42 @@ class Component extends DCLogic {
     });
   }
 
+  /**
+   * Whether this frame rebuilds bloom + streak, or reuses the cached overlay.
+   *
+   * Each rebuild renders the whole scene twice more (the darkened bloom pass and
+   * the streak pass). On the current model that is ~6 ms of a ~15 ms submit, so
+   * while the camera orbits every frame missed 16.7 ms and the panel ran on every
+   * other vsync. Measured on the car, camera orbiting, eight interleaved pairs:
+   * 29.8 fps with a rebuild per frame against 35.5 at one in three, and timer
+   * lag p90 19.9 against 16.6 ms, the same sign in every pair. Camera still, nothing changes:
+   * a dirty overlay rebuilds on the next frame as before.
+   *
+   * A skipped frame leaves _postFxDirty set and queues one more frame without
+   * invalidating anything else, so the first frame after the camera settles
+   * always rebuilds: the resting glow is exact, only a moving one can trail by up
+   * to two frames. Same shape as _requestTweenShadow / _settleTweenShadow.
+   */
+  _postFxRebuildNow(cameraBusy) {
+    // Resize and light warmup leave no real previous frame to reuse.
+    if (this._postFxStale) {
+      this._postFxStale = false;
+      this._postFxMotionFrames = 0;
+      return true;
+    }
+    if (!cameraBusy) {
+      this._postFxMotionFrames = 0;
+      return !!this._postFxDirty;
+    }
+    if (!this._postFxDirty) return false;
+    this._postFxMotionFrames = (this._postFxMotionFrames || 0) + 1;
+    if (this._postFxMotionFrames % POSTFX_MOTION_EVERY === 0) return true;
+    // Throttled frames still owe a rebuild; they are not clean cache hits.
+    if (this._perf) this._perf.postFxThrottled = (this._perf.postFxThrottled || 0) + 1;
+    if (this.requestRender) this.requestRender(1, true);
+    return false;
+  }
+
   _darkenNonBloom(scene) {
     if (!this._blackMat) this._blackMat = new this.THREE.MeshBasicMaterial({ color: 0x000000 });
     if (!this._matStore) this._matStore = new Map();
@@ -27299,6 +27338,8 @@ class Component extends DCLogic {
   // main/bloom/streak programs to compile+render once, turn it back off.
   // Shared by the synchronous and chunked-async warmup runners below.
   _warmupLightKey(k) {
+    // Warmup renders temporary light state into the cached overlay targets.
+    this._postFxStale = true;
     try {
       // 1. Turn this specific group ON
       this._setGroupEmissive(k, true);
@@ -30728,6 +30769,8 @@ class Component extends DCLogic {
       // Mobile renders them at 0.7, which is ~2x the fill for both passes back.
       // Desktop keeps 1.0.
       this._resizePostFX = (W, H) => {
+        // Reallocated targets must be filled before the throttle can reuse them.
+        this._postFxStale = true;
         const postFxScale = this._perfMobile ? 0.7 : 1;
         const targetW = Math.max(1, Math.round(W * postFxScale));
         const targetH = Math.max(1, Math.round(H * postFxScale));
@@ -31473,7 +31516,7 @@ class Component extends DCLogic {
         renderer.info.autoReset = true;
 
         if ((anyLight || xrayBloom) && this.bloomComposer) {
-          if (this._postFxDirty) {
+          if (this._postFxRebuildNow(cameraBusy)) {
             syncCam(this.bloomCam);
             const savedBg = scene.background;
             scene.background = null;
@@ -31498,7 +31541,7 @@ class Component extends DCLogic {
             scene.background = savedBg;
             this._postFxDirty = false;
             this._perf.postFxRenders = (this._perf.postFxRenders || 0) + 1;
-          } else {
+          } else if (!this._postFxDirty) {
             this._perf.postFxCacheHits = (this._perf.postFxCacheHits || 0) + 1;
           }
 
