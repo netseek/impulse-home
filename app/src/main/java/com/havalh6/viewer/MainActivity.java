@@ -264,7 +264,8 @@ public final class MainActivity extends Activity {
             if (pkg == null || pkg.isEmpty() || taskId < 0) return;
             if (pendingProjectionKind != null && pendingProjectionPackages.contains(pkg)) {
                 Log.w(TAG, "Impulse resolved projection " + pkg + " -> task " + taskId);
-                mainHandler.post(() -> completeProjectionRaise(taskId, pkg));
+                final long generation = pendingProjectionGeneration;
+                mainHandler.post(() -> completeProjectionRaise(taskId, pkg, generation));
                 return;
             }
             // Only adopt an id for a slot we actually have open.
@@ -678,7 +679,7 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public void launchAppInPopup(String packageName) {
-            launchAppForPackage(packageName, "");
+            mainHandler.post(() -> launchAppForPackage(packageName, ""));
         }
 
         /**
@@ -4079,6 +4080,7 @@ public final class MainActivity extends Activity {
     private static final String PHONE_CONNECT_PACKAGE = "com.beantechs.settings";
     /** Waiting for Impulse to resolve a projection display task id. */
     private ProjectionPresence.Kind pendingProjectionKind;
+    private long pendingProjectionGeneration;
     private final java.util.Set<String> pendingProjectionPackages = new java.util.HashSet<>();
     private Runnable pendingProjectionTimeout;
     /**
@@ -4796,6 +4798,7 @@ public final class MainActivity extends Activity {
     }
 
     private void onAppLaunched() {
+        clearPendingProjection();
         if (workspaceExpandedAppsMode) {
             setWorkspaceExpandedAppsMode(false, true);
         }
@@ -6553,6 +6556,8 @@ public final class MainActivity extends Activity {
     }
 
     private void clearPendingProjection() {
+        pendingProjectionGeneration++;
+        if (projectionPresence != null) projectionPresence.cancelShow();
         pendingProjectionKind = null;
         pendingProjectionPackages.clear();
         if (pendingProjectionTimeout != null) {
@@ -6561,11 +6566,12 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void completeProjectionRaise(int taskId, String packageName) {
-        clearPendingProjection();
-        if (taskId < 0) return;
+    private void completeProjectionRaise(int taskId, String packageName, long generation) {
+        if (taskId < 0 || generation != pendingProjectionGeneration
+                || pendingProjectionKind == null || !pendingProjectionPackages.contains(packageName)) return;
         Log.w(TAG, "Projection raise task=" + taskId + " pkg=" + packageName);
         if (moveTaskToFrontNoAnim(taskId)) {
+            clearPendingProjection();
             requestTaskBounds(packageName, FULLSCREEN_BOUNDS);
             notifyViewerShellLayout();
         }
@@ -6623,14 +6629,14 @@ public final class MainActivity extends Activity {
         if (taskId == lastRaisedTaskId && now - lastRaiseCompletedMs < RAISE_ECHO_COOLDOWN_MS) {
             return true;
         }
-        lastRaisedTaskId = taskId;
-        lastRaiseCompletedMs = now;
         try {
             android.app.ActivityManager am =
                     (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
             if (am == null) return false;
             Bundle opts = ActivityOptions.makeCustomAnimation(this, 0, 0).toBundle();
             am.moveTaskToFront(taskId, android.app.ActivityManager.MOVE_TASK_NO_USER_ACTION, opts);
+            lastRaisedTaskId = taskId;
+            lastRaiseCompletedMs = now;
             Log.w(TAG, "Raise: moveTaskToFront task=" + taskId + " ok");
             return true;
         } catch (Exception e) {
@@ -15236,6 +15242,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        clearPendingProjection();
         dismissDockEditMenu();
         // Telemetry stays registered across pause: opening a freeform app pauses
         // this activity, and the car keeps sending door/light/speed events that
@@ -15287,6 +15294,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        clearPendingProjection();
         stopOverlayWatchdog();
         unregisterOverlayTaskListener();
         if (mediaAudioViz != null) {
