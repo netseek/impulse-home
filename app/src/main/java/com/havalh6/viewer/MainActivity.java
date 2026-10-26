@@ -4093,11 +4093,32 @@ public final class MainActivity extends Activity {
     private MotionTrailLayout gwmHubItem;
     private boolean shizukuRebootListening;
     private android.content.ServiceConnection gwmRebootConnection;
+    /** Waiting for the Shizuku grant: what to run once it is given, and what to say if it fails. */
+    private GwmServiceCall pendingGwmCall;
+    private String pendingGwmFail;
+    /** TripExportProvider.shizuku while this activity lives: the recorder's bridge thread calls it. */
+    private final TripExportProvider.ShizukuShare tripExportShizuku = new TripExportProvider.ShizukuShare() {
+        @Override
+        public boolean available() {
+            try {
+                return Shizuku.pingBinder();
+            } catch (Throwable t) {
+                return false;
+            }
+        }
+
+        @Override
+        public void share(String component, String path) {
+            mainHandler.post(() -> shareViaShizuku(component, path));
+        }
+    };
     private final Shizuku.OnRequestPermissionResultListener shizukuRebootListener =
             (requestCode, grantResult) -> mainHandler.post(() -> {
                 if (requestCode != SHIZUKU_REBOOT_REQUEST) return;
+                GwmServiceCall call = pendingGwmCall;
+                pendingGwmCall = null;
                 if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                    runRebootProcess();
+                    if (call != null) runGwmService(call, pendingGwmFail);
                 } else {
                     android.widget.Toast.makeText(MainActivity.this,
                             "Permissão do Shizuku negada",
@@ -7324,6 +7345,7 @@ public final class MainActivity extends Activity {
         webView.addJavascriptInterface(new MediaBridge(), "MediaBridge");
         // Process-scoped and fed by its own receiver: see TripRecorder.get.
         tripRecorder = TripRecorder.get(this);
+        TripExportProvider.shizuku = tripExportShizuku;
         webView.addJavascriptInterface(new TripBridge(tripRecorder), "TripBridge");
         webView.addJavascriptInterface(new PersistBridge(), "PersistBridge");
 
@@ -13934,8 +13956,42 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /** One use of the Shizuku user service (GwmRebootService): true when it worked. */
+    private interface GwmServiceCall {
+        boolean run(IGwmRebootService service) throws android.os.RemoteException;
+
+        /** A reboot keeps the service bound (it is taking the unit down); anything else lets it go. */
+        default boolean keepBound() {
+            return false;
+        }
+    }
+
     /** Reboot the head unit through Shizuku. The first tap asks for its grant. */
     private void rebootViaShizuku() {
+        callGwmService(new GwmServiceCall() {
+            @Override
+            public boolean run(IGwmRebootService service) throws android.os.RemoteException {
+                return service.reboot() == 0;
+            }
+
+            @Override
+            public boolean keepBound() {
+                return true;
+            }
+        }, "Não foi possível reiniciar");
+    }
+
+    /**
+     * ENVIAR POR BLUETOOTH where the share activity is not exported
+     * (TripExportProvider.shizuku): Shizuku's user starts it.
+     */
+    private void shareViaShizuku(String component, String path) {
+        callGwmService(service -> service.shareFile(component, path) == 0,
+                "Não foi possível abrir o envio por Bluetooth");
+    }
+
+    /** Runs {@code call} in the Shizuku user service. The first use asks for Shizuku's grant. */
+    private void callGwmService(GwmServiceCall call, String failText) {
         try {
             if (!Shizuku.pingBinder()) {
                 android.widget.Toast.makeText(this, "Shizuku não está em execução",
@@ -13944,14 +14000,15 @@ public final class MainActivity extends Activity {
             }
             if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
                 ensureShizukuRebootListener();
+                pendingGwmCall = call;
+                pendingGwmFail = failText;
                 Shizuku.requestPermission(SHIZUKU_REBOOT_REQUEST);
                 return;
             }
-            runRebootProcess();
+            runGwmService(call, failText);
         } catch (Throwable t) {
-            Log.w(TAG, "Shizuku reboot failed", t);
-            android.widget.Toast.makeText(this, "Não foi possível reiniciar",
-                    android.widget.Toast.LENGTH_SHORT).show();
+            Log.w(TAG, "Shizuku call failed", t);
+            android.widget.Toast.makeText(this, failText, android.widget.Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -13961,7 +14018,8 @@ public final class MainActivity extends Activity {
                 .daemon(false)
                 .processNameSuffix("reboot")
                 .debuggable(false)
-                .version(1);
+                // 2: shareFile. A new version makes Shizuku replace a service still running the old code.
+                .version(2);
     }
 
     private void unbindGwmReboot() {
@@ -13975,26 +14033,26 @@ public final class MainActivity extends Activity {
 
     /**
      * Shizuku 13 keeps shell execution inside a user service. That service
-     * runs as the Shizuku user and starts {@link GwmHub#REBOOT_COMMAND}.
+     * runs as the Shizuku user: it starts {@link GwmHub#REBOOT_COMMAND}, or
+     * the Bluetooth share for a trip export.
      */
-    private void runRebootProcess() {
+    private void runGwmService(GwmServiceCall call, String failText) {
         if (gwmRebootConnection != null) return;
-        Log.w(TAG, "GWM hub reboot via Shizuku");
+        Log.w(TAG, "GWM service call via Shizuku");
         gwmRebootConnection = new android.content.ServiceConnection() {
             @Override
             public void onServiceConnected(android.content.ComponentName name, android.os.IBinder binder) {
-                int code = -1;
+                boolean ok = false;
                 try {
-                    code = IGwmRebootService.Stub.asInterface(binder).reboot();
+                    ok = call.run(IGwmRebootService.Stub.asInterface(binder));
                 } catch (Throwable t) {
-                    Log.w(TAG, "reboot binder failed", t);
+                    Log.w(TAG, "GWM service binder failed", t);
                 }
-                if (code != 0) {
-                    android.widget.Toast.makeText(MainActivity.this,
-                            "Não foi possível reiniciar",
+                if (!ok) {
+                    android.widget.Toast.makeText(MainActivity.this, failText,
                             android.widget.Toast.LENGTH_SHORT).show();
-                    unbindGwmReboot();
                 }
+                if (!ok || !call.keepBound()) unbindGwmReboot();
             }
 
             @Override
@@ -14005,10 +14063,9 @@ public final class MainActivity extends Activity {
         try {
             Shizuku.bindUserService(gwmRebootArgs(), gwmRebootConnection);
         } catch (Throwable t) {
-            Log.w(TAG, "bind reboot service failed", t);
+            Log.w(TAG, "bind GWM service failed", t);
             gwmRebootConnection = null;
-            android.widget.Toast.makeText(this, "Não foi possível reiniciar",
-                    android.widget.Toast.LENGTH_SHORT).show();
+            android.widget.Toast.makeText(this, failText, android.widget.Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -15250,6 +15307,7 @@ public final class MainActivity extends Activity {
             } catch (Throwable ignored) {}
             shizukuRebootListening = false;
         }
+        if (TripExportProvider.shizuku == tripExportShizuku) TripExportProvider.shizuku = null;
         unbindGwmReboot();
         if (projectionPresence != null) projectionPresence.stop();
         if (placeGlance != null) placeGlance.stop();

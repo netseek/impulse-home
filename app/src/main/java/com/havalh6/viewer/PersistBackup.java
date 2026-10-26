@@ -234,6 +234,11 @@ final class PersistBackup {
                             + "WHERE NOT EXISTS (SELECT 1 FROM trip_stops d "
                             + "WHERE d.start_ms = s.start_ms AND d.t = s.t AND d.kind = s.kind)");
                 }
+                if (hasTable(db, "src", "trip_settings") && hasTable(db, "main", "trip_settings")
+                        && columns(db, "main", "trip_settings") == columns(db, "src", "trip_settings")) {
+                    db.execSQL("INSERT INTO trip_settings SELECT * FROM src.trip_settings s "
+                            + "WHERE NOT EXISTS (SELECT 1 FROM trip_settings d WHERE d.start_ms = s.start_ms AND d.t = s.t)");
+                }
                 if (hasTable(db, "src", "range_cycles")
                         && columns(db, "main", "range_cycles") == columns(db, "src", "range_cycles")) {
                     db.execSQL("INSERT OR IGNORE INTO range_cycles SELECT * FROM src.range_cycles");

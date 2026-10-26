@@ -79,6 +79,9 @@ final class TripState {
     double socStart = Double.NaN;
     double socEnd = Double.NaN;
 
+    /** The driving settings last written for this trip (TripSetting.signature), so a replay is not a change. */
+    String settingsSig = "";
+
     /** First and last raw value of each trip-computer key, for validation on the car. */
     final Map<String, String> rawFirst = new LinkedHashMap<>();
     final Map<String, String> rawLast = new LinkedHashMap<>();
@@ -132,6 +135,7 @@ final class TripState {
         put(b, "lastNavT", lastNavT);
         put(b, "socStart", socStart);
         put(b, "socEnd", socEnd);
+        put(b, "settingsSig", settingsSig);
         for (Map.Entry<String, String> e : rawFirst.entrySet()) put(b, "rf." + e.getKey(), e.getValue());
         for (Map.Entry<String, String> e : rawLast.entrySet()) put(b, "rl." + e.getKey(), e.getValue());
         return b.toString();
@@ -195,6 +199,7 @@ final class TripState {
                     case "lastNavT": s.lastNavT = Long.parseLong(v); break;
                     case "socStart": s.socStart = Double.parseDouble(v); break;
                     case "socEnd": s.socEnd = Double.parseDouble(v); break;
+                    case "settingsSig": s.settingsSig = v; break;
                     default: break;
                 }
             } catch (NumberFormatException ignored) {

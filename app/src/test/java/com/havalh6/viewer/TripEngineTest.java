@@ -21,6 +21,7 @@ public class TripEngineTest {
     private final List<TripPoint> points = new ArrayList<>();
     private final List<TripStop> stops = new ArrayList<>();
     private final List<Long> stopTrips = new ArrayList<>();
+    private final List<TripSetting> settings = new ArrayList<>();
     private int opened;
     private TripEngine engine;
 
@@ -30,6 +31,7 @@ public class TripEngineTest {
         @Override public void onTripClosed(TripSummary summary) { closed.add(summary); }
         @Override public void onTripDiscarded(long startMs) { discarded.add(startMs); }
         @Override public void onStop(long startMs, TripStop stop) { stops.add(stop); stopTrips.add(startMs); }
+        @Override public void onSetting(long startMs, TripSetting setting) { settings.add(setting); }
     };
 
     @Before
@@ -776,5 +778,123 @@ public class TripEngineTest {
         engine.tick(T0 + 1000);
         assertNull(engine.live(T0 + 1000));
         assertEquals(0, opened);
+    }
+
+    // ── Driving settings (TripSetting) ─────────────────────────────────────
+
+    private void settingsNow(String drive, String power, String reserve, String target, long t) {
+        signal(TripSetting.KEY_DRIVE_MODE, drive, t);
+        signal(TripSetting.KEY_POWER_MODE, power, t);
+        signal(TripSetting.KEY_RESERVE, reserve, t);
+        signal(TripSetting.KEY_SOC_TARGET, target, t);
+    }
+
+    @Test
+    public void aTripStartsWithOneRowOfTheSettingsInForce() {
+        settingsNow("2", "0", "2", "50", T0 - 60_000);
+        signal(TripEngine.KEY_ODOMETER, "1000.0", T0 - 5000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        cruise(60, T0, 60_000, 1000.0);
+        assertEquals(1, settings.size());
+        TripSetting s = settings.get(0);
+        assertEquals(T0, s.t);
+        assertEquals(0, s.km, 1e-9);
+        assertEquals("Eco · HEV Prioritário 50%", s.label());
+    }
+
+    @Test
+    public void aSliderDragIsOneChangeAtItsFirstMoment() {
+        settingsNow("2", "0", "2", "30", T0 - 60_000);
+        signal(TripEngine.KEY_ODOMETER, "1000.0", T0 - 5000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        double odo = cruise(60, T0, 120_000, 1000.0);
+        long drag = T0 + 120_000;
+        // A real drag: a value a second, with the recorder's 1 s tick in between.
+        signal(TripSetting.KEY_SOC_TARGET, "40", drag);
+        engine.tick(drag);
+        signal(TripSetting.KEY_SOC_TARGET, "50", drag + 1000);
+        engine.tick(drag + 1000);
+        signal(TripSetting.KEY_SOC_TARGET, "60", drag + 2000);
+        cruise(60, drag + 2000, 60_000, odo);
+        assertEquals(2, settings.size());
+        TripSetting change = settings.get(1);
+        assertEquals(drag, change.t);
+        assertEquals(60, change.socTarget);
+        assertEquals(2.0, change.km, 0.11);
+    }
+
+    @Test
+    public void aBurstThatEndsWhereItBeganWritesNothing() {
+        settingsNow("2", "1", "0", "20", T0 - 60_000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        cruise(0, T0, 10_000, 1000.0);
+        signal(TripSetting.KEY_DRIVE_MODE, "1", T0 + 20_000);
+        signal(TripSetting.KEY_DRIVE_MODE, "2", T0 + 21_000);
+        cruise(0, T0 + 21_000, 10_000, 1000.0);
+        assertEquals(1, settings.size());
+    }
+
+    @Test
+    public void theReplayAfterARestartIsNotAChange() {
+        settingsNow("0", "3", "0", "20", T0 - 60_000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        cruise(0, T0, 10_000, 1000.0);
+        assertEquals(1, settings.size());
+        String saved = engine.checkpoint();
+
+        engine = new TripEngine(listener);
+        engine.restore(TripState.decode(saved), T0 + 20_000);
+        signal(TripEngine.KEY_READY, "1", T0 + 20_000);
+        settingsNow("0", "3", "0", "20", T0 + 20_500);
+        cruise(0, T0 + 21_000, 10_000, 1000.0);
+        assertEquals(1, settings.size());
+
+        signal(TripSetting.KEY_POWER_MODE, "1", T0 + 40_000);
+        cruise(0, T0 + 40_000, 10_000, 1000.0);
+        assertEquals(2, settings.size());
+        assertEquals("Normal · EVP", settings.get(1).label());
+    }
+
+    @Test
+    public void aChangeStillSettlingIsWrittenWhenTheTripCloses() {
+        settingsNow("2", "1", "0", "20", T0 - 60_000);
+        signal(TripEngine.KEY_ODOMETER, "1000.0", T0 - 5000);
+        signal(TripEngine.KEY_READY, "1", T0);
+        signal(TripEngine.KEY_SPEED, "60", T0);
+        cruise(60, T0, 120_000, 1000.0);
+        signal(TripSetting.KEY_DRIVE_MODE, "1", T0 + 120_000);
+        engine.finishNow(T0 + 121_000);
+        assertEquals(1, closed.size());
+        assertEquals(2, settings.size());
+        assertEquals(1, settings.get(1).driveMode);
+    }
+
+    @Test
+    public void implausibleSettingValuesAreIgnored() {
+        assertEquals(TripSetting.UNKNOWN, TripSetting.parse(TripSetting.KEY_SOC_TARGET, "250"));
+        assertEquals(TripSetting.UNKNOWN, TripSetting.parse(TripSetting.KEY_DRIVE_MODE, "2.5"));
+        assertEquals(TripSetting.UNKNOWN, TripSetting.parse(TripSetting.KEY_POWER_MODE, "garbage"));
+        assertEquals(50, TripSetting.parse(TripSetting.KEY_SOC_TARGET, "50"));
+    }
+
+    @Test
+    public void eachStretchCarriesWhatItUsed() {
+        List<TripSetting> rows = new ArrayList<>();
+        rows.add(new TripSetting(T0, 2, 0, 2, 50, 0, 0, 0, 0, 0, 0, 0));
+        rows.add(new TripSetting(T0 + 600_000, 1, 0, 2, 50, 10, 2.0, 0.5, 0.4, 6, 540_000, 60_000));
+        List<TripSetting.Segment> segs = TripSetting.segments(rows, T0 + 900_000, 14, 3.5, 0.6, 0.9, 7, 840_000, 60_000);
+        assertEquals(2, segs.size());
+        assertEquals(10, segs.get(0).km, 1e-9);
+        assertEquals(15.0, segs.get(0).kwhPer100Km(), 1e-9);  // (2.0 - 0.5) / 10 km
+        assertEquals(25.0, segs.get(0).kmPerL(), 1e-9);
+        assertEquals(4, segs.get(1).km, 1e-9);
+        assertEquals(T0 + 900_000, segs.get(1).endT);
+        assertEquals(35.0, segs.get(1).kwhPer100Km(), 1e-9);  // (1.5 - 0.1) / 4 km
+        assertEquals("Esportivo · HEV Prioritário 50%", segs.get(1).from.label());
+        // Totals that went backwards (a restored checkpoint) count as nothing, never negative.
+        List<TripSetting.Segment> back = TripSetting.segments(rows, T0 + 900_000, 8, 1, 0, 0, 0, 0, 0);
+        assertEquals(0, back.get(1).km, 1e-9);
     }
 }
