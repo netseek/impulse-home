@@ -14752,11 +14752,25 @@ public final class MainActivity extends Activity {
         notifyAppsCatalogChanged();
     }
 
+    /**
+     * Tell the WebView its apps grid is stale. Pass the package when known so
+     * Side-by-Side can drop that tile immediately (PackageManager can still
+     * list it for a beat after PACKAGE_REMOVED).
+     */
     private void notifyAppsCatalogChanged() {
+        notifyAppsCatalogChanged(null);
+    }
+
+    private void notifyAppsCatalogChanged(String packageName) {
         if (webView == null) return;
+        final String pkg = packageName != null ? packageName : "";
+        // Safe for evaluateJavascript string literal: launcher packages are
+        // [A-Za-z0-9_.]+ — reject anything else rather than risk injection.
+        final String arg = pkg.matches("[A-Za-z][A-Za-z0-9_.]*")
+                ? ("'" + pkg + "'") : "null";
         webView.post(() -> webView.evaluateJavascript(
                 "try{if(window.__app&&typeof window.__app._invalidateAppsCatalog==='function'){"
-                        + "window.__app._invalidateAppsCatalog();}}catch(e){}",
+                        + "window.__app._invalidateAppsCatalog(" + arg + ");}}catch(e){}",
                 null));
     }
 
@@ -14956,7 +14970,13 @@ public final class MainActivity extends Activity {
         }
         updatePinnedVisibility();
         refreshRecentSlots();
-        notifyAppsCatalogChanged();
+        notifyAppsCatalogChanged(pkg);
+        // Second pass once PackageManager has settled — covers the case where
+        // the WebView was paused during the system uninstall UI and the first
+        // evaluateJavascript was a no-op, without refetching on every resume.
+        if (!persistHide) {
+            mainHandler.postDelayed(() -> notifyAppsCatalogChanged(pkg), 900);
+        }
     }
 
     /** Recents already occupy the left slots — drop the same package from the main row. */

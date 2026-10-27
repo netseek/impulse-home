@@ -38854,33 +38854,80 @@ class Component extends DCLogic {
 
   _ensureAppsCatalog() {
     if (this._appsCatalogLoading) return;
-    if (Array.isArray(this._appsCatalog)) return;
+    // Sticky session cache — only refetch when empty or marked stale after
+    // hide/uninstall (avoid re-encoding every icon on each apps-screen visit).
+    if (Array.isArray(this._appsCatalog) && !this._appsCatalogStale) return;
     this._appsCatalogLoading = true;
     try {
       const bridge = window.AppLauncherBridge;
       if (!bridge || typeof bridge.getInstalledApps !== 'function') {
         this._appsCatalog = [];
         this._appsCatalogLoading = false;
+        this._appsCatalogStale = false;
         return;
       }
       const raw = bridge.getInstalledApps();
-      const list = typeof raw === 'string' ? JSON.parse(raw || '[]') : (raw || []);
-      this._appsCatalog = Array.isArray(list) ? list : [];
+      let list = typeof raw === 'string' ? JSON.parse(raw || '[]') : (raw || []);
+      if (!Array.isArray(list)) list = [];
+      // Keep optimistic removals until PackageManager stops listing them
+      // (OEM uninstall broadcast can race a queryIntentActivities call).
+      const gone = this._appsCatalogGone;
+      if (gone) {
+        const stillListed = Object.create(null);
+        for (let i = 0; i < list.length; i++) {
+          const p = list[i] && list[i].packageName;
+          if (p && gone[p]) stillListed[p] = true;
+        }
+        for (const p in gone) {
+          if (!stillListed[p]) delete gone[p];
+        }
+        if (Object.keys(gone).length) {
+          list = list.filter((a) => a && !gone[a.packageName]);
+        } else {
+          this._appsCatalogGone = null;
+        }
+      }
+      this._appsCatalog = list;
+      this._appsCatalogStale = false;
       this.setState({ appsCatalogRev: (this.state.appsCatalogRev || 0) + 1 });
     } catch (e) {
       console.warn('[Shell] getInstalledApps failed', e);
       this._appsCatalog = [];
+      this._appsCatalogStale = false;
     }
     this._appsCatalogLoading = false;
   }
 
-  _invalidateAppsCatalog() {
-    this._appsCatalog = null;
+  /**
+   * Native calls this after hide / unhide / uninstall. Optional packageName
+   * drops that entry immediately so Side-by-Side does not keep a ghost tile
+   * when a full refetch would still see the package for a moment.
+   */
+  _invalidateAppsCatalog(packageName) {
+    const pkg = typeof packageName === 'string' ? packageName : '';
     this._appsCatalogLoading = false;
-    if (this._shellMode === 'appsOnly' || (this.state && this.state.shellMode === 'appsOnly')) {
-      this._ensureAppsCatalog();
+    this._appsCatalogStale = true;
+    if (pkg) {
+      if (!this._appsCatalogGone) this._appsCatalogGone = Object.create(null);
+      this._appsCatalogGone[pkg] = true;
+      if (Array.isArray(this._appsCatalog)) {
+        this._appsCatalog = this._appsCatalog.filter((a) => a && a.packageName !== pkg);
+      }
     } else {
-      this.setState({ appsCatalogRev: (this.state.appsCatalogRev || 0) + 1 });
+      this._appsCatalog = null;
+    }
+    this.setState({ appsCatalogRev: (this.state.appsCatalogRev || 0) + 1 });
+    // Defer the full refetch: an immediate getInstalledApps right after
+    // PACKAGE_REMOVED can still include the package and re-stick the cache.
+    const inApps = this._shellMode === 'appsOnly'
+      || (this.state && this.state.shellMode === 'appsOnly');
+    if (inApps || this.state.defaultAppPicker) {
+      if (this._appsCatalogRefreshTimer) clearTimeout(this._appsCatalogRefreshTimer);
+      this._appsCatalogRefreshTimer = setTimeout(() => {
+        this._appsCatalogRefreshTimer = 0;
+        this._appsCatalogStale = true;
+        this._ensureAppsCatalog();
+      }, 700);
     }
   }
 
