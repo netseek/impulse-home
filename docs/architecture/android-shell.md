@@ -71,7 +71,9 @@ and visible-card limit. Each virtual desktop keeps those choices separately.
 To change desktops, swipe horizontally in either **inset side gutter** (a thin
 empty strip just inside the display edge, above the lower rail). The inset is
 intentional: it leaves Android's outer-edge Back/Home gesture untouched. The
-desktop switcher arrows remain available for precise selection.
+desktop switcher arrows remain available for precise selection. Deleting the
+desktop on screen moves the index onto a remaining neighbour immediately —
+never a hole — so the page and the rail stay on a live desktop.
 
 ## Freeform popups (emulator)
 

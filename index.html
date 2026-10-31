@@ -29476,7 +29476,8 @@ class Component extends DCLogic {
   componentDidUpdate() {
     this._setStateCount = (this._setStateCount || 0) + 1;
     this._syncDockIndicators();
-    const desktopId = this._desktops && this._desktops[this._desktopIndex || 0].id;
+    const curDesk = this._desktops && this._desktops[this._clampedDesktopIndex()];
+    const desktopId = curDesk && curDesk.id;
     if (desktopId !== this._paintedDesktopId) {
       this._paintedDesktopId = desktopId;
       this._powerCardCacheAt = this._graphCanvasCacheAt = 0;
@@ -39343,7 +39344,11 @@ class Component extends DCLogic {
     // A swipe has already started this fade during its slide.
     // Per-desktop test for both ends: _shouldShowCar() only checks the layout,
     // and a wallpaper-only desktop hides the model by another route.
-    const carNow = this._desktopShowsCar(this._desktops[this._desktopIndex || 0]);
+    // opts.fromCar: caller already removed the previous desktop (delete) and
+    // parked the index on the neighbour; read car presence from the arg.
+    const carNow = (opts && typeof opts.fromCar === 'boolean')
+      ? opts.fromCar
+      : this._desktopShowsCar(this._desktops[this._clampedDesktopIndex()]);
     const carNext = this._desktopShowsCar(this._desktops[nextIndex]);
     if (carNow && !carNext && !(opts && opts.carFaded)) {
       this._carFade(false);
@@ -40949,8 +40954,16 @@ class Component extends DCLogic {
     this._switchDesktop(this._desktops.length - 1);
   }
 
+  /** Live index into `_desktops`. Never returns a hole (delete used to park on -1). */
+  _clampedDesktopIndex() {
+    const n = (this._desktops && this._desktops.length) || 0;
+    if (n <= 0) return 0;
+    const i = this._desktopIndex;
+    return Math.max(0, Math.min(n - 1, (i == null || i !== i) ? 0 : i));
+  }
+
   _activeDesktopId() {
-    const d = this._desktops && this._desktops[this._desktopIndex || 0];
+    const d = this._desktops && this._desktops[this._clampedDesktopIndex()];
     return d ? d.id : null;
   }
 
@@ -41008,7 +41021,7 @@ class Component extends DCLogic {
       delete this._desktopShots[this._desktops[i].id];
       this._saveDesktopShots();
     }
-    if (i !== (this._desktopIndex || 0)) {
+    if (i !== this._clampedDesktopIndex()) {
       this._captureActiveDesktop();
       const activeId = this._activeDesktopId();
       this._desktops.splice(i, 1);
@@ -41016,10 +41029,14 @@ class Component extends DCLogic {
       return;
     }
     // The desktop on screen: show its neighbour, and stay in the strip, editing.
+    // Keep `_desktopIndex` on a live entry at every step — a -1 sentinel made
+    // `this._desktopIndex || 0` resolve to -1 (truthy) and crash on `.id` during
+    // the setState that follows (add-then-delete of the active desktop).
+    const fromCar = this._desktopShowsCar(this._desktops[i]);
     this._desktops.splice(i, 1);
     const target = Math.min(i, this._desktops.length - 1);
-    this._desktopIndex = -1;
-    this._switchDesktop(target, true, true);
+    this._desktopIndex = target;
+    this._switchDesktop(target, true, true, { fromCar: fromCar });
     this.setState({ desktopStudioOpen: true, desktopStudioTab: 'desktops', desksEditing: true });
   }
 
@@ -49868,7 +49885,8 @@ class Component extends DCLogic {
       this._desktopBoardsCache = new Map();
     }
     const cache = this._desktopBoardsCache;
-    const desktop = this._desktops[this._desktopIndex || 0];
+    const desktop = this._desktops[this._clampedDesktopIndex()];
+    if (!desktop) return [];
     const cached = cache.get(desktop.id);
     // A revisited board stays frozen through the slide; refresh after it settles.
     if (!cached || !this._deskSlide) {
