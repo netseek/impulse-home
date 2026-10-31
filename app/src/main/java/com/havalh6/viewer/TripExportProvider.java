@@ -1,5 +1,6 @@
 package com.havalh6.viewer;
 
+import android.content.ClipData;
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.Context;
@@ -27,8 +28,8 @@ import java.util.Locale;
  * <p>The Haval MMI ships that activity unexported (measured on the car,
  * 2026-10-25: "not exported from uid 1002"), so an app cannot start it. There
  * the share goes through {@link #shizuku}: the app's Shizuku user service
- * (GwmRebootService.shareFile) starts it with a file:// stream, as Shizuku's
- * user.
+ * (GwmRebootService.shareFile) starts it with this provider's content:// URI
+ * and a read grant, as Shizuku's user.
  */
 public final class TripExportProvider extends ContentProvider {
     private static final String TAG = "H6Trip";
@@ -158,6 +159,10 @@ public final class TripExportProvider extends ContentProvider {
                 .putExtra(Intent.EXTRA_STREAM, uri)
                 .setClassName(bt.activityInfo.packageName, bt.activityInfo.name)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        // EXTRA_STREAM alone is not enough: without ClipData the grant does not
+        // follow the Intent, so the picker opens and the transfer then cannot
+        // read the zip once a phone is chosen.
+        send.setClipData(ClipData.newRawUri(zipName, uri));
         try {
             c.startActivity(send);
             return true;

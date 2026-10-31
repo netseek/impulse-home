@@ -598,11 +598,13 @@ whichever user started Shizuku. On the MMI that user is root
 The same service has `shareFile`, for the trip export's ENVIAR POR BLUETOOTH.
 The MMI ships `com.android.bluetooth/.opp.BluetoothOppLauncherActivity`
 unexported ("not exported from uid 1002"), so an app cannot start it, but
-Shizuku's user can. `shareFile` runs `am start` with the zip as a `file://`
-stream. It takes no shell and checks both arguments: a component name, and an
+Shizuku's user can. `shareFile` runs `am start` with the zip as a `content://`
+stream from `TripExportProvider` and a read grant (`file://` opened the picker
+but the Bluetooth process often could not read the file after a phone was
+chosen). It takes no shell and checks both arguments: a component name, and an
 export zip under `/sdcard/HavalH6Viewer/exports`. Whichever of the two
 features is used first asks for the grant (`callGwmService`). The user
-service's `version` is 2, so Shizuku replaces a copy still running the old
+service's `version` is 3, so Shizuku replaces a copy still running the old
 code. The client library declares minSdk
 24; the shell stays at 23 and overrides that, because the call only happens on
 the Android 9 head unit. The × on the card closes it, and so does a tap outside

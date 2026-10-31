@@ -200,16 +200,32 @@ const CHECKS = {
   },
   // The MMI ships the Bluetooth share unexported, so it is started through
   // Shizuku, as root there: no shell, a share activity and an export zip only.
+  // content:// + grant: file:// opened the picker but the transfer could not read the zip.
   'Shizuku share runs no shell and checks its arguments': ({ gwm }) => {
     const body = javaMethod(gwm, 'public int shareFile(') || '';
     return body.includes('!COMPONENT.matcher(component).matches()') && body.includes('!EXPORT_DIR.matcher(parent).matches()')
       && body.includes('!TripExport.isZipName(zip.getName())') && body.includes('exec(new String[] {')
+      && body.includes('content://com.havalh6.viewer.tripexport/')
+      && body.includes('--grant-read-uri-permission')
+      && !body.includes('file://')
       && !/"(sh|\/system\/bin\/sh)"|"-c"/.test(body);
+  },
+  // Exported Bluetooth share: ClipData carries the URI so the read grant follows the Intent.
+  'bluetooth send grants the zip through ClipData': ({ provider }) => {
+    const body = javaMethod(provider, 'static boolean sendBluetooth(') || '';
+    return body.includes('setClipData(ClipData.newRawUri(zipName, uri))')
+      && body.includes('FLAG_GRANT_READ_URI_PERMISSION');
   },
   // QR CODE: the server answers only on the unit's Wi-Fi, never the car's internal networks.
   'export link answers only on Wi-Fi': ({ link }) =>
     (javaMethod(link, 'private static void serve(') || '').includes('if (!onWifi(conn.getLocalAddress())) continue;')
     && (javaMethod(link, 'private static List<InetAddress> wifiAddresses(') || '').includes('TripExport.isWifiInterface(ni.getName())'),
+  // QR dialog must beat .hv-energy-confirm's z-index:8 and the settings sheet's 25.
+  'QR dialog sits above the settings sheet': ({ html }) => {
+    const confirmAt = html.indexOf('.hv-energy-confirm {');
+    const qrAt = html.indexOf('.hv-energy-confirm.hv-energy-qrdialog { z-index:30; }');
+    return confirmAt >= 0 && qrAt > confirmAt;
+  },
   // Driving settings (TripSetting): the recorder listens for them and every export carries them,
   // so a result can be put down to the mode it was driven in.
   'settings reach the recorder and the export': ({ recorder, store }) =>
@@ -278,9 +294,14 @@ const MUTANTS = {
   'selecting ticks saved trips only': (s) => ({ ...s, html: s.html.replace(
     '    if (live) return;\n    this._uiOnlySetState((st) => {', '    this._uiOnlySetState((st) => {') }),
   'Shizuku share runs no shell and checks its arguments': (s) => ({ ...s, gwm: s.gwm.replace(
-    '                || !TripExport.isZipName(zip.getName()) || !zip.isFile()) return -1;', '                || !zip.isFile()) return -1;') }),
+    'content://com.havalh6.viewer.tripexport/', 'file://') }),
+  'bluetooth send grants the zip through ClipData': (s) => ({ ...s, provider: s.provider.replace(
+    'send.setClipData(ClipData.newRawUri(zipName, uri));\n', '') }),
   'export link answers only on Wi-Fi': (s) => ({ ...s, link: s.link.replace(
     '                    if (!onWifi(conn.getLocalAddress())) continue;\n', '') }),
+  'QR dialog sits above the settings sheet': (s) => ({ ...s, html: s.html.replace(
+    '.hv-energy-confirm.hv-energy-qrdialog { z-index:30; }',
+    '.hv-energy-qrdialog { z-index:30; }') }),
   'settings reach the recorder and the export': (s) => ({ ...s, store: s.store.replace(
     '                if (trip == null) continue;\n                putSettings(trip);\n', '                if (trip == null) continue;\n') }),
   'closing the code stops the link': (s) => ({ ...s, html: s.html.replace(

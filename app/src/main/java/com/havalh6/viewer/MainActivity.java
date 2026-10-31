@@ -14020,8 +14020,8 @@ public final class MainActivity extends Activity {
                 .daemon(false)
                 .processNameSuffix("reboot")
                 .debuggable(false)
-                // 2: shareFile. A new version makes Shizuku replace a service still running the old code.
-                .version(2);
+                // 3: shareFile uses content:// + grant (was file://). A new version makes Shizuku replace a service still running the old code.
+                .version(3);
     }
 
     private void unbindGwmReboot() {

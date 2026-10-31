@@ -52,7 +52,9 @@ public class GwmRebootService extends IGwmRebootService.Stub {
 
     /**
      * {@code am start} of {@code component} with ACTION_SEND and the export zip at
-     * {@code path} as a file:// stream. 0 when it started, 1 when am refused, -1
+     * {@code path} as a content:// stream (TripExportProvider), with a read grant.
+     * file:// looked fine for the picker but the Bluetooth process often could not
+     * read it after a phone was chosen. 0 when it started, 1 when am refused, -1
      * when an argument is not a share activity and an export zip.
      */
     @Override
@@ -62,11 +64,15 @@ public class GwmRebootService extends IGwmRebootService.Stub {
         String parent = zip.getParent();
         if (parent == null || !EXPORT_DIR.matcher(parent).matches()
                 || !TripExport.isZipName(zip.getName()) || !zip.isFile()) return -1;
+        // applicationId is fixed (app/build.gradle); the provider authority is that + ".tripexport".
+        String uri = "content://com.havalh6.viewer.tripexport/" + zip.getName();
         try {
             Process process = Runtime.getRuntime().exec(new String[] {
-                    "/system/bin/am", "start", "-f", "0x10000000",
+                    "/system/bin/am", "start",
+                    "-f", "0x10000001", // NEW_TASK | GRANT_READ_URI_PERMISSION
+                    "--grant-read-uri-permission",
                     "-a", "android.intent.action.SEND", "-t", "application/zip",
-                    "-n", component, "--eu", "android.intent.extra.STREAM", "file://" + zip.getPath() });
+                    "-n", component, "--eu", "android.intent.extra.STREAM", uri });
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[1024];
             try (InputStream in = process.getInputStream(); InputStream err = process.getErrorStream()) {

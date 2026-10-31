@@ -434,7 +434,12 @@ a file manager, `adb pull`). The section only shows when `window.TripBridge` has
   - **Unexported share, as on the MMI:** measured on the car 2026-10-25,
     "Permission Denial … not exported from uid 1002". The share goes through
     Shizuku's user service (`GwmRebootService.shareFile`, see
-    [android-shell](../architecture/android-shell.md)).
+    [android-shell](../architecture/android-shell.md)): `content://` + read
+    grant, not `file://` (the picker opened either way; the transfer after a
+    phone is chosen needs the grant).
+  - **Exported share grant:** `Intent.setClipData` carries the zip URI so
+    `FLAG_GRANT_READ_URI_PERMISSION` follows the Intent (without it the picker
+    opens and the send then fails to read the zip).
   - **Checked on the car:** the device picker opens with the zip.
   - **iPhones do not receive files over Bluetooth (OPP).** That is what QR
     CODE is for.
