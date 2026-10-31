@@ -9762,12 +9762,13 @@ const TIRE_DISPLAY_PREF_KEY = 'h6_tire_display_v1';
 
 // Vehicle telemetry remains canonical (bar / °C); these helpers only format UI text.
 /**
- * Tyre readouts TRUNCATE toward zero; they do not round.
+ * Bar and kPa tyre readouts TRUNCATE toward zero; they do not round.
  *
- * A rounded pressure reads high: 2.48922 bar shown as "2.5" claims more air
- * than the wheel holds, and the number a driver acts on for an underinflated
- * tyre should never be the flattering one. Truncating also stops the readout
- * flickering between two values while a pressure sits on a boundary.
+ * A rounded bar/kPa value reads high: 2.48922 bar shown as "2.5" claims more
+ * air than the wheel holds, and the number a driver acts on for an
+ * underinflated tyre should never be the flattering one. Truncating also stops
+ * the readout flickering between two values while a pressure sits on a
+ * boundary. PSI is different — see formatTirePressure.
  */
 function truncateTo(value, decimals) {
   const scale = Math.pow(10, decimals);
@@ -9776,10 +9777,24 @@ function truncateTo(value, decimals) {
   return (truncated === 0 ? 0 : truncated).toFixed(decimals);
 }
 
+function roundTo(value, decimals) {
+  const scale = Math.pow(10, decimals);
+  const rounded = Math.round(Number(value) * scale) / scale;
+  return (rounded === 0 ? 0 : rounded).toFixed(decimals);
+}
+
+/**
+ * Format a pressure that is already in bar.
+ *
+ * PSI converts the full-precision bar value, then rounds to one decimal so the
+ * Tires card matches the instrument cluster. Truncating after convert sits
+ * ~0.1 PSI low; rounding bar to one decimal *before* convert (OEM phone app)
+ * collapses nearby corners onto one PSI reading.
+ */
 function formatTirePressure(bar, unit) {
   if (!isFinite(bar)) return '—';
   if (unit === 'kpa') return truncateTo(Number(bar) * 100, 0);
-  if (unit === 'psi') return truncateTo(Number(bar) * 14.5037738, 1);
+  if (unit === 'psi') return roundTo(Number(bar) * 14.5037738, 1);
   return truncateTo(Number(bar), 1);
 }
 

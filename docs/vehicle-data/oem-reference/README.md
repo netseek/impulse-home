@@ -75,6 +75,12 @@ and are on the bus.
   `car.tpms.temperatures` are NOT REAL: they are in no CarConstants and nothing
   publishes them, yet the viewer subscribed them and a contract test asserted
   them, so the TIRES card read PRESSURE UNAVAILABLE on a car whose TPMS works.
+- **PSI display matches the cluster, not the phone app.** Canonical storage
+  stays bar. UI PSI is `round(bar × 14.5037738, 1)` after the full-precision
+  convert, which tracks the instrument cluster (e.g. ~2.32 bar → 33.6,
+  ~2.28 bar → 33.1). Truncating after convert sits ~0.1 PSI low. Rounding bar
+  to one decimal *before* convert (OEM companion app) collapses those corners
+  onto a shared 33.3. Bar/kPa readouts still truncate toward zero.
 - **HVAC is fully published and writable**: `car.hvac.power_mode`, `fan_speed`,
   `driver_temperature`, `pass_temperature`, `auto_enable`, `cycle_mode`,
   `anion_enable`, `blower_mode`, `front_defrost_enable`, `sync_enable`,
