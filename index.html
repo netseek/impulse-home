@@ -1894,7 +1894,10 @@ window.HavalSplash = (function () {
             <sc-if value="{{ focusedConsumptionExportAvailable }}" hint-placeholder-val="{{ false }}">
             <section class="hv-energy-set-export">
               <p class="hv-energy-zlabel">EXPORTAR VIAGENS</p>
-              <div class="hv-energy-seg hv-energy-setone"><button type="button" class="{{ focusedConsumptionExportClass }}" onClick="{{ focusedConsumptionExportStart }}">{{ focusedConsumptionExportLabel }}</button><sc-if value="{{ focusedConsumptionExportCanSend }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ focusedConsumptionExportSend }}" aria-label="Enviar por Bluetooth">BLUETOOTH</button></sc-if><sc-if value="{{ focusedConsumptionExportCanQr }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ focusedConsumptionExportQrOpen }}" aria-label="Baixar no celular por QR code">QR CODE</button></sc-if></div>
+              <div class="hv-energy-export-actions">
+                <div class="hv-energy-seg hv-energy-setone"><button type="button" class="{{ focusedConsumptionExportClass }}" onClick="{{ focusedConsumptionExportStart }}">{{ focusedConsumptionExportLabel }}</button></div>
+                <sc-if value="{{ focusedConsumptionExportHasShare }}" hint-placeholder-val="{{ false }}"><div class="hv-energy-seg hv-energy-setone hv-energy-export-share"><sc-if value="{{ focusedConsumptionExportCanSend }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ focusedConsumptionExportSend }}" aria-label="Enviar por Bluetooth">BLUETOOTH</button></sc-if><sc-if value="{{ focusedConsumptionExportCanQr }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ focusedConsumptionExportQrOpen }}" aria-label="Baixar no celular por QR code">QR CODE</button></sc-if></div></sc-if>
+              </div>
               <small class="hv-energy-setnote">{{ focusedConsumptionExportNote }}</small>
             </section>
             </sc-if>
@@ -7823,9 +7826,12 @@ window.HavalSplash = (function () {
     .hv-energy-setrow > small,.hv-energy-setnote { font:600 10px/1.3 var(--hv-font); letter-spacing:.06em; opacity:.72; }
     .hv-energy-setnote { font:400 12px/1.4 var(--hv-font); letter-spacing:0; opacity:.7; }
     .hv-energy-setfull { display:grid; grid-template-columns:1fr 1fr; }
-    /* One button fills the row; a second (BLUETOOTH) shares it. */
+    /* One button fills the row; share actions (BLUETOOTH / QR) sit on the next. */
     .hv-energy-setone { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); }
-    .hv-energy-setone button { padding:0 6px; }
+    .hv-energy-setone button { padding:0 10px; white-space:nowrap; }
+    .hv-energy-export-actions { display:flex; flex-direction:column; gap:8px; }
+    .hv-energy-export-actions > .hv-energy-seg { width:100%; }
+    .hv-energy-export-share button { padding:0 12px; letter-spacing:.04em; }
     /* EXPORTAR VIAGENS sits under the short middle section, so the sheet still fits without scrolling. */
     .hv-energy-settings > .hv-energy-set-tall { grid-row:span 2; }
     .hv-energy-settings > .hv-energy-set-export { grid-column:2; grid-row:2; }
@@ -44555,6 +44561,7 @@ class Component extends DCLogic {
       consumptionExportCanSend: this._energyExportCanSend(),
       consumptionExportSend: (ev) => this._sendEnergyExportBluetooth(ev),
       consumptionExportCanQr: this._energyExportCanQr(),
+      consumptionExportHasShare: this._energyExportCanSend() || this._energyExportCanQr(),
       consumptionExportQrOpen: (ev) => this._openEnergyExportQr(ev),
       consumptionExportQrOpenNow: !!s.energyExportQr,
       consumptionExportQrClose: (ev) => this._closeEnergyExportQr(ev),
