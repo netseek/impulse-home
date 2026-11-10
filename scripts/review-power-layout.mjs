@@ -31,7 +31,7 @@ const fixture = (size) => {
   const view = app._powerWidgetView({w,h});
   const model = app._powerModel(Date.now());
   return { ...view, powerGraphicMarkup:app._powerGraphicMarkup(model,size,'review-'+size.replace('x','-')),
-    powerSource:'DEMO · SIMULATED · NOT VEHICLE', powerSourceClass:'demo', ...app._powerHistoryView(Date.now(), true) };
+    powerSource:'DEMO · SIMULADO · NÃO É DO VEÍCULO', powerSourceClass:'demo', ...app._powerHistoryView(Date.now(), true) };
 };
 const fill = (markup, data) => markup.replace(/onClick="[^"]*"/g,'').replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_,expr) => {
   let key = expr.trim();
