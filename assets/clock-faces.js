@@ -127,7 +127,7 @@
         // Standard rail card (224x124)
         drawDial(58, 62, 54);
         text(snap.time, 119, 70, 34, ink, 700, 'start', 96);
-        label(dateLabel, 119, 91, 9, muted, 600, 'start', 94);
+        label(dateLabel, 119, 95, 13, muted, 600, 'start', 96);
         if (period) text(period, 215, 39, 10, accent, 700, 'end');
       }
     } else if (face === 'panorama') {

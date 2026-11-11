@@ -134,9 +134,8 @@ line of all three tiles says so, fixed, in pt-BR:
 (`DRIVING_RAIL_HINT`). It replaces `VEHICLE · LIVE`, which is a provenance
 badge and told the driver nothing they could act on. Freshness has not gone
 anywhere: the widget and the popup still show the badge from
-`drivingSource`, and the rail's own DEMO chip reads `driving.drivingSource`
-too (`bottomCardDemoSources`), so the tile's second line and its DEMO state no
-longer share one value.
+`drivingSource`. The rail tile no longer has a DEMO chip (owner, 2026-11-11:
+rail cards carry no title strip or badge).
 
 The menu machinery went with it: `_drivingMenuRows`,
 `_applyDrivingMenuCommand`, the `drivingSet:<group>:<value>` command and its

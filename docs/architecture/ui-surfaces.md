@@ -13,7 +13,8 @@ and agent briefs.
 
 ## Readability
 
-Authored labels use short PT-BR; keep DEMO, unavailable, partial and stale provenance explicit.
+Authored labels use short PT-BR; keep unavailable, partial and stale provenance explicit.
+Cards and widgets do not show DEMO (see [signals-and-limits](../vehicle-data/signals-and-limits.md)).
 Web surfaces use opaque `--hv-text-*` colors and footprint `--hv-fp-*` sizes, at least 18px;
 labels outside 1x1 use at least 20px. Primary values use 32px in 1x1, 40px in 1x2/2x1,
 and at least 48px in larger footprints. Primary text targets 7:1 contrast and secondary text
@@ -21,6 +22,10 @@ and at least 48px in larger footprints. Primary text targets 7:1 contrast and se
 Condução widgets keep drive modes, with the full controls available in the popup. Range
 bar text sits on a solid local panel, independent of the moving fill edge.
 Native labels use at least 18sp; Canvas converts that floor with cached `scaledDensity`.
+Two owner exceptions: dock app-name captions use `DOCK_CAPTION_SP` (16sp), and canvas
+units, captions and secondary readouts beside an 18sp+ value may use `compactTextPx` (14sp).
+Rail cards have no title strip and no DEMO badge: the content fills the card, and only the
+chevron (or the source app chip on NAVIGATION and MEDIA) sits in the top-right corner.
 Light muted text uses `#526171`. Do not add per-frame typography work or hide state through opacity.
 
 ## card — the bottom rail

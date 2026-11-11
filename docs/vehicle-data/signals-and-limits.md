@@ -9,6 +9,11 @@ manifest and the telemetry contract; the Climate and weather rows were brought u
 Card vocabulary for source and freshness: `LIVE`, `PARTIAL`, `STALE`, `UNAVAILABLE`, and
 `DEMO · SIMULATED · NOT VEHICLE`. A fallback must never look like a vehicle reading.
 
+Owner exception (2026-11-11): rail cards and widgets no longer display the DEMO label. The demo
+fallback runs only on the emulator and desktop preview, never on a head unit with telemetry. The
+source string is still computed for accessibility; `_widgetSourceLabel()` blanks it on widgets.
+PARTIAL, STALE and UNAVAILABLE are still shown.
+
 ## What the bridge exposes
 
 `TelemetryBridge` offers `getCarData(key)`, an allow-listed `setCarData(key, value)`, an

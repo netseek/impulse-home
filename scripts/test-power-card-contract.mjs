@@ -112,11 +112,17 @@ assert.doesNotMatch(powerStatus.replace('SIMULADO', ''), DEMO_LABEL, 'negative c
 // Native TextViews use sp; Canvas must floor pixel sizes using scaledDensity.
 function nativeReadability(source) {
   assert.match(source, /readableTextPx = 18f \* getResources\(\)\.getDisplayMetrics\(\)\.scaledDensity;/);
+  // Owner exception: dock app-name captions may go down to 16sp so more apps fit.
+  const dockCaption = /DOCK_CAPTION_SP = (\d+(?:\.\d+)?)f;/.exec(source);
+  assert.ok(dockCaption && parseFloat(dockCaption[1]) >= 16, 'dock captions are at least 16sp');
+  // Owner exception: canvas units, captions and secondary readouts may go down to 14sp.
+  const compact = /compactTextPx = (\d+(?:\.\d+)?)f \* getResources\(\)\.getDisplayMetrics\(\)\.scaledDensity;/.exec(source);
+  assert.ok(compact && parseFloat(compact[1]) >= 14, 'compact canvas text is at least 14sp');
   const sizes = [...source.matchAll(/\b(\w+)\.setTextSize\(([^;]+)\);/g)];
   assert.ok(sizes.length > 0);
   for (const [, receiver, size] of sizes) {
     if (receiver === 'paint' || receiver === 'p') {
-      assert.match(size, /^Math\.max\(readableTextPx,/, 'Canvas respects the scaled minimum');
+      assert.match(size, /^Math\.max\((readableTextPx|compactTextPx),/, 'Canvas respects the scaled minimum');
     } else if (/^\d+(?:\.\d+)?f$/.test(size)) {
       assert.ok(parseFloat(size) >= 18, 'native labels are at least 18sp');
     }
@@ -135,7 +141,9 @@ nativeReadability(java);
 for (const [from, to] of [
   ['.scaledDensity;', '.density;'],
   ['paint.setTextSize(Math.max(readableTextPx, px));', 'paint.setTextSize(px);'],
-  ['demoBadge.setTextSize(18f);', 'demoBadge.setTextSize(8f);'],
+  ['affordance.setTextSize(18f);', 'affordance.setTextSize(8f);'],
+  ['DOCK_CAPTION_SP = 16f;', 'DOCK_CAPTION_SP = 12f;'],
+  ['compactTextPx = 14f *', 'compactTextPx = 10f *'],
   ['return dockUiLight ? 0xFF526171', 'return dockUiLight ? 0xFF9AA3AE'],
 ]) {
   assert.ok(java.includes(from), 'negative-control anchor exists');

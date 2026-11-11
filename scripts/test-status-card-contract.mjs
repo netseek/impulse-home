@@ -191,13 +191,16 @@ all(native, [
   'Status do veículo. ', 'getAssets().open("www/assets/ui/tires-top-view-v1.png")',
   'getStatusVehicleBitmap("base.png")', '"door-rl-open-v3.png"',
   '"door-rr-open-v3.png"', '"tailgate-open-v2.png"', '"door-fl-closed-v4.png"',
-  'vividRed.setSaturation(1.55f)',
-  'demoBadge.setTag("frostAccent")', 'demoBadge.setText("DEMO")',
-  'demoBadge.setTextSize(18f)', 'demoBadge.setLetterSpacing(0.02f)',
-  'demoBadgeLp.rightMargin = Math.round(7 * density)',
-], 'native renderer, accessibility, and shared demo badge');
-assert.match(native, /demoBadge\.setVisibility\(card\.demo \? View\.VISIBLE : View\.GONE\)/,
-  'native DEMO badge must be controlled solely by descriptor.demo');
+  'vividRed.setSaturation(1.55f)', 'statusReadoutWidth(w, h)',
+], 'native renderer and accessibility');
+// Owner, 2026-11-11: rail cards carry no title strip and no DEMO badge.
+assert.ok(!/demoBadge|quickCardDemoBadges/.test(native), 'rail cards must not bring back the DEMO badge');
+assert.ok(!/heading\.setText\(descriptor\.title\)/.test(native), 'rail cards must not bring back the title strip');
+// Widgets drop the DEMO provenance too; the source string itself still exists for aria.
+for (const field of ['navigationSource', 'tiresSource', 'drivingSource', 'statusSource', 'rangeSource']) {
+  assert.match(html, new RegExp(field + ': this\\._widgetSourceLabel\\('), `${field} must hide DEMO on widgets`);
+}
+assert.ok(!/sourceShort: \(\{ demo: 'DEMO'/.test(html), 'power widget must not tag DEMO');
 assert.match(native, /String\[\] labels = \{"porta do motorista", "porta do passageiro", "porta traseira esquerda",\s*"porta traseira direita", "porta-malas"\}/,
   'native accessibility must name every physical opening');
 
@@ -224,9 +227,9 @@ all(nativeStatus, [
 // resize failed the contract instead of a regression doing so.
 assert.match(nativeStatus, /float imageH = h \* [\d.]+f/,
   'status vehicle height must scale with the card');
-assert.match(nativeStatus, /Math\.min\(imageW, w \* \.\d+f\)/,
-  'status vehicle width must stay capped by the card');
-assert.match(nativeStatus, /(?:float valueSize = Math\.max|paint\.setTextSize\(Math\.max)\([\d.]+f, Math\.min\(w, h\) \* \.\d+f\)/,
+assert.match(nativeStatus, /Math\.min\(w \* \.\d+f, w - 2f \* \(statusReadoutWidth\(w, h\) \+ sideGap\)\)/,
+  'status vehicle width must stay capped by the card and leave room for the readouts');
+assert.match(native, /private float statusValueSize\(float w, float h\) \{\s*return Math\.max\([\d.]+f, Math\.min\(w, h\) \* \.\d+f\);/,
   'status tyre pressures must scale with the card');
 assert.ok(!nativeStatus.includes('drawCircle'),
   'status corner readouts must contain no dots');

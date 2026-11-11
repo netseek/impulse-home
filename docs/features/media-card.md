@@ -138,8 +138,8 @@ next to the real one.
 Two more things that bit here, both invisible on a dark screen:
 
 - **The app chip wore a dock plate**, whose light fill swallowed its label.
-  It does not need a ground of its own — it sits beside a heading that is
-  already legible on that card, so it borrows the same `frostSecondary` tinting.
+  It does not need a ground of its own — it floats in the card's top-right
+  corner (the MÍDIA heading is gone), so it borrows the `frostSecondary` tinting.
   Setting the colour in the payload path as well meant the two disagreed and
   whichever ran last won.
 - **The artist line fell back to the app name.** With the chip naming the app,

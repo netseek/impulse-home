@@ -886,7 +886,7 @@ window.HavalSplash = (function () {
           <sc-if value="{{ wg.isConsumption }}" hint-placeholder-val="{{ false }}">
             <sc-if value="{{ wg.consumptionGlance }}" hint-placeholder-val="{{ true }}">
               <div class="hv-energy hv-energy-glance {{ wg.consumptionSizeClass }}" onClick="{{ wg.consumptionOpen }}" role="button" aria-label="Abrir consumo">
-                <div class="hv-energy-head"><span>CONSUMO</span><sc-if value="{{ wg.consumptionShowSource }}" hint-placeholder-val="{{ false }}"><small class="{{ wg.consumptionSourceClass }}">DEMO</small></sc-if></div>
+                <div class="hv-energy-head"><span>CONSUMO</span></div>
                 <div class="hv-energy-grid">
                   <section class="hv-energy-zone hv-energy-g-instant">
                     <div class="hv-energy-instant">
@@ -932,7 +932,7 @@ window.HavalSplash = (function () {
             </sc-if>
             <sc-if value="{{ wg.consumptionWide }}" hint-placeholder-val="{{ false }}">
               <div class="hv-energy hv-energy-focus hv-energy-wide">
-                <div class="hv-energy-wshead"><span>CONSUMO</span><sc-if value="{{ wg.consumptionDemoBadge }}" hint-placeholder-val="{{ false }}"><small class="demo">DEMO</small></sc-if></div>
+                <div class="hv-energy-wshead"><span>CONSUMO</span></div>
                 <div class="hv-energy-bar">
                   <div class="hv-energy-tabs" role="tablist" aria-label="Visões de energia">
                     <button type="button" role="tab" class="{{ wg.consumptionTabNowClass }}" aria-selected="{{ wg.consumptionTabNowOn }}" onClick="{{ wg.consumptionTabNow }}">AGORA</button>
@@ -13015,9 +13015,9 @@ class Component extends DCLogic {
       flowSummary: flowSummary,
       kw: isFinite(kwRaw) ? this._powerFmtNum(Math.abs(kwRaw), 1) : '—',
       kwClass: kwClass,
-      // The long source string stays for aria and the native rail; cards show
-      // a tag only when the data is NOT live -- live needs no label.
-      sourceShort: ({ demo: 'DEMO', partial: 'PARCIAL', stale: 'EXPIRADO', unavailable: 'SEM SINAL' })[status.key] || '',
+      // The long source string stays for aria; cards show a tag only for
+      // partial, stale or missing data. Owner, 2026-11-11: no DEMO tag.
+      sourceShort: ({ partial: 'PARCIAL', stale: 'EXPIRADO', unavailable: 'SEM SINAL' })[status.key] || '',
       // Flow speed follows pack power, quantised so a live reading cannot restart
       // the animation on every bus frame (the tier is part of the render key).
       flowTier: !isFinite(kwRaw) ? 2 : (Math.abs(kwRaw) < 8 ? 1 : (Math.abs(kwRaw) < 30 ? 2 : 3)),
@@ -42230,6 +42230,11 @@ class Component extends DCLogic {
     };
   }
 
+  /** Widget source line without the DEMO provenance (owner, 2026-11-11). */
+  _widgetSourceLabel(source) {
+    return /^DEMO\b/.test(source || '') ? '' : (source || '');
+  }
+
   _cardControlEvent(ev) {
     if (ev && ev.stopPropagation) ev.stopPropagation();
     if (ev && ev.preventDefault) ev.preventDefault();
@@ -44642,9 +44647,6 @@ class Component extends DCLogic {
       consumptionWide: wide,
       consumptionSource: m.source,
       consumptionSourceClass: m.sourceClass,
-      // Hidden while recording normally (owner, 2026-09-13); DEMO / UNAVAILABLE / READY states still say so.
-      // Only DEMO is said on the widget; recorder status lines were noise (owner, 2026-09-18).
-      consumptionShowSource: !!m.demo,
       consumptionNowFuel: m.nowFuel,
       consumptionNowFuelUnit: m.nowFuelUnit,
       consumptionTripLabel: m.tripLabel,
@@ -44670,7 +44672,6 @@ class Component extends DCLogic {
     const chart = this._energyChartSpec();
     const view = {
       consumptionDemo: m.demo,
-      consumptionDemoBadge: m.demo,
       consumptionTabNowClass: on(tab === 'now'),
       consumptionTabTripsClass: on(tab === 'trips'),
       consumptionTabHistoryClass: on(tab === 'history'),
@@ -46642,7 +46643,7 @@ class Component extends DCLogic {
     return {
       navigationSizeClass: 'hv-navigation-' + (item.w || 2) + 'x' + (item.h || 1),
       navigationLiveClass: showTurn ? 'is-live' : 'is-idle',
-      navigationSource: source,
+      navigationSource: this._widgetSourceLabel(source),
       navigationDistance: distance,
       navigationStreet: street,
       navigationHeadline: showTurn ? street : idlePrimary,
@@ -46845,7 +46846,7 @@ class Component extends DCLogic {
       tiresSummary = 'TODOS OS PNEUS DISPONÍVEIS NORMAIS';
     }
     return {
-      tiresSource: source,
+      tiresSource: this._widgetSourceLabel(source),
       tiresSourceClass: state,
       tiresUnit: pressureCount ? pressureUnit : '',
       tiresSummary: tiresSummary,
@@ -47491,7 +47492,7 @@ class Component extends DCLogic {
 
     return {
       drivingSizeClass: 'hv-driving-' + w + 'x' + h + (resolved ? '' : ' hv-driving-unavailable'),
-      drivingSource: demo && w === 1 && h === 1 ? 'DEMO · SIMULADO' : source,
+      drivingSource: this._widgetSourceLabel(source),
       drivingSourceClass: sourceClass,
       drivingSummary: summary,
       drivingNote: note,
@@ -47661,7 +47662,7 @@ class Component extends DCLogic {
       statusIsConsole: !!fit.console,
       statusSunroofStateLabel: envelope.sunroof.pct <= 0 ? 'FECHADO' : (envelope.sunroof.pct >= 98 ? 'ABERTO' : 'PARCIAL'),
       statusCurtainStateLabel: envelope.curtain.pct <= 0 ? 'FECHADA' : (envelope.curtain.pct >= 98 ? 'ABERTA' : 'PARCIAL'),
-      statusSource: ptMode,
+      statusSource: this._widgetSourceLabel(ptMode),
       statusState: status.state,
       statusSummary: ptSummary,
       statusSummaryClass: status.open.length
@@ -47802,7 +47803,7 @@ class Component extends DCLogic {
         this._setRangeSourceMode((this._rangeSourceMode || 'oem') === 'hist' ? 'oem' : 'hist', ev);
         this._showRangeToggle();
       },
-      rangeSource: range.source.startsWith('DEMO') && Number(item && item.w) === 1 && Number(item && item.h) === 1 ? 'DEMO · SIMULADO' : range.source,
+      rangeSource: this._widgetSourceLabel(range.source),
       rangeTotalLabel: range.totalLabel,
       rangeTotal: range.total,
       rangeUnit: range.unit,

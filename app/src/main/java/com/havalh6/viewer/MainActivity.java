@@ -54,6 +54,8 @@ import org.json.JSONException;
 public final class MainActivity extends Activity {
     // Canvas sizes are pixels; cache the 18sp floor once at activity creation.
     private float readableTextPx;
+    /** Owner exception: units, captions and secondary readouts beside an 18sp+ value may go to 14sp. */
+    private float compactTextPx;
     private static final String TAG = "H6Viewer";
     private static final String PERF_TAG = "H6Perf";
     /**
@@ -212,7 +214,7 @@ public final class MainActivity extends Activity {
      * can retain an appassets response across a same-version debug reinstall,
      * otherwise leaving the native shell paired with a previous index.html.
      */
-    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v62-readability";
+    private static final String VIEWER_ASSET_REVISION = "vehicle-console-v64-no-demo";
     private static final String VIEWER_URL =
             "https://" + ASSET_HOST + ASSET_PREFIX + "www/index.html?android&assets="
                     + VIEWER_ASSET_REVISION;
@@ -1216,9 +1218,6 @@ public final class MainActivity extends Activity {
             if (clock != null) clock.setSweep(sweep);
         }
     }
-    /** Accent DEMO markers in web-configured card headers, keyed by card id. */
-    private final java.util.Map<String, android.widget.TextView> quickCardDemoBadges =
-            new java.util.HashMap<>();
     /** Card root by id, so a mode change can repaint the wash without a rebuild. */
     private final java.util.Map<String, View> quickCardHosts = new java.util.HashMap<>();
     private final java.util.Map<String, BottomCardDescriptor> quickCardDescriptors = new java.util.HashMap<>();
@@ -2419,60 +2418,63 @@ public final class MainActivity extends Activity {
             float yChips = h * 0.88f;
             float gap = 6f * density;
 
-            // EV Chip on left: EV  <evKm> KM  <evSoc>%
-            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
-            paint.setColor(accent);
-            paint.setTextSize(Math.max(readableTextPx, 12f * density));
-            c.drawText("EV", 0f, yChips, paint);
-            float evLblW = paint.measureText("EV ");
-
-            paint.setTextSize(Math.max(readableTextPx, 14.5f * density));
-            c.drawText(evKm, evLblW, yChips, paint);
-            float evValW = paint.measureText(evKm + " ");
-
-            paint.setTextSize(Math.max(readableTextPx, 10.5f * density));
-            c.drawText(unitStr, evLblW + evValW, yChips, paint);
-            float evUnitW = paint.measureText(unitStr);
-
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
-            paint.setColor(muted);
-            paint.setTextSize(Math.max(readableTextPx, 12f * density));
-            c.drawText(evSoc + "%", evLblW + evValW + evUnitW + gap, yChips, paint);
-
-            // GAS Chip on right: GAS  <fuelKm> KM  <fuelLevel>%
-            String gasLvlStr = fuelLevel + "%";
-            String gasUnitStr = unitStr;
-            String gasValStr = fuelKm + " ";
+            // EV chip on the left, Comb. chip on the right: label, km, unit, then %.
+            // The percentages go first when both chips cannot share the row.
+            android.graphics.Typeface chipBold = android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.BOLD);
+            android.graphics.Typeface chipRegular = android.graphics.Typeface.create("sans-serif",
+                    android.graphics.Typeface.NORMAL);
+            String evLblStr = "EV ";
+            String evValStr = evKm + " ";
+            String evLvlStr = evSoc + "%";
             String gasLblStr = "Comb. ";
+            String gasValStr = fuelKm + " ";
+            String gasLvlStr = fuelLevel + "%";
 
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setTypeface(chipBold);
             paint.setTextSize(Math.max(readableTextPx, 12f * density));
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+            float evLblW = paint.measureText(evLblStr);
+            float gasLblW = paint.measureText(gasLblStr);
+            paint.setTextSize(Math.max(readableTextPx, 14.5f * density));
+            float evValW = paint.measureText(evValStr);
+            float gasValW = paint.measureText(gasValStr);
+            paint.setTextSize(Math.max(compactTextPx, 10.5f * density));
+            float unitW = paint.measureText(unitStr);
+            paint.setTypeface(chipRegular);
+            paint.setTextSize(Math.max(compactTextPx, 12f * density));
+            float evLvlW = paint.measureText(evLvlStr);
             float gasLvlW = paint.measureText(gasLvlStr);
 
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
-            paint.setTextSize(Math.max(readableTextPx, 10.5f * density));
-            float gasUnitW = paint.measureText(gasUnitStr);
+            float evCoreW = evLblW + evValW + unitW;
+            float gasCoreW = gasLblW + gasValW + unitW;
+            boolean showLevels = evCoreW + gap + evLvlW + 2f * gap + gasCoreW + gap + gasLvlW <= w;
 
-            paint.setTextSize(Math.max(readableTextPx, 14.5f * density));
-            float gasValW = paint.measureText(gasValStr);
-
+            paint.setTypeface(chipBold);
+            paint.setColor(accent);
             paint.setTextSize(Math.max(readableTextPx, 12f * density));
-            float gasLblW = paint.measureText(gasLblStr);
+            c.drawText(evLblStr, 0f, yChips, paint);
+            paint.setTextSize(Math.max(readableTextPx, 14.5f * density));
+            c.drawText(evValStr, evLblW, yChips, paint);
+            paint.setTextSize(Math.max(compactTextPx, 10.5f * density));
+            c.drawText(unitStr, evLblW + evValW, yChips, paint);
 
-            float gasStart = w - (gasLblW + gasValW + gasUnitW + gap + gasLvlW);
-
+            float gasStart = w - gasCoreW - (showLevels ? gap + gasLvlW : 0f);
             paint.setColor(0xFFF2994A);
+            paint.setTextSize(Math.max(readableTextPx, 12f * density));
             c.drawText(gasLblStr, gasStart, yChips, paint);
             paint.setTextSize(Math.max(readableTextPx, 14.5f * density));
             c.drawText(gasValStr, gasStart + gasLblW, yChips, paint);
-            paint.setTextSize(Math.max(readableTextPx, 10.5f * density));
-            c.drawText(gasUnitStr, gasStart + gasLblW + gasValW, yChips, paint);
+            paint.setTextSize(Math.max(compactTextPx, 10.5f * density));
+            c.drawText(unitStr, gasStart + gasLblW + gasValW, yChips, paint);
 
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
-            paint.setColor(muted);
-            paint.setTextSize(Math.max(readableTextPx, 12f * density));
-            c.drawText(gasLvlStr, gasStart + gasLblW + gasValW + gasUnitW + gap, yChips, paint);
+            if (showLevels) {
+                paint.setTypeface(chipRegular);
+                paint.setColor(muted);
+                paint.setTextSize(Math.max(compactTextPx, 12f * density));
+                c.drawText(evLvlStr, evCoreW + gap, yChips, paint);
+                c.drawText(gasLvlStr, gasStart + gasCoreW + gap, yChips, paint);
+            }
         }
 
         private void drawRangeGauge(android.graphics.Canvas c, float w, float h,
@@ -2593,9 +2595,18 @@ public final class MainActivity extends Activity {
             float imageH = h * 1.34f;
             float imageW = base == null ? w * .25f
                     : imageH * base.getWidth() / Math.max(1f, base.getHeight()) * 1.08f;
-            imageW = Math.min(imageW, w * .42f);
-            float left = (w - imageW) * .5f;
+            // The car takes whatever the widest TPMS readout leaves on each side,
+            // scaled as a whole so the door layers stay registered.
+            float sideGap = Math.max(4f, w * .012f);
+            float fitW = Math.min(w * .42f, w - 2f * (statusReadoutWidth(w, h) + sideGap));
             float top = -h * .019f;
+            if (imageW > fitW && fitW > 0f) {
+                imageH *= fitW / imageW;
+                imageW = fitW;
+                // Visible car spans y 14..654 of the 675px raster; centre that span.
+                top = (h - imageH * (640f / 675f)) * .5f - imageH * (14f / 675f);
+            }
+            float left = (w - imageW) * .5f;
             String[] openings = descriptor.openingStates == null ? new String[0]
                     : descriptor.openingStates;
             // The raster overflows the card at the bottom, which is where the
@@ -2665,7 +2676,6 @@ public final class MainActivity extends Activity {
 
             // Status and Tires share TPMS health. Large values stay completely
             // outside the vehicle so the door, roof and restraint art remains clear.
-            float sideGap = Math.max(10f, w * .048f);
             float[] tireXs = {vehicleRect.left - sideGap, vehicleRect.right + sideGap,
                     vehicleRect.left - sideGap, vehicleRect.right + sideGap};
             // Vertically anchored to the VIEW, not to vehicleRect. The raster is
@@ -2674,7 +2684,7 @@ public final class MainActivity extends Activity {
             // overflow off the bottom: at imageH 1.34x the lower baseline
             // computed to 83.4 in an 81px view. X still tracks the vehicle,
             // which is the whole point of flanking it.
-            float[] tireYs = {h * .24f, h * .24f, h * .70f, h * .70f};
+            float[] tireYs = {h * .21f, h * .21f, h * .64f, h * .64f};
             String[] pressureReadings = tireReadings(descriptor);
             String[] temps = descriptor.tireTemperatures.split("\\s*/\\s*", -1);
             String unit = descriptor.tirePressureUnit;
@@ -2684,7 +2694,7 @@ public final class MainActivity extends Activity {
                     android.graphics.Typeface.NORMAL);
             android.graphics.Typeface tempFace = android.graphics.Typeface.create("sans-serif-light",
                     android.graphics.Typeface.NORMAL);
-            float valueSize = Math.max(16f, Math.min(w, h) * .245f);
+            float valueSize = statusValueSize(w, h);
             float smallSize = Math.max(9f, valueSize * .5f);
             for (int i = 0; i < 4; i++) {
                 String wheelState = descriptor.wheelStates != null
@@ -2695,7 +2705,7 @@ public final class MainActivity extends Activity {
                 boolean hasValue = !"unavailable".equals(value) && !"—".equals(value);
                 String unitText = hasValue && !unit.isEmpty() ? " " + unit : "";
                 paint.setTypeface(unitFace);
-                paint.setTextSize(Math.max(readableTextPx, smallSize));
+                paint.setTextSize(Math.max(compactTextPx, smallSize));
                 float unitW = paint.measureText(unitText);
                 paint.setTypeface(valueFace);
                 paint.setTextSize(Math.max(readableTextPx, valueSize));
@@ -2709,7 +2719,7 @@ public final class MainActivity extends Activity {
                 c.drawText(value, x, baseline, paint);
                 if (!unitText.isEmpty()) {
                     paint.setTypeface(unitFace);
-                    paint.setTextSize(Math.max(readableTextPx, smallSize));
+                    paint.setTextSize(Math.max(compactTextPx, smallSize));
                     // Match the web popup: PSI/bar rides the same warning tint as the value.
                     fill("warning".equals(wheelState) ? pressureColor : withAlpha(muted, 0xC8));
                     c.drawText(unitText, x + valueW, baseline, paint);
@@ -2717,15 +2727,43 @@ public final class MainActivity extends Activity {
                 String temp = i < temps.length ? temps[i].trim() : "";
                 if (!temp.isEmpty()) {
                     paint.setTypeface(tempFace);
-                    paint.setTextSize(Math.max(readableTextPx, smallSize * 1.1f));
+                    paint.setTextSize(Math.max(compactTextPx, Math.max(readableTextPx * .9f, smallSize * 1.1f)));
                     paint.setTextAlign(leftSide
                             ? android.graphics.Paint.Align.RIGHT : android.graphics.Paint.Align.LEFT);
                     fill(0xFF8F949B);
-                    c.drawText(temp, tireXs[i], baseline + smallSize * 1.35f, paint);
+                    // A small gap under the pressure so the two lines do not touch.
+                    c.drawText(temp, tireXs[i], baseline + paint.getTextSize() * 1.15f, paint);
                 }
             }
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
+        }
+
+        private float statusValueSize(float w, float h) {
+            return Math.max(16f, Math.min(w, h) * .19f);
+        }
+
+        /** Widest pressure + unit readout, measured with the faces the card draws. */
+        private float statusReadoutWidth(float w, float h) {
+            float valueSize = statusValueSize(w, h);
+            float smallSize = Math.max(9f, valueSize * .5f);
+            String unit = descriptor.tirePressureUnit;
+            float widest = 0f;
+            for (String value : tireReadings(descriptor)) {
+                boolean hasValue = !"unavailable".equals(value) && !"—".equals(value);
+                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                        android.graphics.Typeface.BOLD));
+                paint.setTextSize(Math.max(readableTextPx, valueSize));
+                float width = paint.measureText(value);
+                if (hasValue && !unit.isEmpty()) {
+                    paint.setTypeface(android.graphics.Typeface.create("sans-serif",
+                            android.graphics.Typeface.NORMAL));
+                    paint.setTextSize(Math.max(compactTextPx, smallSize));
+                    width += paint.measureText(" " + unit);
+                }
+                widest = Math.max(widest, width);
+            }
+            return widest;
         }
 
         private void drawStatusRoof(android.graphics.Canvas c, android.graphics.RectF vehicleRect) {
@@ -2928,6 +2966,15 @@ public final class MainActivity extends Activity {
             android.graphics.Typeface dayStrong = android.graphics.Typeface.create(
                     "sans-serif-medium", android.graphics.Typeface.NORMAL);
             float colW = Math.min(w * .15f, h * .50f);
+            // At the 18sp floor "HOJE" is wider than the proportional column;
+            // widen to the widest day label so neighbours never touch.
+            paint.setTextSize(Math.max(readableTextPx, h * .135f));
+            for (int i = 0; i < Math.min(days.length, 3); i++) {
+                String[] parts = days[i].split("[|]");
+                boolean today = parts.length >= 4 && "1".equals(parts[3].trim());
+                paint.setTypeface(today ? dayStrong : dayFace);
+                colW = Math.max(colW, paint.measureText(parts[0]) + pad * .8f);
+            }
             float dayBaseline = h * .16f;
             float fcTempBaseline = h * .66f;
             // Icon lives in the gap between day label and forecast temp so a
@@ -2938,7 +2985,10 @@ public final class MainActivity extends Activity {
             float iconMax = Math.max(8f, Math.min(colW * .66f, (iconBandBot - iconBandTop) * .80f));
             float right = w - pad;
             float forecastLeft = leftW + pad * .5f;
-            for (int i = Math.min(days.length, 3) - 1; i >= 0 && right - colW >= forecastLeft; i--) {
+            // Drop the furthest day, never HOJE, when the columns do not all fit.
+            int shownDays = Math.min(Math.min(days.length, 3),
+                    Math.max(0, (int) ((right - forecastLeft) / colW)));
+            for (int i = shownDays - 1; i >= 0; i--) {
                 String[] parts = days[i].split("[|]");
                 if (parts.length < 3) continue;
                 boolean today = parts.length >= 4 && "1".equals(parts[3].trim());
@@ -3123,10 +3173,11 @@ public final class MainActivity extends Activity {
                 if (!street.isEmpty()) {
                     paint.setTextSize(Math.max(readableTextPx, h * .26f));
                     fill(strong);
-                    c.drawText(ellipsizeNav(street, textMax), textX, h * .32f, paint);
+                    c.drawText(ellipsizeNav(street, textMax), textX, showTurn ? h * .36f : h * .32f, paint);
                 }
                 if (showTurn) {
-                    drawNavMetricRow(c, textX, h * .46f, textMax, h,
+                    // Labels land on the maneuver distance's baseline (h·.88).
+                    drawNavMetricRow(c, textX, h * .48f, textMax, h,
                             remaining, duration, eta, accent, muted, strong);
                 } else {
                     // Idle glance: city under the neighbourhood (street/primary,
@@ -3167,7 +3218,9 @@ public final class MainActivity extends Activity {
             android.graphics.Typeface medium = android.graphics.Typeface.create("sans-serif-medium",
                     android.graphics.Typeface.NORMAL);
             float valueSize = Math.max(readableTextPx, h * .28f);
-            float labelSize = Math.max(readableTextPx, h * .13f);
+            android.graphics.Typeface regular = android.graphics.Typeface.create("sans-serif",
+                    android.graphics.Typeface.NORMAL);
+            float labelSize = Math.max(readableTextPx * .9f, h * .13f);
             float gap = Math.max(10f, h * .08f);
             paint.setTextAlign(android.graphics.Paint.Align.LEFT);
             paint.setTypeface(medium);
@@ -3203,7 +3256,8 @@ public final class MainActivity extends Activity {
                 paint.setTextSize(Math.max(readableTextPx, valueSize));
                 fill(isEta ? accent : strong);
                 c.drawText(ellipsizeNav(items.get(i)[0], colW), cx, valueY, paint);
-                paint.setTextSize(Math.max(readableTextPx, labelSize));
+                paint.setTypeface(regular);
+                paint.setTextSize(Math.max(compactTextPx, labelSize));
                 fill(muted);
                 c.drawText(items.get(i)[1], cx, labelY, paint);
                 cx += colW + gap;
@@ -3216,7 +3270,7 @@ public final class MainActivity extends Activity {
             for (int i = 0; i < items.size(); i++) {
                 paint.setTextSize(Math.max(readableTextPx, valueSize));
                 float valueW = paint.measureText(items.get(i)[0]);
-                paint.setTextSize(Math.max(readableTextPx, labelSize));
+                paint.setTextSize(Math.max(compactTextPx, labelSize));
                 widths[i] = Math.max(valueW, paint.measureText(items.get(i)[1]));
             }
             return widths;
@@ -4147,7 +4201,6 @@ public final class MainActivity extends Activity {
     private boolean workspaceExpandedAppsMode;
     private android.widget.LinearLayout launcherIconsLayout;
     private WorkspaceAppsScrollView workspaceAppsScroll;
-    private android.widget.TextView workspaceHeading;
     private android.animation.ValueAnimator workspaceWidthAnimator;
     private final java.util.List<android.widget.TextView> workspaceLayoutCells = new ArrayList<>();
     private final java.util.Map<View, android.animation.Animator> railJiggles = new java.util.HashMap<>();
@@ -4623,6 +4676,8 @@ public final class MainActivity extends Activity {
      * drift from the view it is reserving for.
      */
     private static final float LAUNCHER_STRIP_HEIGHT_DP = 148f;
+    /** App-name caption under dock icons. Owner exception to the 18sp floor so more apps fit. */
+    private static final float DOCK_CAPTION_SP = 16f;
     /** Breathing room between the widget boards and the dock strip. */
     private static final float SLOT_DOCK_GAP_DP = 16f;
 
@@ -7298,6 +7353,7 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         readableTextPx = 18f * getResources().getDisplayMetrics().scaledDensity;
+        compactTextPx = 14f * getResources().getDisplayMetrics().scaledDensity;
         // LAYOUT_NO_LIMITS / LAYOUT_IN_SCREEN are applied only while a freeform
         // slot is open — see applyLauncherFocusPolicy. With focus they would hide
         // the MMI rail and header, which is why they stay off here.
@@ -8124,9 +8180,9 @@ public final class MainActivity extends Activity {
         dockSurfaceMode = normalizeDockSurfaceMode(getSharedPreferences(PREFS_SHELL, MODE_PRIVATE)
                 .getString(PREF_DOCK_SURFACE, DOCK_SURFACE_CARDS));
         float density = getResources().getDisplayMetrics().density;
-        // Sized for compact bottom rail workspace card (48dp plates centered in 124dp card).
-        int iconSizePx = Math.round(38 * density);
-        int itemWidthPx = Math.round(66 * density);
+        // Captions are one line, capped at "Side by Side" width before ellipsizing.
+        int iconSizePx = Math.round(44 * density);
+        int itemWidthPx = Math.round(100 * density);
         dockCellPx = itemWidthPx;
         dockIconPx = iconSizePx;
         int marginBottomPx = compensatedBottomMarginPx(launcherBottomGapPx());
@@ -9535,7 +9591,6 @@ public final class MainActivity extends Activity {
         quickCardDetails.clear();
         quickCardGraphics.clear();
         quickClockCards.clear();
-        quickCardDemoBadges.clear();
         quickMediaArt = null;
         quickMediaHasArt = false;
         quickMediaTitle = null;
@@ -9628,9 +9683,10 @@ public final class MainActivity extends Activity {
         if ("clock".equals(descriptor.id)) {
             return makeQuickClockCard(density, descriptor, click);
         }
-        android.widget.LinearLayout card = new android.widget.LinearLayout(this);
-        card.setOrientation(android.widget.LinearLayout.VERTICAL);
-        card.setGravity(android.view.Gravity.TOP);
+        // No title strip: the content owns the whole card and the corner
+        // affordances (navigation source chip, chevron) float above it.
+        FrameLayout card = new FrameLayout(this);
+        card.setClipToPadding(false);
         int padH = Math.round(13 * density);
         card.setPadding(padH, Math.round(9 * density), padH, Math.round(9 * density));
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
@@ -9661,91 +9717,45 @@ public final class MainActivity extends Activity {
         quickCardHosts.put(descriptor.id, card);
         lastDrivingWash.put(descriptor.id, drivingWashColor(descriptor.state));
 
-        android.widget.LinearLayout header = new android.widget.LinearLayout(this);
-        header.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        header.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        // NAVIGATION's source-chip icon (SOURCE_CHIP_ICON_DP) is taller than this
-        // 22dp strip. Grow the strip itself and NAVIGATION's graphic content below
-        // loses that height -- drawNavigation sizes every font off its own view
-        // height, so the whole card's type shrank. Let the icon overflow the
-        // header visually instead: the strip stays 22dp for everyone, so nothing
-        // downstream of it moves or resizes.
-        header.setClipChildren(false);
-        header.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                Math.round(22 * density)));
-
-        android.widget.TextView demoBadge = new android.widget.TextView(this);
-        demoBadge.setTag("frostAccent");
-        demoBadge.setText("DEMO");
-        demoBadge.setTextSize(18f);
-        demoBadge.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                android.graphics.Typeface.BOLD));
-        demoBadge.setLetterSpacing(0.02f);
-        demoBadge.setVisibility(descriptor.demo ? View.VISIBLE : View.GONE);
-        android.widget.LinearLayout.LayoutParams demoBadgeLp =
-                new android.widget.LinearLayout.LayoutParams(
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        demoBadgeLp.rightMargin = Math.round(7 * density);
-        header.addView(demoBadge, demoBadgeLp);
-        quickCardDemoBadges.put(descriptor.id, demoBadge);
-
-        android.widget.TextView heading = new android.widget.TextView(this);
-        heading.setTag("frostSecondary");
-        heading.setText(descriptor.title);
-        heading.setTextSize(18f);
-        heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                android.graphics.Typeface.NORMAL));
-        heading.setLetterSpacing(0.02f);
-        heading.setMaxLines(1);
-        heading.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        heading.setTextColor(dockLabelColorMuted());
-        heading.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        header.addView(heading);
-
-        // Same slot the MEDIA card puts its chip in: after the weighted
-        // heading, before the chevron, so both read as one rail.
-        boolean isNavigation = "navigation".equals(descriptor.id);
-        if (isNavigation) {
-            SourceChip navChip = makeSourceChip(density);
-            android.widget.LinearLayout.LayoutParams navChipLp =
-                    new android.widget.LinearLayout.LayoutParams(
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-            // Bottom-align so the icon's overflow (it is taller than this 22dp
-            // strip) goes up into the card's own top padding, not down into the
-            // graphic content below -- which draws after this in Z-order and
-            // would paint over a downward overflow.
-            navChipLp.gravity = android.view.Gravity.BOTTOM;
-            header.addView(navChip.row, navChipLp);
-            quickCardSourceChips.put(descriptor.id, navChip);
-            applyNavigationSourceChip(descriptor);
-        }
+        // Corner affordances sit in the card's top-right padding, above the content.
+        android.widget.LinearLayout corner = new android.widget.LinearLayout(this);
+        corner.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        corner.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams cornerLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.TOP | android.view.Gravity.END);
+        cornerLp.topMargin = -Math.round(6 * density);
+        cornerLp.rightMargin = -Math.round(9 * density);
+        corner.setLayoutParams(cornerLp);
 
         // NAVIGATION reads MEDIA's now-playing chip as "what is guiding" rather
         // than "open route details", so like MEDIA it has nothing to disclose
         // and skips the chevron every other CoffeeOS card shows.
-        if (!isNavigation) {
+        boolean isNavigation = "navigation".equals(descriptor.id);
+        if (isNavigation) {
+            SourceChip navChip = makeSourceChip(density);
+            corner.addView(navChip.row, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            quickCardSourceChips.put(descriptor.id, navChip);
+            applyNavigationSourceChip(descriptor);
+        } else {
             android.widget.TextView affordance = new android.widget.TextView(this);
             affordance.setTag("frostSecondary");
             affordance.setText("›");
             affordance.setTextSize(18f);
+            affordance.setIncludeFontPadding(false);
             affordance.setGravity(android.view.Gravity.CENTER);
             affordance.setTextColor(dockLabelColorMuted());
-            header.addView(affordance, new android.widget.LinearLayout.LayoutParams(
+            corner.addView(affordance, new android.widget.LinearLayout.LayoutParams(
                     Math.round(18 * density), android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
         }
-        card.addView(header);
 
         android.widget.LinearLayout content = new android.widget.LinearLayout(this);
         content.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         content.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        android.widget.LinearLayout.LayoutParams contentLp = new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        contentLp.topMargin = Math.round(2 * density);
-        content.setLayoutParams(contentLp);
+        content.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         QuickCardGraphicView graphic = new QuickCardGraphicView(this, descriptor);
         boolean fullGraphicCard = "tires".equals(descriptor.id) || "status".equals(descriptor.id)
@@ -9756,6 +9766,7 @@ public final class MainActivity extends Activity {
                     0, android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1f));
             content.addView(graphic);
             card.addView(content);
+            card.addView(corner);
             quickCardGraphics.put(descriptor.id, graphic);
             return card;
         }
@@ -9828,7 +9839,8 @@ public final class MainActivity extends Activity {
         // The source badge is long and must never ellipsise into something that
         // reads like a different claim ("DEMO · SIMULATED · NOT VEHICLE..." is
         // not the same statement).
-        detail.setMaxLines("power".equals(descriptor.id) || DRIVING_CARD_IDS.contains(descriptor.id) || "wallpaper".equals(descriptor.id) ? 4 : 3);
+        // Three 18sp lines under the primary are all a 124dp card holds.
+        detail.setMaxLines(3);
         detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
         if (isConsumption) {
             detail.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
@@ -9848,6 +9860,7 @@ public final class MainActivity extends Activity {
         copy.addView(detail);
         content.addView(copy);
         card.addView(content);
+        card.addView(corner);
 
         quickCardValues.put(descriptor.id, primary);
         quickCardDetails.put(descriptor.id, detail);
@@ -10018,24 +10031,6 @@ public final class MainActivity extends Activity {
         card.setElevation(3f * density);
         quickCardViews.add(card);
 
-        android.widget.TextView heading = new android.widget.TextView(this);
-        heading.setText(workspaceLayoutMode ? "Telas" : "Área de trabalho");
-        heading.setTag("frostSecondary");
-        heading.setTextSize(18f);
-        heading.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
-                android.graphics.Typeface.NORMAL));
-        heading.setLetterSpacing(0.02f);
-        heading.setTextColor(dockLabelColorMuted());
-        heading.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        FrameLayout.LayoutParams headingLp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        headingLp.leftMargin = Math.round(14 * density);
-        headingLp.topMargin = Math.round(10 * density);
-        heading.setLayoutParams(headingLp);
-        heading.setVisibility((workspaceLayoutMode || workspaceExpandedAppsMode) ? View.GONE : View.VISIBLE);
-        card.addView(heading);
-        workspaceHeading = heading;
-
         android.widget.LinearLayout actions = new android.widget.LinearLayout(this);
         actions.setOrientation(android.widget.LinearLayout.HORIZONTAL);
         actions.setLayoutParams(new FrameLayout.LayoutParams(
@@ -10105,7 +10100,7 @@ public final class MainActivity extends Activity {
         int sideGapPx = Math.round(WORKSPACE_CARD_SIDE_GAP_DP * density);
         int innerGapPx = Math.round(WORKSPACE_CARD_INNER_GAP_DP * density);
         // CARDS icon button on left - same style and size as Apps/Layout icons
-        View cardsAction = makeWorkspaceAction(density, "workspaceCards", "Barra", "Mostrar barra",
+        View cardsAction = makeWorkspaceAction(density, "workspaceCards", "Voltar", "Voltar",
                 v -> setWorkspaceExpandedAppsMode(false, true));
         int cardsActionWidth = Math.round(((WORKSPACE_CARD_WIDTH_DP - 2 * WORKSPACE_CARD_SIDE_GAP_DP - 2 * WORKSPACE_CARD_INNER_GAP_DP) / 3f) * density);
         android.widget.LinearLayout.LayoutParams cardsLp = new android.widget.LinearLayout.LayoutParams(
@@ -10143,8 +10138,7 @@ public final class MainActivity extends Activity {
             if (launcherIconsLayout.getParent() instanceof android.view.ViewGroup) {
                 ((android.view.ViewGroup) launcherIconsLayout.getParent()).removeView(launcherIconsLayout);
             }
-            int platePx = dockPlatePx(dockIconPx, density);
-            int padTop = Math.max(0, Math.round((124 * density - platePx) / 2f));
+            int padTop = workspaceAppsRowTopPx(density);
             launcherIconsLayout.setPadding(Math.round(8 * density), padTop, Math.round(16 * density), 0);
             scroll.addView(launcherIconsLayout, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT));
@@ -10209,15 +10203,6 @@ public final class MainActivity extends Activity {
 
         if (expanded && cardsScrollView instanceof android.widget.HorizontalScrollView) {
             ((android.widget.HorizontalScrollView) cardsScrollView).smoothScrollTo(0, 0);
-        }
-
-        if (workspaceHeading != null) {
-            if (expanded) {
-                workspaceHeading.setVisibility(View.GONE);
-            } else {
-                workspaceHeading.setText(workspaceLayoutMode ? "Telas" : "Área de trabalho");
-                workspaceHeading.setVisibility(workspaceLayoutMode ? View.GONE : View.VISIBLE);
-            }
         }
 
         if (workspaceCard != null) {
@@ -10437,10 +10422,6 @@ public final class MainActivity extends Activity {
             setWorkspaceExpandedAppsMode(false, false);
         }
         workspaceLayoutMode = on;
-        if (workspaceHeading != null) {
-            workspaceHeading.setText(on ? "Telas" : "Área de trabalho");
-            workspaceHeading.setVisibility(on ? View.GONE : View.VISIBLE);
-        }
         crossfadeFaces(on ? workspaceActionsFace : workspaceLayoutFace,
                 on ? workspaceLayoutFace : workspaceActionsFace);
         refreshWorkspaceLayoutAccent();
@@ -10487,19 +10468,24 @@ public final class MainActivity extends Activity {
         cell.setLayoutParams(lp);
         boolean isCards = "workspaceCards".equals(tag);
         int size = Math.round(32 * density);
+        int plateInset = Math.max(0, (dockPlatePx(dockIconPx, density) - size) / 2);
         if (isCards) {
             cell.setGravity(android.view.Gravity.CENTER_HORIZONTAL | android.view.Gravity.TOP);
-            int glyphTop = Math.max(0, Math.round((124 * density - size) / 2f));
-            cell.setPadding(0, glyphTop, 0, 0);
+            cell.setPadding(0, workspaceAppsRowTopPx(density), 0, 0);
         } else {
             cell.setGravity(android.view.Gravity.CENTER);
-            cell.setPadding(0, Math.round(28 * density), 0, 0);
+            cell.setPadding(0, 0, 0, 0);
         }
 
         android.widget.ImageView glyph = new android.widget.ImageView(this);
         glyph.setTag("workspaceGlyph");
         android.widget.LinearLayout.LayoutParams glyphLp =
                 new android.widget.LinearLayout.LayoutParams(size, size);
+        if (isCards) {
+            // Occupies a full app plate so glyph and caption line up with the row.
+            glyphLp.topMargin = plateInset;
+            glyphLp.bottomMargin = plateInset;
+        }
         glyph.setLayoutParams(glyphLp);
         glyph.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         cell.addView(glyph);
@@ -10508,7 +10494,7 @@ public final class MainActivity extends Activity {
         caption.setText(label);
         caption.setTag("workspaceLabel");
         caption.setGravity(android.view.Gravity.CENTER);
-        caption.setTextSize(18f);
+        caption.setTextSize(isCards ? DOCK_CAPTION_SP : 18f);
         caption.setMaxLines(1);
         caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
         caption.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
@@ -10518,12 +10504,23 @@ public final class MainActivity extends Activity {
                 new android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        captionLp.topMargin = Math.round(6 * density);
+        if (isCards) caption.setIncludeFontPadding(false);
+        captionLp.topMargin = Math.round((isCards ? 3 : 6) * density);
         caption.setLayoutParams(captionLp);
         cell.addView(caption);
 
         applyWorkspaceActionGlyph(cell);
         return cell;
+    }
+
+    /** Top inset that centres plate + one-line caption in the 124dp apps card. */
+    private int workspaceAppsRowTopPx(float density) {
+        android.graphics.Paint measure = new android.graphics.Paint();
+        measure.setTextSize(DOCK_CAPTION_SP * getResources().getDisplayMetrics().scaledDensity);
+        android.graphics.Paint.FontMetrics fm = measure.getFontMetrics();
+        int captionPx = Math.round(3 * density) + (int) Math.ceil(fm.descent - fm.ascent);
+        int contentPx = dockPlatePx(dockIconPx, density) + captionPx;
+        return Math.max(0, Math.round((124 * density - contentPx) / 2f));
     }
 
     private void applyWorkspaceActionGlyph(View cell) {
@@ -10717,27 +10714,9 @@ public final class MainActivity extends Activity {
         copy.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
-        // Heading row: the card's own name on the left, and on the right the
-        // app that published the track — its real icon and label, both from the
-        // now-playing payload rather than guessed from the package name.
-        android.widget.LinearLayout headRow = new android.widget.LinearLayout(this);
-        headRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        headRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        headRow.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
-        android.widget.TextView heading = new android.widget.TextView(this);
-        heading.setTag("frostSecondary");
-        heading.setText("MÍDIA");
-        heading.setTextSize(18f);
-        heading.setLetterSpacing(0.02f);
-        heading.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        headRow.addView(heading);
-
+        // The app that published the track floats in the top-right corner — its
+        // real icon from the now-playing payload, not guessed from the package.
         quickMediaAppRow = makeQuickMediaAppChip(density);
-        headRow.addView(quickMediaAppRow);
-        copy.addView(headRow);
         quickMediaTitle = new android.widget.TextView(this);
         quickMediaTitle.setTag("quickValue");
         quickMediaTitle.setText("Nada tocando");
@@ -10784,6 +10763,12 @@ public final class MainActivity extends Activity {
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
         right.addView(copy);
+        FrameLayout.LayoutParams appChipLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.TOP | android.view.Gravity.END);
+        appChipLp.topMargin = Math.round(4 * density);
+        appChipLp.rightMargin = Math.round(6 * density);
+        right.addView(quickMediaAppRow, appChipLp);
         card.addView(right);
         return card;
     }
@@ -12475,8 +12460,6 @@ public final class MainActivity extends Activity {
             if (detail != null && !detailText.equals(detail.getText().toString())) {
                 detail.setText(detailText);
             }
-            android.widget.TextView demoBadge = quickCardDemoBadges.get(card.id);
-            if (demoBadge != null) demoBadge.setVisibility(card.demo ? View.VISIBLE : View.GONE);
             QuickCardGraphicView graphic = quickCardGraphics.get(card.id);
             if (graphic != null) graphic.setDescriptor(card);
             applyNavigationSourceChip(card);
@@ -13292,11 +13275,10 @@ public final class MainActivity extends Activity {
 
     /** Caption band under dock icon. */
     private void styleDockCaption(android.widget.TextView labelView, float density) {
-        labelView.setTextSize(18f);
+        labelView.setTextSize(DOCK_CAPTION_SP);
         labelView.setTextColor(0xE6FFFFFF);
         labelView.setGravity(android.view.Gravity.TOP | android.view.Gravity.CENTER_HORIZONTAL);
-        labelView.setMaxLines(2);
-        labelView.setMinLines(1);
+        labelView.setMaxLines(1);
         labelView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         labelView.setLineSpacing(0f, 0.95f);
         labelView.setIncludeFontPadding(false);
@@ -13312,10 +13294,14 @@ public final class MainActivity extends Activity {
         // Fully opaque: the per-icon entrance animation is gone (the strip fades
         // as a whole in revealLauncherStrip), so nothing would raise it later.
         item.setAlpha(1f);
+        // Width follows the caption: short names keep icons close, long names
+        // still leave a fixed gap between neighbouring captions.
         android.widget.LinearLayout.LayoutParams itemParams = new android.widget.LinearLayout.LayoutParams(
-                itemWidthPx, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-        itemParams.rightMargin = Math.round(8 * density);
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        itemParams.rightMargin = Math.round(14 * density);
         item.setLayoutParams(itemParams);
+        item.setMinimumWidth(dockPlatePx(iconSizePx, density) + Math.round(16 * density));
         item.setBackgroundColor(0x00000000);
         item.setClickable(true);
         item.setFocusable(true);
@@ -13332,6 +13318,7 @@ public final class MainActivity extends Activity {
         android.widget.TextView labelView = new android.widget.TextView(this);
         labelView.setTag("label");
         styleDockCaption(labelView, density);
+        labelView.setMaxWidth(itemWidthPx);
         item.addView(labelView);
         return item;
     }
